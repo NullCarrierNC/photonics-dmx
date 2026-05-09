@@ -20,6 +20,9 @@ import { Rb3MenuCueHandler } from '../cueHandlers/Rb3MenuCueHandler'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('Rb3StageKitDirectProcessor')
 
+const RB3_MAIN_HUB_SCREEN = 'main_hub_screen'
+const RB3_SONG_SELECT_SCREEN = 'song_select_screen'
+
 /**
  * StageKit data structure
  */
@@ -64,9 +67,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   // Bound event handler for proper cleanup
   private boundHandleStageKitEvent: ((event: StageKitData) => void) | null = null
   private boundHandleGameStateEvent: ((event: any) => void) | null = null
+  private boundHandleScreenNameEvent:
+    | ((event: { screenName: string; timestamp: number }) => void)
+    | null = null
 
   // Game state tracking
-  private _currentGameState: 'Menus' | 'InGame' = 'Menus'
+  private _currentGameState: 'Menus' | 'InGame' | 'None' = 'None'
 
   // Track if we're currently in a song (using direct control)
   private _inSong: boolean = false
@@ -148,8 +154,14 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     )
     networkListener.on('rb3e:gameState', this.boundHandleGameStateEvent as (event: unknown) => void)
 
+    this.boundHandleScreenNameEvent = this.handleScreenNameEvent.bind(this)
+    networkListener.on(
+      'rb3e:screenName',
+      this.boundHandleScreenNameEvent as (event: { screenName: string; timestamp: number }) => void,
+    )
+
     log.info(
-      'StageKitDirectProcessor: Registered listeners for stagekit:data and rb3e:gameState events',
+      'StageKitDirectProcessor: Registered listeners for stagekit:data, rb3e:gameState, and rb3e:screenName',
     )
   }
 
@@ -166,9 +178,122 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       networkListener.off('rb3e:gameState', this.boundHandleGameStateEvent)
       this.boundHandleGameStateEvent = null
     }
+    if (this.boundHandleScreenNameEvent) {
+      networkListener.off('rb3e:screenName', this.boundHandleScreenNameEvent)
+      this.boundHandleScreenNameEvent = null
+    }
     log.info(
-      'StageKitDirectProcessor stopped listening for stagekit:data and rb3e:gameState events',
+      'StageKitDirectProcessor stopped listening for stagekit:data, rb3e:gameState, and rb3e:screenName',
     )
+  }
+
+  /**
+   * Cue payload for RB3 menu-style screens (code-based Default cue, not node editor).
+   */
+  private buildMenusCueData(
+    realCueData: CueData | null,
+    platform: string,
+    rb3ScreenNameOverride?: string,
+  ): CueData {
+    return {
+      datagramVersion: realCueData?.datagramVersion || 1,
+      platform: realCueData?.platform || 'RB3E',
+      currentScene: 'Menu',
+      pauseState: realCueData?.pauseState || 'Unpaused',
+      venueSize: 'NoVenue',
+      beatsPerMinute: realCueData?.beatsPerMinute || 0,
+      songSection: realCueData?.songSection || 'Unknown',
+      guitarNotes: realCueData?.guitarNotes || [],
+      bassNotes: realCueData?.bassNotes || [],
+      drumNotes: realCueData?.drumNotes || [],
+      keysNotes: realCueData?.keysNotes || [],
+      vocalNote: realCueData?.vocalNote || 0,
+      harmony0Note: realCueData?.harmony0Note || 0,
+      harmony1Note: realCueData?.harmony1Note || 0,
+      harmony2Note: realCueData?.harmony2Note || 0,
+      lightingCue: 'Default',
+      postProcessing: realCueData?.postProcessing || 'Default',
+      fogState: realCueData?.fogState || false,
+      strobeState: realCueData?.strobeState || 'Strobe_Off',
+      performer: realCueData?.performer || 0,
+      trackMode: realCueData?.trackMode || 'tracked',
+      beat: realCueData?.beat || 'Unknown',
+      keyframe: realCueData?.keyframe || 'Unknown',
+      bonusEffect: realCueData?.bonusEffect || false,
+      ledColor: '',
+      ledPositions: [],
+      rb3Platform: platform,
+      rb3BuildTag: realCueData?.rb3BuildTag || '',
+      rb3SongName: realCueData?.rb3SongName || '',
+      rb3SongArtist: realCueData?.rb3SongArtist || '',
+      rb3SongShortName: realCueData?.rb3SongShortName || '',
+      rb3VenueName: realCueData?.rb3VenueName || '',
+      rb3ScreenName: rb3ScreenNameOverride ?? realCueData?.rb3ScreenName ?? '',
+      rb3BandInfo: realCueData?.rb3BandInfo || { members: [] },
+      rb3ModData: realCueData?.rb3ModData || { identifyValue: '', string: '' },
+      totalScore: realCueData?.totalScore || 0,
+      memberScores: realCueData?.memberScores || [],
+      stars: realCueData?.stars || 0,
+      sustainDurationMs: realCueData?.sustainDurationMs || 0,
+      measureOrBeat: realCueData?.measureOrBeat || 0,
+      cueHistory: [],
+      executionCount: 1,
+      cueStartTime: Date.now(),
+      timeSinceLastCue: 0,
+    }
+  }
+
+  private isDefaultMenuCueRunning(): boolean {
+    return this._currentGameState === 'Menus' && this.menuAnimationTimer !== null
+  }
+
+  /**
+   * Same Default menu path as Menus game state: cueHandled, clear direct lights, menu animation timer.
+   */
+  private applyDefaultMenuCueForScreenName(screenName: string): void {
+    this._currentGameState = 'Menus'
+    this._inSong = false
+    this.emit('cueHandled', this.buildMenusCueData(null, 'RB3E', screenName))
+    this.turnOffAllLights().catch((error) => {
+      log.error(
+        'StageKitDirectProcessor: Error clearing lights during screen-based Default menu cue:',
+        error,
+      )
+    })
+    this.startMenuAnimationTimer()
+  }
+
+  /**
+   * RB3E screen names that map to the main menu: drive the same Default menu cue as Menus game state.
+   * song_select_screen is skipped when that cue is already active to avoid restarting the menu loop.
+   */
+  private handleScreenNameEvent(event: { screenName: string; timestamp: number }): void {
+    const { screenName } = event
+    if (screenName !== RB3_MAIN_HUB_SCREEN && screenName !== RB3_SONG_SELECT_SCREEN) {
+      return
+    }
+
+    if (screenName === RB3_SONG_SELECT_SCREEN && this.isDefaultMenuCueRunning()) {
+      log.info(
+        'StageKitDirectProcessor: song_select_screen skipped — Default menu cue already running',
+      )
+      return
+    }
+
+    try {
+      if (screenName === RB3_MAIN_HUB_SCREEN) {
+        log.info(
+          'StageKitDirectProcessor: Main hub screen — applying code-based Default menu cue (rb3e:screenName)',
+        )
+      } else {
+        log.info(
+          'StageKitDirectProcessor: Song select screen — applying code-based Default menu cue (rb3e:screenName)',
+        )
+      }
+      this.applyDefaultMenuCueForScreenName(screenName)
+    } catch (error) {
+      log.error('StageKitDirectProcessor: Error handling rb3e:screenName:', error)
+    }
   }
 
   /**
@@ -255,52 +380,55 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
       // Emit CueData with empty LED positions to clear frontend display (applies to both states)
       // Use real data when available, fallback to defaults when not
-      const clearCueData: CueData = {
-        datagramVersion: realCueData?.datagramVersion || 1,
-        platform: realCueData?.platform || 'RB3E',
-        currentScene: gameState === 'InGame' ? 'Gameplay' : 'Menu',
-        pauseState: realCueData?.pauseState || 'Unpaused',
-        venueSize: gameState === 'InGame' ? realCueData?.venueSize || 'Large' : 'NoVenue',
-        beatsPerMinute: realCueData?.beatsPerMinute || 0,
-        songSection: realCueData?.songSection || 'Unknown',
-        guitarNotes: realCueData?.guitarNotes || [],
-        bassNotes: realCueData?.bassNotes || [],
-        drumNotes: realCueData?.drumNotes || [],
-        keysNotes: realCueData?.keysNotes || [],
-        vocalNote: realCueData?.vocalNote || 0,
-        harmony0Note: realCueData?.harmony0Note || 0,
-        harmony1Note: realCueData?.harmony1Note || 0,
-        harmony2Note: realCueData?.harmony2Note || 0,
-        lightingCue: gameState === 'InGame' ? 'StageKitDirect' : 'Default',
-        postProcessing: realCueData?.postProcessing || 'Default',
-        fogState: realCueData?.fogState || false,
-        strobeState: realCueData?.strobeState || 'Strobe_Off',
-        performer: realCueData?.performer || 0,
-        trackMode: realCueData?.trackMode || 'tracked',
-        beat: realCueData?.beat || 'Unknown',
-        keyframe: realCueData?.keyframe || 'Unknown',
-        bonusEffect: realCueData?.bonusEffect || false,
-        ledColor: '',
-        ledPositions: [], // Clear LED positions for frontend
-        rb3Platform: event.platform,
-        rb3BuildTag: realCueData?.rb3BuildTag || '',
-        rb3SongName: realCueData?.rb3SongName || '',
-        rb3SongArtist: realCueData?.rb3SongArtist || '',
-        rb3SongShortName: realCueData?.rb3SongShortName || '',
-        rb3VenueName: realCueData?.rb3VenueName || '',
-        rb3ScreenName: realCueData?.rb3ScreenName || '',
-        rb3BandInfo: realCueData?.rb3BandInfo || { members: [] },
-        rb3ModData: realCueData?.rb3ModData || { identifyValue: '', string: '' },
-        totalScore: realCueData?.totalScore || 0,
-        memberScores: realCueData?.memberScores || [],
-        stars: realCueData?.stars || 0,
-        sustainDurationMs: realCueData?.sustainDurationMs || 0,
-        measureOrBeat: realCueData?.measureOrBeat || 0,
-        cueHistory: [],
-        executionCount: 1,
-        cueStartTime: Date.now(),
-        timeSinceLastCue: 0,
-      }
+      const clearCueData: CueData =
+        gameState === 'InGame'
+          ? {
+              datagramVersion: realCueData?.datagramVersion || 1,
+              platform: realCueData?.platform || 'RB3E',
+              currentScene: 'Gameplay',
+              pauseState: realCueData?.pauseState || 'Unpaused',
+              venueSize: realCueData?.venueSize || 'Large',
+              beatsPerMinute: realCueData?.beatsPerMinute || 0,
+              songSection: realCueData?.songSection || 'Unknown',
+              guitarNotes: realCueData?.guitarNotes || [],
+              bassNotes: realCueData?.bassNotes || [],
+              drumNotes: realCueData?.drumNotes || [],
+              keysNotes: realCueData?.keysNotes || [],
+              vocalNote: realCueData?.vocalNote || 0,
+              harmony0Note: realCueData?.harmony0Note || 0,
+              harmony1Note: realCueData?.harmony1Note || 0,
+              harmony2Note: realCueData?.harmony2Note || 0,
+              lightingCue: 'StageKitDirect',
+              postProcessing: realCueData?.postProcessing || 'Default',
+              fogState: realCueData?.fogState || false,
+              strobeState: realCueData?.strobeState || 'Strobe_Off',
+              performer: realCueData?.performer || 0,
+              trackMode: realCueData?.trackMode || 'tracked',
+              beat: realCueData?.beat || 'Unknown',
+              keyframe: realCueData?.keyframe || 'Unknown',
+              bonusEffect: realCueData?.bonusEffect || false,
+              ledColor: '',
+              ledPositions: [],
+              rb3Platform: event.platform,
+              rb3BuildTag: realCueData?.rb3BuildTag || '',
+              rb3SongName: realCueData?.rb3SongName || '',
+              rb3SongArtist: realCueData?.rb3SongArtist || '',
+              rb3SongShortName: realCueData?.rb3SongShortName || '',
+              rb3VenueName: realCueData?.rb3VenueName || '',
+              rb3ScreenName: realCueData?.rb3ScreenName || '',
+              rb3BandInfo: realCueData?.rb3BandInfo || { members: [] },
+              rb3ModData: realCueData?.rb3ModData || { identifyValue: '', string: '' },
+              totalScore: realCueData?.totalScore || 0,
+              memberScores: realCueData?.memberScores || [],
+              stars: realCueData?.stars || 0,
+              sustainDurationMs: realCueData?.sustainDurationMs || 0,
+              measureOrBeat: realCueData?.measureOrBeat || 0,
+              cueHistory: [],
+              executionCount: 1,
+              cueStartTime: Date.now(),
+              timeSinceLastCue: 0,
+            }
+          : this.buildMenusCueData(realCueData, event.platform)
 
       // Emit the clear data for frontend
       this.emit('cueHandled', clearCueData)
