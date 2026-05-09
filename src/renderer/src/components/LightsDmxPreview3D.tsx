@@ -228,7 +228,8 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
   const isStacked = layoutId === 'stacked'
   /** TV group at z = -1; gap along +z to audience centre is 4 m in front-back, 5 m otherwise. */
   const audienceZ = layoutId === 'front-back' ? 3 : 4
-  const downstageLabelZ = layoutId === 'front-back' ? 4.5 : 5.5
+  const audienceLabelZ = audienceZ + 0.8
+  const downstageLabelZ = audienceZ - 1.5
   const flareTex = useMemo(() => createFlareTexture(), [])
 
   const items = useMemo(() => {
@@ -346,6 +347,7 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
       <Suspense fallback={null}>
         <FloorLabel text="Upstage" position={[0, 0.02, -3]} />
         <FloorLabel text="Downstage" position={[0, 0.02, downstageLabelZ]} />
+        <FloorLabel text="Audience" position={[0, 0.02, audienceLabelZ]} />
         <FloorLabel text="Stage Right" position={[-3.2, 0.02, 0]} yawRad={Math.PI / 2} />
         <FloorLabel text="Stage Left" position={[3.2, 0.02, 0]} yawRad={-Math.PI / 2} />
       </Suspense>
