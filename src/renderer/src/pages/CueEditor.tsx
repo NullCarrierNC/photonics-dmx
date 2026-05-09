@@ -849,8 +849,8 @@ const CueEditor: React.FC = () => {
   const hasFile = !!editorDoc?.path
 
   const newFileLabel = isEffectMode ? 'New Effect File' : 'New Cue File'
-  const importLabel = isEffectMode ? 'Import Effect' : 'Import Cue'
-  const exportLabel = isEffectMode ? 'Export Effect' : 'Export Cue'
+  const importLabel = isEffectMode ? 'Import Effect' : 'Import Cue File'
+  const exportLabel = isEffectMode ? 'Export Effect' : 'Export Cue File'
   const deleteLabel = isEffectMode ? 'Delete Effect File' : 'Delete Cue File'
 
   return (
