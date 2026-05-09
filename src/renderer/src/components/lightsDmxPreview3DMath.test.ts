@@ -31,6 +31,17 @@ function expectUnit(v: { x: number; y: number; z: number }): void {
   expect(Math.hypot(v.x, v.y, v.z)).toBeCloseTo(1, 5)
 }
 
+/** On-the-wire DMX for a logical pan/tilt percentage when preview applies invert mirrors internally. */
+function rawDmxFromLogicalPanPct(pct: number, c: FixtureConfig): number {
+  const d = percentToDmx(pct, c.panMin, c.panMax)
+  return c.invertPan ? mirrorDmxForMovingHeadInvert(d, c.panMin, c.panMax) : d
+}
+
+function rawDmxFromLogicalTiltPct(pct: number, c: FixtureConfig): number {
+  const d = percentToDmx(pct, c.tiltMin, c.tiltMax)
+  return c.invertTilt ? mirrorDmxForMovingHeadInvert(d, c.tiltMin, c.tiltMax) : d
+}
+
 /** Same convention as 2D preview disc vs 3D stage axes (see panTiltDmxToStageVector). */
 function assertDiscMatchesStageVector(panDmx: number, tiltDmx: number, cfg: FixtureConfig): void {
   const { xPct, yPct } = panTiltDmxToSphericalXY(panDmx, tiltDmx, cfg)
@@ -290,6 +301,43 @@ describe('panTiltDmxToStageVector', () => {
     expectUnit(v)
     expect(Math.abs(v.y)).toBeLessThan(0.1)
     assertDiscMatchesStageVector(panDmx, tiltRawHorizontal, truss)
+  })
+
+  it('truss tiltHome ≠ 50%: pole crossing reverses horizontal stage direction (non-degenerate pan)', () => {
+    const truss: FixtureConfig = {
+      panHome: 50,
+      panMin: 0,
+      panMax: 255,
+      panRangeDeg: 540,
+      panDirectionCW: true,
+      panStageDeg: 270,
+      tiltHome: 40,
+      tiltMin: 0,
+      tiltMax: 255,
+      tiltRangeDeg: 180,
+      tiltStageDeg: 135,
+      invertPan: true,
+      invertTilt: true,
+    }
+    const panDmx = rawDmxFromLogicalPanPct(30, truss)
+    const horizUnit = (tiltLogicalPct: number): { x: number; z: number; mag: number } => {
+      const v = panTiltDmxToStageVector(
+        panDmx,
+        rawDmxFromLogicalTiltPct(tiltLogicalPct, truss),
+        truss,
+      )
+      const mag = Math.hypot(v.x, v.z)
+      if (mag < 1e-4) {
+        return { x: 0, z: 0, mag }
+      }
+      return { x: v.x / mag, z: v.z / mag, mag }
+    }
+    const before = horizUnit(10)
+    const after = horizUnit(90)
+    expect(before.mag).toBeGreaterThan(0.15)
+    expect(after.mag).toBeGreaterThan(0.15)
+    const dot = before.x * after.x + before.z * after.z
+    expect(dot).toBeLessThan(-0.5)
   })
 })
 
