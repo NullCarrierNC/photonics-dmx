@@ -27,7 +27,7 @@ const Status = () => {
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           Looking for features like audio support, moving heads, or the Cue Editor?{' '}
           <em>Enable Advanced Mode</em>
-          in Preferences &gt; Advanced.
+          &nbsp;in Preferences &gt; Advanced.
         </p>
       </div>
 

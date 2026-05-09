@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { FaChevronCircleDown, FaChevronCircleRight } from 'react-icons/fa'
 import {
   getYargMotionCueGroups,
@@ -61,10 +61,13 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
       try {
         const list = await getAvailableYargMotionCues(groupId)
         if (!cancelled && Array.isArray(list)) {
-          setCues(list)
+          const sorted = [...list].sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+          )
+          setCues(sorted)
           setCueId((prev) => {
-            if (prev && list.some((c) => c.id === prev)) return prev
-            return list[0]?.id ?? ''
+            if (prev && sorted.some((c) => c.id === prev)) return prev
+            return sorted[0]?.id ?? ''
           })
         }
       } catch (e) {
@@ -99,6 +102,22 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
       log.error('Error stopping motion cue simulation:', e)
     }
   }, [])
+
+  const selectedMotionGroup = useMemo(
+    () => (groupId ? groups.find((g) => g.id === groupId) : undefined),
+    [groups, groupId],
+  )
+  const selectedMotionCue = useMemo(
+    () => (cueId ? cues.find((c) => c.id === cueId) : undefined),
+    [cues, cueId],
+  )
+
+  const motionGroupDescription = selectedMotionGroup?.description?.trim() ?? ''
+  const motionCueDescription = selectedMotionCue?.description?.trim() ?? ''
+  const showMotionGroupDescription = Boolean(groupId && motionGroupDescription)
+  const showMotionCueDescription = Boolean(
+    cueId && motionCueDescription && motionCueDescription !== 'No description available',
+  )
 
   return (
     <div className="mt-6 bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
@@ -175,6 +194,18 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
             </button>
           </div>
         </div>
+
+        {showMotionGroupDescription && (
+          <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            <strong>Motion group description:</strong> {motionGroupDescription}
+          </div>
+        )}
+
+        {showMotionCueDescription && (
+          <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            <strong>Motion cue description:</strong> {motionCueDescription}
+          </div>
+        )}
       </div>
     </div>
   )
