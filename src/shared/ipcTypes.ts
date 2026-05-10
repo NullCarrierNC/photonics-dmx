@@ -803,7 +803,7 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.SENDER_START_FAILED]: { sender: string; error: string }
   [RENDERER_RECEIVE.SENDER_ERROR]: string
   [RENDERER_RECEIVE.SENDER_NETWORK_ERROR]: { sender: string; error: string; autoDisabled: boolean }
-  [RENDERER_RECEIVE.YARG_ERROR]: string
+  [RENDERER_RECEIVE.YARG_ERROR]: { type: string; message: string; autoDisabled?: boolean }
   [RENDERER_RECEIVE.CONTROLLERS_RESTARTED]: undefined
   [RENDERER_RECEIVE.AUDIO_ENABLE]: AudioConfig
   [RENDERER_RECEIVE.AUDIO_DISABLE]: undefined

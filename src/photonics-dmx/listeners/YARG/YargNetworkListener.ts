@@ -166,6 +166,9 @@ export class YargNetworkListener extends EventEmitter {
   private lastScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | 'Practice' | null =
     null
 
+  /** Bound while UDP bind() is pending; used to distinguish bind failures from runtime socket errors. */
+  private startBindReject: ((reason: unknown) => void) | null = null
+
   constructor(cueHandler: YargCueRuntime) {
     super() // Initialize EventEmitter
     this.cueHandler = cueHandler
@@ -193,10 +196,15 @@ export class YargNetworkListener extends EventEmitter {
     */
   }
 
-  public start() {
+  public start(): Promise<void> {
     if (this.listening) {
       log.warn('YargNetworkListener is already running.')
-      return
+      return Promise.resolve()
+    }
+
+    if (this.startBindReject !== null) {
+      log.warn('YargNetworkListener start already in progress.')
+      return Promise.reject(new Error('YargNetworkListener start already in progress'))
     }
 
     if (!this.server) {
@@ -204,9 +212,14 @@ export class YargNetworkListener extends EventEmitter {
       this.setupServerEvents()
     }
 
-    this.server.bind(PORT, () => {
-      this.listening = true
-      log.info(`YargNetworkListener started and listening on port ${PORT}`)
+    return new Promise<void>((resolve, reject) => {
+      this.startBindReject = reject
+      this.server!.bind(PORT, () => {
+        this.startBindReject = null
+        this.listening = true
+        log.info(`YargNetworkListener started and listening on port ${PORT}`)
+        resolve()
+      })
     })
   }
 
@@ -215,18 +228,25 @@ export class YargNetworkListener extends EventEmitter {
    * (required before a new listener can bind the same port).
    */
   public stop(): Promise<void> {
-    if (!this.server) {
-      this.listening = false
+    const sock = this.server
+    this.server = null
+    this.listening = false
+    if (!sock) {
       return Promise.resolve()
     }
     return new Promise((resolve) => {
-      const sock = this.server!
-      sock.close(() => {
-        log.info('YargNetworkListener server closed.')
-        this.listening = false
-        this.server = null
+      try {
+        sock.close(() => {
+          log.info('YargNetworkListener server closed.')
+          resolve()
+        })
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException)?.code
+        if (code !== 'ERR_SOCKET_DGRAM_NOT_RUNNING') {
+          log.warn('YargNetworkListener: error during close:', err)
+        }
         resolve()
-      })
+      }
     })
   }
 
@@ -238,9 +258,23 @@ export class YargNetworkListener extends EventEmitter {
     if (!this.server) return
 
     this.server.on('error', (err) => {
+      const bindReject = this.startBindReject
+      if (bindReject !== null) {
+        this.startBindReject = null
+        log.error(`Server error during bind:\n${err.stack}`)
+        void this.stop().finally(() => {
+          bindReject(err)
+        })
+        return
+      }
+
       log.error(`Server error:\n${err.stack}`)
-      this.server?.close()
-      this.listening = false
+      const message = err instanceof Error ? err.message : String(err)
+      this.emit('yarg-error', {
+        type: 'runtime-error',
+        message,
+      })
+      void this.stop()
     })
 
     this.server.on('listening', () => {

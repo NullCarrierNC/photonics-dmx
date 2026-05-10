@@ -91,20 +91,20 @@ describe('YargNetworkListener', () => {
   })
 
   it('start binds the UDP socket and sets listening state', async () => {
-    listener.start()
+    await listener.start()
     expect(mockBind).toHaveBeenCalledWith(36107, expect.any(Function))
     await listener.stop()
     expect(mockClose).toHaveBeenCalled()
   })
 
   it('stop closes the socket', async () => {
-    listener.start()
+    await listener.start()
     await listener.stop()
     expect(mockClose).toHaveBeenCalled()
   })
 
   it('shutdown calls stop', async () => {
-    listener.start()
+    await listener.start()
     await listener.shutdown()
     expect(mockClose).toHaveBeenCalled()
   })
@@ -114,7 +114,7 @@ describe('YargNetworkListener', () => {
     mockClose.mockImplementationOnce((cb?: () => void) => {
       if (cb) pending.push(() => cb())
     })
-    listener.start()
+    await listener.start()
     const stopP = listener.stop()
     let resolved = false
     void stopP.then(() => {
@@ -130,10 +130,10 @@ describe('YargNetworkListener', () => {
   })
 
   it('second start after await stop re-binds the UDP port', async () => {
-    listener.start()
+    await listener.start()
     await listener.stop()
     mockBind.mockClear()
-    listener.start()
+    await listener.start()
     expect(mockBind).toHaveBeenCalledWith(36107, expect.any(Function))
   })
 

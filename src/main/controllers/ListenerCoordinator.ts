@@ -78,12 +78,38 @@ export class ListenerCoordinator {
       'yarg-error',
       (errorData: { type: string; message: string; datagramVersion?: number }) => {
         log.error('YARG Listener Error:', errorData)
-        this.deps.sendToAllWindows(RENDERER_RECEIVE.YARG_ERROR, errorData.message)
+        this.deps.sendToAllWindows(RENDERER_RECEIVE.YARG_ERROR, {
+          type: errorData.type,
+          message: errorData.message,
+        })
       },
     )
-    this.yargListener.start()
-    this.isYargEnabled = true
-    log.info('YARG listener enabled')
+    try {
+      await this.yargListener.start()
+      this.isYargEnabled = true
+      log.info('YARG listener enabled')
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code
+      const isPortInUse = code === 'EADDRINUSE'
+      const message = isPortInUse
+        ? 'YARG network port is already in use. Do you have YALCY or another running? If so, you must quit it first.'
+        : err instanceof Error
+          ? err.message
+          : String(err)
+      log.error('Failed to start YARG listener:', err)
+      this.yargListener = null
+      this.isYargEnabled = false
+      if (this.cueHandler) {
+        this.cueHandler.shutdown()
+        this.cueHandler = null
+        this.deps.setCueHandlerRef(null)
+      }
+      this.deps.sendToAllWindows(RENDERER_RECEIVE.YARG_ERROR, {
+        type: isPortInUse ? 'port-in-use' : 'start-failed',
+        message,
+        autoDisabled: true,
+      })
+    }
   }
 
   public async disableYarg(): Promise<void> {
