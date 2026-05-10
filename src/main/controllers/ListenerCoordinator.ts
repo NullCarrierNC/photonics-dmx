@@ -92,7 +92,7 @@ export class ListenerCoordinator {
       const code = (err as NodeJS.ErrnoException)?.code
       const isPortInUse = code === 'EADDRINUSE'
       const message = isPortInUse
-        ? 'YARG network port is already in use. Do you have YALCY or another running? If so, you must quit it first.'
+        ? 'YARG network port is already in use. Do you have YALCY or another app running? If so, you must quit it first.'
         : err instanceof Error
           ? err.message
           : String(err)
