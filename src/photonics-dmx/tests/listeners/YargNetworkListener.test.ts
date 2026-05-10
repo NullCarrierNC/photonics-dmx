@@ -8,6 +8,36 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { YargNetworkListener, YargCueRuntime } from '../../listeners/YARG/YargNetworkListener'
 import { CueData, CueType, defaultCueData } from '../../cues/types/cueTypes'
 
+const YARG_PACKET_HEADER_LE = 0x59415247 // 'YARG'
+
+/** Total bytes through singalong (before optional camera-cut extension). */
+const YARG_MIN_FULL_PACKET_LEN = 47
+
+function deserializePacket(listener: YargNetworkListener, buffer: Buffer): void {
+  ;(listener as unknown as { deserializePacket(buf: Buffer): void }).deserializePacket(buffer)
+}
+
+function buildYargShutdownPacket(): Buffer {
+  const buf = Buffer.alloc(5)
+  buf.writeUInt32LE(YARG_PACKET_HEADER_LE, 0)
+  buf.writeUInt8(0, 4)
+  return buf
+}
+
+/** Header + datagram version byte only (padding ignored until length check). */
+function buildYargFullSizedPacket(datagramVersion: number): Buffer {
+  const buf = Buffer.alloc(YARG_MIN_FULL_PACKET_LEN)
+  buf.writeUInt32LE(YARG_PACKET_HEADER_LE, 0)
+  buf.writeUInt8(datagramVersion, 4)
+  return buf
+}
+
+class YargNetworkListenerMinV2 extends YargNetworkListener {
+  protected override getMinSupportedDatagramVersion(): number {
+    return 2
+  }
+}
+
 class MockCueHandler implements YargCueRuntime {
   public notifySongStart = jest.fn()
   public notifySongEnd = jest.fn()
@@ -195,6 +225,43 @@ describe('YargNetworkListener', () => {
       expect(notifySongEndSpy).toHaveBeenCalledTimes(1)
 
       notifySongEndSpy.mockRestore()
+    })
+  })
+
+  describe('datagram version handling', () => {
+    it('emits yarg-error with shutdown message when datagramVersion is 0', () => {
+      const onError = jest.fn()
+      listener.on('yarg-error', onError)
+
+      deserializePacket(listener, buildYargShutdownPacket())
+
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError).toHaveBeenCalledWith({
+        type: 'yarg-shutdown',
+        message: 'YARG Has Shutdown',
+        datagramVersion: 0,
+      })
+      expect(cueHandler.handleCue).not.toHaveBeenCalled()
+    })
+
+    it('emits datagram-version-mismatch for non-zero versions below minimum supported', () => {
+      const strictListener = new YargNetworkListenerMinV2(cueHandler)
+      const onError = jest.fn()
+      strictListener.on('yarg-error', onError)
+
+      deserializePacket(strictListener, buildYargFullSizedPacket(1))
+
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'datagram-version-mismatch',
+          datagramVersion: 1,
+          message: expect.stringContaining('YARG Datagram Version too old'),
+        }),
+      )
+      expect(cueHandler.handleCue).not.toHaveBeenCalled()
+
+      void strictListener.shutdown()
     })
   })
 
