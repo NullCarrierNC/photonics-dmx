@@ -1,0 +1,24 @@
+# Normalize line endings to LF so Prettier/ESLint and CI match across macOS/Linux/Windows.
+* text=auto eol=lf
+
+# Windows batch/cmd convention
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets (avoid CRLF conversion)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.zip binary
+*.dmg binary
+*.exe binary
+*.node binary

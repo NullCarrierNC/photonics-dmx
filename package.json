@@ -9,6 +9,7 @@
     "prepare": "husky",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "lockfile:check": "npm install --package-lock-only --ignore-scripts --no-fund --no-audit && git diff --exit-code package-lock.json",
     "lint": "eslint . --fix",
     "lint:check": "eslint .",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
