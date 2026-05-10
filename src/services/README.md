@@ -4,11 +4,11 @@ Shared services used across main and (where applicable) renderer. Currently focu
 
 ## configuration/
 
-| File                   | Role                                                                                                                                                     |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ConfigurationManager` | Manages `AppPreferences` (including per-domain cue preferences), user lights, lighting layout, DMX rigs, audio config. Loads/saves via `ConfigFile` / preferences helpers. Migration support for config schema changes and DMX rig evolution. |
-| `ConfigFile`           | Async atomic JSON file I/O (write-temp-then-rename). Versioned persistence with migration; surfaces corrupt-file recovery events for the renderer.         |
-| `PreferencesConfigFile` | Typed preferences persistence layered on `ConfigFile` where the app splits prefs from other JSON documents.                                            |
+| File                    | Role                                                                                                                                                                                                                                          |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ConfigurationManager`  | Manages `AppPreferences` (including per-domain cue preferences), user lights, lighting layout, DMX rigs, audio config. Loads/saves via `ConfigFile` / preferences helpers. Migration support for config schema changes and DMX rig evolution. |
+| `ConfigFile`            | Async atomic JSON file I/O (write-temp-then-rename). Versioned persistence with migration; surfaces corrupt-file recovery events for the renderer.                                                                                            |
+| `PreferencesConfigFile` | Typed preferences persistence layered on `ConfigFile` where the app splits prefs from other JSON documents.                                                                                                                                   |
 
 ### Config Files
 

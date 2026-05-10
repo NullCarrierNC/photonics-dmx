@@ -1,6 +1,6 @@
 {
   "name": "photonics-dmx",
-  "version": "0.5.0-alpha.5",
+  "version": "0.5.2-alpha.5",
   "description": "A DMX sequencer for YARG, RB3E, and music visualization.",
   "main": "./out/main/index.js",
   "author": "Null Carrier",
@@ -9,6 +9,7 @@
     "prepare": "husky",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "lockfile:check": "npm install --package-lock-only --ignore-scripts --no-fund --no-audit && git diff --exit-code package-lock.json",
     "lint": "eslint . --fix",
     "lint:check": "eslint .",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
