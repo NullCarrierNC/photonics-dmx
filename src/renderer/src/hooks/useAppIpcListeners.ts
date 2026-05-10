@@ -16,7 +16,7 @@ export interface UseAppIpcListenersParams {
   setOpenDmxComPort: (port: string) => void
   setIsLeftMenuCollapsed: (collapsed: boolean) => void
   handleSenderError: (msg: string) => void
-  handleYargError: (msg: string) => void
+  handleYargError: (payload: { type: string; message: string; autoDisabled?: boolean }) => void
   handleNodeCueRuntimeError: (msg: string) => void
   handleSenderNetworkError: (data: { sender: string; error: string; autoDisabled: boolean }) => void
   handleCueStateUpdate: (cueState: CueStateUpdatePayload) => void
@@ -176,7 +176,8 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
   useEffect(() => {
     const p = () => latest.current
     const onSenderError = (msg: string) => p().handleSenderError(msg)
-    const onYargError = (msg: string) => p().handleYargError(msg)
+    const onYargError = (payload: { type: string; message: string; autoDisabled?: boolean }) =>
+      p().handleYargError(payload)
     const onNodeCueRuntimeError = (msg: string) => p().handleNodeCueRuntimeError(msg)
     const onSenderNetworkError = (data: { sender: string; error: string; autoDisabled: boolean }) =>
       p().handleSenderNetworkError(data)

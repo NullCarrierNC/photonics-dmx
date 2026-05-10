@@ -18,6 +18,7 @@ import {
   senderOpenDmxEnabledAtom,
   openDmxComPortAtom,
   syncOutputSenderAtoms,
+  yargListenerEnabledAtom,
 } from './atoms'
 import squareLogo from './assets/images/photonics-icon.png'
 import LeftMenu from './components/LeftMenu'
@@ -74,6 +75,7 @@ export const App = (): JSX.Element => {
   const setEnttecProEnabled = useSetAtom(senderEnttecProEnabledAtom)
   const setOpenDmxEnabled = useSetAtom(senderOpenDmxEnabledAtom)
   const setIpcEnabled = useSetAtom(senderIpcEnabledAtom)
+  const setYargEnabled = useSetAtom(yargListenerEnabledAtom)
   const [appVer, setAppVer] = useState('')
   const { toasts, showToast, hideToast } = useToast()
 
@@ -97,13 +99,15 @@ export const App = (): JSX.Element => {
     [showToast],
   )
 
-  // Handler for YARG listener errors (protocol/datagram version mismatch, etc.)
   const handleYargError = useCallback(
-    (msg: string): void => {
-      log.error('YARG error:', msg)
-      showToast(`YARG: ${msg}`, 'error', 5000)
+    (payload: { type: string; message: string; autoDisabled?: boolean }): void => {
+      log.error('YARG error:', payload)
+      if (payload.autoDisabled) {
+        setYargEnabled(false)
+      }
+      showToast(`YARG: ${payload.message}`, 'error', 5000)
     },
-    [showToast],
+    [showToast, setYargEnabled],
   )
 
   const handleNodeCueRuntimeError = useCallback(
