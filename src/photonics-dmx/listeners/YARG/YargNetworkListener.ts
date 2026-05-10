@@ -260,11 +260,24 @@ export class YargNetworkListener extends EventEmitter {
     })
   }
 
+  /** Minimum supported datagram version for full cue payloads (excluding shutdown sentinel 0). */
+  protected getMinSupportedDatagramVersion(): number {
+    return YARG_DATAGRAM_VERSION
+  }
+
   private deserializePacket(buffer: Buffer) {
     try {
+      const MIN_HEADER_AND_VERSION_LEN = 4 + 1
+
+      if (buffer.length < MIN_HEADER_AND_VERSION_LEN) {
+        throw new Error(
+          `Received packet is too short: ${buffer.length} bytes, expected at least ${MIN_HEADER_AND_VERSION_LEN} bytes`,
+        )
+      }
+
       let offset = 0
 
-      // Ensure buffer has at least the minimum required length (longer packets are allowed for forward compatibility)
+      // Ensure buffer has at least the minimum required length for a full cue packet (longer packets are allowed for forward compatibility)
       const expectedLength =
         4 + // Header
         1 + // Datagram version
@@ -293,12 +306,6 @@ export class YargNetworkListener extends EventEmitter {
         1 + // Spotlight
         1 // Singalong
 
-      if (buffer.length < expectedLength) {
-        throw new Error(
-          `Received packet is too short: ${buffer.length} bytes, expected at least ${expectedLength} bytes`,
-        )
-      }
-
       // Header (little-endian)
       const header = buffer.readUInt32LE(offset)
       offset += 4
@@ -309,6 +316,40 @@ export class YargNetworkListener extends EventEmitter {
 
       const datagramVersion = buffer.readUInt8(offset)
       offset += 1
+
+      if (datagramVersion === 0) {
+        log.info('YARG shutdown notification (datagram version 0)')
+        this.emit('yarg-error', {
+          type: 'yarg-shutdown',
+          message: 'YARG Has Shutdown',
+          datagramVersion: 0,
+        })
+        return
+      }
+
+      if (buffer.length < expectedLength) {
+        throw new Error(
+          `Received packet is too short: ${buffer.length} bytes, expected at least ${expectedLength} bytes`,
+        )
+      }
+
+      const minVersion = this.getMinSupportedDatagramVersion()
+      if (datagramVersion < minVersion) {
+        log.error(
+          `Unsupported datagram version: ${datagramVersion}, need at least version ${minVersion}`,
+        )
+        const errorMessage = `YARG Datagram Version too old: received version ${datagramVersion}, need at least version ${minVersion}`
+
+        // Emit error event for the controller to handle
+        this.emit('yarg-error', {
+          type: 'datagram-version-mismatch',
+          message: errorMessage,
+          datagramVersion: datagramVersion,
+        })
+
+        throw new Error(errorMessage)
+      }
+
       const platformByte = buffer.readUInt8(offset)
       offset += 1
       const sceneByte = buffer.readUInt8(offset)
@@ -353,22 +394,6 @@ export class YargNetworkListener extends EventEmitter {
       offset += 1
       const autoGenTrack = buffer.readUInt8(offset) === 1
       offset += 1
-
-      if (datagramVersion < YARG_DATAGRAM_VERSION) {
-        log.error(
-          `Unsupported datagram version: ${datagramVersion}, need at least version ${YARG_DATAGRAM_VERSION}`,
-        )
-        const errorMessage = `YARG Datagram Version too old: received version ${datagramVersion}, need at least version ${YARG_DATAGRAM_VERSION}`
-
-        // Emit error event for the controller to handle
-        this.emit('yarg-error', {
-          type: 'datagram-version-mismatch',
-          message: errorMessage,
-          datagramVersion: datagramVersion,
-        })
-
-        throw new Error(errorMessage)
-      }
 
       const spotlight = buffer.readUInt8(offset)
       offset += 1
