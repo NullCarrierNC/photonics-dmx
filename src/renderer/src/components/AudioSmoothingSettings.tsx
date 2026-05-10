@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { getAudioConfig, saveAudioConfig } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('AudioSmoothingSettings')
 
 const AudioSmoothingSettings: React.FC = () => {
   const [enabled, setEnabled] = useState(true)
@@ -15,7 +17,7 @@ const AudioSmoothingSettings: React.FC = () => {
           setAlpha(config.smoothing.alpha || 0.7)
         }
       } catch (error) {
-        console.error('Failed to load smoothing settings:', error)
+        log.error('Failed to load smoothing settings:', error)
       }
     }
 
@@ -30,7 +32,7 @@ const AudioSmoothingSettings: React.FC = () => {
     try {
       await saveAudioConfig({ smoothing: { enabled: newEnabled, alpha } })
     } catch (error) {
-      console.error('Failed to save smoothing enabled state:', error)
+      log.error('Failed to save smoothing enabled state:', error)
       setEnabled(!newEnabled) // Revert on error
     } finally {
       setIsSaving(false)
@@ -47,7 +49,7 @@ const AudioSmoothingSettings: React.FC = () => {
     try {
       await saveAudioConfig({ smoothing: { enabled, alpha } })
     } catch (error) {
-      console.error('Failed to save smoothing alpha:', error)
+      log.error('Failed to save smoothing alpha:', error)
     } finally {
       setIsSaving(false)
     }

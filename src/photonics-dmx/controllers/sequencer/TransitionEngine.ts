@@ -1,8 +1,10 @@
 import { performance } from 'perf_hooks'
-import { EffectTransition, RGBIO } from '../../types'
+import { EffectTransition, normalizeFixtureConfig, RGBIO } from '../../types'
 import { LightTransitionController } from './LightTransitionController'
 import { FrameContext, LightEffectState, ILayerManager, ITransitionEngine } from './interfaces'
 import { IEffectManager } from './interfaces'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('TransitionEngine')
 
 /**
  * @class TransitionEngine
@@ -20,6 +22,12 @@ export class TransitionEngine implements ITransitionEngine {
    * same tick can start a new effect without a one-frame black gap.
    */
   private _pendingLayerRemovals: Array<{ layer: number; lightId: string }> = []
+
+  /**
+   * When true, next updateTransitions clears pan/tilt from layer state so fixtures return to
+   * configured home via DmxPublisher. Deferred one frame like _pendingLayerRemovals.
+   */
+  private _pendingPanTiltClear = false
 
   /**
    * @constructor
@@ -97,6 +105,14 @@ export class TransitionEngine implements ITransitionEngine {
     return this.lightTransitionController
   }
 
+  public schedulePanTiltClear(): void {
+    this._pendingPanTiltClear = true
+  }
+
+  public cancelPanTiltClear(): void {
+    this._pendingPanTiltClear = false
+  }
+
   /**
    * Updates all active transitions using a single timestamp for atomic calculations.
    * This method is called by the Clock system to advance transitions incrementally.
@@ -115,6 +131,11 @@ export class TransitionEngine implements ITransitionEngine {
       }
     }
     this._pendingLayerRemovals = []
+
+    if (this._pendingPanTiltClear) {
+      this.lightTransitionController.clearPanTilt()
+      this._pendingPanTiltClear = false
+    }
 
     const effectsToRemove: Array<{ layer: number; lightId: string }> = []
 
@@ -145,9 +166,7 @@ export class TransitionEngine implements ITransitionEngine {
             this.handleWaitingUntil(lightEffect, currentTransition, currentTime)
             break
           default:
-            console.warn(
-              `Unknown state "${lightEffect.state}" for effect "${lightEffect.effect.id}".`,
-            )
+            log.warn(`Unknown state "${lightEffect.state}" for effect "${lightEffect.effect.id}".`)
         }
       })
     })
@@ -174,7 +193,7 @@ export class TransitionEngine implements ITransitionEngine {
       } else if (!newEffectStarted) {
         const nextQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId)
         if (nextQueuedEffect) {
-          console.warn(
+          log.warn(
             `Cannot start next queued effect for layer ${layer}, light ${lightId} - no effect manager set`,
           )
           this.layerManager.removeQueuedEffect(layer, lightId)
@@ -300,11 +319,12 @@ export class TransitionEngine implements ITransitionEngine {
 
     const color = { ...transition.transform.color }
     if (light.config) {
+      const cfg = normalizeFixtureConfig(light.config)
       if (color.pan === undefined) {
-        color.pan = light.config.panHome
+        color.pan = cfg.panHome
       }
       if (color.tilt === undefined) {
-        color.tilt = light.config.tiltHome
+        color.tilt = cfg.tiltHome
       }
     }
 

@@ -3,6 +3,7 @@ import { useAtom } from 'jotai'
 import {
   yargListenerEnabledAtom,
   rb3eListenerEnabledAtom,
+  audioListenerEnabledAtom,
   lightingPrefsAtom,
   senderSacnEnabledAtom,
   senderArtNetEnabledAtom,
@@ -13,6 +14,7 @@ import {
 const StatusBar: React.FC = () => {
   const [isYargEnabled] = useAtom(yargListenerEnabledAtom)
   const [isRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
+  const [isAudioEnabled] = useAtom(audioListenerEnabledAtom)
   const [isSacnEnabled] = useAtom(senderSacnEnabledAtom)
   const [isArtNetEnabled] = useAtom(senderArtNetEnabledAtom)
   const [isEnttecProEnabled] = useAtom(senderEnttecProEnabledAtom)
@@ -24,6 +26,7 @@ const StatusBar: React.FC = () => {
       <div className="flex space-x-4">
         <StatusIndicator label="YARG" isActive={isYargEnabled} />
         <StatusIndicator label="RB3" isActive={isRb3Enabled} />
+        <StatusIndicator label="Audio" isActive={isAudioEnabled} />
         <div className="w-1"></div>
         <StatusIndicator
           label="sACN"

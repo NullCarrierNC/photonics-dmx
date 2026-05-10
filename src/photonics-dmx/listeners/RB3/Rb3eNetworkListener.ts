@@ -8,6 +8,9 @@ import {
   Rb3Difficulty,
 } from './rb3eTypes'
 import { CueData, StrobeState } from '../../cues/types/cueTypes'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('Rb3eNetworkListener')
 
 // Use the same port that RB3Enhanced sends to.
 const PORT = 21070
@@ -69,17 +72,17 @@ const DIFFICULTY_MAP: Record<number, Rb3Difficulty> = {
  *
  * // Listen for all RB3E data
  * listener.on('rb3eData', (data) => {
- *   console.log('Received RB3E data:', data);
+ *   // handle data
  * });
  *
  * // Listen for specific song information
  * listener.on('rb3eSongName', (songName) => {
- *   console.log('Song changed to:', songName);
+ *   // handle song name
  * });
  *
  * // Listen for platform changes
  * listener.on('rb3ePlatform', (platform) => {
- *   console.log('Platform detected:', platform);
+ *   // handle platform
  * });
  *
  * listener.start();
@@ -99,51 +102,57 @@ export class Rb3eNetworkListener extends EventEmitter {
 
   constructor() {
     super()
-    console.log('Rb3eNetworkListener initialized as event emitter.')
+    log.info('Rb3eNetworkListener initialized as event emitter.')
   }
 
   public start() {
     if (this.listening) {
-      console.warn('RB3ENetworkListener is already running.')
+      log.warn('RB3ENetworkListener is already running.')
       return
     }
-    console.log(`RB3ENetworkListener: Starting UDP server on port ${PORT}...`)
+    log.info(`RB3ENetworkListener: Starting UDP server on port ${PORT}...`)
     this.server = dgram.createSocket('udp4')
     this.setupServerEvents()
     this.server.bind(PORT, () => {
       this.listening = true
-      console.log(`RB3ENetworkListener started and listening on port ${PORT}`)
+      log.info(`RB3ENetworkListener started and listening on port ${PORT}`)
     })
 
     // Add error handling for bind failures
     this.server.on('error', (err) => {
-      console.error(`RB3ENetworkListener: Bind error:`, err)
+      log.error(`RB3ENetworkListener: Bind error:`, err)
     })
   }
 
-  public stop() {
-    if (!this.listening) {
-      console.warn('RB3ENetworkListener is not running.')
-      return
+  /**
+   * Closes the UDP socket and resolves when the OS has released the port
+   * (required before a new listener can bind the same port).
+   */
+  public stop(): Promise<void> {
+    if (!this.server) {
+      this.listening = false
+      return Promise.resolve()
     }
-    if (this.server) {
-      this.server.close(() => {
-        console.log('RB3ENetworkListener server closed.')
+    return new Promise((resolve) => {
+      const sock = this.server!
+      sock.close(() => {
+        log.info('RB3ENetworkListener server closed.')
         this.listening = false
         this.server = null
+        resolve()
       })
-    }
+    })
   }
 
-  public shutdown() {
-    this.stop()
+  public shutdown(): Promise<void> {
+    return this.stop()
   }
 
   private setupServerEvents() {
     if (!this.server) return
 
     this.server.on('error', (err) => {
-      console.error(`Server error:\n${err.stack}`)
+      log.error(`Server error:\n${err.stack}`)
       this.server?.close()
       this.listening = false
     })
@@ -151,7 +160,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     this.server.on('listening', () => {
       const address = this.server?.address()
       if (address) {
-        console.log(`Listening for RB3E events on ${address.address}:${address.port}`)
+        log.info(`Listening for RB3E events on ${address.address}:${address.port}`)
       }
     })
 
@@ -160,7 +169,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       try {
         this.deserializePacket(msg)
       } catch (error) {
-        console.error('Failed to parse message:', error)
+        log.error('Failed to parse message:', error)
       }
     })
   }
@@ -171,7 +180,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     try {
       // Minimum 8 bytes for RB3E header (magic + 4 more).
       if (buffer.length < 8) {
-        console.warn(`Received packet is too short: ${buffer.length} bytes`)
+        log.warn(`Received packet is too short: ${buffer.length} bytes`)
         return
       }
 
@@ -185,7 +194,7 @@ export class Rb3eNetworkListener extends EventEmitter {
           magic[3] === PROTOCOL_MAGIC[3]
         )
       ) {
-        console.warn(`Invalid protocol magic: ${magic.toString('hex')}`)
+        log.warn(`Invalid protocol magic: ${magic.toString('hex')}`)
         return
       }
       offset += 4
@@ -198,7 +207,7 @@ export class Rb3eNetworkListener extends EventEmitter {
 
       // Validate packet type
       if (packetType > 10) {
-        console.warn(`Invalid packet type: ${packetType}`)
+        log.warn(`Invalid packet type: ${packetType}`)
         return
       }
 
@@ -206,12 +215,12 @@ export class Rb3eNetworkListener extends EventEmitter {
 
       // Validate payload size
       if (payloadSize > 255) {
-        console.warn(`Invalid payload size: ${payloadSize}`)
+        log.warn(`Invalid payload size: ${payloadSize}`)
         return
       }
 
       if (buffer.length < offset + payloadSize) {
-        console.warn(
+        log.warn(
           `Packet payload is too short: expected ${payloadSize}, got ${buffer.length - offset}`,
         )
         return
@@ -321,7 +330,7 @@ export class Rb3eNetworkListener extends EventEmitter {
           break
 
         default:
-          console.warn(`Unknown RB3E packet type: ${packetType}`)
+          log.warn(`Unknown RB3E packet type: ${packetType}`)
           return
       }
 
@@ -349,8 +358,8 @@ export class Rb3eNetworkListener extends EventEmitter {
       // Log summary of the data received
       //  this.logDataSummary(cueData, packetType);
     } catch (error) {
-      console.error('Error processing RB3E packet:', error)
-      console.error('Packet buffer:', buffer.toString('hex'))
+      log.error('Error processing RB3E packet:', error)
+      log.error('Packet buffer:', buffer.toString('hex'))
     }
   }
 
@@ -361,8 +370,8 @@ export class Rb3eNetworkListener extends EventEmitter {
     return data1.payload.equals(data2.payload)
   }
 
-  public destroy() {
-    this.stop()
+  public destroy(): Promise<void> {
+    return this.stop()
   }
 
   /**
@@ -500,7 +509,7 @@ export class Rb3eNetworkListener extends EventEmitter {
   private handleAlive(payload: Buffer, cueData: CueData) {
     const txt = this.readNullTerminatedString(payload)
     cueData.rb3BuildTag = txt
-    console.log(`RB3E_EVENT_ALIVE => ${txt}`)
+    log.info(`RB3E_EVENT_ALIVE => ${txt}`)
   }
 
   private handleGameState(payload: Buffer, _cueData: CueData) {
@@ -509,9 +518,8 @@ export class Rb3eNetworkListener extends EventEmitter {
     const stateByte = payload.readUInt8(0)
     const gameState: Rb3GameState = stateByte === 0 ? 'Menus' : 'InGame'
 
-    console.log(`RB3E_EVENT_STATE => ${gameState}`)
+    log.info(`RB3E_EVENT_STATE => ${gameState}`)
 
-    //TODO: Tie in game state to the rest of the system
     this.emit('rb3e:gameState', {
       gameState,
       platform: this.lastData?.cueData?.rb3Platform || 'Unknown',
@@ -531,7 +539,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       timestamp: Date.now(),
     })
 
-    console.log(`RB3E_EVENT_SONG_NAME => ${name}`)
+    log.info(`RB3E_EVENT_SONG_NAME => ${name}`)
   }
 
   private handleSongArtist(payload: Buffer, cueData: CueData) {
@@ -544,7 +552,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       timestamp: Date.now(),
     })
 
-    console.log(`RB3E_EVENT_SONG_ARTIST => ${artist}`)
+    log.info(`RB3E_EVENT_SONG_ARTIST => ${artist}`)
   }
 
   private handleSongShortName(payload: Buffer, cueData: CueData) {
@@ -557,13 +565,13 @@ export class Rb3eNetworkListener extends EventEmitter {
       timestamp: Date.now(),
     })
 
-    console.log(`RB3E_EVENT_SONG_SHORTNAME => ${shortName}`)
+    log.info(`RB3E_EVENT_SONG_SHORTNAME => ${shortName}`)
   }
 
   private handleScore(payload: Buffer, _cueData: CueData) {
     // struct is 4 + 4*4 + 1 = 21 bytes total
     if (payload.length < 21) {
-      console.warn(`Score payload too short, expected >=21, got ${payload.length}`)
+      log.warn(`Score payload too short, expected >=21, got ${payload.length}`)
       return
     }
     const totalScore = payload.readInt32LE(0)
@@ -587,7 +595,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       timestamp: Date.now(),
     })
 
-    console.log(
+    log.info(
       `RB3E_EVENT_SCORE => totalScore=${totalScore}, stars=${stars}, memberScores=${memberScores}`,
     )
   }
@@ -595,7 +603,7 @@ export class Rb3eNetworkListener extends EventEmitter {
   private handleStageKit(payload: Buffer, cueData: CueData) {
     // StageKit struct has 2 bytes: LeftChannel, RightChannel
     if (payload.length < 2) {
-      console.warn(`STAGEKIT payload too short: expected 2 bytes, got ${payload.length}`)
+      log.warn(`STAGEKIT payload too short: expected 2 bytes, got ${payload.length}`)
       return
     }
     const leftChannel = payload.readUInt8(0)
@@ -714,7 +722,7 @@ export class Rb3eNetworkListener extends EventEmitter {
   private handleBandInfo(payload: Buffer, cueData: CueData) {
     // 3 arrays of 4 bytes each: existence, difficulty, trackType
     if (payload.length < 12) {
-      console.warn(`Band info payload too short: expected >=12, got ${payload.length}`)
+      log.warn(`Band info payload too short: expected >=12, got ${payload.length}`)
       return
     }
 
@@ -744,7 +752,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       timestamp: Date.now(),
     })
 
-    console.log(`RB3E_EVENT_BAND_INFO => members: ${JSON.stringify(members)}`)
+    log.info(`RB3E_EVENT_BAND_INFO => members: ${JSON.stringify(members)}`)
   }
 
   private handleVenueName(payload: Buffer, cueData: CueData) {
@@ -757,7 +765,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       timestamp: Date.now(),
     })
 
-    console.log(`RB3E_EVENT_VENUE_NAME => ${venue}`)
+    log.info(`RB3E_EVENT_VENUE_NAME => ${venue}`)
   }
 
   private handleScreenName(payload: Buffer, cueData: CueData) {
@@ -770,13 +778,13 @@ export class Rb3eNetworkListener extends EventEmitter {
       timestamp: Date.now(),
     })
 
-    console.log(`RB3E_EVENT_SCREEN_NAME => ${screen}`)
+    log.info(`RB3E_EVENT_SCREEN_NAME => ${screen}`)
   }
 
   private handleDxData(payload: Buffer, cueData: CueData) {
     // Typically 10 bytes identifyValue + up to 240 for string
     if (payload.length < 10) {
-      console.warn(`DX data payload too short: expected >=10, got ${payload.length}`)
+      log.warn(`DX data payload too short: expected >=10, got ${payload.length}`)
       return
     }
 
@@ -795,7 +803,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       timestamp: Date.now(),
     })
 
-    console.log(`RB3E_EVENT_DX_DATA => identifyValue: ${identifyValue}, string: ${string}`)
+    log.info(`RB3E_EVENT_DX_DATA => identifyValue: ${identifyValue}, string: ${string}`)
   }
 
   private readNullTerminatedString(buf: Buffer): string {
@@ -826,7 +834,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     if (cueData.strobeState) summary.push(`Strobe State: ${cueData.strobeState}`);
     if (cueData.fogState !== undefined) summary.push(`Fog State: ${cueData.fogState ? 'On' : 'Off'}`);
 
-    console.log(`Received RB3E packet type ${packetType} with summary: ${summary.join(', ')}`);
+    log.info(`Received RB3E packet type ${packetType} with summary: ${summary.join(', ')}`);
   }
     */
 }

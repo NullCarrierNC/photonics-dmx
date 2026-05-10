@@ -19,20 +19,20 @@ const NotesNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) 
   const isInfo = variant === 'info'
   const isImportant = variant === 'important'
   const containerClasses = isImportant
-    ? 'bg-red-400 dark:bg-red-500 text-red-950 dark:text-red-950'
+    ? 'bg-red-800 dark:bg-red-900 text-white'
     : isInfo
-      ? 'bg-blue-400 dark:bg-blue-500 text-blue-950 dark:text-blue-950'
+      ? 'bg-blue-800 dark:bg-blue-900 text-white'
       : 'bg-yellow-200 dark:bg-yellow-300 text-yellow-900 dark:text-yellow-950'
   const titleClasses = isImportant
-    ? 'border-red-300 dark:border-red-700'
+    ? 'border-red-400/60 dark:border-red-300/40'
     : isInfo
-      ? 'border-blue-300 dark:border-blue-700'
+      ? 'border-blue-400/60 dark:border-blue-300/40'
       : 'border-yellow-400 dark:border-yellow-500'
 
   return (
     <FlowNodeFrame
       id={id}
-      className={`px-3 py-2.5 rounded-sm text-xs shadow-lg min-w-[320px] max-w-[440px] transform rotate-[-1.5deg] ${containerClasses} ${selectedStyles}`}
+      className={`px-3 py-2.5 rounded-sm text-[0.825rem] shadow-lg min-w-[320px] max-w-[440px] transform rotate-[-1.5deg] ${containerClasses} ${selectedStyles}`}
       style={{
         boxShadow: selected
           ? '0 0 18px 16px rgba(59,130,246,0.8), 0 2px 8px rgba(0,0,0,0.15)'
@@ -41,9 +41,11 @@ const NotesNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) 
         minHeight: title ? '60px' : '50px',
       }}>
       {title && (
-        <div className={`font-bold mb-1.5 border-b pb-1 text-[11px] ${titleClasses}`}>{title}</div>
+        <div className={`font-bold mb-1.5 border-b pb-1 text-[13.31px] ${titleClasses}`}>
+          {title}
+        </div>
       )}
-      <div className="text-[11px] break-words leading-relaxed whitespace-pre-wrap">{note}</div>
+      <div className="text-[12.1px] break-words leading-relaxed whitespace-pre-wrap">{note}</div>
     </FlowNodeFrame>
   )
 }

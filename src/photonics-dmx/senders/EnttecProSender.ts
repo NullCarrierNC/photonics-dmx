@@ -1,6 +1,8 @@
 import { DMX, EnttecUSBDMXProDriver, IUniverseDriver } from 'dmx-ts'
 import { EventEmitter } from 'events'
 import { BaseSender, SenderError } from './BaseSender'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('EnttecProSender')
 
 export class EnttecProSender extends BaseSender {
   private dmx: DMX = new DMX()
@@ -31,7 +33,7 @@ export class EnttecProSender extends BaseSender {
       return
     }
 
-    console.log(`Stopping Enttec Pro sender on port ${this.port}...`)
+    log.info(`Stopping Enttec Pro sender on port ${this.port}...`)
 
     try {
       // First set all channels to zero (blackout)
@@ -44,10 +46,10 @@ export class EnttecProSender extends BaseSender {
       try {
         if (this.universe) {
           this.universe.update(zeroPayload)
-          console.log('Sent zero values to all DMX channels')
+          log.info('Sent zero values to all DMX channels')
         }
       } catch (err) {
-        console.error('Failed to send zero values before stopping:', err)
+        log.error('Failed to send zero values before stopping:', err)
       }
 
       // Give a small delay to ensure commands are sent
@@ -59,9 +61,9 @@ export class EnttecProSender extends BaseSender {
         if (this.dmx) {
           this.dmx.removeAllListeners()
         }
-        console.log('Removed all event listeners')
+        log.info('Removed all event listeners')
       } catch (err) {
-        console.error('Error removing event listeners:', err)
+        log.error('Error removing event listeners:', err)
       }
 
       // Carefully close the DMX connection
@@ -69,10 +71,10 @@ export class EnttecProSender extends BaseSender {
         if (this.dmx) {
           // Try first with close()
           await this.dmx.close()
-          console.log('DMX connection closed')
+          log.info('DMX connection closed')
         }
       } catch (err) {
-        console.error('Error during DMX close:', err)
+        log.error('Error during DMX close:', err)
 
         // If close fails, we'll try forcibly clearing references
         try {
@@ -82,15 +84,15 @@ export class EnttecProSender extends BaseSender {
           // Add a small delay to let any pending operations complete
           await new Promise((resolve) => setTimeout(resolve, 100))
         } catch (innerErr) {
-          console.error('Error during failsafe cleanup:', innerErr)
+          log.error('Error during failsafe cleanup:', innerErr)
         }
       }
     } catch (outerErr) {
-      console.error('Unhandled error during EnttecProSender stop:', outerErr)
+      log.error('Unhandled error during EnttecProSender stop:', outerErr)
     } finally {
       // Final cleanup, clear all references
       this.universe = undefined
-      console.log('EnttecProSender cleanup completed')
+      log.info('EnttecProSender cleanup completed')
     }
   }
 
@@ -99,7 +101,7 @@ export class EnttecProSender extends BaseSender {
       this.verifySenderStarted()
       this.universe!.update(universeBuffer)
     } catch (err) {
-      console.error('EnttecProSender error:', err)
+      log.error('EnttecProSender error:', err)
       const errorEvent = new SenderError(err, { senderId: 'enttecpro' })
       this.eventEmitter.emit('SenderError', errorEvent)
     }

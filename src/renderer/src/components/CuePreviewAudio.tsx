@@ -31,7 +31,7 @@ interface CuePreviewAudioProps {
   className?: string
   /** When false, omit the in-card "Audio Preview" heading (page supplies the title). */
   showTitle?: boolean
-  /** DMX Preview: show Global Sensitivity / Noise Floor under the spectrum (same as Audio Settings). */
+  /** DMX Preview: show Global Sensitivity / Noise Floor under the spectrum (same as Preferences → Audio). */
   showAudioQuickControls?: boolean
 }
 

@@ -1,5 +1,6 @@
 // src/managers/SenderManager.ts
-import { EventEmitter } from 'stream'
+import { EventEmitter } from 'node:events'
+import { createLogger } from '../../shared/logger'
 import { BaseSender, SenderError } from '../senders/BaseSender'
 import { IpcSender } from '../senders/IpcSender'
 import { ArtNetSender } from '../senders/ArtNetSender'
@@ -7,6 +8,14 @@ import { SacnSender } from '../senders/SacnSender'
 import { EnttecProSender } from '../senders/EnttecProSender'
 import { OpenDmxSender } from '../senders/OpenDmxSender'
 import type { SenderConfig } from '../types'
+import type { RuntimeBroadcaster } from '../runtime/broadcaster'
+
+const log = createLogger('SenderManager')
+
+export type SenderManagerIpcOptions = {
+  broadcaster: RuntimeBroadcaster
+  hasReceivers: () => boolean
+}
 
 /**
  * Senders are responsible for actually broadcasting the
@@ -24,7 +33,7 @@ export class SenderManager {
   private initializingSenderPorts: Map<string, number | null> = new Map()
   private onSenderEnabledCallback: ((senderId: string) => void) | null = null
 
-  constructor() {
+  constructor(private readonly ipcOptions: SenderManagerIpcOptions) {
     this.enabledSenders = new Map<string, BaseSender>()
     this.eventEmitter = new EventEmitter()
   }
@@ -59,7 +68,7 @@ export class SenderManager {
   ): Promise<void> {
     // Check if sender is already enabled or currently initializing
     if (this.enabledSenders.has(id) || this.initializingSenders.has(id)) {
-      console.warn(`Sender with ID "${id}" is already enabled or initializing.`)
+      log.warn(`Sender with ID "${id}" is already enabled or initializing.`)
       return
     }
 
@@ -76,19 +85,19 @@ export class SenderManager {
       if (senderType === 'ipc') {
         // Handle IPC sender separately (runs in main process)
         if (this.ipcSender) {
-          console.warn('IPC sender is already enabled.')
+          log.warn('IPC sender is already enabled.')
           this.initializingSenders.delete(id)
           return
         }
 
-        this.ipcSender = new IpcSender()
+        this.ipcSender = new IpcSender(this.ipcOptions.broadcaster, this.ipcOptions.hasReceivers)
         await this.ipcSender.start()
 
-        console.log(`IPC sender enabled and started successfully.`)
+        log.info('IPC sender enabled and started successfully.')
         this.initializingSenders.delete(id)
       } else {
         // Handle network senders directly
-        console.log(`Creating direct sender for ${senderType} with ID "${id}"`)
+        log.info(`Creating direct sender for ${senderType} with ID "${id}"`)
 
         let sender: BaseSender
 
@@ -160,7 +169,7 @@ export class SenderManager {
             throw new Error(`Unknown sender type: ${senderType}`)
         }
 
-        console.log(`Direct sender created for "${id}"`)
+        log.info(`Direct sender created for "${id}"`)
 
         // Track this sender's port so getSenderIdByPort works during initialization
         this.initializingSenderPorts.set(id, sender.getConfiguredPort())
@@ -169,7 +178,7 @@ export class SenderManager {
         sender.onSendError(this.handleSenderError)
 
         // Start the sender and wait for it to complete
-        console.log(`Starting sender "${id}"...`)
+        log.info(`Starting sender "${id}"...`)
         await sender.start()
 
         if (this.failedDuringInit.has(id)) {
@@ -177,24 +186,22 @@ export class SenderManager {
           this.initializingSenders.delete(id)
           this.initializingSenderPorts.delete(id)
           sender.removeSendError(this.handleSenderError)
-          sender
-            .stop()
-            .catch((err) => console.error(`Error stopping ${id} after init failure:`, err))
+          sender.stop().catch((err) => log.error(`Error stopping ${id} after init failure:`, err))
           throw new Error(`Sender "${id}" encountered a network error during initialization`)
         }
 
-        console.log(`Sender "${id}" started successfully`)
+        log.info(`Sender "${id}" started successfully`)
 
         // Only add to enabled senders after successful startup
         this.enabledSenders.set(id, sender)
-        console.log(`Direct sender with ID "${id}" enabled and started successfully.`)
+        log.info(`Direct sender with ID "${id}" enabled and started successfully.`)
 
         // Remove from initializing set
         this.initializingSenders.delete(id)
         this.initializingSenderPorts.delete(id)
       }
     } catch (err) {
-      console.error(`Error starting sender with ID "${id}":`, err)
+      log.error(`Error starting sender with ID "${id}":`, err)
       // Remove from initializing set on error
       this.initializingSenders.delete(id)
       this.initializingSenderPorts.delete(id)
@@ -216,9 +223,9 @@ export class SenderManager {
           await this.ipcSender.stop()
           this.ipcSender = null
           this.initializingSenders.delete(id)
-          console.log('IPC sender disabled.')
+          log.info('IPC sender disabled.')
         } catch (err) {
-          console.error('Error stopping IPC sender:', err)
+          log.error('Error stopping IPC sender:', err)
         }
       }
       return
@@ -226,7 +233,7 @@ export class SenderManager {
 
     const sender = this.enabledSenders.get(id)
     if (!sender) {
-      console.warn(`No enabled sender with ID "${id}" found.`)
+      log.warn(`No enabled sender with ID "${id}" found.`)
       // Still remove from initializing set in case it was stuck there
       this.initializingSenders.delete(id)
       return
@@ -235,12 +242,12 @@ export class SenderManager {
     try {
       await sender.stop()
     } catch (err) {
-      console.error(`Error stopping sender with ID "${id}":`, err)
+      log.error(`Error stopping sender with ID "${id}":`, err)
     }
     sender.removeSendError(this.handleSenderError)
     this.enabledSenders.delete(id)
     this.initializingSenders.delete(id)
-    console.log(`Sender with ID "${id}" disabled.`)
+    log.info(`Sender with ID "${id}" disabled.`)
   }
 
   /**
@@ -250,7 +257,7 @@ export class SenderManager {
    */
   public async restartSender(id: string, config: SenderConfig): Promise<void> {
     if (this.enabledSenders.has(id)) {
-      console.log(`Restarting sender with ID "${id}" with new configuration`)
+      log.info(`Restarting sender with ID "${id}" with new configuration`)
 
       // Disable the current sender
       await this.disableSender(id)
@@ -258,7 +265,7 @@ export class SenderManager {
       // Re-enable with new configuration
       await this.enableSender(id, config.sender || 'sacn', config)
     } else {
-      console.warn(`Sender with ID "${id}" is not enabled, cannot restart.`)
+      log.warn(`Sender with ID "${id}" is not enabled, cannot restart.`)
     }
   }
 
@@ -266,17 +273,17 @@ export class SenderManager {
    * Disables all senders.
    */
   public async disableAllSenders(): Promise<void> {
-    console.log('SenderManager: disabling all senders')
+    log.info('SenderManager: disabling all senders')
 
     const senderPromises: Promise<void>[] = []
 
     for (const [id, sender] of this.enabledSenders) {
-      console.log(`SenderManager: disabling sender "${id}"`)
+      log.info(`SenderManager: disabling sender "${id}"`)
       try {
         // Add each sender's stop promise to our array
         senderPromises.push(
           sender.stop().catch((err) => {
-            console.error(`Error stopping sender with ID "${id}":`, err)
+            log.error(`Error stopping sender with ID "${id}":`, err)
             // Don't rethrow, we want to continue with other senders
           }),
         )
@@ -284,7 +291,7 @@ export class SenderManager {
         // Also remove error handlers while we're here
         sender.removeSendError(this.handleSenderError)
       } catch (err) {
-        console.error(`Error preparing sender "${id}" for shutdown:`, err)
+        log.error(`Error preparing sender "${id}" for shutdown:`, err)
       }
     }
 
@@ -292,16 +299,16 @@ export class SenderManager {
     if (senderPromises.length > 0) {
       try {
         await Promise.all(senderPromises)
-        console.log('All senders have completed shutdown')
+        log.info('All senders have completed shutdown')
       } catch (err) {
-        console.error('Error waiting for senders to shut down:', err)
+        log.error('Error waiting for senders to shut down:', err)
       }
     }
 
     // Clear the lists regardless of any errors
     this.enabledSenders.clear()
     this.initializingSenders.clear()
-    console.log('All senders disabled and removed from manager')
+    log.info('All senders disabled and removed from manager')
   }
 
   /**
@@ -312,14 +319,14 @@ export class SenderManager {
   public send(universeBuffer: Record<number, number>): void {
     if (this.ipcSender) {
       Promise.resolve(this.ipcSender.send(universeBuffer)).catch((error) => {
-        console.error('Error sending data to IPC sender:', error)
+        log.error('Error sending data to IPC sender:', error)
       })
     }
 
     const sendersToUse = Array.from(this.enabledSenders.entries())
     for (const [_id, sender] of sendersToUse) {
       Promise.resolve(sender.send(universeBuffer)).catch((error) => {
-        console.error(`Error sending data with ${sender.constructor.name}:`, error)
+        log.error(`Error sending data with ${sender.constructor.name}:`, error)
         if (error instanceof SenderError && error.shouldDisable) {
           this.handleSenderError(error)
         }
@@ -331,7 +338,7 @@ export class SenderManager {
    * Shuts down the manager by disabling all senders.
    */
   public async shutdown(): Promise<void> {
-    console.log('SenderManager shutdown: starting')
+    log.info('SenderManager shutdown: starting')
     try {
       await this.disableAllSenders()
 
@@ -340,15 +347,15 @@ export class SenderManager {
         try {
           await this.ipcSender.stop()
           this.ipcSender = null
-          console.log('IPC sender shutdown: completed')
+          log.info('IPC sender shutdown: completed')
         } catch (err) {
-          console.error('Error shutting down IPC sender:', err)
+          log.error('Error shutting down IPC sender:', err)
         }
       }
 
-      console.log('SenderManager shutdown: completed')
+      log.info('SenderManager shutdown: completed')
     } catch (error) {
-      console.error('SenderManager shutdown error:', error)
+      log.error('SenderManager shutdown error:', error)
       throw error
     }
   }

@@ -1,5 +1,6 @@
 import React from 'react'
 import type {
+  NodeCueKind,
   NodeCueMode,
   LogicNode,
   NodeEffectType,
@@ -7,13 +8,25 @@ import type {
   AudioEventNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorMode, NotesVariant } from '../lib/types'
-import { NODE_EFFECT_TYPES } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { getEffectTypesForCueKind } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { getDefaultEventOption } from '../lib/options'
 import type { EventOption } from '../lib/types'
+import { NODE_DRAG_MIME, serializeNodeDrag, type NodeDragPayload } from '../lib/nodeDragPayload'
 
-// Helper function to get button classes for logic nodes based on their type
+const DRAG_CURSOR_CLASSES = 'cursor-grab active:cursor-grabbing'
+
+const makeDragHandlers = (
+  payload: NodeDragPayload,
+): Pick<React.HTMLAttributes<HTMLButtonElement>, 'onDragStart'> & { draggable: true } => ({
+  draggable: true,
+  onDragStart: (event) => {
+    event.dataTransfer.setData(NODE_DRAG_MIME, serializeNodeDrag(payload))
+    event.dataTransfer.effectAllowed = 'copy'
+  },
+})
+
 const getLogicNodeButtonClasses = (logicType: LogicNode['logicType']): string => {
-  const baseClasses = 'border-2 rounded px-2 py-1 text-xs hover:opacity-80 transition-opacity'
+  const baseClasses = `border-2 rounded px-2 py-1 text-xs hover:opacity-80 transition-opacity ${DRAG_CURSOR_CLASSES}`
 
   const isArrayNode =
     logicType === 'array-length' ||
@@ -40,6 +53,7 @@ const getLogicNodeButtonClasses = (logicType: LogicNode['logicType']): string =>
 
 interface NodeCreationSectionsProps {
   activeMode: NodeCueMode
+  cueKind: NodeCueKind
   editorMode: EditorMode
   addEventNode: (
     option: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
@@ -55,22 +69,25 @@ interface NodeCreationSectionsProps {
 
 const EventNodesSection: React.FC<{
   activeMode: NodeCueMode
+  cueKind: NodeCueKind
   addEventNode: (
     option: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
   ) => void
   addEventListenerNode?: () => void
-}> = ({ activeMode, addEventNode, addEventListenerNode }) => (
+}> = ({ activeMode, cueKind, addEventNode, addEventListenerNode }) => (
   <div>
     <h3 className="font-semibold text-sm mb-2">Event Listeners</h3>
     <div className="grid grid-cols-2 gap-2 text-xs">
       <button
-        className="border-2 border-blue-400 bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
-        onClick={() => addEventNode(getDefaultEventOption(activeMode))}>
+        className={`border-2 border-blue-400 bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-100 rounded px-2 py-1 hover:opacity-80 transition-opacity ${DRAG_CURSOR_CLASSES}`}
+        {...makeDragHandlers({ kind: 'system-event' })}
+        onClick={() => addEventNode(getDefaultEventOption(activeMode, cueKind))}>
         System Event Listener
       </button>
       {addEventListenerNode && (
         <button
-          className="border-2 border-purple-400 bg-purple-50 dark:bg-purple-900/40 text-purple-800 dark:text-purple-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+          className={`border-2 border-purple-400 bg-purple-50 dark:bg-purple-900/40 text-purple-800 dark:text-purple-100 rounded px-2 py-1 hover:opacity-80 transition-opacity ${DRAG_CURSOR_CLASSES}`}
+          {...makeDragHandlers({ kind: 'event-listener' })}
           onClick={() => addEventListenerNode()}>
           Custom Event Listener
         </button>
@@ -86,7 +103,8 @@ const EffectListenerSection: React.FC<{
     <h3 className="font-semibold text-sm mb-2">Effect Entry</h3>
     <div className="grid grid-cols-3 gap-2 text-xs">
       <button
-        className="border-2 border-cyan-500 bg-cyan-100 dark:bg-cyan-800/60 text-cyan-900 dark:text-cyan-50 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+        className={`border-2 border-cyan-500 bg-cyan-100 dark:bg-cyan-800/60 text-cyan-900 dark:text-cyan-50 rounded px-2 py-1 hover:opacity-80 transition-opacity ${DRAG_CURSOR_CLASSES}`}
+        {...makeDragHandlers({ kind: 'effect-listener' })}
         onClick={() => addEffectListenerNode()}>
         Effect Listener
       </button>
@@ -95,22 +113,28 @@ const EffectListenerSection: React.FC<{
 )
 
 const ActionNodesSection: React.FC<{
+  cueKind: NodeCueKind
+  editorMode: EditorMode
   addActionNode: (effect: NodeEffectType) => void
-}> = ({ addActionNode }) => (
-  <div>
-    <h3 className="font-semibold text-sm mb-2">Action Nodes</h3>
-    <div className="grid grid-cols-3 gap-2 text-xs">
-      {NODE_EFFECT_TYPES.map((effect) => (
-        <button
-          key={effect}
-          className="border-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded px-2 py-1 hover:opacity-80 transition-opacity"
-          onClick={() => addActionNode(effect)}>
-          {effect}
-        </button>
-      ))}
+}> = ({ cueKind, editorMode, addActionNode }) => {
+  const effectTypes = getEffectTypesForCueKind(editorMode === 'effect' ? 'lighting' : cueKind)
+  return (
+    <div>
+      <h3 className="font-semibold text-sm mb-2">Action Nodes</h3>
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        {effectTypes.map((effect) => (
+          <button
+            key={effect}
+            className={`border-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded px-2 py-1 hover:opacity-80 transition-opacity ${DRAG_CURSOR_CLASSES}`}
+            {...makeDragHandlers({ kind: 'action', effectType: effect })}
+            onClick={() => addActionNode(effect)}>
+            {effect}
+          </button>
+        ))}
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
 const LogicNodesSection: React.FC<{
   addLogicNode: (logicType: LogicNode['logicType']) => void
@@ -121,75 +145,94 @@ const LogicNodesSection: React.FC<{
       {/* Data nodes (orange) */}
       <button
         className={getLogicNodeButtonClasses('config-data')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'config-data' })}
         onClick={() => addLogicNode('config-data')}>
         Config Data
       </button>
       <button
         className={getLogicNodeButtonClasses('cue-data')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'cue-data' })}
         onClick={() => addLogicNode('cue-data')}>
         Cue Data
       </button>
       {/* Logic nodes (amber) */}
       <button
         className={getLogicNodeButtonClasses('conditional')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'conditional' })}
         onClick={() => addLogicNode('conditional')}>
         Conditional
       </button>
-      <button className={getLogicNodeButtonClasses('delay')} onClick={() => addLogicNode('delay')}>
+      <button
+        className={getLogicNodeButtonClasses('delay')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'delay' })}
+        onClick={() => addLogicNode('delay')}>
         Delay
       </button>
       <button
         className={getLogicNodeButtonClasses('lights-from-index')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'lights-from-index' })}
         onClick={() => addLogicNode('lights-from-index')}>
         Lights From Index
       </button>
-      <button className={getLogicNodeButtonClasses('math')} onClick={() => addLogicNode('math')}>
+      <button
+        className={getLogicNodeButtonClasses('math')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'math' })}
+        onClick={() => addLogicNode('math')}>
         Math
       </button>
       <button
         className={getLogicNodeButtonClasses('random')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'random' })}
         onClick={() => addLogicNode('random')}>
         Random
       </button>
       <button
         className={getLogicNodeButtonClasses('variable')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'variable' })}
         onClick={() => addLogicNode('variable')}>
         Variable
       </button>
       {/* Light operations (teal) */}
       <button
         className={getLogicNodeButtonClasses('array-length')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'array-length' })}
         onClick={() => addLogicNode('array-length')}>
         Array Length
       </button>
       <button
         className={getLogicNodeButtonClasses('concat-lights')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'concat-lights' })}
         onClick={() => addLogicNode('concat-lights')}>
         Concat Lights
       </button>
       <button
         className={getLogicNodeButtonClasses('create-pairs')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'create-pairs' })}
         onClick={() => addLogicNode('create-pairs')}>
         Create Pairs
       </button>
       <button
         className={getLogicNodeButtonClasses('reverse-lights')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'reverse-lights' })}
         onClick={() => addLogicNode('reverse-lights')}>
         Reverse Lights
       </button>
       <button
         className={getLogicNodeButtonClasses('shuffle-lights')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'shuffle-lights' })}
         onClick={() => addLogicNode('shuffle-lights')}>
         Shuffle Lights
       </button>
       <button
         className={getLogicNodeButtonClasses('for-each-light')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'for-each-light' })}
         onClick={() => addLogicNode('for-each-light')}>
         For Each Light
       </button>
       {/* Debug node (red) */}
       <button
         className={getLogicNodeButtonClasses('debugger')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'debugger' })}
         onClick={() => addLogicNode('debugger')}>
         Debugger
       </button>
@@ -204,7 +247,8 @@ const RuntimeEventsSection: React.FC<{
     <h3 className="font-semibold text-sm mb-2">Runtime Events</h3>
     <div className="grid grid-cols-2 gap-2 text-xs">
       <button
-        className="border-2 border-purple-400 bg-purple-50 dark:bg-purple-900/40 text-purple-800 dark:text-purple-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+        className={`border-2 border-purple-400 bg-purple-50 dark:bg-purple-900/40 text-purple-800 dark:text-purple-100 rounded px-2 py-1 hover:opacity-80 transition-opacity ${DRAG_CURSOR_CLASSES}`}
+        {...makeDragHandlers({ kind: 'event-raiser' })}
         onClick={() => addEventRaiserNode()}>
         Custom Event Raiser
       </button>
@@ -219,7 +263,8 @@ const EffectNodesSection: React.FC<{
     <h3 className="font-semibold text-sm mb-2">Effect Nodes</h3>
     <div className="grid grid-cols-2 gap-2 text-xs">
       <button
-        className="border-2 border-cyan-400 bg-cyan-50 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-100 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+        className={`border-2 border-cyan-400 bg-cyan-50 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-100 rounded px-2 py-1 hover:opacity-80 transition-opacity ${DRAG_CURSOR_CLASSES}`}
+        {...makeDragHandlers({ kind: 'effect-raiser' })}
         onClick={() => addEffectRaiserNode()}>
         Effect Raiser
       </button>
@@ -234,17 +279,20 @@ const NotesSection: React.FC<{
     <h3 className="font-semibold text-sm mb-2">Documentation</h3>
     <div className="grid grid-cols-3 gap-2 text-xs">
       <button
-        className="border-2 border-blue-400 bg-blue-400 dark:bg-blue-500 text-blue-950 dark:text-blue-950 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+        className={`border-2 border-blue-400 bg-blue-400 dark:bg-blue-500 text-blue-950 dark:text-blue-950 rounded px-2 py-1 hover:opacity-80 transition-opacity ${DRAG_CURSOR_CLASSES}`}
+        {...makeDragHandlers({ kind: 'notes', variant: 'info' })}
         onClick={() => addNotesNode('info')}>
         Info
       </button>
       <button
-        className="border-2 border-yellow-500 bg-yellow-400 dark:bg-yellow-500 text-yellow-900 dark:text-yellow-950 rounded px-2 py-1 hover:opacity-80 transition-opacity font-semibold"
+        className={`border-2 border-yellow-500 bg-yellow-400 dark:bg-yellow-500 text-yellow-900 dark:text-yellow-950 rounded px-2 py-1 hover:opacity-80 transition-opacity font-semibold ${DRAG_CURSOR_CLASSES}`}
+        {...makeDragHandlers({ kind: 'notes', variant: 'notes' })}
         onClick={() => addNotesNode('notes')}>
         Notes
       </button>
       <button
-        className="border-2 border-red-400 bg-red-400 dark:bg-red-500 text-red-950 dark:text-red-950 rounded px-2 py-1 hover:opacity-80 transition-opacity"
+        className={`border-2 border-red-400 bg-red-400 dark:bg-red-500 text-red-950 dark:text-red-950 rounded px-2 py-1 hover:opacity-80 transition-opacity ${DRAG_CURSOR_CLASSES}`}
+        {...makeDragHandlers({ kind: 'notes', variant: 'important' })}
         onClick={() => addNotesNode('important')}>
         Important
       </button>
@@ -254,6 +302,7 @@ const NotesSection: React.FC<{
 
 const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
   activeMode,
+  cueKind,
   editorMode,
   addEventNode,
   addActionNode,
@@ -269,6 +318,7 @@ const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
       {editorMode === 'cue' && (
         <EventNodesSection
           activeMode={activeMode}
+          cueKind={cueKind}
           addEventNode={addEventNode}
           addEventListenerNode={addEventListenerNode}
         />
@@ -278,7 +328,7 @@ const NodeCreationSections: React.FC<NodeCreationSectionsProps> = ({
         <EffectListenerSection addEffectListenerNode={addEffectListenerNode} />
       )}
 
-      <ActionNodesSection addActionNode={addActionNode} />
+      <ActionNodesSection cueKind={cueKind} editorMode={editorMode} addActionNode={addActionNode} />
 
       <LogicNodesSection addLogicNode={addLogicNode} />
 

@@ -1,20 +1,47 @@
-import React from 'react'
-import { useAtom } from 'jotai'
-import { previewRigIdAtom } from '@renderer/atoms'
+import React, { useEffect } from 'react'
+import { getDefaultStore, useAtom } from 'jotai'
+import { lightingPrefsAtom, previewRigIdAtom, resolveLastUsedRigId } from '@renderer/atoms'
+import { getActiveRigs } from '@renderer/ipcApi'
+import { createLogger } from '../../../shared/logger'
 import LightsDmxPreview from '@renderer/components/LightsDmxPreview'
 import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPreview'
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles'
 import CuePreview from '@renderer/components/CuePreview'
-import ActiveGroupsSelector from '@renderer/components/ActiveCueGroupsSelector'
 import DmxRigSelector from '@renderer/components/DmxRigSelector'
 import AudioCueSelectorPanel from '@renderer/components/AudioCueSelectorPanel'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
 import { useCuePreviewInputPlatform } from '@renderer/hooks/useCuePreviewInputPlatform'
 
+const log = createLogger('DmxPreview')
+
 const DmxPreview: React.FC = () => {
+  const [prefs] = useAtom(lightingPrefsAtom)
+  const advancedModeEnabled = prefs.advancedModeEnabled ?? false
   const [selectedRigId, setSelectedRigId] = useAtom(previewRigIdAtom)
   const { selectedRig, rigConfig, dmxValues } = useDmxPreview()
   const platform = useCuePreviewInputPlatform()
+
+  useEffect(() => {
+    if (advancedModeEnabled) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const activeRigs = await getActiveRigs()
+        if (cancelled) return
+        const orderedIds = activeRigs.map((r) => r.id)
+        const currentId = getDefaultStore().get(previewRigIdAtom)
+        const resolved = resolveLastUsedRigId(currentId, orderedIds)
+        if (resolved !== currentId) {
+          setSelectedRigId(resolved)
+        }
+      } catch (e) {
+        log.error('Failed to resolve preview rig when Advanced Mode is off', e)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [advancedModeEnabled, setSelectedRigId])
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
@@ -31,10 +58,10 @@ const DmxPreview: React.FC = () => {
       </p>
 
       <DmxSettingsAccordion startOpen={true} />
-      <ActiveGroupsSelector />
 
-      {/* Rig Selector */}
-      <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />
+      {advancedModeEnabled && (
+        <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />
+      )}
 
       <hr className="my-6 border-gray-200 dark:border-gray-600" />
 
@@ -53,7 +80,9 @@ const DmxPreview: React.FC = () => {
       )}
       {selectedRig === null && (
         <p className="text-gray-600 dark:text-gray-400 mt-4">
-          Please select a rig to preview DMX data.
+          {advancedModeEnabled
+            ? 'Please select a rig to preview DMX data.'
+            : 'No active rigs configured. Create and activate a rig in Lights Layout to see DMX preview.'}
         </p>
       )}
     </div>

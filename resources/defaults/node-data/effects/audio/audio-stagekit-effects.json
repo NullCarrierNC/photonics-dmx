@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "cueVersion": 1,
   "mode": "audio",
   "group": {
     "id": "audio-stagekit-effects",
@@ -338,7 +339,10 @@
                 "source": "variable",
                 "name": "holdTime"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -402,7 +406,10 @@
                 "source": "variable",
                 "name": "extraWait"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -466,7 +473,10 @@
                 "source": "variable",
                 "name": "betweenDelay"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1350,7 +1360,10 @@
                 "source": "variable",
                 "name": "p1Count"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1418,7 +1431,10 @@
                 "source": "variable",
                 "name": "phase2Count"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1486,7 +1502,10 @@
                 "source": "variable",
                 "name": "p3Count"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2195,7 +2214,10 @@
                 "source": "variable",
                 "name": "p1Count"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2263,7 +2285,10 @@
                 "source": "variable",
                 "name": "phase2Count"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2331,7 +2356,10 @@
                 "source": "variable",
                 "name": "p3Count"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2980,7 +3008,10 @@
                 "source": "variable",
                 "name": "aStepsUntil"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3048,7 +3079,10 @@
                 "source": "literal",
                 "value": 1
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3116,7 +3150,10 @@
                 "source": "variable",
                 "name": "aStepsAfter"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3184,7 +3221,10 @@
                 "source": "variable",
                 "name": "bStepsUntil"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3252,7 +3292,10 @@
                 "source": "literal",
                 "value": 1
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3320,7 +3363,10 @@
                 "source": "variable",
                 "name": "bStepsAfter"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1

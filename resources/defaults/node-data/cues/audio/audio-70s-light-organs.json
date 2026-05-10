@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "cueVersion": 1,
   "mode": "audio",
   "group": {
     "id": "audio-70s-light-organs",
@@ -49,7 +50,6 @@
             "threshold": 0.1,
             "hysteresis": 0.04,
             "holdMs": 150,
-            "smoothing": 0.82,
             "color": "#ff0000",
             "nodeLabel": "Bass",
             "outputs": ["enter", "during", "exit"],
@@ -66,7 +66,6 @@
             "threshold": 0.09,
             "hysteresis": 0.05,
             "holdMs": 150,
-            "smoothing": 0.75,
             "color": "#00ff00",
             "nodeLabel": "Mid",
             "outputs": ["enter", "during", "exit"],
@@ -83,7 +82,6 @@
             "threshold": 0.07,
             "hysteresis": 0.05,
             "holdMs": 150,
-            "smoothing": 0.68,
             "color": "#0000ff",
             "nodeLabel": "Treble",
             "outputs": ["enter", "during", "exit"],
@@ -144,7 +142,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -208,7 +209,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -272,7 +276,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -423,11 +430,11 @@
             "y": 0
           },
           "act-70s-tri-bass-on": {
-            "x": 517.7946515390066,
-            "y": 258.34971123437083
+            "x": 489.4413388768263,
+            "y": 581.5843498134268
           },
           "act-70s-tri-mid-on": {
-            "x": 245.71651918254793,
+            "x": 229.94301145437373,
             "y": 263.9104072935879
           },
           "act-70s-tri-treble-on": {
@@ -447,28 +454,29 @@
             "y": 136.43673022071084
           },
           "logic-70s-tri-bass-total": {
-            "x": 507.73360282244784,
-            "y": 200
+            "x": 546.4503945188753,
+            "y": 254.49029942460152
           },
           "logic-70s-tri-gt4": {
-            "x": 507.73360282244784,
-            "y": 256
+            "x": 548.1063495251879,
+            "y": 351.9405438783808
           },
           "logic-70s-tri-set-frontback": {
-            "x": 400,
-            "y": 200
+            "x": 408.9601889850712,
+            "y": 475.7552818755214
           },
           "logic-70s-tri-set-frontonly": {
-            "x": 620,
-            "y": 200
+            "x": 642.1672027350166,
+            "y": 469.44912888829606
           }
         },
         "viewport": {
-          "x": 253.16352883136142,
-          "y": 23.287328734430275,
-          "zoom": 0.9649936721805082
+          "x": 131.5476968597169,
+          "y": 11.989285030640701,
+          "zoom": 0.6643429070482554
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-beat-strobe",
@@ -487,7 +495,7 @@
           {
             "id": "ev-70s-strobe-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.4
@@ -566,7 +574,8 @@
           "y": 161.12843077396974,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-bass-cymbal",
@@ -602,7 +611,6 @@
             "threshold": 0.08,
             "hysteresis": 0.03,
             "holdMs": 200,
-            "smoothing": 0.84,
             "color": "#aa2200",
             "nodeLabel": "Bass",
             "outputs": ["enter", "during", "exit"],
@@ -677,7 +685,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -801,21 +812,22 @@
             "x": 270.0356423949513,
             "y": 117.70542281001599
           },
-          "er-70s-bc-hfc-flash": {
-            "x": 0,
-            "y": 162.41736608371139
-          },
           "logic-482b8306-af1e-49a7-b7b3-ee7060971e5e": {
             "x": 293.2636157918522,
             "y": 217.552288156111
+          },
+          "er-70s-bc-hfc-flash": {
+            "x": 0,
+            "y": 162.41736608371139
           }
         },
         "viewport": {
-          "x": 327.0744414921664,
-          "y": 75.35899595185384,
-          "zoom": 0.7911373011854507
+          "x": 120.9162021542005,
+          "y": 140.5439202628806,
+          "zoom": 1.0837259668447805
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-quarter-chase",
@@ -836,7 +848,7 @@
           {
             "id": "ev-70s-chase-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.4
@@ -896,7 +908,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -960,7 +975,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1028,7 +1046,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1096,7 +1117,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1164,7 +1188,10 @@
                 "source": "literal",
                 "value": 100
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1359,7 +1386,8 @@
           "y": 33.93021922019466,
           "zoom": 0.7323429873168543
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-quarter-chase-random",
@@ -1387,7 +1415,7 @@
           {
             "id": "ev-70s-rchase-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.4
@@ -1447,7 +1475,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1511,7 +1542,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1579,7 +1613,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1647,7 +1684,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1715,7 +1755,10 @@
                 "source": "literal",
                 "value": 100
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1881,20 +1924,20 @@
             "y": 95.65980909247821
           },
           "act-70s-rchase-q1": {
-            "x": -207.333532788252,
-            "y": 576.0306126240486
+            "x": -166.56582541627756,
+            "y": 680.8618601519828
           },
           "act-70s-rchase-q2": {
-            "x": -109.56846227495447,
-            "y": 782.6289653523766
+            "x": -68.80075490298009,
+            "y": 887.4602128803108
           },
           "act-70s-rchase-q3": {
-            "x": 26.410289650998152,
-            "y": 949.5747555567671
+            "x": 67.17799702297253,
+            "y": 1054.4060030847013
           },
           "act-70s-rchase-q4": {
-            "x": 324.3870327108692,
-            "y": 924.6306822857925
+            "x": 365.1547400828436,
+            "y": 1029.4619298137268
           },
           "logic-70s-rchase-add": {
             "x": 0,
@@ -1904,29 +1947,30 @@
             "x": 3.412372838705778,
             "y": 348.3852688074112
           },
+          "logic-70s-rchase-rand-color": {
+            "x": -11.103905940991808,
+            "y": 461.15156105796154
+          },
           "logic-70s-rchase-eq0": {
-            "x": 1.4748965129256248,
-            "y": 449.34206695482135
+            "x": 42.24260388490001,
+            "y": 554.1733144827556
           },
           "logic-70s-rchase-eq1": {
-            "x": 88.81713694986672,
-            "y": 640.8100927460075
+            "x": 129.5848443218411,
+            "y": 745.6413402739418
           },
           "logic-70s-rchase-eq2": {
-            "x": 193.30104029385961,
-            "y": 788.1037328695652
-          },
-          "logic-70s-rchase-rand-color": {
-            "x": 2,
-            "y": 400
+            "x": 234.068747665834,
+            "y": 892.9349803974994
           }
         },
         "viewport": {
-          "x": 360.20279592432746,
-          "y": 33.93021922019466,
-          "zoom": 0.7323429873168543
+          "x": 204.87194935600104,
+          "y": -28.706000988599158,
+          "zoom": 0.6973718331752026
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-eight-band",
@@ -2137,7 +2181,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2201,7 +2248,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2265,7 +2315,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2329,7 +2382,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2393,7 +2449,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2457,7 +2516,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2521,7 +2583,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2585,7 +2650,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2838,7 +2906,8 @@
           "y": -107.22727272727269,
           "zoom": 0.5769962738160228
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-instrument-isolation",
@@ -2979,7 +3048,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3043,7 +3115,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3107,7 +3182,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3297,7 +3375,8 @@
           "y": 186.95143454093898,
           "zoom": 0.6792431422744739
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-70s-layered-spectrum",
@@ -3326,7 +3405,6 @@
             "threshold": 0.1,
             "hysteresis": 0.04,
             "holdMs": 180,
-            "smoothing": 0.82,
             "color": "#ff0000",
             "nodeLabel": "Kick & Bass",
             "outputs": ["enter", "during", "exit"],
@@ -3343,7 +3421,6 @@
             "threshold": 0.09,
             "hysteresis": 0.05,
             "holdMs": 150,
-            "smoothing": 0.75,
             "color": "#00ff00",
             "nodeLabel": "Low Mid & Mid",
             "outputs": ["enter", "during", "exit"],
@@ -3360,7 +3437,6 @@
             "threshold": 0.06,
             "hysteresis": 0.05,
             "holdMs": 150,
-            "smoothing": 0.68,
             "color": "#0000ff",
             "nodeLabel": "Upper Mid & High",
             "outputs": ["enter", "during", "exit"],
@@ -3421,7 +3497,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3485,7 +3564,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3549,7 +3631,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3632,37 +3717,38 @@
             "x": 0,
             "y": 0
           },
-          "logic-70s-ls-low-level": {
-            "x": 400,
-            "y": 120
-          },
-          "logic-70s-ls-mid-level": {
-            "x": 200,
-            "y": 120
-          },
-          "logic-70s-ls-high-level": {
-            "x": 0,
-            "y": 120
-          },
           "act-70s-ls-low-on": {
-            "x": 400,
-            "y": 260
+            "x": 446.5916655679705,
+            "y": 239.61614631401278
           },
           "act-70s-ls-mid-on": {
-            "x": 200,
-            "y": 260
+            "x": 172.33619856901737,
+            "y": 245.44010451000918
           },
           "act-70s-ls-high-on": {
-            "x": 0,
-            "y": 260
+            "x": -94.63932068494057,
+            "y": 246.8960940590082
+          },
+          "logic-70s-ls-low-level": {
+            "x": 413.1039059409918,
+            "y": 118.54401045100087
+          },
+          "logic-70s-ls-mid-level": {
+            "x": 188.35208360800732,
+            "y": 118.54401045100087
+          },
+          "logic-70s-ls-high-level": {
+            "x": -27.66380143098263,
+            "y": 117.08802090200174
           }
         },
         "viewport": {
-          "x": 0,
-          "y": 0,
-          "zoom": 0.75
+          "x": 203.556938577464,
+          "y": 119.10311005168836,
+          "zoom": 0.6868181167148115
         }
-      }
+      },
+      "kind": "lighting"
     }
   ],
   "bundled": true

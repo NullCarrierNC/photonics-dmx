@@ -1,6 +1,11 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
-import { useAtom } from 'jotai'
-import { audioListenerEnabledAtom, previewRigIdAtom } from '@renderer/atoms'
+import { getDefaultStore, useAtom } from 'jotai'
+import {
+  audioListenerEnabledAtom,
+  lightingPrefsAtom,
+  previewRigIdAtom,
+  resolveLastUsedRigId,
+} from '@renderer/atoms'
 import { EffectSelector } from '../../../photonics-dmx/types'
 import EffectsDropdown from '../components/EffectSelector'
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles'
@@ -14,6 +19,7 @@ import CueRegistrySelector from '@renderer/components/CueRegistrySelector'
 import CueSimulationAbout from './CueSimulation/CueSimulationAbout'
 import CueSimulationActions from './CueSimulation/CueSimulationActions'
 import CueSimulationInstrument from './CueSimulation/CueSimulationInstrument'
+import CueSimulationMotion from './CueSimulation/CueSimulationMotion'
 import {
   startTestEffect,
   stopTestEffect,
@@ -21,12 +27,16 @@ import {
   savePrefs,
   getCueGroups,
   getAvailableCues,
+  getActiveRigs,
   simulateBeat,
   simulateKeyframe,
   simulateMeasure,
   simulateInstrumentNote,
+  stopMotionCueSimulation,
 } from '../ipcApi'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('CueSimulation')
 
 type CueRegistryType = 'YARG' | 'RB3E'
 
@@ -37,8 +47,12 @@ type CueGroup = {
   cueTypes: string[]
 }
 
+const isYargVisualCueGroup = (g: CueGroup) => g.cueTypes.length > 0
+
 const CueSimulation: React.FC = () => {
   const [isAudioReactiveEnabled] = useAtom(audioListenerEnabledAtom)
+  const [lightingPrefs] = useAtom(lightingPrefsAtom)
+  const advancedModeEnabled = lightingPrefs.advancedModeEnabled ?? false
   const [selectedEffect, setSelectedEffect] = useState<EffectSelector | null>(null)
   const [selectedRegistryType, setSelectedRegistryType] = useState<CueRegistryType>('YARG')
   const [selectedGroup, setSelectedGroup] = useState<string>('Select')
@@ -79,12 +93,45 @@ const CueSimulation: React.FC = () => {
   const hasLoadedSavedEffect = useRef(false)
   const savedEffectIdRef = useRef<string | null>(null)
 
+  useEffect(() => {
+    if (!advancedModeEnabled) {
+      stopMotionCueSimulation().catch((error) => {
+        log.error('Error stopping motion cue simulation when Advanced Mode is disabled', error)
+      })
+    }
+  }, [advancedModeEnabled])
+
+  useEffect(() => {
+    if (advancedModeEnabled) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const activeRigs = await getActiveRigs()
+        if (cancelled) return
+        const orderedIds = activeRigs.map((r) => r.id)
+        const currentId = getDefaultStore().get(previewRigIdAtom)
+        const resolved = resolveLastUsedRigId(currentId, orderedIds)
+        if (resolved !== currentId) {
+          setSelectedRigId(resolved)
+        }
+      } catch (e) {
+        log.error('Failed to resolve preview rig when Advanced Mode is off', e)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [advancedModeEnabled, setSelectedRigId])
+
   // Cleanup effect: stop any running test effects when component unmounts
   useEffect(() => {
     return () => {
       // Stop any running test effects when leaving the page
       stopTestEffect().catch((error) => {
-        console.error('Error stopping test effect on unmount:', error)
+        log.error('Error stopping test effect on unmount:', error)
+      })
+      stopMotionCueSimulation().catch((error) => {
+        log.error('Error stopping motion cue simulation on unmount:', error)
       })
       // Clear any pending save timeout
       if (saveTimeoutRef.current) {
@@ -116,26 +163,23 @@ const CueSimulation: React.FC = () => {
             setSelectedInstrument(savedSettings.instrument)
           }
           if (savedSettings.groupId) {
-            // Store saved effect ID for later loading
-            if (savedSettings.effectId) {
-              savedEffectIdRef.current = savedSettings.effectId
-            }
-            // Set group ID first, which will trigger group loading
-            setSelectedGroupId(savedSettings.groupId)
-            // Get group display name
             try {
               const allGroups = await getCueGroups()
               const group = allGroups.find((g: CueGroup) => g.id === savedSettings.groupId)
-              if (group) {
+              if (group && isYargVisualCueGroup(group)) {
+                if (savedSettings.effectId) {
+                  savedEffectIdRef.current = savedSettings.effectId
+                }
+                setSelectedGroupId(savedSettings.groupId)
                 setSelectedGroup(group.name)
               }
             } catch (error) {
-              console.error('Error fetching group details during load:', error)
+              log.error('Error fetching group details during load:', error)
             }
           }
         }
       } catch (error) {
-        console.error('Error loading simulation settings:', error)
+        log.error('Error loading simulation settings:', error)
       } finally {
         isLoadingFromPrefs.current = false
       }
@@ -169,7 +213,7 @@ const CueSimulation: React.FC = () => {
           },
         })
       } catch (error) {
-        console.error('Error saving simulation settings:', error)
+        log.error('Error saving simulation settings:', error)
       }
     }, 500) // 500ms debounce
   }, [
@@ -221,7 +265,7 @@ const CueSimulation: React.FC = () => {
             savedEffectIdRef.current = null
           }
         } catch (error) {
-          console.error('Error loading saved effect:', error)
+          log.error('Error loading saved effect:', error)
           hasLoadedSavedEffect.current = true
           savedEffectIdRef.current = null
         }
@@ -254,13 +298,13 @@ const CueSimulation: React.FC = () => {
   }, [selectedGroupId])
 
   const handleEffectSelect = useCallback(async (effect: EffectSelector) => {
-    console.log('Effect selected:', effect)
+    log.info('Effect selected:', effect)
     setSelectedEffect(effect)
   }, [])
 
   const handleTestEffect = async () => {
     if (!selectedEffect) {
-      console.log('No effect selected')
+      log.info('No effect selected')
       return
     }
 
@@ -272,10 +316,10 @@ const CueSimulation: React.FC = () => {
         selectedGroupId || undefined,
       )
       if (!result.success) {
-        console.error('Failed to start test effect:', result.error)
+        log.error('Failed to start test effect:', result.error)
       }
     } catch (error) {
-      console.error('Error starting test effect:', error)
+      log.error('Error starting test effect:', error)
     }
   }
 
@@ -283,7 +327,7 @@ const CueSimulation: React.FC = () => {
     try {
       await stopTestEffect()
     } catch (error) {
-      console.error('Error stopping test effect:', error)
+      log.error('Error stopping test effect:', error)
     }
   }
 
@@ -329,7 +373,7 @@ const CueSimulation: React.FC = () => {
         effectId: selectedEffect?.id || null,
       })
     } catch (error) {
-      console.error('Error simulating instrument note:', error)
+      log.error('Error simulating instrument note:', error)
     }
   }
 
@@ -344,16 +388,19 @@ const CueSimulation: React.FC = () => {
       // Handle group selection - only single groups are supported
       if (groupIds.length === 1) {
         const groupId = groupIds[0]
-        setSelectedGroupId(groupId) // Store the actual group ID
         // Clear selected effect when group changes so EffectsDropdown will show "- Select -"
         setSelectedEffect(null)
 
-        // Get group details to determine display name
         try {
           const allGroups = await getCueGroups()
-          const group = allGroups.find((g: CueGroup) => g.id === groupId)
-          const displayName = group ? group.name : groupId
-
+          const group = allGroups.find((g: CueGroup) => g.id === groupId && isYargVisualCueGroup(g))
+          if (!group) {
+            setSelectedGroup('')
+            setSelectedGroupId('')
+            return
+          }
+          setSelectedGroupId(groupId)
+          const displayName = group.name
           // Only update state if the selection actually changed
           setSelectedGroup((prevSelectedGroup) => {
             if (prevSelectedGroup !== displayName) {
@@ -362,8 +409,9 @@ const CueSimulation: React.FC = () => {
             return prevSelectedGroup
           })
         } catch (error) {
-          console.error('Error fetching group details:', error)
-          setSelectedGroup(groupId)
+          log.error('Error fetching group details:', error)
+          setSelectedGroup('')
+          setSelectedGroupId('')
         }
       } else {
         // No group selected - reset to empty state
@@ -391,15 +439,27 @@ const CueSimulation: React.FC = () => {
         } else {
           // Single group selection
           const groups = await getCueGroups()
-          const group = groups.find((g: CueGroup) => g.id === selectedGroupId)
+          const group = groups.find(
+            (g: CueGroup) => g.id === selectedGroupId && isYargVisualCueGroup(g),
+          )
           if (group) {
             setCurrentGroup(group)
 
             // Don't fetch effects here - let the EffectsDropdown handle it
+          } else {
+            setSelectedGroupId('')
+            setSelectedGroup('')
+            setSelectedEffect(null)
+            setCurrentGroup({
+              id: 'none',
+              name: 'No Group Selected',
+              description: 'Please select a cue group to view its effects.',
+              cueTypes: [],
+            })
           }
         }
       } catch (error) {
-        console.error('Error fetching group info:', error)
+        log.error('Error fetching group info:', error)
       }
     }
 
@@ -419,8 +479,9 @@ const CueSimulation: React.FC = () => {
 
       <CueSimulationAbout isOpen={isAboutOpen} onToggle={() => setIsAboutOpen(!isAboutOpen)} />
 
-      {/* Rig Selector */}
-      <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />
+      {advancedModeEnabled && (
+        <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />
+      )}
 
       <div className="my-6">
         <h2 className="text-xl font-bold mb-2 text-gray-800 dark:text-gray-200">
@@ -513,6 +574,7 @@ const CueSimulation: React.FC = () => {
             onSimulateNote={handleSimulateInstrumentNote}
             disabled={!selectedGroupId}
           />
+          {advancedModeEnabled && <CueSimulationMotion />}
         </>
       )}
 
@@ -548,7 +610,9 @@ const CueSimulation: React.FC = () => {
       )}
       {selectedRig === null && (
         <p className="text-gray-600 dark:text-gray-400 mt-4">
-          Please select a rig to preview DMX data.
+          {advancedModeEnabled
+            ? 'Please select a rig to preview DMX data.'
+            : 'No active rigs configured. Create and activate a rig in Lights Layout to see DMX preview.'}
         </p>
       )}
     </div>

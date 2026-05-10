@@ -4,6 +4,8 @@ import { getEasingFunction } from '../../easing'
 
 import { LightStateManager } from './LightStateManager'
 import type { FrameContext } from './interfaces'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('LightTransitionController')
 
 /**
  * Holds data for each layer's transition on a specific light.
@@ -77,7 +79,7 @@ export class LightTransitionController {
     // CRITICAL: Reject new transitions if we're in the middle of clearing
     // This prevents race conditions where events trigger new transitions during cleanup
     if (this._clearingTransitions) {
-      console.warn(
+      log.warn(
         `[LTC] Rejected setTransition for light ${lightId} layer ${layer} - clearing in progress`,
       )
       return
@@ -243,6 +245,52 @@ export class LightTransitionController {
     // This ensures the light updates immediately rather than waiting for the next update cycle
     this.calculateFinalColorForLight(lightId)
     //  this._lightStateManager.publishLightStates();
+  }
+
+  /**
+   * Strips pan/tilt from every layer state so merged output omits them and DmxPublisher
+   * can fall back to fixture panHome/tiltHome. Invoked on the frame after motion cues stop.
+   */
+  public clearPanTilt(): void {
+    for (const [lightId, layerMap] of this._currentLayerStates) {
+      for (const [layer, state] of layerMap) {
+        const next: RGBIO = { ...state }
+        delete next.pan
+        delete next.tilt
+        layerMap.set(layer, next)
+      }
+      this.calculateFinalColorForLight(lightId)
+    }
+  }
+
+  /**
+   * Writes pan/tilt (and transparent RGB) for a layer without a transition.
+   * Used by {@link MotionPatternEngine} so parametric motion participates in layer blending.
+   */
+  public setGeneratorLayerState(lightId: string, layer: number, state: RGBIO): void {
+    if (this._clearingTransitions) {
+      return
+    }
+    if (!this._currentLayerStates.has(lightId)) {
+      this._currentLayerStates.set(lightId, new Map())
+    }
+    this._currentLayerStates.get(lightId)!.set(layer, { ...state })
+  }
+
+  /**
+   * Removes generator-driven layer state and republishes merged output.
+   */
+  public removeGeneratorLayer(lightId: string, layer: number): void {
+    const currentLayerMap = this._currentLayerStates.get(lightId)
+    if (!currentLayerMap) {
+      return
+    }
+    currentLayerMap.delete(layer)
+    if (currentLayerMap.size === 0) {
+      this._currentLayerStates.delete(lightId)
+    }
+    this.calculateFinalColorForLight(lightId)
+    this._lightStateManager.publishLightStates()
   }
 
   /**
@@ -485,7 +533,7 @@ export class LightTransitionController {
         this._transitionsByLight.delete(lightId)
       })
     } catch (error) {
-      console.error('Critical error in transition processing:', error)
+      log.error('Critical error in transition processing:', error)
       this.emergencyStateReset()
     }
 
@@ -632,9 +680,9 @@ export class LightTransitionController {
         break
     }
 
-    // Handle optional properties
-    if (newState.pan !== undefined) out.pan = newState.pan
-    if (newState.tilt !== undefined) out.tilt = newState.tilt
+    // Handle optional properties: carry forward from the lower layer when the incoming layer omits them
+    out.pan = newState.pan !== undefined ? newState.pan : current.pan
+    out.tilt = newState.tilt !== undefined ? newState.tilt : current.tilt
 
     return out
   }
@@ -706,7 +754,7 @@ export class LightTransitionController {
   public shutdown(): void {
     this._transitionsByLight.clear()
     this._currentLayerStates.clear()
-    console.log('LightTransitionController has been shut down.')
+    log.info('LightTransitionController has been shut down.')
   }
 
   /**
@@ -805,12 +853,12 @@ export class LightTransitionController {
       corrected.blendMode = 'replace'
     }
 
-    // Validate optional pan/tilt values
+    // Validate optional pan/tilt values (normalised 0–100 % of fixture range)
     if (corrected.pan !== undefined) {
-      corrected.pan = Math.max(-32768, Math.min(32767, corrected.pan))
+      corrected.pan = Math.max(0, Math.min(100, corrected.pan))
     }
     if (corrected.tilt !== undefined) {
-      corrected.tilt = Math.max(-32768, Math.min(32767, corrected.tilt))
+      corrected.tilt = Math.max(0, Math.min(100, corrected.tilt))
     }
 
     return corrected
@@ -825,7 +873,7 @@ export class LightTransitionController {
         const corrected = this.validateAndCorrectLightState(lightId, state)
         if (JSON.stringify(state) !== JSON.stringify(corrected)) {
           const position = this.getLightPosition(lightId)
-          console.warn(
+          log.warn(
             `Corrected invalid state for light ${lightId} (position ${position}), layer ${layer}`,
           )
           layerMap.set(layer, corrected)
@@ -845,7 +893,7 @@ export class LightTransitionController {
       for (const [layer, transitionData] of layerMap.entries()) {
         if (currentTime - transitionData.startTime > maxTransitionAge) {
           const position = this.getLightPosition(lightId)
-          console.warn(
+          log.warn(
             `Removing orphaned transition for light ${lightId} (position ${position}), layer ${layer}`,
           )
           layerMap.delete(layer)
@@ -874,7 +922,7 @@ export class LightTransitionController {
    * Emergency state reset for critical error recovery
    */
   private emergencyStateReset(): void {
-    console.error('LightTransitionController: Performing emergency state reset')
+    log.error('LightTransitionController: Performing emergency state reset')
 
     // Force all lights to black state first
     const allLightIds = this._lightStateManager.getTrackedLightIds()

@@ -1,94 +1,40 @@
 import { IpcMain } from 'electron'
-import { ControllerManager } from '../controllers/ControllerManager'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
-import { CueType } from '../../photonics-dmx/cues/types/cueTypes'
 import { ipcError } from './ipcResult'
+import { isNonEmptyString, validateCueType } from './inputValidation'
 import { LIGHT } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('cue-group-handlers')
 
 /**
- * Set up cue-group and consistency IPC handlers.
+ * Set up YARG cue group registry IPC handlers (enabled groups, source group, consistency status).
+ * Cue selection preferences (consistency window, motion min-hold, group selection mode) live in
+ * cue-selection-prefs-handlers.ts.
  */
-export function setupCueGroupHandlers(
-  ipcMain: IpcMain,
-  controllerManager: ControllerManager,
-): void {
+export function setupCueGroupHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(LIGHT.GET_CUE_GROUPS, async () => {
     const registry = YargCueRegistry.getInstance()
     const groupIds = registry.getAllGroups()
-    return groupIds.map((groupId) => {
-      const group = registry.getGroup(groupId)
-      return {
-        id: groupId,
-        name: group!.name,
-        description: group!.description,
-        cueTypes: group ? Array.from(group.cues.keys()) : [],
-      }
-    })
+    return groupIds
+      .map((groupId) => {
+        const group = registry.getGroup(groupId)
+        if (!group || group.cues.size === 0) {
+          return null
+        }
+        return {
+          id: groupId,
+          name: group.name,
+          description: group.description,
+          cueTypes: Array.from(group.cues.keys()),
+        }
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null)
   })
 
-  ipcMain.handle(LIGHT.GET_ACTIVE_CUE_GROUPS, async () => {
-    const registry = YargCueRegistry.getInstance()
-    const activeGroupIds = registry.getActiveGroups()
-    console.log('Active group IDs:', activeGroupIds)
-    return activeGroupIds.map((groupId) => {
-      const group = registry.getGroup(groupId)
-      console.log(`Group ${groupId}:`, group ? 'found' : 'not found')
-      return {
-        id: groupId,
-        name: group!.name,
-        description: group!.description,
-        cueTypes: group ? Array.from(group.cues.keys()) : [],
-      }
-    })
-  })
-
-  ipcMain.handle(LIGHT.ACTIVATE_CUE_GROUP, async (_, groupId: string) => {
-    try {
-      const registry = YargCueRegistry.getInstance()
-      const group = registry.getGroup(groupId)
-      if (!group) {
-        return { success: false, error: `Group '${groupId}' not found` }
-      }
-      const result = registry.activateGroup(groupId)
-      if (result) {
-        console.log(`Activated cue group: ${group.name}`)
-        return { success: true }
-      }
-      console.error(`Failed to activate group '${group.name}'. It may not be enabled.`)
-      return {
-        success: false,
-        error: `Failed to activate group '${group.name}'. It may not be enabled.`,
-      }
-    } catch (error) {
-      console.error('Error activating cue group:', error)
-      return ipcError(error)
+  ipcMain.handle(LIGHT.ENABLE_CUE_GROUP, async (_, groupId: unknown) => {
+    if (!isNonEmptyString(groupId)) {
+      return { success: false, error: 'groupId is required' }
     }
-  })
-
-  ipcMain.handle(LIGHT.DEACTIVATE_CUE_GROUP, async (_, groupId: string) => {
-    try {
-      const registry = YargCueRegistry.getInstance()
-      const group = registry.getGroup(groupId)
-      if (!group) {
-        return { success: false, error: `Group '${groupId}' not found` }
-      }
-      const result = registry.deactivateGroup(groupId)
-      if (result) {
-        console.log(`Deactivated cue group: ${group.name}`)
-        return { success: true }
-      }
-      console.error(`Failed to deactivate group '${group.name}'. It may be the default group.`)
-      return {
-        success: false,
-        error: `Failed to deactivate group '${group.name}'. It may be the default group.`,
-      }
-    } catch (error) {
-      console.error('Error deactivating cue group:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(LIGHT.ENABLE_CUE_GROUP, async (_, groupId: string) => {
     try {
       const registry = YargCueRegistry.getInstance()
       const group = registry.getGroup(groupId)
@@ -97,18 +43,21 @@ export function setupCueGroupHandlers(
       }
       const result = registry.enableGroup(groupId)
       if (result) {
-        console.log(`Enabled cue group: ${group.name}`)
+        log.info(`Enabled cue group: ${group.name}`)
         return { success: true }
       }
-      console.error(`Failed to enable group '${group.name}'.`)
+      log.error(`Failed to enable group '${group.name}'.`)
       return { success: false, error: `Failed to enable group '${group.name}'.` }
     } catch (error) {
-      console.error('Error enabling cue group:', error)
+      log.error('Error enabling cue group:', error)
       return ipcError(error)
     }
   })
 
-  ipcMain.handle(LIGHT.DISABLE_CUE_GROUP, async (_, groupId: string) => {
+  ipcMain.handle(LIGHT.DISABLE_CUE_GROUP, async (_, groupId: unknown) => {
+    if (!isNonEmptyString(groupId)) {
+      return { success: false, error: 'groupId is required' }
+    }
     try {
       const registry = YargCueRegistry.getInstance()
       const group = registry.getGroup(groupId)
@@ -117,69 +66,28 @@ export function setupCueGroupHandlers(
       }
       const result = registry.disableGroup(groupId)
       if (result) {
-        console.log(`Disabled cue group: ${group.name}`)
+        log.info(`Disabled cue group: ${group.name}`)
         return { success: true }
       }
-      console.error(`Failed to disable group '${group.name}'. It may be the default group.`)
+      log.error(`Failed to disable group '${group.name}'. It may be the default group.`)
       return {
         success: false,
         error: `Failed to disable group '${group.name}'. It may be the default group.`,
       }
     } catch (error) {
-      console.error('Error disabling cue group:', error)
+      log.error('Error disabling cue group:', error)
       return ipcError(error)
     }
   })
 
-  ipcMain.handle(LIGHT.SET_ACTIVE_CUE_GROUPS, async (_, groupIds: string[]) => {
-    try {
-      const registry = YargCueRegistry.getInstance()
-      const invalidGroups: string[] = []
-      const disabledGroups: string[] = []
-      const validGroupIds: string[] = []
-      const enabledGroupIds = registry.getEnabledGroups()
-
-      for (const groupId of groupIds) {
-        if (!registry.getGroup(groupId)) {
-          invalidGroups.push(groupId)
-        } else if (!enabledGroupIds.includes(groupId)) {
-          disabledGroups.push(groupId)
-        } else {
-          validGroupIds.push(groupId)
-        }
-      }
-
-      if (invalidGroups.length > 0) {
-        console.error(`Cannot set active groups: groups not found: ${invalidGroups.join(', ')}`)
-      }
-      if (disabledGroups.length > 0) {
-        console.error(`Cannot set active groups: groups not enabled: ${disabledGroups.join(', ')}`)
-      }
-      if (validGroupIds.length === 0) {
-        return {
-          success: false,
-          error: `No valid groups provided. Invalid: ${invalidGroups.join(', ')}, Disabled: ${disabledGroups.join(', ')}`,
-        }
-      }
-
-      registry.setActiveGroups(validGroupIds)
-      console.log(`Set active cue groups: ${validGroupIds.join(', ')}`)
-      return {
-        success: true,
-        activeGroups: validGroupIds,
-        invalidGroups: invalidGroups.length > 0 ? invalidGroups : undefined,
-        disabledGroups: disabledGroups.length > 0 ? disabledGroups : undefined,
-      }
-    } catch (error) {
-      console.error('Error setting active cue groups:', error)
-      return ipcError(error)
+  ipcMain.handle(LIGHT.GET_CUE_SOURCE_GROUP, async (_, cueType: unknown) => {
+    const validated = validateCueType(cueType)
+    if (!validated.ok) {
+      return { success: false, error: validated.error }
     }
-  })
-
-  ipcMain.handle(LIGHT.GET_CUE_SOURCE_GROUP, async (_, cueType: string) => {
     try {
       const registry = YargCueRegistry.getInstance()
-      const cueState = registry.getCueState(cueType as CueType)
+      const cueState = registry.getCueState(validated.value)
       if (cueState) {
         return {
           success: true,
@@ -191,59 +99,9 @@ export function setupCueGroupHandlers(
           limit: cueState.limit,
         }
       }
-      return { success: false, error: `No state found for cue: ${cueType}` }
+      return { success: false, error: `No state found for cue: ${validated.value}` }
     } catch (error) {
-      console.error('Error getting cue source group:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(LIGHT.SET_CUE_CONSISTENCY_WINDOW, async (_, windowMs: number) => {
-    try {
-      controllerManager.getConfig().setCueConsistencyWindow(windowMs)
-      const registry = YargCueRegistry.getInstance()
-      registry.setCueConsistencyWindow(windowMs)
-      return { success: true, windowMs }
-    } catch (error) {
-      console.error('Error setting cue consistency window:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(LIGHT.GET_CUE_CONSISTENCY_WINDOW, async () => {
-    try {
-      const windowMs = controllerManager.getConfig().getCueConsistencyWindow()
-      return { success: true, windowMs }
-    } catch (error) {
-      console.error('Error getting cue consistency window:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(
-    LIGHT.SET_CUE_GROUP_SELECTION_MODE,
-    async (_, mode: 'oncePerSong' | 'withinSong') => {
-      try {
-        if (mode !== 'oncePerSong' && mode !== 'withinSong') {
-          return ipcError(new Error('Invalid mode: must be "oncePerSong" or "withinSong"'))
-        }
-        await controllerManager.getConfig().setCueGroupSelectionMode(mode)
-        const registry = YargCueRegistry.getInstance()
-        registry.setCueGroupSelectionMode(mode)
-        return { success: true, mode }
-      } catch (error) {
-        console.error('Error setting cue group selection mode:', error)
-        return ipcError(error)
-      }
-    },
-  )
-
-  ipcMain.handle(LIGHT.GET_CUE_GROUP_SELECTION_MODE, async () => {
-    try {
-      const mode = controllerManager.getConfig().getCueGroupSelectionMode()
-      return { success: true, mode }
-    } catch (error) {
-      console.error('Error getting cue group selection mode:', error)
+      log.error('Error getting cue source group:', error)
       return ipcError(error)
     }
   })
@@ -254,7 +112,7 @@ export function setupCueGroupHandlers(
       const status = registry.getConsistencyStatus()
       return { success: true, status }
     } catch (error) {
-      console.error('Error getting consistency status:', error)
+      log.error('Error getting consistency status:', error)
       return ipcError(error)
     }
   })

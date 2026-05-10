@@ -1,3 +1,5 @@
+import type { Brightness, Color } from '../../types'
+
 /**
  * Audio analysis data structure for lighting control
  * Emitted by AudioInputListener as 'audio:data' events
@@ -70,10 +72,10 @@ export interface AudioLightingData {
   bandOnsets?: Record<string, number>
 }
 
-/** Minimum value for per-band gain multiplier (Audio Settings frequency bands). */
+/** Minimum value for per-band gain multiplier (Preferences → Audio frequency bands). */
 export const AUDIO_BAND_GAIN_MIN = 0.1
 
-/** Maximum value for per-band gain multiplier (Audio Settings frequency bands). */
+/** Maximum value for per-band gain multiplier (Preferences → Audio frequency bands). */
 export const AUDIO_BAND_GAIN_MAX = 10
 
 /**
@@ -143,6 +145,28 @@ export interface AudioConfig {
   strobeTriggerThreshold: number
   /** Probability (0–100 %) that the strobe fires when the threshold is exceeded (default: 100) */
   strobeProbability: number
+
+  /**
+   * When audio Game Mode is on, treat sustained low overall energy as menu/idle: static colour, no motion.
+   * Only evaluated while Game Mode is enabled.
+   */
+  idleDetection: AudioIdleDetectionConfig
+}
+
+/**
+ * Idle/menu detection for audio-reactive Game Mode (overall energy vs threshold).
+ */
+export interface AudioIdleDetectionConfig {
+  /** When false, idle detection is never applied. */
+  enabled: boolean
+  /** Overall energy (0–100 %) below this counts as “low” for entering idle. */
+  thresholdPct: number
+  /** Seconds overall energy must stay below the threshold before entering idle. */
+  minIdleSeconds: number
+  /** Seconds overall energy must stay at or above the threshold before resuming normal cues. */
+  resumeSeconds: number
+  idleColor: Color
+  idleBrightness: Brightness
 }
 
 /**
@@ -155,6 +179,12 @@ export interface AudioGameModeConfig {
   cueDurationMin: number
   /** Maximum seconds before the next cue switch is scheduled */
   cueDurationMax: number
+}
+
+/** Main-process game mode schedule snapshot (wall-clock deadline until next switch window ends). */
+export interface AudioGameModeSchedulePayload {
+  deadlineMs: number | null
+  pending: boolean
 }
 
 export const DEFAULT_AUDIO_GAME_MODE: AudioGameModeConfig = {

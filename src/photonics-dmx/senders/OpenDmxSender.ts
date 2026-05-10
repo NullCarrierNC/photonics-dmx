@@ -13,7 +13,10 @@
 
 import { EventEmitter } from 'events'
 import { EnttecOpenDMXUSBDevice } from 'enttec-open-dmx-usb'
+import { createLogger } from '../../shared/logger'
 import { BaseSender, SenderError } from './BaseSender'
+
+const log = createLogger('OpenDmxSender')
 
 /** Function that blocks for n microseconds (used for precise DMX break timing). */
 type UsleepFn = (microSeconds: number) => unknown
@@ -129,7 +132,7 @@ class OpenDmxDeviceAdapter implements IOpenDmxDeviceAdapter {
           port.close((err?: Error | null) => (err ? reject(err) : resolve()))
         })
       } catch (err) {
-        console.error('OpenDMX serial port close failed (port may already be closed):', err)
+        log.error('OpenDMX serial port close failed (port may already be closed):', err)
       }
     }
     this.device = null
@@ -190,23 +193,23 @@ export class OpenDmxSender extends BaseSender {
       return
     }
 
-    console.log(`Stopping OpenDMX sender on port ${this.port}...`)
+    log.info(`Stopping OpenDMX sender on port ${this.port}...`)
 
     try {
       try {
         await this.device.stop()
-        console.log('Sent zero values to all DMX channels and stopped sending')
+        log.info('Sent zero values to all DMX channels and stopped sending')
       } catch (err) {
-        console.error('Failed to stop OpenDMX device:', err)
+        log.error('Failed to stop OpenDMX device:', err)
       }
 
       this.eventEmitter.removeAllListeners()
-      console.log('Removed all event listeners')
+      log.info('Removed all event listeners')
     } catch (outerErr) {
-      console.error('Unhandled error during OpenDmxSender stop:', outerErr)
+      log.error('Unhandled error during OpenDmxSender stop:', outerErr)
     } finally {
       this.device = undefined
-      console.log('OpenDmxSender cleanup completed')
+      log.info('OpenDmxSender cleanup completed')
     }
   }
 
@@ -215,7 +218,7 @@ export class OpenDmxSender extends BaseSender {
       this.verifySenderStarted()
       this.device!.writeChannels(universeBuffer)
     } catch (err) {
-      console.error('OpenDmxSender error:', err)
+      log.error('OpenDmxSender error:', err)
       const errorEvent = new SenderError(err, { senderId: 'opendmx' })
       this.eventEmitter.emit('SenderError', errorEvent)
     }

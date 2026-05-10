@@ -1,5 +1,9 @@
-import { AudioCueType } from '../types/audioCueTypes'
+import { AudioCueType, AudioMotionCueRef } from '../types/audioCueTypes'
+import type { MotionGroupSelectionMode } from '../types/nodeCueTypes'
 import { IAudioCue } from '../interfaces/IAudioCue'
+import { MotionSelectionState } from './MotionSelectionState'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('AudioCueRegistry')
 
 /**
  * Interface for an audio cue group
@@ -9,6 +13,8 @@ export interface AudioCueGroup {
   name: string
   description: string
   cues: Map<AudioCueType, IAudioCue>
+  /** Audio motion programs, keyed by cue definition id (parallel to lighting). */
+  motionCues?: Map<string, IAudioCue>
 }
 
 /**
@@ -29,6 +35,8 @@ export class AudioCueRegistry {
 
   /** Per-group disabled audio cue type IDs (user preferences) */
   private disabledCues: Map<string, Set<string>> = new Map()
+
+  private readonly motionState = new MotionSelectionState<IAudioCue>()
 
   /** Cache of cue metadata for renderer requests */
   private cueDetailsCache: Map<string, Array<{ id: string; description: string }>> = new Map()
@@ -63,6 +71,8 @@ export class AudioCueRegistry {
     if (this.enabledGroups.size === 0) {
       this.enabledGroups.add(group.id)
     }
+
+    this.motionState.onRegisterGroup(group.id, group.motionCues?.size ?? 0)
   }
 
   /**
@@ -77,6 +87,7 @@ export class AudioCueRegistry {
     this.groups.delete(groupId)
     this.enabledGroups.delete(groupId)
     this.cueDetailsCache.delete(groupId)
+    this.motionState.onUnregisterGroup(groupId)
 
     if (this.defaultGroup === groupId) {
       this.defaultGroup = null
@@ -192,11 +203,13 @@ export class AudioCueRegistry {
    * Get summaries for all groups (used by renderer)
    */
   public getGroupSummaries(): Array<{ id: string; name: string; description: string }> {
-    return Array.from(this.groups.values()).map((group) => ({
-      id: group.id,
-      name: group.name,
-      description: group.description,
-    }))
+    return Array.from(this.groups.values())
+      .filter((group) => group.cues.size > 0)
+      .map((group) => ({
+        id: group.id,
+        name: group.name,
+        description: group.description,
+      }))
   }
 
   /**
@@ -304,7 +317,131 @@ export class AudioCueRegistry {
     this.defaultGroup = null
     this.enabledGroups.clear()
     this.disabledCues.clear()
+    this.motionState.reset()
     this.cueDetailsCache.clear()
-    console.log('AudioCueRegistry reset to initial state')
+    log.info('AudioCueRegistry reset to initial state')
+  }
+
+  public setMotionSelectionMode(mode: MotionGroupSelectionMode): void {
+    this.motionState.setMotionSelectionMode(mode)
+  }
+
+  public getMotionSelectionMode(): MotionGroupSelectionMode {
+    return this.motionState.getMotionSelectionMode()
+  }
+
+  public onMotionSongStart(): void {
+    this.motionState.onMotionSongStart()
+  }
+
+  public onMotionSongEnd(): void {
+    this.motionState.onMotionSongEnd()
+  }
+
+  public getRandomMotionCue(): IAudioCue | null {
+    return this.motionState.getRandomMotionCue((id) => this.groups.get(id), this.defaultGroup)
+  }
+
+  /**
+   * Resolve a specific motion program when manual selection is active.
+   * Returns null if the group is not motion-enabled, the cue is disabled, or the id is unknown.
+   */
+  public getMotionCueImplementation(ref: AudioMotionCueRef): IAudioCue | null {
+    const group = this.groups.get(ref.groupId)
+    const motionMap = group?.motionCues
+    if (!motionMap || motionMap.size === 0) {
+      return null
+    }
+    if (!this.motionState.getEnabledMotionGroups().includes(ref.groupId)) {
+      return null
+    }
+    if (this.isMotionCueDisabled(ref.groupId, ref.cueId)) {
+      return null
+    }
+    return motionMap.get(ref.cueId) ?? null
+  }
+
+  /** Locate group/cue ids for a motion cue instance (for UI / IPC metadata). */
+  public findAudioMotionCueRef(cue: IAudioCue): AudioMotionCueRef | null {
+    for (const group of this.groups.values()) {
+      const motionMap = group.motionCues
+      if (!motionMap) continue
+      for (const [cueId, impl] of motionMap) {
+        if (impl === cue) {
+          return { groupId: group.id, cueId }
+        }
+      }
+    }
+    return null
+  }
+
+  public getAudioMotionGroupsInfo(): Array<{
+    id: string
+    name: string
+    description?: string
+    cueCount: number
+  }> {
+    const rows: Array<{
+      id: string
+      name: string
+      description?: string
+      cueCount: number
+    }> = []
+    for (const group of this.groups.values()) {
+      const n = group.motionCues?.size ?? 0
+      if (n === 0) {
+        continue
+      }
+      rows.push({
+        id: group.id,
+        name: group.name,
+        description: group.description,
+        cueCount: n,
+      })
+    }
+    return rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  }
+
+  public getAudioMotionCueDetails(
+    groupId: string,
+  ): Array<{ id: string; name: string; description: string }> {
+    const group = this.groups.get(groupId)
+    const motionMap = group?.motionCues
+    if (!motionMap) {
+      return []
+    }
+    return Array.from(motionMap.values()).map((cue) => ({
+      id: String(cue.cueType),
+      name: cue.name,
+      description: cue.description ?? '',
+    }))
+  }
+
+  public setDisabledMotionCues(map: Record<string, string[]>): void {
+    this.motionState.setDisabledMotionCues(map)
+  }
+
+  public isMotionCueDisabled(groupId: string, cueId: string): boolean {
+    return this.motionState.isMotionCueDisabled(groupId, cueId)
+  }
+
+  public setEnabledMotionGroups(groupIds: string[]): void {
+    this.motionState.setEnabledMotionGroups(groupIds, (id) => {
+      return this.groups.has(id) && (this.groups.get(id)?.motionCues?.size ?? 0) > 0
+    })
+  }
+
+  public getEnabledMotionGroups(): string[] {
+    return this.motionState.getEnabledMotionGroups()
+  }
+
+  public getRegisteredMotionGroupIds(): string[] {
+    return this.motionState.getRegisteredMotionGroupIds(this.groups.values())
+  }
+
+  public enableMotionGroup(groupId: string): void {
+    this.motionState.enableMotionGroup(groupId, (id) => {
+      return this.groups.has(id) && (this.groups.get(id)?.motionCues?.size ?? 0) > 0
+    })
   }
 }

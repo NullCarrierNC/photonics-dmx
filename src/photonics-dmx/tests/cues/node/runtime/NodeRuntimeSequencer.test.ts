@@ -20,8 +20,7 @@ import {
 import { getColor } from '../../../../helpers/dmxHelpers'
 import * as utils from '../../../../helpers/utils'
 import { createSequencerHarness } from '../../../helpers/sequencerHarness'
-
-jest.mock('../../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
+import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
 
 const createCueData = (overrides: Partial<CueData> = {}): CueData => ({
   ...defaultCueData,
@@ -128,6 +127,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'chain-test',
       name: 'Chain Test',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -149,6 +149,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:chain-test',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -221,6 +222,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'beat-gate',
       name: 'Beat Gate',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -239,6 +241,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:beat-gate',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -321,6 +324,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'array-target',
       name: 'Array Target',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -349,6 +353,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:array-target',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -424,6 +429,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'string-conditional',
       name: 'String Conditional',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -447,6 +453,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:string-conditional',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -467,88 +474,95 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('blocks execution through delay nodes', async () => {
-    const eventNode: YargEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
+    jest.useFakeTimers()
+    try {
+      const eventNode: YargEventNode = {
+        id: 'event-1',
+        type: 'event',
+        eventType: 'beat',
+      }
+
+      const delayNode: LogicNode = {
+        id: 'delay-1',
+        type: 'logic',
+        logicType: 'delay',
+        delayTime: { source: 'literal', value: 20 },
+      }
+
+      const actionNode: ActionNode = {
+        id: 'action-1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'blue' },
+          brightness: { source: 'literal', value: 'high' },
+          blendMode: { source: 'literal', value: 'replace' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 0 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+      }
+
+      const definition: YargNodeCueDefinition = {
+        id: 'delay-test',
+        name: 'Delay Test',
+        kind: 'lighting',
+        cueType: CueType.Default,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [actionNode],
+          logic: [delayNode],
+          eventRaisers: [],
+          eventListeners: [],
+          effectRaisers: [],
+        },
+        connections: [
+          { from: 'event-1', to: 'delay-1' },
+          { from: 'delay-1', to: 'action-1' },
+        ],
+      }
+
+      const engine = new NodeExecutionEngine(
+        compileCue(definition),
+        'test-group:delay-test',
+        harness.sequencer,
+        harness.lightManager,
+        noopRuntimeBroadcaster(),
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+      )
+
+      engine.startExecution(eventNode, createCueData())
+      harness.advanceBy(1)
+
+      const lightId = harness.frontLightIds[0]
+      const beforeDelay = harness.getLightState(lightId)
+      expect(beforeDelay?.intensity ?? 0).toBe(0)
+
+      jest.advanceTimersByTime(25)
+      harness.advanceBy(1)
+
+      const afterDelay = harness.getLightState(lightId)
+      const expected = getColor('blue', 'high')
+      expect(afterDelay).toMatchObject({
+        red: expected.red,
+        green: expected.green,
+        blue: expected.blue,
+        blendMode: expected.blendMode,
+      })
+    } finally {
+      jest.useRealTimers()
     }
-
-    const delayNode: LogicNode = {
-      id: 'delay-1',
-      type: 'logic',
-      logicType: 'delay',
-      delayTime: { source: 'literal', value: 20 },
-    }
-
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'blue' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: YargNodeCueDefinition = {
-      id: 'delay-test',
-      name: 'Delay Test',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [delayNode],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'delay-1' },
-        { from: 'delay-1', to: 'action-1' },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:delay-test',
-      harness.sequencer,
-      harness.lightManager,
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-    )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const lightId = harness.frontLightIds[0]
-    const beforeDelay = harness.getLightState(lightId)
-    expect(beforeDelay?.intensity ?? 0).toBe(0)
-
-    jest.advanceTimersByTime(25)
-    harness.advanceBy(1)
-
-    const afterDelay = harness.getLightState(lightId)
-    const expected = getColor('blue', 'high')
-    expect(afterDelay).toMatchObject({
-      red: expected.red,
-      green: expected.green,
-      blue: expected.blue,
-      blendMode: expected.blendMode,
-    })
   })
 
   it('waits until beat to complete action', () => {
@@ -583,6 +597,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'wait-until-beat',
       name: 'Wait Until Beat',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -601,6 +616,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:wait-until-beat',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -662,6 +678,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'wait-until-count',
       name: 'Wait Until Count',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -680,6 +697,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:wait-until-count',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -761,6 +779,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'measure-keyframe',
       name: 'Measure + Keyframe',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -782,6 +801,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:measure-keyframe',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -872,6 +892,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'measure-keyframe-count',
       name: 'Measure + Keyframe Count',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -893,6 +914,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:measure-keyframe-count',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -991,6 +1013,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'note-counts',
       name: 'Note Counts',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1012,6 +1035,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:note-counts',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -1106,6 +1130,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'bass-keys-counts',
       name: 'Bass Keys Counts',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1127,6 +1152,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:bass-keys-counts',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -1207,6 +1233,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'math-duration',
       name: 'Math Duration',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1229,6 +1256,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:math-duration',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -1314,6 +1342,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'math-ops',
       name: 'Math Ops',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1345,6 +1374,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:math-ops',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -1422,6 +1452,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'init-fallback',
       name: 'Init/Conditional',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1449,6 +1480,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:init-fallback',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -1524,6 +1556,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'variable-get',
       name: 'Variable Get',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1548,6 +1581,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:variable-get',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -1634,6 +1668,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'concat-length',
       name: 'Concat + Length',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1665,6 +1700,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:concat-length',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -1753,6 +1789,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'pairs-test',
       name: 'Pairs Test',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1783,6 +1820,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:pairs-test',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -1871,6 +1909,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'target-groups',
       name: 'Target Groups',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1892,6 +1931,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:target-groups',
       localHarness.sequencer,
       localHarness.lightManager,
+      noopRuntimeBroadcaster(),
       localCueStore,
       localGroupStore,
       new EffectRegistry(),
@@ -1966,6 +2006,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'random-targets',
       name: 'Random Targets',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -1984,6 +2025,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:random-targets',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
@@ -2090,6 +2132,7 @@ describe('Node runtime with real Sequencer', () => {
     const definition: YargNodeCueDefinition = {
       id: 'event-chain',
       name: 'Event Chain',
+      kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
@@ -2112,6 +2155,7 @@ describe('Node runtime with real Sequencer', () => {
       'test-group:event-chain',
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),

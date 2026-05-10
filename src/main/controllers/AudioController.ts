@@ -3,20 +3,25 @@ import { ConfigurationManager } from '../../services/configuration/Configuration
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
 import { AudioCueProcessor } from '../../photonics-dmx/processors/AudioCueProcessor'
+import type { RuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 import {
   AudioConfig,
   AudioGameModeConfig,
   AudioLightingData,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
-import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
+import { AudioCueType, AudioMotionCueRef } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { RENDERER_RECEIVE, RENDERER_SEND } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+import { validateAudioLightingData } from '../ipc/audioLightingValidation'
+const log = createLogger('AudioController')
 
 export interface AudioControllerDeps {
   getDmxLightManager: () => DmxLightManager | null
   getEffectsController: () => ILightingController | null
   config: ConfigurationManager
   sendToAllWindows: (channel: string, ...args: unknown[]) => void
+  runtimeBroadcaster: RuntimeBroadcaster
 }
 
 type AudioDataHandler = (event: unknown, data: unknown) => void
@@ -26,6 +31,9 @@ export class AudioController {
   private isAudioEnabled = false
   private audioDataHandler: AudioDataHandler | null = null
   private broadcastAudioMirror: ((data: AudioLightingData) => void) | null = null
+  /** Throttle logs for invalid renderer audio frames (can arrive at high rate). */
+  private invalidAudioFrameCount = 0
+  private invalidAudioFrameLastLogMs = 0
 
   constructor(private readonly deps: AudioControllerDeps) {}
 
@@ -35,7 +43,7 @@ export class AudioController {
 
   public async enableAudio(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
     if (!isInitialized) {
-      console.log('Initializing system before enabling Audio')
+      log.info('Initializing system before enabling Audio')
       await initAsync()
     }
     await this.enableAudioInternal()
@@ -45,18 +53,22 @@ export class AudioController {
     const dmxLightManager = this.deps.getDmxLightManager()
     const effectsController = this.deps.getEffectsController()
     if (this.isAudioEnabled || !effectsController || !dmxLightManager) {
-      console.log('Cannot enable Audio: already enabled or missing required components')
+      log.info('Cannot enable Audio: already enabled or missing required components')
       return
     }
     const audioConfig = this.deps.config.getAudioConfig()
     try {
-      console.log('Enabling audio with Web Audio API...')
-      const preferredCueType = this.deps.config.getActiveAudioCueType()
+      log.info('Enabling audio with Web Audio API...')
+      const preferredCueType = this.deps.config.getPreference('activeAudioCueType')
       this.audioProcessor = new AudioCueProcessor(
         dmxLightManager,
         effectsController,
+        this.deps.runtimeBroadcaster,
         audioConfig,
         preferredCueType,
+        null,
+        () => this.deps.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
+        () => this.deps.config.getPreference('cueDomains').audioMotion.probabilityPercent ?? 100,
       )
       this.audioProcessor.setOnStrobeStateChange((active) => {
         const strobeCueType = this.audioProcessor?.getEffectiveStrobeCueType() ?? null
@@ -70,19 +82,42 @@ export class AudioController {
           activeCueType,
         })
       })
+      this.audioProcessor.setOnGameModeScheduleChange((info) => {
+        this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_GAME_MODE_DEADLINE, info)
+      })
+      this.audioProcessor.setMotionEnabled(this.deps.config.getPreference('motionEnabled') ?? true)
+      this.audioProcessor.setManualMotionRef(
+        this.deps.config.getPreference('cueDomains').audioMotion.activeCueRef ?? null,
+      )
       this.audioProcessor.start()
       const gameMode = this.deps.config.getAudioGameModeConfig()
       if (gameMode.enabled) {
         this.audioProcessor.enableGameMode(gameMode)
       } else {
-        await this.deps.config.setActiveAudioCueType(this.audioProcessor.getManualPrimaryCueType())
+        await this.deps.config.setPreference(
+          'activeAudioCueType',
+          this.audioProcessor.getManualPrimaryCueType(),
+        )
       }
       if (this.audioDataHandler) {
         ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
         this.audioDataHandler = null
       }
       this.audioDataHandler = (_: unknown, data: unknown) => {
-        const lightingData = data as AudioLightingData
+        const validated = validateAudioLightingData(data)
+        if (!validated.ok) {
+          this.invalidAudioFrameCount++
+          const now = Date.now()
+          if (now - this.invalidAudioFrameLastLogMs > 2000) {
+            log.warn(
+              `Invalid AUDIO_DATA frame (${this.invalidAudioFrameCount} since last log): ${validated.error}`,
+            )
+            this.invalidAudioFrameCount = 0
+            this.invalidAudioFrameLastLogMs = now
+          }
+          return
+        }
+        const lightingData = validated.value
         if (this.audioProcessor && this.isAudioEnabled) {
           this.audioProcessor.processAudioData(lightingData)
         }
@@ -90,11 +125,11 @@ export class AudioController {
       }
       ipcMain.on(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
       this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLE, audioConfig)
-      console.log('Sent audio:enable to renderer')
+      log.info('Sent audio:enable to renderer')
       this.isAudioEnabled = true
-      console.log('Audio enabled successfully')
+      log.info('Audio enabled successfully')
     } catch (error) {
-      console.error('Failed to enable audio:', error)
+      log.error('Failed to enable audio:', error)
       throw error
     }
   }
@@ -103,21 +138,21 @@ export class AudioController {
     if (!this.isAudioEnabled) {
       return
     }
-    console.log('Disabling audio...')
+    log.info('Disabling audio...')
     const effectsController = this.deps.getEffectsController()
     if (effectsController) {
       try {
         effectsController.removeAllEffects()
         await effectsController.blackout(0)
-        console.log(
+        log.info(
           'AudioController: Cleared all running effects and initiated blackout when disabling Audio',
         )
       } catch (error) {
-        console.error('Error clearing effects when disabling Audio:', error)
+        log.error('Error clearing effects when disabling Audio:', error)
       }
     }
     this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_DISABLE, undefined)
-    console.log('Sent audio:disable to renderer')
+    log.info('Sent audio:disable to renderer')
     if (this.audioDataHandler) {
       ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
       this.audioDataHandler = null
@@ -125,11 +160,12 @@ export class AudioController {
     if (this.audioProcessor) {
       this.audioProcessor.setOnStrobeStateChange(null)
       this.audioProcessor.setOnGameModeCueChange(null)
+      this.audioProcessor.setOnGameModeScheduleChange(null)
       this.audioProcessor.shutdown()
       this.audioProcessor = null
     }
     this.isAudioEnabled = false
-    console.log('Audio disabled successfully')
+    log.info('Audio disabled successfully')
   }
 
   public updateAudioConfig(config: AudioConfig): void {
@@ -140,14 +176,17 @@ export class AudioController {
     const mergedConfig = { ...currentConfig, ...config }
     this.deps.config.setAudioConfig(mergedConfig)
     this.audioProcessor.updateConfig(mergedConfig)
-    console.log('AudioCueProcessor configuration updated')
+    log.info('AudioCueProcessor configuration updated')
   }
 
   public refreshAudioCueSelection(): void {
     if (this.audioProcessor) {
       this.audioProcessor.refreshCueSelection()
       if (!this.deps.config.getAudioGameModeConfig().enabled) {
-        void this.deps.config.setActiveAudioCueType(this.audioProcessor.getManualPrimaryCueType())
+        void this.deps.config.setPreference(
+          'activeAudioCueType',
+          this.audioProcessor.getManualPrimaryCueType(),
+        )
       }
     }
   }
@@ -190,7 +229,7 @@ export class AudioController {
     if (this.audioProcessor) {
       return this.audioProcessor.getCurrentCueType()
     }
-    const saved = this.deps.config.getActiveAudioCueType()
+    const saved = this.deps.config.getPreference('activeAudioCueType')
     if (saved) {
       return saved
     }
@@ -215,7 +254,9 @@ export class AudioController {
         error: `Cue ${cueType} is not available in enabled groups`,
       }
     }
-    this.deps.config.setActiveAudioCueType(cueType)
+    void this.deps.config.setPreference('activeAudioCueType', cueType).catch((err) => {
+      log.error('Failed to persist active audio cue type:', err)
+    })
     if (this.audioProcessor) {
       const applied = this.audioProcessor.setActiveCueType(cueType)
       if (!applied) {
@@ -277,5 +318,13 @@ export class AudioController {
 
   public isAudioGameModeActive(): boolean {
     return this.audioProcessor?.isGameModeEnabled() ?? false
+  }
+
+  public setMotionEnabled(enabled: boolean): void {
+    this.audioProcessor?.setMotionEnabled(enabled)
+  }
+
+  public setActiveAudioMotionCueRef(ref: AudioMotionCueRef | null): void {
+    this.audioProcessor?.setManualMotionRef(ref)
   }
 }

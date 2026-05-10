@@ -9,6 +9,7 @@ import {
   NODE_CUES,
   EFFECTS,
   WINDOW,
+  LIFECYCLE,
   LIGHT,
   CONFIG,
   CUE,
@@ -18,17 +19,27 @@ import {
 import type {
   NodeCueFile,
   NodeCueMode,
+  NodeCueKind,
   EffectFile,
   EffectMode,
   DmxRig,
+  DmxFixture,
   LightingConfiguration,
   SenderConfig,
   AudioCueType,
+  CueType,
   AppPreferences,
   AudioConfig,
   AudioGameModeConfig,
   AudioLightingData,
 } from '../../shared/ipcTypes'
+import type { FixtureConfig } from '../../photonics-dmx/types'
+
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
+
+export const getLifecyclePhase = () => window.api.invoke(LIFECYCLE.GET_PHASE, undefined)
 
 // ---------------------------------------------------------------------------
 // Cue consistency window
@@ -40,11 +51,62 @@ export const setCueConsistencyWindow = (windowMs: number) =>
 export const getCueConsistencyWindow = () =>
   window.api.invoke(LIGHT.GET_CUE_CONSISTENCY_WINDOW, undefined)
 
+export const getMotionCueMinHoldMs = () =>
+  window.api.invoke(LIGHT.GET_MOTION_CUE_MIN_HOLD_MS, undefined)
+
+export const setMotionCueMinHoldMs = (minHoldMs: number) =>
+  window.api.invoke(LIGHT.SET_MOTION_CUE_MIN_HOLD_MS, minHoldMs)
+
+export const getMotionCueProbabilityPercent = () =>
+  window.api.invoke(LIGHT.GET_MOTION_CUE_PROBABILITY_PERCENT, undefined)
+
+export const setMotionCueProbabilityPercent = (percent: number) =>
+  window.api.invoke(LIGHT.SET_MOTION_CUE_PROBABILITY_PERCENT, percent)
+
+export const getAudioMotionCueProbabilityPercent = () =>
+  window.api.invoke(LIGHT.GET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT, undefined)
+
+export const setAudioMotionCueProbabilityPercent = (percent: number) =>
+  window.api.invoke(LIGHT.SET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT, percent)
+
 export const getCueGroupSelectionMode = () =>
   window.api.invoke(LIGHT.GET_CUE_GROUP_SELECTION_MODE, undefined)
 
 export const setCueGroupSelectionMode = (mode: 'oncePerSong' | 'withinSong') =>
   window.api.invoke(LIGHT.SET_CUE_GROUP_SELECTION_MODE, mode)
+
+export const getYargMotionGroupSelectionMode = () =>
+  window.api.invoke(LIGHT.GET_YARG_MOTION_GROUP_SELECTION_MODE, undefined)
+
+export const setYargMotionGroupSelectionMode = (mode: 'oncePerSong' | 'perCueChange' | 'none') =>
+  window.api.invoke(LIGHT.SET_YARG_MOTION_GROUP_SELECTION_MODE, mode)
+
+export const getAudioMotionGroupSelectionMode = () =>
+  window.api.invoke(LIGHT.GET_AUDIO_MOTION_GROUP_SELECTION_MODE, undefined)
+
+export const setAudioMotionGroupSelectionMode = (mode: 'oncePerSong' | 'perCueChange' | 'none') =>
+  window.api.invoke(LIGHT.SET_AUDIO_MOTION_GROUP_SELECTION_MODE, mode)
+
+export const getYargMotionCueGroups = () =>
+  window.api.invoke(LIGHT.GET_YARG_MOTION_CUE_GROUPS, undefined)
+
+export const getAudioMotionCueGroups = () =>
+  window.api.invoke(LIGHT.GET_AUDIO_MOTION_CUE_GROUPS, undefined)
+
+export const getAvailableYargMotionCues = (groupId?: string) =>
+  window.api.invoke(LIGHT.GET_AVAILABLE_YARG_MOTION_CUES, groupId)
+
+export const getAvailableAudioMotionCues = (groupId?: string) =>
+  window.api.invoke(LIGHT.GET_AVAILABLE_AUDIO_MOTION_CUES, groupId)
+
+export const startYargMotionCueSimulation = (groupId: string, cueId: string) =>
+  window.api.invoke(LIGHT.START_YARG_MOTION_CUE_SIMULATION, { groupId, cueId })
+
+export const startAudioMotionCueSimulation = (groupId: string, cueId: string) =>
+  window.api.invoke(LIGHT.START_AUDIO_MOTION_CUE_SIMULATION, { groupId, cueId })
+
+export const stopMotionCueSimulation = () =>
+  window.api.invoke(LIGHT.STOP_MOTION_CUE_SIMULATION, undefined)
 
 export const getConsistencyStatus = () => window.api.invoke(LIGHT.GET_CONSISTENCY_STATUS, undefined)
 
@@ -59,24 +121,13 @@ export const getEnabledCueGroups = () => window.api.invoke(CONFIG.GET_ENABLED_CU
 export const setEnabledCueGroups = (groupIds: string[]) =>
   window.api.invoke(CONFIG.SET_ENABLED_CUE_GROUPS, groupIds)
 
-export const getActiveCueGroups = () => window.api.invoke(LIGHT.GET_ACTIVE_CUE_GROUPS, undefined)
-
-export const setActiveCueGroups = (groupIds: string[]) =>
-  window.api.invoke(LIGHT.SET_ACTIVE_CUE_GROUPS, groupIds)
-
-export const activateCueGroup = (groupId: string) =>
-  window.api.invoke(LIGHT.ACTIVATE_CUE_GROUP, groupId)
-
-export const deactivateCueGroup = (groupId: string) =>
-  window.api.invoke(LIGHT.DEACTIVATE_CUE_GROUP, groupId)
-
 export const enableCueGroup = (groupId: string) =>
   window.api.invoke(LIGHT.ENABLE_CUE_GROUP, groupId)
 
 export const disableCueGroup = (groupId: string) =>
   window.api.invoke(LIGHT.DISABLE_CUE_GROUP, groupId)
 
-export const getCueSourceGroup = (cueType: string) =>
+export const getCueSourceGroup = (cueType: CueType) =>
   window.api.invoke(LIGHT.GET_CUE_SOURCE_GROUP, cueType)
 
 export const getAvailableCues = (groupId: string | undefined) =>
@@ -95,8 +146,7 @@ export const getLightLibrary = () => window.api.invoke(CONFIG.GET_LIGHT_LIBRARY,
 
 export const getMyLights = () => window.api.invoke(CONFIG.GET_MY_LIGHTS, undefined)
 
-export const saveMyLights = (data: import('../../shared/ipcTypes').DmxFixture[]) =>
-  window.api.send(CONFIG.SAVE_MY_LIGHTS, data)
+export const saveMyLights = (data: DmxFixture[]) => window.api.invoke(CONFIG.SAVE_MY_LIGHTS, data)
 
 export const getLightLayout = (filename: string) =>
   window.api.invoke(CONFIG.GET_LIGHT_LAYOUT, filename)
@@ -158,6 +208,30 @@ export const getDisabledAudioCues = () =>
 export const setDisabledAudioCues = (disabled: Record<string, string[]>) =>
   window.api.invoke(CONFIG.SET_DISABLED_AUDIO_CUES, disabled)
 
+export const getEnabledYargMotionCueGroups = () =>
+  window.api.invoke(CONFIG.GET_ENABLED_YARG_MOTION_CUE_GROUPS, undefined)
+
+export const setEnabledYargMotionCueGroups = (groupIds: string[]) =>
+  window.api.invoke(CONFIG.SET_ENABLED_YARG_MOTION_CUE_GROUPS, groupIds)
+
+export const getDisabledYargMotionCues = () =>
+  window.api.invoke(CONFIG.GET_DISABLED_YARG_MOTION_CUES, undefined)
+
+export const setDisabledYargMotionCues = (disabled: Record<string, string[]>) =>
+  window.api.invoke(CONFIG.SET_DISABLED_YARG_MOTION_CUES, disabled)
+
+export const getEnabledAudioMotionCueGroups = () =>
+  window.api.invoke(CONFIG.GET_ENABLED_AUDIO_MOTION_CUE_GROUPS, undefined)
+
+export const setEnabledAudioMotionCueGroups = (groupIds: string[]) =>
+  window.api.invoke(CONFIG.SET_ENABLED_AUDIO_MOTION_CUE_GROUPS, groupIds)
+
+export const getDisabledAudioMotionCues = () =>
+  window.api.invoke(CONFIG.GET_DISABLED_AUDIO_MOTION_CUES, undefined)
+
+export const setDisabledAudioMotionCues = (disabled: Record<string, string[]>) =>
+  window.api.invoke(CONFIG.SET_DISABLED_AUDIO_MOTION_CUES, disabled)
+
 export const getAudioReactiveCues = () =>
   window.api.invoke(CONFIG.GET_AUDIO_REACTIVE_CUES, undefined)
 
@@ -168,6 +242,23 @@ export const getAudioGameMode = () => window.api.invoke(CONFIG.GET_AUDIO_GAME_MO
 
 export const setAudioGameMode = (updates: Partial<AudioGameModeConfig>) =>
   window.api.invoke(CONFIG.SET_AUDIO_GAME_MODE, updates)
+
+export const getMotionEnabled = () => window.api.invoke(CONFIG.GET_MOTION_ENABLED, undefined)
+
+export const setMotionEnabled = (enabled: boolean) =>
+  window.api.invoke(CONFIG.SET_MOTION_ENABLED, enabled)
+
+export const getActiveAudioMotionCue = () =>
+  window.api.invoke(CONFIG.GET_ACTIVE_AUDIO_MOTION_CUE, undefined)
+
+export const setActiveAudioMotionCue = (ref: { groupId: string; cueId: string } | null) =>
+  window.api.invoke(CONFIG.SET_ACTIVE_AUDIO_MOTION_CUE, ref)
+
+export const getActiveYargMotionCue = () =>
+  window.api.invoke(CONFIG.GET_ACTIVE_YARG_MOTION_CUE, undefined)
+
+export const setActiveYargMotionCue = (ref: { groupId: string; cueId: string } | null) =>
+  window.api.invoke(CONFIG.SET_ACTIVE_YARG_MOTION_CUE, ref)
 
 // ---------------------------------------------------------------------------
 // Stage kit
@@ -203,6 +294,9 @@ export const getAppVersion = () => window.api.invoke(CONFIG.GET_APP_VERSION, und
 
 export const getValidationErrors = () => window.api.invoke(CONFIG.GET_VALIDATION_ERRORS, undefined)
 
+export const getCorruptRecoveryEvents = () =>
+  window.api.invoke(CONFIG.GET_CORRUPT_RECOVERY_EVENTS, undefined)
+
 // ---------------------------------------------------------------------------
 // System status
 // ---------------------------------------------------------------------------
@@ -234,10 +328,38 @@ export const getRb3Stats = () => window.api.invoke(CUE.RB3E_GET_STATS, undefined
 // Sender management
 // ---------------------------------------------------------------------------
 
-export const enableSender = (config: SenderConfig) => window.api.send(LIGHT.SENDER_ENABLE, config)
+export const enableSender = (config: SenderConfig) => window.api.invoke(LIGHT.SENDER_ENABLE, config)
 
 export const disableSender = (config: { sender: string }) =>
-  window.api.send(LIGHT.SENDER_DISABLE, config)
+  window.api.invoke(LIGHT.SENDER_DISABLE, config)
+
+export const disableAllOutputSenders = () => window.api.invoke(LIGHT.SENDER_DISABLE_ALL, undefined)
+
+// ---------------------------------------------------------------------------
+// DMX Console (exclusive manual buffer)
+// ---------------------------------------------------------------------------
+
+export const enableConsole = (rigId: string) => window.api.invoke(LIGHT.CONSOLE_ENABLE, { rigId })
+
+export const disableConsole = () => window.api.invoke(LIGHT.CONSOLE_DISABLE, undefined)
+
+export const sendConsoleDmx = (buffer: Record<number, number>) =>
+  window.api.send(LIGHT.CONSOLE_SEND_DMX, buffer)
+
+export const updateConsoleChannel = (payload: {
+  rigId: string
+  lightId: string
+  fixtureId: string
+  channelName: string
+  channelNumber: number
+}) => window.api.invoke(LIGHT.CONSOLE_UPDATE_CHANNEL, payload)
+
+export const setConsoleFixtureConfig = (payload: {
+  rigId: string
+  lightId: string
+  fixtureId: string
+  config: Partial<FixtureConfig>
+}) => window.api.invoke(LIGHT.CONSOLE_SET_FIXTURE_CONFIG, payload)
 
 // ---------------------------------------------------------------------------
 // Listener management
@@ -250,9 +372,6 @@ export const disableYarg = () => window.api.send(CUE.YARG_LISTENER_DISABLED, und
 export const enableRb3 = () => window.api.send(CUE.RB3E_LISTENER_ENABLED, undefined)
 
 export const disableRb3 = () => window.api.send(CUE.RB3E_LISTENER_DISABLED, undefined)
-
-export const switchRb3Mode = (mode: 'direct' | 'cueBased') =>
-  window.api.send(CUE.RB3E_SWITCH_MODE, mode)
 
 export const getYargEnabled = () => window.api.invoke(CUE.GET_YARG_ENABLED, undefined)
 
@@ -354,10 +473,11 @@ export const deleteNodeCueFile = (filePath: string) => window.api.invoke(NODE_CU
 export const validateNodeCue = (payload: { path?: string; content?: NodeCueFile }) =>
   window.api.invoke(NODE_CUES.VALIDATE, payload)
 
-export const getNodeCueTypes = (mode: NodeCueMode) =>
-  window.api.invoke(NODE_CUES.GET_CUE_TYPES, mode)
+export const getNodeCueTypes = (mode: NodeCueMode, kind?: NodeCueKind) =>
+  window.api.invoke(NODE_CUES.GET_CUE_TYPES, { mode, kind })
 
-export const importNodeCueFile = (mode?: NodeCueMode) => window.api.invoke(NODE_CUES.IMPORT, mode)
+export const pickNodeCueImportFile = (mode?: NodeCueMode) =>
+  window.api.invoke(NODE_CUES.IMPORT_PICK, mode)
 
 export const exportNodeCueFile = (filePath: string) => window.api.invoke(NODE_CUES.EXPORT, filePath)
 
@@ -382,7 +502,8 @@ export const deleteEffectFile = (filePath: string) => window.api.invoke(EFFECTS.
 export const validateEffect = (payload: { path?: string; content?: EffectFile }) =>
   window.api.invoke(EFFECTS.VALIDATE, payload)
 
-export const importEffectFile = (mode?: EffectMode) => window.api.invoke(EFFECTS.IMPORT, mode)
+export const pickEffectImportFile = (mode?: EffectMode) =>
+  window.api.invoke(EFFECTS.IMPORT_PICK, mode)
 
 export const exportEffectFile = (filePath: string) => window.api.invoke(EFFECTS.EXPORT, filePath)
 

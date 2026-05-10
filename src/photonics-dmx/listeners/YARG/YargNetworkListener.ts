@@ -12,8 +12,24 @@ import {
   InstrumentNoteType,
   DrumNoteType,
 } from '../../cues/types/cueTypes'
+import { createLogger } from '../../../shared/logger'
 
-import { BaseCueHandler } from '../../cueHandlers/BaseCueHandler'
+const log = createLogger('YargNetworkListener')
+
+export interface YargCueRuntime {
+  notifySongStart(): void
+  notifySongEnd(): void
+  handleBeat(): void
+  handleMeasure(): void
+  handleKeyframeFirst(): void
+  handleKeyframeNext(): void
+  handleKeyframePrevious(): void
+  handleCue(cueType: CueType, parameters: CueData): Promise<void>
+  handleDrumNote(noteType: DrumNoteType, data: CueData): void
+  handleGuitarNote(noteType: InstrumentNoteType, data: CueData): void
+  handleBassNote(noteType: InstrumentNoteType, data: CueData): void
+  handleKeysNote(noteType: InstrumentNoteType, data: CueData): void
+}
 
 enum PlatformByte {
   Unknown = 0,
@@ -126,7 +142,7 @@ const IDENTICAL_FRAME_THROTTLE_MS = 1000 / 30
 
 export class YargNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null
-  private cueHandler: BaseCueHandler
+  private cueHandler: YargCueRuntime
 
   //private logFilePath = path.join(app.getPath('documents'), 'yargLog.json');
   private listening = false
@@ -150,11 +166,14 @@ export class YargNetworkListener extends EventEmitter {
   private lastScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | 'Practice' | null =
     null
 
-  constructor(cueHandler: BaseCueHandler) {
+  /** Bound while UDP bind() is pending; used to distinguish bind failures from runtime socket errors. */
+  private startBindReject: ((reason: unknown) => void) | null = null
+
+  constructor(cueHandler: YargCueRuntime) {
     super() // Initialize EventEmitter
     this.cueHandler = cueHandler
 
-    console.log('YargNetworkListener initialized.')
+    log.info('YargNetworkListener initialized.')
 
     /*
     // Initialize the flush timer
@@ -177,10 +196,15 @@ export class YargNetworkListener extends EventEmitter {
     */
   }
 
-  public start() {
+  public start(): Promise<void> {
     if (this.listening) {
-      console.warn('YargNetworkListener is already running.')
-      return
+      log.warn('YargNetworkListener is already running.')
+      return Promise.resolve()
+    }
+
+    if (this.startBindReject !== null) {
+      log.warn('YargNetworkListener start already in progress.')
+      return Promise.reject(new Error('YargNetworkListener start already in progress'))
     }
 
     if (!this.server) {
@@ -188,44 +212,75 @@ export class YargNetworkListener extends EventEmitter {
       this.setupServerEvents()
     }
 
-    this.server.bind(PORT, () => {
-      this.listening = true
-      console.log(`YargNetworkListener started and listening on port ${PORT}`)
+    return new Promise<void>((resolve, reject) => {
+      this.startBindReject = reject
+      this.server!.bind(PORT, () => {
+        this.startBindReject = null
+        this.listening = true
+        log.info(`YargNetworkListener started and listening on port ${PORT}`)
+        resolve()
+      })
     })
   }
 
-  public stop() {
-    if (!this.listening) {
-      console.warn('YargNetworkListener is not running.')
-      return
+  /**
+   * Closes the UDP socket and resolves when the OS has released the port
+   * (required before a new listener can bind the same port).
+   */
+  public stop(): Promise<void> {
+    const sock = this.server
+    this.server = null
+    this.listening = false
+    if (!sock) {
+      return Promise.resolve()
     }
-
-    if (this.server) {
-      this.server.close(() => {
-        console.log('YargNetworkListener server closed.')
-        this.listening = false
-        this.server = null
-      })
-    }
+    return new Promise((resolve) => {
+      try {
+        sock.close(() => {
+          log.info('YargNetworkListener server closed.')
+          resolve()
+        })
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException)?.code
+        if (code !== 'ERR_SOCKET_DGRAM_NOT_RUNNING') {
+          log.warn('YargNetworkListener: error during close:', err)
+        }
+        resolve()
+      }
+    })
   }
 
-  public shutdown() {
-    this.stop()
+  public shutdown(): Promise<void> {
+    return this.stop()
   }
 
   private setupServerEvents() {
     if (!this.server) return
 
     this.server.on('error', (err) => {
-      console.error(`Server error:\n${err.stack}`)
-      this.server?.close()
-      this.listening = false
+      const bindReject = this.startBindReject
+      if (bindReject !== null) {
+        this.startBindReject = null
+        log.error(`Server error during bind:\n${err.stack}`)
+        void this.stop().finally(() => {
+          bindReject(err)
+        })
+        return
+      }
+
+      log.error(`Server error:\n${err.stack}`)
+      const message = err instanceof Error ? err.message : String(err)
+      this.emit('yarg-error', {
+        type: 'runtime-error',
+        message,
+      })
+      void this.stop()
     })
 
     this.server.on('listening', () => {
       const address = this.server?.address()
       if (address) {
-        console.log(`Listening for YARG events on ${address.address}:${address.port}`)
+        log.info(`Listening for YARG events on ${address.address}:${address.port}`)
       }
     })
 
@@ -234,16 +289,29 @@ export class YargNetworkListener extends EventEmitter {
         // console.log(`Received message of ${msg.length} bytes: ${msg.toString('hex')}`);
         this.deserializePacket(msg)
       } catch (error) {
-        console.error('Failed to parse message:', error)
+        log.error('Failed to parse message:', error)
       }
     })
   }
 
+  /** Minimum supported datagram version for full cue payloads (excluding shutdown sentinel 0). */
+  protected getMinSupportedDatagramVersion(): number {
+    return YARG_DATAGRAM_VERSION
+  }
+
   private deserializePacket(buffer: Buffer) {
     try {
+      const MIN_HEADER_AND_VERSION_LEN = 4 + 1
+
+      if (buffer.length < MIN_HEADER_AND_VERSION_LEN) {
+        throw new Error(
+          `Received packet is too short: ${buffer.length} bytes, expected at least ${MIN_HEADER_AND_VERSION_LEN} bytes`,
+        )
+      }
+
       let offset = 0
 
-      // Ensure buffer has at least the minimum required length (longer packets are allowed for forward compatibility)
+      // Ensure buffer has at least the minimum required length for a full cue packet (longer packets are allowed for forward compatibility)
       const expectedLength =
         4 + // Header
         1 + // Datagram version
@@ -272,22 +340,50 @@ export class YargNetworkListener extends EventEmitter {
         1 + // Spotlight
         1 // Singalong
 
+      // Header (little-endian)
+      const header = buffer.readUInt32LE(offset)
+      offset += 4
+      if (header !== PACKET_HEADER) {
+        log.warn(`Invalid packet header: 0x${header.toString(16)}`)
+        return
+      }
+
+      const datagramVersion = buffer.readUInt8(offset)
+      offset += 1
+
+      if (datagramVersion === 0) {
+        log.info('YARG shutdown notification (datagram version 0)')
+        this.emit('yarg-error', {
+          type: 'yarg-shutdown',
+          message: 'YARG Has Shutdown',
+          datagramVersion: 0,
+        })
+        return
+      }
+
       if (buffer.length < expectedLength) {
         throw new Error(
           `Received packet is too short: ${buffer.length} bytes, expected at least ${expectedLength} bytes`,
         )
       }
 
-      // Header (little-endian)
-      const header = buffer.readUInt32LE(offset)
-      offset += 4
-      if (header !== PACKET_HEADER) {
-        console.warn(`Invalid packet header: 0x${header.toString(16)}`)
-        return
+      const minVersion = this.getMinSupportedDatagramVersion()
+      if (datagramVersion < minVersion) {
+        log.error(
+          `Unsupported datagram version: ${datagramVersion}, need at least version ${minVersion}`,
+        )
+        const errorMessage = `YARG Datagram Version too old: received version ${datagramVersion}, need at least version ${minVersion}`
+
+        // Emit error event for the controller to handle
+        this.emit('yarg-error', {
+          type: 'datagram-version-mismatch',
+          message: errorMessage,
+          datagramVersion: datagramVersion,
+        })
+
+        throw new Error(errorMessage)
       }
 
-      const datagramVersion = buffer.readUInt8(offset)
-      offset += 1
       const platformByte = buffer.readUInt8(offset)
       offset += 1
       const sceneByte = buffer.readUInt8(offset)
@@ -332,22 +428,6 @@ export class YargNetworkListener extends EventEmitter {
       offset += 1
       const autoGenTrack = buffer.readUInt8(offset) === 1
       offset += 1
-
-      if (datagramVersion < YARG_DATAGRAM_VERSION) {
-        console.error(
-          `Unsupported datagram version: ${datagramVersion}, need at least version ${YARG_DATAGRAM_VERSION}`,
-        )
-        const errorMessage = `YARG Datagram Version too old: received version ${datagramVersion}, need at least version ${YARG_DATAGRAM_VERSION}`
-
-        // Emit error event for the controller to handle
-        this.emit('yarg-error', {
-          type: 'datagram-version-mismatch',
-          message: errorMessage,
-          datagramVersion: datagramVersion,
-        })
-
-        throw new Error(errorMessage)
-      }
 
       const spotlight = buffer.readUInt8(offset)
       offset += 1
@@ -403,7 +483,7 @@ export class YargNetworkListener extends EventEmitter {
       //console.log("Keyframe:", YargCueData.keyframe);
       this.processCueData(YargCueData)
     } catch (error) {
-      console.error('YARG Listener: Error during packet deserialization:', error)
+      log.error('YARG Listener: Error during packet deserialization:', error)
     }
   }
 
@@ -466,7 +546,7 @@ export class YargNetworkListener extends EventEmitter {
     if (cueType) {
       this.cueHandler.handleCue(cueType as CueType, YargCueData)
     } else {
-      console.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
+      log.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
     }
 
     const activeStrobeStates: StrobeState[] = [
@@ -867,7 +947,7 @@ export class YargNetworkListener extends EventEmitter {
           existingLogs = [];
         }
       } catch (err) {
-        console.error('Failed to read existing log file. Starting fresh.', err);
+        log.error('Failed to read existing log file. Starting fresh.', err);
         existingLogs = [];
       }
     }
@@ -876,11 +956,11 @@ export class YargNetworkListener extends EventEmitter {
 
     try {
       fs.writeFileSync(this.logFilePath, JSON.stringify(combinedLogs, null, 2), 'utf-8');
-      console.log(`Flushed ${this.logBuffer.length} logs to ${this.logFilePath}`);
+      log.info(`Flushed ${this.logBuffer.length} logs to ${this.logFilePath}`);
       // Clear the buffer after flushing
       this.logBuffer = [];
     } catch (err) {
-      console.error('Failed to write log file:', err);
+      log.error('Failed to write log file:', err);
     }
   }
 
@@ -895,11 +975,11 @@ export class YargNetworkListener extends EventEmitter {
   ): void {
     // Check if we have a scene change
     if (this.lastScene !== null && this.lastScene !== currentScene) {
-      console.log(`YARG: Scene transition detected: ${this.lastScene} -> ${currentScene}`)
+      log.info(`YARG: Scene transition detected: ${this.lastScene} -> ${currentScene}`)
 
       // Handle Menu -> Gameplay transition (song start)
       if (this.lastScene === 'Menu' && currentScene === 'Gameplay') {
-        console.log('YARG: Song starting - triggering blackout to clear menu lighting')
+        log.info('YARG: Song starting - triggering blackout to clear menu lighting')
         this.cueHandler.notifySongStart()
         // Trigger a fast blackout to clear any menu lighting
         this.cueHandler.handleCue(CueType.Blackout_Fast, {
@@ -940,11 +1020,11 @@ export class YargNetworkListener extends EventEmitter {
     this.lastScene = currentScene
   }
 
-  public destroy() {
+  public async destroy(): Promise<void> {
     if (this.flushTimer) {
       clearInterval(this.flushTimer)
       this.flushTimer = null
     }
-    this.stop()
+    return this.stop()
   }
 }

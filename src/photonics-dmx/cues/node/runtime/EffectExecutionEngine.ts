@@ -11,8 +11,12 @@ import { AudioCueData } from '../../types/audioCueTypes'
 import { CompiledEffect } from '../compiler/EffectCompiler'
 import {
   ActionEffectFactory,
-  ResolvedColorSetting,
-  ResolvedActionTiming,
+  ResolvedActionTarget,
+  ResolvedPositionSetting,
+  buildSetPositionSubmissionFingerprint,
+  resolvedMotionPatternSettingsEqual,
+  resolvedMotionPatternSettingsEqualExceptBearing,
+  trackedLightIdsEqualOrder,
 } from '../compiler/ActionEffectFactory'
 import {
   ActionNode,
@@ -26,21 +30,33 @@ import {
 import type { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
 import { VariableValue, NodeRuntimeCallbacks } from './executionTypes'
-import { resolveValue, getVariableStore } from './valueResolver'
-import { resolveActionTiming, resolveActionColor, resolveActionLayer } from './actionResolver'
+import {
+  resolveValue,
+  getVariableStore,
+  resolveLocationGroups,
+  resolveLightTarget,
+} from './valueResolver'
+import {
+  resolveActionTiming,
+  resolveActionColor,
+  resolveActionLayer,
+  resolveActionPosition,
+  resolveMotionPattern,
+} from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { collectReachableNodes } from './engineUtils'
+import {
+  buildActionChain,
+  markConsecutiveActionChainTailVisited,
+  mapSetColorChainStepsForEffectFactory,
+  resolveChainStep,
+  runContextBatch,
+  tryBuildHomogeneousSetColorChainData,
+} from './graphActionHelpers'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
-import { sendToAllWindows } from '../../../../main/utils/windowUtils'
-
-type ChainStep = {
-  action: ActionNode
-  lights: TrackedLight[]
-  lightIds: string
-  resolvedLayer: number
-  resolvedTiming: ResolvedActionTiming
-  resolvedColor: ResolvedColorSetting
-}
+import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { createLogger } from '../../../../shared/logger'
+const log = createLogger('EffectExecutionEngine')
 
 export class EffectExecutionEngine {
   private static nextInstanceId = 0
@@ -60,6 +76,8 @@ export class EffectExecutionEngine {
   private firingIdle = false
   /** Effect names and layers submitted via addEffect/addEffectUnblockedNameWithCallback, for cancelAll to remove. */
   private submittedEffects: Map<string, number> = new Map()
+  private submittedMotionPatterns: Set<string> = new Set()
+  private setPositionSubmissionFingerprint: Map<string, string> = new Map()
   /** Callback-backed effects still running in sequencer for this engine instance. */
   private pendingCallbackEffects: Set<string> = new Set()
   /** When .use is true, the next effect submission must use setEffect (then set .use = false). */
@@ -67,6 +85,7 @@ export class EffectExecutionEngine {
   /** When provided (e.g. by V2), use instead of reading/mutating the ref. */
   private readonly consumeInitialClearPolicy?: () => boolean
   private readonly runtimeCallbacks?: NodeRuntimeCallbacks
+  private readonly broadcaster: RuntimeBroadcaster
 
   /** Returns whether the next effect submission should use setEffect, and consumes the policy. */
   private getAndConsumeInitialClearPolicy(): boolean {
@@ -100,7 +119,7 @@ export class EffectExecutionEngine {
     if (this.runtimeCallbacks) {
       this.runtimeCallbacks.emit(channel, payload)
     } else {
-      sendToAllWindows(channel, payload)
+      this.broadcaster.emit(channel, payload)
     }
   }
 
@@ -117,6 +136,7 @@ export class EffectExecutionEngine {
     compiledEffect: CompiledEffect<BaseEventNode>,
     sequencer: ILightingController,
     lightManager: DmxLightManager,
+    broadcaster: RuntimeBroadcaster,
     parameterValues: Record<string, any>,
     callerCueData: CueData | AudioCueData,
     firstSubmissionUsesSetEffectRef?: { use: boolean },
@@ -127,6 +147,7 @@ export class EffectExecutionEngine {
     this.compiledEffect = compiledEffect
     this.sequencer = sequencer
     this.lightManager = lightManager
+    this.broadcaster = broadcaster
     this.parameterValues = parameterValues
     this.callerCueData = callerCueData
     this.firstSubmissionUsesSetEffectRef = firstSubmissionUsesSetEffectRef
@@ -176,7 +197,7 @@ export class EffectExecutionEngine {
     // Get the effect listener (entry point)
     const effectListener = Array.from(this.compiledEffect.effectListenerMap.values())[0]
     if (!effectListener) {
-      console.warn('No effect listener found in effect')
+      log.warn('No effect listener found in effect')
       return
     }
 
@@ -318,10 +339,9 @@ export class EffectExecutionEngine {
       return
     }
 
-    console.warn(`Unknown node type for id: ${nodeId}`)
+    log.warn(`Unknown node type for id: ${nodeId}`)
   }
 
-  /**
   /**
    * Helper to get the var store for a named variable.
    */
@@ -348,7 +368,167 @@ export class EffectExecutionEngine {
     const lights = ActionEffectFactory.resolveLights(this.lightManager, action.target, getVar)
 
     if (!lights || lights.length === 0) {
-      console.warn(`No lights resolved for action ${action.id}, skipping`)
+      log.warn(`No lights resolved for action ${action.id}, skipping`)
+      this.emitNodeExecution('deactivated', action.id)
+      this.continueToNextNodes(action.id, context)
+      return
+    }
+
+    if (action.effectType === 'set-position') {
+      if (!action.position) {
+        log.warn(`set-position action ${action.id} is missing position`)
+        this.emitNodeExecution('deactivated', action.id)
+        this.continueToNextNodes(action.id, context)
+        return
+      }
+      const resolvedPosition: ResolvedPositionSetting = resolveActionPosition(
+        action.position,
+        context,
+      )
+      const resolvedTiming = resolveActionTiming(action.timing, context)
+      const resolvedLayer = resolveActionLayer(action.layer, context)
+      const resolvedTarget: ResolvedActionTarget = {
+        groups: resolveLocationGroups(action.target.groups, context),
+        filter: resolveLightTarget(action.target.filter, context),
+      }
+      const iterIdx = context.getForEachIterationIndex()
+
+      const submitPositionAction = (): void => {
+        const effectName =
+          iterIdx >= 0
+            ? `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}:${iterIdx}`
+            : `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}`
+
+        const positionFp = buildSetPositionSubmissionFingerprint(
+          resolvedTarget,
+          resolvedPosition,
+          resolvedLayer,
+          resolvedTiming,
+        )
+        if (this.setPositionSubmissionFingerprint.get(effectName) === positionFp) {
+          this.emitNodeExecution('deactivated', action.id)
+          this.continueToNextNodes(action.id, context)
+          return
+        }
+
+        const effect = ActionEffectFactory.buildEffect({
+          action,
+          lights,
+          resolvedPosition,
+          resolvedTiming,
+          resolvedLayer,
+        })
+        if (!effect) {
+          log.warn(`Failed to create set-position effect for action ${action.id}`)
+          this.emitNodeExecution('deactivated', action.id)
+          this.continueToNextNodes(action.id, context)
+          return
+        }
+        const useSetEffect = this.getAndConsumeInitialClearPolicy()
+        const shouldBlock = resolvedTiming.waitUntilCondition !== 'none'
+        if (shouldBlock) {
+          context.registerActiveAction(action.id, action)
+          this.pendingCallbackEffects.add(effectName)
+          const callback = (): void => {
+            this.pendingCallbackEffects.delete(effectName)
+            this.submittedEffects.delete(effectName)
+            this.setPositionSubmissionFingerprint.set(effectName, positionFp)
+            this.emitNodeExecution('deactivated', action.id)
+            context.advancePhase()
+            context.completeAction(action.id)
+            this.continueToNextNodes(action.id, context)
+            this.maybeFireIdle()
+          }
+          this.submittedEffects.set(effectName, resolvedLayer)
+          if (useSetEffect) {
+            this.sequencer.setEffectUnblockedNameWithCallback(effectName, effect, callback)
+          } else {
+            this.sequencer.addEffectUnblockedNameWithCallback(effectName, effect, callback)
+          }
+        } else {
+          this.submittedEffects.set(effectName, resolvedLayer)
+          if (useSetEffect) {
+            this.sequencer.setEffectUnblockedName(effectName, effect)
+          } else {
+            // set-position is a state-target effect: each new resolved position
+            // must take effect immediately. Queueing behind a stale in-flight
+            // transition would desynchronise per-light motion across beats.
+            this.sequencer.replaceEffect(effectName, effect)
+          }
+          this.setPositionSubmissionFingerprint.set(effectName, positionFp)
+          this.emitNodeExecution('deactivated', action.id)
+          this.continueToNextNodes(action.id, context)
+        }
+      }
+
+      submitPositionAction()
+      return
+    }
+
+    if (action.effectType === 'motion-pattern') {
+      if (!action.motionPattern) {
+        log.warn(`motion-pattern action ${action.id} is missing motionPattern`)
+        this.emitNodeExecution('deactivated', action.id)
+        this.continueToNextNodes(action.id, context)
+        return
+      }
+      const resolvedMotion = resolveMotionPattern(action.motionPattern, context)
+      const resolvedTiming = resolveActionTiming(action.timing, context)
+      const resolvedLayer = resolveActionLayer(action.layer, context)
+      if (
+        !Number.isFinite(resolvedMotion.speedHz) ||
+        resolvedMotion.speedHz <= 0 ||
+        !Number.isFinite(resolvedMotion.sizeDeg) ||
+        resolvedMotion.sizeDeg <= 0
+      ) {
+        log.warn(
+          `motion-pattern action ${action.id}: speed (Hz) and size (deg) must be finite and positive`,
+        )
+        this.emitNodeExecution('deactivated', action.id)
+        this.continueToNextNodes(action.id, context)
+        return
+      }
+      const iterIdx = context.getForEachIterationIndex()
+      const effectName =
+        iterIdx >= 0
+          ? `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}:${iterIdx}`
+          : `effect_${this.compiledEffect.definition.id}_${this.instanceId}_${action.id}`
+      const rampUpMs = resolvedTiming.duration > 0 ? resolvedTiming.duration : 0
+
+      const existingPattern = this.sequencer.getMotionPattern(effectName)
+      if (
+        existingPattern &&
+        existingPattern.layer === resolvedLayer &&
+        existingPattern.rampUpDurationMs === rampUpMs &&
+        trackedLightIdsEqualOrder(existingPattern.lights, lights)
+      ) {
+        if (resolvedMotionPatternSettingsEqual(existingPattern.config, resolvedMotion)) {
+          this.submittedMotionPatterns.add(effectName)
+          this.emitNodeExecution('deactivated', action.id)
+          this.continueToNextNodes(action.id, context)
+          return
+        }
+        if (
+          resolvedMotionPatternSettingsEqualExceptBearing(existingPattern.config, resolvedMotion)
+        ) {
+          this.sequencer.updateMotionPatternConfig(effectName, resolvedMotion)
+          this.submittedMotionPatterns.add(effectName)
+          this.emitNodeExecution('deactivated', action.id)
+          this.continueToNextNodes(action.id, context)
+          return
+        }
+      }
+
+      this.sequencer.cancelPanTiltClear()
+      this.sequencer.addMotionPattern(effectName, resolvedMotion, lights, resolvedLayer, rampUpMs)
+      this.submittedMotionPatterns.add(effectName)
+      this.emitNodeExecution('deactivated', action.id)
+      this.continueToNextNodes(action.id, context)
+      return
+    }
+
+    if (!action.color) {
+      log.warn(`Action ${action.id} (${action.effectType}) is missing color`)
       this.emitNodeExecution('deactivated', action.id)
       this.continueToNextNodes(action.id, context)
       return
@@ -358,27 +538,11 @@ export class EffectExecutionEngine {
     const resolvedTiming = resolveActionTiming(action.timing, context)
     const resolvedLayer = resolveActionLayer(action.layer, context)
 
-    // Build action chain: collect consecutive single-edge set-color action nodes
-    const buildActionChain = (): ActionNode[] => {
-      const { adjacency, actionMap } = this.compiledEffect
-      const chain: ActionNode[] = [action]
-      const visitedInChain = new Set<string>([action.id])
-      let currentId = action.id
-      while (true) {
-        const outgoing = adjacency.get(currentId) ?? []
-        if (outgoing.length !== 1) break
-        const nextId = outgoing[0].to
-        const nextAction = actionMap.get(nextId)
-        if (!nextAction) break
-        if (visitedInChain.has(nextId)) break
-        chain.push(nextAction)
-        visitedInChain.add(nextId)
-        currentId = nextId
-      }
-      return chain
-    }
-
-    const actionChain = buildActionChain()
+    const actionChain = buildActionChain(
+      action,
+      this.compiledEffect.adjacency,
+      this.compiledEffect.actionMap,
+    )
 
     const iterIdx = context.getForEachIterationIndex()
 
@@ -393,7 +557,7 @@ export class EffectExecutionEngine {
       })
 
       if (!effect) {
-        console.warn(`Failed to create effect for action ${action.id}`)
+        log.warn(`Failed to create effect for action ${action.id}`)
         this.emitNodeExecution('deactivated', action.id)
         this.continueToNextNodes(action.id, context)
         return
@@ -444,46 +608,9 @@ export class EffectExecutionEngine {
       return
     }
 
-    // Try to resolve each chain step (only set-color actions can be chained)
-    const resolveChainStep = (a: ActionNode): ChainStep | null => {
-      if (a.effectType !== 'set-color') return null
-
-      const layerNum = resolveActionLayer(a.layer, context)
-      const rc = resolveActionColor(a.color, context)
-      const rtiming = resolveActionTiming(a.timing, context)
-      const chainLights = ActionEffectFactory.resolveLights(this.lightManager, a.target, getVar)
-      if (!chainLights || chainLights.length === 0) return null
-
-      const lightIds = chainLights.map((l) => l.id).join(',')
-      return {
-        action: a,
-        lights: chainLights,
-        lightIds,
-        resolvedLayer: layerNum,
-        resolvedTiming: rtiming,
-        resolvedColor: rc,
-      }
-    }
-
-    const chainData = (() => {
-      const steps: ChainStep[] = []
-      let baseLayer: number | null = null
-      let baseLightIds: string | null = null
-
-      for (const stepAction of actionChain) {
-        const step = resolveChainStep(stepAction)
-        if (!step) return null
-        if (baseLayer === null) {
-          baseLayer = step.resolvedLayer
-          baseLightIds = step.lightIds
-        } else if (baseLayer !== step.resolvedLayer || baseLightIds !== step.lightIds) {
-          return null
-        }
-        steps.push(step)
-      }
-
-      return { steps, baseLayer: baseLayer ?? 0, baseLights: steps[0]?.lights ?? [] }
-    })()
+    const chainData = tryBuildHomogeneousSetColorChainData(actionChain, (a) =>
+      resolveChainStep(a, context, this.lightManager, getVar),
+    )
 
     if (!chainData) {
       submitSingleAction()
@@ -495,21 +622,16 @@ export class EffectExecutionEngine {
         ? `effect_${this.compiledEffect.definition.id}_${this.instanceId}_chain_${actionChain[0].id}:${iterIdx}`
         : `effect_${this.compiledEffect.definition.id}_${this.instanceId}_chain_${actionChain[0].id}`
 
-    // Mark rest of chain nodes as visited so they don't execute independently
-    for (let i = 1; i < actionChain.length; i++) {
-      context.markVisited(actionChain[i].id)
-      this.emitNodeExecution('activated', actionChain[i].id)
-    }
+    markConsecutiveActionChainTailVisited(context, actionChain, (nodeId) =>
+      this.emitNodeExecution('activated', nodeId),
+    )
 
     const composedEffect = ActionEffectFactory.buildEffectChain(
-      chainData.steps.map((step) => ({
-        action: step.action,
-        lights: chainData.baseLights,
-        resolvedColor: step.resolvedColor,
-        resolvedTiming: step.resolvedTiming,
-        resolvedLayer: chainData.baseLayer,
-        intensityScale: 1,
-      })),
+      mapSetColorChainStepsForEffectFactory(
+        chainData.steps,
+        chainData.baseLights,
+        chainData.baseLayer,
+      ),
     )
 
     if (!composedEffect) {
@@ -671,7 +793,7 @@ export class EffectExecutionEngine {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${logic.id}: ${msg}`)
-      console.error(`Error executing logic node ${logic.id}:`, error)
+      log.error(`Error executing logic node ${logic.id}:`, error)
       this.emitNodeExecution('deactivated', logic.id)
     }
   }
@@ -725,7 +847,7 @@ export class EffectExecutionEngine {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${delayNode.id}: ${msg}`)
-      console.error(`Error executing delay node ${delayNode.id}:`, error)
+      log.error(`Error executing delay node ${delayNode.id}:`, error)
       this.emitNodeExecution('deactivated', delayNode.id)
     }
   }
@@ -784,20 +906,13 @@ export class EffectExecutionEngine {
    * have had a chance to register blocking nodes (e.g. delays).
    */
   private continueExecution(nodeIds: string[], context: ExecutionContext): void {
-    context.beginBatch()
-    for (const nodeId of nodeIds) {
-      try {
-        this.executeNode(nodeId, context)
-      } catch (error) {
+    runContextBatch(context, nodeIds, (nodeId) => this.executeNode(nodeId, context), {
+      onNodeError: (nodeId, error) => {
         const msg = error instanceof Error ? error.message : String(error)
         this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
-        console.error(`Error executing node ${nodeId}:`, error)
-      }
-    }
-    context.endBatch()
-    if (context.tryComplete()) {
-      context.dispose()
-    }
+        log.error(`Error executing node ${nodeId}:`, error)
+      },
+    })
   }
 
   /**
@@ -851,6 +966,13 @@ export class EffectExecutionEngine {
       }
     }
     this.submittedEffects.clear()
+    for (const name of this.submittedMotionPatterns) {
+      if (!skipEffectRemoval) {
+        this.sequencer.removeMotionPattern(name)
+      }
+    }
+    this.submittedMotionPatterns.clear()
+    this.setPositionSubmissionFingerprint.clear()
     this.pendingCallbackEffects.clear()
     this.onIdleCallback = undefined
   }

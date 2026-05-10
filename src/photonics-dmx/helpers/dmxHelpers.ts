@@ -13,6 +13,122 @@ import {
   StrobeDmxChannels,
 } from '../types'
 
+/**
+ * Converts a normalised percentage (0–100) to a DMX value (0–255) within the fixture's
+ * configured min/max range. 0% = min, 100% = max.
+ */
+export function percentToDmx(pct: number, min: number, max: number): number {
+  const clampedPct = Math.max(0, Math.min(100, pct))
+  const value = min + (clampedPct / 100) * (max - min)
+  return Math.max(0, Math.min(255, Math.round(value)))
+}
+
+/**
+ * Converts a DMX value to a normalised percentage (0–100) within min/max.
+ * Used when bridging fixture home (DMX) into RGBIO percentage space.
+ */
+export function dmxToPercent(dmx: number, min: number, max: number): number {
+  if (max === min) {
+    return 50
+  }
+  const clampedDmx = Math.max(0, Math.min(255, dmx))
+  const pct = ((clampedDmx - min) / (max - min)) * 100
+  return Math.max(0, Math.min(100, pct))
+}
+
+/**
+ * Converts a signed degree offset from fixture home into a percentage of the configured
+ * physical range (see FixtureConfig panRangeDeg / tiltRangeDeg).
+ */
+export function degreeOffsetToPercent(offsetDeg: number, rangeDeg: number): number {
+  if (!Number.isFinite(offsetDeg) || !Number.isFinite(rangeDeg) || rangeDeg <= 0) {
+    return 0
+  }
+  return (offsetDeg / rangeDeg) * 100
+}
+
+/**
+ * Mirrors a normalised percentage around a home percentage (both 0–100).
+ */
+export function mirrorPercentAroundHome(percent: number, homePercent: number): number {
+  const mirrored = 2 * homePercent - percent
+  return Math.max(0, Math.min(100, mirrored))
+}
+
+/**
+ * Inverts pan/tilt DMX for truss-mounted fixtures: end-for-end mirror across the channel span.
+ * Mounting inversion flips physical endpoints; it is independent of idle home percent.
+ */
+export function mirrorDmxForMovingHeadInvert(
+  dmx: number,
+  channelMin: number,
+  channelMax: number,
+): number {
+  const span = channelMax - channelMin
+  if (span <= 0) {
+    return Math.max(0, Math.min(255, Math.round(dmx)))
+  }
+  const d = Math.max(0, Math.min(255, Math.round(dmx)))
+  const mirrored = channelMin + channelMax - d
+  return Math.max(0, Math.min(255, Math.round(mirrored)))
+}
+
+/**
+ * Logical pan direction for stage-relative math (bearing, motion engine, preview disc).
+ * `panDirectionCW` is the user's physical observation (clockwise from above when pan DMX increases).
+ * When `invertPan` mirrors DMX for truss mounting, logical motor direction can differ from that
+ * observation; XOR combines both so logical motor increase matches clockwise stage bearing increase.
+ */
+export function logicalPanDir(c: { panDirectionCW: boolean; invertPan: boolean }): 1 | -1 {
+  return c.panDirectionCW !== c.invertPan ? 1 : -1
+}
+
+/**
+ * Logical tilt direction for stage-relative math.
+ * Up-firing fixtures use motor-positive tilt as logical-positive; down-firing fixtures invert it.
+ */
+export function logicalTiltDir(c: { invertTilt: boolean }): 1 | -1 {
+  return c.invertTilt ? -1 : 1
+}
+
+/**
+ * For waveform / static-offset paths, inverted fixtures with a home position away from 50%
+ * need a percentage-space mirror so that stage-relative degree offsets land on the correct
+ * side of the physical home after the DMX publisher applies its channel-midpoint inversion.
+ * This mirror is independent of `tiltStageDeg`.
+ */
+export function shouldMirrorTiltForStageRelative(c: {
+  invertTilt: boolean
+  tiltHome: number
+}): boolean {
+  return c.invertTilt && Math.abs(c.tiltHome - 50) > 0.5
+}
+
+/**
+ * For gimbal IK, the solver requires phi0 = tiltHomeDeg − tiltStageDeg to be positive so the
+ * home beam is on the correct side of the tilt pole. When an inverted fixture's logical home is
+ * below the pole (phi0 < 0), we mirror the home across the pole in degree space to produce a
+ * canonical IK home with phi0 > 0. The canonical orbit (around the mirrored home) maps back to
+ * the actual orbit via pole-reflection of the IK output. When phi0 >= 0 the IK runs correctly
+ * in-place and the actual home is returned unchanged.
+ *
+ * The returned value may exceed [0, tiltRangeDeg] and must NOT be used for headroom or
+ * motor-bounds checks — only for IK geometry.
+ */
+export function canonicalGimbalTiltHomeDeg(c: {
+  invertTilt: boolean
+  tiltHome: number
+  tiltRangeDeg: number
+  tiltStageDeg: number
+}): number {
+  const tiltHomeDeg = (c.tiltHome / 100) * c.tiltRangeDeg
+  const phi0 = tiltHomeDeg - c.tiltStageDeg
+  if (c.invertTilt && phi0 < -1e-9) {
+    return 2 * c.tiltStageDeg - tiltHomeDeg
+  }
+  return tiltHomeDeg
+}
+
 // Global brightness configuration - will be set by the application
 let globalBrightnessConfig: { low: number; medium: number; high: number; max: number } | null = null
 

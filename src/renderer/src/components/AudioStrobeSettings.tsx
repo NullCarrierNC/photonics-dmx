@@ -3,6 +3,8 @@ import type { AudioConfig } from '../../../shared/ipcTypes'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getAudioConfig, saveAudioConfig } from '../ipcApi'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('AudioStrobeSettings')
 
 const AudioStrobeSettings: React.FC = () => {
   const [strobeEnabled, setStrobeEnabled] = useState(false)
@@ -21,7 +23,7 @@ const AudioStrobeSettings: React.FC = () => {
         setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)
         setStrobeProbability(config?.strobeProbability ?? 100)
       } catch (error) {
-        console.error('Failed to load strobe settings:', error)
+        log.error('Failed to load strobe settings:', error)
       } finally {
         setIsLoading(false)
       }
@@ -51,14 +53,14 @@ const AudioStrobeSettings: React.FC = () => {
       setIsSaving(true)
       const result = await saveAudioConfig(updates)
       if (!result.success) {
-        console.error('Failed to save strobe settings:', result.error)
+        log.error('Failed to save strobe settings:', result.error)
         const config = await getAudioConfig()
         setStrobeEnabled(config?.strobeEnabled ?? false)
         setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)
         setStrobeProbability(config?.strobeProbability ?? 100)
       }
     } catch (error) {
-      console.error('Failed to save strobe settings:', error)
+      log.error('Failed to save strobe settings:', error)
       const config = await getAudioConfig()
       setStrobeEnabled(config?.strobeEnabled ?? false)
       setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)

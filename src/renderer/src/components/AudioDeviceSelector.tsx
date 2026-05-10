@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { getAudioConfig, saveAudioConfig } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('AudioDeviceSelector')
 
 interface AudioDevice {
   deviceId: string
@@ -24,7 +26,7 @@ const AudioDeviceSelector: React.FC = () => {
         // Load available devices
         await loadDevices()
       } catch (error) {
-        console.error('Failed to load audio config:', error)
+        log.error('Failed to load audio config:', error)
         setError('Failed to load audio configuration')
       }
     }
@@ -46,10 +48,10 @@ const AudioDeviceSelector: React.FC = () => {
           label: d.label || `Microphone ${d.deviceId.substring(0, 8)}`,
         }))
 
-      console.log(`Found ${audioInputs.length} audio input devices`)
+      log.info(`Found ${audioInputs.length} audio input devices`)
       setDevices(audioInputs)
     } catch (error) {
-      console.error('Failed to enumerate audio devices:', error)
+      log.error('Failed to enumerate audio devices:', error)
       setError('Failed to load audio devices. Please check microphone permissions.')
     } finally {
       setIsLoading(false)
@@ -69,7 +71,7 @@ const AudioDeviceSelector: React.FC = () => {
       })
 
       if (!result.success) {
-        console.error('Failed to save audio device:', result.error)
+        log.error('Failed to save audio device:', result.error)
         setError('Failed to save device selection')
 
         // Revert on failure
@@ -77,7 +79,7 @@ const AudioDeviceSelector: React.FC = () => {
         setSelectedDeviceId(config?.deviceId || 'default')
       }
     } catch (error) {
-      console.error('Failed to save audio device:', error)
+      log.error('Failed to save audio device:', error)
       setError('Failed to save device selection')
 
       // Revert on failure

@@ -1,8 +1,9 @@
 import { spawn } from 'child_process'
 import { IpcMain, app, shell } from 'electron'
-import path from 'path'
 import { SHELL } from '../../shared/ipcChannels'
-import { validatePathUnderAllowedRoots } from './inputValidation'
+import type { IpcErrorResult } from '../../shared/ipcTypes'
+import { validateNodeScriptPath, validatePathUnderAllowedRoots } from './inputValidation'
+import { ipcError, ipcSuccess } from './ipcResult'
 
 /**
  * Set up shell-related IPC handlers
@@ -14,10 +15,10 @@ export function setupShellHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(SHELL.SHOW_ITEM_IN_FOLDER, async (_event, filePath: string) => {
     const validatedPath = validatePathUnderAllowedRoots(filePath)
     if (!validatedPath.ok) {
-      return validatedPath.error
+      return ipcError(validatedPath.error)
     }
     shell.showItemInFolder(validatedPath.value)
-    return ''
+    return ipcSuccess()
   })
 
   /**
@@ -26,48 +27,50 @@ export function setupShellHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(SHELL.OPEN_PATH, async (_event, filePath: string) => {
     const validatedPath = validatePathUnderAllowedRoots(filePath)
     if (!validatedPath.ok) {
-      return validatedPath.error
+      return ipcError(validatedPath.error)
     }
-    return shell.openPath(validatedPath.value)
+    const result = await shell.openPath(validatedPath.value)
+    return { success: true, result } as const
   })
 
   /**
    * Run a Node.js script from the app's scripts directory.
    * Payload: { scriptName: string; args: string[] }
-   * Returns: { stdout: string; stderr: string } on success; rejects on non-zero exit.
    */
   ipcMain.handle(
     SHELL.RUN_NODE_SCRIPT,
-    async (
-      _event,
-      payload: { scriptName: string; args: string[] },
-    ): Promise<{ stdout: string; stderr: string }> => {
+    async (_event, payload: { scriptName: string; args: string[] }) => {
       const { scriptName, args } = payload
-      const appPath = app.getAppPath()
-      const scriptPath = path.join(appPath, 'scripts', scriptName)
-      const resolved = path.resolve(scriptPath)
-      if (!resolved.startsWith(path.resolve(appPath))) {
-        throw new Error('Script path must be under app scripts directory')
+      if (!Array.isArray(args) || !args.every((a) => typeof a === 'string')) {
+        return ipcError(new Error('args must be an array of strings'))
       }
-      return new Promise((resolve, reject) => {
-        const proc = spawn('node', [scriptPath, ...args])
-        let stdout = ''
-        let stderr = ''
-        proc.stdout?.on('data', (d: Buffer) => {
-          stdout += d.toString()
-        })
-        proc.stderr?.on('data', (d: Buffer) => {
-          stderr += d.toString()
-        })
-        proc.on('close', (code) => {
-          if (code === 0) {
-            resolve({ stdout, stderr })
-          } else {
-            reject(new Error(stderr || `exit ${code}`))
-          }
-        })
-        proc.on('error', (err) => reject(err))
-      })
+      const appPath = app.getAppPath()
+      const pathCheck = validateNodeScriptPath(appPath, scriptName)
+      if (!pathCheck.ok) {
+        return ipcError(new Error(pathCheck.error))
+      }
+      const scriptPath = pathCheck.value
+      return new Promise<{ success: true; stdout: string; stderr: string } | IpcErrorResult>(
+        (resolve) => {
+          const proc = spawn('node', [scriptPath, ...args])
+          let stdout = ''
+          let stderr = ''
+          proc.stdout?.on('data', (d: Buffer) => {
+            stdout += d.toString()
+          })
+          proc.stderr?.on('data', (d: Buffer) => {
+            stderr += d.toString()
+          })
+          proc.on('close', (code) => {
+            if (code === 0) {
+              resolve({ success: true, stdout, stderr })
+            } else {
+              resolve(ipcError(new Error(stderr.trim() || `Process exited with code ${code}`)))
+            }
+          })
+          proc.on('error', (err) => resolve(ipcError(err)))
+        },
+      )
     },
   )
 }

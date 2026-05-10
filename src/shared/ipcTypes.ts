@@ -3,7 +3,8 @@
  *
  * Three maps tie every channel to its payload type:
  *   IpcInvokeMap      - channels using ipcMain.handle / ipcRenderer.invoke (request → response)
- *   IpcSendMap        - channels using ipcMain.on / ipcRenderer.send (fire-and-forget)
+ *   IpcSendMap        - channels using ipcMain.on / ipcRenderer.send (fire-and-forget; state
+ *                       mutations with user-visible failure use IpcInvokeMap)
  *   IpcEventMap       - channels using webContents.send / ipcRenderer.on (main → renderer push)
  *   IpcRendererSendMap - renderer → main one-way push (not request/response)
  *
@@ -16,12 +17,15 @@ import {
   EFFECTS,
   WINDOW,
   SHELL,
+  LIFECYCLE,
   CUE,
   LIGHT,
   CONFIG,
   RENDERER_RECEIVE,
   RENDERER_SEND,
 } from './ipcChannels'
+
+import type { NodeCueKind } from '../photonics-dmx/cues/types/nodeCueTypes'
 
 // ---------------------------------------------------------------------------
 // Re-used domain types (re-exported so consumers can import from one place)
@@ -30,6 +34,7 @@ import {
 export type {
   NodeCueFile,
   NodeCueMode,
+  NodeCueKind,
   EffectFile,
   EffectMode,
 } from '../photonics-dmx/cues/types/nodeCueTypes'
@@ -55,8 +60,22 @@ export type {
 export type {
   AudioConfig,
   AudioGameModeConfig,
+  AudioGameModeSchedulePayload,
   AudioLightingData,
 } from '../photonics-dmx/listeners/Audio/AudioTypes'
+
+/**
+ * Runtime lifecycle phases for the main-process controller graph.
+ * Owned by `ControllerManager`; mirrored here so the renderer can disable actions outside `running`.
+ */
+export type LifecyclePhase =
+  | 'initializing'
+  | 'running'
+  | 'restarting'
+  | 'consoleMode'
+  | 'failed'
+  | 'shuttingDown'
+  | 'stopped'
 
 import type {
   NodeCueFile,
@@ -75,8 +94,10 @@ import type {
 import type { CueData, CueType } from '../photonics-dmx/cues/types/cueTypes'
 import type { AudioCueType } from '../photonics-dmx/cues/types/audioCueTypes'
 import type { AppPreferences } from '../services/configuration/ConfigurationManager'
+import type { ConfigCorruptInfo } from '../services/configuration/configCorruptTypes'
 import type {
   DmxFixture,
+  FixtureConfig,
   LightingConfiguration,
   DmxRig,
   SenderConfig,
@@ -84,12 +105,22 @@ import type {
 import type {
   AudioConfig,
   AudioGameModeConfig,
+  AudioGameModeSchedulePayload,
   AudioLightingData,
 } from '../photonics-dmx/listeners/Audio/AudioTypes'
 
 // ---------------------------------------------------------------------------
 // Shared response shapes
 // ---------------------------------------------------------------------------
+//
+// Invoke (ipcMain.handle) conventions:
+// - Read-only / query channels may return a plain DTO, null, or a typed union; see IpcInvokeMap.
+// - State-changing and validation-gated channels should return IpcSuccessResult, { success: true, ... }
+//   with a payload, or IpcErrorResult, so the renderer can branch on result.success without
+//   treating thrown errors as a second control path.
+// - Use ipcError() / ipcSuccess() from main/ipc/ipcResult in handlers. Throw only for unexpected
+//   failures; document channels that still reject in IpcInvokeMap.
+//
 
 export interface IpcErrorResult {
   success: false
@@ -135,12 +166,14 @@ export interface IpcInvokeMap {
       | { valid: false; errors: string[] }
   }
   [NODE_CUES.GET_CUE_TYPES]: {
-    request: NodeCueMode
+    request: { mode: NodeCueMode; kind?: NodeCueKind }
     response: string[]
   }
-  [NODE_CUES.IMPORT]: {
+  [NODE_CUES.IMPORT_PICK]: {
     request: NodeCueMode | undefined
-    response: { success: true; path: string } | IpcErrorResult
+    response:
+      | { success: true; sourceBasename: string; mode: NodeCueMode; content: NodeCueFile }
+      | IpcErrorResult
   }
   [NODE_CUES.EXPORT]: {
     request: string
@@ -174,13 +207,21 @@ export interface IpcInvokeMap {
       | { valid: true; data: EffectFile; errors: string[]; mode: EffectMode }
       | { valid: false; errors: string[] }
   }
-  [EFFECTS.IMPORT]: {
+  [EFFECTS.IMPORT_PICK]: {
     request: EffectMode | undefined
-    response: { success: true; path: string } | IpcErrorResult
+    response:
+      | { success: true; sourceBasename: string; mode: EffectMode; content: EffectFile }
+      | IpcErrorResult
   }
   [EFFECTS.EXPORT]: {
     request: string
     response: { success: true; path: string } | IpcErrorResult
+  }
+
+  // ---- Lifecycle ----
+  [LIFECYCLE.GET_PHASE]: {
+    request: void
+    response: LifecyclePhase
   }
 
   // ---- Window ----
@@ -196,15 +237,15 @@ export interface IpcInvokeMap {
   // ---- Shell ----
   [SHELL.SHOW_ITEM_IN_FOLDER]: {
     request: string
-    response: string
+    response: IpcSuccessResult | IpcErrorResult
   }
   [SHELL.OPEN_PATH]: {
     request: string
-    response: string
+    response: IpcErrorResult | { success: true; result: string }
   }
   [SHELL.RUN_NODE_SCRIPT]: {
     request: { scriptName: string; args: string[] }
-    response: { stdout: string; stderr: string }
+    response: { success: true; stdout: string; stderr: string } | IpcErrorResult
   }
 
   // ---- Cue / listeners ----
@@ -218,7 +259,7 @@ export interface IpcInvokeMap {
   }
   [CUE.RB3E_GET_MODE]: {
     request: void
-    response: 'direct' | 'cueBased' | 'none'
+    response: 'direct' | 'none'
   }
   [CUE.RB3E_GET_STATS]: {
     request: void
@@ -253,18 +294,6 @@ export interface IpcInvokeMap {
     request: void
     response: Array<{ id: string; name: string; description: string; cueTypes: CueType[] }>
   }
-  [LIGHT.GET_ACTIVE_CUE_GROUPS]: {
-    request: void
-    response: Array<{ id: string; name: string; description: string; cueTypes: CueType[] }>
-  }
-  [LIGHT.ACTIVATE_CUE_GROUP]: {
-    request: string
-    response: IpcSuccessResult | IpcErrorResult
-  }
-  [LIGHT.DEACTIVATE_CUE_GROUP]: {
-    request: string
-    response: IpcSuccessResult | IpcErrorResult
-  }
   [LIGHT.ENABLE_CUE_GROUP]: {
     request: string
     response: IpcSuccessResult | IpcErrorResult
@@ -272,17 +301,6 @@ export interface IpcInvokeMap {
   [LIGHT.DISABLE_CUE_GROUP]: {
     request: string
     response: IpcSuccessResult | IpcErrorResult
-  }
-  [LIGHT.SET_ACTIVE_CUE_GROUPS]: {
-    request: string[]
-    response:
-      | {
-          success: true
-          activeGroups: string[]
-          invalidGroups?: string[]
-          disabledGroups?: string[]
-        }
-      | IpcErrorResult
   }
   [LIGHT.GET_NETWORK_INTERFACES]: {
     request: void
@@ -365,7 +383,7 @@ export interface IpcInvokeMap {
     response: Array<{ id: string; name: string; description: string }>
   }
   [LIGHT.GET_CUE_SOURCE_GROUP]: {
-    request: string
+    request: CueType
     response:
       | {
           success: true
@@ -386,6 +404,30 @@ export interface IpcInvokeMap {
     request: void
     response: { success: true; windowMs: number } | IpcErrorResult
   }
+  [LIGHT.GET_MOTION_CUE_MIN_HOLD_MS]: {
+    request: void
+    response: { success: true; minHoldMs: number } | IpcErrorResult
+  }
+  [LIGHT.SET_MOTION_CUE_MIN_HOLD_MS]: {
+    request: number
+    response: { success: true; minHoldMs: number } | IpcErrorResult
+  }
+  [LIGHT.GET_MOTION_CUE_PROBABILITY_PERCENT]: {
+    request: void
+    response: { success: true; percent: number } | IpcErrorResult
+  }
+  [LIGHT.SET_MOTION_CUE_PROBABILITY_PERCENT]: {
+    request: number
+    response: { success: true; percent: number } | IpcErrorResult
+  }
+  [LIGHT.GET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT]: {
+    request: void
+    response: { success: true; percent: number } | IpcErrorResult
+  }
+  [LIGHT.SET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT]: {
+    request: number
+    response: { success: true; percent: number } | IpcErrorResult
+  }
   [LIGHT.SET_CUE_GROUP_SELECTION_MODE]: {
     request: 'oncePerSong' | 'withinSong'
     response: { success: true; mode: 'oncePerSong' | 'withinSong' } | IpcErrorResult
@@ -398,12 +440,105 @@ export interface IpcInvokeMap {
     request: void
     response: { success: true; status: unknown } | IpcErrorResult
   }
+  [LIGHT.GET_YARG_MOTION_CUE_GROUPS]: {
+    request: void
+    response: Array<{ id: string; name: string; description?: string; cueCount: number }>
+  }
+  [LIGHT.GET_AUDIO_MOTION_CUE_GROUPS]: {
+    request: void
+    response: Array<{ id: string; name: string; description?: string; cueCount: number }>
+  }
+  [LIGHT.GET_AVAILABLE_YARG_MOTION_CUES]: {
+    request: string | undefined
+    response: Array<{ id: string; name: string; description: string }>
+  }
+  [LIGHT.GET_AVAILABLE_AUDIO_MOTION_CUES]: {
+    request: string | undefined
+    response: Array<{ id: string; name: string; description: string }>
+  }
+  [LIGHT.GET_YARG_MOTION_GROUP_SELECTION_MODE]: {
+    request: void
+    response: { success: true; mode: 'oncePerSong' | 'perCueChange' | 'none' } | IpcErrorResult
+  }
+  [LIGHT.SET_YARG_MOTION_GROUP_SELECTION_MODE]: {
+    request: 'oncePerSong' | 'perCueChange' | 'none'
+    response: { success: true; mode: 'oncePerSong' | 'perCueChange' | 'none' } | IpcErrorResult
+  }
+  [LIGHT.GET_AUDIO_MOTION_GROUP_SELECTION_MODE]: {
+    request: void
+    response: { success: true; mode: 'oncePerSong' | 'perCueChange' | 'none' } | IpcErrorResult
+  }
+  [LIGHT.SET_AUDIO_MOTION_GROUP_SELECTION_MODE]: {
+    request: 'oncePerSong' | 'perCueChange' | 'none'
+    response: { success: true; mode: 'oncePerSong' | 'perCueChange' | 'none' } | IpcErrorResult
+  }
+  [LIGHT.START_YARG_MOTION_CUE_SIMULATION]: {
+    request: { groupId: string; cueId: string }
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.START_AUDIO_MOTION_CUE_SIMULATION]: {
+    request: { groupId: string; cueId: string }
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.STOP_MOTION_CUE_SIMULATION]: {
+    request: void
+    response: IpcSuccessResult | IpcErrorResult
+  }
   [LIGHT.UPDATE_SACN_CONFIG]: {
     request: {
       universe?: number
       networkInterface?: string
       useUnicast?: boolean
       unicastDestination?: string
+    }
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.SENDER_ENABLE]: {
+    request: SenderConfig
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.SENDER_DISABLE]: {
+    request: { sender: string }
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.SENDER_DISABLE_ALL]: {
+    request: void
+    response: { disabled: string[] }
+  }
+  [LIGHT.CONSOLE_ENABLE]: {
+    request: { rigId: string }
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.CONSOLE_DISABLE]: {
+    request: void
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.CONSOLE_UPDATE_CHANNEL]: {
+    request: {
+      rigId: string
+      lightId: string
+      fixtureId: string
+      channelName: string
+      channelNumber: number
+    }
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.CONSOLE_SET_HOME]: {
+    request: {
+      rigId: string
+      lightId: string
+      fixtureId: string
+      panHome: number
+      tiltHome: number
+    }
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.CONSOLE_SET_FIXTURE_CONFIG]: {
+    request: {
+      rigId: string
+      lightId: string
+      fixtureId: string
+      config: Partial<FixtureConfig>
     }
     response: IpcSuccessResult | IpcErrorResult
   }
@@ -416,6 +551,10 @@ export interface IpcInvokeMap {
   [CONFIG.GET_MY_LIGHTS]: {
     request: void
     response: DmxFixture[]
+  }
+  [CONFIG.SAVE_MY_LIGHTS]: {
+    request: DmxFixture[]
+    response: IpcSuccessResult | IpcErrorResult
   }
   [CONFIG.GET_LIGHT_LAYOUT]: {
     request: string
@@ -438,7 +577,7 @@ export interface IpcInvokeMap {
     response: DmxRig[]
   }
   [CONFIG.SAVE_DMX_RIG]: {
-    request: DmxRig
+    request: unknown
     response: IpcSuccessResult | IpcErrorResult
   }
   [CONFIG.DELETE_DMX_RIG]: {
@@ -452,6 +591,10 @@ export interface IpcInvokeMap {
   [CONFIG.GET_VALIDATION_ERRORS]: {
     request: void
     response: Array<{ source: 'node-cue' | 'effect'; errors: string[] }>
+  }
+  [CONFIG.GET_CORRUPT_RECOVERY_EVENTS]: {
+    request: void
+    response: { files: ConfigCorruptInfo[] }
   }
   [CONFIG.GET_PREFS]: {
     request: void
@@ -517,6 +660,38 @@ export interface IpcInvokeMap {
     request: Record<string, string[]>
     response: IpcSuccessResult | IpcErrorResult
   }
+  [CONFIG.GET_ENABLED_YARG_MOTION_CUE_GROUPS]: {
+    request: void
+    response: string[]
+  }
+  [CONFIG.SET_ENABLED_YARG_MOTION_CUE_GROUPS]: {
+    request: string[]
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [CONFIG.GET_DISABLED_YARG_MOTION_CUES]: {
+    request: void
+    response: Record<string, string[]>
+  }
+  [CONFIG.SET_DISABLED_YARG_MOTION_CUES]: {
+    request: Record<string, string[]>
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [CONFIG.GET_ENABLED_AUDIO_MOTION_CUE_GROUPS]: {
+    request: void
+    response: string[]
+  }
+  [CONFIG.SET_ENABLED_AUDIO_MOTION_CUE_GROUPS]: {
+    request: string[]
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [CONFIG.GET_DISABLED_AUDIO_MOTION_CUES]: {
+    request: void
+    response: Record<string, string[]>
+  }
+  [CONFIG.SET_DISABLED_AUDIO_MOTION_CUES]: {
+    request: Record<string, string[]>
+    response: IpcSuccessResult | IpcErrorResult
+  }
   [CONFIG.GET_AUDIO_REACTIVE_CUES]: {
     request: void
     response:
@@ -547,6 +722,30 @@ export interface IpcInvokeMap {
     request: Partial<AudioGameModeConfig>
     response: { success: true; config: AudioGameModeConfig } | (IpcErrorResult & { success: false })
   }
+  [CONFIG.GET_MOTION_ENABLED]: {
+    request: void
+    response: boolean
+  }
+  [CONFIG.SET_MOTION_ENABLED]: {
+    request: boolean
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [CONFIG.GET_ACTIVE_AUDIO_MOTION_CUE]: {
+    request: void
+    response: { groupId: string; cueId: string } | null
+  }
+  [CONFIG.SET_ACTIVE_AUDIO_MOTION_CUE]: {
+    request: { groupId: string; cueId: string } | null
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [CONFIG.GET_ACTIVE_YARG_MOTION_CUE]: {
+    request: void
+    response: { groupId: string; cueId: string } | null
+  }
+  [CONFIG.SET_ACTIVE_YARG_MOTION_CUE]: {
+    request: { groupId: string; cueId: string } | null
+    response: IpcSuccessResult | IpcErrorResult
+  }
   [CONFIG.GET_STAGE_KIT_PRIORITY]: {
     request: void
     response: 'prefer-for-tracked' | 'random' | 'never'
@@ -571,13 +770,10 @@ export interface IpcSendMap {
   [CUE.YARG_LISTENER_DISABLED]: void
   [CUE.RB3E_LISTENER_ENABLED]: void
   [CUE.RB3E_LISTENER_DISABLED]: void
-  [CUE.RB3E_SWITCH_MODE]: 'direct' | 'cueBased'
   [CUE.SET_LISTEN_CUE_DATA]: boolean
   [CUE.CUE_STYLE]: 'simple' | 'complex'
   [CUE.UPDATE_EFFECT_DEBOUNCE]: number
-  [LIGHT.SENDER_ENABLE]: SenderConfig
-  [LIGHT.SENDER_DISABLE]: { sender: string }
-  [CONFIG.SAVE_MY_LIGHTS]: DmxFixture[]
+  [LIGHT.CONSOLE_SEND_DMX]: Record<number, number>
 }
 
 export type IpcSendChannel = keyof IpcSendMap
@@ -607,7 +803,7 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.SENDER_START_FAILED]: { sender: string; error: string }
   [RENDERER_RECEIVE.SENDER_ERROR]: string
   [RENDERER_RECEIVE.SENDER_NETWORK_ERROR]: { sender: string; error: string; autoDisabled: boolean }
-  [RENDERER_RECEIVE.YARG_ERROR]: string
+  [RENDERER_RECEIVE.YARG_ERROR]: { type: string; message: string; autoDisabled?: boolean }
   [RENDERER_RECEIVE.CONTROLLERS_RESTARTED]: undefined
   [RENDERER_RECEIVE.AUDIO_ENABLE]: AudioConfig
   [RENDERER_RECEIVE.AUDIO_DISABLE]: undefined
@@ -615,7 +811,21 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE]: AudioConfig | undefined
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE]: AudioGameModeConfig
   [RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED]: undefined
+  [RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED]: undefined
+  [RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED]: undefined
+  [RENDERER_RECEIVE.MOTION_ENABLED_CHANGED]: boolean
+  [RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE]: {
+    ref: { groupId: string; cueId: string } | null
+    source: 'manual' | 'auto' | 'cleared'
+    manualFallback: boolean
+  }
+  [RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE]: {
+    ref: { groupId: string; cueId: string } | null
+    source: 'manual' | 'auto' | 'cleared'
+    manualFallback: boolean
+  }
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE]: { activeCueType: string }
+  [RENDERER_RECEIVE.AUDIO_GAME_MODE_DEADLINE]: AudioGameModeSchedulePayload
   [RENDERER_RECEIVE.AUDIO_STROBE_STATE]: {
     active: boolean
     strobeCueType: string | null
@@ -623,6 +833,7 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.AUDIO_DATA_MIRROR]: AudioLightingData
   [RENDERER_RECEIVE.CUE_STATE_UPDATE]: CueStateUpdatePayload
   [RENDERER_RECEIVE.DMX_VALUES]: { universeBuffer: Record<number, number> }
+  [RENDERER_RECEIVE.CONFIG_CORRUPT_RECOVERED]: { files: ConfigCorruptInfo[] }
   [RENDERER_RECEIVE.CUE_HANDLED]: CueData
   [RENDERER_RECEIVE.NODE_CUES_CHANGED]: NodeCueListSummary
   [RENDERER_RECEIVE.EFFECTS_CHANGED]: EffectListSummary
@@ -633,6 +844,7 @@ export interface IpcEventMap {
   }
   [RENDERER_RECEIVE.NODE_EXECUTION]: NodeExecutionPayload
   [RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR]: string
+  [RENDERER_RECEIVE.LIFECYCLE_PHASE_CHANGED]: LifecyclePhase
 }
 
 export type IpcEventChannel = keyof IpcEventMap

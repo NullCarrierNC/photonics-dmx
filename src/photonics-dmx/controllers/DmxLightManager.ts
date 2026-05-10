@@ -1,4 +1,5 @@
 import { randomBetween } from '../helpers/utils'
+import { backLightBearingIsFlipped } from '../helpers/stageDirections'
 import {
   LightingConfiguration,
   TrackedLight,
@@ -6,6 +7,9 @@ import {
   LightTarget,
   DmxFixture,
 } from '../types'
+import { createLogger } from '../../shared/logger'
+
+const log = createLogger('DmxLightManager')
 
 /**
  * Requests lights based on groups and targets.
@@ -29,7 +33,7 @@ export class DmxLightManager {
    * Initializes the tracked light arrays based on the current configuration.
    */
   private initializeLights(): void {
-    //  console.log("Init",  this.config.frontLights);
+    const layoutId = this.config.lightLayout?.id
 
     this._frontLights = this.config.frontLights
       .filter((light) => light.id !== null)
@@ -46,6 +50,7 @@ export class DmxLightManager {
         id: light.id as string,
         position: light.position,
         config: light.config,
+        bearingIsFlipped: backLightBearingIsFlipped(layoutId, 'back'),
       }))
       .sort((a, b) => a.position - b.position)
 
@@ -147,7 +152,7 @@ export class DmxLightManager {
           break
         default:
           // Optionally handle unknown groups
-          console.warn(`Unknown group: ${g}`)
+          log.warn(`Unknown group: ${g}`)
           break
       }
     })
@@ -220,7 +225,7 @@ export class DmxLightManager {
           lights[randomBetween(0, lights.length - 1)],
         ]
       default:
-        console.warn(`Unknown target: ${target}`)
+        log.warn(`Unknown target: ${target}`)
         return []
     }
   }

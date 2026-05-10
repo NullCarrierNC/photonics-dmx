@@ -5,12 +5,12 @@ files and executed by the node cue runtime in `src/photonics-dmx/cues/node/`.
 
 ## Modes
 
-| Mode | Purpose |
-|------|---------|
-| `yarg` | YARG game cues – event-driven, triggered by in-game state changes |
-| `audio` | Audio-reactive cues (early development; excluded from most documentation) |
-| `cue` | Edit a cue within a cue file (one cue per file, or multiple cues per group) |
-| `effect` | Edit a reusable effect definition (shared across cues) |
+| Mode     | Purpose                                                                     |
+| -------- | --------------------------------------------------------------------------- |
+| `yarg`   | YARG game cues – event-driven, triggered by in-game state changes           |
+| `audio`  | Audio-reactive cues (early development; excluded from most documentation)   |
+| `cue`    | Edit a cue within a cue file (one cue per file, or multiple cues per group) |
+| `effect` | Edit a reusable effect definition (shared across cues)                      |
 
 ## Structure
 
@@ -30,18 +30,18 @@ cue-editor/
 
 ## Key Hooks
 
-| Hook | Role |
-|------|------|
-| `useCueFlow` | Orchestrates flow state (nodes, edges), integrates useFlowSync, useNodeSelection, useNodeCreation |
-| `useFlowSync` | Syncs document ↔ ReactFlow: load cue into canvas, build document from flow |
-| `useCueFileIO` | File operations: select, save, create, delete; integrates with IPC |
-| `useCueCrud` | Cue CRUD within a file: add/remove/rename cues |
-| `useCueMetadata` | Group/cue metadata (name, description, variables, events) |
-| `useCueFiles` | File list, grouping, mode (yarg/audio), registry data |
-| `useNodeSelection` | Selection state, node creation at position |
-| `useNodeCreation` | Add event, action, logic, event raiser, effect raiser/listener nodes |
-| `useActiveNodes` | Resolve active (selected) nodes for sidebar |
-| `useEdgeManagement` | Edge add/remove, validation |
+| Hook                | Role                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------- |
+| `useCueFlow`        | Orchestrates flow state (nodes, edges), integrates useFlowSync, useNodeSelection, useNodeCreation |
+| `useFlowSync`       | Syncs document ↔ ReactFlow: load cue into canvas, build document from flow                       |
+| `useCueFileIO`      | File operations: select, save, create, delete; integrates with IPC                                |
+| `useCueCrud`        | Cue CRUD within a file: add/remove/rename cues                                                    |
+| `useCueMetadata`    | Group/cue metadata (name, description, variables, events)                                         |
+| `useCueFiles`       | File list, grouping, mode (yarg/audio), registry data                                             |
+| `useNodeSelection`  | Selection state, node creation at position                                                        |
+| `useNodeCreation`   | Add event, action, logic, event raiser, effect raiser/listener nodes                              |
+| `useActiveNodes`    | Resolve active (selected) nodes for sidebar                                                       |
+| `useEdgeManagement` | Edge add/remove, validation                                                                       |
 
 ## IPC Channels
 
@@ -51,7 +51,15 @@ The editor communicates with the main process via:
 - **EFFECTS** – Effect files: list, read, save, delete, validate, import/export
 - **SHELL** – Open folder, show file in folder (for "Open File Location")
 
+It also subscribes to two main → renderer push channels for live editor feedback during cue execution:
+
+- **`RENDERER_RECEIVE.NODE_EXECUTION`** – Node activation/deactivation events emitted by the runtime engines; consumed by `useActiveNodes` to highlight currently-running nodes in the canvas.
+- **`RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR`** – Per-node runtime errors emitted by `EffectExecutionEngine` (and surfaced in `DebugPanel`); consumed by `useErrorNodes` to flag failing nodes.
+
 See `src/shared/ipcChannels.ts` for channel constants.
+
+Read/delete/save paths are resolved on the main process against the loader-owned cue and effect roots so arbitrary
+filesystem paths from the renderer cannot escape those directories.
 
 ## Node Types
 

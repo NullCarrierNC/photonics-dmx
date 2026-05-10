@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "cueVersion": 1,
   "mode": "yarg",
   "group": {
     "id": "yarg-alt1",
@@ -76,7 +77,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -112,7 +116,8 @@
           "y": 139.66204963178205,
           "zoom": 0.5
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-silhouettes",
@@ -182,7 +187,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -318,7 +326,8 @@
           "initialValue": "front",
           "isParameter": false
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-score",
@@ -393,7 +402,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -534,7 +546,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-silhouettes-spotlight",
@@ -609,7 +622,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -812,7 +828,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-stomp",
@@ -882,7 +899,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -946,7 +966,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1010,7 +1033,10 @@
                 "source": "literal",
                 "value": 160
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1074,7 +1100,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1138,7 +1167,8 @@
           "y": 139.66204963178205,
           "zoom": 0.5
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-default",
@@ -1334,7 +1364,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Cross-Fade Colours"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-cool-manual",
@@ -1409,7 +1440,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1473,7 +1507,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1537,7 +1574,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1601,7 +1641,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1665,7 +1708,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1729,7 +1775,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1793,7 +1842,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1857,7 +1909,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2118,7 +2173,8 @@
           "initialValue": 0,
           "isParameter": false
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-cool-auto",
@@ -2314,7 +2370,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Cross-Fade Colours"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-warm-manual",
@@ -2510,7 +2567,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Cross-Fade Colours"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-chorus",
@@ -2585,7 +2643,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -2887,7 +2948,8 @@
           "initialValue": "medium",
           "isParameter": false
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-verse",
@@ -2962,7 +3024,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3264,7 +3329,8 @@
           "initialValue": "medium",
           "isParameter": false
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-big-rock-ending",
@@ -3566,7 +3632,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-frenzy",
@@ -3641,7 +3708,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3705,7 +3775,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -3828,7 +3901,8 @@
           "initialValue": "blue",
           "isParameter": false
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-menu",
@@ -4015,7 +4089,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Sweep Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-sweep",
@@ -4365,7 +4440,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Sweep Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-searchlights",
@@ -4667,7 +4743,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Sweep Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-flare-fast",
@@ -4921,7 +4998,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-flare-slow",
@@ -5175,7 +5253,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-strobe-slow",
@@ -5400,7 +5479,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-strobe-medium",
@@ -5625,7 +5705,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-strobe-fast",
@@ -5850,7 +5931,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-strobe-fastest",
@@ -6075,7 +6157,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Flash Colour"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-dischord",
@@ -6155,7 +6238,10 @@
                 "source": "literal",
                 "value": 120
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -6219,7 +6305,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -6583,7 +6672,8 @@
           "effectFileId": "yarg-core-effects",
           "name": "Alternating Pattern"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-y1-harmony",
@@ -6658,7 +6748,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "sin-out" },
+              "easing": {
+                "source": "literal",
+                "value": "sin-out"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -6722,7 +6815,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "sin-out" },
+              "easing": {
+                "source": "literal",
+                "value": "sin-out"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -6980,7 +7076,8 @@
           "initialValue": "",
           "isParameter": false
         }
-      ]
+      ],
+      "kind": "lighting"
     }
   ],
   "bundled": true

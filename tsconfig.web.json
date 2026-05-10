@@ -7,10 +7,12 @@
     "src/preload/*.d.ts",
     "src/photonics-dmx/**/*",
     "src/mocks/**/*",
+    "src/services/**/*",
     "src/shared/**/*"
   ],
   "compilerOptions": {
     "composite": true,
+    "outDir": "out/types/web",
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {

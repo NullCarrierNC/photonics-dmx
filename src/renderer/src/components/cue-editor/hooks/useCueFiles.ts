@@ -3,13 +3,25 @@ import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/
 import type {
   AudioNodeCueDefinition,
   NodeCueFile,
+  NodeCueKind,
   NodeCueMode,
   YargNodeCueDefinition,
   EffectFile,
+  EffectMode,
   YargEffectDefinition,
   AudioEffectDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import { getNodeCueTypes, listNodeCueFiles, listEffectFiles } from '../../../ipcApi'
+import {
+  getNodeCueTypes,
+  listNodeCueFiles,
+  listEffectFiles,
+  pickEffectImportFile,
+  pickNodeCueImportFile,
+  saveEffectFile,
+  saveNodeCueFile,
+  validateEffect,
+  validateNodeCue,
+} from '../../../ipcApi'
 import { addIpcListener, removeIpcListener } from '../../../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import {
@@ -28,7 +40,25 @@ import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/l
 import { useCueFileIO } from './useCueFileIO'
 import { useCueCrud } from './useCueCrud'
 import { useCueMetadata } from './useCueMetadata'
-import { isCueTypeSelectable } from '../lib/cueUtils'
+import { isCueTypeSelectable, suggestNonConflictingGroupId } from '../lib/cueUtils'
+import { createLogger } from '../../../../../shared/logger'
+const log = createLogger('useCueFiles')
+
+export type PendingCueEditorImport =
+  | {
+      kind: 'cue'
+      sourceBasename: string
+      saveMode: NodeCueMode
+      suggestedGroupId: string
+      content: NodeCueFile
+    }
+  | {
+      kind: 'effect'
+      sourceBasename: string
+      saveMode: EffectMode
+      suggestedGroupId: string
+      content: EffectFile
+    }
 
 type UseCueFilesParams = {
   loadCueIntoFlow: (
@@ -54,8 +84,12 @@ const useCueFiles = ({
   const [effectFiles, setEffectFiles] = useState<EffectFileSummary[]>([])
   const [mode, setMode] = useState<NodeCueMode>(() => {
     const stored = getLastActiveMode()
-    if (stored) return stored.startsWith('yarg') ? 'yarg' : 'audio'
+    if (stored?.startsWith('audio')) return 'audio'
     return 'yarg'
+  })
+  const [cueKind, setCueKind] = useState<NodeCueKind>(() => {
+    const stored = getLastActiveMode()
+    return stored === 'yarg-motion-cue' || stored === 'audio-motion-cue' ? 'motion' : 'lighting'
   })
   const [editorMode, setEditorMode] = useState<EditorMode>(() => {
     const stored = getLastActiveMode()
@@ -68,6 +102,7 @@ const useCueFiles = ({
   const [availableCueTypes, setAvailableCueTypes] = useState<string[]>([])
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [isDirty, setIsDirty] = useState<boolean>(false)
+  const [pendingImport, setPendingImport] = useState<PendingCueEditorImport | null>(null)
   const restoredLastFileRef = useRef<boolean>(false)
   const lastStoredFilePathRef = useRef<string | null>(getStoredLastFilePath())
 
@@ -78,7 +113,7 @@ const useCueFiles = ({
       const summary = await listNodeCueFiles()
       setFiles([...summary.yarg, ...summary.audio])
     } catch (error) {
-      console.error('Failed to list node cue files', error)
+      log.error('Failed to list node cue files', error)
     }
   }, [])
 
@@ -87,7 +122,7 @@ const useCueFiles = ({
       const summary = await listEffectFiles()
       setEffectFiles([...summary.yarg, ...summary.audio])
     } catch (error) {
-      console.error('Failed to list effect files', error)
+      log.error('Failed to list effect files', error)
     }
   }, [])
 
@@ -131,6 +166,9 @@ const useCueFiles = ({
     setSelectedCueId,
     setFilename,
     mode,
+    cueKind,
+    files,
+    effectFiles,
     setValidationErrors,
     setIsDirty,
     loadCueIntoFlow,
@@ -138,6 +176,159 @@ const useCueFiles = ({
     refreshEffectFiles: fileIO.refreshEffectFiles,
     onError,
   })
+
+  const existingGroupIdsForNewFileModal = useMemo(() => {
+    const list =
+      editorMode === 'effect'
+        ? effectFiles.filter((f) => f.mode === mode)
+        : files.filter((f) => f.mode === mode)
+    return new Set(list.map((f) => f.groupId.trim().toLowerCase()))
+  }, [editorMode, effectFiles, files, mode])
+
+  const existingGroupIdsForImportModal = useMemo(() => {
+    if (!pendingImport) {
+      return new Set<string>()
+    }
+    const list =
+      pendingImport.kind === 'effect'
+        ? effectFiles.filter((f) => f.mode === pendingImport.saveMode)
+        : files.filter((f) => f.mode === pendingImport.saveMode)
+    return new Set(list.map((f) => f.groupId.trim().toLowerCase()))
+  }, [pendingImport, effectFiles, files])
+
+  const existingFilenamesLowerForImportModal = useMemo(() => {
+    if (!pendingImport) {
+      return new Set<string>()
+    }
+    const list =
+      pendingImport.kind === 'effect'
+        ? effectFiles.filter((f) => f.mode === pendingImport.saveMode)
+        : files.filter((f) => f.mode === pendingImport.saveMode)
+    return new Set(
+      list.map((f) => {
+        const base = f.path.split(/[/\\]/).pop() ?? ''
+        return base.toLowerCase()
+      }),
+    )
+  }, [pendingImport, effectFiles, files])
+
+  const handleImport = useCallback(async () => {
+    if (editorDoc?.mode === 'effect') {
+      const effectMode: EffectMode = mode === 'audio' ? 'audio' : 'yarg'
+      const result = await pickEffectImportFile(effectMode)
+      if (!result.success) {
+        if (result.error !== 'User cancelled import.') {
+          onError?.(result.error)
+        }
+        return
+      }
+      const taken = new Set(
+        effectFiles
+          .filter((f) => f.mode === result.mode)
+          .map((f) => f.groupId.trim().toLowerCase()),
+      )
+      const suggestedGroupId = suggestNonConflictingGroupId(result.content.group.id, taken)
+      setPendingImport({
+        kind: 'effect',
+        sourceBasename: result.sourceBasename,
+        saveMode: result.mode,
+        suggestedGroupId,
+        content: result.content,
+      })
+    } else {
+      const result = await pickNodeCueImportFile(mode)
+      if (!result.success) {
+        if (result.error !== 'User cancelled import.') {
+          onError?.(result.error)
+        }
+        return
+      }
+      const taken = new Set(
+        files.filter((f) => f.mode === result.mode).map((f) => f.groupId.trim().toLowerCase()),
+      )
+      const suggestedGroupId = suggestNonConflictingGroupId(result.content.group.id, taken)
+      setPendingImport({
+        kind: 'cue',
+        sourceBasename: result.sourceBasename,
+        saveMode: result.mode,
+        suggestedGroupId,
+        content: result.content,
+      })
+    }
+  }, [editorDoc?.mode, mode, effectFiles, files, onError])
+
+  const clearPendingImport = useCallback(() => {
+    setPendingImport(null)
+  }, [])
+
+  const commitPendingImport = useCallback(
+    async (saveFilename: string, groupId: string) => {
+      if (!pendingImport) {
+        return
+      }
+      try {
+        const raw = JSON.parse(JSON.stringify(pendingImport.content)) as NodeCueFile | EffectFile
+        delete raw.bundled
+        delete raw.cueVersion
+        raw.group = { ...raw.group, id: groupId.trim() }
+
+        if (pendingImport.kind === 'cue') {
+          const cuePayload = raw as NodeCueFile
+          const validation = await validateNodeCue({ content: cuePayload })
+          if (!validation.valid) {
+            onError?.(`Import validation failed: ${validation.errors.join(', ')}`)
+            return
+          }
+          const response = await saveNodeCueFile({
+            mode: cuePayload.mode,
+            filename: saveFilename,
+            content: cuePayload,
+          })
+          if (!response.success) {
+            onError?.(`Failed to save imported cue: ${saveFilename}`)
+            return
+          }
+          await refreshFiles()
+          const summaryList = await listNodeCueFiles()
+          const flat = [...summaryList.yarg, ...summaryList.audio]
+          const summary = flat.find((s) => s.path === response.path)
+          if (summary) {
+            await fileIO.selectFile(summary)
+          }
+          onSaveSuccess?.(`Cue imported: ${saveFilename}`)
+        } else {
+          const effectPayload = raw as EffectFile
+          const validation = await validateEffect({ content: effectPayload })
+          if (!validation.valid) {
+            onError?.(`Import validation failed: ${validation.errors.join(', ')}`)
+            return
+          }
+          const response = await saveEffectFile({
+            mode: effectPayload.mode,
+            filename: saveFilename,
+            content: effectPayload,
+          })
+          if (!response.success) {
+            onError?.(`Failed to save imported effect: ${saveFilename}`)
+            return
+          }
+          await refreshEffectFiles()
+          const summaryList = await listEffectFiles()
+          const flat = [...summaryList.yarg, ...summaryList.audio]
+          const summary = flat.find((s) => s.path === response.path)
+          if (summary) {
+            await fileIO.selectEffectFile(summary)
+          }
+          onSaveSuccess?.(`Effect imported: ${saveFilename}`)
+        }
+        setPendingImport(null)
+      } catch (error) {
+        log.error('Failed to commit import', error)
+        onError?.(error instanceof Error ? error.message : String(error))
+      }
+    },
+    [pendingImport, fileIO, onError, onSaveSuccess, refreshFiles, refreshEffectFiles],
+  )
 
   const metadata = useCueMetadata({
     editorDoc,
@@ -151,6 +342,14 @@ const useCueFiles = ({
     const cueFile = editorDoc.file as NodeCueFile
     return cueFile.cues.find((cue) => cue.id === selectedCueId) ?? null
   }, [editorDoc, selectedCueId])
+
+  useEffect(() => {
+    if (!currentCueDefinition || !('kind' in currentCueDefinition)) return
+    const k = currentCueDefinition.kind
+    if (k === 'lighting' || k === 'motion') {
+      setCueKind(k)
+    }
+  }, [currentCueDefinition])
 
   const currentEffectDefinition = useMemo(() => {
     if (!editorDoc || !selectedCueId || editorDoc.mode !== 'effect') return null
@@ -178,16 +377,27 @@ const useCueFiles = ({
     (nextMode: string) => {
       const isEffect = nextMode === 'yarg-effect' || nextMode === 'audio-effect'
       const cueMode: NodeCueMode =
-        nextMode === 'yarg-effect' || nextMode === 'yarg' ? 'yarg' : 'audio'
+        nextMode === 'yarg-effect' || nextMode === 'yarg-cue' || nextMode === 'yarg-motion-cue'
+          ? 'yarg'
+          : 'audio'
+      const nextKind: NodeCueKind =
+        nextMode === 'yarg-motion-cue' || nextMode === 'audio-motion-cue' ? 'motion' : 'lighting'
       const modeKey: EditorModeKey = isEffect
         ? cueMode === 'yarg'
           ? 'yarg-effect'
           : 'audio-effect'
-        : cueMode === 'yarg'
-          ? 'yarg-cue'
-          : 'audio-cue'
+        : nextMode === 'yarg-motion-cue'
+          ? 'yarg-motion-cue'
+          : nextMode === 'audio-motion-cue'
+            ? 'audio-motion-cue'
+            : cueMode === 'yarg'
+              ? 'yarg-cue'
+              : 'audio-cue'
 
       setMode(cueMode)
+      if (!isEffect) {
+        setCueKind(nextKind)
+      }
       setEditorMode(isEffect ? 'effect' : 'cue')
       setLastActiveMode(modeKey)
 
@@ -226,6 +436,7 @@ const useCueFiles = ({
       setEditorDoc,
       setFilename,
       setMode,
+      setCueKind,
       setSelectedCueId,
       setIsDirty,
     ],
@@ -250,10 +461,10 @@ const useCueFiles = ({
   }, [fileIO.refreshFiles, fileIO.refreshEffectFiles])
 
   useEffect(() => {
-    getNodeCueTypes(mode)
+    getNodeCueTypes(mode, cueKind)
       .then((types: string[]) => setAvailableCueTypes(types.filter(isCueTypeSelectable)))
       .catch(() => setAvailableCueTypes([]))
-  }, [mode])
+  }, [mode, cueKind])
 
   useEffect(() => {
     if (!selectedCueId || !editorDoc) return
@@ -263,9 +474,16 @@ const useCueFiles = ({
       ? cueMode === 'yarg'
         ? 'yarg-effect'
         : 'audio-effect'
-      : cueMode === 'yarg'
-        ? 'yarg-cue'
-        : 'audio-cue'
+      : (() => {
+          const currentCue = (editorDoc.file as NodeCueFile).cues.find(
+            (c) => c.id === selectedCueId,
+          )
+          const kind = currentCue?.kind
+          if (cueMode === 'yarg') {
+            return kind === 'motion' ? 'yarg-motion-cue' : 'yarg-cue'
+          }
+          return kind === 'motion' ? 'audio-motion-cue' : 'audio-cue'
+        })()
     setLastItemIdForMode(modeKey, selectedCueId)
   }, [selectedCueId, editorDoc])
 
@@ -303,6 +521,8 @@ const useCueFiles = ({
 
   return {
     mode,
+    cueKind,
+    setCueKind,
     activeMode,
     editorMode,
     files,
@@ -335,10 +555,16 @@ const useCueFiles = ({
     selectEffectFile: fileIO.selectEffectFile,
     handleSave: fileIO.handleSave,
     handleDelete: fileIO.handleDelete,
-    handleImport: fileIO.handleImport,
+    handleImport,
     handleExport: fileIO.handleExport,
     refreshFiles: fileIO.refreshFiles,
     handleReload: fileIO.handleReload,
+    existingGroupIdsForNewFileModal,
+    pendingImport,
+    clearPendingImport,
+    commitPendingImport,
+    existingGroupIdsForImportModal,
+    existingFilenamesLowerForImportModal,
   }
 }
 

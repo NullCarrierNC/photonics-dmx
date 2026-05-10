@@ -1,3 +1,4 @@
+import type { ResolvedMotionPatternSetting } from '../../cues/node/compiler/ActionEffectFactory'
 import { Effect, RGBIO, TrackedLight } from '../../types'
 import { InstrumentNoteType, DrumNoteType } from '../../cues/types/cueTypes'
 import { LightTransitionController } from './LightTransitionController'
@@ -5,13 +6,21 @@ import { DebugMonitor } from './DebugMonitor'
 import { EffectManager } from './EffectManager'
 import { EffectTransformer } from './EffectTransformer'
 import { SongEventHandler } from './SongEventHandler'
-import { FrameContext, ILightingController, LightEffectState } from './interfaces'
+import {
+  ActiveMotionPattern,
+  FrameContext,
+  ILightingController,
+  LightEffectState,
+} from './interfaces'
 import { LayerManager } from './LayerManager'
 import { SystemEffectsController } from './SystemEffectsController'
 import { EventScheduler } from './EventScheduler'
 import { TransitionEngine } from './TransitionEngine'
+import { MotionPatternEngine } from './MotionPatternEngine'
 import { Clock } from './Clock'
 import { performance } from 'perf_hooks'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('Sequencer')
 
 /**
  * @class Sequencer
@@ -31,6 +40,7 @@ export class Sequencer implements ILightingController {
   private eventHandler: SongEventHandler
   private systemEffectsController: SystemEffectsController
   private debugMonitor: DebugMonitor
+  private motionPatternEngine: MotionPatternEngine
   private clock: Clock
   private frameIndex: number = 0
   private readonly handleClockTick: (deltaTime: number) => void
@@ -59,6 +69,7 @@ export class Sequencer implements ILightingController {
     )
     this.eventHandler = new SongEventHandler(this.layerManager, this.transitionEngine)
     this.debugMonitor = new DebugMonitor(this.lightTransitionController, this.layerManager)
+    this.motionPatternEngine = new MotionPatternEngine(this.lightTransitionController)
 
     // Bind frame processing to the shared clock
     this.handleClockTick = (deltaTime: number) => {
@@ -68,6 +79,7 @@ export class Sequencer implements ILightingController {
         frameIndex: this.frameIndex++,
       }
       this.transitionEngine.advanceFrame(frameContext)
+      this.motionPatternEngine.advanceFrame(frameContext)
       this.lightTransitionController.advanceFrame(frameContext)
     }
 
@@ -87,6 +99,21 @@ export class Sequencer implements ILightingController {
    */
   public addEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
     this.effectManager.addEffect(name, effect, isPersistent)
+  }
+
+  /**
+   * Per-(layer, light) replace. Cancels any active or queued effect on each
+   * targeted slot and starts the new transitions immediately, easing from each
+   * light's current state. Use for state-target effects like non-blocking
+   * `set-position` where the latest submission must take effect now and queueing
+   * the new transition behind a stale in-flight one would desynchronise motion.
+   *
+   * @param name The name of the effect
+   * @param effect The effect configuration
+   * @param isPersistent If true, the effect re-queues itself after completing
+   */
+  public replaceEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
+    this.effectManager.replaceEffect(name, effect, isPersistent)
   }
 
   /**
@@ -217,7 +244,40 @@ export class Sequencer implements ILightingController {
    * Removes all active effects
    */
   public removeAllEffects(): void {
+    this.motionPatternEngine.removeAllPatterns()
     this.effectManager.removeAllEffects()
+  }
+
+  public addMotionPattern(
+    name: string,
+    config: ResolvedMotionPatternSetting,
+    lights: TrackedLight[],
+    layer: number,
+    rampUpDurationMs: number,
+  ): void {
+    if (this.motionPatternEngine.hasPattern(name)) {
+      this.motionPatternEngine.removePattern(name)
+    }
+    this.motionPatternEngine.addPattern({
+      name,
+      config,
+      lights,
+      layer,
+      startTime: performance.now(),
+      rampUpDurationMs,
+    })
+  }
+
+  public removeMotionPattern(name: string): void {
+    this.motionPatternEngine.removePattern(name)
+  }
+
+  public getMotionPattern(name: string): ActiveMotionPattern | undefined {
+    return this.motionPatternEngine.getPattern(name)
+  }
+
+  public updateMotionPatternConfig(name: string, config: ResolvedMotionPatternSetting): void {
+    this.motionPatternEngine.updatePatternConfig(name, config)
   }
 
   /**
@@ -257,6 +317,14 @@ export class Sequencer implements ILightingController {
    */
   public setState(lights: TrackedLight[], color: RGBIO, time: number): void {
     this.effectManager.setState(lights, color, time)
+  }
+
+  public schedulePanTiltClear(): void {
+    this.transitionEngine.schedulePanTiltClear()
+  }
+
+  public cancelPanTiltClear(): void {
+    this.transitionEngine.cancelPanTiltClear()
   }
 
   /**
@@ -366,7 +434,7 @@ export class Sequencer implements ILightingController {
    * Shuts down the lighting coordinator and all its components
    */
   public shutdown(): void {
-    console.log('PhotonicsSequencer shutdown: starting')
+    log.info('PhotonicsSequencer shutdown: starting')
 
     try {
       // Stop the clock
@@ -382,9 +450,9 @@ export class Sequencer implements ILightingController {
       // Clean up other resources
       this.eventScheduler.destroy()
 
-      console.log('PhotonicsSequencer shutdown: completed')
+      log.info('PhotonicsSequencer shutdown: completed')
     } catch (error) {
-      console.error('Error during PhotonicsSequencer shutdown:', error)
+      log.error('Error during PhotonicsSequencer shutdown:', error)
     }
   }
 }

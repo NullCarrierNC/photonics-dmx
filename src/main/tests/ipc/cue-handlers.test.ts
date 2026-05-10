@@ -25,6 +25,7 @@ const mockControllerManager = {
   init: jest.fn(),
   startTestEffect: jest.fn(),
   stopTestEffect: jest.fn(),
+  setOnConsoleEnter: jest.fn(),
 }
 
 // Mock implementation with descriptions
@@ -56,10 +57,6 @@ class MockCueImplementation implements INetCue {
   onPause(): void {
     // Mock lifecycle method
   }
-
-  onDestroy(): void {
-    // Mock lifecycle method
-  }
 }
 
 // Import the module under test - need to mock this import
@@ -80,7 +77,6 @@ describe('IPC Light Handlers for Cue Registry', () => {
 
   // Store the original handlers for each IPC endpoint
   let getCueGroupsHandler: (event: unknown, ...args: any[]) => Promise<any>
-  let setActiveGroupsHandler: (event: unknown, groupNames: string[]) => Promise<any>
   let getAvailableCuesHandler: (event: unknown, groupName?: string) => Promise<any>
   let simulateBeatHandler: (event: unknown, data?: any) => Promise<boolean>
   let startTestEffectHandler: (event: unknown, data?: any) => Promise<any>
@@ -95,8 +91,6 @@ describe('IPC Light Handlers for Cue Registry', () => {
     mockIpcMain.handle.mockImplementation((channel: string, handler: any) => {
       if (channel === 'get-cue-groups') {
         getCueGroupsHandler = handler
-      } else if (channel === 'set-active-cue-groups') {
-        setActiveGroupsHandler = handler
       } else if (channel === 'get-available-cues') {
         getAvailableCuesHandler = handler
       } else if (channel === LIGHT.SIMULATE_BEAT) {
@@ -153,7 +147,7 @@ describe('IPC Light Handlers for Cue Registry', () => {
   })
 
   describe('get-cue-groups handler', () => {
-    it('should return all registered groups with their descriptions', async () => {
+    it('should return all registered lighting cue groups with their descriptions', async () => {
       const groupInfo = await getCueGroupsHandler({})
 
       expect(groupInfo).toHaveLength(2)
@@ -170,62 +164,21 @@ describe('IPC Light Handlers for Cue Registry', () => {
         cueTypes: [CueType.Chorus, CueType.Verse],
       })
     })
-  })
 
-  describe('set-active-cue-groups handler', () => {
-    it('should set the active groups', async () => {
-      const result = await setActiveGroupsHandler({}, ['custom'])
+    it('omits motion-only groups (no lighting cues) from the lighting cue group list', async () => {
+      const motionOnlyGroup: ICueGroup = {
+        id: 'motion-only',
+        name: 'Default Motion',
+        description: 'Motion programs only',
+        cues: new Map(),
+        motionCues: new Map([['m1', new MockCueImplementation('m1', 'A motion program')]]),
+      }
+      registry.registerGroup(motionOnlyGroup)
 
-      // Expect detailed response with only the groups explicitly set
-      expect(result).toEqual({
-        success: true,
-        activeGroups: ['custom'],
-        invalidGroups: undefined,
-        disabledGroups: undefined,
-      })
-      expect(registry.getActiveGroups()).toEqual(['custom'])
-    })
+      const groupInfo = await getCueGroupsHandler({})
 
-    it('should set multiple active groups correctly', async () => {
-      const result = await setActiveGroupsHandler({}, ['custom', 'default'])
-
-      // Expect detailed response
-      expect(result).toEqual({
-        success: true,
-        activeGroups: expect.arrayContaining(['custom', 'default']),
-        invalidGroups: undefined,
-        disabledGroups: undefined,
-      })
-      expect(result.activeGroups).toHaveLength(2)
-      expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['custom', 'default']))
-      expect(registry.getActiveGroups()).toHaveLength(2)
-    })
-
-    it('should return error for empty array', async () => {
-      await setActiveGroupsHandler({}, ['custom']) // Set one first
-      const result = await setActiveGroupsHandler({}, [])
-
-      // Expect failure response
-      expect(result).toEqual({
-        success: false,
-        error: 'No valid groups provided. Invalid: , Disabled: ',
-      })
-      // Ensure registry didn't actually clear (due to handler validation)
-      expect(registry.getActiveGroups()).toEqual(['custom'])
-    })
-
-    it('should ignore non-existent groups and return invalid ones', async () => {
-      const result = await setActiveGroupsHandler({}, ['custom', 'non-existent'])
-
-      // Expect detailed response with only valid groups and the invalid group listed
-      expect(result).toEqual({
-        success: true,
-        activeGroups: ['custom'],
-        invalidGroups: ['non-existent'],
-        disabledGroups: undefined,
-      })
-      // Verify registry state reflects only the valid groups
-      expect(registry.getActiveGroups()).toEqual(['custom'])
+      expect(groupInfo).toHaveLength(2)
+      expect(groupInfo.map((g: { id: string }) => g.id)).not.toContain('motion-only')
     })
   })
 
@@ -272,7 +225,7 @@ describe('IPC Light Handlers for Cue Registry', () => {
   describe('simulate-beat with cueGroup (non-destructive active groups)', () => {
     it('restores active groups after simulating with a different cueGroup', async () => {
       registry.setEnabledGroups(['default', 'custom'])
-      await setActiveGroupsHandler({}, ['default'])
+      registry.setActiveGroups(['default'])
       expect(registry.getActiveGroups()).toEqual(['default'])
 
       await simulateBeatHandler(

@@ -1,3 +1,6 @@
+import { createLogger } from '../../shared/logger'
+const log = createLogger('utils')
+
 export function randomBetween(start: number, end: number): number {
   return Math.floor(Math.random() * (end - start + 1)) + start
 }
@@ -10,7 +13,7 @@ export function randomBetween(start: number, end: number): number {
  */
 export function randomInRange(start: number, end: number): number {
   if (typeof start !== 'number' || typeof end !== 'number') {
-    console.warn(`Invalid range values: start=${start}, end=${end}`)
+    log.warn(`Invalid range values: start=${start}, end=${end}`)
     return 0
   }
   const rand = start + Math.random() * (end - start)

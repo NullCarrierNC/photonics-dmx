@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useAtom } from 'jotai'
 import { yargListenerEnabledAtom, rb3eListenerEnabledAtom } from '../atoms'
 import { getAudioEnabled } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('useCuePreviewInputPlatform')
 
 /**
  * Determines which input platform is active for cue preview.
@@ -21,7 +23,7 @@ export function useCuePreviewInputPlatform(): 'RB3E' | 'YARG' | 'AUDIO' | null {
         const enabled = await getAudioEnabled()
         setAudioEnabled(enabled)
       } catch (error) {
-        console.error('Failed to check audio enabled state:', error)
+        log.error('Failed to check audio enabled state:', error)
       }
     }
 

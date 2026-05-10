@@ -8,10 +8,16 @@ import {
   RgbwDmxChannels,
   StrobeDmxChannels,
   FixtureConfig,
+  normalizeFixtureConfig,
+  LightingConfiguration,
 } from '../../../photonics-dmx/types'
 import { LightIcon } from './LightIcon'
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
-import { BsLightningFill } from 'react-icons/bs'
+import { BsArrowsMove, BsLightningFill } from 'react-icons/bs'
+import MovingHeadCalibrationWizard from './MovingHeadCalibrationWizard'
+import { createLogger } from '../../../shared/logger'
+import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
+const log = createLogger('LightChannelsConfig')
 
 interface LightChannelsConfigProps {
   light: DmxLight | null
@@ -19,13 +25,38 @@ interface LightChannelsConfigProps {
   onClick: () => void
   isHighlighted: boolean
   myLights: DmxFixture[] // Light templates
+  /** When set, moving-head fixtures can open the live calibration wizard. */
+  rigId?: string | null
+  /** Current rig lighting config (for 3D preview in the calibration wizard). */
+  lightingConfig: LightingConfiguration
+  /** Drag handle only; card body is not draggable. */
+  dragHandle?: {
+    setActivatorRef: (el: HTMLElement | null) => void
+    attributes: DraggableAttributes
+    listeners?: DraggableSyntheticListeners | undefined
+  }
 }
 
 const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeSpeed']
 
 const getDisplayName = (channelName: string) => {
   if (channelName === 'masterDimmer') return 'Master Dimmer'
-  // For other keys, simply capitalize the first letter.
+  if (channelName === 'panRangeDeg') return 'Pan range (deg)'
+  if (channelName === 'panDirectionCW') {
+    return 'Pan increases clockwise from above'
+  }
+  if (channelName === 'tiltRangeDeg') return 'Tilt range (deg)'
+  if (channelName === 'panMin') return 'Pan min'
+  if (channelName === 'panMax') return 'Pan max'
+  if (channelName === 'tiltMin') return 'Tilt min'
+  if (channelName === 'tiltMax') return 'Tilt max'
+  if (channelName === 'panHome') return 'Pan home (%) — idle pose'
+  if (channelName === 'tiltHome') return 'Tilt home (%) — idle pose'
+  if (channelName === 'panStageDeg') return 'Pan upstage reference (deg)'
+  if (channelName === 'tiltStageDeg') return 'Tilt vertical reference (deg)'
+  if (channelName === 'invertPan') return 'Invert pan direction'
+  if (channelName === 'invertTilt') return 'Invert tilt direction'
+  // For other keys, capitalize the first letter.
   return channelName.charAt(0).toUpperCase() + channelName.slice(1)
 }
 
@@ -42,6 +73,9 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
   onClick,
   isHighlighted,
   myLights,
+  rigId,
+  lightingConfig,
+  dragHandle,
 }) => {
   const [localChannels, setLocalChannels] = useState<
     RgbDmxChannels | RgbStrobeDmxChannels | RgbwDmxChannels | StrobeDmxChannels | null
@@ -49,13 +83,14 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
 
   // State for the light's config (if available)
   const [localConfig, setLocalConfig] = useState<FixtureConfig | null>(null)
+  const [calibrationOpen, setCalibrationOpen] = useState(false)
 
   useEffect(() => {
     if (light) {
       const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId)
 
       if (!fixtureTemplate) {
-        console.warn(`fixtureId (${light.fixtureId}) not found in myLights.`)
+        log.warn(`fixtureId (${light.fixtureId}) not found in myLights.`)
         // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when fixture not found
         setLocalChannels(null)
         setLocalConfig(null)
@@ -88,7 +123,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       // Handle Config
       // Copy the config from the light (no master dimmer logic here)
       if (light.config) {
-        setLocalConfig(light.config)
+        setLocalConfig(normalizeFixtureConfig(light.config))
       } else {
         setLocalConfig(null)
       }
@@ -111,7 +146,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       // Find the fixture template to get the original offsets
       const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId)
       if (!fixtureTemplate) {
-        console.warn(`fixtureId (${light.fixtureId}) not found in myLights.`)
+        log.warn(`fixtureId (${light.fixtureId}) not found in myLights.`)
         return
       }
 
@@ -148,20 +183,51 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
   /**
    * Handles updates for any property in the config.
    * For number fields, the value is parsed to a number.
-   * For boolean fields (like 'invert'), the value is taken from the checkbox.
+   * For boolean fields (invertPan / invertTilt / panDirectionCW), the value is taken from the checkbox.
    */
   const handleConfigChange = (key: keyof FixtureConfig, value: string | boolean) => {
     if (light && localConfig) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- config value can be number or string
       let updatedValue: any = value
-      if (key !== 'invert') {
-        updatedValue = Number(value)
+      if (key !== 'invertPan' && key !== 'invertTilt' && key !== 'panDirectionCW') {
+        if (key === 'panRangeDeg') {
+          const num = Number(value)
+          updatedValue = Math.max(1, Math.min(720, Math.round(num)))
+        } else if (key === 'tiltRangeDeg') {
+          const num = Number(value)
+          updatedValue = Math.max(1, Math.min(360, Math.round(num)))
+        } else if (key === 'panHome' || key === 'tiltHome') {
+          const num = Number(value)
+          updatedValue = Math.max(0, Math.min(100, Math.round(num)))
+        } else if (key === 'panStageDeg') {
+          const num = Number(value)
+          updatedValue = Math.max(0, Math.min(localConfig.panRangeDeg, Math.round(num)))
+        } else if (key === 'tiltStageDeg') {
+          const num = Number(value)
+          updatedValue = Math.max(0, Math.min(localConfig.tiltRangeDeg, Math.round(num)))
+        } else {
+          updatedValue = Number(value)
+        }
       }
       const updatedConfig = { ...localConfig, [key]: updatedValue }
       setLocalConfig(updatedConfig)
       const updatedLight: DmxLight = { ...light, config: updatedConfig }
       onChange(updatedLight)
     }
+  }
+
+  const toggleFiringDirection = (): void => {
+    if (!light || !localConfig) return
+    const { invertPan, invertTilt } = localConfig
+    if (invertPan !== invertTilt) return
+    const nextBoth = !invertPan
+    const updatedConfig: FixtureConfig = {
+      ...localConfig,
+      invertPan: nextBoth,
+      invertTilt: nextBoth,
+    }
+    setLocalConfig(updatedConfig)
+    onChange({ ...light, config: updatedConfig })
   }
 
   /**
@@ -208,8 +274,9 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
 
     // For config, if the new fixture has a config template, use it.
     if (selectedFixture.config) {
-      setLocalConfig(selectedFixture.config)
-      updatedLight.config = { ...selectedFixture.config }
+      const normalized = normalizeFixtureConfig(selectedFixture.config)
+      setLocalConfig(normalized)
+      updatedLight.config = normalized
     } else {
       setLocalConfig(null)
       updatedLight.config = undefined
@@ -233,16 +300,58 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
 
   const isFixtureInMyLights = myLights.some((fixture) => fixture.id === light?.fixtureId)
 
+  const showCalibrate =
+    !!light &&
+    !!rigId &&
+    !!light.id &&
+    (light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH)
+
+  let dragHandleButton: React.ReactNode = null
+  if (dragHandle) {
+    const { setActivatorRef, attributes, listeners } = dragHandle
+    const { onClick: dragOnClick, ...listenerRest } = listeners ?? {}
+    dragHandleButton = (
+      <button
+        type="button"
+        ref={(node) => {
+          setActivatorRef(node)
+        }}
+        {...attributes}
+        {...listenerRest}
+        onClick={(e) => {
+          dragOnClick?.(e)
+          e.stopPropagation()
+        }}
+        aria-label="Drag to reorder light"
+        className="absolute top-2 right-2 z-10 -translate-y-[6px] translate-x-[6px] p-1 cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 touch-none">
+        <BsArrowsMove aria-hidden />
+      </button>
+    )
+  }
+
   return (
     <div
       onClick={onClick}
-      className={`flex flex-col flex-grow items-center space-y-2 p-4 max-w-[440px] rounded-lg shadow cursor-pointer 
+      className={`relative flex flex-col flex-grow items-center space-y-2 p-4 max-w-[440px] rounded-lg shadow cursor-pointer 
                   text-gray-800 dark:text-gray-200 
                   ${
                     isHighlighted
                       ? 'bg-yellow-500 dark:bg-yellow-600'
                       : 'bg-gray-300 dark:bg-[#303548] hover:bg-gray-200 dark:hover:bg-[#40465a]'
                   }`}>
+      {dragHandleButton}
+      {calibrationOpen && showCalibrate && light && rigId && (
+        <MovingHeadCalibrationWizard
+          key={light.id}
+          light={light}
+          rigId={rigId}
+          lightingConfig={lightingConfig}
+          onClose={() => setCalibrationOpen(false)}
+          onComplete={(updatedConfig) => {
+            onChange({ ...light, config: updatedConfig })
+          }}
+        />
+      )}
       {/* Light Type Selector */}
       <select
         value={isFixtureInMyLights ? light?.fixtureId : myLights[0]?.id || ''}
@@ -308,13 +417,32 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       {light && localConfig && (
         <div className="mt-2 w-full">
           <h3 className="text-lg font-bold">Config</h3>
+          {(light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH) && (
+            <>
+              <p className="text-xs text-gray-600 dark:text-gray-200 mb-2">
+                Use the Calibrate button below to configure these fields interactively.
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                Home sets the idle/default pose. Stage-reference fields set the calibration anchor
+                for direction and circle cues.
+              </p>
+            </>
+          )}
           <ul className="text-sm space-y-1">
             {Object.entries(localConfig).map(([key, value]) => {
               // Determine input type based on value type.
               const inputType = typeof value === 'boolean' ? 'checkbox' : 'number'
+              const isPanRangeDeg = key === 'panRangeDeg'
+              const isTiltRangeDeg = key === 'tiltRangeDeg'
+              const isPanHome = key === 'panHome'
+              const isTiltHome = key === 'tiltHome'
+              const isPanStageDeg = key === 'panStageDeg'
+              const isTiltStageDeg = key === 'tiltStageDeg'
+              const noCapitalize =
+                isPanRangeDeg || isTiltRangeDeg || isPanStageDeg || isTiltStageDeg
               return (
                 <li key={key} className="flex justify-between items-center">
-                  <span className="capitalize">{getDisplayName(key)}</span>
+                  <span className={noCapitalize ? '' : 'capitalize'}>{getDisplayName(key)}</span>
                   {inputType === 'checkbox' ? (
                     <input
                       type="checkbox"
@@ -327,6 +455,30 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                   ) : (
                     <input
                       type="number"
+                      min={
+                        isPanRangeDeg
+                          ? 1
+                          : isTiltRangeDeg
+                            ? 1
+                            : isPanHome || isTiltHome
+                              ? 0
+                              : isPanStageDeg || isTiltStageDeg
+                                ? 0
+                                : undefined
+                      }
+                      max={
+                        isPanRangeDeg
+                          ? 720
+                          : isTiltRangeDeg
+                            ? 360
+                            : isPanHome || isTiltHome
+                              ? 100
+                              : isPanStageDeg
+                                ? localConfig?.panRangeDeg ?? 720
+                                : isTiltStageDeg
+                                  ? localConfig?.tiltRangeDeg ?? 360
+                                  : undefined
+                      }
                       value={value as number}
                       onChange={(e) =>
                         handleConfigChange(key as keyof FixtureConfig, e.target.value)
@@ -337,7 +489,37 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                 </li>
               )
             })}
+            {(light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH) &&
+              localConfig.invertPan === localConfig.invertTilt && (
+                <li className="flex flex-col items-stretch pt-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleFiringDirection()
+                    }}
+                    className="text-xs px-2 py-1 rounded border border-gray-400 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 w-full">
+                    {localConfig.invertPan && localConfig.invertTilt
+                      ? 'Down firing (invert pan + tilt)'
+                      : 'Up firing (normal pan + tilt)'}
+                  </button>
+                </li>
+              )}
           </ul>
+        </div>
+      )}
+
+      {showCalibrate && (
+        <div className="w-full mt-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setCalibrationOpen(true)
+            }}
+            className="text-sm px-2 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 w-full">
+            Calibrate (live DMX)
+          </button>
         </div>
       )}
 

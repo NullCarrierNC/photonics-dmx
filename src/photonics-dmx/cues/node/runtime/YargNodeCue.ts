@@ -8,7 +8,9 @@ import type { NodeRuntimeCallbacks } from './executionTypes'
 import { CueSession } from './CueSession'
 import { GraphExecutionEngine } from './GraphExecutionEngine'
 import { cueGraphPolicy } from './GraphExecutionPolicy'
-import type { YargNodeCueDefinition } from '../../types/nodeCueTypes'
+import type { YargLightingNodeCueDefinition } from '../../types/nodeCueTypes'
+import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
 /**
  * YARG node cue: uses CueSession and GraphExecutionEngine.
@@ -21,6 +23,7 @@ export class YargNodeCue implements INetCue {
   private readonly effectRegistry: EffectRegistry
   private readonly session: CueSession
   private readonly runtimeCallbacks?: NodeRuntimeCallbacks
+  private readonly runtimeBroadcaster: RuntimeBroadcaster
   private engine: GraphExecutionEngine | null = null
 
   constructor(
@@ -28,30 +31,32 @@ export class YargNodeCue implements INetCue {
     compiledCue: CompiledYargCue,
     effectRegistry?: EffectRegistry,
     runtimeCallbacks?: NodeRuntimeCallbacks,
+    runtimeBroadcaster?: RuntimeBroadcaster,
   ) {
     this.groupId = groupId
     this.compiledCue = compiledCue
     this.effectRegistry = effectRegistry ?? new EffectRegistry()
     this.session = new CueSession()
     this.runtimeCallbacks = runtimeCallbacks
-    const definition = compiledCue.definition as YargNodeCueDefinition
+    this.runtimeBroadcaster = runtimeBroadcaster ?? noopRuntimeBroadcaster()
+    const definition = compiledCue.definition as YargLightingNodeCueDefinition
     this.session.initializeVariables(definition.variables ?? [], compiledCue.groupVariables ?? [])
   }
 
   get cueId(): string {
-    return (this.compiledCue.definition as YargNodeCueDefinition).cueType
+    return (this.compiledCue.definition as YargLightingNodeCueDefinition).cueType
   }
 
   get id(): string {
-    return `${this.groupId}:${(this.compiledCue.definition as YargNodeCueDefinition).id}`
+    return `${this.groupId}:${(this.compiledCue.definition as YargLightingNodeCueDefinition).id}`
   }
 
   get description(): string | undefined {
-    return (this.compiledCue.definition as YargNodeCueDefinition).description
+    return (this.compiledCue.definition as YargLightingNodeCueDefinition).description
   }
 
   get style(): CueStyle {
-    const s = (this.compiledCue.definition as YargNodeCueDefinition).style
+    const s = (this.compiledCue.definition as YargLightingNodeCueDefinition).style
     return s === 'secondary' ? CueStyle.Secondary : CueStyle.Primary
   }
 
@@ -61,7 +66,7 @@ export class YargNodeCue implements INetCue {
     lightManager: DmxLightManager,
   ): void | Promise<void> {
     if (!this.engine) {
-      const definition = this.compiledCue.definition as YargNodeCueDefinition
+      const definition = this.compiledCue.definition as YargLightingNodeCueDefinition
       const cueId = this.id
       const policy = cueGraphPolicy(this.groupId, cueId)
       this.engine = GraphExecutionEngine.forCue(
@@ -71,6 +76,7 @@ export class YargNodeCue implements INetCue {
         this.session,
         sequencer,
         lightManager,
+        this.runtimeBroadcaster,
         this.effectRegistry,
         definition.variables ?? [],
         this.runtimeCallbacks,
@@ -89,10 +95,6 @@ export class YargNodeCue implements INetCue {
   }
 
   onPause(): void {
-    // Optional INetCue lifecycle; no-op for node cues
-  }
-
-  onDestroy(): void {
     // Optional INetCue lifecycle; no-op for node cues
   }
 }

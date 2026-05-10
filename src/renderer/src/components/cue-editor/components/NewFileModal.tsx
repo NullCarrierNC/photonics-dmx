@@ -1,9 +1,12 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
+import type { NodeCueMode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 type Props = {
   isOpen: boolean
   isEffectMode: boolean
-  mode: 'yarg' | 'audio'
+  mode: NodeCueMode
+  /** Lowercase group IDs already used for this mode (yarg vs audio) and document kind (cue vs effect). */
+  existingGroupIds: ReadonlySet<string>
   onCancel: () => void
   onSave: (metadata: {
     groupId: string
@@ -14,7 +17,14 @@ type Props = {
   }) => void
 }
 
-const NewFileModal: React.FC<Props> = ({ isOpen, isEffectMode, mode, onCancel, onSave }) => {
+const NewFileModal: React.FC<Props> = ({
+  isOpen,
+  isEffectMode,
+  mode,
+  existingGroupIds,
+  onCancel,
+  onSave,
+}) => {
   const [groupId, setGroupId] = useState('')
   const [groupName, setGroupName] = useState('')
   const [groupDescription, setGroupDescription] = useState('')
@@ -24,9 +34,18 @@ const NewFileModal: React.FC<Props> = ({ isOpen, isEffectMode, mode, onCancel, o
   const fileTypeLabel = isEffectMode ? 'Effect' : 'Cue'
   const groupLabel = isEffectMode ? 'Effect Group' : 'Cue Group'
 
+  const groupIdNormalized = groupId.trim().toLowerCase()
+  const groupIdTaken = useMemo(
+    () => groupIdNormalized.length > 0 && existingGroupIds.has(groupIdNormalized),
+    [existingGroupIds, groupIdNormalized],
+  )
+
   const handleSave = () => {
     if (!groupId.trim() || !groupName.trim() || !itemName.trim()) {
       alert('Please fill in all required fields (Group ID, Group Name, and Item Name)')
+      return
+    }
+    if (groupIdTaken) {
       return
     }
     onSave({ groupId, groupName, groupDescription, itemName, itemDescription })
@@ -64,12 +83,24 @@ const NewFileModal: React.FC<Props> = ({ isOpen, isEffectMode, mode, onCancel, o
               value={groupId}
               onChange={(e) => setGroupId(e.target.value)}
               placeholder="e.g., my-custom-effects"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+              aria-invalid={groupIdTaken}
+              className={`w-full px-3 py-2 border rounded bg-white dark:bg-gray-700 text-sm ${
+                groupIdTaken
+                  ? 'border-red-500 dark:border-red-500'
+                  : 'border-gray-300 dark:border-gray-600'
+              }`}
               autoFocus
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Used as the filename (e.g., my-custom-effects.json)
-            </p>
+            {groupIdTaken ? (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                This group ID is already used by another {fileTypeLabel.toLowerCase()} file in{' '}
+                {mode.toUpperCase()} mode. Choose a different ID.
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">
+                Used as the filename (e.g., my-custom-effects.json)
+              </p>
+            )}
           </div>
 
           <div>
@@ -131,7 +162,8 @@ const NewFileModal: React.FC<Props> = ({ isOpen, isEffectMode, mode, onCancel, o
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-500">
+            disabled={!groupId.trim() || !groupName.trim() || !itemName.trim() || groupIdTaken}
+            className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
             Save
           </button>
         </div>

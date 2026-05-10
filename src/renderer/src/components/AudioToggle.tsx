@@ -15,6 +15,9 @@ import {
   disableYarg,
   disableRb3,
 } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('AudioToggle')
 
 interface AudioToggleProps {
   disabled?: boolean
@@ -46,13 +49,13 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
         const enabled = await getAudioEnabled()
         setIsAudioEnabled(enabled)
       } catch (error) {
-        console.error('Error initializing Audio toggle state:', error)
+        log.error('Error initializing Audio toggle state:', error)
       }
     }
 
     // Handle controllers restarted event - audio is disabled on restart
     const handleControllersRestarted = () => {
-      console.log('Controllers restarted, audio disabled')
+      log.info('Controllers restarted, audio disabled')
       setIsAudioEnabled(false)
     }
 
@@ -105,7 +108,7 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
       setIsSaving(true)
       const result = await setAudioEnabled(newState)
       if (!result.success) {
-        console.error('Failed to save audio enabled state:', result.error)
+        log.error('Failed to save audio enabled state:', result.error)
         setIsAudioEnabled(!newState) // Revert on failure
       } else {
         // Disable YARG/RB3E when audio is enabled (mutual exclusion)
@@ -121,7 +124,7 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
         }
       }
     } catch (error) {
-      console.error('Failed to save audio enabled state:', error)
+      log.error('Failed to save audio enabled state:', error)
       setIsAudioEnabled(!newState) // Revert on failure
     } finally {
       setIsSaving(false)
@@ -137,12 +140,12 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
       const result = await setAudioGameMode({ enabled: next })
       if (!result.success) {
         setGameModeEnabled(!next)
-        console.error('Failed to set audio game mode:', result.error)
+        log.error('Failed to set audio game mode:', result.error)
       } else {
         setGameModeEnabled(result.config.enabled)
       }
     } catch (error) {
-      console.error('Failed to set audio game mode:', error)
+      log.error('Failed to set audio game mode:', error)
       setGameModeEnabled(!next)
     } finally {
       setGameModeSaving(false)

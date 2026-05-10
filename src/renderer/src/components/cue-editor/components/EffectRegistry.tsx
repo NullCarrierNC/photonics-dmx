@@ -3,6 +3,8 @@ import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/l
 import type { EffectReference } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { listEffectFiles, readEffectFile } from '../../../ipcApi'
+import { createLogger } from '../../../../../shared/logger'
+const log = createLogger('EffectRegistry')
 
 type EffectDefinition = {
   id: string
@@ -53,7 +55,7 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
       )
       setAvailableFiles(allFiles)
     } catch (error) {
-      console.error('Failed to load effect files', error)
+      log.error('Failed to load effect files', error)
     }
   }
 
@@ -72,7 +74,7 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
         )
       setAvailableEffects(effects)
     } catch (error) {
-      console.error('Failed to load effects from file', error)
+      log.error('Failed to load effects from file', error)
       setAvailableEffects([])
     } finally {
       setLoadingEffects(false)

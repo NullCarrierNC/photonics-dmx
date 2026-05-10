@@ -29,6 +29,8 @@ import { getBandEnergy } from '../../../photonics-dmx/listeners/Audio/bandEnergy
 import { getDefaultStore } from 'jotai'
 import { audioDataAtom } from '../atoms'
 import { sendAudioData } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('AudioCaptureManager')
 
 const store = getDefaultStore()
 
@@ -50,6 +52,7 @@ const DEFAULT_CONFIG: AudioConfig = {
   strobeEnabled: DEFAULT_AUDIO_CONFIG.strobeEnabled,
   strobeTriggerThreshold: DEFAULT_AUDIO_CONFIG.strobeTriggerThreshold,
   strobeProbability: DEFAULT_AUDIO_CONFIG.strobeProbability,
+  idleDetection: { ...DEFAULT_AUDIO_CONFIG.idleDetection },
 }
 
 const BASS_MIN_HZ = 20
@@ -98,7 +101,7 @@ export class AudioCaptureManager {
     this.beatDetector = new BeatDetector(this.config.beatDetection)
     this.multibandOnset = new MultibandOnsetDetector([])
     this.keyDetector = new KeyDetector()
-    console.log('AudioCaptureManager initialized')
+    log.info('AudioCaptureManager initialized')
   }
 
   /**
@@ -106,12 +109,12 @@ export class AudioCaptureManager {
    */
   async start(deviceId?: string): Promise<void> {
     if (this.isCapturing) {
-      console.warn('AudioCaptureManager is already capturing')
+      log.warn('AudioCaptureManager is already capturing')
       return
     }
 
     try {
-      console.log('Starting audio capture...', deviceId ? `device: ${deviceId}` : 'default device')
+      log.info('Starting audio capture...', deviceId ? `device: ${deviceId}` : 'default device')
 
       // Request microphone access
       const constraints: MediaStreamConstraints = {
@@ -119,7 +122,7 @@ export class AudioCaptureManager {
       }
 
       this.stream = await navigator.mediaDevices.getUserMedia(constraints)
-      console.log('Microphone access granted')
+      log.info('Microphone access granted')
 
       // Create Web Audio API context
       this.audioContext = new AudioContext()
@@ -131,7 +134,7 @@ export class AudioCaptureManager {
       this.source = this.audioContext.createMediaStreamSource(this.stream)
       this.source.connect(this.analyser)
 
-      console.log(
+      log.info(
         `Audio context created (sample rate: ${this.audioContext.sampleRate}Hz, FFT size: ${this.analyser.fftSize})`,
       )
 
@@ -152,9 +155,9 @@ export class AudioCaptureManager {
       // Start analysis loop
       this.analyzeAudio()
 
-      console.log('Audio capture started successfully')
+      log.info('Audio capture started successfully')
     } catch (error) {
-      console.error('Failed to start audio capture:', error)
+      log.error('Failed to start audio capture:', error)
 
       if (error instanceof DOMException) {
         if (error.name === 'NotAllowedError') {
@@ -165,7 +168,7 @@ export class AudioCaptureManager {
           // Device may have been disconnected
           if (deviceId) {
             throw new Error(
-              `Audio device not found. The saved device is no longer connected. Please select a different device in Audio Settings.`,
+              `Audio device not found. The saved device is no longer connected. Please select a different device in Preferences → Audio.`,
             )
           } else {
             throw new Error('No microphone found. Please connect a microphone and try again.')
@@ -193,11 +196,11 @@ export class AudioCaptureManager {
    */
   stop(): void {
     if (!this.isCapturing) {
-      console.warn('AudioCaptureManager is not capturing')
+      log.warn('AudioCaptureManager is not capturing')
       return
     }
 
-    console.log('Stopping audio capture...')
+    log.info('Stopping audio capture...')
 
     // Clear audio data atom
     store.set(audioDataAtom, null)
@@ -239,7 +242,7 @@ export class AudioCaptureManager {
     this.uiUpdateCounter = 0
     this.lastAudioData = null
 
-    console.log('Audio capture stopped')
+    log.info('Audio capture stopped')
   }
 
   /**
@@ -249,10 +252,10 @@ export class AudioCaptureManager {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices()
       const audioInputs = devices.filter((d) => d.kind === 'audioinput')
-      console.log(`Found ${audioInputs.length} audio input devices`)
+      log.info(`Found ${audioInputs.length} audio input devices`)
       return audioInputs
     } catch (error) {
-      console.error('Failed to enumerate devices:', error)
+      log.error('Failed to enumerate devices:', error)
       return []
     }
   }
@@ -302,7 +305,7 @@ export class AudioCaptureManager {
     }))
     this.multibandOnset.reconfigure(onsetConfigs)
 
-    console.log('Rebuilt bin-to-band mapping', {
+    log.info('Rebuilt bin-to-band mapping', {
       binCount,
       sampleRate,
       fftSize,
@@ -328,7 +331,7 @@ export class AudioCaptureManager {
       )
       // Rebuild mapping since FFT size changed
       this.rebuildBinToBandMap()
-      console.log(`Updated FFT size to ${config.fftSize}`)
+      log.info(`Updated FFT size to ${config.fftSize}`)
     }
 
     // Rebuild mapping if bands changed
@@ -340,7 +343,7 @@ export class AudioCaptureManager {
       this.beatDetector.updateConfig(config.beatDetection)
     }
 
-    console.log('AudioCaptureManager configuration updated:', {
+    log.info('AudioCaptureManager configuration updated:', {
       sensitivity: config.sensitivity !== undefined ? config.sensitivity : 'unchanged',
       bands: config.bands !== undefined ? 'updated' : 'unchanged',
       smoothing: config.smoothing !== undefined ? config.smoothing : 'unchanged',
@@ -400,7 +403,7 @@ export class AudioCaptureManager {
     this.frameCounter++
     if (this.frameCounter >= this.DEBUG_LOG_INTERVAL) {
       this.frameCounter = 0
-      console.log('Audio Capture Active:', {
+      log.info('Audio Capture Active:', {
         energy: audioData.energy.toFixed(3),
         overallLevel: audioData.overallLevel.toFixed(3),
         beat: audioData.beatDetected ? 'YES' : 'no',

@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getEnabledCueGroups, getCueGroups } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('CueRegistrySelector')
 
 type CueRegistryType = 'YARG' | 'RB3E'
 
@@ -52,29 +54,36 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
 
   const fetchGroups = useCallback(async () => {
     try {
-      console.log('Fetching enabled cue groups...')
+      log.info('Fetching enabled cue groups...')
 
       const enabledGroupIds = await getEnabledCueGroups()
       const allGroups = await getCueGroups()
 
-      const enabledGroups = allGroups.filter((g: CueGroup) => enabledGroupIds.includes(g.id))
+      // Motion-only groups (no lighting cue types) are chosen under Motion Cue Simulation.
+      const enabledGroups = allGroups.filter(
+        (g: CueGroup) => enabledGroupIds.includes(g.id) && g.cueTypes.length > 0,
+      )
 
-      console.log(`Enabled groups:`, enabledGroups)
-      setGroups(enabledGroups)
+      const sortedGroups = [...enabledGroups].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+      )
+
+      log.info(`Enabled groups:`, sortedGroups)
+      setGroups(sortedGroups)
 
       if (selectedGroup === '') {
-        if (enabledGroups.length > 0 && isInitialMount.current) {
-          const firstGroup = enabledGroups[0]
+        if (sortedGroups.length > 0 && isInitialMount.current) {
+          const firstGroup = sortedGroups[0]
           setSelectedGroup(firstGroup.id)
           handleGroupChangeCallback(firstGroup.id)
           isInitialMount.current = false
         }
-      } else if (isInitialMount.current && enabledGroups.length > 0) {
+      } else if (isInitialMount.current && sortedGroups.length > 0) {
         handleGroupChangeCallback(selectedGroup)
         isInitialMount.current = false
       }
     } catch (error) {
-      console.error('Error fetching cue groups:', error)
+      log.error('Error fetching cue groups:', error)
     }
   }, [handleGroupChangeCallback, selectedGroup])
 

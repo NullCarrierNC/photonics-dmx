@@ -1,8 +1,15 @@
-import { CueData, CueType } from '../cues/types/cueTypes'
+import { EventEmitter } from 'events'
+import { CueData, CueType, DrumNoteType, InstrumentNoteType } from '../cues/types/cueTypes'
+import { YargMotionCueRef } from '../cues/types/audioCueTypes'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
-import { BaseCueHandler } from './BaseCueHandler'
 import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
+import { YargCueRegistry } from '../cues/registries/YargCueRegistry'
+import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import type { RuntimeBroadcaster } from '../runtime/broadcaster'
+import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('YargCueHandler')
 
 /**
  * YargCueHandler handles the cues called by the YARG network listener.
@@ -10,6 +17,11 @@ import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
  * Cue selection is delegated to YargCueRegistry.getCueImplementation(cueType, trackMode), which uses
  * active/enabled groups, consistency tracking, stage-kit preference when applicable,
  * and default-group fallback when no active group implements the cue.
+ *
+ * Motion cues run in parallel via YargCueRegistry.getRandomMotionCue() when the lighting cue type
+ * changes (not on re-queues of the same cue). Simulated cues (trackMode === 'simulated') skip
+ * random motion selection; use motion simulation IPC instead. Optional once-per-song lock from
+ * configuration applies to random selection.
  *
  * Reminder: setEffect clears all running effects, regardless of layer.
  * Layer 0 will maintain its state though.
@@ -23,17 +35,169 @@ const STROBE_TYPES: CueType[] = [
   CueType.Strobe_Off,
 ]
 
-class YargCueHandler extends BaseCueHandler {
+export type YargCueHandlerOptions = {
+  getMotionCueMinimumHoldMs?: () => number
+  /** Probability (0-100) that an automatic motion cue pick will play on a new lighting cue. Defaults to 100 (always). */
+  getMotionCueProbabilityPercent?: () => number
+  runtimeBroadcaster?: RuntimeBroadcaster
+}
+
+class YargCueHandler extends EventEmitter {
+  private readonly _lightManager: DmxLightManager
+  private readonly _sequencer: ILightingController
+  private readonly registry: YargCueRegistry
   private currentPrimaryCue: INetCue | null = null
   private currentSecondaryCue: INetCue | null = null
   private currentStrobeCue: INetCue | null = null
+  private currentMotionCue: INetCue | null = null
+  private currentMotionCueStartTime: number | null = null
+  private motionEnabled = true
+  private manualMotionRef: YargMotionCueRef | null = null
+  /** Tracks which manual ref was used for the last motion pick (undefined = not yet synced). */
+  private lastManualMotionRefForMotion: YargMotionCueRef | null | undefined = undefined
+  private lastEmittedMotionKey: string | null = null
+  private readonly getMotionCueMinimumHoldMs: () => number
+  private readonly getMotionCueProbabilityPercent: () => number
+  private readonly runtimeBroadcaster: RuntimeBroadcaster
+  private cueHistory: CueType[] = []
+  private currentCue?: CueType
+  private executionCount = 0
+  private cueStartTime = 0
+  private lastCueChangeTime = 0
+  private previousCueData?: Partial<CueData>
 
-  constructor(lightManager: DmxLightManager, photonicsSequencer: ILightingController) {
-    super(lightManager, photonicsSequencer)
+  public setManualMotionRef(ref: YargMotionCueRef | null): void {
+    this.manualMotionRef = ref
+    this.lastManualMotionRefForMotion = undefined
+  }
+
+  private emitYargMotionCueChange(
+    ref: YargMotionCueRef | null,
+    source: 'manual' | 'auto' | 'cleared',
+    manualFallback?: boolean,
+  ): void {
+    const key = ref ? `${ref.groupId}:${ref.cueId}` : 'null'
+    if (key === this.lastEmittedMotionKey && source !== 'cleared' && manualFallback !== true) {
+      return
+    }
+    this.lastEmittedMotionKey = key
+    this.runtimeBroadcaster.emit(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
+      ref,
+      source,
+      manualFallback: manualFallback === true,
+    })
+  }
+
+  public setMotionEnabled(enabled: boolean): void {
+    if (this.motionEnabled === enabled) {
+      return
+    }
+    this.motionEnabled = enabled
+    if (!enabled) {
+      if (this.currentMotionCue) {
+        this.currentMotionCue.onStop?.()
+        this.currentMotionCue = null
+        this.currentMotionCueStartTime = null
+        this._sequencer.schedulePanTiltClear()
+        this.emitYargMotionCueChange(null, 'cleared')
+      }
+      this.lastManualMotionRefForMotion = undefined
+    } else {
+      this.lastManualMotionRefForMotion = undefined
+    }
+  }
+
+  constructor(
+    lightManager: DmxLightManager,
+    photonicsSequencer: ILightingController,
+    options?: YargCueHandlerOptions,
+  ) {
+    super()
+    this._lightManager = lightManager
+    this._sequencer = photonicsSequencer
+    this.registry = YargCueRegistry.getInstance()
+    this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
+    this.getMotionCueProbabilityPercent = options?.getMotionCueProbabilityPercent ?? (() => 100)
+    this.runtimeBroadcaster = options?.runtimeBroadcaster ?? noopRuntimeBroadcaster()
+  }
+
+  public notifySongStart(): void {
+    this.registry.onSongStart()
+    YargCueRegistry.getInstance().onMotionSongStart()
+  }
+
+  public notifySongEnd(): void {
+    this.registry.onSongEnd()
+    YargCueRegistry.getInstance().onMotionSongEnd()
   }
 
   public reset(): void {
-    super.reset()
+    this.registry.reset()
+    this.resetCueHistory()
+  }
+
+  private resetCueHistory(): void {
+    this.cueHistory = []
+    this.currentCue = undefined
+    this.executionCount = 0
+    this.cueStartTime = 0
+    this.lastCueChangeTime = 0
+    this.previousCueData = undefined
+  }
+
+  private addHistoryToCueData(cueType: CueType, parameters: CueData): CueData {
+    const now = Date.now()
+
+    if (this.currentCue !== cueType) {
+      if (this.currentCue && this.currentCue !== cueType) {
+        this.cueHistory.push(this.currentCue)
+
+        if (this.cueHistory.length > 5) {
+          this.cueHistory.shift()
+        }
+      }
+
+      this.currentCue = cueType
+      this.executionCount = 1
+      this.lastCueChangeTime = now
+      this.cueStartTime = now
+    } else {
+      this.executionCount++
+    }
+
+    const historicCueData: CueData = {
+      ...parameters,
+      previousCue:
+        this.cueHistory.length > 0 ? this.cueHistory[this.cueHistory.length - 1] : undefined,
+      cueHistory: [...this.cueHistory],
+      executionCount: this.executionCount,
+      cueStartTime: this.cueStartTime,
+      timeSinceLastCue: now - this.lastCueChangeTime,
+      previousFrame: this.previousCueData,
+    }
+
+    this.previousCueData = {
+      vocalNote: parameters.vocalNote,
+      harmony0Note: parameters.harmony0Note,
+      harmony1Note: parameters.harmony1Note,
+      harmony2Note: parameters.harmony2Note,
+      beat: parameters.beat,
+      keyframe: parameters.keyframe,
+    }
+
+    return historicCueData
+  }
+
+  public addCueHandledListener(listener: (data: CueData) => void): void {
+    this.on('cueHandled', listener)
+  }
+
+  public removeCueHandledListener(listener: (data: CueData) => void): void {
+    this.off('cueHandled', listener)
+  }
+
+  public setEffectDebouncePeriod(_time: number): void {
+    // Stored preference compatibility; node cue dispatch does not debounce cue events.
   }
 
   /**
@@ -49,6 +213,34 @@ class YargCueHandler extends BaseCueHandler {
   public handleMeasure(): void {
     this._sequencer.onBeat()
     this._sequencer.onMeasure()
+  }
+
+  public handleKeyframeFirst(): void {
+    this._sequencer.onKeyframeFirst()
+  }
+
+  public handleKeyframeNext(): void {
+    this._sequencer.onKeyframeNext()
+  }
+
+  public handleKeyframePrevious(): void {
+    this._sequencer.onKeyframePrevious()
+  }
+
+  public handleDrumNote(noteType: DrumNoteType, _data: CueData): void {
+    this._sequencer.onDrumNote(noteType)
+  }
+
+  public handleGuitarNote(noteType: InstrumentNoteType, _data: CueData): void {
+    this._sequencer.onGuitarNote(noteType)
+  }
+
+  public handleBassNote(noteType: InstrumentNoteType, _data: CueData): void {
+    this._sequencer.onBassNote(noteType)
+  }
+
+  public handleKeysNote(noteType: InstrumentNoteType, _data: CueData): void {
+    this._sequencer.onKeysNote(noteType)
   }
 
   public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
@@ -135,11 +327,100 @@ class YargCueHandler extends BaseCueHandler {
       }
 
       await cue.execute(historicCueData, this._sequencer, this._lightManager)
-      this.emit('cueHandled', historicCueData)
     } else {
-      console.error(`No implementation found for cue: ${cueType}`)
-      this.emit('cueHandled', historicCueData)
+      log.error(`No implementation found for cue: ${cueType}`)
     }
+
+    if (trackMode !== 'simulated') {
+      if (!this.motionEnabled) {
+        if (this.currentMotionCue) {
+          this.currentMotionCue.onStop?.()
+          this.currentMotionCue = null
+          this.currentMotionCueStartTime = null
+          this._sequencer.schedulePanTiltClear()
+          this.emitYargMotionCueChange(null, 'cleared')
+        }
+      } else {
+        const registry = YargCueRegistry.getInstance()
+        const isNewCue = historicCueData.executionCount === 1
+        const isManualChange = this.manualMotionRef !== this.lastManualMotionRefForMotion
+        const now = Date.now()
+        const minHold = this.getMotionCueMinimumHoldMs()
+        const heldLongEnough =
+          this.currentMotionCueStartTime == null || now - this.currentMotionCueStartTime >= minHold
+        const needNewMotionPick = isManualChange || (isNewCue && heldLongEnough)
+
+        let motionCue: INetCue | null = null
+
+        if (needNewMotionPick) {
+          this.lastManualMotionRefForMotion = this.manualMotionRef
+          let pickSource: 'manual' | 'auto' = 'auto'
+          let pickManualFallback = false
+          if (this.manualMotionRef) {
+            motionCue = registry.getMotionCueImplementation(this.manualMotionRef)
+            if (motionCue) {
+              pickSource = 'manual'
+            } else {
+              pickManualFallback = true
+              motionCue = registry.getRandomMotionCue()
+              pickSource = 'auto'
+              this.runtimeBroadcaster.emit(RENDERER_RECEIVE.DEBUG_LOG, {
+                message:
+                  'Selected YARG motion cue is unavailable (disabled or unknown); using a random motion program.',
+                variables: [],
+                timestamp: Date.now(),
+              })
+            }
+          } else {
+            const probability = this.getMotionCueProbabilityPercent()
+            if (probability >= 100 || Math.random() * 100 < probability) {
+              motionCue = registry.getRandomMotionCue()
+            }
+          }
+
+          if (motionCue) {
+            const prevMotion = this.currentMotionCue
+            if (this.currentMotionCue && this.currentMotionCue !== motionCue) {
+              this.currentMotionCue.onStop?.()
+            }
+            this.currentMotionCue = motionCue
+            if (prevMotion !== motionCue) {
+              this.currentMotionCueStartTime = now
+            }
+            this._sequencer.cancelPanTiltClear()
+            const ref = registry.findYargMotionCueRef(motionCue)
+            if (ref) {
+              this.emitYargMotionCueChange(ref, pickSource, pickManualFallback)
+            }
+          } else if (this.currentMotionCue) {
+            this.currentMotionCue.onStop?.()
+            this.currentMotionCue = null
+            this.currentMotionCueStartTime = null
+            this._sequencer.schedulePanTiltClear()
+            this.emitYargMotionCueChange(null, 'cleared')
+          }
+        } else {
+          motionCue = this.currentMotionCue
+        }
+
+        try {
+          if (motionCue) {
+            await motionCue.execute(historicCueData, this._sequencer, this._lightManager)
+          }
+        } catch (error) {
+          log.error('Motion cue execution failed:', error)
+          if (motionCue && this.currentMotionCue === motionCue) {
+            this.currentMotionCue.onStop?.()
+            this.currentMotionCue = null
+            this.currentMotionCueStartTime = null
+            this._sequencer.schedulePanTiltClear()
+            this.emitYargMotionCueChange(null, 'cleared')
+          }
+        }
+      }
+    }
+
+    this.emit('cueHandled', historicCueData)
   }
 
   /**
@@ -159,6 +440,13 @@ class YargCueHandler extends BaseCueHandler {
       this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
     }
+    if (this.currentMotionCue) {
+      this.currentMotionCue.onStop?.()
+      this.currentMotionCue = null
+      this.currentMotionCueStartTime = null
+      this._sequencer.schedulePanTiltClear()
+      this.emitYargMotionCueChange(null, 'cleared')
+    }
   }
 
   /**
@@ -176,155 +464,38 @@ class YargCueHandler extends BaseCueHandler {
     this._sequencer.onKeyframe()
   }
 
-  protected async handleCueBigRockEnding(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.BigRockEnding, parameters)
-  }
-
-  protected async handleCueBlackout_Fast(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Blackout_Fast, _parameters)
-  }
-
-  protected async handleCueBlackout_Slow(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Blackout_Slow, _parameters)
-  }
-
-  protected async handleCueBlackout_Spotlight(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Blackout_Spotlight, _parameters)
-  }
-
-  protected async handleCueChorus(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Chorus, parameters)
-  }
-
-  protected async handleCueCool_Automatic(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Cool_Automatic, parameters)
-  }
-
-  protected async handleCueCool_Manual(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Cool_Manual, parameters)
-  }
-
-  protected async handleCueDefault(parameters: CueData): Promise<void> {
+  public async handleCueDefault(parameters: CueData): Promise<void> {
     await this.handleCue(CueType.Default, parameters)
   }
 
-  protected async handleCueDischord(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Dischord, parameters)
-  }
-
-  protected async handleCueFlare_Fast(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Flare_Fast, parameters)
-  }
-
-  protected async handleCueFlare_Slow(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Flare_Slow, parameters)
-  }
-
-  protected async handleCueFrenzy(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Frenzy, parameters)
-  }
-
-  protected async handleCueHarmony(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Harmony, parameters)
-  }
-
-  protected async handleCueIntro(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Intro, parameters)
-  }
-
-  protected async handleCueKeyframe_First(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Keyframe_First, _parameters)
-  }
-
-  protected async handleCueKeyframe_Next(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Keyframe_Next, _parameters)
-  }
-
-  protected async handleCueKeyframe_Previous(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Keyframe_Previous, _parameters)
-  }
-
-  protected async handleCueMenu(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Menu, parameters)
-  }
-
-  protected async handleCueNoCue(_parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.NoCue, _parameters)
-  }
-
-  protected async handleCueScore(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Score, parameters)
-  }
-
-  protected async handleCueSearchlights(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Searchlights, parameters)
-  }
-
-  protected async handleCueSilhouettes(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Silhouettes, parameters)
-  }
-
-  protected async handleCueSilhouettes_Spotlight(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Silhouettes_Spotlight, parameters)
-  }
-
-  protected async handleCueStomp(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Stomp, parameters)
-  }
-
-  protected async handleCueStrobe_Fast(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Fast, parameters)
-  }
-
-  protected async handleCueStrobe_Fastest(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Fastest, parameters)
-  }
-
-  protected async handleCueStrobe_Medium(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Medium, parameters)
-  }
-
-  protected async handleCueStrobe_Off(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Off, parameters)
-  }
-
-  protected async handleCueStrobe_Slow(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Strobe_Slow, parameters)
-  }
-
-  protected async handleCueSweep(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Sweep, parameters)
-  }
-
-  protected async handleCueVerse(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Verse, parameters)
-  }
-
-  protected async handleCueWarm_Automatic(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Warm_Automatic, parameters)
-  }
-
-  protected async handleCueWarm_Manual(parameters: CueData): Promise<void> {
-    await this.handleCue(CueType.Warm_Manual, parameters)
-  }
-
   /**
-   * Clean up resources and call destroy lifecycle on any executing cue.
+   * Clean up resources and stop any executing cue.
+   *
+   * Node cue instances are singletons held by `YargCueRegistry`, so they are not
+   * literally destroyed when this handler tears down; the same instances are reused
+   * by the next handler. We call `onStop()` so each cue's `CueSession` is reset
+   * (`cueStartedFired` cleared, engine nulled) and the next activation can fire
+   * `cue-started` from a clean state.
    */
   public shutdown(): void {
     if (this.currentPrimaryCue) {
-      this.currentPrimaryCue.onDestroy?.()
+      this.currentPrimaryCue.onStop?.()
       this.currentPrimaryCue = null
     }
     if (this.currentSecondaryCue) {
-      this.currentSecondaryCue.onDestroy?.()
+      this.currentSecondaryCue.onStop?.()
       this.currentSecondaryCue = null
     }
     if (this.currentStrobeCue) {
-      this.currentStrobeCue.onDestroy?.()
+      this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
     }
-    super.shutdown()
+    if (this.currentMotionCue) {
+      this.currentMotionCue.onStop?.()
+      this.currentMotionCue = null
+      this.currentMotionCueStartTime = null
+    }
+    this.removeAllListeners()
   }
 }
 

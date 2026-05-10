@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { getClockRate, setClockRate as saveClockRateToBackend } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('ClockRateSettings')
 
 const ClockRateSettings: React.FC = () => {
   const [clockRateValue, setClockRateValue] = useState(10)
@@ -14,7 +16,7 @@ const ClockRateSettings: React.FC = () => {
           setClockRateValue(result.clockRate)
         }
       } catch (error) {
-        console.error('Failed to load clock rate:', error)
+        log.error('Failed to load clock rate:', error)
       } finally {
         setIsLoading(false)
       }
@@ -36,12 +38,12 @@ const ClockRateSettings: React.FC = () => {
         if (result.success) {
           setClockRateValue(newValue)
         } else {
-          console.error('Failed to save clock rate:', result.error)
+          log.error('Failed to save clock rate:', result.error)
           // Revert to previous value on failure (it will be re-fetched from backend)
           window.location.reload() // Simple approach - could be more sophisticated
         }
       } catch (error) {
-        console.error('Failed to save clock rate:', error)
+        log.error('Failed to save clock rate:', error)
         // Revert to previous value on failure
         window.location.reload() // Simple approach - could be more sophisticated
       } finally {
@@ -99,7 +101,7 @@ const ClockRateSettings: React.FC = () => {
 
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
             Default is 10ms. Increase for better performance on slower systems. Range: 1-100ms but
-            you probably should't go higher than 40ms.
+            you probably shouldn't go higher than 40ms.
           </p>
         </div>
       </div>

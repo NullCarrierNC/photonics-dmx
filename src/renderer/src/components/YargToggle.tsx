@@ -8,6 +8,8 @@ import {
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getSystemStatus, enableYarg, disableYarg, setAudioEnabled } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('YargToggle')
 
 interface YargToggleProps {
   disabled?: boolean
@@ -27,13 +29,13 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
           setIsYargEnabled(response.isYargEnabled)
         }
       } catch (error) {
-        console.error('Error initializing YARG toggle state:', error)
+        log.error('Error initializing YARG toggle state:', error)
       }
     }
 
     // Handle controllers restarted event
     const handleControllersRestarted = () => {
-      console.log('Controllers restarted, refreshing YARG toggle state')
+      log.info('Controllers restarted, refreshing YARG toggle state')
       initializeState()
     }
 
@@ -54,7 +56,7 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
 
     if (newState) {
       enableYarg()
-      console.log('YARG Listener enabled')
+      log.info('YARG Listener enabled')
       // Disable Audio when YARG is enabled (mutual exclusion)
       if (isAudioEnabled) {
         setIsAudioEnabled(false)
@@ -62,7 +64,7 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
       }
     } else {
       disableYarg()
-      console.log('YARG Listener disabled')
+      log.info('YARG Listener disabled')
     }
   }
 

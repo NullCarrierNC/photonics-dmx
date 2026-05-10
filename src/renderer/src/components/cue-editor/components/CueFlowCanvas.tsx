@@ -14,15 +14,18 @@ import ReactFlow, {
 } from 'reactflow'
 import type { EditorNode, EventOption, NotesVariant } from '../lib/types'
 import {
-  NODE_EFFECT_TYPES,
+  getEffectTypesForCueKind,
   type LogicNode,
   type NodeEffectType,
+  type NodeCueKind,
+  type NodeCueMode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type {
   AudioEventNode,
   YargEventNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { getDefaultEventOption } from '../lib/options'
+import { NODE_DRAG_MIME, parseNodeDrag, type NodeDragPayload } from '../lib/nodeDragPayload'
 
 type Props = {
   nodes: EditorNode[]
@@ -43,7 +46,9 @@ type Props = {
   onRemoveNode: (nodeId: string) => void
   setReactFlowInstance: (instance: ReactFlowInstance) => void
   isValidConnection: (connection: Connection) => boolean
-  activeMode: 'yarg' | 'audio'
+  activeMode: NodeCueMode
+  /** When editing a cue graph, which kind (lighting vs motion). Effects use lighting defaults. */
+  activeCueKind?: NodeCueKind
   editorMode: 'cue' | 'effect'
   addEventNode: (
     option?: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
@@ -80,6 +85,7 @@ const CueFlowCanvas: React.FC<Props> = ({
   setReactFlowInstance,
   isValidConnection,
   activeMode,
+  activeCueKind = 'lighting',
   editorMode,
   addEventNode,
   addActionNode,
@@ -98,6 +104,82 @@ const CueFlowCanvas: React.FC<Props> = ({
   }
 
   const menuRef = React.useRef<HTMLDivElement>(null)
+  const reactFlowInstanceRef = React.useRef<ReactFlowInstance | null>(null)
+
+  const handleInit = React.useCallback(
+    (instance: ReactFlowInstance) => {
+      reactFlowInstanceRef.current = instance
+      setReactFlowInstance(instance)
+    },
+    [setReactFlowInstance],
+  )
+
+  const dispatchAdd = React.useCallback(
+    (payload: NodeDragPayload, position: { x: number; y: number }) => {
+      switch (payload.kind) {
+        case 'system-event':
+          addEventNode(getDefaultEventOption(activeMode, activeCueKind), position)
+          return
+        case 'event-listener':
+          if (addEventListenerNode) addEventListenerNode(position)
+          return
+        case 'effect-listener':
+          if (addEffectListenerNode) addEffectListenerNode(position)
+          return
+        case 'event-raiser':
+          if (addEventRaiserNode) addEventRaiserNode(position)
+          return
+        case 'effect-raiser':
+          if (addEffectRaiserNode) addEffectRaiserNode(position)
+          return
+        case 'action':
+          addActionNode(payload.effectType, position)
+          return
+        case 'logic':
+          addLogicNode(payload.logicType, position)
+          return
+        case 'notes':
+          if (addNotesNode) addNotesNode(payload.variant, position)
+          return
+      }
+    },
+    [
+      activeMode,
+      activeCueKind,
+      addEventNode,
+      addEventListenerNode,
+      addEffectListenerNode,
+      addEventRaiserNode,
+      addEffectRaiserNode,
+      addActionNode,
+      addLogicNode,
+      addNotesNode,
+    ],
+  )
+
+  const handleDragOver = React.useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes(NODE_DRAG_MIME)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }, [])
+
+  const handleDrop = React.useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      const raw = event.dataTransfer.getData(NODE_DRAG_MIME)
+      const payload = parseNodeDrag(raw)
+      const wrapper = flowWrapperRef.current
+      const instance = reactFlowInstanceRef.current
+      if (!payload || !wrapper || !instance) return
+      event.preventDefault()
+      const bounds = wrapper.getBoundingClientRect()
+      const position = instance.project({
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+      })
+      dispatchAdd(payload, position)
+    },
+    [dispatchAdd, flowWrapperRef],
+  )
 
   // Adjust menu position after render to prevent overflow
   React.useEffect(() => {
@@ -142,7 +224,11 @@ const CueFlowCanvas: React.FC<Props> = ({
   }, [paneContextMenu])
 
   return (
-    <div className="flex-1 relative" ref={flowWrapperRef}>
+    <div
+      className="flex-1 relative"
+      ref={flowWrapperRef}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -150,7 +236,7 @@ const CueFlowCanvas: React.FC<Props> = ({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onSelectionChange={onSelectionChange}
-        onInit={setReactFlowInstance}
+        onInit={handleInit}
         isValidConnection={isValidConnection}
         onNodeContextMenu={onNodeContextMenu}
         onEdgeContextMenu={onEdgeContextMenu}
@@ -233,7 +319,7 @@ const CueFlowCanvas: React.FC<Props> = ({
                 className="block w-full text-left px-3 py-1 text-blue-800 dark:text-blue-100 bg-blue-50 dark:bg-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/60"
                 onClick={() =>
                   handlePaneMenuClick(() =>
-                    addEventNode(getDefaultEventOption(activeMode), {
+                    addEventNode(getDefaultEventOption(activeMode, activeCueKind), {
                       x: paneContextMenu.flowX,
                       y: paneContextMenu.flowY,
                     }),
@@ -262,18 +348,23 @@ const CueFlowCanvas: React.FC<Props> = ({
           <div className="px-3 py-1 font-semibold italic text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 border-t border-b border-gray-300 dark:border-gray-600">
             Action Nodes
           </div>
-          {[...NODE_EFFECT_TYPES].sort().map((effectType) => (
-            <button
-              key={effectType}
-              className="block w-full text-left px-3 py-1 text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() =>
-                handlePaneMenuClick(() =>
-                  addActionNode(effectType, { x: paneContextMenu.flowX, y: paneContextMenu.flowY }),
-                )
-              }>
-              {effectType}
-            </button>
-          ))}
+          {[...getEffectTypesForCueKind(editorMode === 'effect' ? 'lighting' : activeCueKind)]
+            .sort()
+            .map((effectType) => (
+              <button
+                key={effectType}
+                className="block w-full text-left px-3 py-1 text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
+                onClick={() =>
+                  handlePaneMenuClick(() =>
+                    addActionNode(effectType, {
+                      x: paneContextMenu.flowX,
+                      y: paneContextMenu.flowY,
+                    }),
+                  )
+                }>
+                {effectType}
+              </button>
+            ))}
           <div className="px-3 py-1 font-semibold italic text-amber-800 dark:text-amber-100 bg-amber-50 dark:bg-amber-900/30 border-t border-b border-amber-400 dark:border-amber-600">
             Logic Nodes
           </div>

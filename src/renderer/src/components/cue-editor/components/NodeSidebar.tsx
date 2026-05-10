@@ -10,6 +10,7 @@ import type {
   EffectEventListenerNode,
   EffectDefinition,
   LogicNode,
+  NodeCueKind,
   NodeCueMode,
   NodeEffectType,
   YargEventNode,
@@ -33,6 +34,7 @@ import { showNodeIdsAtom } from '../../../atoms'
 
 type Props = {
   activeMode: NodeCueMode
+  cueKind: NodeCueKind
   editorMode: EditorMode
   selectedNode: EditorNode | null
   selectedActionHasEventParent: boolean
@@ -108,6 +110,7 @@ const NodeIdInput: React.FC<{
 
 const NodeSidebar: React.FC<Props> = ({
   activeMode,
+  cueKind,
   editorMode,
   selectedNode,
   selectedActionHasEventParent,
@@ -136,6 +139,7 @@ const NodeSidebar: React.FC<Props> = ({
             <div className="shrink-0">
               <NodeCreationSections
                 activeMode={activeMode}
+                cueKind={cueKind}
                 editorMode={editorMode}
                 addEventNode={addEventNode}
                 addActionNode={addActionNode}
@@ -219,6 +223,8 @@ const NodeSidebar: React.FC<Props> = ({
               <ActionNodeEditor
                 node={selectedNode.data.payload as ActionNode}
                 activeMode={activeMode}
+                cueKind={cueKind}
+                editorMode={editorMode}
                 selectedActionHasEventParent={selectedActionHasEventParent}
                 availableVariables={availableVariables}
                 updateNode={(updates) => updateSelectedNode<ActionNode>(updates)}

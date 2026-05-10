@@ -4,6 +4,8 @@ import * as path from 'path'
 import chokidar, { FSWatcher } from 'chokidar'
 import { validateEffectFile } from '../schema/validation'
 import { EffectFile, EffectMode, EffectReference } from '../../types/nodeCueTypes'
+import { createLogger } from '../../../../shared/logger'
+const log = createLogger('EffectLoader')
 
 export interface EffectFileSummary {
   path: string
@@ -77,7 +79,7 @@ export class EffectLoader extends EventEmitter {
   }
 
   public async readFile(filePath: string): Promise<EffectFile> {
-    const resolvedPath = this.resolvePath(filePath)
+    const resolvedPath = this.resolveExistingEffectFilePath(filePath)
     const mode = this.getModeFromPath(resolvedPath)
     if (!mode) {
       throw new Error('Unsupported effect file path.')
@@ -98,6 +100,15 @@ export class EffectLoader extends EventEmitter {
     return validation.data
   }
 
+  /**
+   * Resolves a renderer-supplied path to an absolute path inside the YARG/audio effect roots,
+   * or throws. Use this when an IPC handler needs the rooted path (e.g. for fs.copyFile during
+   * export) and must not trust the raw IPC string.
+   */
+  public resolveEffectFilePathForIpc(filePath: string): string {
+    return this.resolveExistingEffectFilePath(filePath)
+  }
+
   public async saveFile(
     mode: EffectMode,
     filename: string,
@@ -116,6 +127,8 @@ export class EffectLoader extends EventEmitter {
     const sanitizedName = this.sanitizeFilename(filename)
     const filePath = this.resolveInDir(targetDir, sanitizedName)
 
+    this.assertNoConflictingEffectGroupIdForPath(filePath, mode, content.group.id)
+
     await fs.mkdir(path.dirname(filePath), { recursive: true })
     await fs.writeFile(filePath, JSON.stringify(content, null, 2), 'utf-8')
     await this.loadFile(mode, filePath)
@@ -125,7 +138,7 @@ export class EffectLoader extends EventEmitter {
   }
 
   public async deleteFile(filePath: string): Promise<{ success: boolean }> {
-    const resolvedPath = this.resolvePath(filePath)
+    const resolvedPath = this.resolveExistingEffectFilePath(filePath)
     const mode = this.getModeFromPath(resolvedPath)
     if (!mode) {
       throw new Error('Unsupported effect file path.')
@@ -271,6 +284,30 @@ export class EffectLoader extends EventEmitter {
     return summary
   }
 
+  /** Two effect JSON files in the same mode must not share the same `group.id`. */
+  private assertNoConflictingEffectGroupIdForPath(
+    targetPath: string,
+    mode: EffectMode,
+    groupId: string,
+  ): void {
+    const normalizedTarget = path.resolve(targetPath)
+    const key = groupId.trim().toLowerCase()
+    if (!key) {
+      return
+    }
+    const summaries = mode === 'yarg' ? this.summaries.yarg : this.summaries.audio
+    for (const s of summaries) {
+      if (path.resolve(s.path) === normalizedTarget) {
+        continue
+      }
+      if (s.groupId.trim().toLowerCase() === key) {
+        throw new Error(
+          `Another ${mode} effect file already uses group id '${groupId}'. Choose a different group ID.`,
+        )
+      }
+    }
+  }
+
   private updateSummary(summary: EffectFileSummary): void {
     const summaries = summary.mode === 'yarg' ? this.summaries.yarg : this.summaries.audio
     const existingIndex = summaries.findIndex((item) => item.path === summary.path)
@@ -296,7 +333,7 @@ export class EffectLoader extends EventEmitter {
       await this.loadFile(mode, filePath)
       this.emit('changed', this.getSummary())
     } catch (error) {
-      console.error('Failed to reload effect file', filePath, error)
+      log.error('Failed to reload effect file', filePath, error)
     }
   }
 
@@ -328,6 +365,30 @@ export class EffectLoader extends EventEmitter {
 
   private resolvePath(targetPath: string): string {
     return path.resolve(targetPath)
+  }
+
+  /**
+   * Resolves a user-supplied path to an absolute path that must lie under the YARG or audio effect roots.
+   * Relative segments are anchored to {@link EffectLoaderOptions.baseDir}.
+   */
+  private resolveExistingEffectFilePath(userPath: string): string {
+    if (typeof userPath !== 'string' || userPath.trim().length === 0) {
+      throw new Error('Effect file path is required.')
+    }
+    if (userPath.includes('\0')) {
+      throw new Error('Effect file path must not contain null bytes.')
+    }
+    const trimmed = userPath.trim()
+    const resolved = path.isAbsolute(trimmed)
+      ? path.resolve(trimmed)
+      : path.resolve(this.baseDir, trimmed)
+    if (
+      !this.isPathWithinDir(resolved, this.yargDir) &&
+      !this.isPathWithinDir(resolved, this.audioDir)
+    ) {
+      throw new Error('Effect file path must be under the YARG or audio effect directories.')
+    }
+    return resolved
   }
 
   private resolveInDir(baseDir: string, filename: string): string {

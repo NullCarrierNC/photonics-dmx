@@ -1,5 +1,4 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
-import { useAtomValue } from 'jotai'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import type { Layout } from 'react-resizable-panels'
 import 'reactflow/dist/style.css'
@@ -21,6 +20,7 @@ import EffectRaiserNodeComponent from '../components/cue-editor/components/flow/
 import EffectListenerNodeComponent from '../components/cue-editor/components/flow/EffectListenerNode'
 import NotesNodeComponent from '../components/cue-editor/components/flow/NotesNode'
 import NewFileModal from '../components/cue-editor/components/NewFileModal'
+import ImportCueFileModal from '../components/cue-editor/components/ImportCueFileModal'
 import ToastContainer from '../components/Toast'
 import { useToast } from '../hooks/useToast'
 import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles'
@@ -49,14 +49,16 @@ import type {
   ValueSource,
   YargNodeCueDefinition,
   AudioNodeCueDefinition,
+  NodeCueMode,
+  NodeCueKind,
 } from '../../../photonics-dmx/cues/types/nodeCueTypes'
 import {
   getAudioCueDataPropertyMeta,
   getYargCueDataPropertyMeta,
 } from '../../../photonics-dmx/constants/cueDataPropertyMeta'
-import { readEffectFile, showItemInFolder, getAudioConfig, setAudioEnabled } from '../ipcApi'
-import { liveMonitorEnabledAtom } from '../atoms'
-import { AudioCaptureManager } from '../services/AudioCaptureManager'
+import { readEffectFile, showItemInFolder } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('CueEditor')
 
 type EditorCueOrEffect =
   | YargNodeCueDefinition
@@ -78,7 +80,7 @@ type AvailableVariable = {
 
 function deriveCueDataValidValues(
   logicNodes: LogicNode[] | undefined,
-  mode: 'yarg' | 'audio',
+  mode: NodeCueMode,
 ): Map<string, string[]> {
   const derivedValidValues = new Map<string, string[]>()
 
@@ -86,9 +88,9 @@ function deriveCueDataValidValues(
     if (node.logicType !== 'cue-data' || !node.assignTo || !node.dataProperty) continue
 
     const meta =
-      mode === 'yarg'
-        ? getYargCueDataPropertyMeta(node.dataProperty)
-        : getAudioCueDataPropertyMeta(node.dataProperty)
+      mode === 'audio'
+        ? getAudioCueDataPropertyMeta(node.dataProperty)
+        : getYargCueDataPropertyMeta(node.dataProperty)
 
     if (!meta?.validValues?.length) continue
     derivedValidValues.set(node.assignTo, [...meta.validValues])
@@ -100,7 +102,7 @@ function deriveCueDataValidValues(
 function enrichAvailableVariables(
   variables: AvailableVariable[],
   logicNodes: LogicNode[] | undefined,
-  mode: 'yarg' | 'audio',
+  mode: NodeCueMode,
 ): AvailableVariable[] {
   const derivedValidValues = deriveCueDataValidValues(logicNodes, mode)
   if (derivedValidValues.size === 0) return variables
@@ -168,41 +170,6 @@ const CueEditor: React.FC = () => {
   const loadCueIntoFlowRef = useRef<(cue: EditorCueOrEffect) => void>(() => {})
   const getUpdatedDocumentRef = useRef<() => NodeCueFile | EffectFile | null>(() => null)
   const flowWrapperRef = useRef<HTMLDivElement | null>(null)
-  const liveMonitorEnabled = useAtomValue(liveMonitorEnabledAtom)
-  const liveMonitorManagerRef = useRef<AudioCaptureManager | null>(null)
-
-  useEffect(() => {
-    if (!liveMonitorEnabled) {
-      if (liveMonitorManagerRef.current) {
-        liveMonitorManagerRef.current.stop()
-        liveMonitorManagerRef.current = null
-      }
-      return
-    }
-    let cancelled = false
-    setAudioEnabled(true)
-      .then(() => {
-        if (cancelled) return
-        return getAudioConfig()
-      })
-      .then((config) => {
-        if (cancelled || !config) return
-        const manager = new AudioCaptureManager(config)
-        liveMonitorManagerRef.current = manager
-        return manager.start()
-      })
-      .catch((err) => {
-        if (!cancelled) console.error('Live Monitor: failed to start audio capture', err)
-      })
-    return () => {
-      cancelled = true
-      if (liveMonitorManagerRef.current) {
-        liveMonitorManagerRef.current.stop()
-        liveMonitorManagerRef.current = null
-      }
-      setAudioEnabled(false).catch(() => {})
-    }
-  }, [liveMonitorEnabled])
 
   const loadCueIntoFlowProxy = useCallback(
     (cue: EditorCueOrEffect) => loadCueIntoFlowRef.current(cue),
@@ -212,6 +179,8 @@ const CueEditor: React.FC = () => {
 
   const {
     mode,
+    cueKind,
+    setCueKind,
     activeMode,
     editorMode,
     groupedFiles,
@@ -229,6 +198,7 @@ const CueEditor: React.FC = () => {
     setIsDirty,
     handleModeChange,
     handleCreateNewFile,
+    existingGroupIdsForNewFileModal,
     updateGroupMeta,
     updateCueMetadata,
     updateEffectMetadata,
@@ -243,6 +213,11 @@ const CueEditor: React.FC = () => {
     handleImport,
     handleExport,
     handleReload,
+    pendingImport,
+    clearPendingImport,
+    commitPendingImport,
+    existingGroupIdsForImportModal,
+    existingFilenamesLowerForImportModal,
   } = useCueFiles({
     loadCueIntoFlow: loadCueIntoFlowProxy,
     getUpdatedDocument: getUpdatedDocumentProxy,
@@ -250,22 +225,48 @@ const CueEditor: React.FC = () => {
     onError: (message) => showToast(message, 'error'),
   })
 
-  const cueMode = mode
   const isEffectMode = editorMode === 'effect'
 
-  const handleCueModeChange = useCallback(
-    (mode: 'yarg' | 'audio') => {
-      handleModeChange(isEffectMode ? (mode === 'yarg' ? 'yarg-effect' : 'audio-effect') : mode)
+  const handleCuePlatformChange = useCallback(
+    (p: 'yarg' | 'audio') => {
+      if (isEffectMode) {
+        handleModeChange(p === 'audio' ? 'audio-effect' : 'yarg-effect')
+        return
+      }
+      if (cueKind === 'motion') {
+        handleModeChange(p === 'yarg' ? 'yarg-motion-cue' : 'audio-motion-cue')
+      } else {
+        handleModeChange(p === 'yarg' ? 'yarg-cue' : 'audio-cue')
+      }
     },
-    [handleModeChange, isEffectMode],
+    [handleModeChange, isEffectMode, cueKind],
   )
+
+  const handleCueKindChange = useCallback(
+    (k: NodeCueKind) => {
+      if (isEffectMode) return
+      setCueKind(k)
+      if (k === 'motion') {
+        handleModeChange(mode === 'yarg' ? 'yarg-motion-cue' : 'audio-motion-cue')
+      } else {
+        handleModeChange(mode === 'yarg' ? 'yarg-cue' : 'audio-cue')
+      }
+    },
+    [handleModeChange, isEffectMode, mode, setCueKind],
+  )
+
   const handleEffectToggle = useCallback(
     (isEffect: boolean) => {
-      handleModeChange(
-        isEffect ? (activeMode === 'yarg' ? 'yarg-effect' : 'audio-effect') : activeMode,
-      )
+      if (isEffect) {
+        setCueKind('lighting')
+        const effectKey = mode === 'audio' ? 'audio-effect' : 'yarg-effect'
+        handleModeChange(effectKey)
+      } else {
+        const cueKey = mode === 'yarg' ? 'yarg-cue' : 'audio-cue'
+        handleModeChange(cueKey)
+      }
     },
-    [handleModeChange, activeMode],
+    [handleModeChange, mode, setCueKind],
   )
 
   const {
@@ -301,6 +302,7 @@ const CueEditor: React.FC = () => {
     handlePaneContextMenu,
   } = useCueFlow({
     activeMode,
+    cueKind: editorMode === 'cue' ? cueKind : 'lighting',
     editorMode,
     setIsDirty,
     flowWrapperRef,
@@ -310,6 +312,34 @@ const CueEditor: React.FC = () => {
   useEffect(() => {
     loadCueIntoFlowRef.current = loadCueIntoFlow
   }, [loadCueIntoFlow])
+
+  useEffect(() => {
+    if (editorMode !== 'cue' || !editorDoc || editorDoc.mode !== 'cue') return
+    const cueFile = editorDoc.file as NodeCueFile
+    const matchingCues = cueFile.cues.filter((c) => c.kind === cueKind)
+    if (matchingCues.length === 0) {
+      setEditorDoc(null)
+      setSelectedCueId(null)
+      loadCueIntoFlow(null)
+      setIsDirty(false)
+      return
+    }
+    const selectedOk = selectedCueId != null && matchingCues.some((c) => c.id === selectedCueId)
+    if (!selectedOk) {
+      const first = matchingCues[0]
+      setSelectedCueId(first.id)
+      loadCueIntoFlow(first as EditorCueOrEffect)
+    }
+  }, [
+    cueKind,
+    editorDoc,
+    selectedCueId,
+    editorMode,
+    setEditorDoc,
+    setSelectedCueId,
+    loadCueIntoFlow,
+    setIsDirty,
+  ])
 
   const getUpdatedDocument = useCallback((): NodeCueFile | EffectFile | null => {
     if (editorDoc?.mode === 'effect') {
@@ -345,15 +375,19 @@ const CueEditor: React.FC = () => {
   const errorNodeIds = useErrorNodes(currentGraphId)
 
   const usedCueTypes = useMemo((): Set<string> => {
-    if (!editorDoc || editorDoc.mode !== 'cue' || activeMode !== 'yarg') return new Set()
+    if (!editorDoc || editorDoc.mode !== 'cue' || cueKind !== 'lighting') return new Set()
     const cueFile = editorDoc.file as NodeCueFile
     return new Set(
       cueFile.cues
-        .filter((cue) => cue.id !== selectedCueId)
-        .map((cue) => (cue as YargNodeCueDefinition).cueType)
+        .filter((cue) => cue.id !== selectedCueId && cue.kind === 'lighting')
+        .map((cue) =>
+          cueFile.mode === 'yarg'
+            ? (cue as YargNodeCueDefinition & { kind: 'lighting' }).cueType
+            : (cue as AudioNodeCueDefinition & { kind: 'lighting' }).cueTypeId,
+        )
         .filter(Boolean),
     )
-  }, [editorDoc, selectedCueId, activeMode])
+  }, [editorDoc, selectedCueId, cueKind])
 
   const nodeTypes = useMemo(
     () => ({
@@ -699,7 +733,7 @@ const CueEditor: React.FC = () => {
           const effectDef = effectFileData.effects.find((e) => e.id === effectRef.effectId)
           return effectDef ? ([effectRef.effectId, effectDef] as const) : null
         } catch (error) {
-          console.warn(`Failed to load effect ${effectRef.effectId}:`, error)
+          log.warn(`Failed to load effect ${effectRef.effectId}:`, error)
           return null
         }
       })
@@ -815,16 +849,18 @@ const CueEditor: React.FC = () => {
   const hasFile = !!editorDoc?.path
 
   const newFileLabel = isEffectMode ? 'New Effect File' : 'New Cue File'
-  const importLabel = isEffectMode ? 'Import Effect' : 'Import Cue'
-  const exportLabel = isEffectMode ? 'Export Effect' : 'Export Cue'
+  const importLabel = isEffectMode ? 'Import Effect' : 'Import Cue File'
+  const exportLabel = isEffectMode ? 'Export Effect' : 'Export Cue File'
   const deleteLabel = isEffectMode ? 'Delete Effect File' : 'Delete Cue File'
 
   return (
     <div className="p-4 space-y-4 text-sm h-full flex flex-col">
       <CueEditorToolbar
-        cueMode={cueMode}
+        cuePlatform={mode}
+        cueKind={cueKind}
         isEffectMode={isEffectMode}
-        onCueModeChange={(m) => guardJsonEditorNavigation(() => handleCueModeChange(m))}
+        onCuePlatformChange={(p) => guardJsonEditorNavigation(() => handleCuePlatformChange(p))}
+        onCueKindChange={(k) => guardJsonEditorNavigation(() => handleCueKindChange(k))}
         onEffectToggle={(e) => guardJsonEditorNavigation(() => handleEffectToggle(e))}
         onNewFile={() => setShowNewFileModal(true)}
         onSave={handleSave}
@@ -852,6 +888,7 @@ const CueEditor: React.FC = () => {
           className="flex flex-col gap-4 overflow-hidden min-h-0">
           <CueFileSidebar
             mode={mode}
+            cueKind={cueKind}
             isEffectMode={isEffectMode}
             fileList={fileList}
             effectFileList={effectFiles}
@@ -965,6 +1002,7 @@ const CueEditor: React.FC = () => {
                     setReactFlowInstance={setReactFlowInstance}
                     isValidConnection={isValidConnection}
                     activeMode={activeMode}
+                    activeCueKind={editorMode === 'cue' ? cueKind : 'lighting'}
                     editorMode={editorMode}
                     addEventNode={addEventNode}
                     addActionNode={addActionNode}
@@ -988,6 +1026,7 @@ const CueEditor: React.FC = () => {
           <div className={`h-full ${!hasFile ? 'opacity-50 pointer-events-none' : ''}`}>
             <NodeSidebar
               activeMode={activeMode}
+              cueKind={editorMode === 'cue' ? cueKind : 'lighting'}
               editorMode={editorMode}
               selectedNode={selectedNode}
               selectedActionHasEventParent={selectedActionHasEventParent}
@@ -1065,12 +1104,30 @@ const CueEditor: React.FC = () => {
         isOpen={showNewFileModal}
         isEffectMode={isEffectMode}
         mode={mode}
+        existingGroupIds={existingGroupIdsForNewFileModal}
         onCancel={() => setShowNewFileModal(false)}
         onSave={(metadata) => {
           handleCreateNewFile(metadata)
           setShowNewFileModal(false)
         }}
       />
+
+      {pendingImport !== null && (
+        <ImportCueFileModal
+          key={`${pendingImport.kind}-${pendingImport.sourceBasename}`}
+          isOpen
+          isEffectMode={pendingImport.kind === 'effect'}
+          mode={pendingImport.saveMode}
+          sourceBasename={pendingImport.sourceBasename}
+          defaultGroupId={pendingImport.suggestedGroupId}
+          existingGroupIds={existingGroupIdsForImportModal}
+          existingFilenamesLower={existingFilenamesLowerForImportModal}
+          onCancel={clearPendingImport}
+          onSave={(saveFilename, groupId) => {
+            void commitPendingImport(saveFilename, groupId)
+          }}
+        />
+      )}
 
       {pendingNavigation && (
         <div

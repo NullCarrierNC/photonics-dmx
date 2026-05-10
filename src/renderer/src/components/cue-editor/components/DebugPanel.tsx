@@ -4,6 +4,8 @@ import type { IpcEventMap } from '../../../../../shared/ipcTypes'
 import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import { addIpcListener, removeIpcListener } from '../../../utils/ipcHelpers'
 import { showNodeIdsAtom } from '../../../atoms'
+import { createLogger } from '../../../../../shared/logger'
+const log = createLogger('DebugPanel')
 
 type DebugLogEntry = IpcEventMap['node-cues:debug-log']
 
@@ -91,7 +93,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ className }) => {
     try {
       await navigator.clipboard.writeText(text)
     } catch (error) {
-      console.warn('Failed to copy debug output:', error)
+      log.warn('Failed to copy debug output:', error)
     }
   }, [entries])
 

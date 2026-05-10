@@ -6,8 +6,7 @@
     "src/preload/**/*",
     "src/photonics-dmx/**/*",
     "src/services/**/*",
-    "src/shared/**/*",
-    "src/photonics-dmx/cues/yarg/groups/.ts"
+    "src/shared/**/*"
   ],
   "exclude": ["**/*.test.ts", "**/*.spec.ts", "src/photonics-dmx/tests/**/*"],
   "compilerOptions": {

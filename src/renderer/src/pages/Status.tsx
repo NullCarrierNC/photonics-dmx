@@ -7,7 +7,7 @@ const Status = () => {
 
       <DmxSettingsAccordion startOpen={true} />
 
-      <hr className="mt-8 mb-8 border-gray-200 dark:border-gray-600" />
+      <hr className="mt-8 mb-4 border-gray-200 dark:border-gray-600" />
 
       <div className="flex flex-col">
         <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">DMX Output</h2>
@@ -20,7 +20,18 @@ const Status = () => {
         </p>
       </div>
 
-      <hr className="mt-8 mb-8 border-gray-200 dark:border-gray-600" />
+      <hr className="mt-4 mb-4 border-gray-200 dark:border-gray-600" />
+
+      <div className="flex flex-col">
+        <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">Advanced Mode</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Looking for features like audio support, moving heads, or the Cue Editor?{' '}
+          <em>Enable Advanced Mode</em>
+          &nbsp;in Preferences &gt; Advanced.
+        </p>
+      </div>
+
+      <hr className="mt-4 mb-4 border-gray-200 dark:border-gray-600" />
 
       <div className="flex flex-col">
         <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">Getting Help</h2>

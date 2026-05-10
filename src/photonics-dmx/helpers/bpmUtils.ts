@@ -1,3 +1,6 @@
+import { createLogger } from '../../shared/logger'
+const log = createLogger('bpmUtils')
+
 /**
  * BPM and timing utility functions for YARG cues
  */
@@ -10,7 +13,7 @@
  */
 export function bpmToBps(bpm: number): number {
   if (typeof bpm !== 'number' || bpm <= 0) {
-    console.warn(`Invalid BPM value: ${bpm}. Using default value of 120.`)
+    log.warn(`Invalid BPM value: ${bpm}. Using default value of 120.`)
     return 120 / 60
   }
   return bpm / 60
@@ -24,7 +27,7 @@ export function bpmToBps(bpm: number): number {
  */
 export function getBeatDuration(bpm: number): number {
   if (typeof bpm !== 'number' || bpm <= 0) {
-    console.warn(`Invalid BPM value: ${bpm}. Using default value of 120.`)
+    log.warn(`Invalid BPM value: ${bpm}. Using default value of 120.`)
     bpm = 120
   }
   return 1000 / bpmToBps(bpm)
@@ -59,7 +62,7 @@ export function getHalfBeatDuration(bpm: number): number {
  */
 export function getBeatsDuration(bpm: number, beats: number): number {
   if (typeof beats !== 'number' || beats < 0) {
-    console.warn(`Invalid beats value: ${beats}. Using default value of 1.`)
+    log.warn(`Invalid beats value: ${beats}. Using default value of 1.`)
     beats = 1
   }
   return getBeatDuration(bpm) * beats
@@ -79,11 +82,11 @@ export function getAdjustedDuration(
   adjustment: number = 100,
 ): number {
   if (typeof baseDuration !== 'number' || baseDuration < 0) {
-    console.warn(`Invalid baseDuration value: ${baseDuration}. Using default value of 0.`)
+    log.warn(`Invalid baseDuration value: ${baseDuration}. Using default value of 0.`)
     baseDuration = 0
   }
   if (typeof adjustment !== 'number') {
-    console.warn(`Invalid adjustment value: ${adjustment}. Using default value of 100.`)
+    log.warn(`Invalid adjustment value: ${adjustment}. Using default value of 100.`)
     adjustment = 100
   }
   return baseDuration + (adjustment - bpm)
@@ -98,7 +101,7 @@ export function getAdjustedDuration(
  */
 export function getStrobeTiming(bpm: number, division: number = 8): number {
   if (typeof division !== 'number' || division <= 0) {
-    console.warn(`Invalid division value: ${division}. Using default value of 8.`)
+    log.warn(`Invalid division value: ${division}. Using default value of 8.`)
     division = 8
   }
   return getBeatDuration(bpm) / division

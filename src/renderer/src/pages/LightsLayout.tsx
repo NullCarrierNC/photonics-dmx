@@ -1,47 +1,82 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useLayoutEffect, useRef } from 'react'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  defaultDropAnimationSideEffects,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+  type DropAnimation,
+  type ClientRect,
+} from '@dnd-kit/core'
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import LightLayoutPreview from '../components/LightLayoutPreview'
-import { useAtom } from 'jotai'
+import { useAtom, useSetAtom } from 'jotai'
+import ToastContainer from '../components/Toast'
 
 import {
-  ConfigLightLayoutType,
   ConfigStrobeType,
   DmxLight,
   FixtureTypes,
   DmxRig,
+  LightingConfiguration,
 } from '../../../photonics-dmx/types'
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
-import { v4 as uuidv4 } from 'uuid'
 import {
   activeDmxLightsConfigAtom,
   myValidDmxLightsAtom,
   myDmxLightsAtom,
   dmxRigsAtom,
   activeRigIdAtom,
+  lightsLayoutHasUnsavedChangesAtom,
+  lightingPrefsAtom,
 } from '@renderer/atoms'
-import { getDmxRigs, getDmxRig, saveDmxRig } from '../ipcApi'
-
 import LightsLayoutRigSection from './LightsLayout/LightsLayoutRigSection'
 import LightsLayoutForm from './LightsLayout/LightsLayoutForm'
 import LightChannelAssignmentSection from './LightsLayout/LightChannelAssignmentSection'
 import LightsLayoutIntro from './LightsLayout/LightsLayoutIntro'
-
-const LIGHT_LAYOUTS: ConfigLightLayoutType[] = [
-  { id: 'front', label: 'Front' },
-  { id: 'front-back', label: 'Front and Back' },
-]
+import { saveDmxRig } from '../ipcApi'
+import {
+  LIGHT_LAYOUTS,
+  isTwoRowPrimaryLayout,
+  splitLights,
+  createDmxLightInstance,
+  mapLightsToNewIdsForSave,
+  lightingConfigsEqual,
+} from './LightsLayout/lightsLayoutHelpers'
+import {
+  reassignNonStrobeGroups,
+  mapDedicatedStrobeGroupRows,
+} from './LightsLayout/lightsLayoutState'
+import { reorderWithinGroup, swapAcrossGroups } from './LightsLayout/lightLayoutDnd'
+import { useLightsLayoutRig } from './LightsLayout/useLightsLayoutRig'
+import { useLightsLayoutActiveConfigSync } from './LightsLayout/useLightsLayoutActiveConfigSync'
+import { useToast } from '../hooks/useToast'
+import { useConfirm } from '../hooks/useConfirm'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('LightsLayout')
 
 /**
  * Handles the light layout and channel configuration.
  * @returns React component
  */
 const LightsLayout = () => {
+  const { toasts, showToast, hideToast } = useToast()
+  const confirm = useConfirm()
   const [activeConfig, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom)
   const [myFixtures] = useAtom(myValidDmxLightsAtom)
   const [myFixtureLibrary] = useAtom(myDmxLightsAtom)
   const [rigs, setRigs] = useAtom(dmxRigsAtom)
   const [activeRigId, setActiveRigId] = useAtom(activeRigIdAtom)
-
-  const [rigName, setRigName] = useState<string>('')
+  const [prefs] = useAtom(lightingPrefsAtom)
+  const advancedModeEnabled = prefs.advancedModeEnabled ?? false
+  const setLightsLayoutUnsaved = useSetAtom(lightsLayoutHasUnsavedChangesAtom)
 
   const [selectedCount, setSelectedCount] = useState<number | null>(() => {
     if (activeConfig?.numLights === 0) return null
@@ -52,7 +87,7 @@ const LightsLayout = () => {
   )
 
   const initialAssignedToBack = useMemo(() => {
-    if (activeConfig?.lightLayout.id === 'front-back') {
+    if (activeConfig && isTwoRowPrimaryLayout(activeConfig.lightLayout.id)) {
       return activeConfig.backLights.length > 0 ? activeConfig.backLights.length : 'None'
     }
     return 'None'
@@ -68,119 +103,12 @@ const LightsLayout = () => {
 
   const [highlightedLight, setHighlightedLight] = useState<number | null>(null)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
-  const [isInitializing, setIsInitializing] = useState(true)
+  const [activeDragLight, setActiveDragLight] = useState<DmxLight | null>(null)
+  const overRectRef = useRef<ClientRect | null>(null)
 
-  // Load rigs on mount
-  useEffect(() => {
-    const loadRigs = async () => {
-      try {
-        const loadedRigs = await getDmxRigs()
-        setRigs(loadedRigs || [])
-
-        // If no active rig selected, select first rig or create default
-        if (!activeRigId && loadedRigs.length > 0) {
-          setActiveRigId(loadedRigs[0].id)
-        } else if (loadedRigs.length === 0) {
-          // No rigs exist, create a default one
-          const defaultRig: DmxRig = {
-            id: uuidv4(),
-            name: 'Default Rig',
-            active: true,
-            config: {
-              numLights: 0,
-              lightLayout: { id: 'front', label: 'Front' },
-              strobeType: ConfigStrobeType.None,
-              frontLights: [],
-              backLights: [],
-              strobeLights: [],
-            },
-          }
-          await saveDmxRig(defaultRig)
-          setRigs([defaultRig])
-          setActiveRigId(defaultRig.id)
-        }
-      } catch (error) {
-        console.error('Failed to load DMX rigs:', error)
-      }
-    }
-
-    loadRigs()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: load rigs once
-  }, [setActiveRigId, setRigs])
-
-  // Load active rig configuration when rig selection changes
-  useEffect(() => {
-    const loadRigConfig = async () => {
-      if (!activeRigId) return
-
-      try {
-        const rig = await getDmxRig(activeRigId)
-        if (rig) {
-          setRigName(rig.name)
-          setActiveLightsConfig(rig.config)
-        }
-      } catch (error) {
-        console.error('Failed to load rig configuration:', error)
-      }
-    }
-
-    if (activeRigId) {
-      loadRigConfig()
-    }
-  }, [activeRigId, setActiveLightsConfig])
-
-  // Update all dependent state when activeConfig changes (e.g., when switching rigs)
-  useEffect(() => {
-    if (!activeConfig) return
-
-    // Update selected count
-    setSelectedCount(activeConfig.numLights > 0 ? activeConfig.numLights : null)
-
-    // Update selected layout
-    setSelectedLayout(activeConfig.lightLayout.id)
-
-    // Update selected strobe type
-    setSelectedStrobe(activeConfig.strobeType)
-
-    // Update assigned to back count
-    if (activeConfig.lightLayout.id === 'front-back') {
-      setAssignedToBack(
-        activeConfig.backLights.length > 0 ? activeConfig.backLights.length : 'None',
-      )
-    } else {
-      setAssignedToBack('None')
-    }
-
-    // Update allPrimaryLights from the config
-    const front = activeConfig.frontLights || []
-    const back = activeConfig.backLights || []
-    const strobe = activeConfig.strobeLights || []
-    // Only include strobe lights in the working array when Dedicated; for AllCapable
-    // they are copies of front lights (same IDs) and would cause ghost duplicates when editing.
-    const strobeForMerge =
-      activeConfig.strobeType === ConfigStrobeType.Dedicated
-        ? strobe.map((l) => ({ ...l, group: 'strobe' as const }))
-        : []
-    const merged = [
-      ...front.map((l) => ({ ...l, group: 'front' as const })),
-      ...back.map((l) => ({ ...l, group: 'back' as const })),
-      ...strobeForMerge,
-    ]
-    setAllPrimaryLights(merged)
-
-    // Update dedicated strobe count if applicable
-    if (activeConfig.strobeType === ConfigStrobeType.Dedicated) {
-      setDedicatedStrobeCount(strobe.length > 0 ? strobe.length : 0)
-    } else {
-      setDedicatedStrobeCount(0)
-    }
-  }, [activeConfig])
-
-  //  Single Array for All Primary Lights
   const [allPrimaryLights, setAllPrimaryLights] = useState<DmxLight[]>(() => {
     const front = activeConfig?.frontLights || []
     const back = activeConfig?.backLights || []
-    // Mark each as front/back
     const merged = [
       ...front.map((l) => ({ ...l, group: 'front' as const })),
       ...back.map((l) => ({ ...l, group: 'back' as const })),
@@ -188,70 +116,36 @@ const LightsLayout = () => {
     return merged
   })
 
+  const { rigName, setRigName } = useLightsLayoutRig(
+    activeRigId,
+    setRigs,
+    setActiveRigId,
+    setActiveLightsConfig,
+  )
+
+  useLightsLayoutActiveConfigSync(
+    activeConfig,
+    setSelectedCount,
+    setSelectedLayout,
+    setAssignedToBack,
+    setSelectedStrobe,
+    setDedicatedStrobeCount,
+    setAllPrimaryLights,
+  )
+
   //  Available Layouts
   const availableLayouts = useMemo(() => {
     return LIGHT_LAYOUTS.filter((layout) => {
       if (layout.id === 'front') return true
-      if (layout.id === 'front-back') return (selectedCount || 0) >= 2
+      if (layout.id === 'two-rows' || layout.id === 'front-back' || layout.id === 'stacked')
+        return (selectedCount || 0) >= 2
       return false
     })
   }, [selectedCount])
 
-  //  Helper to Split Front and Back Counts
-  const splitLights = (count: number, assignedBack: number | 'None') => {
-    if (assignedBack === 'None' || assignedBack === 0) {
-      return { frontCount: count, backCount: 0 }
-    }
-    const frontCount = count - assignedBack
-    const backCount = assignedBack
-    return { frontCount, backCount }
-  }
-
-  //  Create a New Light Instance
   const createLightInstance = useCallback(
     (group: 'front' | 'back' | 'strobe') => {
-      const totalExisting = allPrimaryLights.length
-      const templateIndex = totalExisting % myFixtures.length
-      const selectedFixture = myFixtures[templateIndex]
-
-      // Calculate the new master dimmer channel
-      const newMasterDimmer = 1 + totalExisting * 10
-
-      // Calculate channel offsets from the template
-      const templateChannels = selectedFixture.channels
-      const offsets: { [key: string]: number } = {}
-      Object.entries(templateChannels).forEach(([channelName, value]) => {
-        if (channelName !== 'masterDimmer') {
-          offsets[channelName] = value - templateChannels.masterDimmer
-        }
-      })
-
-      // Recalculate all channels using the new master dimmer and template offsets
-      const recalculatedChannels: { [key: string]: number } = {}
-      Object.entries(templateChannels).forEach(([channelName, _]) => {
-        if (channelName === 'masterDimmer') {
-          recalculatedChannels[channelName] = newMasterDimmer
-        } else {
-          recalculatedChannels[channelName] = newMasterDimmer + (offsets[channelName] || 0)
-        }
-      })
-
-      // Cast the channels to the correct type based on the fixture
-      const castChannels = castToChannelType(selectedFixture.fixture, recalculatedChannels)
-
-      return {
-        id: uuidv4(),
-        fixtureId: selectedFixture.id!,
-        position: totalExisting + 1,
-        fixture: selectedFixture.fixture,
-        label: selectedFixture.label,
-        name: selectedFixture.name,
-        isStrobeEnabled: selectedFixture.isStrobeEnabled,
-        group,
-        channels: castChannels,
-        config: selectedFixture.config || undefined, // Include config if present (e.g. MH lights)
-        universe: selectedFixture.universe,
-      }
+      return createDmxLightInstance(group, allPrimaryLights.length, myFixtures)
     },
     [allPrimaryLights.length, myFixtures],
   )
@@ -294,7 +188,7 @@ const LightsLayout = () => {
             const castChannels = castToChannelType(firstFixture.fixture, recalculatedChannels)
 
             updated.push({
-              id: uuidv4(),
+              id: crypto.randomUUID(),
               fixtureId: firstFixture.id!,
               position: i + 1,
               fixture: firstFixture.fixture,
@@ -305,6 +199,7 @@ const LightsLayout = () => {
               channels: castChannels,
               config: firstFixture.config || undefined,
               universe: firstFixture.universe,
+              mount: 'floor' as const,
             })
           }
         }
@@ -329,33 +224,11 @@ const LightsLayout = () => {
     const { frontCount, backCount } = splitLights(selectedCount || 0, assignedToBack)
 
     setAllPrimaryLights((prev) => {
-      // Separate non-strobe lights from dedicated strobe lights.
       const nonStrobeLights = prev.filter((l) => l.group !== 'strobe')
       const strobeLights = prev.filter((l) => l.group === 'strobe')
-
-      // Sort non-strobe lights by their current position.
       const sorted = [...nonStrobeLights].sort((a, b) => a.position - b.position)
-
-      let fCount = frontCount
-      let bCount = backCount
-
-      sorted.forEach((light, idx) => {
-        if (fCount > 0) {
-          light.group = 'front'
-          fCount--
-        } else if (bCount > 0) {
-          light.group = 'back'
-          bCount--
-        } else {
-          // Fallback, though this situation should not occur.
-          light.group = 'front'
-        }
-        // Reassign position among non-strobe lights only.
-        light.position = idx + 1
-      })
-
-      // Return non-strobe lights with their new positions plus the dedicated strobe lights untouched.
-      return [...sorted, ...strobeLights]
+      const reordered = reassignNonStrobeGroups(sorted, frontCount, backCount)
+      return [...reordered, ...strobeLights]
     })
   }, [assignedToBack, selectedLayout, selectedCount])
 
@@ -408,15 +281,7 @@ const LightsLayout = () => {
         })
       }
 
-      // Ensure all strobe lights have proper properties
-      updated.forEach((light) => {
-        if (light.group === 'strobe') {
-          light.fixture = FixtureTypes.STROBE
-          light.isStrobeEnabled = true
-        }
-      })
-
-      return updated
+      return mapDedicatedStrobeGroupRows(updated)
     })
   }, [selectedStrobe, dedicatedStrobeCount, createLightInstance])
 
@@ -429,42 +294,82 @@ const LightsLayout = () => {
     }
   }, [availableLayouts, selectedLayout])
 
-  // Initialize from activeConfig
-  useEffect(() => {
-    if (isInitializing && activeConfig) {
-      setSelectedCount(activeConfig.numLights)
-      setSelectedLayout(activeConfig.lightLayout.id)
-      setSelectedStrobe(activeConfig.strobeType)
-
-      if (activeConfig.lightLayout.id === 'front-back') {
-        setAssignedToBack(
-          activeConfig.backLights.length > 0 ? activeConfig.backLights.length : 'None',
-        )
-      } else {
-        setAssignedToBack('None')
-      }
-      // Set dedicated strobe count from activeConfig (if applicable)
-      if (activeConfig.strobeType === ConfigStrobeType.Dedicated) {
-        setDedicatedStrobeCount(
-          activeConfig.strobeLights && activeConfig.strobeLights.length > 0
-            ? activeConfig.strobeLights.length
-            : 1,
-        )
-      } else {
-        setDedicatedStrobeCount(0)
-      }
-      setIsInitializing(false)
-    }
-  }, [activeConfig, isInitializing])
-
-  // Memos for Front and Back Columns
+  // Memos for Front and Back Columns (sorted by global position for stable grid order after swaps)
   const frontLights = useMemo(() => {
-    return allPrimaryLights.filter((l) => l.group === 'front')
+    return allPrimaryLights
+      .filter((l) => l.group === 'front')
+      .sort((a, b) => a.position - b.position)
   }, [allPrimaryLights])
 
   const backLights = useMemo(() => {
-    return allPrimaryLights.filter((l) => l.group === 'back')
+    return allPrimaryLights
+      .filter((l) => l.group === 'back')
+      .sort((a, b) => a.position - b.position)
   }, [allPrimaryLights])
+
+  /** Working rig config for previews (matches save shape). */
+  const currentLightingConfig = useMemo<LightingConfiguration>(() => {
+    const lightLayout =
+      LIGHT_LAYOUTS.find((layout) => layout.id === selectedLayout) || LIGHT_LAYOUTS[0]
+    const finalFront = allPrimaryLights.filter((l) => l.group === 'front')
+    const finalBack = allPrimaryLights.filter((l) => l.group === 'back')
+    let finalStrobe: DmxLight[] = []
+    if (selectedStrobe === ConfigStrobeType.AllCapable) {
+      finalStrobe = allPrimaryLights.filter((l) => l.isStrobeEnabled && l.group !== 'strobe')
+    } else if (selectedStrobe === ConfigStrobeType.Dedicated) {
+      finalStrobe = allPrimaryLights.filter((l) => l.group === 'strobe')
+    }
+    return {
+      numLights: selectedCount || 0,
+      lightLayout,
+      strobeType: selectedStrobe,
+      frontLights: finalFront,
+      backLights: finalBack,
+      strobeLights: finalStrobe,
+    }
+  }, [allPrimaryLights, selectedCount, selectedLayout, selectedStrobe])
+
+  const savedRig = useMemo(
+    () => (activeRigId ? rigs.find((r) => r.id === activeRigId) : undefined),
+    [rigs, activeRigId],
+  )
+
+  const isDirty = useMemo(() => {
+    if (!savedRig) return false
+    return (
+      !lightingConfigsEqual(currentLightingConfig, savedRig.config) || rigName !== savedRig.name
+    )
+  }, [savedRig, currentLightingConfig, rigName])
+
+  useLayoutEffect(() => {
+    setLightsLayoutUnsaved(isDirty)
+  }, [isDirty, setLightsLayoutUnsaved])
+
+  useLayoutEffect(() => {
+    return () => {
+      setLightsLayoutUnsaved(false)
+    }
+  }, [setLightsLayoutUnsaved])
+
+  useEffect(() => {
+    if (!isDirty) return
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [isDirty])
+
+  const tryConfirmUnsaved = useCallback(async () => {
+    if (!isDirty) return true
+    return confirm({
+      title: 'Unsaved changes',
+      message: 'You have unsaved changes to this layout. Leave without saving?',
+      confirmLabel: 'Discard changes',
+      danger: true,
+    })
+  }, [isDirty, confirm])
 
   // Memo Check for Physical Strobe Fixtures in Source Lights
   const hasPhysicalStrobe = useMemo(() => {
@@ -478,34 +383,78 @@ const LightsLayout = () => {
     )
   }
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      overRectRef.current = null
+      const id = String(event.active.id)
+      setActiveDragLight(allPrimaryLights.find((l) => l.id === id) ?? null)
+    },
+    [allPrimaryLights],
+  )
+
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    overRectRef.current = event.over?.rect ?? null
+  }, [])
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    setActiveDragLight(null)
+    const { active, over } = event
+    overRectRef.current = null
+    if (!over || active.id === over.id) return
+    const sourceGroup = active.data.current?.group as 'front' | 'back' | undefined
+    const targetGroup = over.data.current?.group as 'front' | 'back' | undefined
+    if (!sourceGroup || !targetGroup) return
+    setAllPrimaryLights((prev) =>
+      sourceGroup === targetGroup
+        ? reorderWithinGroup(prev, sourceGroup, String(active.id), String(over.id))
+        : swapAcrossGroups(prev, String(active.id), String(over.id)),
+    )
+  }, [])
+
+  const handleDragCancel = useCallback(() => {
+    setActiveDragLight(null)
+    overRectRef.current = null
+  }, [])
+
+  const dropAnimation: DropAnimation = useMemo(
+    () => ({
+      duration: 220,
+      easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+      keyframes: ({ active, transform }) => {
+        const target = overRectRef.current
+        const source = active.rect
+        if (!target || !source) {
+          return [
+            { transform: CSS.Transform.toString(transform.initial) },
+            { transform: CSS.Transform.toString(transform.final) },
+          ]
+        }
+        const dx = target.left - source.left
+        const dy = target.top - source.top
+        return [
+          { transform: CSS.Transform.toString(transform.initial) },
+          { transform: `translate3d(${dx}px, ${dy}px, 0)` },
+        ]
+      },
+      sideEffects: defaultDropAnimationSideEffects({
+        styles: { active: { opacity: '0' } },
+      }),
+    }),
+    [],
+  )
+
   const handleLightClick = (lightPosition: number) => {
     setHighlightedLight(lightPosition)
   }
 
-  // Save Logic
-  /**
-   * This helper ensures that if the same original light appears in multiple arrays
-   * (e.g., frontLights + strobeLights), it keeps the same ID.
-   */
-  const mapLightsToNewIds = (lights: DmxLight[], idMap: Record<string, string>) => {
-    return lights.map((light) => {
-      // Fallback to a placeholder if the light’s ID is null/undefined (first use)
-      const originalId = light.id ?? uuidv4()
-
-      if (!idMap[originalId]) {
-        idMap[originalId] = uuidv4()
-      }
-
-      return {
-        ...light,
-        id: idMap[originalId],
-      }
-    })
-  }
-
   const handleSaveChanges = async () => {
     if (!activeRigId) {
-      console.error('No rig selected')
+      log.error('No rig selected')
       return
     }
 
@@ -526,41 +475,46 @@ const LightsLayout = () => {
 
     const idMap: Record<string, string> = {}
 
-    const frontWithNewIds = mapLightsToNewIds(finalFront, idMap)
-    const backWithNewIds = mapLightsToNewIds(finalBack, idMap)
-    const strobeWithNewIds = mapLightsToNewIds(finalStrobe, idMap)
+    const frontWithNewIds = mapLightsToNewIdsForSave(finalFront, idMap)
+    const backWithNewIds = mapLightsToNewIdsForSave(finalBack, idMap)
+    const strobeWithNewIds = mapLightsToNewIdsForSave(finalStrobe, idMap)
 
-    const updatedConfig = {
+    const updatedConfig: LightingConfiguration = {
       numLights: selectedCount || 0,
-      lightLayout:
-        availableLayouts.find((layout) => layout.id === selectedLayout) || LIGHT_LAYOUTS[0],
+      lightLayout: LIGHT_LAYOUTS.find((layout) => layout.id === selectedLayout) || LIGHT_LAYOUTS[0],
       strobeType: selectedStrobe,
       frontLights: frontWithNewIds,
       backLights: backWithNewIds,
       strobeLights: strobeWithNewIds,
     }
 
-    setActiveLightsConfig(updatedConfig)
+    const currentRig = rigs.find((r) => r.id === activeRigId)
+    if (!currentRig) {
+      showToast('No rig selected to save.', 'error', 4000)
+      return
+    }
 
-    // Save to the selected rig
+    const updatedRig: DmxRig = {
+      ...currentRig,
+      name: rigName,
+      config: updatedConfig,
+    }
+
     try {
-      const currentRig = rigs.find((r) => r.id === activeRigId)
-      if (currentRig) {
-        const updatedRig: DmxRig = {
-          ...currentRig,
-          name: rigName,
-          config: updatedConfig,
-        }
-        await saveDmxRig(updatedRig)
-
-        // Update local rigs state
-        setRigs((prev) => prev.map((r) => (r.id === activeRigId ? updatedRig : r)))
+      const result = await saveDmxRig(updatedRig)
+      if (!result.success) {
+        showToast(result.error, 'error', 5000)
+        return
       }
+
+      setActiveLightsConfig(updatedConfig)
+      setRigs((prev) => prev.map((r) => (r.id === activeRigId ? updatedRig : r)))
 
       setShowSuccessMessage(true)
       setTimeout(() => setShowSuccessMessage(false), 3000)
     } catch (error) {
-      console.error('Failed to save rig:', error)
+      log.error('Failed to save rig:', error)
+      showToast('Failed to save rig.', 'error', 5000)
     }
   }
 
@@ -577,6 +531,7 @@ const LightsLayout = () => {
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
+      <ToastContainer toasts={toasts} onDismiss={hideToast} />
       <LightsLayoutIntro />
 
       {/* Check if any lights are configured at all */}
@@ -592,14 +547,17 @@ const LightsLayout = () => {
         </div>
       ) : (
         <>
-          <LightsLayoutRigSection
-            rigs={rigs}
-            activeRigId={activeRigId}
-            setActiveRigId={setActiveRigId}
-            rigName={rigName}
-            setRigName={setRigName}
-            onRigsChange={setRigs}
-          />
+          {advancedModeEnabled && (
+            <LightsLayoutRigSection
+              rigs={rigs}
+              activeRigId={activeRigId}
+              setActiveRigId={setActiveRigId}
+              rigName={rigName}
+              setRigName={setRigName}
+              onRigsChange={setRigs}
+              onBeforeDiscardingUnsaved={tryConfirmUnsaved}
+            />
+          )}
 
           <LightsLayoutForm
             selectedCount={selectedCount}
@@ -620,48 +578,101 @@ const LightsLayout = () => {
 
           {/* Light Layout Preview */}
           <LightLayoutPreview
+            layoutId={selectedLayout}
             frontCount={frontCount}
             backCount={backCount}
             highlightedLight={highlightedLight}
             selectedStrobe={selectedStrobe}
           />
 
-          <div className="mt-8 space-y-8">
-            <LightChannelAssignmentSection
-              title={rigName ? `${rigName} - Front Lights` : 'Front Lights'}
-              lights={frontLights}
-              myLights={myFixtures}
-              onLightChange={handleLightChange}
-              highlightedLight={highlightedLight}
-              onLightClick={handleLightClick}
-              lightLabel={(light, index) => `Front ${index + 1} (Position ${light.position})`}
-            />
-
-            {selectedLayout === 'front-back' && backLights.length > 0 && (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}>
+            <div className="mt-8 space-y-8">
               <LightChannelAssignmentSection
-                title={rigName ? `${rigName} - Back Lights` : 'Back Lights'}
-                lights={backLights}
+                title={
+                  selectedLayout === 'stacked'
+                    ? rigName
+                      ? `${rigName} - Top Lights`
+                      : 'Top Lights'
+                    : rigName
+                      ? `${rigName} - Front Lights`
+                      : 'Front Lights'
+                }
+                lights={frontLights}
                 myLights={myFixtures}
+                rigId={activeRigId}
+                lightingConfig={currentLightingConfig}
                 onLightChange={handleLightChange}
                 highlightedLight={highlightedLight}
                 onLightClick={handleLightClick}
-                lightLabel={(light, index) => `Back ${index + 1} (Position ${light.position})`}
+                lightLabel={(light, index) =>
+                  selectedLayout === 'stacked'
+                    ? `Top ${index + 1} (Position ${light.position})`
+                    : `Front ${index + 1} (Position ${light.position})`
+                }
+                isStacked={selectedLayout === 'stacked'}
+                sectionGroup="front"
               />
-            )}
 
-            {selectedStrobe === ConfigStrobeType.Dedicated &&
-              allPrimaryLights.filter((l) => l.group === 'strobe').length > 0 && (
+              {isTwoRowPrimaryLayout(selectedLayout) && backLights.length > 0 && (
                 <LightChannelAssignmentSection
-                  title="Dedicated Strobe Lights"
-                  lights={allPrimaryLights.filter((l) => l.group === 'strobe')}
+                  title={
+                    selectedLayout === 'stacked'
+                      ? rigName
+                        ? `${rigName} - Bottom Lights`
+                        : 'Bottom Lights'
+                      : rigName
+                        ? `${rigName} - Back Lights`
+                        : 'Back Lights'
+                  }
+                  lights={backLights}
                   myLights={myFixtures}
+                  rigId={activeRigId}
+                  lightingConfig={currentLightingConfig}
                   onLightChange={handleLightChange}
                   highlightedLight={highlightedLight}
                   onLightClick={handleLightClick}
-                  lightLabel={(light) => `Dedicated Strobe (Position ${light.position})`}
+                  lightLabel={(light, index) =>
+                    selectedLayout === 'stacked'
+                      ? `Bottom ${index + 1} (Position ${light.position})`
+                      : `Back ${index + 1} (Position ${light.position})`
+                  }
+                  isStacked={selectedLayout === 'stacked'}
+                  sectionGroup="back"
                 />
               )}
-          </div>
+
+              {selectedStrobe === ConfigStrobeType.Dedicated &&
+                allPrimaryLights.filter((l) => l.group === 'strobe').length > 0 && (
+                  <LightChannelAssignmentSection
+                    title="Dedicated Strobe Lights"
+                    lights={allPrimaryLights.filter((l) => l.group === 'strobe')}
+                    myLights={myFixtures}
+                    rigId={activeRigId}
+                    lightingConfig={currentLightingConfig}
+                    onLightChange={handleLightChange}
+                    highlightedLight={highlightedLight}
+                    onLightClick={handleLightClick}
+                    lightLabel={(light) => `Dedicated Strobe (Position ${light.position})`}
+                    isStacked={selectedLayout === 'stacked'}
+                  />
+                )}
+            </div>
+            <DragOverlay dropAnimation={dropAnimation}>
+              {activeDragLight ? (
+                <div className="max-w-[440px] rounded-lg shadow-2xl border-2 border-blue-500 bg-gray-300 dark:bg-[#303548] p-4 pointer-events-none">
+                  <div className="text-center font-semibold text-gray-800 dark:text-gray-200">
+                    {activeDragLight.label} (Position {activeDragLight.position})
+                  </div>
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
 
           {/* Success Message */}
           {showSuccessMessage && (

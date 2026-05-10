@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "cueVersion": 1,
   "mode": "yarg",
   "group": {
     "id": "yarg-stagekit-effects",
@@ -214,7 +215,10 @@
                 "source": "variable",
                 "name": "aStepsUntil"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -282,7 +286,10 @@
                 "source": "literal",
                 "value": 1
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -350,7 +357,10 @@
                 "source": "variable",
                 "name": "aStepsAfter"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -418,7 +428,10 @@
                 "source": "variable",
                 "name": "bStepsUntil"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -486,7 +499,10 @@
                 "source": "literal",
                 "value": 1
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -554,7 +570,10 @@
                 "source": "variable",
                 "name": "bStepsAfter"
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1

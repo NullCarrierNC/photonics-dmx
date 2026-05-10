@@ -3,6 +3,8 @@ import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTy
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getAudioConfig, saveAudioConfig } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('AudioLinearResponseToggle')
 
 const AudioLinearResponseToggle: React.FC = () => {
   const [linearResponse, setLinearResponse] = useState(true)
@@ -15,7 +17,7 @@ const AudioLinearResponseToggle: React.FC = () => {
         const config = await getAudioConfig()
         setLinearResponse(config?.linearResponse !== false)
       } catch (error) {
-        console.error('Failed to load audio linear response setting:', error)
+        log.error('Failed to load audio linear response setting:', error)
       } finally {
         setIsLoading(false)
       }
@@ -44,12 +46,12 @@ const AudioLinearResponseToggle: React.FC = () => {
       const result = await saveAudioConfig({ linearResponse: nextValue })
 
       if (!result?.success) {
-        console.error('Failed to save linear response setting:', result?.error)
+        log.error('Failed to save linear response setting:', result?.error)
         const config = await getAudioConfig()
         setLinearResponse(config?.linearResponse !== false)
       }
     } catch (error) {
-      console.error('Failed to save linear response setting:', error)
+      log.error('Failed to save linear response setting:', error)
       const config = await getAudioConfig()
       setLinearResponse(config?.linearResponse !== false)
     } finally {

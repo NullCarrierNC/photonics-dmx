@@ -4,6 +4,8 @@ import { CueData } from '../../photonics-dmx/cues/types/cueTypes'
 import { sendToAllWindows } from '../utils/windowUtils'
 import { ipcError } from './ipcResult'
 import { CUE, RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('cue-handlers')
 
 /**
  * Set up cue-related IPC handlers
@@ -34,7 +36,7 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
       await controllerManager.disableYarg()
       return { success: true }
     } catch (error) {
-      console.error('Error disabling YARG:', error)
+      log.error('Error disabling YARG:', error)
       return ipcError(error)
     }
   })
@@ -45,14 +47,9 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
       await controllerManager.disableRb3()
       return { success: true }
     } catch (error) {
-      console.error('Error disabling RB3:', error)
+      log.error('Error disabling RB3:', error)
       return ipcError(error)
     }
-  })
-
-  // RB3 mode switching
-  ipcMain.on(CUE.RB3E_SWITCH_MODE, async (_, mode: 'direct' | 'cueBased') => {
-    await controllerManager.switchRb3Mode(mode)
   })
 
   // Get RB3 current mode
@@ -108,7 +105,7 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
           cueHandler.setEffectDebouncePeriod(debounceTime)
         }
       } catch (err) {
-        console.error('Failed to save effect debounce preference:', err)
+        log.error('Failed to save effect debounce preference:', err)
       }
     })()
   })
@@ -118,7 +115,7 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
     void controllerManager
       .getConfig()
       .setPreference('complex', style === 'complex')
-      .catch((err) => console.error('Failed to save cue style preference:', err))
+      .catch((err) => log.error('Failed to save cue style preference:', err))
   })
 
   // Get YARG enabled state

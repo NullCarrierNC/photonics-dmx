@@ -1,4 +1,4 @@
-import { Effect, EffectTransition, RGBIO, TrackedLight } from '../../types'
+import { Effect, EffectTransition, normalizeFixtureConfig, RGBIO, TrackedLight } from '../../types'
 import {
   IEffectManager,
   IEffectTransformer,
@@ -9,6 +9,8 @@ import {
 } from './interfaces'
 import { LightTransitionController } from './LightTransitionController'
 import { performance } from 'perf_hooks'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('EffectManager')
 
 /**
  * Tracks the lifecycle of a persistent effect that should restart only after
@@ -35,9 +37,13 @@ type PersistentEffectRun = {
  * - Coordinates with SystemEffects for blackout handling
  * - Tracks layer-specific effect history
  *
- * Provides four key methods for effects:
+ * Provides five key methods for effects:
  * - addEffect: Adds an effect, replacing existing ones (if on same layer) or queueing
  * - setEffect: Like addEffect but clears all effects on all layers first
+ * - replaceEffect: Per-(layer, light) replace; cancels active/queued for the same
+ *   targets and starts the new transitions immediately, easing from current state.
+ *   Use for state-target effects like non-blocking set-position where the latest
+ *   submission must win.
  * - addEffectUnblockedName: Discards if effect with same name exists anywhere
  * - setEffectUnblockedName: Like addEffectUnblockedName but cancels existing effects
  */
@@ -174,12 +180,12 @@ export class EffectManager implements IEffectManager {
    */
   public addEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
     if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      console.warn('Add cancelling blackout')
+      log.warn('Add cancelling blackout')
       this.systemEffects.cancelBlackout()
     }
 
     if (effect.transitions.length === 0) {
-      console.warn(`Effect "${name}" has no transitions. Ignoring.`)
+      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
       return
     }
 
@@ -207,6 +213,78 @@ export class EffectManager implements IEffectManager {
   }
 
   /**
+   * Per-(layer, light) replace. For each light targeted by the new effect on each
+   * layer it touches, cancels any active and queued effect on that slot (regardless
+   * of whether the active name matches) and starts the new transitions immediately.
+   *
+   * Mid-transition takeover is graceful: `startEffect` seeds each new transition
+   * from the light's current state, so the easing continues smoothly from wherever
+   * the light is now.
+   *
+   * Effects on other layers and on lights NOT targeted by the new effect are
+   * untouched.
+   *
+   * Intended for state-target effects (e.g. non-blocking `set-position`) whose
+   * resolved configuration changes every trigger and where queueing the new
+   * transition behind a stale in-flight one would cause desynchronised motion.
+   */
+  public replaceEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
+    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
+      log.warn('Replace cancelling blackout')
+      this.systemEffects.cancelBlackout()
+    }
+
+    if (effect.transitions.length === 0) {
+      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
+      return
+    }
+
+    const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(
+      effect.transitions,
+    )
+
+    const hasLayer0 = transitionsByLayerAndLight.has(0)
+    if (hasLayer0) {
+      this._lastCalled0LayerEffect = name
+    }
+
+    const persistentRunId = isPersistent
+      ? this.registerPersistentRun(name, effect, transitionsByLayerAndLight)
+      : undefined
+
+    transitionsByLayerAndLight.forEach((layerMap, layer) => {
+      layerMap.forEach((transitionsForLight, lightId) => {
+        const targetLight = transitionsForLight[0].lights.find((l) => l.id === lightId)
+        if (!targetLight) {
+          log.warn(
+            `No tracked light found for ${lightId} on layer ${layer} when replacing effect ${name}`,
+          )
+          return
+        }
+
+        const activeEffect = this.layerManager.getActiveEffect(layer, lightId)
+        if (activeEffect) {
+          if (activeEffect.effectRunId) {
+            this.cancelPersistentRun(activeEffect.effectRunId)
+          }
+          this.layerManager.removeActiveEffect(layer, lightId)
+        }
+        this.layerManager.removeQueuedEffect(layer, lightId)
+
+        this.startEffect(
+          name,
+          effect,
+          [targetLight],
+          layer,
+          transitionsForLight,
+          isPersistent,
+          persistentRunId,
+        )
+      })
+    })
+  }
+
+  /**
    * Adds a new effect and clears all other effects that were running.
    * Used for significant changes in scenes. E.g., from Menu to in-game.
    *
@@ -216,12 +294,12 @@ export class EffectManager implements IEffectManager {
    */
   public setEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
     if (this.systemEffects.isBlackoutActive()) {
-      console.warn('Cancelling blackout for setEffect')
+      log.warn('Cancelling blackout for setEffect')
       this.systemEffects.cancelBlackout()
     }
 
     if (effect.transitions.length === 0) {
-      console.warn(`Effect "${name}" has no transitions. Ignoring.`)
+      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
       return
     }
 
@@ -264,12 +342,12 @@ export class EffectManager implements IEffectManager {
     isPersistent: boolean = false,
   ): boolean {
     if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      console.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
+      log.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
       return false
     }
 
     if (effect.transitions.length === 0) {
-      console.warn(`Effect "${name}" has no transitions. Ignoring.`)
+      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
       return false
     }
 
@@ -363,7 +441,7 @@ export class EffectManager implements IEffectManager {
       layerMap.forEach((transitionsForLight, lightId) => {
         const targetLight = transitionsForLight[0].lights.find((l) => l.id === lightId)
         if (!targetLight) {
-          console.warn(
+          log.warn(
             `No tracked light found for ${lightId} on layer ${layer} when applying effect ${name}`,
           )
           return
@@ -423,12 +501,12 @@ export class EffectManager implements IEffectManager {
     isPersistent: boolean = false,
   ): boolean {
     if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      console.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
+      log.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
       return false
     }
 
     if (effect.transitions.length === 0) {
-      console.warn(`Effect "${name}" has no transitions. Ignoring.`)
+      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
       return false
     }
 
@@ -439,7 +517,7 @@ export class EffectManager implements IEffectManager {
     )
 
     if (effectAlreadyRunning) {
-      console.warn(
+      log.warn(
         `Not setting effect "${name}" because an effect with the same name is already running. Preventing timing issues.`,
       )
       return false
@@ -497,7 +575,7 @@ export class EffectManager implements IEffectManager {
   public removeAllEffects(): void {
     // Cancel any active blackouts first
     if (this.systemEffects.isBlackoutActive()) {
-      console.warn('Cancelling blackout for removeAllEffects')
+      log.warn('Cancelling blackout for removeAllEffects')
       this.systemEffects.cancelBlackout()
     }
 
@@ -613,11 +691,12 @@ export class EffectManager implements IEffectManager {
         // Prepare the color with pan/tilt defaults if needed
         const color = { ...firstTransition.transform.color }
         if (light.config) {
+          const cfg = normalizeFixtureConfig(light.config)
           if (color.pan === undefined) {
-            color.pan = light.config.panHome
+            color.pan = cfg.panHome
           }
           if (color.tilt === undefined) {
-            color.tilt = light.config.tiltHome
+            color.tilt = cfg.tiltHome
           }
         }
 
@@ -855,12 +934,12 @@ export class EffectManager implements IEffectManager {
    */
   public setState(lights: TrackedLight[], color: RGBIO, time: number): void {
     if (lights.length === 0) {
-      console.warn('No lights provided to setState')
+      log.warn('No lights provided to setState')
       return
     }
 
     if (this.systemEffects.isBlackoutActive()) {
-      console.warn('Cancelling blackout to set light states')
+      log.warn('Cancelling blackout to set light states')
       this.systemEffects.cancelBlackout()
     }
 

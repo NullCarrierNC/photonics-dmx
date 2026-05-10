@@ -6,6 +6,12 @@ import { AudioLightingData, AudioConfig } from '../../listeners/Audio/AudioTypes
  */
 export type AudioCueType = string
 
+/** Registered audio motion program reference (manual picker / IPC). */
+export type AudioMotionCueRef = { groupId: string; cueId: string }
+
+/** YARG motion program selection (same shape as audio motion ref). */
+export type YargMotionCueRef = { groupId: string; cueId: string }
+
 /**
  * Context injected when execution was started from an AudioTriggerNode output path.
  * Used by cue-data getter nodes to read trigger-specific values.

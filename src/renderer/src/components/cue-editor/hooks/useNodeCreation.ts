@@ -5,6 +5,7 @@ import {
   type EventListenerNode,
   type LogicNode,
   type MathLogicNode,
+  type NodeCueKind,
   type NodeCueMode,
   type NodeEffectType,
   type VariableLogicNode,
@@ -34,10 +35,17 @@ type UseNodeCreationParams = {
   nodes: Array<{ id: string; position: { x: number; y: number } }>
   setNodes: React.Dispatch<React.SetStateAction<EditorNode[]>>
   activeMode: NodeCueMode
+  cueKind: NodeCueKind
   setIsDirty: (dirty: boolean) => void
 }
 
-const useNodeCreation = ({ nodes, setNodes, activeMode, setIsDirty }: UseNodeCreationParams) => {
+const useNodeCreation = ({
+  nodes,
+  setNodes,
+  activeMode,
+  cueKind,
+  setIsDirty,
+}: UseNodeCreationParams) => {
   const findAvailablePosition = useCallback(
     (
       preferredX: number,
@@ -304,7 +312,7 @@ const useNodeCreation = ({ nodes, setNodes, activeMode, setIsDirty }: UseNodeCre
     ) => {
       const nodeMode = activeMode
       const newEventId = `event-${createId()}`
-      const defaultOption = option ?? getDefaultEventOption(nodeMode)
+      const defaultOption = option ?? getDefaultEventOption(nodeMode, cueKind)
       const nodeWidth = 150
       const nodeHeight = 80
       const centeredPosition = position
@@ -344,7 +352,7 @@ const useNodeCreation = ({ nodes, setNodes, activeMode, setIsDirty }: UseNodeCre
       setNodes((nds) => [...nds, newNode])
       setIsDirty(true)
     },
-    [activeMode, findAvailablePosition, setIsDirty, setNodes],
+    [activeMode, cueKind, findAvailablePosition, setIsDirty, setNodes],
   )
 
   const addActionNode = useCallback(

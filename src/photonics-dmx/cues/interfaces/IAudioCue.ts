@@ -18,7 +18,7 @@ export interface IAudioCue {
   /** Display name from the cue file (editor Cue Name) */
   name: string
 
-  /** Primary = base look; secondary/strobe = overlay. Strobe is for strobe-only cues (Game Mode filters these from primary rotation). */
+  /** Primary = base look; secondary/strobe = overlay (lighting cues only). Audio motion uses `AudioMotionNodeCue` and omits `style`. */
   style?: 'primary' | 'secondary' | 'strobe'
 
   /**
@@ -42,9 +42,4 @@ export interface IAudioCue {
    * Called when the cue is paused
    */
   onPause?(): void
-
-  /**
-   * Called when the cue is completely removed/destroyed
-   */
-  onDestroy?(): void
 }

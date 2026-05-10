@@ -9,6 +9,9 @@ import type {
   IpcRendererSendChannel,
   IpcRendererSendMap,
 } from '../shared/ipcTypes'
+import { createLogger } from '../shared/logger'
+
+const log = createLogger('preload')
 
 const api = {
   /**
@@ -60,9 +63,10 @@ if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('api', api)
   } catch (error) {
-    console.error(error)
+    log.error('Failed to expose preload API', error)
   }
 } else {
-  // @ts-ignore (define in dts)
-  window.api = api
+  // Preload not context-isolated; `tsconfig.node` may not apply `index.d.ts` global merge to this file
+  const w = window as typeof window & { api: typeof api }
+  w.api = api
 }

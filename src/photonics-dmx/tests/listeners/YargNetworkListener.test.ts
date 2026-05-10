@@ -5,56 +5,61 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { YargNetworkListener } from '../../listeners/YARG/YargNetworkListener'
-import { BaseCueHandler } from '../../cueHandlers/BaseCueHandler'
+import { YargNetworkListener, YargCueRuntime } from '../../listeners/YARG/YargNetworkListener'
 import { CueData, CueType, defaultCueData } from '../../cues/types/cueTypes'
-import { DmxLightManager } from '../../controllers/DmxLightManager'
-import { ILightingController } from '../../controllers/sequencer/interfaces'
-import { createMockLightingConfig } from '../helpers/testFixtures'
 
-class MockCueHandler extends BaseCueHandler {
+const YARG_PACKET_HEADER_LE = 0x59415247 // 'YARG'
+
+/** Total bytes through singalong (before optional camera-cut extension). */
+const YARG_MIN_FULL_PACKET_LEN = 47
+
+function deserializePacket(listener: YargNetworkListener, buffer: Buffer): void {
+  ;(listener as unknown as { deserializePacket(buf: Buffer): void }).deserializePacket(buffer)
+}
+
+function buildYargShutdownPacket(): Buffer {
+  const buf = Buffer.alloc(5)
+  buf.writeUInt32LE(YARG_PACKET_HEADER_LE, 0)
+  buf.writeUInt8(0, 4)
+  return buf
+}
+
+/** Header + datagram version byte only (padding ignored until length check). */
+function buildYargFullSizedPacket(datagramVersion: number): Buffer {
+  const buf = Buffer.alloc(YARG_MIN_FULL_PACKET_LEN)
+  buf.writeUInt32LE(YARG_PACKET_HEADER_LE, 0)
+  buf.writeUInt8(datagramVersion, 4)
+  return buf
+}
+
+class YargNetworkListenerMinV2 extends YargNetworkListener {
+  protected override getMinSupportedDatagramVersion(): number {
+    return 2
+  }
+}
+
+class MockCueHandler implements YargCueRuntime {
+  public notifySongStart = jest.fn()
+  public notifySongEnd = jest.fn()
+  public handleBeat = jest.fn()
+  public handleMeasure = jest.fn()
+  public handleKeyframeFirst = jest.fn()
+  public handleKeyframeNext = jest.fn()
+  public handleKeyframePrevious = jest.fn()
   public handleCue = jest.fn(async (_cueType: CueType, _parameters: CueData): Promise<void> => {})
-  public handleCueNoCue = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueDischord = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueChorus = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueDefault = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueStomp = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueVerse = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueMenu = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueScore = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueBigRockEnding = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueBlackout_Fast = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueBlackout_Slow = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueBlackout_Spotlight = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueCool_Manual = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueCool_Automatic = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueWarm_Manual = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueWarm_Automatic = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueFlare_Fast = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueFlare_Slow = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueFrenzy = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueIntro = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueHarmony = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueSilhouettes = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueSilhouettes_Spotlight = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueSearchlights = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueStrobe_Fastest = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueStrobe_Fast = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueStrobe_Medium = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueStrobe_Slow = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueStrobe_Off = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueSweep = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueKeyframe_First = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueKeyframe_Next = jest.fn(async (_: CueData): Promise<void> => {})
-  protected handleCueKeyframe_Previous = jest.fn(async (_: CueData): Promise<void> => {})
+  public handleDrumNote = jest.fn()
+  public handleGuitarNote = jest.fn()
+  public handleBassNote = jest.fn()
+  public handleKeysNote = jest.fn()
 }
 
 const mockBind = jest.fn((_port: number, callback: () => void) => {
   callback()
 })
-const mockClose = jest.fn((callback?: () => void) => {
+const defaultMockClose = (callback?: () => void) => {
   if (callback) callback()
-})
+}
+const mockClose = jest.fn(defaultMockClose)
 const mockOn = jest.fn()
 
 jest.mock('dgram', () => ({
@@ -66,28 +71,18 @@ jest.mock('dgram', () => ({
 }))
 
 describe('YargNetworkListener', () => {
-  let lightManager: DmxLightManager
-  let mockSequencer: ILightingController
   let cueHandler: MockCueHandler
   let listener: YargNetworkListener
 
   beforeEach(() => {
     jest.clearAllMocks()
-    const config = createMockLightingConfig()
-    lightManager = new DmxLightManager(config)
-    mockSequencer = {
-      addEffect: jest.fn(),
-      removeEffect: jest.fn(),
-      onBeat: jest.fn(),
-      onMeasure: jest.fn(),
-    } as unknown as ILightingController
-    cueHandler = new MockCueHandler(lightManager, mockSequencer)
+    cueHandler = new MockCueHandler()
     listener = new YargNetworkListener(cueHandler)
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     if (listener) {
-      listener.shutdown()
+      await listener.shutdown()
     }
   })
 
@@ -95,23 +90,51 @@ describe('YargNetworkListener', () => {
     expect(listener).toBeDefined()
   })
 
-  it('start binds the UDP socket and sets listening state', () => {
-    listener.start()
+  it('start binds the UDP socket and sets listening state', async () => {
+    await listener.start()
     expect(mockBind).toHaveBeenCalledWith(36107, expect.any(Function))
-    listener.stop()
+    await listener.stop()
     expect(mockClose).toHaveBeenCalled()
   })
 
-  it('stop closes the socket', () => {
-    listener.start()
-    listener.stop()
+  it('stop closes the socket', async () => {
+    await listener.start()
+    await listener.stop()
     expect(mockClose).toHaveBeenCalled()
   })
 
-  it('shutdown calls stop', () => {
-    listener.start()
-    listener.shutdown()
+  it('shutdown calls stop', async () => {
+    await listener.start()
+    await listener.shutdown()
     expect(mockClose).toHaveBeenCalled()
+  })
+
+  it('stop() Promise resolves only when the dgram close callback runs', async () => {
+    const pending: Array<() => void> = []
+    mockClose.mockImplementationOnce((cb?: () => void) => {
+      if (cb) pending.push(() => cb())
+    })
+    await listener.start()
+    const stopP = listener.stop()
+    let resolved = false
+    void stopP.then(() => {
+      resolved = true
+    })
+    await Promise.resolve()
+    expect(resolved).toBe(false)
+    expect(pending).toHaveLength(1)
+    pending[0]!()
+    await stopP
+    expect(resolved).toBe(true)
+    mockClose.mockImplementation(defaultMockClose)
+  })
+
+  it('second start after await stop re-binds the UDP port', async () => {
+    await listener.start()
+    await listener.stop()
+    mockBind.mockClear()
+    await listener.start()
+    expect(mockBind).toHaveBeenCalledWith(36107, expect.any(Function))
   })
 
   describe('passive strobe shutdown', () => {
@@ -202,6 +225,43 @@ describe('YargNetworkListener', () => {
       expect(notifySongEndSpy).toHaveBeenCalledTimes(1)
 
       notifySongEndSpy.mockRestore()
+    })
+  })
+
+  describe('datagram version handling', () => {
+    it('emits yarg-error with shutdown message when datagramVersion is 0', () => {
+      const onError = jest.fn()
+      listener.on('yarg-error', onError)
+
+      deserializePacket(listener, buildYargShutdownPacket())
+
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError).toHaveBeenCalledWith({
+        type: 'yarg-shutdown',
+        message: 'YARG Has Shutdown',
+        datagramVersion: 0,
+      })
+      expect(cueHandler.handleCue).not.toHaveBeenCalled()
+    })
+
+    it('emits datagram-version-mismatch for non-zero versions below minimum supported', () => {
+      const strictListener = new YargNetworkListenerMinV2(cueHandler)
+      const onError = jest.fn()
+      strictListener.on('yarg-error', onError)
+
+      deserializePacket(strictListener, buildYargFullSizedPacket(1))
+
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'datagram-version-mismatch',
+          datagramVersion: 1,
+          message: expect.stringContaining('YARG Datagram Version too old'),
+        }),
+      )
+      expect(cueHandler.handleCue).not.toHaveBeenCalled()
+
+      void strictListener.shutdown()
     })
   })
 

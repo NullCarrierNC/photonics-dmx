@@ -19,21 +19,29 @@ import { AudioCueRegistry, AudioCueGroup } from '../../registries/AudioCueRegist
 import type { ICueGroup } from '../../interfaces/INetCueGroup'
 import { INetCue } from '../../interfaces/INetCue'
 import { YargNodeCue } from '../runtime/YargNodeCue'
+import { YargMotionNodeCue } from '../runtime/YargMotionNodeCue'
 import { CompiledEffectIndex } from '../runtime/CompiledEffectIndex'
 import { AudioNodeCue } from '../runtime/AudioNodeCue'
+import { AudioMotionNodeCue } from '../runtime/AudioMotionNodeCue'
 import { CueType } from '../../types/cueTypes'
 import { AudioCueType } from '../../types/audioCueTypes'
 import { IAudioCue } from '../../interfaces/IAudioCue'
 import { EffectRegistry } from '../runtime/EffectRegistry'
 import { EffectCompiler } from '../compiler/EffectCompiler'
 import type { EffectLoader } from './EffectLoader'
-import type { EffectReference } from '../../types/nodeCueTypes'
+import { migrateLegacyBearings } from './migrateLegacyBearings'
+import type { EffectMode, EffectReference } from '../../types/nodeCueTypes'
+import { createLogger } from '../../../../shared/logger'
+import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
+const log = createLogger('NodeCueLoader')
 
 export interface NodeCueFileSummary {
   path: string
   groupId: string
   groupName: string
   cueCount: number
+  lightingCueCount: number
+  motionCueCount: number
   mode: NodeCueMode
   updatedAt: number
   errors?: string[]
@@ -59,6 +67,8 @@ interface NodeCueLoaderOptions {
   yargRegistry: YargCueRegistry
   audioRegistry: AudioCueRegistry
   effectLoader?: EffectLoader
+  /** Injected host emit for cue/effect runtime IPC; required for production main. */
+  runtimeBroadcaster: RuntimeBroadcaster
   /** When provided, passed to YargNodeCue for debug/error emission. */
   getNodeRuntimeCallbacks?: () => NodeRuntimeCallbacks | undefined
   /** When provided, compiled effects are cached here and reused across cues. */
@@ -119,7 +129,7 @@ export class NodeCueLoader extends EventEmitter {
   }
 
   public async readFile(filePath: string): Promise<NodeCueFile> {
-    const resolvedPath = this.resolvePath(filePath)
+    const resolvedPath = this.resolveExistingCueFilePath(filePath)
     const mode = this.getModeFromPath(resolvedPath)
     if (!mode) {
       throw new Error('Unsupported node cue path.')
@@ -127,6 +137,7 @@ export class NodeCueLoader extends EventEmitter {
 
     const data = await fs.readFile(resolvedPath, 'utf-8')
     const parsed = JSON.parse(data)
+    migrateLegacyBearings(parsed)
     const validation =
       mode === 'yarg' ? validateYargNodeCueFile(parsed) : validateAudioNodeCueFile(parsed)
 
@@ -135,6 +146,15 @@ export class NodeCueLoader extends EventEmitter {
     }
 
     return validation.data
+  }
+
+  /**
+   * Resolves a renderer-supplied path to an absolute path inside the YARG/audio cue roots,
+   * or throws. Use this when an IPC handler needs the rooted path (e.g. for fs.copyFile during
+   * export) and must not trust the raw IPC string.
+   */
+  public resolveCueFilePathForIpc(filePath: string): string {
+    return this.resolveExistingCueFilePath(filePath)
   }
 
   public async saveFile(
@@ -155,6 +175,8 @@ export class NodeCueLoader extends EventEmitter {
     const sanitizedName = this.sanitizeFilename(filename)
     const filePath = this.resolveInDir(targetDir, sanitizedName)
 
+    this.assertNoConflictingGroupIdForPath(filePath, mode, content.group.id)
+
     await fs.mkdir(path.dirname(filePath), { recursive: true })
     await fs.writeFile(filePath, JSON.stringify(content, null, 2), 'utf-8')
     await this.loadFile(mode, filePath)
@@ -164,7 +186,7 @@ export class NodeCueLoader extends EventEmitter {
   }
 
   public async deleteFile(filePath: string): Promise<{ success: boolean }> {
-    const resolvedPath = this.resolvePath(filePath)
+    const resolvedPath = this.resolveExistingCueFilePath(filePath)
     const mode = this.getModeFromPath(resolvedPath)
     if (!mode) {
       throw new Error('Unsupported node cue path.')
@@ -200,7 +222,10 @@ export class NodeCueLoader extends EventEmitter {
     }
   }
 
-  public getAvailableCueTypes(mode: NodeCueMode): string[] {
+  public getAvailableCueTypes(mode: NodeCueMode, kind?: 'lighting' | 'motion'): string[] {
+    if (kind === 'motion') {
+      return []
+    }
     if (mode === 'yarg') {
       return Object.values(CueType)
     }
@@ -244,6 +269,8 @@ export class NodeCueLoader extends EventEmitter {
           groupId: path.basename(file, '.json'),
           groupName: path.basename(file, '.json'),
           cueCount: 0,
+          lightingCueCount: 0,
+          motionCueCount: 0,
           mode,
           updatedAt: Date.now(),
           errors: [message],
@@ -259,6 +286,7 @@ export class NodeCueLoader extends EventEmitter {
   private async loadFile(mode: NodeCueMode, filePath: string): Promise<NodeCueFileSummary | null> {
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed = JSON.parse(contents)
+    migrateLegacyBearings(parsed)
     const validation =
       mode === 'yarg' ? validateYargNodeCueFile(parsed) : validateAudioNodeCueFile(parsed)
 
@@ -269,11 +297,16 @@ export class NodeCueLoader extends EventEmitter {
     const file = validation.data
     await this.registerFile(filePath, mode, file)
 
+    const lightingCueCount = file.cues.filter((c) => c.kind === 'lighting').length
+    const motionCueCount = file.cues.filter((c) => c.kind === 'motion').length
+
     const summary: NodeCueFileSummary = {
       path: filePath,
       groupId: file.group.id,
       groupName: file.group.name,
       cueCount: file.cues.length,
+      lightingCueCount,
+      motionCueCount,
       mode,
       updatedAt: Date.now(),
       bundled: file.bundled ?? false,
@@ -303,7 +336,7 @@ export class NodeCueLoader extends EventEmitter {
     if (mode === 'yarg') {
       const group = await this.buildYargGroup(file as YargNodeCueFile)
       this.options.yargRegistry.registerGroup(group)
-      const groupMeta = (file as YargNodeCueFile).group
+      const groupMeta = file.group
       if (groupMeta.isDefault) {
         this.options.yargRegistry.setDefaultGroup(group.id)
       }
@@ -316,7 +349,11 @@ export class NodeCueLoader extends EventEmitter {
       if (wasAudioGroupEnabled) {
         this.options.audioRegistry.enableGroup(group.id)
       }
-      file.cues.forEach((cue) => this.customAudioCueTypes.add(cue.cueTypeId))
+      file.cues.forEach((cue) => {
+        if (cue.kind === 'lighting') {
+          this.customAudioCueTypes.add(cue.cueTypeId)
+        }
+      })
     }
 
     this.fileRegistrations.set(filePath, { mode, groupId: file.group.id })
@@ -341,72 +378,174 @@ export class NodeCueLoader extends EventEmitter {
 
   private async buildYargGroup(file: YargNodeCueFile): Promise<ICueGroup> {
     const cueMap = new Map<CueType, INetCue>()
+    const motionMap = new Map<string, INetCue>()
 
     for (const cue of file.cues) {
-      if (cueMap.has(cue.cueType)) {
-        throw new NodeCueCompilationError(
-          `Duplicate cueType '${cue.cueType}' in group '${file.group.name}'.`,
-        )
-      }
-
-      try {
-        const compiled = NodeCueCompiler.compileYargCue(cue)
-        compiled.groupVariables = file.group.variables ?? []
-
-        // Build effect registry for this cue
-        const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg')
-
-        const callbacks = this.options.getNodeRuntimeCallbacks?.()
-        cueMap.set(cue.cueType, new YargNodeCue(file.group.id, compiled, effectRegistry, callbacks))
-      } catch (err) {
-        console.warn(`Skipping cue '${cue.cueType}':`, err)
+      if (cue.kind === 'lighting') {
+        if (cueMap.has(cue.cueType)) {
+          throw new NodeCueCompilationError(
+            `Duplicate cueType '${cue.cueType}' in group '${file.group.name}'.`,
+          )
+        }
+        try {
+          const compiled = NodeCueCompiler.compileYargCue(cue)
+          compiled.groupVariables = file.group.variables ?? []
+          const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg')
+          const callbacks = this.options.getNodeRuntimeCallbacks?.()
+          cueMap.set(
+            cue.cueType,
+            new YargNodeCue(
+              file.group.id,
+              compiled,
+              effectRegistry,
+              callbacks,
+              this.options.runtimeBroadcaster,
+            ),
+          )
+        } catch (err) {
+          log.warn(`Skipping cue '${cue.cueType}':`, err)
+        }
+      } else {
+        if (motionMap.has(cue.id)) {
+          throw new NodeCueCompilationError(
+            `Duplicate motion cue id '${cue.id}' in group '${file.group.name}'.`,
+          )
+        }
+        try {
+          const compiled = NodeCueCompiler.compileYargCue(cue)
+          compiled.groupVariables = file.group.variables ?? []
+          const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg')
+          const callbacks = this.options.getNodeRuntimeCallbacks?.()
+          motionMap.set(
+            cue.id,
+            new YargMotionNodeCue(
+              file.group.id,
+              compiled,
+              effectRegistry,
+              callbacks,
+              this.options.runtimeBroadcaster,
+            ),
+          )
+        } catch (err) {
+          log.warn(`Skipping motion cue '${cue.id}':`, err)
+        }
       }
     }
 
-    if (cueMap.size === 0) {
-      throw new NodeCueCompilationError('Group must contain at least one cue definition.')
+    if (cueMap.size === 0 && motionMap.size === 0) {
+      throw new NodeCueCompilationError(
+        'Group must contain at least one lighting or motion cue definition.',
+      )
     }
 
-    return {
+    const result: ICueGroup = {
       id: file.group.id,
       name: file.group.name,
       description: file.group.description,
       cues: cueMap,
     }
+    if (motionMap.size > 0) {
+      result.motionCues = motionMap
+    }
+    return result
   }
 
   private async buildAudioGroup(file: AudioNodeCueFile): Promise<AudioCueGroup> {
     const cueMap = new Map<AudioCueType, IAudioCue>()
+    const motionMap = new Map<string, IAudioCue>()
 
     for (const cue of file.cues) {
-      if (cueMap.has(cue.cueTypeId)) {
-        throw new NodeCueCompilationError(
-          `Duplicate audio cue id '${cue.cueTypeId}' in group '${file.group.name}'.`,
-        )
-      }
-
-      try {
-        const compiled = NodeCueCompiler.compileAudioCue(cue)
-        compiled.groupVariables = file.group.variables ?? []
-
-        // Build effect registry for this cue
-        const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio')
-
-        cueMap.set(cue.cueTypeId, new AudioNodeCue(file.group.id, compiled, effectRegistry))
-      } catch (err) {
-        console.warn(`Skipping audio cue '${cue.cueTypeId}':`, err)
+      if (cue.kind === 'lighting') {
+        if (cueMap.has(cue.cueTypeId)) {
+          throw new NodeCueCompilationError(
+            `Duplicate audio cue id '${cue.cueTypeId}' in group '${file.group.name}'.`,
+          )
+        }
+        try {
+          const compiled = NodeCueCompiler.compileAudioCue(cue)
+          compiled.groupVariables = file.group.variables ?? []
+          const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio')
+          cueMap.set(
+            cue.cueTypeId,
+            new AudioNodeCue(
+              file.group.id,
+              compiled,
+              effectRegistry,
+              this.options.runtimeBroadcaster,
+            ),
+          )
+        } catch (err) {
+          log.warn(`Skipping audio cue '${cue.cueTypeId}':`, err)
+        }
+      } else {
+        if (motionMap.has(cue.id)) {
+          throw new NodeCueCompilationError(
+            `Duplicate audio motion cue id '${cue.id}' in group '${file.group.name}'.`,
+          )
+        }
+        try {
+          const compiled = NodeCueCompiler.compileAudioCue(cue)
+          compiled.groupVariables = file.group.variables ?? []
+          const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio')
+          motionMap.set(
+            cue.id,
+            new AudioMotionNodeCue(
+              file.group.id,
+              compiled,
+              effectRegistry,
+              this.options.runtimeBroadcaster,
+            ),
+          )
+        } catch (err) {
+          log.warn(`Skipping audio motion cue '${cue.id}':`, err)
+        }
       }
     }
 
-    if (cueMap.size === 0) {
-      throw new NodeCueCompilationError('Group must contain at least one audio cue definition.')
+    if (cueMap.size === 0 && motionMap.size === 0) {
+      throw new NodeCueCompilationError(
+        'Group must contain at least one lighting or motion audio cue definition.',
+      )
     }
 
-    return {
+    const result: AudioCueGroup = {
       id: file.group.id,
       name: file.group.name,
       description: file.group.description ?? 'Node-based audio cues',
       cues: cueMap,
+    }
+    if (motionMap.size > 0) {
+      result.motionCues = motionMap
+    }
+    return result
+  }
+
+  /**
+   * Prevents two cue files in the same domain (yarg vs audio) from sharing one `group.id`,
+   * which would overwrite the other in the registry (see registerFile / unregisterGroup).
+   */
+  private assertNoConflictingGroupIdForPath(
+    targetPath: string,
+    mode: NodeCueMode,
+    groupId: string,
+  ): void {
+    const normalizedTarget = path.resolve(targetPath)
+    const key = groupId.trim().toLowerCase()
+    if (!key) {
+      return
+    }
+    for (const [registeredPath, reg] of this.fileRegistrations) {
+      if (reg.mode !== mode) {
+        continue
+      }
+      if (path.resolve(registeredPath) === normalizedTarget) {
+        continue
+      }
+      if (reg.groupId.trim().toLowerCase() === key) {
+        throw new Error(
+          `Another ${mode} cue file already uses group id '${groupId}'. Choose a different group ID.`,
+        )
+      }
     }
   }
 
@@ -430,7 +569,7 @@ export class NodeCueLoader extends EventEmitter {
       await this.loadFile(mode, filePath)
       this.emit('changed', this.getSummary())
     } catch (error) {
-      console.error('Failed to reload node cue file', filePath, error)
+      log.error('Failed to reload node cue file', filePath, error)
     }
   }
 
@@ -464,6 +603,30 @@ export class NodeCueLoader extends EventEmitter {
     return path.resolve(targetPath)
   }
 
+  /**
+   * Resolves a user-supplied path to an absolute path that must lie under the YARG or audio cue roots.
+   * Relative segments are anchored to {@link NodeCueLoaderOptions.baseDir} so paths cannot escape via cwd.
+   */
+  private resolveExistingCueFilePath(userPath: string): string {
+    if (typeof userPath !== 'string' || userPath.trim().length === 0) {
+      throw new Error('Node cue path is required.')
+    }
+    if (userPath.includes('\0')) {
+      throw new Error('Node cue path must not contain null bytes.')
+    }
+    const trimmed = userPath.trim()
+    const resolved = path.isAbsolute(trimmed)
+      ? path.resolve(trimmed)
+      : path.resolve(this.baseDir, trimmed)
+    if (
+      !this.isPathWithinDir(resolved, this.yargDir) &&
+      !this.isPathWithinDir(resolved, this.audioDir)
+    ) {
+      throw new Error('Node cue file path must be under the YARG or audio cue directories.')
+    }
+    return resolved
+  }
+
   private resolveInDir(baseDir: string, filename: string): string {
     const resolvedBase = this.resolvePath(baseDir)
     const resolvedPath = this.resolvePath(path.join(resolvedBase, filename))
@@ -481,9 +644,6 @@ export class NodeCueLoader extends EventEmitter {
     )
   }
 
-  /**
-   * Builds an EffectRegistry for a cue by loading and compiling all referenced effects.
-   */
   private async buildEffectRegistry(
     effectReferences: EffectReference[],
     mode: NodeCueMode,
@@ -494,20 +654,26 @@ export class NodeCueLoader extends EventEmitter {
       return registry
     }
 
+    const effectLoaderMode: EffectMode = mode === 'audio' ? 'audio' : 'yarg'
+    const effectIndexMode: NodeCueMode = mode
+
     const effectIndex = this.options.getCompiledEffectIndex?.()
 
     for (const effectRef of effectReferences) {
       try {
-        const cached = effectIndex?.get(mode, effectRef.effectFileId, effectRef.effectId)
+        const cached = effectIndex?.get(effectIndexMode, effectRef.effectFileId, effectRef.effectId)
         if (cached) {
           registry.registerEffect(effectRef.effectId, cached)
           continue
         }
 
-        const effectFile = await this.options.effectLoader.loadEffectByReference(effectRef, mode)
+        const effectFile = await this.options.effectLoader.loadEffectByReference(
+          effectRef,
+          effectLoaderMode,
+        )
 
         if (!effectFile) {
-          console.warn(
+          log.warn(
             `Effect file ${effectRef.effectFileId} not found, skipping effect ${effectRef.effectId}`,
           )
           continue
@@ -516,17 +682,22 @@ export class NodeCueLoader extends EventEmitter {
         const effect = effectFile.effects.find((e) => e.id === effectRef.effectId)
 
         if (!effect) {
-          console.warn(
+          log.warn(
             `Effect ${effectRef.effectId} not found in file ${effectRef.effectFileId}, skipping`,
           )
           continue
         }
 
         const compiledEffect = EffectCompiler.compile(effect)
-        effectIndex?.set(mode, effectRef.effectFileId, effectRef.effectId, compiledEffect)
+        effectIndex?.set(
+          effectIndexMode,
+          effectRef.effectFileId,
+          effectRef.effectId,
+          compiledEffect,
+        )
         registry.registerEffect(effectRef.effectId, compiledEffect)
       } catch (error) {
-        console.error(`Failed to load/compile effect ${effectRef.effectId}:`, error)
+        log.error(`Failed to load/compile effect ${effectRef.effectId}:`, error)
       }
     }
 

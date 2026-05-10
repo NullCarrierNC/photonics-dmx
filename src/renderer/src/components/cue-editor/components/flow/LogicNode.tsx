@@ -292,7 +292,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
   const isDebugNode = logicType === 'debugger'
 
   const nodeStyles = isDebugNode
-    ? 'border-red-400 bg-red-50 dark:bg-red-900/30 text-xs shadow-sm min-w-[150px]'
+    ? 'border-red-400 bg-red-50 dark:bg-red-900/30 text-xs shadow-sm min-w-[150px] max-w-[320px]'
     : isArrayNode
       ? 'border-teal-400 bg-teal-50 dark:bg-teal-900/30 text-xs shadow-sm min-w-[150px]'
       : isDataNode
@@ -308,7 +308,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
         : 'font-semibold text-amber-800 dark:text-amber-100 text-center'
 
   const detailStyles = isDebugNode
-    ? 'text-[11px] text-red-900 dark:text-red-50 opacity-90 text-center'
+    ? 'text-[11px] text-red-900 dark:text-red-50 opacity-90 text-center break-words'
     : isArrayNode
       ? 'text-[11px] text-teal-900 dark:text-teal-50 opacity-90 text-center'
       : isDataNode

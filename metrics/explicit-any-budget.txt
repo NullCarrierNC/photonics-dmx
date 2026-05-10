@@ -1,0 +1,3 @@
+0
+Auto-generated: `npx eslint src` messages for @typescript-eslint/no-explicit-any.
+Lower this when reducing explicit any; do not increase without a deliberate pass.

@@ -3,6 +3,7 @@ import * as path from 'path'
 import * as net from 'net'
 import type {
   ArtNetSenderConfig,
+  DmxRig,
   IpcSenderConfig,
   LightingConfiguration,
   SacnSenderConfig,
@@ -12,11 +13,27 @@ import type {
 import { ConfigStrobeType } from '../../photonics-dmx/types'
 import type { AppPreferences } from '../../services/configuration/ConfigurationManager'
 import {
+  CUE_DOMAINS,
+  type CueDomain,
+  type CueDomainPrefs,
+} from '../../services/configuration/cueDomainTypes'
+import {
   AUDIO_BAND_GAIN_MAX,
   AUDIO_BAND_GAIN_MIN,
   type AudioGameModeConfig,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
+import type { Brightness, Color, DmxFixture } from '../../photonics-dmx/types'
+import { FixtureTypes } from '../../photonics-dmx/types'
+import { CueType } from '../../photonics-dmx/cues/types/cueTypes'
+import type { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
+import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 
+/**
+ * Renderer-supplied IPC payloads MUST be treated as `unknown`. Validators in this module return a
+ * `ValidationResult<T>` whose success value is assignable to the corresponding
+ * `IpcInvokeMap[Channel]['request']` for the channel that uses them. When you change a request type
+ * in `ipcTypes.ts`, update the matching validator's return type here so the contract stays narrow.
+ */
 export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
 const SENDER_IDS = new Set(['sacn', 'ipc', 'enttecpro', 'artnet', 'opendmx'])
@@ -53,6 +70,103 @@ export function validateNumberInRange(
     return { ok: false, error: `${fieldName} must be between ${min} and ${max}` }
   }
   return { ok: true, value: num }
+}
+
+/**
+ * Validates that `value` is one of the literal strings in `allowed`.
+ * Accepts a `field` label for the error message.
+ */
+export function validateStringUnion<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  field: string,
+): ValidationResult<T> {
+  if (typeof value !== 'string') {
+    return { ok: false, error: `${field} must be a string` }
+  }
+  if (!(allowed as readonly string[]).includes(value)) {
+    return { ok: false, error: `${field} must be one of: ${allowed.join(', ')}` }
+  }
+  return { ok: true, value: value as T }
+}
+
+const YARG_AUDIO_MOTION_SELECTION_MODES = ['oncePerSong', 'perCueChange', 'none'] as const
+const CUE_GROUP_SELECTION_MODES = ['oncePerSong', 'withinSong'] as const
+const STAGE_KIT_PRIORITIES = ['prefer-for-tracked', 'random', 'never'] as const
+
+export type YargAudioMotionSelectionMode = (typeof YARG_AUDIO_MOTION_SELECTION_MODES)[number]
+export type CueGroupSelectionMode = (typeof CUE_GROUP_SELECTION_MODES)[number]
+export type StageKitPriority = (typeof STAGE_KIT_PRIORITIES)[number]
+
+export function validateMotionSelectionMode(
+  value: unknown,
+): ValidationResult<YargAudioMotionSelectionMode> {
+  return validateStringUnion(value, YARG_AUDIO_MOTION_SELECTION_MODES, 'selection mode')
+}
+
+export function validateCueGroupSelectionMode(
+  value: unknown,
+): ValidationResult<CueGroupSelectionMode> {
+  return validateStringUnion(value, CUE_GROUP_SELECTION_MODES, 'cue group selection mode')
+}
+
+export function validateStageKitPriority(value: unknown): ValidationResult<StageKitPriority> {
+  return validateStringUnion(value, STAGE_KIT_PRIORITIES, 'stage kit priority')
+}
+
+const CUE_TYPE_VALUES = new Set<string>(Object.values(CueType))
+
+/**
+ * Structural validation for a YARG `CueType`. Returns the narrowed enum value on success.
+ */
+export function validateCueType(value: unknown): ValidationResult<CueType> {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return { ok: false, error: 'cueType is required' }
+  }
+  if (!CUE_TYPE_VALUES.has(value)) {
+    return { ok: false, error: `cueType '${value}' is not a known CueType` }
+  }
+  return { ok: true, value: value as CueType }
+}
+
+/**
+ * Validates an audio cue type against the runtime AudioCueRegistry. Optionally restricts to
+ * currently-enabled cues; defaults to the full registered set so handlers can decide.
+ */
+export function validateAudioCueType(
+  value: unknown,
+  options: { onlyEnabled?: boolean } = {},
+): ValidationResult<AudioCueType> {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return { ok: false, error: 'cueType is required' }
+  }
+  const registry = AudioCueRegistry.getInstance()
+  const known = registry.getAvailableCueTypes(!options.onlyEnabled)
+  if (!known.includes(value)) {
+    return { ok: false, error: `audio cueType '${value}' is not registered` }
+  }
+  return { ok: true, value }
+}
+
+/**
+ * Validates a `{ groupId, cueId }` cue-ref payload (or null). Used by the audio/YARG motion
+ * "active cue ref" channels.
+ */
+export function validateCueRefPayload(
+  value: unknown,
+): ValidationResult<{ groupId: string; cueId: string } | null> {
+  if (value === null || value === undefined) {
+    return { ok: true, value: null }
+  }
+  if (!isPlainObject(value)) {
+    return { ok: false, error: 'cue ref must be an object with groupId and cueId' }
+  }
+  const groupId = typeof value.groupId === 'string' ? value.groupId.trim() : ''
+  const cueId = typeof value.cueId === 'string' ? value.cueId.trim() : ''
+  if (!groupId || !cueId) {
+    return { ok: false, error: 'groupId and cueId are required' }
+  }
+  return { ok: true, value: { groupId, cueId } }
 }
 
 export function validateOptionalStringArray(
@@ -324,6 +438,34 @@ export function validateLightingConfiguration(
   return { ok: true, value }
 }
 
+export function validateDmxRigPayload(data: unknown): ValidationResult<DmxRig> {
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'DmxRig must be a plain object' }
+  }
+  if (typeof data.id !== 'string' || data.id.trim().length === 0) {
+    return { ok: false, error: 'DmxRig.id must be a non-empty string' }
+  }
+  if (typeof data.name !== 'string' || data.name.trim().length === 0) {
+    return { ok: false, error: 'DmxRig.name must be a non-empty string' }
+  }
+  if (typeof data.active !== 'boolean') {
+    return { ok: false, error: 'DmxRig.active must be a boolean' }
+  }
+  const cfg = validateLightingConfiguration(data.config)
+  if (!cfg.ok) {
+    return { ok: false, error: `DmxRig.config: ${cfg.error}` }
+  }
+  return {
+    ok: true,
+    value: {
+      id: data.id.trim(),
+      name: data.name.trim(),
+      active: data.active,
+      config: cfg.value,
+    },
+  }
+}
+
 export function validatePathUnderAllowedRoots(
   targetPath: unknown,
   allowedRoots: string[] = [process.cwd(), os.homedir(), os.tmpdir()],
@@ -351,6 +493,146 @@ export function validatePathUnderAllowedRoots(
   return { ok: true, value: resolvedTarget }
 }
 
+/**
+ * Resolves a script name to an absolute path under `appPath/scripts`.
+ * `scriptName` must be a single file segment (no path separators, `..`, or NUL).
+ */
+export function validateNodeScriptPath(
+  appPath: string,
+  scriptName: string,
+): ValidationResult<string> {
+  if (typeof scriptName !== 'string' || scriptName.length === 0) {
+    return { ok: false, error: 'Script name is required' }
+  }
+  if (scriptName.includes('\0')) {
+    return { ok: false, error: 'Script name must not contain null bytes' }
+  }
+  if (scriptName === '.' || scriptName === '..') {
+    return { ok: false, error: 'Script name must be a base filename' }
+  }
+  if (scriptName.includes('/') || scriptName.includes('\\')) {
+    return { ok: false, error: 'Script name must not contain path separators' }
+  }
+  if (scriptName !== path.basename(scriptName)) {
+    return { ok: false, error: 'Script name must not include path segments' }
+  }
+
+  const scriptsRoot = path.resolve(path.join(appPath, 'scripts'))
+  const scriptPath = path.join(scriptsRoot, scriptName)
+  const resolved = path.resolve(scriptPath)
+  const rel = path.relative(scriptsRoot, resolved)
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    return { ok: false, error: 'Script must resolve under the app scripts directory' }
+  }
+
+  return { ok: true, value: resolved }
+}
+
+function isStringArray(x: unknown): x is string[] {
+  return Array.isArray(x) && x.every((e) => typeof e === 'string')
+}
+
+/**
+ * Accepts a partial per-domain update for SAVE_PREFS (merged server-side with stored cueDomains).
+ */
+function validateCueDomainsPayload(
+  data: unknown,
+): ValidationResult<Partial<Record<CueDomain, Partial<CueDomainPrefs>>>> {
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'cueDomains must be a plain object' }
+  }
+  const src = data
+  const out: Partial<Record<CueDomain, Partial<CueDomainPrefs>>> = {}
+  for (const d of CUE_DOMAINS) {
+    if (!(d in src) || src[d] == null) {
+      continue
+    }
+    if (!isPlainObject(src[d])) {
+      return { ok: false, error: `cueDomains.${d} must be an object` }
+    }
+    const o = src[d] as Record<string, unknown>
+    const partial: Partial<CueDomainPrefs> = {}
+    if (o.enabledGroups != null) {
+      if (!isStringArray(o.enabledGroups)) {
+        return { ok: false, error: `cueDomains.${d}.enabledGroups must be a string[]` }
+      }
+      partial.enabledGroups = o.enabledGroups
+    }
+    if (o.knownGroups != null) {
+      if (!isStringArray(o.knownGroups)) {
+        return { ok: false, error: `cueDomains.${d}.knownGroups must be a string[]` }
+      }
+      partial.knownGroups = o.knownGroups
+    }
+    if (o.disabledCues != null) {
+      if (!isPlainObject(o.disabledCues)) {
+        return { ok: false, error: `cueDomains.${d}.disabledCues must be an object` }
+      }
+      for (const v of Object.values(o.disabledCues)) {
+        if (!isStringArray(v)) {
+          return { ok: false, error: `cueDomains.${d}.disabledCues values must be string[]` }
+        }
+      }
+
+      partial.disabledCues = o.disabledCues as Record<string, string[]>
+    }
+    if (o.selectionMode != null) {
+      if (
+        o.selectionMode !== 'oncePerSong' &&
+        o.selectionMode !== 'perCueChange' &&
+        o.selectionMode !== 'withinSong' &&
+        o.selectionMode !== 'none'
+      ) {
+        return { ok: false, error: `cueDomains.${d}.selectionMode is invalid` }
+      }
+      partial.selectionMode = o.selectionMode
+    }
+    if ('activeCueRef' in o) {
+      const ar = o.activeCueRef
+      if (ar === null) {
+        partial.activeCueRef = null
+      } else if (
+        isPlainObject(ar) &&
+        typeof ar.groupId === 'string' &&
+        typeof ar.cueId === 'string'
+      ) {
+        partial.activeCueRef = { groupId: ar.groupId, cueId: ar.cueId }
+      } else {
+        return { ok: false, error: `cueDomains.${d}.activeCueRef is invalid` }
+      }
+    }
+    if (o.probabilityPercent != null) {
+      if (typeof o.probabilityPercent !== 'number' || Number.isNaN(o.probabilityPercent)) {
+        return { ok: false, error: `cueDomains.${d}.probabilityPercent must be a number` }
+      }
+      const r = validateNumberInRange(
+        o.probabilityPercent,
+        0,
+        100,
+        `cueDomains.${d}.probabilityPercent`,
+      )
+      if (!r.ok) {
+        return r
+      }
+      partial.probabilityPercent = Math.round(r.value)
+    }
+    if (o.minimumHoldMs != null) {
+      if (typeof o.minimumHoldMs !== 'number' || Number.isNaN(o.minimumHoldMs)) {
+        return { ok: false, error: `cueDomains.${d}.minimumHoldMs must be a number` }
+      }
+      const r = validateNumberInRange(o.minimumHoldMs, 0, 600000, `cueDomains.${d}.minimumHoldMs`)
+      if (!r.ok) {
+        return r
+      }
+      partial.minimumHoldMs = Math.round(r.value)
+    }
+    if (Object.keys(partial).length > 0) {
+      out[d] = partial
+    }
+  }
+  return { ok: true, value: out }
+}
+
 const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'effectDebounce',
   'complex',
@@ -359,20 +641,18 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'artNetConfig',
   'sacnConfig',
   'brightness',
-  'enabledCueGroups',
-  'knownYargCueGroups',
-  'enabledAudioCueGroups',
-  'knownAudioCueGroups',
+  'cueDomains',
   'cueConsistencyWindow',
-  'cueGroupSelectionMode',
   'clockRate',
   'dmxOutputConfig',
   'stageKitPrefs',
   'dmxSettingsPrefs',
   'allowMultipleActiveRigs',
+  'advancedModeEnabled',
   'audioConfig',
   'activeAudioCueType',
   'audioGameMode',
+  'motionEnabled',
   'simulationSettings',
   'leftMenuCollapsed',
   'windowState',
@@ -402,6 +682,24 @@ export function validatePreferencesPayload(
     return { ok: false, error: 'Preferences payload contains no valid preference keys' }
   }
 
+  if ('cueConsistencyWindow' in cleaned) {
+    const v = validateNumberInRange(cleaned.cueConsistencyWindow, 0, 600000, 'cueConsistencyWindow')
+    if (!v.ok) return v
+    cleaned.cueConsistencyWindow = Math.round(v.value)
+  }
+
+  if ('cueDomains' in cleaned) {
+    const d = validateCueDomainsPayload(cleaned.cueDomains)
+    if (!d.ok) {
+      return d
+    }
+    cleaned.cueDomains = d.value
+  }
+
+  if ('advancedModeEnabled' in cleaned && typeof cleaned.advancedModeEnabled !== 'boolean') {
+    return { ok: false, error: 'advancedModeEnabled must be a boolean' }
+  }
+
   return { ok: true, value: cleaned as Partial<AppPreferences> }
 }
 
@@ -418,7 +716,77 @@ const AUDIO_CONFIG_KEYS = new Set([
   'strobeEnabled',
   'strobeTriggerThreshold',
   'strobeProbability',
+  'idleDetection',
 ])
+
+const VALID_AUDIO_IDLE_COLORS = new Set<Color>([
+  'red',
+  'blue',
+  'yellow',
+  'green',
+  'cyan',
+  'orange',
+  'purple',
+  'chartreuse',
+  'teal',
+  'violet',
+  'magenta',
+  'vermilion',
+  'amber',
+  'white',
+  'black',
+  'transparent',
+])
+
+const VALID_AUDIO_IDLE_BRIGHTNESS = new Set<Brightness>(['low', 'medium', 'high', 'max', 'linear'])
+
+function validateIdleDetectionPayload(data: unknown): ValidationResult<Record<string, unknown>> {
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'idleDetection must be an object' }
+  }
+  const o = data as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+
+  if ('enabled' in o) {
+    if (typeof o.enabled !== 'boolean') {
+      return { ok: false, error: 'idleDetection.enabled must be a boolean' }
+    }
+    out.enabled = o.enabled
+  }
+  if ('thresholdPct' in o) {
+    const t = validateNumberInRange(o.thresholdPct, 0, 100, 'idleDetection.thresholdPct')
+    if (!t.ok) return t
+    out.thresholdPct = t.value
+  }
+  if ('minIdleSeconds' in o) {
+    const t = validateNumberInRange(o.minIdleSeconds, 0, 600, 'idleDetection.minIdleSeconds')
+    if (!t.ok) return t
+    out.minIdleSeconds = t.value
+  }
+  if ('resumeSeconds' in o) {
+    const t = validateNumberInRange(o.resumeSeconds, 0, 60, 'idleDetection.resumeSeconds')
+    if (!t.ok) return t
+    out.resumeSeconds = t.value
+  }
+  if ('idleColor' in o) {
+    if (!VALID_AUDIO_IDLE_COLORS.has(o.idleColor as Color)) {
+      return { ok: false, error: 'idleDetection.idleColor is not a valid color' }
+    }
+    out.idleColor = o.idleColor
+  }
+  if ('idleBrightness' in o) {
+    if (!VALID_AUDIO_IDLE_BRIGHTNESS.has(o.idleBrightness as Brightness)) {
+      return { ok: false, error: 'idleDetection.idleBrightness is not a valid brightness' }
+    }
+    out.idleBrightness = o.idleBrightness
+  }
+
+  if (Object.keys(out).length === 0) {
+    return { ok: false, error: 'idleDetection contains no valid keys' }
+  }
+
+  return { ok: true, value: out }
+}
 
 /**
  * Validates a single audio band definition
@@ -523,6 +891,12 @@ export function validateAudioConfigPayload(
           return t
         }
         cleaned[key] = t.value
+      } else if (key === 'idleDetection') {
+        const idResult = validateIdleDetectionPayload(data[key])
+        if (!idResult.ok) {
+          return idResult
+        }
+        cleaned[key] = idResult.value
       } else {
         cleaned[key] = data[key]
       }
@@ -591,4 +965,43 @@ export function validateAudioGameModePayload(
   }
 
   return { ok: true, value: merged }
+}
+
+const FIXTURE_TYPE_VALUES = new Set<string>(Object.values(FixtureTypes))
+
+/**
+ * Structural validation for CONFIG.SAVE_MY_LIGHTS (user-edited DMX fixture list from the renderer).
+ */
+export function validateDmxFixturesArray(
+  value: unknown,
+  fieldName: string = 'lights',
+): ValidationResult<DmxFixture[]> {
+  if (!Array.isArray(value)) {
+    return { ok: false, error: `${fieldName} must be an array` }
+  }
+  for (let i = 0; i < value.length; i++) {
+    const el = value[i]
+    if (!isPlainObject(el)) {
+      return { ok: false, error: `${fieldName}[${i}] must be an object` }
+    }
+    if (el.id != null && typeof el.id !== 'string') {
+      return { ok: false, error: `${fieldName}[${i}].id must be string or null` }
+    }
+    if (typeof el.position !== 'number' || !Number.isFinite(el.position)) {
+      return { ok: false, error: `${fieldName}[${i}].position must be a number` }
+    }
+    if (el.fixture == null || !FIXTURE_TYPE_VALUES.has(String(el.fixture))) {
+      return { ok: false, error: `${fieldName}[${i}].fixture must be a valid fixture type` }
+    }
+    if (typeof el.label !== 'string' || typeof el.name !== 'string') {
+      return { ok: false, error: `${fieldName}[${i}].label and name must be strings` }
+    }
+    if (typeof el.isStrobeEnabled !== 'boolean') {
+      return { ok: false, error: `${fieldName}[${i}].isStrobeEnabled must be a boolean` }
+    }
+    if (!isPlainObject(el.channels)) {
+      return { ok: false, error: `${fieldName}[${i}].channels must be an object` }
+    }
+  }
+  return { ok: true, value: value as DmxFixture[] }
 }

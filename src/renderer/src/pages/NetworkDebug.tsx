@@ -4,6 +4,8 @@ import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggl
 import { registerIpcListener } from '@renderer/utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { setListenCueData, getYargEnabled, getRb3Enabled } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('NetworkDebug')
 
 const NetworkDebug = () => {
   // Local state for latest cue data from IPC events.
@@ -62,7 +64,7 @@ const NetworkDebug = () => {
     const cleanupHandled = registerIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueHandled)
 
     return () => {
-      console.log('NetworkDebug unmounting, cleaning up listeners')
+      log.info('NetworkDebug unmounting, cleaning up listeners')
       // First disable the data listening on the main process
       setListenCueData(false)
 
@@ -86,11 +88,11 @@ const NetworkDebug = () => {
 
         // If listeners were enabled while we were already mounted, re-register
         if ((yargState && !yargWasEnabled) || (rb3State && !rb3WasEnabled)) {
-          console.log('Listener state changed, re-registering cue data listeners')
+          log.info('Listener state changed, re-registering cue data listeners')
           setListenCueData(true)
         }
       } catch (error) {
-        console.error('Error checking listener state:', error)
+        log.error('Error checking listener state:', error)
       }
     }
 

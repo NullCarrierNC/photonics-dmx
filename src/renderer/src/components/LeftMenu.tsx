@@ -6,16 +6,16 @@ import {
   FiCpu,
   FiInfo,
   FiSliders,
-  FiVolume2,
   FiPenTool,
   FiChevronLeft,
   FiChevronRight,
   FiExternalLink,
 } from 'react-icons/fi'
-import { MdGraphicEq } from 'react-icons/md'
-import { useAtom, useSetAtom } from 'jotai'
+import { MdGraphicEq, MdTune } from 'react-icons/md'
+import { useAtom } from 'jotai'
 import { Pages } from './../types'
-import { currentPageAtom } from './../atoms'
+import { currentPageAtom, lightsLayoutHasUnsavedChangesAtom, lightingPrefsAtom } from './../atoms'
+import { useConfirm } from '../hooks/useConfirm'
 import { openCueEditorWindow, openAudioPreviewWindow } from '../ipcApi'
 
 interface LeftMenuProps {
@@ -31,11 +31,22 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
   isCollapsed,
   onToggleCollapse,
 }) => {
-  const setCurrentPage = useSetAtom(currentPageAtom)
-  const [activeMenu, setActiveMenu] = useAtom(currentPageAtom)
+  const [activeMenu, setCurrentPage] = useAtom(currentPageAtom)
+  const [lightsLayoutUnsaved] = useAtom(lightsLayoutHasUnsavedChangesAtom)
+  const [prefs] = useAtom(lightingPrefsAtom)
+  const advancedModeEnabled = prefs.advancedModeEnabled ?? false
+  const confirm = useConfirm()
 
-  const handleMenuClick = (page: Pages) => {
-    setActiveMenu(page)
+  const handleMenuClick = async (page: Pages) => {
+    if (activeMenu === Pages.LightLayout && page !== Pages.LightLayout && lightsLayoutUnsaved) {
+      const leave = await confirm({
+        title: 'Unsaved changes',
+        message: 'You have unsaved changes to this layout. Leave without saving?',
+        confirmLabel: 'Discard changes',
+        danger: true,
+      })
+      if (!leave) return
+    }
     setCurrentPage(page)
   }
 
@@ -84,6 +95,15 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
           {!isCollapsed && <span className="text-[10pt]">Light Layout</span>}
         </button>
 
+        {/* DMX Console */}
+        <button
+          onClick={() => handleMenuClick(Pages.DmxConsole)}
+          className={buttonClasses(Pages.DmxConsole)}
+          title={isCollapsed ? 'DMX Console' : undefined}>
+          <MdTune className="text-xl" />
+          {!isCollapsed && <span className="text-[10pt]">DMX Console</span>}
+        </button>
+
         {/* Cue Preview Button */}
         <button
           onClick={() => handleMenuClick(Pages.CuePreview)}
@@ -111,42 +131,37 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
           {!isCollapsed && <span className="text-[10pt]">Preferences</span>}
         </button>
 
-        {/* Audio Settings */}
-        <button
-          onClick={() => handleMenuClick(Pages.AudioSettings)}
-          className={buttonClasses(Pages.AudioSettings)}
-          title={isCollapsed ? 'Audio Settings' : undefined}>
-          <FiVolume2 className="text-xl" />
-          {!isCollapsed && <span className="text-[10pt]">Audio Settings</span>}
-        </button>
+        {advancedModeEnabled && (
+          <>
+            {/* Audio Preview — separate window (no main route; never show as selected) */}
+            <button
+              onClick={handleAudioPreviewClick}
+              className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-2'} p-2 hover:text-gray-400 text-gray-800 dark:text-gray-300`}
+              title={isCollapsed ? 'Audio Preview' : undefined}>
+              <MdGraphicEq className="text-xl" />
+              {!isCollapsed && (
+                <span className="text-[10pt] flex items-center gap-1">
+                  Spectrum Analyzer
+                  <FiExternalLink className="text-[10pt]" />
+                </span>
+              )}
+            </button>
 
-        {/* Audio Preview — separate window (no main route; never show as selected) */}
-        <button
-          onClick={handleAudioPreviewClick}
-          className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-2'} p-2 hover:text-gray-400 text-gray-800 dark:text-gray-300`}
-          title={isCollapsed ? 'Audio Preview' : undefined}>
-          <MdGraphicEq className="text-xl" />
-          {!isCollapsed && (
-            <span className="text-[10pt] flex items-center gap-1">
-              Spectrum Analyzer
-              <FiExternalLink className="text-[10pt]" />
-            </span>
-          )}
-        </button>
-
-        {/* Cue Editor Button */}
-        <button
-          onClick={handleCueEditorClick}
-          className={buttonClasses(Pages.CueEditor)}
-          title={isCollapsed ? 'Cue Editor' : undefined}>
-          <FiPenTool className="text-xl" />
-          {!isCollapsed && (
-            <span className="text-[10pt] flex items-center gap-1">
-              Cue Editor
-              <FiExternalLink className="text-[10pt]" />
-            </span>
-          )}
-        </button>
+            {/* Cue Editor Button */}
+            <button
+              onClick={handleCueEditorClick}
+              className={buttonClasses(Pages.CueEditor)}
+              title={isCollapsed ? 'Cue Editor' : undefined}>
+              <FiPenTool className="text-xl" />
+              {!isCollapsed && (
+                <span className="text-[10pt] flex items-center gap-1">
+                  Cue Editor
+                  <FiExternalLink className="text-[10pt]" />
+                </span>
+              )}
+            </button>
+          </>
+        )}
 
         {/* Network Debug Button */}
         <button

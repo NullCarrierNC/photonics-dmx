@@ -4,8 +4,7 @@ import type { YargEffectDefinition } from '../../../../cues/types/nodeCueTypes'
 import type { CueData } from '../../../../cues/types/cueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
-
-jest.mock('../../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
+import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
 
 describe('EffectExecutionEngine', () => {
   let mockSequencer: jest.Mocked<ILightingController>
@@ -41,6 +40,7 @@ describe('EffectExecutionEngine', () => {
   beforeEach(() => {
     mockSequencer = {
       addEffect: jest.fn(),
+      replaceEffect: jest.fn(),
       setEffect: jest.fn(),
       addEffectWithCallback: jest.fn((_name, _effect, callback) => {
         setTimeout(() => callback(), 0)
@@ -58,6 +58,12 @@ describe('EffectExecutionEngine', () => {
       }),
       removeEffectCallback: jest.fn(),
       removeEffect: jest.fn(),
+      cancelPanTiltClear: jest.fn(),
+      schedulePanTiltClear: jest.fn(),
+      addMotionPattern: jest.fn(),
+      getMotionPattern: jest.fn().mockReturnValue(undefined),
+      removeMotionPattern: jest.fn(),
+      updateMotionPatternConfig: jest.fn(),
     } as any
 
     mockLightManager = {
@@ -133,6 +139,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
       )
@@ -196,6 +203,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
       )
@@ -309,6 +317,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
       )
@@ -402,6 +411,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
       )
@@ -525,6 +535,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
       )
@@ -691,6 +702,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
       )
@@ -800,6 +812,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
       )
@@ -896,6 +909,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         {},
         createCueData(),
       )
@@ -993,6 +1007,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         {},
         createCueData(),
       )
@@ -1064,6 +1079,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         {},
         createCueData(),
       )
@@ -1136,6 +1152,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         {},
         createCueData(),
       )
@@ -1238,6 +1255,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         {},
         createCueData(),
       )
@@ -1269,6 +1287,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         {},
         createCueData(),
       )
@@ -1309,6 +1328,7 @@ describe('EffectExecutionEngine', () => {
         compiledEffect,
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         {},
         createCueData(),
       )

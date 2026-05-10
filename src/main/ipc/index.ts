@@ -8,6 +8,8 @@ import { setupNodeCueHandlers } from './node-cue-handlers'
 import { setupEffectHandlers } from './effect-handlers'
 import { setupShellHandlers } from './shell-handlers'
 import { setupWindowHandlers } from './window-handlers'
+import { setupConsoleHandlers } from './console-handlers'
+import { setupLifecycleHandlers } from './lifecycle-handlers'
 
 /**
  * Set up all IPC handlers
@@ -15,8 +17,8 @@ import { setupWindowHandlers } from './window-handlers'
  * @param controllerManager The controller manager instance
  * @param windowManager The window manager instance
  *
- * Note: setupLightHandlers composes sender, simulation, and cue-group handlers
- * internally (setupSenderHandlers, setupSimulationHandlers, setupCueGroupHandlers).
+ * Note: setupLightHandlers composes sender, simulation, cue-group registry, cue selection prefs,
+ * and motion-group handlers internally.
  */
 export function setupIpcHandlers(
   ipcMain: IpcMain,
@@ -25,11 +27,13 @@ export function setupIpcHandlers(
 ): void {
   setupConfigHandlers(ipcMain, controllerManager)
   setupLightHandlers(ipcMain, controllerManager)
+  setupConsoleHandlers(ipcMain, controllerManager)
   setupCueHandlers(ipcMain, controllerManager)
   setupNodeCueHandlers(ipcMain, controllerManager)
   setupEffectHandlers(ipcMain, controllerManager)
   setupShellHandlers(ipcMain)
   setupWindowHandlers(ipcMain, windowManager)
+  setupLifecycleHandlers(ipcMain, controllerManager)
 
   controllerManager.setAudioMirrorBroadcaster((data) => {
     windowManager.broadcastAudioMirror(data)

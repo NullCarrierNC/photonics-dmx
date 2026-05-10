@@ -3,7 +3,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { sendToAllWindows } from '../utils/windowUtils'
-import { NodeCueMode, NodeCueFile } from '../../photonics-dmx/cues/types/nodeCueTypes'
+import { NodeCueMode, NodeCueFile, NodeCueKind } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateNodeCueFile } from '../../photonics-dmx/cues/node/schema/validation'
 import { NodeExecutionEngine } from '../../photonics-dmx/cues/node/runtime/NodeExecutionEngine'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
@@ -38,20 +38,24 @@ async function persistGroupEnableAfterNodeCueSave(
   const config = controllerManager.getConfig()
 
   if (mode === 'yarg') {
-    const enabled = config.getEnabledCueGroups() ?? []
+    const enabled = config.getPreference('cueDomains').yarg.enabledGroups ?? []
     if (!enabled.includes(groupId)) {
       const next = [...enabled, groupId]
-      await config.setEnabledCueGroups(next)
+      await config.updateCueDomain('yarg', { enabledGroups: next })
       YargCueRegistry.getInstance().setEnabledGroups(next)
-      await config.setKnownYargCueGroups(YargCueRegistry.getInstance().getAllGroups())
+      await config.updateCueDomain('yarg', {
+        knownGroups: YargCueRegistry.getInstance().getAllGroups(),
+      })
     }
   } else {
-    const enabled = config.getEnabledAudioCueGroups() ?? []
+    const enabled = config.getPreference('cueDomains').audio.enabledGroups ?? []
     if (!enabled.includes(groupId)) {
       const next = [...enabled, groupId]
-      await config.setEnabledAudioCueGroups(next)
+      await config.updateCueDomain('audio', { enabledGroups: next })
       AudioCueRegistry.getInstance().setEnabledGroups(next)
-      await config.setKnownAudioCueGroups(AudioCueRegistry.getInstance().getRegisteredGroups())
+      await config.updateCueDomain('audio', {
+        knownGroups: AudioCueRegistry.getInstance().getRegisteredGroups(),
+      })
       controllerManager.refreshAudioCueSelection()
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, undefined)
     }
@@ -105,12 +109,8 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     if (payload.path) {
       try {
         const file = await loader.readFile(payload.path)
-        return {
-          valid: true,
-          data: file,
-          errors: [],
-          mode: file.mode,
-        }
+        // readFile rejects invalid JSON/schema; still run the canonical validator for parity with the content branch.
+        return validateNodeCueFile(file)
       } catch (error) {
         return {
           valid: false,
@@ -122,13 +122,15 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     throw new Error('Validation payload must include either content or path.')
   })
 
-  ipcMain.handle(NODE_CUES.GET_CUE_TYPES, async (_event, mode: NodeCueMode) => {
-    const loader = ensureLoader(controllerManager)
-    return loader.getAvailableCueTypes(mode)
-  })
+  ipcMain.handle(
+    NODE_CUES.GET_CUE_TYPES,
+    async (_event, payload: { mode: NodeCueMode; kind?: NodeCueKind }) => {
+      const loader = ensureLoader(controllerManager)
+      return loader.getAvailableCueTypes(payload.mode, payload.kind)
+    },
+  )
 
-  ipcMain.handle(NODE_CUES.IMPORT, async (_event, preferredMode?: NodeCueMode) => {
-    const loader = ensureLoader(controllerManager)
+  ipcMain.handle(NODE_CUES.IMPORT_PICK, async (_event, preferredMode?: NodeCueMode) => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Node Cue Files', extensions: ['json'] }],
@@ -147,19 +149,24 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     }
 
     const mode = preferredMode ?? validation.mode
-    const filename = path.basename(sourcePath)
-    const saveResult = await loader.saveFile(mode, filename, validation.data)
-    await persistGroupEnableAfterNodeCueSave(controllerManager, mode, validation.data.group.id)
-    return { success: true, path: saveResult.path }
+    return {
+      success: true,
+      sourceBasename: path.basename(sourcePath),
+      mode,
+      content: validation.data,
+    }
   })
 
   ipcMain.handle(NODE_CUES.EXPORT, async (_event, filePath: string) => {
     const loader = ensureLoader(controllerManager)
-    await loader.readFile(filePath) // ensure file is valid/exists
+    // Resolve through the loader so the source path used for fs.copyFile is the same
+    // rooted path the loader vetted; never copy from the raw IPC string.
+    const resolvedSource = loader.resolveCueFilePathForIpc(filePath)
+    await loader.readFile(resolvedSource) // ensure file is valid/exists
 
     const result = await dialog.showSaveDialog({
       title: 'Export Node Cue File',
-      defaultPath: path.basename(filePath),
+      defaultPath: path.basename(resolvedSource),
       filters: [{ name: 'Node Cue Files', extensions: ['json'] }],
     })
 
@@ -167,7 +174,7 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
       return { success: false, error: 'User cancelled export.' }
     }
 
-    await fs.copyFile(filePath, result.filePath)
+    await fs.copyFile(resolvedSource, result.filePath)
     return { success: true, path: result.filePath }
   })
 }

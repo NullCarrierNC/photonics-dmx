@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.web.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "types": ["node", "jest", "electron-vite/node"]
+  },
+  "include": [
+    "src/photonics-dmx/tests/window-globals.d.ts",
+    "src/shared/**/*.ts",
+    "src/main/logging/**/*.ts",
+    "src/main/tests/**/*.ts",
+    "src/photonics-dmx/tests/**/*.ts",
+    "src/photonics-dmx/**/*.test.ts",
+    "src/services/**/tests/**/*.ts",
+    "src/renderer/src/**/*.test.ts",
+    "src/renderer/src/**/*.test.tsx"
+  ],
+  "exclude": ["node_modules", "out", "dist", "coverage"]
+}

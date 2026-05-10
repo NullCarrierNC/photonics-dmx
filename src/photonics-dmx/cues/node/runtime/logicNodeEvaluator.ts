@@ -18,6 +18,8 @@ import {
   UninitializedVariableError,
 } from './valueResolver'
 import { extractCueDataValue, extractConfigDataValue } from './dataExtractors'
+import { createLogger } from '../../../../shared/logger'
+const log = createLogger('logicNodeEvaluator')
 
 export interface LogicNodeEvaluatorContext {
   cueId: string
@@ -211,7 +213,7 @@ export function evaluateLogicNode(
       const sourceVar = sourceVarStore.get(logicNode.sourceVariable)
 
       if (!sourceVar || sourceVar.type !== 'light-array') {
-        console.warn(
+        log.warn(
           `lights-from-index node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`,
         )
         return edges.map((edge) => edge.to)
@@ -220,7 +222,7 @@ export function evaluateLogicNode(
       const lightsArray = sourceVar.value as TrackedLight[]
 
       if (lightsArray.length === 0) {
-        console.warn(`lights-from-index node ${nodeId}: source array is empty`)
+        log.warn(`lights-from-index node ${nodeId}: source array is empty`)
         return edges.map((edge) => edge.to)
       }
 
@@ -302,7 +304,7 @@ export function evaluateLogicNode(
 
       // If no valid indices found, return early
       if (indices.length === 0) {
-        console.warn(`lights-from-index node ${nodeId}: no valid indices found`)
+        log.warn(`lights-from-index node ${nodeId}: no valid indices found`)
         return edges.map((edge) => edge.to)
       }
 
@@ -333,7 +335,7 @@ export function evaluateLogicNode(
         const lightsArray = sourceVar.value as TrackedLight[]
         length = lightsArray.length
       } else {
-        console.warn(
+        log.warn(
           `array-length node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`,
         )
       }
@@ -351,7 +353,7 @@ export function evaluateLogicNode(
       const sourceVar = sourceVarStore.get(logicNode.sourceVariable)
 
       if (!sourceVar || sourceVar.type !== 'light-array') {
-        console.warn(
+        log.warn(
           `reverse-lights node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`,
         )
         return edges.map((edge) => edge.to)
@@ -373,7 +375,7 @@ export function evaluateLogicNode(
       const sourceVar = sourceVarStore.get(logicNode.sourceVariable)
 
       if (!sourceVar || sourceVar.type !== 'light-array') {
-        console.warn(
+        log.warn(
           `create-pairs node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`,
         )
         return edges.map((edge) => edge.to)
@@ -408,7 +410,7 @@ export function evaluateLogicNode(
         if (sourceVar && sourceVar.type === 'light-array') {
           concatResult.push(...(sourceVar.value as TrackedLight[]))
         } else {
-          console.warn(
+          log.warn(
             `concat-lights node ${nodeId}: variable "${varName}" is not a light-array, skipping`,
           )
         }
@@ -432,7 +434,7 @@ export function evaluateLogicNode(
       const sourceVar = sourceVarStore.get(logicNode.sourceVariable)
 
       if (!sourceVar || sourceVar.type !== 'light-array') {
-        console.warn(
+        log.warn(
           `shuffle-lights node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`,
         )
         return edges.map((edge) => edge.to)
@@ -476,7 +478,7 @@ export function evaluateLogicNode(
         const sourceVarStore = getVarStore(logicNode.sourceVariable ?? '')
         const sourceVar = sourceVarStore.get(logicNode.sourceVariable ?? '')
         if (!sourceVar || sourceVar.type !== 'light-array') {
-          console.warn(
+          log.warn(
             `random node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`,
           )
           return edges.map((edge) => edge.to)
@@ -503,7 +505,7 @@ export function evaluateLogicNode(
       const message = String(
         resolveValue('string', logicNode.message, context, variableDefinitions),
       )
-      console.log(`[DebuggerNode] ${message}`)
+      log.info(`[DebuggerNode] ${message}`)
 
       // Log checked variables with their current values
       const variablesForLog = logicNode.variablesToLog.map((varName) => {
@@ -519,9 +521,9 @@ export function evaluateLogicNode(
         const varStore = getVarStore(varName)
         const variable = varStore.get(varName)
         if (variable) {
-          console.log(`[DebuggerNode] ${varName}:`, variable.value)
+          log.info(`[DebuggerNode] ${varName}:`, variable.value)
         } else {
-          console.log(`[DebuggerNode] ${varName}: <undefined>`)
+          log.info(`[DebuggerNode] ${varName}: <undefined>`)
         }
       }
 

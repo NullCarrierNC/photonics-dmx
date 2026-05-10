@@ -17,6 +17,8 @@ import {
   LightingPreferences,
   senderOpenDmxEnabledAtom,
   openDmxComPortAtom,
+  syncOutputSenderAtoms,
+  yargListenerEnabledAtom,
 } from './atoms'
 import squareLogo from './assets/images/photonics-icon.png'
 import LeftMenu from './components/LeftMenu'
@@ -30,10 +32,22 @@ import { AudioCaptureManager } from './services/AudioCaptureManager'
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { useToast } from './hooks/useToast'
 import ToastContainer from './components/Toast'
+import { ConfirmModalHost } from './components/ConfirmModalHost'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useDarkMode } from './DarkModeProvider'
 import type { CueStateUpdatePayload } from '../../shared/ipcTypes'
-import { setAudioEnabled, savePrefs, getLightLibrary, getMyLights, getLightLayout } from './ipcApi'
+import {
+  setAudioEnabled,
+  savePrefs,
+  getLightLibrary,
+  getMyLights,
+  getLightLayout,
+  getSystemStatus,
+} from './ipcApi'
+import { registerIpcListener } from './utils/ipcHelpers'
+import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('App')
 
 /**
  * Main application component
@@ -46,7 +60,7 @@ export const App = (): JSX.Element => {
   // State atoms
   const setMyLights = useSetAtom(myDmxLightsAtom)
   const setLightLibrary = useSetAtom(dmxLightsLibraryAtom)
-  const [activeConfig, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom)
+  const [, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom)
   const [currentPage] = useAtom(currentPageAtom)
   const { isDarkMode, toggleDarkMode } = useDarkMode()
   const [, setPrefs] = useAtom(lightingPrefsAtom)
@@ -61,6 +75,7 @@ export const App = (): JSX.Element => {
   const setEnttecProEnabled = useSetAtom(senderEnttecProEnabledAtom)
   const setOpenDmxEnabled = useSetAtom(senderOpenDmxEnabledAtom)
   const setIpcEnabled = useSetAtom(senderIpcEnabledAtom)
+  const setYargEnabled = useSetAtom(yargListenerEnabledAtom)
   const [appVer, setAppVer] = useState('')
   const { toasts, showToast, hideToast } = useToast()
 
@@ -78,24 +93,26 @@ export const App = (): JSX.Element => {
   // Handler for sender errors (non-network; network errors use SENDER_NETWORK_ERROR + toast)
   const handleSenderError = useCallback(
     (msg: string): void => {
-      console.error('Sender error:', msg)
+      log.error('Sender error:', msg)
       showToast(msg, 'error', 5000)
     },
     [showToast],
   )
 
-  // Handler for YARG listener errors (protocol/datagram version mismatch, etc.)
   const handleYargError = useCallback(
-    (msg: string): void => {
-      console.error('YARG error:', msg)
-      showToast(`YARG: ${msg}`, 'error', 5000)
+    (payload: { type: string; message: string; autoDisabled?: boolean }): void => {
+      log.error('YARG error:', payload)
+      if (payload.autoDisabled) {
+        setYargEnabled(false)
+      }
+      showToast(`YARG: ${payload.message}`, 'error', 5000)
     },
-    [showToast],
+    [showToast, setYargEnabled],
   )
 
   const handleNodeCueRuntimeError = useCallback(
     (msg: string): void => {
-      console.error('Node cue runtime error:', msg)
+      log.error('Node cue runtime error:', msg)
       showToast(msg, 'error', 5000)
     },
     [showToast],
@@ -115,6 +132,18 @@ export const App = (): JSX.Element => {
     [showToast],
   )
 
+  const handleConfigCorruptRecovered = useCallback(
+    (payload: { files: { fileName: string; message?: string }[] }): void => {
+      const list = payload.files.map((f) => f.fileName).join(', ')
+      showToast(
+        `A local settings file was invalid. Defaults were restored; your original file was saved as a backup. (${list})`,
+        'warning',
+        10000,
+      )
+    },
+    [showToast],
+  )
+
   // Handler for cue state updates
   const handleCueStateUpdate = useCallback(
     (cueState: CueStateUpdatePayload): void => {
@@ -126,7 +155,7 @@ export const App = (): JSX.Element => {
   // Handler for sender start failures
   const handleSenderStartFailure = useCallback(
     (data: { sender: string; error: string }): void => {
-      console.error(`Sender "${data.sender}" failed to start:`, data.error)
+      log.error(`Sender "${data.sender}" failed to start:`, data.error)
 
       // Update the UI state to reflect that the sender is not running
       switch (data.sender) {
@@ -146,7 +175,7 @@ export const App = (): JSX.Element => {
           setIpcEnabled(false)
           break
         default:
-          console.warn(`Unknown sender type in failure notification: ${data.sender}`)
+          log.warn(`Unknown sender type in failure notification: ${data.sender}`)
       }
 
       const senderName =
@@ -170,7 +199,7 @@ export const App = (): JSX.Element => {
   // Handler for sender network errors (invalid destinations, etc.)
   const handleSenderNetworkError = useCallback(
     (data: { sender: string; error: string; autoDisabled: boolean }): void => {
-      console.error(`Sender "${data.sender}" network error:`, data.error)
+      log.error(`Sender "${data.sender}" network error:`, data.error)
 
       // Update the UI state to reflect that the sender is not running
       switch (data.sender) {
@@ -187,7 +216,7 @@ export const App = (): JSX.Element => {
           setOpenDmxEnabled(false)
           break
         default:
-          console.warn(`Unknown sender type in network error notification: ${data.sender}`)
+          log.warn(`Unknown sender type in network error notification: ${data.sender}`)
       }
 
       // Show error toast message
@@ -208,13 +237,13 @@ export const App = (): JSX.Element => {
   // Handler for audio:enable from main process
   const handleAudioEnable = useCallback(
     async (config: AudioConfig): Promise<void> => {
-      console.log('Received audio:enable from main process', config)
+      log.info('Received audio:enable from main process', config)
 
       try {
         // Create AudioCaptureManager if it doesn't exist
         if (!audioCaptureManagerRef.current) {
           audioCaptureManagerRef.current = new AudioCaptureManager(config)
-          console.log('Created AudioCaptureManager')
+          log.info('Created AudioCaptureManager')
         } else {
           // Update config if manager already exists
           audioCaptureManagerRef.current.updateConfig(config)
@@ -222,9 +251,9 @@ export const App = (): JSX.Element => {
 
         // Start capturing audio
         await audioCaptureManagerRef.current.start(config.deviceId)
-        console.log('Audio capture started')
+        log.info('Audio capture started')
       } catch (error) {
-        console.error('Failed to start audio capture:', error)
+        log.error('Failed to start audio capture:', error)
         setIsSenderError(true)
         // Show full error message - extract message from Error objects or convert to string
         const errorMessage =
@@ -239,9 +268,9 @@ export const App = (): JSX.Element => {
         // Automatically disable audio in main process since it failed to start
         try {
           await setAudioEnabled(false)
-          console.log('Audio automatically disabled due to capture failure')
+          log.info('Audio automatically disabled due to capture failure')
         } catch (disableError) {
-          console.error('Failed to disable audio after capture failure:', disableError)
+          log.error('Failed to disable audio after capture failure:', disableError)
         }
       }
     },
@@ -250,23 +279,23 @@ export const App = (): JSX.Element => {
 
   // Handler for audio:disable from main process
   const handleAudioDisable = useCallback((): void => {
-    console.log('Received audio:disable from main process')
+    log.info('Received audio:disable from main process')
 
     if (audioCaptureManagerRef.current) {
       audioCaptureManagerRef.current.stop()
-      console.log('Audio capture stopped')
+      log.info('Audio capture stopped')
     }
   }, [])
 
   // Handler for audio:config-update from main process
   const handleAudioConfigUpdate = useCallback(
     (config: AudioConfig | undefined): void => {
-      console.log('Received audio:config-update from main process', config)
+      log.info('Received audio:config-update from main process', config)
 
       // Update AudioCaptureManager if it exists (only when config is defined; updateConfig expects Partial<AudioConfig>)
       if (config && audioCaptureManagerRef.current) {
         audioCaptureManagerRef.current.updateConfig(config)
-        console.log('AudioCaptureManager configuration updated')
+        log.info('AudioCaptureManager configuration updated')
       }
 
       if (!config) return
@@ -296,10 +325,28 @@ export const App = (): JSX.Element => {
           deviceId: prev.audioConfig?.deviceId,
         } as LightingPreferences['audioConfig'],
       }))
-      console.log('Lighting preferences updated with new audio config')
+      log.info('Lighting preferences updated with new audio config')
     },
     [setPrefs],
   )
+
+  // After a controller restart the main process auto-restores senders from preferences.
+  // Sync the renderer toggle atoms so the UI reflects the actual runtime sender state.
+  useEffect(() => {
+    const handleControllersRestarted = () => {
+      getSystemStatus()
+        .then((status) => {
+          if (status?.success && status.senderStatus) {
+            syncOutputSenderAtoms(status.senderStatus)
+          }
+        })
+        .catch((err) => {
+          log.error('App: failed to sync sender status after restart', err)
+        })
+    }
+
+    return registerIpcListener(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, handleControllersRestarted)
+  }, [])
 
   const handleToggleLeftMenu = async (): Promise<void> => {
     const newCollapsed = !isLeftMenuCollapsed
@@ -307,7 +354,7 @@ export const App = (): JSX.Element => {
     try {
       await savePrefs({ leftMenuCollapsed: newCollapsed })
     } catch (error) {
-      console.error('Failed to save left menu collapsed state:', error)
+      log.error('Failed to save left menu collapsed state:', error)
     }
   }
 
@@ -318,7 +365,7 @@ export const App = (): JSX.Element => {
         const data = await getLightLibrary()
         setLightLibrary(data || [])
       } catch (error) {
-        console.error('Failed to load light library:', error)
+        log.error('Failed to load light library:', error)
       }
     }
 
@@ -332,7 +379,7 @@ export const App = (): JSX.Element => {
         const data = await getMyLights()
         setMyLights(data || [])
       } catch (error) {
-        console.error('Failed to load my lights:', error)
+        log.error('Failed to load my lights:', error)
       }
     }
 
@@ -346,7 +393,7 @@ export const App = (): JSX.Element => {
         const data = await getLightLayout('myLayout.json')
         setActiveLightsConfig(data || null)
       } catch (error) {
-        console.error('Failed to load light layout:', error)
+        log.error('Failed to load light layout:', error)
       }
     }
 
@@ -354,7 +401,6 @@ export const App = (): JSX.Element => {
   }, [setActiveLightsConfig])
 
   useAppIpcListeners({
-    activeConfig,
     setAppVer,
     setPrefs: setPrefs as (prefs: LightingPreferences) => void,
     setEnttecProComPort,
@@ -367,11 +413,17 @@ export const App = (): JSX.Element => {
     handleCueStateUpdate,
     handleSenderStartFailure,
     handleCueValidationErrors,
+    handleConfigCorruptRecovered,
     handleAudioEnable,
     handleAudioDisable,
     handleAudioConfigUpdate,
-    audioCaptureManagerRef,
   })
+
+  useEffect(() => {
+    return () => {
+      audioCaptureManagerRef.current?.stop()
+    }
+  }, [])
 
   const sidebarWidth = isLeftMenuCollapsed ? 80 : 218
 
@@ -430,6 +482,7 @@ export const App = (): JSX.Element => {
         <StatusBar />
       </div>
       <ToastContainer toasts={toasts} onDismiss={hideToast} />
+      <ConfirmModalHost />
     </div>
   )
 }

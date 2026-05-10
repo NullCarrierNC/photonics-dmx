@@ -16,6 +16,10 @@ import {
   YargNodeCueDefinition,
   ValueSource,
 } from '../../types/nodeCueTypes'
+import { createLogger } from '../../../../shared/logger'
+import { validateSharedActionNodePayload } from './sharedActionNodeValidation'
+
+const log = createLogger('NodeCueCompiler')
 
 export class NodeCueCompilationError extends Error {
   constructor(message: string) {
@@ -96,7 +100,12 @@ export class NodeCueCompiler {
       !eventListeners.length &&
       !effectRaisers.length
     ) {
-      const cueId = 'cueType' in definition ? definition.cueType : definition.cueTypeId
+      const cueId =
+        definition.kind === 'lighting'
+          ? 'cueType' in definition
+            ? definition.cueType
+            : definition.cueTypeId
+          : definition.id
       throw new NodeCueCompilationError(
         `At least one action, event raiser, event listener, or effect raiser node is required. Cue '${definition.name}' (${cueId}) has none.`,
       )
@@ -113,7 +122,7 @@ export class NodeCueCompiler {
     // Validate that all event raiser/listener nodes reference valid registered events
     for (const raiser of eventRaisers) {
       if (!raiser.eventName) {
-        console.warn(`Event raiser '${raiser.label ?? raiser.id}' has no event selected.`)
+        log.warn(`Event raiser '${raiser.label ?? raiser.id}' has no event selected.`)
         continue // Allow empty during editing, skip validation
       }
       if (!eventNameSet.has(raiser.eventName)) {
@@ -125,7 +134,7 @@ export class NodeCueCompiler {
 
     for (const listener of eventListeners) {
       if (!listener.eventName) {
-        console.warn(`Event listener '${listener.label ?? listener.id}' has no event selected.`)
+        log.warn(`Event listener '${listener.label ?? listener.id}' has no event selected.`)
         continue // Allow empty during editing, skip validation
       }
       if (!eventNameSet.has(listener.eventName)) {
@@ -218,17 +227,6 @@ export class NodeCueCompiler {
   }
 
   private static validateAction(action: ActionNode): void {
-    // Check if groups is defined (ValueSource should always have a value)
-    if (!action.target.groups) {
-      throw new NodeCueCompilationError(
-        `Action '${action.label ?? action.id}' must target at least one group.`,
-      )
-    }
-    // If it's a literal source, check the value isn't empty
-    if (action.target.groups.source === 'literal' && !action.target.groups.value) {
-      throw new NodeCueCompilationError(
-        `Action '${action.label ?? action.id}' must target at least one group.`,
-      )
-    }
+    validateSharedActionNodePayload(action, (message) => new NodeCueCompilationError(message))
   }
 }

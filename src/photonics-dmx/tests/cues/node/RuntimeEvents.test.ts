@@ -17,8 +17,7 @@ import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../../cues/types/cueTypes'
 import { VariableValue } from '../../../cues/node/runtime/executionTypes'
-
-jest.mock('../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
+import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
 describe('Runtime Event System', () => {
   let mockSequencer: ILightingController
@@ -154,6 +153,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'keyframe' as any,
         style: 'primary',
         nodes: {
@@ -176,6 +176,7 @@ describe('Runtime Event System', () => {
         'cue1',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -255,6 +256,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'keyframe' as any,
         style: 'primary',
         nodes: {
@@ -277,6 +279,7 @@ describe('Runtime Event System', () => {
         'cue1',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -364,6 +367,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'keyframe' as any,
         style: 'primary',
         nodes: {
@@ -386,6 +390,7 @@ describe('Runtime Event System', () => {
         'cue1',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -472,6 +477,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'keyframe' as any,
         style: 'primary',
         nodes: {
@@ -494,6 +500,7 @@ describe('Runtime Event System', () => {
         'cue1',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -545,6 +552,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'keyframe' as any,
         style: 'primary',
         nodes: {
@@ -599,6 +607,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
+        kind: 'lighting',
         cueType: 'keyframe' as any,
         style: 'primary',
         nodes: {
@@ -647,6 +656,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-lifecycle',
         name: 'Lifecycle Cue',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'primary',
         nodes: {
@@ -664,6 +674,7 @@ describe('Runtime Event System', () => {
         'cue-lifecycle',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -707,6 +718,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-no-ref',
         name: 'No Ref Cue',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'primary',
         nodes: {
@@ -723,6 +735,7 @@ describe('Runtime Event System', () => {
         'cue-no-ref',
         mockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         new EffectRegistry(),
@@ -766,6 +779,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-full',
         name: 'Full Lifecycle Cue',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'primary',
         nodes: {
@@ -829,6 +843,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-transition',
         name: 'Transition Test Cue',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'primary',
         nodes: {
@@ -881,6 +896,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-secondary',
         name: 'Secondary Overlay Cue',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'secondary',
         nodes: {
@@ -930,6 +946,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-primary-called-only',
         name: 'Primary Cue Called Only',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'primary',
         nodes: {
@@ -983,6 +1000,7 @@ describe('Runtime Event System', () => {
       const cueDefinition: YargNodeCueDefinition = {
         id: 'cue-blocking',
         name: 'Blocking Cue',
+        kind: 'lighting',
         cueType: 'Intro' as any,
         style: 'primary',
         nodes: {
@@ -1048,6 +1066,7 @@ describe('Runtime Event System', () => {
         'group1:cue-blocking',
         neverCallMockSequencer,
         mockLightManager,
+        noopRuntimeBroadcaster(),
         cueLevelVarStore,
         groupLevelVarStore,
         effectRegistry,

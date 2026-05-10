@@ -5,6 +5,8 @@
  */
 
 import type { IpcEventChannel, IpcEventMap } from '../../../shared/ipcTypes'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('ipcHelpers')
 
 export type IpcHandler<TPayload = unknown> = (payload: TPayload) => void
 
@@ -33,7 +35,7 @@ export function addIpcListener<T extends IpcEventChannel>(
         try {
           fn(payload)
         } catch (err) {
-          console.error(`[ipcHelpers] Subscriber error on channel "${channel}":`, err)
+          log.error(`[ipcHelpers] Subscriber error on channel "${channel}":`, err)
         }
       })
     })
@@ -42,7 +44,7 @@ export function addIpcListener<T extends IpcEventChannel>(
 
   const state = registry.get(channel)!
   if (state.subscribers.has(listener as IpcHandler)) {
-    console.warn(
+    log.warn(
       `Listener for channel "${channel}" already registered. Skipping to prevent duplicates.`,
     )
     return

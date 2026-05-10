@@ -74,6 +74,7 @@ describe('NodeCueCompiler', () => {
       const definition: YargNodeCueDefinition = {
         id: 'unreach-cue',
         name: 'Unreachable Cue',
+        kind: 'lighting',
         cueType: CueType.Chorus,
         style: 'primary',
         nodes: {
@@ -95,6 +96,7 @@ describe('NodeCueCompiler', () => {
       const definition: YargNodeCueDefinition = {
         id: 'effects-only-cue',
         name: 'Effects Only',
+        kind: 'lighting',
         cueType: CueType.Chorus,
         style: 'primary',
         nodes: {

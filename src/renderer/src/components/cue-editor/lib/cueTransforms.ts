@@ -87,7 +87,8 @@ function normalizeAudioEventForSave(
     (event.eventType === 'none' ||
       event.eventType === 'delay' ||
       event.eventType === 'cue-started' ||
-      event.eventType === 'audio-beat' ||
+      event.eventType === 'cue-called' ||
+      event.eventType === 'beat' ||
       event.eventType === 'audio-energy' ||
       event.eventType === 'audio-centroid' ||
       event.eventType === 'audio-flatness' ||
@@ -331,7 +332,10 @@ function flowToNodesAndConnections(
   return { layoutPositions, nodes: payload, connections }
 }
 
-const cueModeOf = (cue: CueDefinition): NodeCueMode => ('cueType' in cue ? 'yarg' : 'audio')
+const cueModeOf = (cue: CueDefinition): NodeCueMode => {
+  if ('cueTypeId' in cue) return 'audio'
+  return 'yarg'
+}
 
 const cueToFlow = (
   cue: CueDefinition | null,

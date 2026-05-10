@@ -2,11 +2,20 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import {
+  getActiveAudioMotionCue,
   getAudioEnabled,
   getAudioGameMode,
+  getAudioMotionCueGroups,
   getAudioReactiveCues,
+  getAvailableAudioMotionCues,
+  getMotionEnabled,
   setActiveAudioCue,
+  setActiveAudioMotionCue,
 } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+import type { AudioGameModeSchedulePayload } from '../../../shared/ipcTypes'
+
+const log = createLogger('AudioCueSelectorPanel')
 
 interface AudioCueOption {
   id: string
@@ -48,6 +57,22 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
   const [strobeFiringDisplay, setStrobeFiringDisplay] = useState(false)
   const [strobeCueType, setStrobeCueType] = useState<string | null>(null)
   const strobeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [motionGlobalEnabled, setMotionGlobalEnabled] = useState(true)
+  const [motionPlayingLabel, setMotionPlayingLabel] = useState<string | null>(null)
+  const [motionPlayingGroupLabel, setMotionPlayingGroupLabel] = useState<string | null>(null)
+  const [motionGroups, setMotionGroups] = useState<
+    Array<{ id: string; name: string; description?: string; cueCount: number }>
+  >([])
+  const [motionGroupId, setMotionGroupId] = useState('')
+  const [motionCueId, setMotionCueId] = useState('')
+  const [motionCuesOptions, setMotionCuesOptions] = useState<Array<{ id: string; name: string }>>(
+    [],
+  )
+  const [savingMotion, setSavingMotion] = useState(false)
+  const [gameModeSchedule, setGameModeSchedule] = useState<AudioGameModeSchedulePayload | null>(
+    null,
+  )
+  const [, setGameModeScheduleTick] = useState(0)
 
   const loadCueState = useCallback(async (silent = false) => {
     try {
@@ -58,10 +83,21 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
       setAudioEnabled(enabled)
 
       try {
+        const me = await getMotionEnabled()
+        setMotionGlobalEnabled(me === true)
+      } catch {
+        setMotionGlobalEnabled(true)
+      }
+
+      try {
         const gm = await getAudioGameMode()
         setGameModeEnabled(gm.enabled)
+        if (!gm.enabled) {
+          setGameModeSchedule(null)
+        }
       } catch {
         setGameModeEnabled(false)
+        setGameModeSchedule(null)
       }
 
       if (!enabled) {
@@ -72,7 +108,44 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         setSelectedCueId('')
         setSelectedGroupId('')
         setError(null)
+        setMotionGroups([])
+        setMotionGroupId('')
+        setMotionCueId('')
+        setMotionCuesOptions([])
+        setMotionPlayingLabel(null)
+        setMotionPlayingGroupLabel(null)
+        setGameModeSchedule(null)
         return
+      }
+
+      try {
+        const [groups, activeRef] = await Promise.all([
+          getAudioMotionCueGroups(),
+          getActiveAudioMotionCue(),
+        ])
+        const groupsList = groups ?? []
+        setMotionGroups(groupsList)
+        if (activeRef && typeof activeRef === 'object' && 'groupId' in activeRef) {
+          const ref = activeRef as { groupId: string; cueId: string }
+          setMotionGroupId(ref.groupId)
+          setMotionCueId(ref.cueId)
+          const cues = await getAvailableAudioMotionCues(ref.groupId)
+          setMotionCuesOptions(cues.map((c) => ({ id: c.id, name: c.name })))
+          const groupRow = groupsList.find((g) => g.id === ref.groupId)
+          setMotionPlayingGroupLabel(groupRow?.name ?? ref.groupId)
+          const cueRow = cues.find((c) => c.id === ref.cueId)
+          setMotionPlayingLabel(cueRow?.name ?? ref.cueId)
+        } else {
+          setMotionGroupId('')
+          setMotionCueId('')
+          setMotionCuesOptions([])
+          setMotionPlayingGroupLabel(null)
+          setMotionPlayingLabel(null)
+        }
+      } catch (e) {
+        log.error('Failed to load audio motion picker state', e)
+        setMotionPlayingGroupLabel(null)
+        setMotionPlayingLabel(null)
       }
 
       const response: CueStateResponse = await getAudioReactiveCues()
@@ -101,7 +174,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         setError(response?.error || 'Unable to load audio cue state')
       }
     } catch (err) {
-      console.error('Failed to load audio reactive cues', err)
+      log.error('Failed to load audio reactive cues', err)
       setError('Failed to load audio cue state')
     } finally {
       if (!silent) {
@@ -119,6 +192,8 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent)
     addIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, handleAudioEvent)
     addIpcListener(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, handleAudioEvent)
+    const onMotionEnabled = () => loadCueState(true)
+    addIpcListener(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, onMotionEnabled)
 
     return () => {
       removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent)
@@ -126,6 +201,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
       removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, handleAudioEvent)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, handleAudioEvent)
+      removeIpcListener(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, onMotionEnabled)
     }
   }, [loadCueState])
 
@@ -138,6 +214,35 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
       removeIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE, handleGameModeCueChange)
     }
   }, [])
+
+  useEffect(() => {
+    const handleGameModeDeadline = (payload: AudioGameModeSchedulePayload) => {
+      if (payload.deadlineMs == null && !payload.pending) {
+        setGameModeSchedule(null)
+      } else {
+        setGameModeSchedule(payload)
+      }
+    }
+    addIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_DEADLINE, handleGameModeDeadline)
+    return () => {
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_DEADLINE, handleGameModeDeadline)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (
+      !gameModeEnabled ||
+      !gameModeSchedule ||
+      gameModeSchedule.pending ||
+      gameModeSchedule.deadlineMs == null
+    ) {
+      return
+    }
+    const id = setInterval(() => {
+      setGameModeScheduleTick((t) => t + 1)
+    }, 1000)
+    return () => clearInterval(id)
+  }, [gameModeEnabled, gameModeSchedule])
 
   useEffect(() => {
     const clearHideTimer = () => {
@@ -165,6 +270,33 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     return () => {
       removeIpcListener(RENDERER_RECEIVE.AUDIO_STROBE_STATE, handleStrobeState)
       clearHideTimer()
+    }
+  }, [])
+
+  useEffect(() => {
+    const onMotionCueChange = async (payload: {
+      ref: { groupId: string; cueId: string } | null
+    }) => {
+      if (!payload.ref) {
+        setMotionPlayingLabel(null)
+        setMotionPlayingGroupLabel(null)
+        return
+      }
+      try {
+        const groups = await getAudioMotionCueGroups()
+        const groupRow = groups?.find((g) => g.id === payload.ref!.groupId)
+        setMotionPlayingGroupLabel(groupRow?.name ?? payload.ref.groupId)
+        const cues = await getAvailableAudioMotionCues(payload.ref.groupId)
+        const row = cues.find((c) => c.id === payload.ref!.cueId)
+        setMotionPlayingLabel(row?.name ?? payload.ref.cueId)
+      } catch {
+        setMotionPlayingGroupLabel(payload.ref.groupId)
+        setMotionPlayingLabel(payload.ref.cueId)
+      }
+    }
+    addIpcListener(RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE, onMotionCueChange)
+    return () => {
+      removeIpcListener(RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE, onMotionCueChange)
     }
   }, [])
 
@@ -238,6 +370,11 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     return availableCues.find((cue) => cue.id === secondaryCueType)
   }, [availableCues, secondaryCueType])
 
+  const gameModeRemainingSec =
+    !gameModeSchedule?.deadlineMs || gameModeSchedule.pending
+      ? 0
+      : Math.max(0, Math.ceil((gameModeSchedule.deadlineMs - Date.now()) / 1000))
+
   const handleCueChange = async (cueId: string) => {
     setSelectedCueId(cueId)
 
@@ -255,7 +392,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         setError(result?.error || 'Unable to update cue selection')
       }
     } catch (err) {
-      console.error('Failed to set active audio cue', err)
+      log.error('Failed to set active audio cue', err)
       setError('Failed to set active cue')
     } finally {
       setSaving(false)
@@ -269,6 +406,55 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
       handleCueChange(firstCueInGroup.id)
     } else {
       setSelectedCueId('')
+    }
+  }
+
+  const handleMotionGroupChange = async (groupId: string) => {
+    if (!motionGlobalEnabled || savingMotion) return
+    setMotionGroupId(groupId)
+    setMotionCueId('')
+    setMotionCuesOptions([])
+    setSavingMotion(true)
+    try {
+      if (!groupId) {
+        const result = await setActiveAudioMotionCue(null)
+        if (result && typeof result === 'object' && 'success' in result && !result.success) {
+          setError('Unable to save motion selection')
+        }
+        return
+      }
+      const cues = await getAvailableAudioMotionCues(groupId)
+      const mapped = cues.map((c) => ({ id: c.id, name: c.name }))
+      setMotionCuesOptions(mapped)
+      const first = mapped[0]
+      if (first) {
+        setMotionCueId(first.id)
+        const result = await setActiveAudioMotionCue({ groupId, cueId: first.id })
+        if (result && typeof result === 'object' && 'success' in result && !result.success) {
+          setError('Unable to save motion selection')
+        }
+      }
+    } catch (e) {
+      log.error('Unable to update motion cue', e)
+      setError('Unable to update motion cue')
+    } finally {
+      setSavingMotion(false)
+    }
+  }
+
+  const handleMotionCueChange = async (cueId: string) => {
+    if (!motionGlobalEnabled || savingMotion || !motionGroupId) return
+    setMotionCueId(cueId)
+    setSavingMotion(true)
+    try {
+      const result = await setActiveAudioMotionCue({ groupId: motionGroupId, cueId })
+      if (result && typeof result === 'object' && 'success' in result && !result.success) {
+        setError('Unable to save motion selection')
+      }
+    } catch (e) {
+      log.error('Unable to save motion selection', e)
+    } finally {
+      setSavingMotion(false)
     }
   }
 
@@ -300,7 +486,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
 
       {!audioEnabled && (
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Enable Audio Reactive mode in Audio Settings to pick a cue.
+          Enable Audio Reactive mode in Preferences → Audio to pick a cue.
         </p>
       )}
 
@@ -316,17 +502,30 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
 
       {audioEnabled && !loading && availableCues.length > 0 && (
         <div className="space-y-4">
-          {gameModeEnabled ? (
-            <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                  Current cue
-                </h3>
-              </div>
-              <div className="overflow-x-auto">
+          <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                Current cue
+              </h3>
+              {gameModeEnabled && gameModeSchedule && (
+                <span
+                  className="shrink-0 text-sm font-medium tabular-nums text-gray-600 dark:text-gray-300"
+                  aria-live="polite">
+                  {gameModeSchedule.pending
+                    ? 'Waiting for beat...'
+                    : gameModeSchedule.deadlineMs != null
+                      ? `Next cue in ${gameModeRemainingSec}s`
+                      : null}
+                </span>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              {gameModeEnabled ? (
                 <div className="grid w-full min-w-[36rem] grid-cols-4 gap-3 sm:gap-4">
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-800 dark:text-gray-200">Cue group</p>
+                    <p className="font-medium text-gray-800 dark:text-gray-200">
+                      Lighting Cue Group
+                    </p>
                     <p className="text-sm text-gray-700 dark:text-gray-300">
                       {activeCueForGameMode?.groupName ?? '—'}
                     </p>
@@ -360,9 +559,71 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
                     </p>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="grid w-full grid-cols-2 gap-3 sm:gap-4">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 dark:text-gray-200">
+                      Lighting Cue Group
+                    </p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      {selectedCue?.groupName ?? selectedGroupInfo?.name ?? '—'}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 dark:text-gray-200">Audio Cue</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      {selectedCue?.label ?? selectedCueId ?? activeCue ?? '—'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
-          ) : (
+            {motionGlobalEnabled && (
+              <div className="mt-3 pt-3 border-t border-gray-300 dark:border-gray-600">
+                <div className="overflow-x-auto">
+                  {gameModeEnabled ? (
+                    <div className="grid w-full min-w-[36rem] grid-cols-4 gap-3 sm:gap-4">
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-800 dark:text-gray-200">
+                          Motion Cue Group
+                        </p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          {motionPlayingGroupLabel ?? '—'}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-800 dark:text-gray-200">Motion Cue</p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          {motionPlayingLabel ?? '—'}
+                        </p>
+                      </div>
+                      <div className="min-w-0" aria-hidden />
+                      <div className="min-w-0" aria-hidden />
+                    </div>
+                  ) : (
+                    <div className="grid w-full grid-cols-2 gap-3 sm:gap-4">
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-800 dark:text-gray-200">
+                          Motion Cue Group
+                        </p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          {motionPlayingGroupLabel ?? '—'}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-800 dark:text-gray-200">Motion Cue</p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          {motionPlayingLabel ?? '—'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {!gameModeEnabled && (
             <>
               <div className="flex flex-col gap-4 md:flex-row">
                 <div className={`${DROPDOWN_WIDTH}`}>
@@ -430,6 +691,46 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
                 </div>
               )}
             </>
+          )}
+          {!gameModeEnabled && motionGlobalEnabled && motionGroups.length > 0 && (
+            <div className="flex flex-col gap-4 md:flex-row">
+              <div className={`${DROPDOWN_WIDTH}`}>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Motion cue group
+                </label>
+                <select
+                  className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
+                  value={motionGroupId}
+                  onChange={(e) => void handleMotionGroupChange(e.target.value)}
+                  disabled={savingMotion || motionGroups.length === 0}>
+                  <option value="">Auto (random per primary cue change)</option>
+                  {motionGroups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={`${DROPDOWN_WIDTH}`}>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Motion cue
+                </label>
+                <select
+                  className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
+                  value={motionCueId}
+                  onChange={(e) => void handleMotionCueChange(e.target.value)}
+                  disabled={savingMotion || !motionGroupId || motionCuesOptions.length === 0}>
+                  <option value="" disabled>
+                    {!motionGroupId ? 'Choose Auto or a group first' : 'Choose a motion cue'}
+                  </option>
+                  {motionCuesOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name || c.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           )}
         </div>
       )}

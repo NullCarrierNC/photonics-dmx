@@ -1,5 +1,9 @@
+/* eslint-disable no-console -- DebugMonitor prints a formatted ASCII table that must render contiguously without a logger prefix on every line. */
 import { IDebugMonitor, ILayerManager } from './interfaces'
 import { LightTransitionController } from './LightTransitionController'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('DebugMonitor')
 
 /**
  * @class DebugMonitor
@@ -103,7 +107,7 @@ export class DebugMonitor implements IDebugMonitor {
         this._lastDebugRefresh = now
       } catch (error) {
         // Catch to avoid crashing the app if there's an error in debug logging
-        console.error('Error in debug output:', error)
+        log.error('Error in debug output:', error)
         this._lastDebugRefresh = now // Still update to avoid rapid retries
       }
     }

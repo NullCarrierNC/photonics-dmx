@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "cueVersion": 1,
   "mode": "audio",
   "group": {
     "id": "audio-disco",
@@ -110,7 +111,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -174,7 +178,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -259,7 +266,8 @@
           "y": 97.07177513185889,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-disco-color-chase",
@@ -287,7 +295,7 @@
           {
             "id": "ev-disco-cc-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.4
@@ -347,7 +355,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -411,7 +422,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -479,7 +493,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -547,7 +564,10 @@
                 "source": "literal",
                 "value": 500
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -615,7 +635,10 @@
                 "source": "literal",
                 "value": 100
               },
-              "easing": { "source": "literal", "value": "easeIn" },
+              "easing": {
+                "source": "literal",
+                "value": "easeIn"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -826,7 +849,8 @@
           "y": 31.61274981936316,
           "zoom": 0.6045778379166812
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-disco-funky-bass",
@@ -947,7 +971,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1011,7 +1038,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1152,7 +1182,8 @@
           "y": 96.95693265553564,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "lighting"
     }
   ],
   "bundled": true

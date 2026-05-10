@@ -1,12 +1,15 @@
 import { useAtom } from 'jotai'
 import { senderArtNetEnabledAtom, artNetConfigAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('ArtNetToggle')
 
 interface ArtNetToggleProps {
   disabled?: boolean
+  compact?: boolean
 }
 
-const ArtNetToggle = ({ disabled = false }: ArtNetToggleProps) => {
+const ArtNetToggle = ({ disabled = false, compact = false }: ArtNetToggleProps) => {
   const [isArtNetEnabled, setIsArtNetEnabled] = useAtom(senderArtNetEnabledAtom)
   const [artNetConfig] = useAtom(artNetConfigAtom)
   const [prefs] = useAtom(lightingPrefsAtom)
@@ -17,10 +20,10 @@ const ArtNetToggle = ({ disabled = false }: ArtNetToggleProps) => {
 
     if (newState) {
       enableSender({ sender: 'artnet', ...artNetConfig })
-      console.log('ArtNet enabled')
+      log.info('ArtNet enabled')
     } else {
       disableSender({ sender: 'artnet' })
-      console.log('ArtNet disabled')
+      log.info('ArtNet disabled')
     }
   }
 
@@ -30,10 +33,20 @@ const ArtNetToggle = ({ disabled = false }: ArtNetToggleProps) => {
   }
 
   return (
-    <div className="flex flex-col gap-2 mb-4 w-[190px] justify-between">
-      <div className="flex items-center gap-4 justify-between">
+    <div
+      className={
+        compact
+          ? 'flex flex-col gap-1 shrink-0'
+          : 'flex flex-col gap-2 mb-4 w-[190px] justify-between'
+      }>
+      <div
+        className={
+          compact
+            ? 'flex items-center gap-2 justify-between'
+            : 'flex items-center gap-4 justify-between'
+        }>
         <label
-          className={`text-lg font-semibold ${
+          className={`${compact ? 'text-sm font-medium' : 'text-lg font-semibold'} ${
             disabled ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'
           }`}>
           ArtNet Out
@@ -41,7 +54,7 @@ const ArtNetToggle = ({ disabled = false }: ArtNetToggleProps) => {
         <button
           onClick={handleToggle}
           disabled={artNetConfig.host.length < 7 || disabled}
-          className={`w-12 h-6 rounded-full transition-colors ${
+          className={`${compact ? 'w-9 h-5' : 'w-12 h-6'} rounded-full transition-colors ${
             isArtNetEnabled ? 'bg-green-500' : 'bg-gray-400'
           } relative focus:outline-none ${
             artNetConfig.host.length < 7 || disabled
@@ -49,8 +62,8 @@ const ArtNetToggle = ({ disabled = false }: ArtNetToggleProps) => {
               : 'cursor-pointer'
           }`}>
           <div
-            className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
-              isArtNetEnabled ? 'translate-x-6' : 'translate-x-0'
+            className={`${compact ? 'w-5 h-5' : 'w-6 h-6'} bg-white rounded-full shadow-md transform transition-transform duration-200 ${
+              isArtNetEnabled ? (compact ? 'translate-x-4' : 'translate-x-6') : 'translate-x-0'
             }`}></div>
         </button>
       </div>

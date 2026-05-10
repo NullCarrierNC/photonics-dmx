@@ -1,4 +1,8 @@
-import type { AudioGameModeConfig, AudioLightingData } from '../listeners/Audio/AudioTypes'
+import type {
+  AudioGameModeConfig,
+  AudioGameModeSchedulePayload,
+  AudioLightingData,
+} from '../listeners/Audio/AudioTypes'
 import type { IAudioCue } from '../cues/interfaces/IAudioCue'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import type { AudioCueType } from '../cues/types/audioCueTypes'
@@ -39,6 +43,7 @@ export class AudioGameModeManager {
   private pendingSwitch = false
   private switchDeadlineMs = 0
   private onCueSwitch: ((cueType: AudioCueType) => void) | null = null
+  private onScheduleChange: ((info: AudioGameModeSchedulePayload) => void) | null = null
 
   constructor(initialConfig: AudioGameModeConfig) {
     this.config = { ...initialConfig }
@@ -58,6 +63,7 @@ export class AudioGameModeManager {
     }
     this.pendingSwitch = false
     this.scheduleNextSwitch()
+    this.emitScheduleChange()
     this.onCueSwitch?.(this.primaryCue)
   }
 
@@ -65,17 +71,26 @@ export class AudioGameModeManager {
     this.onCueSwitch = cb
   }
 
+  public setOnScheduleChange(cb: ((info: AudioGameModeSchedulePayload) => void) | null): void {
+    this.onScheduleChange = cb
+  }
+
   public stop(): void {
+    this.onScheduleChange?.({ deadlineMs: null, pending: false })
     this.pendingSwitch = false
   }
 
   public updateConfig(config: AudioGameModeConfig): void {
+    const wasPending = this.pendingSwitch
     this.config = { ...config }
     if (!this.pendingSwitch && this.switchDeadlineMs > 0) {
       const remaining = this.switchDeadlineMs - Date.now()
       if (remaining < 0) {
         this.pendingSwitch = true
       }
+    }
+    if (!wasPending && this.pendingSwitch) {
+      this.emitScheduleChange()
     }
   }
 
@@ -90,13 +105,22 @@ export class AudioGameModeManager {
     const now = Date.now()
     if (!this.pendingSwitch && now >= this.switchDeadlineMs) {
       this.pendingSwitch = true
+      this.emitScheduleChange()
     }
 
     if (this.pendingSwitch && audioData.beatDetected) {
       this.switchToNextCue()
       this.pendingSwitch = false
       this.scheduleNextSwitch()
+      this.emitScheduleChange()
     }
+  }
+
+  private emitScheduleChange(): void {
+    this.onScheduleChange?.({
+      deadlineMs: this.switchDeadlineMs > 0 ? this.switchDeadlineMs : null,
+      pending: this.pendingSwitch,
+    })
   }
 
   private scheduleNextSwitch(): void {

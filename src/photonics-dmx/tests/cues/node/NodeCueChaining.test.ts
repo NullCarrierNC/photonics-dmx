@@ -6,8 +6,6 @@ import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { CueType } from '../../../cues/types/cueTypes'
 import { Effect, TrackedLight } from '../../../types'
 
-jest.mock('../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
-
 describe('Node cue chaining', () => {
   afterEach(() => {
     jest.restoreAllMocks()
@@ -18,6 +16,7 @@ describe('Node cue chaining', () => {
       id: 'test-cue',
       name: 'Chained Beat',
       description: '',
+      kind: 'lighting',
       cueType: CueType.Cool_Automatic,
       style: 'primary',
       nodes: {

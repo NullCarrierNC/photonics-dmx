@@ -5,6 +5,8 @@ import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { setListenCueData } from '../ipcApi'
 import { useAtom } from 'jotai'
 import { rb3eListenerEnabledAtom } from '../atoms'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('CuePreviewRb3e')
 
 interface CuePreviewRb3eProps {
   className?: string
@@ -46,7 +48,7 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
     setListenCueData(true)
 
     const handleCueData = (cueData: CueData) => {
-      console.log('Received RB3E cue data:', cueData)
+      log.info('Received RB3E cue data:', cueData)
 
       // Update color banks based on LED positions
       if (cueData.ledPositions !== undefined && cueData.ledColor) {

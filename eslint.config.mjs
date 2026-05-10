@@ -19,6 +19,31 @@ export default defineConfig([
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-empty-function': 'off',
+      'no-console': 'error',
+    },
+  },
+  {
+    files: ['src/shared/logger.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+  {
+    files: [
+      'src/photonics-dmx/tests/**',
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/*.spec.ts',
+      '**/*.spec.tsx',
+    ],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+  {
+    files: ['scripts/**'],
+    rules: {
+      'no-console': 'off',
     },
   },
   {

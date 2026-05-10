@@ -1,12 +1,15 @@
 import { useAtom } from 'jotai'
 import { enttecProComPortAtom, senderEnttecProEnabledAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('EnttecProToggle')
 
 interface EnttecProToggleProps {
   disabled?: boolean
+  compact?: boolean
 }
 
-const EnttecProToggle = ({ disabled = false }: EnttecProToggleProps) => {
+const EnttecProToggle = ({ disabled = false, compact = false }: EnttecProToggleProps) => {
   const [isEnttecProEnabled, setIsEnttecProEnabled] = useAtom(senderEnttecProEnabledAtom)
   const [comPort] = useAtom(enttecProComPortAtom)
   const [prefs] = useAtom(lightingPrefsAtom)
@@ -17,10 +20,10 @@ const EnttecProToggle = ({ disabled = false }: EnttecProToggleProps) => {
 
     if (newState) {
       enableSender({ sender: 'enttecpro', devicePath: comPort })
-      console.log('EnttecPro enabled')
+      log.info('EnttecPro enabled')
     } else {
       disableSender({ sender: 'enttecpro' })
-      console.log('EnttecPro disabled')
+      log.info('EnttecPro disabled')
     }
   }
 
@@ -30,10 +33,20 @@ const EnttecProToggle = ({ disabled = false }: EnttecProToggleProps) => {
   }
 
   return (
-    <div className="flex flex-col gap-2 mb-4  w-[190px] justify-between">
-      <div className="flex items-center gap-4 justify-between">
+    <div
+      className={
+        compact
+          ? 'flex flex-col gap-1 shrink-0'
+          : 'flex flex-col gap-2 mb-4  w-[190px] justify-between'
+      }>
+      <div
+        className={
+          compact
+            ? 'flex items-center gap-2 justify-between'
+            : 'flex items-center gap-4 justify-between'
+        }>
         <label
-          className={`text-lg font-semibold ${
+          className={`${compact ? 'text-sm font-medium' : 'text-lg font-semibold'} ${
             disabled ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'
           }`}>
           Enttec Pro Out
@@ -41,14 +54,14 @@ const EnttecProToggle = ({ disabled = false }: EnttecProToggleProps) => {
         <button
           onClick={handleToggle}
           disabled={comPort.length < 3 || disabled}
-          className={`w-12 h-6 rounded-full transition-colors ${
+          className={`${compact ? 'w-9 h-5' : 'w-12 h-6'} rounded-full transition-colors ${
             isEnttecProEnabled ? 'bg-green-500' : 'bg-gray-400'
           } relative focus:outline-none ${
             comPort.length < 3 || disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
           }`}>
           <div
-            className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
-              isEnttecProEnabled ? 'translate-x-6' : 'translate-x-0'
+            className={`${compact ? 'w-5 h-5' : 'w-6 h-6'} bg-white rounded-full shadow-md transform transition-transform duration-200 ${
+              isEnttecProEnabled ? (compact ? 'translate-x-4' : 'translate-x-6') : 'translate-x-0'
             }`}></div>
         </button>
       </div>

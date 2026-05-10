@@ -4,8 +4,7 @@ import type { YargEffectDefinition } from '../../../../cues/types/nodeCueTypes'
 import { defaultCueData, type CueData } from '../../../../cues'
 import { getColor } from '../../../../helpers/dmxHelpers'
 import { createSequencerHarness } from '../../../helpers/sequencerHarness'
-
-jest.mock('../../../../../main/utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
+import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
 
 const createCueData = (overrides: Partial<CueData> = {}): CueData => ({
   ...defaultCueData,
@@ -85,6 +84,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       { colorParam: 'green' },
       createCueData(),
     )
@@ -157,6 +157,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       { startDelay: 30 },
       createCueData(),
     )
@@ -234,6 +235,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       { fadeDuration: 40 },
       createCueData(),
     )
@@ -259,89 +261,95 @@ describe('Effect runtime with real Sequencer', () => {
   })
 
   it('blocks execution through effect delay nodes', async () => {
-    const effect: YargEffectDefinition = {
-      id: 'delay-effect',
-      mode: 'yarg',
-      name: 'Delay Effect',
-      description: '',
-      nodes: {
-        events: [],
-        actions: [
-          {
-            id: 'action-1',
-            type: 'action',
-            effectType: 'set-color',
-            target: {
-              groups: { source: 'literal', value: 'front' },
-              filter: { source: 'literal', value: 'all' },
+    jest.useFakeTimers()
+    try {
+      const effect: YargEffectDefinition = {
+        id: 'delay-effect',
+        mode: 'yarg',
+        name: 'Delay Effect',
+        description: '',
+        nodes: {
+          events: [],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'red' },
+                brightness: { source: 'literal', value: 'high' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 0 },
+                waitUntilCondition: { source: 'literal', value: 'none' },
+                waitUntilTime: { source: 'literal', value: 0 },
+              },
             },
-            color: {
-              name: { source: 'literal', value: 'red' },
-              brightness: { source: 'literal', value: 'high' },
-              blendMode: { source: 'literal', value: 'replace' },
+          ],
+          logic: [
+            {
+              id: 'delay-1',
+              type: 'logic',
+              logicType: 'delay',
+              delayTime: { source: 'literal', value: 20 },
             },
-            timing: {
-              waitForCondition: { source: 'literal', value: 'none' },
-              waitForTime: { source: 'literal', value: 0 },
-              duration: { source: 'literal', value: 0 },
-              waitUntilCondition: { source: 'literal', value: 'none' },
-              waitUntilTime: { source: 'literal', value: 0 },
+          ],
+          eventRaisers: [],
+          eventListeners: [],
+          effectListeners: [
+            {
+              id: 'listener-1',
+              type: 'effect-listener',
+              label: 'Entry',
+              outputs: ['delay-1'],
             },
-          },
+          ],
+        },
+        connections: [
+          { from: 'listener-1', to: 'delay-1' },
+          { from: 'delay-1', to: 'action-1' },
         ],
-        logic: [
-          {
-            id: 'delay-1',
-            type: 'logic',
-            logicType: 'delay',
-            delayTime: { source: 'literal', value: 20 },
-          },
-        ],
-        eventRaisers: [],
-        eventListeners: [],
-        effectListeners: [
-          {
-            id: 'listener-1',
-            type: 'effect-listener',
-            label: 'Entry',
-            outputs: ['delay-1'],
-          },
-        ],
-      },
-      connections: [
-        { from: 'listener-1', to: 'delay-1' },
-        { from: 'delay-1', to: 'action-1' },
-      ],
-      layout: { nodePositions: {} },
+        layout: { nodePositions: {} },
+      }
+
+      const compiledEffect = EffectCompiler.compile(effect)
+      const engine = new EffectExecutionEngine(
+        compiledEffect,
+        harness.sequencer,
+        harness.lightManager,
+        noopRuntimeBroadcaster(),
+        {},
+        createCueData(),
+      )
+
+      engine.triggerEffect(createCueData())
+      harness.advanceBy(1)
+
+      const lightId = harness.frontLightIds[0]
+      const beforeDelay = harness.getLightState(lightId)
+      expect(beforeDelay?.intensity ?? 0).toBe(0)
+
+      jest.advanceTimersByTime(25)
+      harness.advanceBy(1)
+
+      const afterDelay = harness.getLightState(lightId)
+      const expected = getColor('red', 'high')
+      expect(afterDelay).toMatchObject({
+        red: expected.red,
+        green: expected.green,
+        blue: expected.blue,
+        blendMode: expected.blendMode,
+      })
+    } finally {
+      jest.useRealTimers()
     }
-
-    const compiledEffect = EffectCompiler.compile(effect)
-    const engine = new EffectExecutionEngine(
-      compiledEffect,
-      harness.sequencer,
-      harness.lightManager,
-      {},
-      createCueData(),
-    )
-
-    engine.triggerEffect(createCueData())
-    harness.advanceBy(1)
-
-    const lightId = harness.frontLightIds[0]
-    const beforeDelay = harness.getLightState(lightId)
-    expect(beforeDelay?.intensity ?? 0).toBe(0)
-
-    jest.advanceTimersByTime(25)
-    harness.advanceBy(1)
-
-    const afterDelay = harness.getLightState(lightId)
-    const expected = getColor('red', 'high')
-    expect(afterDelay).toMatchObject({
-      red: expected.red,
-      green: expected.green,
-      blue: expected.blue,
-      blendMode: expected.blendMode,
-    })
   })
 
   it('raises internal events to drive effect actions', () => {
@@ -417,6 +425,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       {},
       createCueData(),
     )
@@ -498,6 +507,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       { targetLights: selectedLights },
       createCueData(),
     )
@@ -590,6 +600,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       { colorName: 'red', brightness: 'max', blendMode: 'add' },
       createCueData(),
     )
@@ -659,6 +670,7 @@ describe('Effect runtime with real Sequencer', () => {
       compiledEffect,
       harness.sequencer,
       harness.lightManager,
+      noopRuntimeBroadcaster(),
       {},
       createCueData(),
     )

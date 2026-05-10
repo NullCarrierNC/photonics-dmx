@@ -6,11 +6,19 @@ import {
   StrobeDmxChannels,
   MovingHeadDmxChannels,
   DmxRig,
+  FixtureTypes,
+  normalizeFixtureConfig,
 } from '../types'
 import { DmxLightManager } from './DmxLightManager'
-import { castToChannelType } from '../helpers/dmxHelpers'
+import {
+  castToChannelType,
+  mirrorDmxForMovingHeadInvert,
+  percentToDmx,
+} from '../helpers/dmxHelpers'
 import { SenderManager } from './SenderManager'
 import { LightStateManager } from './sequencer/LightStateManager'
+import { createLogger } from '../../shared/logger'
+const log = createLogger('DmxPublisher')
 
 /**
  * Prepares DMX data to be sent to individual lights by
@@ -25,6 +33,8 @@ export class DmxPublisher {
   private _immediateBlackoutData: Record<number, number> = {}
   /** Reused each frame to reduce GC */
   private _mergedBuffer: Record<number, number> = {}
+  /** When true, `publish` ignores light states; output comes only from `setManualBuffer`. */
+  private _manualMode = false
 
   constructor(senderManager: SenderManager, lightStateManager: LightStateManager) {
     this._sender = senderManager
@@ -44,7 +54,47 @@ export class DmxPublisher {
    * mapping the desired channels to each DMX fixture's channels.
    */
   public publish = (lights: Map<string, RGBIO>): void => {
+    if (this._manualMode) {
+      return
+    }
     this.publishNow(lights)
+  }
+
+  /**
+   * DMX Console: send a raw universe buffer and take over output until {@link clearManualBuffer}.
+   */
+  public setManualBuffer(buffer: Record<number, number>): void {
+    this._manualMode = true
+    for (const key of Object.keys(this._mergedBuffer)) {
+      delete this._mergedBuffer[Number(key)]
+    }
+    for (const [k, v] of Object.entries(buffer)) {
+      const ch = Number(k)
+      if (!Number.isFinite(ch) || ch < 1 || ch > 512) {
+        continue
+      }
+      this._mergedBuffer[ch] = Math.max(0, Math.min(255, Math.round(v)))
+    }
+    if (Object.keys(this._mergedBuffer).length === 0) {
+      for (let ch = 1; ch <= 512; ch++) {
+        this._mergedBuffer[ch] = this._immediateBlackoutData[ch]
+      }
+    }
+    try {
+      this._sender.send(this._mergedBuffer)
+    } catch (error) {
+      log.error('Failed to send manual DMX data:', error)
+    }
+  }
+
+  /**
+   * Resume cue-driven output from {@link LightStatesUpdated}.
+   */
+  public clearManualBuffer(): void {
+    this._manualMode = false
+    for (const key of Object.keys(this._mergedBuffer)) {
+      delete this._mergedBuffer[Number(key)]
+    }
   }
 
   /**
@@ -111,20 +161,55 @@ export class DmxPublisher {
         }
 
         const { red: r, green: g, blue: b, intensity, pan, tilt } = lightValue
+        const isMovingHead =
+          dmxLight.fixture === FixtureTypes.RGBMH || dmxLight.fixture === FixtureTypes.RGBWMH
+        let panOut: number
+        let tiltOut: number
+        if (isMovingHead) {
+          const cfg = normalizeFixtureConfig(dmxLight.config)
+          const homePanDmxLogical = percentToDmx(cfg.panHome, cfg.panMin, cfg.panMax)
+          const homeTiltDmxLogical = percentToDmx(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
+          const homePanDmx = cfg.invertPan
+            ? mirrorDmxForMovingHeadInvert(homePanDmxLogical, cfg.panMin, cfg.panMax)
+            : homePanDmxLogical
+          const homeTiltDmx = cfg.invertTilt
+            ? mirrorDmxForMovingHeadInvert(homeTiltDmxLogical, cfg.tiltMin, cfg.tiltMax)
+            : homeTiltDmxLogical
+          if (pan != null) {
+            const panDmx = percentToDmx(pan, cfg.panMin, cfg.panMax)
+            panOut = cfg.invertPan
+              ? mirrorDmxForMovingHeadInvert(panDmx, cfg.panMin, cfg.panMax)
+              : panDmx
+          } else {
+            panOut = homePanDmx
+          }
+          if (tilt != null) {
+            const tiltDmx = percentToDmx(tilt, cfg.tiltMin, cfg.tiltMax)
+            tiltOut = cfg.invertTilt
+              ? mirrorDmxForMovingHeadInvert(tiltDmx, cfg.tiltMin, cfg.tiltMax)
+              : tiltDmx
+          } else {
+            tiltOut = homeTiltDmx
+          }
+        } else {
+          panOut = pan ?? dmxLight.config?.panHome ?? 0
+          tiltOut = tilt ?? dmxLight.config?.tiltHome ?? 0
+        }
+
         const channelsInput: { [key: string]: number } = {
           red: r,
           green: g,
           blue: b,
           masterDimmer: intensity,
-          pan: pan ?? dmxLight.config?.panHome ?? 0,
-          tilt: tilt ?? dmxLight.config?.tiltHome ?? 0,
+          pan: panOut,
+          tilt: tiltOut,
         }
 
         let dmxChannelData
         try {
           dmxChannelData = castToChannelType(dmxLight.fixture, channelsInput)
         } catch (error) {
-          console.error(`Error casting channels for Light ID: ${lightId} - ${error}`)
+          log.error(`Error casting channels for Light ID: ${lightId} - ${error}`)
           continue
         }
 
@@ -172,13 +257,14 @@ export class DmxPublisher {
       try {
         this._sender.send(this._mergedBuffer)
       } catch (error) {
-        console.error('Failed to send DMX data:', error)
+        log.error('Failed to send DMX data:', error)
       }
     }
   }
 
   public async shutdown(): Promise<void> {
     try {
+      this.clearManualBuffer()
       // Remove all event listeners
       this._lightStateManager.removeAllListeners()
 
@@ -186,15 +272,15 @@ export class DmxPublisher {
       if (this._sender) {
         try {
           this._sender.send(this._immediateBlackoutData)
-          console.log('DmxPublisher sent final blackout signal')
+          log.info('DmxPublisher sent final blackout signal')
         } catch (err) {
-          console.error('Error sending final blackout signal:', err)
+          log.error('Error sending final blackout signal:', err)
         }
       }
 
-      console.log('DmxPublisher has been successfully shut down.')
+      log.info('DmxPublisher has been successfully shut down.')
     } catch (error) {
-      console.error('Error during DmxPublisher shutdown:', error)
+      log.error('Error during DmxPublisher shutdown:', error)
       throw error
     }
   }

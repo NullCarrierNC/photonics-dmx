@@ -62,12 +62,8 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     if (payload.path) {
       try {
         const file = await loader.readFile(payload.path)
-        return {
-          valid: true,
-          data: file,
-          errors: [],
-          mode: file.mode,
-        }
+        // readFile rejects invalid JSON/schema; still run the canonical validator for parity with the content branch.
+        return validateEffectFile(file)
       } catch (error) {
         return {
           valid: false,
@@ -79,8 +75,7 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     throw new Error('Validation payload must include either content or path.')
   })
 
-  ipcMain.handle(EFFECTS.IMPORT, async (_event, preferredMode?: EffectMode) => {
-    const loader = ensureLoader(controllerManager)
+  ipcMain.handle(EFFECTS.IMPORT_PICK, async (_event, preferredMode?: EffectMode) => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Effect Files', extensions: ['json'] }],
@@ -103,18 +98,24 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     }
 
     const mode = preferredMode ?? validation.mode
-    const filename = path.basename(sourcePath)
-    const saveResult = await loader.saveFile(mode, filename, validation.data)
-    return { success: true, path: saveResult.path }
+    return {
+      success: true,
+      sourceBasename: path.basename(sourcePath),
+      mode,
+      content: validation.data,
+    }
   })
 
   ipcMain.handle(EFFECTS.EXPORT, async (_event, filePath: string) => {
     const loader = ensureLoader(controllerManager)
-    await loader.readFile(filePath) // ensure file is valid/exists
+    // Resolve through the loader so the source path used for fs.copyFile is the same
+    // rooted path the loader vetted; never copy from the raw IPC string.
+    const resolvedSource = loader.resolveEffectFilePathForIpc(filePath)
+    await loader.readFile(resolvedSource) // ensure file is valid/exists
 
     const result = await dialog.showSaveDialog({
       title: 'Export Effect File',
-      defaultPath: path.basename(filePath),
+      defaultPath: path.basename(resolvedSource),
       filters: [{ name: 'Effect Files', extensions: ['json'] }],
     })
 
@@ -122,7 +123,7 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: false, error: 'User cancelled export.' }
     }
 
-    await fs.copyFile(filePath, result.filePath)
+    await fs.copyFile(resolvedSource, result.filePath)
     return { success: true, path: result.filePath }
   })
 }

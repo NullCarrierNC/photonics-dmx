@@ -2,6 +2,7 @@ import React from 'react'
 import type {
   VariableDefinition,
   VariableType,
+  NodeCueKind,
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { TrackedLight } from '../../../../../../photonics-dmx/types'
@@ -20,6 +21,7 @@ type VariableFormDialogProps = {
   onSave: () => void
   onCancel: () => void
   activeMode: NodeCueMode
+  cueKind: NodeCueKind
   isEffectMode: boolean
   editingVar: VariableDefinition | null
 }
@@ -29,8 +31,9 @@ function getInitialValueInput(
   value: number | boolean | string | TrackedLight[] | undefined,
   onChange: (val: number | boolean | string | TrackedLight[]) => void,
   activeMode: NodeCueMode,
+  cueKind: NodeCueKind,
 ) {
-  const defaultEventValue = getDefaultEventOption(activeMode)?.value ?? ''
+  const defaultEventValue = getDefaultEventOption(activeMode, cueKind)?.value ?? ''
   const eventOptionValues =
     activeMode === 'yarg'
       ? YARG_EVENT_OPTIONS_CATEGORIZED.flatMap((category) =>
@@ -125,6 +128,7 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
   onSave,
   onCancel,
   activeMode,
+  cueKind,
   isEffectMode,
   editingVar,
 }) => {
@@ -134,7 +138,7 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
     let newValue: number | boolean | string | TrackedLight[] = 0
     if (newType === 'boolean') newValue = false
     else if (newType === 'string' || newType === 'cue-type') newValue = ''
-    else if (newType === 'event') newValue = getDefaultEventOption(activeMode)?.value ?? ''
+    else if (newType === 'event') newValue = getDefaultEventOption(activeMode, cueKind)?.value ?? ''
     else if (newType === 'color') newValue = 'blue'
     else if (newType === 'light-array') newValue = []
     onFormDataChange({ ...formData, type: newType, initialValue: newValue })
@@ -184,6 +188,7 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
               formData.initialValue,
               (val) => onFormDataChange({ ...formData, initialValue: val }),
               activeMode,
+              cueKind,
             )}
           </label>
 

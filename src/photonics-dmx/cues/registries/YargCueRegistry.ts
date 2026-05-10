@@ -1,6 +1,11 @@
 import { CueType } from '../types/cueTypes'
+import type { MotionGroupSelectionMode } from '../types/nodeCueTypes'
 import { ICueGroup } from '../interfaces/INetCueGroup'
 import { INetCue, CueStyle } from '../interfaces/INetCue'
+import { YargMotionNodeCue } from '../node/runtime/YargMotionNodeCue'
+import { MotionSelectionState } from './MotionSelectionState'
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('YargCueRegistry')
 
 /**
  * Interface for cue state updates sent to frontend
@@ -40,6 +45,8 @@ export class YargCueRegistry {
 
   /** Per-group disabled cue types (user preferences) */
   private disabledCues: Map<string, Set<string>> = new Map()
+
+  private readonly motionState = new MotionSelectionState<INetCue>()
 
   /** Name of the default group that provides fallback implementations */
   private defaultGroup: string | null = null
@@ -129,6 +136,7 @@ export class YargCueRegistry {
     this.enabledGroups.clear()
     this.activeGroups.clear()
     this.disabledCues.clear()
+    this.motionState.reset()
     this.defaultGroup = null
     this.stageKitGroup = null
     this.stageKitPriority = 'prefer-for-tracked'
@@ -146,7 +154,7 @@ export class YargCueRegistry {
     this.lockedGroupIdForSong = null
     this.clearConsistencyTracking()
 
-    console.log('CueRegistry reset to initial state')
+    log.info('CueRegistry reset to initial state')
   }
 
   /**
@@ -171,6 +179,8 @@ export class YargCueRegistry {
     this.enabledGroups.add(group.id)
     // Add to active groups by default (all enabled groups are active by default)
     this.activeGroups.add(group.id)
+
+    this.motionState.onRegisterGroup(group.id, group.motionCues?.size ?? 0)
   }
 
   /**
@@ -185,6 +195,7 @@ export class YargCueRegistry {
     this.groups.delete(groupId)
     this.enabledGroups.delete(groupId)
     this.activeGroups.delete(groupId)
+    this.motionState.onUnregisterGroup(groupId)
 
     if (this.defaultGroup === groupId) {
       this.defaultGroup = null
@@ -284,7 +295,7 @@ export class YargCueRegistry {
     // No consistent selection available, get a new random selection
     const tempSelection = this.getRandomCueFromActiveGroups(cueType)
     if (!tempSelection) {
-      console.error(`No implementation found for cue: ${cueType}`)
+      log.error(`No implementation found for cue: ${cueType}`)
       return null
     }
 
@@ -344,7 +355,7 @@ export class YargCueRegistry {
    */
   public setCueConsistencyWindow(windowMs: number): void {
     this.cueConsistencyWindow = Math.max(0, windowMs)
-    console.log(`Cue consistency window set to ${this.cueConsistencyWindow}ms`)
+    log.info(`Cue consistency window set to ${this.cueConsistencyWindow}ms`)
   }
 
   /**
@@ -566,7 +577,7 @@ export class YargCueRegistry {
         return cue
       } else {
         // Something went wrong with the consistent selection, clear it and fall through to normal logic
-        console.warn(
+        log.warn(
           `[Consistency] Consistent selection validation failed for ${cueType}, falling back to normal selection`,
         )
         this.clearCueConsistencyTracking(cueType)
@@ -680,7 +691,7 @@ export class YargCueRegistry {
         return cue
       } else {
         // Something went wrong with the consistent selection, clear it and fall through to normal logic
-        console.warn(
+        log.warn(
           `[Consistency] Consistent selection validation failed for ${cueType}, falling back to normal selection`,
         )
         this.clearCueConsistencyTracking(cueType)
@@ -905,7 +916,7 @@ export class YargCueRegistry {
       if (this.enabledGroups.has(groupId)) {
         newActive.add(groupId)
       } else {
-        console.warn(`Cannot activate group '${groupId}': group not enabled`)
+        log.warn(`Cannot activate group '${groupId}': group not enabled`)
       }
     }
 
@@ -1019,7 +1030,7 @@ export class YargCueRegistry {
   public setStageKitPriority(preference: 'prefer-for-tracked' | 'random' | 'never'): void {
     const oldPriority = this.stageKitPriority
     this.stageKitPriority = preference
-    console.log(`[CueRegistry] Stage kit priority changed from '${oldPriority}' to '${preference}'`)
+    log.info(`[CueRegistry] Stage kit priority changed from '${oldPriority}' to '${preference}'`)
 
     // Clear consistency tracking when priority changes to ensure immediate effect
     this.clearConsistencyTracking()
@@ -1216,5 +1227,132 @@ export class YargCueRegistry {
       windowMs: this.cueConsistencyWindow,
       trackedCues,
     }
+  }
+
+  public setMotionSelectionMode(mode: MotionGroupSelectionMode): void {
+    this.motionState.setMotionSelectionMode(mode)
+  }
+
+  public getMotionSelectionMode(): MotionGroupSelectionMode {
+    return this.motionState.getMotionSelectionMode()
+  }
+
+  public onMotionSongStart(): void {
+    this.motionState.onMotionSongStart()
+  }
+
+  public onMotionSongEnd(): void {
+    this.motionState.onMotionSongEnd()
+  }
+
+  public getRandomMotionCue(): INetCue | null {
+    return this.motionState.getRandomMotionCue((id) => this.groups.get(id), this.defaultGroup)
+  }
+
+  /**
+   * Resolve a specific motion program when manual selection is active.
+   * Returns null if the group is not motion-enabled, the cue is disabled, or the id is unknown.
+   */
+  public getMotionCueImplementation(ref: { groupId: string; cueId: string }): INetCue | null {
+    const group = this.groups.get(ref.groupId)
+    const motionMap = group?.motionCues
+    if (!motionMap || motionMap.size === 0) {
+      return null
+    }
+    if (!this.motionState.getEnabledMotionGroups().includes(ref.groupId)) {
+      return null
+    }
+    if (this.isMotionCueDisabled(ref.groupId, ref.cueId)) {
+      return null
+    }
+    return motionMap.get(ref.cueId) ?? null
+  }
+
+  /** Locate group/cue ids for a motion cue instance (for UI / IPC metadata). */
+  public findYargMotionCueRef(cue: INetCue): { groupId: string; cueId: string } | null {
+    for (const group of this.groups.values()) {
+      const motionMap = group.motionCues
+      if (!motionMap) continue
+      for (const [cueId, impl] of motionMap) {
+        if (impl === cue) {
+          return { groupId: group.id, cueId }
+        }
+      }
+    }
+    return null
+  }
+
+  public getYargMotionGroupsInfo(): Array<{
+    id: string
+    name: string
+    description?: string
+    cueCount: number
+  }> {
+    const rows: Array<{
+      id: string
+      name: string
+      description?: string
+      cueCount: number
+    }> = []
+    for (const group of this.groups.values()) {
+      const n = group.motionCues?.size ?? 0
+      if (n === 0) {
+        continue
+      }
+      rows.push({
+        id: group.id,
+        name: group.name,
+        description: group.description,
+        cueCount: n,
+      })
+    }
+    return rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  }
+
+  public getYargMotionCueDetails(
+    groupId: string,
+  ): Array<{ id: string; name: string; description: string }> {
+    const group = this.groups.get(groupId)
+    const motionMap = group?.motionCues
+    if (!motionMap) {
+      return []
+    }
+    return Array.from(motionMap.values()).map((cue) => {
+      const name = cue instanceof YargMotionNodeCue ? cue.name : cue.cueId
+      return {
+        id: cue.cueId,
+        name,
+        description: cue.description ?? '',
+      }
+    })
+  }
+
+  public setDisabledMotionCues(map: Record<string, string[]>): void {
+    this.motionState.setDisabledMotionCues(map)
+  }
+
+  public isMotionCueDisabled(groupId: string, cueId: string): boolean {
+    return this.motionState.isMotionCueDisabled(groupId, cueId)
+  }
+
+  public setEnabledMotionGroups(groupIds: string[]): void {
+    this.motionState.setEnabledMotionGroups(groupIds, (id) => {
+      return this.groups.has(id) && (this.groups.get(id)?.motionCues?.size ?? 0) > 0
+    })
+  }
+
+  public getEnabledMotionGroups(): string[] {
+    return this.motionState.getEnabledMotionGroups()
+  }
+
+  /** Group ids that have at least one YARG motion program registered. */
+  public getRegisteredMotionGroupIds(): string[] {
+    return this.motionState.getRegisteredMotionGroupIds(this.groups.values())
+  }
+
+  public enableMotionGroup(groupId: string): void {
+    this.motionState.enableMotionGroup(groupId, (id) => {
+      return this.groups.has(id) && (this.groups.get(id)?.motionCues?.size ?? 0) > 0
+    })
   }
 }

@@ -1,3 +1,6 @@
+import { createLogger } from '../../../shared/logger'
+const log = createLogger('Clock')
+
 /**
  * @class Clock
  * @description Centralized timing source for the lighting sequencer system.
@@ -136,7 +139,7 @@ export class Clock {
       try {
         callback(deltaTime)
       } catch (error) {
-        console.error('Error in timing update callback:', error)
+        log.error('Error in timing update callback:', error)
       }
     })
   }

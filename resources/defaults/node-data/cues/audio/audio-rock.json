@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "cueVersion": 1,
   "mode": "audio",
   "group": {
     "id": "audio-rock",
@@ -110,7 +111,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -174,7 +178,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -259,7 +266,8 @@
           "y": 97.6196366744116,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-rock-kick-snare",
@@ -390,7 +398,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -454,7 +465,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -518,7 +532,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -700,7 +717,8 @@
           "y": 139.1640271396376,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-rock-arena-strobe",
@@ -719,7 +737,7 @@
           {
             "id": "ev-rock-as-beat",
             "type": "event",
-            "eventType": "audio-beat",
+            "eventType": "beat",
             "triggerMode": "edge",
             "label": "Beat",
             "threshold": 0.3
@@ -867,7 +885,8 @@
           "y": 43.49221274383544,
           "zoom": 1.0844492209093106
         }
-      }
+      },
+      "kind": "lighting"
     },
     {
       "id": "cue-rock-metal-wall",
@@ -988,7 +1007,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1052,7 +1074,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1116,7 +1141,10 @@
                 "source": "literal",
                 "value": 0
               },
-              "easing": { "source": "literal", "value": "linear" },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
               "level": {
                 "source": "literal",
                 "value": 1
@@ -1229,7 +1257,8 @@
           "y": 104.66165645653382,
           "zoom": 0.75
         }
-      }
+      },
+      "kind": "lighting"
     }
   ],
   "bundled": true

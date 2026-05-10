@@ -12,12 +12,12 @@ const Header: React.FC = () => {
     [Pages.Status]: 'Status',
     [Pages.MyLights]: 'My Lights',
     [Pages.LightLayout]: 'Light Layout',
+    [Pages.DmxConsole]: 'DMX Console',
     [Pages.NetworkDebug]: 'Network Debug',
     [Pages.CuePreview]: 'DMX Preview',
     [Pages.CueSimulation]: 'Cue Simulation',
     [Pages.CueEditor]: 'Cue Editor',
     [Pages.Preferences]: 'Preferences',
-    [Pages.AudioSettings]: 'Audio Settings',
     [Pages.About]: 'About Photonics (ALPHA VERSION)',
   }
 
