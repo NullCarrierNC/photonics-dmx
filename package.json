@@ -1,6 +1,6 @@
 {
   "name": "photonics-dmx",
-  "version": "0.5.2-alpha.5",
+  "version": "0.5.3-alpha.5",
   "description": "A DMX sequencer for YARG, RB3E, and music visualization.",
   "main": "./out/main/index.js",
   "author": "Null Carrier",
@@ -97,10 +97,11 @@
     "vite": "^6.4.2"
   },
   "overrides": {
-    "esbuild": "0.25.12"
+    "esbuild": "0.25.12",
+    "three-mesh-bvh": "^0.8.0"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.12.0"
   },
   "lint-staged": {
     "*.{ts,tsx,js,cjs,mjs}": "eslint --fix",

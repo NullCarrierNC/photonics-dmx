@@ -30,7 +30,7 @@ function eslintJsonForSrc() {
     '--max-warnings',
     '1000000',
   ]
-  return execFileSync('npx', args, { cwd: root, encoding: 'utf8' })
+  return execFileSync('npx', args, { cwd: root, encoding: 'utf8', shell: true })
 }
 
 function countExplicitAnysEslint() {
