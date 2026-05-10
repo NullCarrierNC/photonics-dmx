@@ -68,3 +68,16 @@ jobs:
 
       - name: Test
         run: npm test
+
+  all-checks-passed:
+    name: all checks passed
+    needs: [source-checks, test]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [ "${{ needs.source-checks.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ]; then
+            echo "One or more required checks failed"
+            exit 1
+          fi
