@@ -6,6 +6,7 @@ import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getAppVersion, getCorruptRecoveryEvents, getPrefs, getValidationErrors } from '../ipcApi'
 import type { CueStateUpdatePayload } from '../../../shared/ipcTypes'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
+import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../../shared/dmxOutputRefresh'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('useAppIpcListeners')
 
@@ -78,7 +79,7 @@ async function loadAndApplyPrefs(
   }
   setEnttecProComPort(updatedPrefs.enttecProConfig?.port ?? '')
 
-  const defaultOpenDmxConfig = { port: '', dmxSpeed: 40 }
+  const defaultOpenDmxConfig = { port: '', dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ }
   if (!prefs.openDmxConfig) {
     log.info('No saved OpenDMX config, using defaults:', defaultOpenDmxConfig)
     updatedPrefs.openDmxConfig = defaultOpenDmxConfig

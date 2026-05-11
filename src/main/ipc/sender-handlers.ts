@@ -2,15 +2,9 @@ import { IpcMain } from 'electron'
 import * as os from 'os'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { sendToAllWindows } from '../utils/windowUtils'
-import type { SacnSenderConfig } from '../../photonics-dmx/types'
 import { ipcError, ipcSuccess } from './ipcResult'
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
-import {
-  isPlainObject,
-  validateNumberInRange,
-  validateSenderEnablePayload,
-  validateSenderId,
-} from './inputValidation'
+import { isPlainObject, validateSenderEnablePayload, validateSenderId } from './inputValidation'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('Ipc.Sender')
@@ -78,29 +72,13 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       if (!isPlainObject(config)) {
         return { success: false, error: 'Invalid sACN config payload' }
       }
-      let universe: number | undefined
-      if (config.universe !== undefined) {
-        const universeValidation = validateNumberInRange(config.universe, 0, 63999, 'SACN universe')
-        if (!universeValidation.ok) {
-          return { success: false, error: universeValidation.error }
-        }
-        universe = universeValidation.value
+      const payloadValidation = validateSenderEnablePayload({ sender: 'sacn', ...config })
+      if (!payloadValidation.ok) {
+        return { success: false as const, error: payloadValidation.error }
       }
-      const maxOutputRate =
-        typeof config.maxOutputRate === 'number' && config.maxOutputRate >= 0
-          ? Math.min(200, config.maxOutputRate)
-          : undefined
-      const sacnConfig: SacnSenderConfig = {
-        sender: 'sacn',
-        universe,
-        networkInterface:
-          typeof config.networkInterface === 'string' && config.networkInterface.trim() !== ''
-            ? config.networkInterface
-            : undefined,
-        useUnicast: Boolean(config.useUnicast),
-        unicastDestination:
-          typeof config.unicastDestination === 'string' ? config.unicastDestination : undefined,
-        maxOutputRate,
+      const sacnConfig = payloadValidation.value
+      if (sacnConfig.sender !== 'sacn') {
+        return { success: false as const, error: 'Internal validation mismatch' }
       }
       const senderManager = controllerManager.getSenderManager()
       if (senderManager.getEnabledSenders().includes('sacn')) {
@@ -112,6 +90,33 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true }
     } catch (error) {
       log.error('Error updating sACN configuration:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle(LIGHT.UPDATE_ARTNET_CONFIG, async (_, config: unknown) => {
+    try {
+      if (!isPlainObject(config)) {
+        return { success: false, error: 'Invalid Art-Net config payload' }
+      }
+      const payloadValidation = validateSenderEnablePayload({ sender: 'artnet', ...config })
+      if (!payloadValidation.ok) {
+        return { success: false as const, error: payloadValidation.error }
+      }
+      const artnetConfig = payloadValidation.value
+      if (artnetConfig.sender !== 'artnet') {
+        return { success: false as const, error: 'Internal validation mismatch' }
+      }
+      const senderManager = controllerManager.getSenderManager()
+      if (senderManager.getEnabledSenders().includes('artnet')) {
+        await senderManager.restartSender('artnet', artnetConfig)
+        log.info('Art-Net configuration updated and sender restarted')
+      } else {
+        log.info('Art-Net not currently enabled, configuration saved for next enable')
+      }
+      return { success: true }
+    } catch (error) {
+      log.error('Error updating Art-Net configuration:', error)
       throw error
     }
   })

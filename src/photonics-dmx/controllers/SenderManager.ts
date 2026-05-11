@@ -1,6 +1,7 @@
 // src/managers/SenderManager.ts
 import { EventEmitter } from 'node:events'
 import { createLogger } from '../../shared/logger'
+import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../shared/dmxOutputRefresh'
 import { BaseSender, SenderError } from '../senders/BaseSender'
 import { IpcSender } from '../senders/IpcSender'
 import { ArtNetSender } from '../senders/ArtNetSender'
@@ -125,6 +126,7 @@ export class SenderManager {
               useUnicast: config.useUnicast,
               unicastDestination: config.unicastDestination,
               maxOutputRate: config.maxOutputRate,
+              minRefreshRate: config.minRefreshRate,
             })
             break
           }
@@ -154,7 +156,7 @@ export class SenderManager {
             const USB_UNIVERSE = 0
             sender = new OpenDmxSender(
               openDevicePath,
-              { dmxSpeed: config.dmxSpeed ?? 40 },
+              { dmxSpeed: config.dmxSpeed ?? OPEN_DMX_DEFAULT_REFRESH_RATE_HZ },
               'uni1',
               USB_UNIVERSE,
             )

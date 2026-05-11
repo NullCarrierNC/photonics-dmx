@@ -14,6 +14,7 @@
 import { EventEmitter } from 'events'
 import { EnttecOpenDMXUSBDevice } from 'enttec-open-dmx-usb'
 import { createLogger } from '../../shared/logger'
+import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../shared/dmxOutputRefresh'
 import { BaseSender, SenderError } from './BaseSender'
 
 const log = createLogger('OpenDmxSender')
@@ -27,15 +28,13 @@ interface OpenDmxDeviceOptions {
   usleep?: UsleepFn | null
 }
 
-const DEFAULT_DMX_SPEED_HZ = 40
-
 /**
  * Converts dmxSpeed (Hz) to send interval in ms for enttec-open-dmx-usb.
- * interval = 1000 / dmxSpeed; e.g. 40 Hz -> 25 ms.
+ * interval = 1000 / dmxSpeed; e.g. 20 Hz -> 50 ms.
  */
 function dmxSpeedToIntervalMs(dmxSpeed: number): number {
   if (dmxSpeed <= 0 || !Number.isFinite(dmxSpeed)) {
-    return 1000 / DEFAULT_DMX_SPEED_HZ
+    return 1000 / OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
   }
   return Math.max(1, Math.round(1000 / dmxSpeed))
 }
@@ -59,7 +58,7 @@ class OpenDmxDeviceAdapter implements IOpenDmxDeviceAdapter {
     this.path = path
     this.onError = options.onError
     this.usleep = options.usleep
-    const dmxSpeed = options.dmxSpeed ?? DEFAULT_DMX_SPEED_HZ
+    const dmxSpeed = options.dmxSpeed ?? OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
     this.intervalMs = dmxSpeedToIntervalMs(dmxSpeed)
   }
 
@@ -150,7 +149,7 @@ export class OpenDmxSender extends BaseSender {
 
   constructor(
     private port: string,
-    private options: OpenDmxDeviceOptions = { dmxSpeed: 40 },
+    private options: OpenDmxDeviceOptions = { dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ },
     _universeName: string = 'uni1', // All OpenDMX devices are single-universe
     universe: number = 0,
     deviceFactory?: (path: string, options: OpenDmxDeviceOptions) => IOpenDmxDeviceAdapter,
