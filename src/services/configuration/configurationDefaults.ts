@@ -1,4 +1,8 @@
 import {
+  DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+  OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
+} from '../../shared/dmxOutputRefresh'
+import {
   type AudioConfig,
   type AudioGameModeConfig,
   DEFAULT_AUDIO_GAME_MODE,
@@ -28,12 +32,16 @@ export interface AppPreferences {
     subnet: number
     subuni: number
     port: number
+    /** Unified refresh rate (Hz); drives sender cap and protocol refresh. */
+    refreshRateHz?: number
   }
   sacnConfig?: {
     universe: number
     networkInterface?: string
     unicastDestination?: string
     useUnicast: boolean
+    /** Unified refresh rate (Hz); drives sender cap and protocol refresh. */
+    refreshRateHz?: number
   }
   brightness?: {
     low: number
@@ -125,12 +133,22 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   },
   openDmxConfig: {
     port: '',
-    dmxSpeed: 40,
+    dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
+  },
+  artNetConfig: {
+    host: '',
+    universe: 0,
+    net: 0,
+    subnet: 0,
+    subuni: 0,
+    port: 6454,
+    refreshRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
   },
   sacnConfig: {
     universe: 1,
     useUnicast: false,
     unicastDestination: '',
+    refreshRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
   },
   stageKitPrefs: {
     yargPriority: 'prefer-for-tracked',

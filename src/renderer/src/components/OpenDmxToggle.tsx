@@ -1,6 +1,7 @@
 import { useAtom } from 'jotai'
 import { openDmxComPortAtom, senderOpenDmxEnabledAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
+import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../../shared/dmxOutputRefresh'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('OpenDmxToggle')
 
@@ -13,7 +14,7 @@ const OpenDmxToggle = ({ disabled = false, compact = false }: OpenDmxToggleProps
   const [isOpenDmxEnabled, setIsOpenDmxEnabled] = useAtom(senderOpenDmxEnabledAtom)
   const [comPort] = useAtom(openDmxComPortAtom)
   const [prefs] = useAtom(lightingPrefsAtom)
-  const openDmxSpeed = prefs.openDmxConfig?.dmxSpeed ?? 22
+  const openDmxSpeed = prefs.openDmxConfig?.dmxSpeed ?? OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
 
   const handleToggle = () => {
     const newState = !isOpenDmxEnabled

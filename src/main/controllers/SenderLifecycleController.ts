@@ -13,6 +13,10 @@ import {
   getLastErrorHandledTime,
   removeSenderErrorHandled,
 } from '../senderErrorTracking'
+import {
+  artNetBaseRefreshIntervalMs,
+  dmxOutputRefreshRateHzFromUnknownPayload,
+} from '../../shared/dmxOutputRefresh'
 
 const log = createLogger('SenderLifecycle')
 
@@ -143,6 +147,9 @@ export class SenderLifecycleController {
 
     if (sendersToRestore.sacn) {
       const sc = prefs.sacnConfig
+      const hz = dmxOutputRefreshRateHzFromUnknownPayload({
+        refreshRateHz: sc?.refreshRateHz,
+      })
       try {
         await sm.enableSender('sacn', 'sacn', {
           sender: 'sacn',
@@ -150,6 +157,8 @@ export class SenderLifecycleController {
           networkInterface: sc?.networkInterface || undefined,
           useUnicast: sc?.useUnicast ?? false,
           unicastDestination: sc?.unicastDestination || undefined,
+          maxOutputRate: hz,
+          minRefreshRate: hz,
         })
         log.info('Restored sACN sender from preferences')
       } catch (err) {
@@ -160,6 +169,9 @@ export class SenderLifecycleController {
     if (sendersToRestore.artnet) {
       const ac = prefs.artNetConfig
       if (ac?.host) {
+        const hz = dmxOutputRefreshRateHzFromUnknownPayload({
+          refreshRateHz: ac.refreshRateHz,
+        })
         try {
           await sm.enableSender('artnet', 'artnet', {
             sender: 'artnet',
@@ -169,6 +181,8 @@ export class SenderLifecycleController {
             subnet: ac.subnet,
             subuni: ac.subuni,
             port: ac.port,
+            base_refresh_interval: artNetBaseRefreshIntervalMs(hz),
+            maxOutputRate: hz,
           })
           log.info('Restored Art-Net sender from preferences')
         } catch (err) {

@@ -17,6 +17,8 @@ export interface SacnConfig {
   unicastDestination?: string
   /** Max packets per second (Hz). 0 = no limit. Default 44. */
   maxOutputRate?: number
+  /** Passed to sacn `Sender` as minRefreshRate (Hz). Defaults to effective max output rate. */
+  minRefreshRate?: number
 }
 
 export class SacnSender extends BaseSender {
@@ -30,8 +32,11 @@ export class SacnSender extends BaseSender {
     super()
     this.eventEmitter = new EventEmitter()
     this.config = config
-    const rate = config.maxOutputRate ?? SACN_DEFAULT_MAX_OUTPUT_RATE
-    this.minIntervalMs = rate > 0 ? 1000 / rate : 0
+    const throttleHz =
+      config.maxOutputRate !== undefined && config.maxOutputRate !== null
+        ? config.maxOutputRate
+        : config.minRefreshRate ?? SACN_DEFAULT_MAX_OUTPUT_RATE
+    this.minIntervalMs = throttleHz > 0 ? 1000 / throttleHz : 0
   }
 
   public async start(): Promise<void> {
@@ -44,6 +49,9 @@ export class SacnSender extends BaseSender {
     const validUniverse = Math.max(0, Math.min(63999, Number(universe)))
 
     // Configure sender options (sacn library does not export types for Sender options)
+    const minRefreshHz =
+      this.config.minRefreshRate ?? this.config.maxOutputRate ?? SACN_DEFAULT_MAX_OUTPUT_RATE
+
     const senderOptions: {
       universe: number
       port: number
@@ -56,7 +64,7 @@ export class SacnSender extends BaseSender {
       universe: validUniverse,
       port: 5568,
       reuseAddr: true,
-      minRefreshRate: 30,
+      minRefreshRate: minRefreshHz,
       defaultPacketOptions: {
         sourceName: 'Photonics-DMX',
         useRawDmxValues: true,
