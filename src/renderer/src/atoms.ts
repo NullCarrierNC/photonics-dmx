@@ -10,6 +10,10 @@ import {
 import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { Pages } from './types'
+import {
+  clampDmxOutputRefreshRateHz,
+  DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+} from '../../shared/dmxOutputRefresh'
 
 /**
  * Atom for tracking current page in navigation
@@ -213,6 +217,11 @@ export function syncOutputSenderAtoms(senderStatus: {
 // ArtNet config derived from preferences with fallback defaults
 export const artNetConfigAtom = atom((get) => {
   const prefs = get(lightingPrefsAtom)
+  const rawHz = prefs.artNetConfig?.refreshRateHz
+  const refreshRateHz =
+    typeof rawHz === 'number' && Number.isFinite(rawHz)
+      ? clampDmxOutputRefreshRateHz(rawHz)
+      : DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT
   return {
     host: prefs.artNetConfig?.host || '127.0.0.1',
     universe: prefs.artNetConfig?.universe || 0,
@@ -220,17 +229,24 @@ export const artNetConfigAtom = atom((get) => {
     subnet: prefs.artNetConfig?.subnet || 0,
     subuni: prefs.artNetConfig?.subuni || 0,
     port: prefs.artNetConfig?.port || 6454,
+    refreshRateHz,
   }
 })
 
 // sACN config derived from preferences with fallback defaults
 export const sacnConfigAtom = atom((get) => {
   const prefs = get(lightingPrefsAtom)
+  const rawHz = prefs.sacnConfig?.refreshRateHz
+  const refreshRateHz =
+    typeof rawHz === 'number' && Number.isFinite(rawHz)
+      ? clampDmxOutputRefreshRateHz(rawHz)
+      : DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT
   return {
     universe: prefs.sacnConfig?.universe ?? 1,
     networkInterface: prefs.sacnConfig?.networkInterface || '',
     unicastDestination: prefs.sacnConfig?.unicastDestination || '',
     useUnicast: prefs.sacnConfig?.useUnicast || false,
+    refreshRateHz,
   }
 })
 
@@ -256,12 +272,14 @@ export interface LightingPreferences {
     subnet: number
     subuni: number
     port: number
+    refreshRateHz?: number
   }
   sacnConfig?: {
     universe: number
     networkInterface?: string
     unicastDestination?: string
     useUnicast: boolean
+    refreshRateHz?: number
   }
   brightness?: {
     low: number

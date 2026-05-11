@@ -1,4 +1,5 @@
 import React from 'react'
+import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../../../shared/dmxOutputRefresh'
 import CollapsibleSenderCard from './CollapsibleSenderCard'
 
 interface OpenDmxConfigCardProps {
@@ -60,8 +61,9 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
         />
       </div>
       <p className="text-xs text-gray-600 dark:text-gray-400">
-        Default is 40 Hz. Higher values reduce latency but can increase flicker on lower-quality
-        adapters. If you experience flickering, try lowering the value.
+        Default is {OPEN_DMX_DEFAULT_REFRESH_RATE_HZ} Hz. Higher values reduce latency but can
+        increase flicker on lower-quality adapters. If you experience flickering, try lowering the
+        value.
         <br />
         Strobes may not work as expected if the value is too low.
       </p>

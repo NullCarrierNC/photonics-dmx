@@ -109,6 +109,7 @@ export const LIGHT = {
   START_AUDIO_MOTION_CUE_SIMULATION: 'start-audio-motion-cue-simulation',
   STOP_MOTION_CUE_SIMULATION: 'stop-motion-cue-simulation',
   UPDATE_SACN_CONFIG: 'update-sacn-config',
+  UPDATE_ARTNET_CONFIG: 'update-artnet-config',
   CONSOLE_ENABLE: 'console-enable',
   CONSOLE_DISABLE: 'console-disable',
   CONSOLE_SEND_DMX: 'console-send-dmx',

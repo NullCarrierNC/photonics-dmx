@@ -1,4 +1,5 @@
 import React from 'react'
+import { DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT } from '../../../../shared/dmxOutputRefresh'
 import CollapsibleSenderCard from './CollapsibleSenderCard'
 
 export interface ArtNetConfig {
@@ -8,6 +9,8 @@ export interface ArtNetConfig {
   universe: number
   subuni: number
   port: number
+  /** Unified refresh rate (Hz); 10–44. */
+  refreshRateHz: number
 }
 
 interface ArtNetConfigCardProps {
@@ -106,6 +109,30 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
           min="1024"
           max="65535"
         />
+      </div>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-28 shrink-0">
+            Refresh rate:
+          </label>
+          <input
+            type="number"
+            value={config.refreshRateHz}
+            onChange={(e) =>
+              onConfigChange(
+                'refreshRateHz',
+                parseInt(e.target.value, 10) || DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+              )
+            }
+            className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            min={10}
+            max={44}
+          />
+          <span className="text-xs text-gray-500 dark:text-gray-400">Hz (10–44)</span>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 ml-[7.5rem] max-w-lg leading-snug">
+          If you see flickering, try lowering this value to 20.
+        </p>
       </div>
     </div>
   </CollapsibleSenderCard>

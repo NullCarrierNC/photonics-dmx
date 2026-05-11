@@ -490,6 +490,19 @@ export interface IpcInvokeMap {
       networkInterface?: string
       useUnicast?: boolean
       unicastDestination?: string
+      refreshRateHz?: number
+    }
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [LIGHT.UPDATE_ARTNET_CONFIG]: {
+    request: {
+      host: string
+      universe: number
+      net: number
+      subnet: number
+      subuni: number
+      port: number
+      refreshRateHz?: number
     }
     response: IpcSuccessResult | IpcErrorResult
   }

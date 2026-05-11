@@ -9,12 +9,18 @@ import {
   validateMotionSelectionMode,
   validateNumberInRange,
   validatePathUnderAllowedRoots,
+  validatePreferencesPayload,
   validateSenderEnablePayload,
   validateSenderId,
   validateStageKitPriority,
   validateStringUnion,
 } from '../../ipc/inputValidation'
 import { CueType } from '../../../photonics-dmx/cues/types/cueTypes'
+import {
+  DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+  DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
+  DMX_OUTPUT_REFRESH_RATE_HZ_MIN,
+} from '../../../shared/dmxOutputRefresh'
 
 describe('inputValidation', () => {
   describe('isPlainObject', () => {
@@ -106,38 +112,59 @@ describe('inputValidation', () => {
     it('accepts valid artnet payload', () => {
       const result = validateSenderEnablePayload({ sender: 'artnet', host: '127.0.0.1' })
       expect(result.ok).toBe(true)
-      if (result.ok) expect(result.value.sender).toBe('artnet')
+      if (result.ok) {
+        expect(result.value.sender).toBe('artnet')
+        if (result.value.sender === 'artnet') {
+          expect(result.value.maxOutputRate).toBe(40)
+          expect(result.value.base_refresh_interval).toBe(25)
+        }
+      }
     })
 
-    it('accepts artnet payload with maxOutputRate and clamps to 200', () => {
+    it('accepts artnet payload with high refreshRateHz and clamps to 44 Hz', () => {
+      const result = validateSenderEnablePayload({
+        sender: 'artnet',
+        host: '127.0.0.1',
+        refreshRateHz: 300,
+      })
+      expect(result.ok).toBe(true)
+      if (result.ok && result.value.sender === 'artnet') {
+        expect(result.value.maxOutputRate).toBe(44)
+        expect(result.value.base_refresh_interval).toBe(23)
+      }
+    })
+
+    it('accepts artnet legacy maxOutputRate and clamps Hz into 10–44', () => {
       const result = validateSenderEnablePayload({
         sender: 'artnet',
         host: '127.0.0.1',
         maxOutputRate: 300,
       })
       expect(result.ok).toBe(true)
-      if (result.ok) {
-        expect(result.value.sender).toBe('artnet')
-        expect((result.value as { maxOutputRate?: number }).maxOutputRate).toBe(200)
+      if (result.ok && result.value.sender === 'artnet') {
+        expect(result.value.maxOutputRate).toBe(44)
       }
     })
 
     it('accepts valid sacn payload', () => {
       const result = validateSenderEnablePayload({ sender: 'sacn', universe: 1 })
       expect(result.ok).toBe(true)
-      if (result.ok) expect(result.value.sender).toBe('sacn')
+      if (result.ok && result.value.sender === 'sacn') {
+        expect(result.value.maxOutputRate).toBe(40)
+        expect(result.value.minRefreshRate).toBe(40)
+      }
     })
 
-    it('accepts sacn payload with maxOutputRate and clamps to 200', () => {
+    it('accepts sacn legacy maxOutputRate and clamps Hz into 10–44', () => {
       const result = validateSenderEnablePayload({
         sender: 'sacn',
         universe: 1,
         maxOutputRate: 300,
       })
       expect(result.ok).toBe(true)
-      if (result.ok) {
-        expect(result.value.sender).toBe('sacn')
-        expect((result.value as { maxOutputRate?: number }).maxOutputRate).toBe(200)
+      if (result.ok && result.value.sender === 'sacn') {
+        expect(result.value.maxOutputRate).toBe(44)
+        expect(result.value.minRefreshRate).toBe(44)
       }
     })
 
@@ -365,6 +392,52 @@ describe('inputValidation', () => {
     it('rejects path when allowed roots is empty', () => {
       const result = validatePathUnderAllowedRoots('/tmp/foo', [])
       expect(result.ok).toBe(false)
+    })
+  })
+
+  describe('validatePreferencesPayload', () => {
+    it('clamps sacnConfig.refreshRateHz into allowed range', () => {
+      const r = validatePreferencesPayload({
+        sacnConfig: { universe: 1, useUnicast: false, refreshRateHz: 300 },
+      })
+      expect(r.ok).toBe(true)
+      if (r.ok) expect(r.value.sacnConfig?.refreshRateHz).toBe(DMX_OUTPUT_REFRESH_RATE_HZ_MAX)
+    })
+
+    it('clamps artNetConfig.refreshRateHz into allowed range', () => {
+      const r = validatePreferencesPayload({
+        artNetConfig: {
+          host: '',
+          universe: 0,
+          net: 0,
+          subnet: 0,
+          subuni: 0,
+          port: 6454,
+          refreshRateHz: 3,
+        },
+      })
+      expect(r.ok).toBe(true)
+      if (r.ok) expect(r.value.artNetConfig?.refreshRateHz).toBe(DMX_OUTPUT_REFRESH_RATE_HZ_MIN)
+    })
+
+    it('preserves default-range sacnConfig.refreshRateHz', () => {
+      const r = validatePreferencesPayload({
+        sacnConfig: {
+          universe: 1,
+          useUnicast: false,
+          refreshRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+        },
+      })
+      expect(r.ok).toBe(true)
+      if (r.ok) expect(r.value.sacnConfig?.refreshRateHz).toBe(DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT)
+    })
+
+    it('rejects non-number sacnConfig.refreshRateHz', () => {
+      const payload: Record<string, unknown> = {
+        sacnConfig: { refreshRateHz: 'fast' },
+      }
+      const r = validatePreferencesPayload(payload)
+      expect(r.ok).toBe(false)
     })
   })
 })
