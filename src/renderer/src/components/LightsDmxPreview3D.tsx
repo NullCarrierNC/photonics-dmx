@@ -510,8 +510,9 @@ function SceneEffects() {
 
 const LightsDmxPreview3D: React.FC<LightsDmxPreview3DProps> = ({ lightingConfig, dmxValues }) => {
   return (
-    <div className="w-full h-[min(420px,55vh)] min-h-[280px] rounded-md overflow-hidden border border-gray-400/40 dark:border-gray-600/50">
+    <div className="w-full min-w-0 max-w-full aspect-video max-h-[min(420px,55vh)] rounded-md overflow-hidden border border-gray-400/40 dark:border-gray-600/50">
       <Canvas
+        resize={{ scroll: false, offsetSize: true }}
         camera={{ position: [0, 2.2, 9], fov: 42, near: 0.1, far: 80 }}
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
         dpr={[1, 2]}>
