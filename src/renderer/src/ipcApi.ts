@@ -314,7 +314,18 @@ export const updateSacnConfig = (config: {
   networkInterface?: string
   useUnicast?: boolean
   unicastDestination?: string
+  refreshRateHz?: number
 }) => window.api.invoke(LIGHT.UPDATE_SACN_CONFIG, config)
+
+export const updateArtNetConfig = (config: {
+  host: string
+  universe: number
+  net: number
+  subnet: number
+  subuni: number
+  port: number
+  refreshRateHz?: number
+}) => window.api.invoke(LIGHT.UPDATE_ARTNET_CONFIG, config)
 
 // ---------------------------------------------------------------------------
 // RB3E

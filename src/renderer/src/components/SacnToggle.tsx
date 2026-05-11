@@ -1,5 +1,5 @@
 import { useAtom } from 'jotai'
-import { senderSacnEnabledAtom, lightingPrefsAtom } from '../atoms'
+import { senderSacnEnabledAtom, sacnConfigAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('SacnToggle')
@@ -13,23 +13,23 @@ interface SacnToggleProps {
 const SacnToggle = ({ disabled = false, compact = false }: SacnToggleProps) => {
   const [isSacnEnabled, setIsSacnEnabled] = useAtom(senderSacnEnabledAtom)
   const [prefs] = useAtom(lightingPrefsAtom)
+  const [sacnConfig] = useAtom(sacnConfigAtom)
 
   const handleToggle = () => {
     const newState = !isSacnEnabled
     setIsSacnEnabled(newState)
 
     if (newState) {
-      // Get the latest sacnConfig when enabling
-      const networkInterface = prefs.sacnConfig?.networkInterface
-      const currentSacnConfig = {
-        universe: prefs.sacnConfig?.universe ?? 1,
+      const networkInterface = sacnConfig.networkInterface
+      enableSender({
+        sender: 'sacn',
+        universe: sacnConfig.universe,
         networkInterface: networkInterface === '' ? undefined : networkInterface,
-        unicastDestination: prefs.sacnConfig?.unicastDestination || '',
-        useUnicast: prefs.sacnConfig?.useUnicast || false,
-      }
-
-      enableSender({ sender: 'sacn', ...currentSacnConfig })
-      log.info('sACN enabled with config:', currentSacnConfig)
+        unicastDestination: sacnConfig.unicastDestination || '',
+        useUnicast: sacnConfig.useUnicast || false,
+        refreshRateHz: sacnConfig.refreshRateHz,
+      })
+      log.info('sACN enabled with config:', sacnConfig)
     } else {
       disableSender({ sender: 'sacn' })
       log.info('sACN disabled')

@@ -187,6 +187,8 @@ describe('ControllerManager lifecycle and sender restore', () => {
       networkInterface: '192.168.1.10',
       useUnicast: true,
       unicastDestination: '192.168.1.50',
+      maxOutputRate: 40,
+      minRefreshRate: 40,
     })
   })
 
@@ -266,6 +268,8 @@ describe('ControllerManager lifecycle and sender restore', () => {
       networkInterface: '10.0.0.10',
       useUnicast: false,
       unicastDestination: undefined,
+      maxOutputRate: 40,
+      minRefreshRate: 40,
     })
   })
 
@@ -560,6 +564,8 @@ describe('ControllerManager lifecycle and sender restore', () => {
       networkInterface: '10.0.0.12',
       useUnicast: false,
       unicastDestination: undefined,
+      maxOutputRate: 40,
+      minRefreshRate: 40,
     })
     expect(senderManager.enableSender).toHaveBeenNthCalledWith(2, 'sacn', 'sacn', {
       sender: 'sacn',
@@ -567,6 +573,8 @@ describe('ControllerManager lifecycle and sender restore', () => {
       networkInterface: '10.0.0.12',
       useUnicast: false,
       unicastDestination: undefined,
+      maxOutputRate: 40,
+      minRefreshRate: 40,
     })
   })
 

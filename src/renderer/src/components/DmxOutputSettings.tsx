@@ -22,7 +22,13 @@ import {
   disableSender,
   savePrefs,
   updateSacnConfig,
+  updateArtNetConfig,
 } from '../ipcApi'
+import {
+  clampDmxOutputRefreshRateHz,
+  DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+  OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
+} from '../../../shared/dmxOutputRefresh'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('DmxOutputSettings')
@@ -37,7 +43,7 @@ const DmxOutputSettings: React.FC = () => {
   const [comPort, setComPort] = useAtom(enttecProComPortAtom)
   const [openDmxComPort, setOpenDmxComPort] = useAtom(openDmxComPortAtom)
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
-  const openDmxSpeed = prefs.openDmxConfig?.dmxSpeed ?? 40
+  const openDmxSpeed = prefs.openDmxConfig?.dmxSpeed ?? OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
 
   const [artNetExpanded, setArtNetExpanded] = useState(false)
   const [sacnExpanded, setSacnExpanded] = useState(false)
@@ -287,19 +293,30 @@ const DmxOutputSettings: React.FC = () => {
     field: keyof typeof artNetConfig,
     value: string | number,
   ) => {
+    const parsed =
+      field === 'refreshRateHz'
+        ? clampDmxOutputRefreshRateHz(
+            typeof value === 'number' && Number.isFinite(value)
+              ? value
+              : DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+          )
+        : value
     const newConfig = {
       ...artNetConfig,
-      [field]: typeof value === 'string' ? value : value,
+      [field]: parsed,
     }
 
     try {
       await savePrefs({ artNetConfig: newConfig })
 
-      // Update the preferences atom to reflect the change
       setPrefs((prev) => ({
         ...prev,
         artNetConfig: newConfig,
       }))
+
+      if (isArtNetEnabled) {
+        await updateArtNetConfig(newConfig)
+      }
     } catch (error) {
       log.error('Failed to save ArtNet configuration:', error)
     }
@@ -332,7 +349,7 @@ const DmxOutputSettings: React.FC = () => {
     setOpenDmxComPort(newPort)
 
     const newConfig = {
-      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: 40 }),
+      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ }),
       port: newPort,
     }
 
@@ -350,10 +367,13 @@ const DmxOutputSettings: React.FC = () => {
 
   const handleOpenDmxSpeedChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const parsed = parseInt(e.target.value, 10)
-    const sanitized = Number.isFinite(parsed) && parsed > 0 ? Math.min(44, Math.max(1, parsed)) : 40
+    const sanitized =
+      Number.isFinite(parsed) && parsed > 0
+        ? Math.min(44, Math.max(1, parsed))
+        : OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
 
     const newConfig = {
-      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: 40 }),
+      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ }),
       dmxSpeed: sanitized,
     }
 
@@ -373,9 +393,17 @@ const DmxOutputSettings: React.FC = () => {
     field: keyof typeof sacnConfig,
     value: string | number | boolean,
   ) => {
+    const parsed =
+      field === 'refreshRateHz'
+        ? clampDmxOutputRefreshRateHz(
+            typeof value === 'number' && Number.isFinite(value)
+              ? value
+              : DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+          )
+        : value
     const newConfig = {
       ...sacnConfig,
-      [field]: value,
+      [field]: parsed,
     }
 
     try {

@@ -27,6 +27,11 @@ import { FixtureTypes } from '../../photonics-dmx/types'
 import { CueType } from '../../photonics-dmx/cues/types/cueTypes'
 import type { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
+import {
+  artNetBaseRefreshIntervalMs,
+  clampDmxOutputRefreshRateHz,
+  dmxOutputRefreshRateHzFromUnknownPayload,
+} from '../../shared/dmxOutputRefresh'
 
 /**
  * Renderer-supplied IPC payloads MUST be treated as `unknown`. Validators in this module return a
@@ -258,10 +263,7 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
       if (!universeValidation.ok) {
         return universeValidation
       }
-      const maxOutputRate =
-        typeof data.maxOutputRate === 'number' && data.maxOutputRate >= 0
-          ? Math.min(200, data.maxOutputRate)
-          : undefined
+      const hz = dmxOutputRefreshRateHzFromUnknownPayload(data as Record<string, unknown>)
       const config: SacnSenderConfig = {
         sender: 'sacn',
         universe: universeValidation.value,
@@ -272,7 +274,8 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
         useUnicast: Boolean(data.useUnicast),
         unicastDestination:
           typeof data.unicastDestination === 'string' ? data.unicastDestination : undefined,
-        maxOutputRate,
+        maxOutputRate: hz,
+        minRefreshRate: hz,
       }
       return { ok: true, value: config }
     }
@@ -361,10 +364,7 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
       if (!portValidation.ok) {
         return portValidation
       }
-      const maxOutputRate =
-        typeof data.maxOutputRate === 'number' && data.maxOutputRate >= 0
-          ? Math.min(200, data.maxOutputRate)
-          : undefined
+      const hz = dmxOutputRefreshRateHzFromUnknownPayload(data as Record<string, unknown>)
       const config: ArtNetSenderConfig = {
         sender: 'artnet',
         host: hostValidation.value,
@@ -373,8 +373,8 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
         subnet: subnetValidation.value,
         subuni: subuniValidation.value,
         port: portValidation.value,
-        base_refresh_interval: 1000,
-        maxOutputRate,
+        base_refresh_interval: artNetBaseRefreshIntervalMs(hz),
+        maxOutputRate: hz,
       }
       return { ok: true, value: config }
     }
@@ -698,6 +698,38 @@ export function validatePreferencesPayload(
 
   if ('advancedModeEnabled' in cleaned && typeof cleaned.advancedModeEnabled !== 'boolean') {
     return { ok: false, error: 'advancedModeEnabled must be a boolean' }
+  }
+
+  if ('sacnConfig' in cleaned) {
+    const sc = cleaned.sacnConfig
+    if (!isPlainObject(sc)) {
+      return { ok: false, error: 'sacnConfig must be an object' }
+    }
+    const next: Record<string, unknown> = { ...sc }
+    if ('refreshRateHz' in next) {
+      const hz = next.refreshRateHz
+      if (typeof hz !== 'number' || Number.isNaN(hz)) {
+        return { ok: false, error: 'sacnConfig.refreshRateHz must be a finite number' }
+      }
+      next.refreshRateHz = clampDmxOutputRefreshRateHz(hz)
+    }
+    cleaned.sacnConfig = next
+  }
+
+  if ('artNetConfig' in cleaned) {
+    const ac = cleaned.artNetConfig
+    if (!isPlainObject(ac)) {
+      return { ok: false, error: 'artNetConfig must be an object' }
+    }
+    const next: Record<string, unknown> = { ...ac }
+    if ('refreshRateHz' in next) {
+      const hz = next.refreshRateHz
+      if (typeof hz !== 'number' || Number.isNaN(hz)) {
+        return { ok: false, error: 'artNetConfig.refreshRateHz must be a finite number' }
+      }
+      next.refreshRateHz = clampDmxOutputRefreshRateHz(hz)
+    }
+    cleaned.artNetConfig = next
   }
 
   return { ok: true, value: cleaned as Partial<AppPreferences> }
