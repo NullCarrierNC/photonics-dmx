@@ -92,7 +92,7 @@ const DmxPreviewWithStageLegend: React.FC<{
         </span>
       </>
     )}
-    <div className="relative z-0 flex flex-col items-center">{children}</div>
+    <div className="relative z-0 flex w-full min-w-0 flex-col items-center">{children}</div>
   </div>
 )
 

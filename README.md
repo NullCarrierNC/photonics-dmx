@@ -87,6 +87,28 @@ Grab the release for your OS and install. For YARG you can run Photonics on the 
 
 Please take a look at the [Quickstart Guide](https://photonics.rocks/quickstart-guide/) for instructions on getting up and running.
 
+
+
+### Installing on Windows
+
+If the first time you run Photonics on your PC it shows you an error:
+
+>Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.
+
+This is Windows blocking the app because it’s not currently signed. To install, click `More Info` and then `Install Anyway`. 
+
+
+
+### Installing on Mac
+
+If the first time you run Photonics your Mac shows you an error:
+
+>“Photonics” is damaged and can’t be opened. You should move it to the Trash.
+
+This is Gatekeeper blocking the app because it’s not currently signed. To bypass this warning you need to open your terminal and run:
+`xattr -r -d com.apple.quarantine /Applications/Photonics.app`
+
+
 ## Upgrading from Previous Versions
 
 Alpha 5 introduces a new light layout, `stacked`. This is for lights mounted on a truss or T-bar where some may be up-firing while others are down-firing.
