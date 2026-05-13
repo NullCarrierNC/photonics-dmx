@@ -1,10 +1,109 @@
 import type { DmxFixture, DmxLight, DmxRigsConfig, LightingConfiguration } from '../types'
-import { FixtureTypes, normalizeFixtureConfig } from '../types'
+import {
+  DEFAULT_STROBE_CHANNEL_VALUES,
+  FixtureTypes,
+  LEGACY_FIXTURE_RGB_STROBE,
+  LEGACY_FIXTURE_RGBW_STROBE,
+  normalizeFixtureConfig,
+} from '../types'
 
 const TWO_ROWS_LAYOUT = { id: 'two-rows', label: 'Two Rows (one in front of the other)' } as const
 
-/** Written to `DmxRigsConfig.schemaVersion` after the one-time legacy layout rename and mount backfill. */
-export const CURRENT_RIGS_SCHEMA_VERSION = 1
+/**
+ * Written to `DmxRigsConfig.schemaVersion`. Bumped past each one-time migration:
+ *  v1 — legacy `front-back` → `two-rows` rename and initial mount backfill.
+ *  v2 — `rgb/s`/`rgbw/s` collapsed onto plain `rgb`/`rgbw` with `channels.strobeChannel` and
+ *       per-fixture `strobeValues`; legacy `channels.strobeSpeed` renamed to `strobeChannel`.
+ *  v3 — rig lights are aligned to their fixture templates on every load (see
+ *       {@link syncRigsConfigWithUserLights}); the schema bump simply marks that one-time pass
+ *       has run and the stored data is template-aligned at rest.
+ */
+export const CURRENT_RIGS_SCHEMA_VERSION = 3
+
+/**
+ * Converts a single fixture/light from the pre-v2 strobe model. Only RGB-family fixtures are
+ * promoted onto the new `hasStrobeChannel + strobeValues` model — dedicated {@link FixtureTypes.STROBE}
+ * fixtures are a different device class (colour-less hardware strobe) and don't consume
+ * `strobeValues`; for those we only correct the legacy channel-key name.
+ *
+ * Specifically:
+ *   - `fixture: 'rgb/s'` → `'rgb'` with `channels.strobeChannel` preserved from the legacy
+ *     `channels.strobeSpeed` (default 0 if missing) and `strobeValues` seeded with defaults.
+ *   - `fixture: 'rgbw/s'` → same for `'rgbw'`.
+ *   - `fixture: 'strobe'` keeps its type; the channel key is renamed `strobeSpeed`→`strobeChannel`.
+ *     `strobeValues` is **not** seeded for these fixtures (it isn't part of the dedicated-strobe
+ *     model).
+ *
+ * Returns the input unchanged when no migration is needed. Operates on a generic shape so it can
+ * be reused for both rig fixtures (`DmxLight`) and the fixture library (`DmxFixture`).
+ */
+export function migrateFixtureToStrobeChannelSchema<T extends DmxFixture>(
+  fixture: T,
+): { fixture: T; changed: boolean } {
+  const legacyFixtureKey = String(fixture.fixture)
+  const isLegacyRgbStrobe = legacyFixtureKey === LEGACY_FIXTURE_RGB_STROBE
+  const isLegacyRgbwStrobe = legacyFixtureKey === LEGACY_FIXTURE_RGBW_STROBE
+  const channels = (fixture.channels ?? {}) as unknown as Record<string, number>
+  const hasLegacyStrobeSpeed = Object.prototype.hasOwnProperty.call(channels, 'strobeSpeed')
+  const hasStrobeChannel = Object.prototype.hasOwnProperty.call(channels, 'strobeChannel')
+  const needsStrobeValuesSeed =
+    (isLegacyRgbStrobe || isLegacyRgbwStrobe) && fixture.strobeValues == null
+
+  if (
+    !isLegacyRgbStrobe &&
+    !isLegacyRgbwStrobe &&
+    !hasLegacyStrobeSpeed &&
+    !needsStrobeValuesSeed
+  ) {
+    return { fixture, changed: false }
+  }
+
+  const nextChannels: Record<string, number> = { ...channels }
+  if (hasLegacyStrobeSpeed) {
+    const legacyValue = nextChannels.strobeSpeed
+    delete nextChannels.strobeSpeed
+    if (!hasStrobeChannel) {
+      nextChannels.strobeChannel = legacyValue ?? 0
+    }
+  } else if ((isLegacyRgbStrobe || isLegacyRgbwStrobe) && !hasStrobeChannel) {
+    // Legacy template with no explicit channel offset: default to 0 so the user fills it in.
+    nextChannels.strobeChannel = 0
+  }
+
+  const next: T = {
+    ...fixture,
+    channels: nextChannels as unknown as T['channels'],
+  }
+  if (isLegacyRgbStrobe) {
+    next.fixture = FixtureTypes.RGB
+  } else if (isLegacyRgbwStrobe) {
+    next.fixture = FixtureTypes.RGBW
+  }
+  if (needsStrobeValuesSeed) {
+    next.strobeValues = { ...DEFAULT_STROBE_CHANNEL_VALUES }
+  }
+  return { fixture: next, changed: true }
+}
+
+/**
+ * Migrates a list of user-defined fixture templates (the `MyLights` library) for the strobe-channel
+ * schema. Returns the original array reference unchanged when no entry needed migration so callers
+ * can do a cheap identity check.
+ */
+export function migrateUserLightsForStrobeChannel(lights: DmxFixture[]): {
+  lights: DmxFixture[]
+  changed: boolean
+} {
+  let changed = false
+  const next = lights.map((light) => {
+    const result = migrateFixtureToStrobeChannelSchema(light)
+    if (result.changed) {
+      changed = true
+    }
+    return result.fixture
+  })
+  return changed ? { lights: next, changed: true } : { lights, changed: false }
+}
 
 function isMovingHeadFixture(light: DmxFixture): boolean {
   return light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH
@@ -21,11 +120,17 @@ function deriveMountFromConfig(light: DmxFixture): 'floor' | 'ceiling' {
 function migrateLights(lights: DmxLight[]): { lights: DmxLight[]; changed: boolean } {
   let changed = false
   const next = lights.map((light) => {
-    if (light.mount === 'floor' || light.mount === 'ceiling') {
-      return light
+    let current: DmxLight = light
+    const strobeResult = migrateFixtureToStrobeChannelSchema(current)
+    if (strobeResult.changed) {
+      changed = true
+      current = strobeResult.fixture
     }
-    changed = true
-    return { ...light, mount: deriveMountFromConfig(light) }
+    if (current.mount !== 'floor' && current.mount !== 'ceiling') {
+      changed = true
+      current = { ...current, mount: deriveMountFromConfig(current) }
+    }
+    return current
   })
   return { lights: next, changed }
 }

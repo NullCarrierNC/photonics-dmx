@@ -1,8 +1,16 @@
 import { EventEmitter } from 'events'
-import { CueData, CueType, DrumNoteType, InstrumentNoteType } from '../cues/types/cueTypes'
+import {
+  CueData,
+  CueType,
+  DrumNoteType,
+  InstrumentNoteType,
+  cueTypeToStrobeSlot,
+  isStrobeCueType,
+} from '../cues/types/cueTypes'
 import { YargMotionCueRef } from '../cues/types/audioCueTypes'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
+import { getStrobeStateManager } from '../controllers/StrobeStateManager'
 import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
 import { YargCueRegistry } from '../cues/registries/YargCueRegistry'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
@@ -27,14 +35,6 @@ const log = createLogger('YargCueHandler')
  * Layer 0 will maintain its state though.
  * addEffect will not clear other effects unless it's on the same layer.
  */
-const STROBE_TYPES: CueType[] = [
-  CueType.Strobe_Fastest,
-  CueType.Strobe_Fast,
-  CueType.Strobe_Medium,
-  CueType.Strobe_Slow,
-  CueType.Strobe_Off,
-]
-
 export type YargCueHandlerOptions = {
   getMotionCueMinimumHoldMs?: () => number
   /** Probability (0-100) that an automatic motion cue pick will play on a new lighting cue. Defaults to 100 (always). */
@@ -269,6 +269,7 @@ class YargCueHandler extends EventEmitter {
           this.currentStrobeCue.onStop?.()
           this.currentStrobeCue = null
         }
+        getStrobeStateManager().setActive(null)
         this.emit('cueHandled', historicCueData)
         return
       case CueType.Keyframe_First:
@@ -300,7 +301,7 @@ class YargCueHandler extends EventEmitter {
         : this.registry.getCueImplementation(cueType, trackMode)
 
     if (cue) {
-      const incomingIsStrobe = STROBE_TYPES.includes(cueType)
+      const incomingIsStrobe = isStrobeCueType(cueType)
       const incomingIsSecondary = cue.style === CueStyle.Secondary
 
       if (incomingIsStrobe) {
@@ -310,6 +311,7 @@ class YargCueHandler extends EventEmitter {
           this.currentStrobeCue = null
         }
         this.currentStrobeCue = cue
+        getStrobeStateManager().setActive(cueTypeToStrobeSlot(cueType))
       } else if (incomingIsSecondary) {
         // Non-strobe overlays run concurrently with primary and strobes, but replace the existing secondary overlay.
         if (this.currentSecondaryCue && this.currentSecondaryCue !== cue) {
@@ -439,6 +441,7 @@ class YargCueHandler extends EventEmitter {
     if (this.currentStrobeCue) {
       this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
+      getStrobeStateManager().setActive(null)
     }
     if (this.currentMotionCue) {
       this.currentMotionCue.onStop?.()
@@ -489,6 +492,7 @@ class YargCueHandler extends EventEmitter {
     if (this.currentStrobeCue) {
       this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
+      getStrobeStateManager().setActive(null)
     }
     if (this.currentMotionCue) {
       this.currentMotionCue.onStop?.()

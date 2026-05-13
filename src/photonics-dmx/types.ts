@@ -214,12 +214,14 @@ export interface EffectTransition {
 export enum FixtureTypes {
   RGB = 'rgb',
   RGBW = 'rgbw',
-  RGBS = 'rgb/s',
-  RGBWS = 'rgbw/s',
   STROBE = 'strobe',
   RGBMH = 'rgb/mh',
   RGBWMH = 'rgbw/mh',
 }
+
+/** Legacy fixture identifiers replaced by the hasStrobeChannel model; retained for migration only. */
+export const LEGACY_FIXTURE_RGB_STROBE = 'rgb/s'
+export const LEGACY_FIXTURE_RGBW_STROBE = 'rgbw/s'
 
 /**
  * DMX-related types
@@ -238,18 +240,22 @@ export interface RgbDmxChannels extends BaseDmxFixture {
   red: number
   green: number
   blue: number
-}
-
-export interface RgbStrobeDmxChannels extends RgbDmxChannels {
-  strobeSpeed: number
+  /**
+   * Optional hardware strobe-speed DMX channel on an RGB-family fixture (RGB / RGBW / RGBMH /
+   * RGBWMH). Present when the fixture template has "Strobe Channel?" enabled — i.e. the user has
+   * declared that this colour fixture also exposes a strobe-speed channel. Stored alongside the
+   * other channel offsets so master-dimmer shifts propagate the same way they do for r/g/b.
+   *
+   * This is **not** the same concept as {@link StrobeDmxChannels.strobeChannel}: that one belongs
+   * to a dedicated (colour-less) hardware strobe fixture. The runtime treats the two channels
+   * differently — only the RGB-family flavour participates in the latch-and-write behaviour added
+   * for the "Strobe Channel?" feature.
+   */
+  strobeChannel?: number
 }
 
 export interface RgbwDmxChannels extends RgbDmxChannels {
   white: number
-}
-
-export interface RgbwStrobeDmxCannels extends RgbwDmxChannels {
-  strobeSpeed: number
 }
 
 export interface MovingHeadDmxChannels {
@@ -425,8 +431,35 @@ export interface RgbMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbDmxC
 
 export interface RgbwMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbwDmxChannels {}
 
+/**
+ * Channel record for a **dedicated** hardware strobe fixture — a colour-less light whose only
+ * outputs are master dimmer + strobe speed. Distinct from {@link RgbDmxChannels.strobeChannel},
+ * which is the optional strobe-speed channel exposed by some RGB-family fixtures.
+ */
 export interface StrobeDmxChannels extends BaseDmxFixture {
-  strobeSpeed: number
+  strobeChannel: number
+}
+
+/**
+ * Per-fixture DMX values written to {@link RgbDmxChannels.strobeChannel} when each strobe cue is
+ * active. Values are DMX 0–255 (not channel numbers).
+ *
+ * Only used by RGB-family fixtures with the "Strobe Channel?" template option enabled. Dedicated
+ * {@link FixtureTypes.STROBE} fixtures do not consume this — they are a separate device class.
+ */
+export interface StrobeChannelValues {
+  slow: number
+  medium: number
+  fast: number
+  fastest: number
+}
+
+/** Defaults used when a strobe-channel fixture has no explicit per-cue speed values yet. */
+export const DEFAULT_STROBE_CHANNEL_VALUES: Readonly<StrobeChannelValues> = {
+  slow: 64,
+  medium: 128,
+  fast: 192,
+  fastest: 255,
 }
 
 export type TrackedLight = {
@@ -448,9 +481,7 @@ export interface DmxFixture {
   group?: string
   channels:
     | RgbDmxChannels
-    | RgbStrobeDmxChannels
     | RgbwDmxChannels
-    | RgbwStrobeDmxCannels
     | StrobeDmxChannels
     | RgbMovingHeadDmxChannels
     | RgbwMovingHeadDmxChannels
@@ -458,6 +489,12 @@ export interface DmxFixture {
   universe?: number
   /** Floor vs ceiling/truss placement for preview and static wash; default floor when omitted before migration. */
   mount?: 'floor' | 'ceiling'
+  /**
+   * DMX values (0–255) written to {@link RgbDmxChannels.strobeChannel} based on the active strobe
+   * cue. Only meaningful when this is an RGB-family fixture whose `channels.strobeChannel` is set;
+   * dedicated {@link FixtureTypes.STROBE} fixtures don't use this field.
+   */
+  strobeValues?: StrobeChannelValues
 }
 
 export interface DmxLight extends DmxFixture {
@@ -554,7 +591,7 @@ export const LightTypes: DmxFixture[] = [
     group: '',
     channels: {
       masterDimmer: 0,
-      strobeSpeed: 0,
+      strobeChannel: 0,
     },
     universe: 1,
   },

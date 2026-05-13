@@ -14,7 +14,11 @@ import {
   DmxRig,
   DmxRigsConfig,
 } from '../../photonics-dmx/types'
-import { migrateDmxRigsConfig } from '../../photonics-dmx/helpers/lightingConfigMigration'
+import {
+  migrateDmxRigsConfig,
+  migrateUserLightsForStrobeChannel,
+} from '../../photonics-dmx/helpers/lightingConfigMigration'
+import { syncRigsConfigWithUserLights } from '../../photonics-dmx/helpers/rigTemplateSync'
 
 import {
   type AudioConfig,
@@ -102,8 +106,32 @@ export class ConfigurationManager {
 
     // Handle legacy lights format migration
     this.migrateLegacyLightsFormat()
+    this.migrateUserLightsStrobeChannelSchema()
     this.normalizeStraySenderFlatKeys()
     this.migrateToDmxRigs()
+  }
+
+  /**
+   * One-time strobe-channel schema migration for the user-defined fixture library
+   * (`MyLights`). Converts legacy `rgb/s`/`rgbw/s` to `rgb`/`rgbw` + `channels.strobeChannel`,
+   * renames any stray `channels.strobeSpeed` to `strobeChannel`, and seeds default
+   * `strobeValues` on strobe-capable templates.
+   */
+  private migrateUserLightsStrobeChannelSchema(): void {
+    const current = this.userLights.get()
+    if (!current || !Array.isArray(current.lights)) {
+      return
+    }
+    const { lights, changed } = migrateUserLightsForStrobeChannel(current.lights)
+    if (!changed) {
+      return
+    }
+    this.userLights
+      .update({ ...current, lights })
+      .catch((err) =>
+        log.error('[Photonics Config] Failed to persist strobe-channel migrated user lights:', err),
+      )
+    log.info('[Photonics Config] Migrated user lights to strobe-channel schema')
   }
 
   /**
@@ -443,17 +471,42 @@ export class ConfigurationManager {
   // DMX Rigs Methods
 
   /**
-   * Gets all DMX rigs (layout/mount migration applied on read; persisted when changed).
+   * Gets all DMX rigs. Two reconciliation passes run on read and persist if anything changed:
+   *  1. {@link migrateDmxRigsConfig} — one-time schema migrations (layout rename, mount backfill,
+   *     strobe-channel schema upgrade, …).
+   *  2. {@link syncRigsConfigWithUserLights} — rig lights aligned to their current MyLights
+   *     templates so template edits (e.g. adding a Strobe Channel) reach the rig automatically.
    */
   getDmxRigs(): DmxRig[] {
     const current = this.dmxRigs.get()
-    const { config: migrated, changed } = migrateDmxRigsConfig(current)
-    if (changed) {
+    const { config: migrated, changed: migrationChanged } = migrateDmxRigsConfig(current)
+    const { config: synced, changed: syncChanged } = syncRigsConfigWithUserLights(
+      migrated,
+      this.getUserLights(),
+    )
+    if (migrationChanged || syncChanged) {
       void this.dmxRigs
-        .update(migrated)
-        .catch((err) => log.error('[Photonics Config] Failed to persist migrated DMX rigs:', err))
+        .update(synced)
+        .catch((err) =>
+          log.error('[Photonics Config] Failed to persist migrated/synced DMX rigs:', err),
+        )
     }
-    return migrated.rigs
+    return synced.rigs
+  }
+
+  /**
+   * Realigns all rigs to the current MyLights library and persists if anything changed. Returns
+   * true when at least one rig was updated. Called after a successful `SAVE_MY_LIGHTS` so template
+   * edits propagate to rig snapshots without waiting for the next process restart.
+   */
+  async syncRigsWithUserLights(): Promise<boolean> {
+    const current = this.dmxRigs.get()
+    const { config: synced, changed } = syncRigsConfigWithUserLights(current, this.getUserLights())
+    if (!changed) {
+      return false
+    }
+    await this.dmxRigs.update(synced)
+    return true
   }
 
   /**

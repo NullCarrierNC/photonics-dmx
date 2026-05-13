@@ -53,11 +53,7 @@ export function getDmxPreviewLightColor(
     return finalizePreviewRgb({ r: v, g: v, b: v }, dimmer === 0, use3dOffGrey)
   }
 
-  if (
-    fixture === FixtureTypes.RGB ||
-    fixture === FixtureTypes.RGBS ||
-    fixture === FixtureTypes.RGBMH
-  ) {
+  if (fixture === FixtureTypes.RGB || fixture === FixtureTypes.RGBMH) {
     const rgbChannels = channels as RgbDmxChannels
     const red = dmxValues[rgbChannels.red] || 0
     const green = dmxValues[rgbChannels.green] || 0
@@ -75,11 +71,7 @@ export function getDmxPreviewLightColor(
     )
   }
 
-  if (
-    fixture === FixtureTypes.RGBW ||
-    fixture === FixtureTypes.RGBWS ||
-    fixture === FixtureTypes.RGBWMH
-  ) {
+  if (fixture === FixtureTypes.RGBW || fixture === FixtureTypes.RGBWMH) {
     const rgbwChannels = channels as RgbwDmxChannels
     const red = dmxValues[rgbwChannels.red] || 0
     const green = dmxValues[rgbwChannels.green] || 0

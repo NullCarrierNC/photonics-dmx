@@ -2,11 +2,11 @@ import {
   RGBIO,
   RgbwDmxChannels,
   RgbDmxChannels,
-  RgbStrobeDmxChannels,
   StrobeDmxChannels,
   MovingHeadDmxChannels,
   DmxRig,
   FixtureTypes,
+  DEFAULT_STROBE_CHANNEL_VALUES,
   normalizeFixtureConfig,
 } from '../types'
 import { DmxLightManager } from './DmxLightManager'
@@ -17,8 +17,17 @@ import {
 } from '../helpers/dmxHelpers'
 import { SenderManager } from './SenderManager'
 import { LightStateManager } from './sequencer/LightStateManager'
+import { getStrobeStateManager, StrobeStateManager } from './StrobeStateManager'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('DmxPublisher')
+
+/** Per-light snapshot of the most recent non-zero color seen during an active strobe cue. */
+interface LatchedOnColor {
+  red: number
+  green: number
+  blue: number
+  intensity: number
+}
 
 /**
  * Prepares DMX data to be sent to individual lights by
@@ -30,15 +39,30 @@ export class DmxPublisher {
   private _rigManagers: Map<string, { manager: DmxLightManager; rig: DmxRig }> = new Map()
   private _sender: SenderManager
   private _lightStateManager: LightStateManager
+  private _strobeStateManager: StrobeStateManager
   private _immediateBlackoutData: Record<number, number> = {}
   /** Reused each frame to reduce GC */
   private _mergedBuffer: Record<number, number> = {}
   /** When true, `publish` ignores light states; output comes only from `setManualBuffer`. */
   private _manualMode = false
+  /**
+   * Per-light latched "on-phase" color during an active strobe cue. Captured the first frame
+   * the cue produces non-zero output, held through subsequent off-phase frames so hardware-strobe
+   * lights see a steady color while the strobe channel does the chopping. Cleared when the strobe
+   * cue ends.
+   */
+  private _strobeLatchedColors: Map<string, LatchedOnColor> = new Map()
+  /** Tracks whether a strobe was active on the previous publish, so we can clear the latch on transition. */
+  private _lastStrobeActive = false
 
-  constructor(senderManager: SenderManager, lightStateManager: LightStateManager) {
+  constructor(
+    senderManager: SenderManager,
+    lightStateManager: LightStateManager,
+    strobeStateManager: StrobeStateManager = getStrobeStateManager(),
+  ) {
     this._sender = senderManager
     this._lightStateManager = lightStateManager
+    this._strobeStateManager = strobeStateManager
 
     this.publish = this.publish.bind(this)
     this._lightStateManager.on('LightStatesUpdated', this.publish)
@@ -145,6 +169,14 @@ export class DmxPublisher {
       delete this._mergedBuffer[Number(key)]
     }
 
+    const activeStrobeSlot = this._strobeStateManager.getActive()
+    // Drop the latched on-phase colors when transitioning out of an active strobe so the next
+    // strobe cue starts fresh (latches on its own first non-zero frame).
+    if (this._lastStrobeActive && activeStrobeSlot == null) {
+      this._strobeLatchedColors.clear()
+    }
+    this._lastStrobeActive = activeStrobeSlot != null
+
     // Sort light IDs for consistent processing order
     const sortedLightIds = Array.from(lights.keys()).sort((a, b) => a.localeCompare(b))
 
@@ -160,7 +192,39 @@ export class DmxPublisher {
           continue
         }
 
-        const { red: r, green: g, blue: b, intensity, pan, tilt } = lightValue
+        const lightChannels = dmxLight.channels as RgbDmxChannels
+        const hasStrobeChannel = typeof lightChannels.strobeChannel === 'number'
+        // The "Strobe Channel?" runtime path is for RGB-family fixtures whose template declares an
+        // extra hardware strobe-speed channel. Dedicated STROBE fixtures are a separate device
+        // class (no RGB to latch, no per-cue `strobeValues` model) and are deliberately excluded.
+        const isRgbFamilyWithStrobeChannel =
+          hasStrobeChannel && dmxLight.fixture !== FixtureTypes.STROBE
+        const strobeChannelActive =
+          activeStrobeSlot != null && dmxLight.isStrobeEnabled && isRgbFamilyWithStrobeChannel
+
+        let { red: r, green: g, blue: b, intensity } = lightValue
+        const { pan, tilt } = lightValue
+
+        // Hardware-strobe latch: hold the first non-zero color seen during the cue so off-phase
+        // frames from the cue's flash envelope don't go dark on lights that are using their
+        // hardware strobe channel to do the chopping. See plan step 7.
+        if (strobeChannelActive) {
+          const cueIsOnPhase = r > 0 || g > 0 || b > 0 || intensity > 0
+          if (cueIsOnPhase) {
+            this._strobeLatchedColors.set(lightId, { red: r, green: g, blue: b, intensity })
+          } else {
+            const latched = this._strobeLatchedColors.get(lightId)
+            if (latched) {
+              r = latched.red
+              g = latched.green
+              b = latched.blue
+              intensity = latched.intensity
+            }
+            // else: pre-latch (first frame happens to be 0) — fall through and write as-is.
+          }
+        } else if (this._strobeLatchedColors.has(lightId)) {
+          this._strobeLatchedColors.delete(lightId)
+        }
         const isMovingHead =
           dmxLight.fixture === FixtureTypes.RGBMH || dmxLight.fixture === FixtureTypes.RGBWMH
         let panOut: number
@@ -218,31 +282,31 @@ export class DmxPublisher {
 
           switch (channelName) {
             case 'red':
-              value = (dmxChannelData as RgbDmxChannels | RgbStrobeDmxChannels | RgbwDmxChannels)
-                .red
+              value = (dmxChannelData as RgbDmxChannels | RgbwDmxChannels).red
               break
             case 'green':
-              value = (dmxChannelData as RgbDmxChannels | RgbStrobeDmxChannels | RgbwDmxChannels)
-                .green
+              value = (dmxChannelData as RgbDmxChannels | RgbwDmxChannels).green
               break
             case 'blue':
-              value = (dmxChannelData as RgbDmxChannels | RgbStrobeDmxChannels | RgbwDmxChannels)
-                .blue
+              value = (dmxChannelData as RgbDmxChannels | RgbwDmxChannels).blue
               break
             case 'masterDimmer':
-              value = (
-                dmxChannelData as
-                  | RgbDmxChannels
-                  | RgbStrobeDmxChannels
-                  | RgbwDmxChannels
-                  | StrobeDmxChannels
-              ).masterDimmer
+              value = (dmxChannelData as RgbDmxChannels | RgbwDmxChannels | StrobeDmxChannels)
+                .masterDimmer
               break
             case 'pan':
               value = (dmxChannelData as MovingHeadDmxChannels).pan
               break
             case 'tilt':
               value = (dmxChannelData as MovingHeadDmxChannels).tilt
+              break
+            case 'strobeChannel':
+              if (strobeChannelActive && activeStrobeSlot) {
+                const values = dmxLight.strobeValues ?? DEFAULT_STROBE_CHANNEL_VALUES
+                value = values[activeStrobeSlot]
+              } else {
+                value = 0
+              }
               break
             default:
               continue

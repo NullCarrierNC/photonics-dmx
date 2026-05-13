@@ -55,7 +55,7 @@ const minimalStrobe: DmxLight = {
   name: 's',
   label: 's',
   isStrobeEnabled: true,
-  channels: { masterDimmer: 1, strobeSpeed: 1 },
+  channels: { masterDimmer: 1, strobeChannel: 1 },
   universe: 0,
 }
 

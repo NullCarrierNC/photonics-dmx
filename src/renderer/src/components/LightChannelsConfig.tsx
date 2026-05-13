@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react'
 import {
   DmxFixture,
   DmxLight,
+  DEFAULT_STROBE_CHANNEL_VALUES,
   FixtureTypes,
   RgbDmxChannels,
-  RgbStrobeDmxChannels,
   RgbwDmxChannels,
+  StrobeChannelValues,
   StrobeDmxChannels,
   FixtureConfig,
   normalizeFixtureConfig,
@@ -37,10 +38,18 @@ interface LightChannelsConfigProps {
   }
 }
 
-const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeSpeed']
+const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeChannel']
+
+const STROBE_VALUE_FIELDS: ReadonlyArray<{ key: keyof StrobeChannelValues; label: string }> = [
+  { key: 'slow', label: 'Strobe Slow' },
+  { key: 'medium', label: 'Strobe Medium' },
+  { key: 'fast', label: 'Strobe Fast' },
+  { key: 'fastest', label: 'Strobe Fastest' },
+]
 
 const getDisplayName = (channelName: string) => {
   if (channelName === 'masterDimmer') return 'Master Dimmer'
+  if (channelName === 'strobeChannel') return 'Strobe Speed'
   if (channelName === 'panRangeDeg') return 'Pan range (deg)'
   if (channelName === 'panDirectionCW') {
     return 'Pan increases clockwise from above'
@@ -78,7 +87,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
   dragHandle,
 }) => {
   const [localChannels, setLocalChannels] = useState<
-    RgbDmxChannels | RgbStrobeDmxChannels | RgbwDmxChannels | StrobeDmxChannels | null
+    RgbDmxChannels | RgbwDmxChannels | StrobeDmxChannels | null
   >(null)
 
   // State for the light's config (if available)
@@ -296,6 +305,21 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       }
       onChange(updatedLight)
     }
+  }
+
+  /**
+   * Handles per-light overrides for a strobe speed slot. The fixture template provides defaults;
+   * setting a value here overrides for this light only.
+   */
+  const handleStrobeValueChange = (key: keyof StrobeChannelValues, raw: string) => {
+    if (!light) return
+    const parsed = Number(raw)
+    const clamped = Math.max(0, Math.min(255, Number.isFinite(parsed) ? Math.round(parsed) : 0))
+    const base = light.strobeValues ?? { ...DEFAULT_STROBE_CHANNEL_VALUES }
+    onChange({
+      ...light,
+      strobeValues: { ...base, [key]: clamped },
+    })
   }
 
   const isFixtureInMyLights = myLights.some((fixture) => fixture.id === light?.fixtureId)
@@ -540,6 +564,42 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
           <span className="text-left w-full">Use as strobe</span>
         </label>
       )}
+
+      {/* Per-light strobe speed value overrides. Only shown for RGB-family fixtures whose template
+          has "Strobe Channel?" enabled — dedicated STROBE fixtures are a separate device class and
+          don't consume strobeValues. */}
+      {light &&
+        light.isStrobeEnabled &&
+        light.fixture !== FixtureTypes.STROBE &&
+        typeof (light.channels as RgbDmxChannels).strobeChannel === 'number' && (
+          <div className="w-full mt-2 space-y-1">
+            <h4 className="text-sm font-semibold">Strobe Speed Values</h4>
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              DMX 0–255 written to the strobe channel for each cue speed. Override per light;
+              inherits from the fixture template when unset.
+            </p>
+            {STROBE_VALUE_FIELDS.map(({ key, label }) => {
+              const v = light.strobeValues?.[key] ?? DEFAULT_STROBE_CHANNEL_VALUES[key]
+              return (
+                <div
+                  key={key}
+                  className="flex justify-between items-center"
+                  onClick={(e) => e.stopPropagation()}>
+                  <span>{label}:</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={255}
+                    value={v}
+                    onChange={(e) => handleStrobeValueChange(key, e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-16 p-1 border border-gray-300 dark:border-gray-700 rounded text-black dark:text-white dark:bg-gray-700 text-right"
+                  />
+                </div>
+              )
+            })}
+          </div>
+        )}
     </div>
   )
 }

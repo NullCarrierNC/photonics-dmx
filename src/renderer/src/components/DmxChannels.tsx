@@ -14,6 +14,16 @@ function fixtureConfigLabel(key: string): string {
   return key
 }
 
+function channelLabel(key: string): string {
+  if (key === 'strobeChannel') {
+    return 'Strobe Speed'
+  }
+  if (key === 'masterDimmer') {
+    return 'Master Dimmer'
+  }
+  return key
+}
+
 interface DmxChannelsProps {
   light: DmxFixture
   onChannelChange: (channelName: string, value: number | boolean) => void
@@ -32,7 +42,16 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
     allowZero: boolean = false,
   ) => {
     // Define the desired order of channel names
-    const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'pan', 'tilt']
+    const channelOrder = [
+      'masterDimmer',
+      'red',
+      'green',
+      'blue',
+      'white',
+      'strobeChannel',
+      'pan',
+      'tilt',
+    ]
 
     const sortedChannels = Object.entries(channels).sort((a, b) => {
       const indexA = channelOrder.indexOf(a[0])
@@ -55,7 +74,7 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
             <label
               htmlFor={channelName}
               className="text-sm capitalize w-1/3 text-gray-700 dark:text-gray-300">
-              {allowZero ? fixtureConfigLabel(channelName) : channelName}:
+              {allowZero ? fixtureConfigLabel(channelName) : channelLabel(channelName)}:
             </label>
             {typeof value === 'number' ? (
               <input
