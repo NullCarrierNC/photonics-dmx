@@ -66,6 +66,28 @@ describe('syncDmxLightWithTemplate', () => {
     expect((light.channels as unknown as Record<string, number>).red).toBe(12)
   })
 
+  it('propagates a template channel-offset re-layout to existing rig lights (Fix 4)', () => {
+    // Rig light persisted with offsets red=+1,green=+2,blue=+3 from master 11 → 12/13/14.
+    const rigLight: DmxLight = {
+      ...baseRgbLight,
+      channels: { masterDimmer: 11, red: 12, green: 13, blue: 14 },
+    }
+    // Template re-wired: red is now +3, green +4, blue +5 from its master dimmer.
+    const reLaidOutTemplate: DmxFixture = {
+      ...baseRgbTemplate,
+      channels: { masterDimmer: 1, red: 4, green: 5, blue: 6 },
+    }
+    const { light, changed } = syncDmxLightWithTemplate(rigLight, reLaidOutTemplate)
+    expect(changed).toBe(true)
+    const ch = light.channels as unknown as Record<string, number>
+    // masterDimmer is rig-owned (DMX start address), unchanged.
+    expect(ch.masterDimmer).toBe(11)
+    // Every other channel re-derived from the template's new offsets: 11 + (templateCh - 1).
+    expect(ch.red).toBe(14) // 11 + (4 - 1)
+    expect(ch.green).toBe(15) // 11 + (5 - 1)
+    expect(ch.blue).toBe(16) // 11 + (6 - 1)
+  })
+
   it('removes a strobe channel and clears strobeValues when the template drops the channel', () => {
     const lightWithStrobe: DmxLight = {
       ...baseRgbLight,

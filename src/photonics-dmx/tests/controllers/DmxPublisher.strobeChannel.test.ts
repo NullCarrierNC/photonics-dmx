@@ -140,32 +140,74 @@ describe('DmxPublisher strobe-channel runtime', () => {
     expect(ctx.lastBuffer()[5]).toBe(30)
   })
 
-  it('latches on first non-zero frame and holds RGB through cue off-phases', () => {
+  it('holds the peak blended color through the cue envelope (fade + primary showing through)', () => {
+    // Models the real post-blend stream the publisher sees: stock strobe cues flash opacity,
+    // which the blender folds into rgb/intensity. So a strobe-channel light sees: peak white
+    // burst -> dimming as opacity fades -> the underlying primary cue when opacity hits 0.
     ctx.strobe.setActive('medium')
-    const lights = new Map<string, RGBIO>([['light-1', makeBrightRgbio()]])
+    const peak = makeBrightRgbio() // {255,64,0,i255} — opacity 1 moment
+    const fading: RGBIO = {
+      red: 128,
+      green: 32,
+      blue: 0,
+      intensity: 128,
+      opacity: 1,
+      blendMode: 'replace',
+    } // opacity ~0.5 baked in
+    const primaryShowing: RGBIO = {
+      red: 200,
+      green: 0,
+      blue: 0,
+      intensity: 200,
+      opacity: 1,
+      blendMode: 'replace',
+    } // off-phase: underlying primary red
 
-    ctx.publisher.publish(lights)
-    const onPhase = ctx.lastBuffer()
-    expect(onPhase[2]).toBe(255)
-    expect(onPhase[3]).toBe(64)
-    expect(onPhase[1]).toBe(255)
-    expect(onPhase[5]).toBe(90)
+    ctx.publisher.publish(new Map([['light-1', peak]]))
+    const f1 = ctx.lastBuffer()
+    expect([f1[2], f1[3], f1[1]]).toEqual([255, 64, 255])
+    expect(f1[5]).toBe(90)
 
-    // Cue's off-phase frame — publisher should hold the latched on-color rather than going dark.
-    lights.set('light-1', makeBlackRgbio())
-    ctx.publisher.publish(lights)
-    const offPhase = ctx.lastBuffer()
-    expect(offPhase[2]).toBe(255)
-    expect(offPhase[3]).toBe(64)
-    expect(offPhase[1]).toBe(255)
-    expect(offPhase[5]).toBe(90)
+    ctx.publisher.publish(new Map([['light-1', fading]]))
+    const f2 = ctx.lastBuffer()
+    // Holds the peak, not the dimmer fading frame.
+    expect([f2[2], f2[3], f2[1]]).toEqual([255, 64, 255])
+
+    ctx.publisher.publish(new Map([['light-1', primaryShowing]]))
+    const f3 = ctx.lastBuffer()
+    // Holds the peak, not the underlying primary.
+    expect([f3[2], f3[3], f3[1]]).toEqual([255, 64, 255])
+    expect(f3[5]).toBe(90)
   })
 
-  it('clears the latch when the strobe cue ends and lets RGB flow unchanged', () => {
+  it('promotes to a brighter peak if a later frame exceeds the stored peak', () => {
+    ctx.strobe.setActive('slow')
+    const dim: RGBIO = {
+      red: 80,
+      green: 0,
+      blue: 0,
+      intensity: 80,
+      opacity: 1,
+      blendMode: 'replace',
+    }
+    const brighter = makeBrightRgbio() // max(255,64,0,255)=255 > 80
+
+    ctx.publisher.publish(new Map([['light-1', dim]]))
+    expect(ctx.lastBuffer()[1]).toBe(80) // first sample becomes the peak
+
+    ctx.publisher.publish(new Map([['light-1', brighter]]))
+    const f2 = ctx.lastBuffer()
+    expect([f2[2], f2[3], f2[1]]).toEqual([255, 64, 255]) // promoted
+
+    ctx.publisher.publish(new Map([['light-1', dim]]))
+    const f3 = ctx.lastBuffer()
+    expect([f3[2], f3[3], f3[1]]).toEqual([255, 64, 255]) // holds the higher peak
+  })
+
+  it('clears the peak when the strobe cue ends and lets RGB flow unchanged', () => {
     ctx.strobe.setActive('medium')
-    const lights = new Map<string, RGBIO>([['light-1', makeBrightRgbio()]])
-    ctx.publisher.publish(lights) // latches red=255,green=64
-    ctx.publisher.publish(new Map([['light-1', makeBlackRgbio()]])) // off-phase, should hold
+    ctx.publisher.publish(new Map([['light-1', makeBrightRgbio()]])) // peak = {255,64,0,255}
+    ctx.publisher.publish(new Map([['light-1', makeBlackRgbio()]])) // holds peak
 
     ctx.strobe.setActive(null)
     ctx.publisher.publish(new Map([['light-1', makeBlackRgbio()]]))
@@ -175,14 +217,13 @@ describe('DmxPublisher strobe-channel runtime', () => {
     expect(buf[5]).toBe(0)
   })
 
-  it('writes the cue frame as-is when the very first strobe frame is dark (pre-latch)', () => {
+  it('writes the cue frame as-is when the very first strobe frame is dark (pre-peak)', () => {
     ctx.strobe.setActive('fast')
-    const lights = new Map<string, RGBIO>([['light-1', makeBlackRgbio()]])
-    ctx.publisher.publish(lights)
+    ctx.publisher.publish(new Map<string, RGBIO>([['light-1', makeBlackRgbio()]]))
     const buf = ctx.lastBuffer()
     expect(buf[1]).toBe(0)
     expect(buf[2]).toBe(0)
-    expect(buf[5]).toBe(180)
+    expect(buf[5]).toBe(180) // strobe channel still driven even pre-peak
   })
 
   it('falls back to default strobe values when the light has none configured', () => {

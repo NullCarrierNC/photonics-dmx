@@ -9,19 +9,22 @@ import type { DmxFixture, DmxLight, DmxRig, DmxRigsConfig, LightingConfiguration
  * switches RGB→RGBW, renames, tunes default strobe values — the rig's snapshot doesn't pick up the
  * change automatically. This module owns the reconciliation rules.
  *
- * **Template-owned** fields are pulled from the template each time sync runs:
+ * A rig is an *implementation* of its template: a change to the root template propagates down.
+ *
+ * **Template-owned** fields are recomputed from the template every time sync runs:
  *  - `fixture`, `label`, `name`
- *  - Channel **shape** (which keys exist in `channels`); channel **numbers** are preserved from the
- *    rig for keys already present, and new keys are derived from the template's master-dimmer
- *    offset applied to the rig's master dimmer (same math {@link createDmxLightInstance} uses).
+ *  - The entire channel layout. Every channel except `masterDimmer` is derived as
+ *    `rigMasterDimmer + (templateChannel - templateMasterDimmer)` — the same offset model
+ *    {@link createDmxLightInstance} and LightChannelsConfig use. Re-laying-out channel offsets in
+ *    a template therefore propagates to every rig light using it.
  *  - Default `strobeValues` (when the rig has no per-light override)
  *  - `config` defaults when the rig has none and the template provides them (e.g. fixture-type
  *    change RGB→RGBMH adds moving-head defaults). Existing rig calibration is preserved.
  *
  * **Rig-owned** fields are preserved across template edits:
  *  - `id`, `fixtureId`, `position`, `group`, `universe`, `mount`
- *  - `masterDimmer` (per-light DMX position)
- *  - Per-light channel numbers for any channel already present on the rig
+ *  - `masterDimmer` — the light's per-rig DMX start address (the one value the rig owns; all
+ *    other channels derive from it plus the template offsets)
  *  - `config` overrides — once a moving-head is calibrated per-light, those stick
  *  - `strobeValues` overrides — when explicitly set per-light
  *  - `isStrobeEnabled` — this is a layout-level toggle (LightChannelsConfig's "Use as strobe"),
@@ -53,20 +56,17 @@ export function syncDmxLightWithTemplate(
   const templateMaster = templateChannels.masterDimmer ?? 0
   const rigMaster = rigChannels.masterDimmer ?? templateMaster
 
-  // Build the synced channel record from the template's shape, preserving per-light DMX numbers
-  // where they already exist and deriving fresh ones from the template offset otherwise.
+  // Channel layout is template-owned. Every channel except masterDimmer is derived from the
+  // template's offset relative to its own master dimmer, applied to this rig light's master
+  // dimmer. This makes template channel re-layouts propagate to existing rig lights. There is no
+  // UI that persists an independent per-light channel number (LightChannelsConfig only edits
+  // masterDimmer and recomputes the rest), so nothing legitimate is lost by always deriving.
   const nextChannels: ChannelRecord = {}
   for (const [name, templateValue] of Object.entries(templateChannels)) {
     if (name === 'masterDimmer') {
       nextChannels[name] = rigMaster
-      continue
-    }
-    const persisted = rigChannels[name]
-    if (typeof persisted === 'number') {
-      nextChannels[name] = persisted
     } else {
-      const offset = templateValue - templateMaster
-      nextChannels[name] = rigMaster + offset
+      nextChannels[name] = rigMaster + (templateValue - templateMaster)
     }
   }
 

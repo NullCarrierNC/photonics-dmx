@@ -441,8 +441,10 @@ class YargCueHandler extends EventEmitter {
     if (this.currentStrobeCue) {
       this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
-      getStrobeStateManager().setActive(null)
     }
+    // Unconditional: clearing a primary/blackout must also drop any shared strobe slot even if
+    // this handler didn't think a strobe cue was active (defensive against state drift).
+    getStrobeStateManager().setActive(null)
     if (this.currentMotionCue) {
       this.currentMotionCue.onStop?.()
       this.currentMotionCue = null
@@ -492,8 +494,9 @@ class YargCueHandler extends EventEmitter {
     if (this.currentStrobeCue) {
       this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
-      getStrobeStateManager().setActive(null)
     }
+    // Unconditional: a handler teardown must never leave the shared StrobeStateManager stuck.
+    getStrobeStateManager().setActive(null)
     if (this.currentMotionCue) {
       this.currentMotionCue.onStop?.()
       this.currentMotionCue = null

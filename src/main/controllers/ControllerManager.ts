@@ -2,6 +2,7 @@ import { ConfigurationManager } from '../../services/configuration/Configuration
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { Sequencer } from '../../photonics-dmx/controllers/sequencer/Sequencer'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
+import { getStrobeStateManager } from '../../photonics-dmx/controllers/StrobeStateManager'
 import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
 import { LightingConfiguration, ConfigStrobeType, FixtureConfig } from '../../photonics-dmx/types'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
@@ -846,6 +847,12 @@ export class ControllerManager {
       if (this.cueHandler) {
         this.cueHandler.shutdown()
       }
+
+      // Gguarantee the process-wide strobe state is cleared on every restart,
+      // even if no cue handler was active to clear it during its own shutdown.
+      // Prevents a stale strobe slot from driving hardware-strobe-channel
+      // lights after an input-platform switch.
+      getStrobeStateManager().setActive(null)
 
       this.dmxLightManager = null
       this.lightStateManager = null

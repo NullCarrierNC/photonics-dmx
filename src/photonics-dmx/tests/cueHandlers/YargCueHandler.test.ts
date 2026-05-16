@@ -14,6 +14,10 @@ import { CueStyle, INetCue } from '../../cues/interfaces/INetCue'
 import { CueData, CueType, defaultCueData } from '../../cues/types/cueTypes'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
+import {
+  getStrobeStateManager,
+  __resetStrobeStateManagerForTests,
+} from '../../controllers/StrobeStateManager'
 
 type CueLifecycleMocks = {
   execute: jest.Mock
@@ -118,5 +122,18 @@ describe('YargCueHandler shutdown lifecycle', () => {
     expect(internals.currentStrobeCue).toBeNull()
     expect(internals.currentMotionCue).toBeNull()
     expect(internals.currentMotionCueStartTime).toBeNull()
+  })
+
+  it('shutdown clears shared strobe state even when no strobe cue was active (Fix 2)', () => {
+    __resetStrobeStateManagerForTests()
+    // Simulate a stale slot left by a prior interrupted strobe (no Strobe_Off received).
+    getStrobeStateManager().setActive('fast')
+    expect(getStrobeStateManager().getActive()).toBe('fast')
+
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    // No currentStrobeCue set — old code only cleared when one was present.
+    handler.shutdown()
+
+    expect(getStrobeStateManager().getActive()).toBeNull()
   })
 })

@@ -21,8 +21,15 @@ import { getStrobeStateManager, StrobeStateManager } from './StrobeStateManager'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('DmxPublisher')
 
-/** Per-light snapshot of the most recent non-zero color seen during an active strobe cue. */
-interface LatchedOnColor {
+/**
+ * Per-light snapshot of the brightest blended color seen during an active strobe cue.
+ *
+ * No `opacity`: by the time light state reaches the publisher, LightTransitionController has
+ * already consumed the strobe's opacity envelope into rgb/intensity (replace-mode blend does
+ * `channel * opacity`) and emits a constant `opacity: 1.0`. So peak brightness — not opacity —
+ * is the signal that identifies the cue's highest-opacity moment.
+ */
+interface StrobePeakColor {
   red: number
   green: number
   blue: number
@@ -46,12 +53,13 @@ export class DmxPublisher {
   /** When true, `publish` ignores light states; output comes only from `setManualBuffer`. */
   private _manualMode = false
   /**
-   * Per-light latched "on-phase" color during an active strobe cue. Captured the first frame
-   * the cue produces non-zero output, held through subsequent off-phase frames so hardware-strobe
-   * lights see a steady color while the strobe channel does the chopping. Cleared when the strobe
-   * cue ends.
+   * Per-light peak colour seen since the current strobe became active. The stock strobe cues
+   * modulate opacity, which the blender bakes into rgb/intensity — so the brightest blended
+   * frame corresponds to the cue's peak (highest-opacity) moment. We hold that peak for the
+   * whole strobe so a hardware-strobe-channel light shows a steady color while its strobe
+   * channel does the chopping. Reset when the strobe cue ends.
    */
-  private _strobeLatchedColors: Map<string, LatchedOnColor> = new Map()
+  private _strobePeakColors: Map<string, StrobePeakColor> = new Map()
   /** Tracks whether a strobe was active on the previous publish, so we can clear the latch on transition. */
   private _lastStrobeActive = false
 
@@ -170,10 +178,10 @@ export class DmxPublisher {
     }
 
     const activeStrobeSlot = this._strobeStateManager.getActive()
-    // Drop the latched on-phase colors when transitioning out of an active strobe so the next
-    // strobe cue starts fresh (latches on its own first non-zero frame).
+    // Drop the peak colors when transitioning out of an active strobe so the next strobe cue
+    // starts fresh (re-establishes its own peak from the new cue's first frames).
     if (this._lastStrobeActive && activeStrobeSlot == null) {
-      this._strobeLatchedColors.clear()
+      this._strobePeakColors.clear()
     }
     this._lastStrobeActive = activeStrobeSlot != null
 
@@ -205,25 +213,35 @@ export class DmxPublisher {
         let { red: r, green: g, blue: b, intensity } = lightValue
         const { pan, tilt } = lightValue
 
-        // Hardware-strobe latch: hold the first non-zero color seen during the cue so off-phase
-        // frames from the cue's flash envelope don't go dark on lights that are using their
-        // hardware strobe channel to do the chopping. See plan step 7.
+        // Hardware-strobe peak-hold: stock strobe cues flash opacity, which the blender folds
+        // into rgb/intensity — so the post-blend stream swings between the peak (highest-opacity)
+        // colour and the underlying primary cue. For a strobe-channel light we want a steady
+        // colour while its hardware strobe channel does the chopping, so we track the brightest
+        // sample seen since the strobe became active and always emit that. Brightness metric is
+        // max(intensity, r, g, b) so a future constant-intensity coloured strobe still latches.
         if (strobeChannelActive) {
-          const cueIsOnPhase = r > 0 || g > 0 || b > 0 || intensity > 0
-          if (cueIsOnPhase) {
-            this._strobeLatchedColors.set(lightId, { red: r, green: g, blue: b, intensity })
-          } else {
-            const latched = this._strobeLatchedColors.get(lightId)
-            if (latched) {
-              r = latched.red
-              g = latched.green
-              b = latched.blue
-              intensity = latched.intensity
+          const currentLevel = Math.max(intensity, r, g, b)
+          const peak = this._strobePeakColors.get(lightId)
+          if (!peak) {
+            if (currentLevel > 0) {
+              this._strobePeakColors.set(lightId, { red: r, green: g, blue: b, intensity })
             }
-            // else: pre-latch (first frame happens to be 0) — fall through and write as-is.
+            // else: pre-peak (first frame is fully dark) — emit as-is until a non-zero arrives.
+          } else {
+            const peakLevel = Math.max(peak.intensity, peak.red, peak.green, peak.blue)
+            if (currentLevel > peakLevel) {
+              // New brighter peak: store it and emit the current frame as-is.
+              this._strobePeakColors.set(lightId, { red: r, green: g, blue: b, intensity })
+            } else {
+              // Hold the established peak.
+              r = peak.red
+              g = peak.green
+              b = peak.blue
+              intensity = peak.intensity
+            }
           }
-        } else if (this._strobeLatchedColors.has(lightId)) {
-          this._strobeLatchedColors.delete(lightId)
+        } else if (this._strobePeakColors.has(lightId)) {
+          this._strobePeakColors.delete(lightId)
         }
         const isMovingHead =
           dmxLight.fixture === FixtureTypes.RGBMH || dmxLight.fixture === FixtureTypes.RGBWMH

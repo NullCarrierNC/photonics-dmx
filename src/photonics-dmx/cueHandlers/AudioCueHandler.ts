@@ -353,8 +353,10 @@ export class AudioCueHandler extends EventEmitter {
     if (this.currentStrobeCue) {
       this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
-      getStrobeStateManager().setActive(null)
     }
+    // Unconditional: an interrupted audio strobe (processing stops with no explicit clear) must
+    // not leave the process-wide StrobeStateManager stuck on a slot.
+    getStrobeStateManager().setActive(null)
     this.currentMotionCue?.onStop?.()
     this.currentMotionCue = null
     this.currentMotionCueStartTime = null
