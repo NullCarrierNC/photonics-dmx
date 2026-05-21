@@ -14,13 +14,25 @@ const mockIpcMain = {
 const updateUserLights = jest.fn(async () => {}) as jest.MockedFunction<
   (fixtures: unknown) => Promise<void>
 >
+const syncRigsWithUserLights = jest.fn(async () => false) as jest.MockedFunction<
+  () => Promise<boolean>
+>
+const restartControllers = jest.fn(async () => {}) as jest.MockedFunction<() => Promise<void>>
 const mockGetConfig = jest.fn(() => ({
   updateUserLights,
+  syncRigsWithUserLights,
 }))
 
 const mockControllerManager = {
   getConfig: mockGetConfig,
-} as { getConfig: () => { updateUserLights: typeof updateUserLights } }
+  restartControllers,
+} as {
+  getConfig: () => {
+    updateUserLights: typeof updateUserLights
+    syncRigsWithUserLights: typeof syncRigsWithUserLights
+  }
+  restartControllers: typeof restartControllers
+}
 
 jest.mock('electron', () => ({
   ipcMain: mockIpcMain,
@@ -65,6 +77,8 @@ describe('registerLightsRigsConfigHandlers (SAVE_MY_LIGHTS)', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     updateUserLights.mockResolvedValue(undefined)
+    syncRigsWithUserLights.mockResolvedValue(false)
+    restartControllers.mockResolvedValue(undefined)
   })
 
   it('returns a validation error for invalid myLights payload', async () => {
@@ -100,5 +114,31 @@ describe('registerLightsRigsConfigHandlers (SAVE_MY_LIGHTS)', () => {
     const r = await h(null, [])
 
     expect(r).toEqual({ success: false, error: 'disk full' })
+  })
+
+  it('restarts controllers when the rig sync reports changes', async () => {
+    registerLightsRigsConfigHandlers(mockIpcMain as any, mockControllerManager as any)
+    validateDmx.mockReturnValue({ ok: true, value: [{ id: 'a' }] as any })
+    syncRigsWithUserLights.mockResolvedValue(true)
+
+    const h = getSaveMyLightsHandler()
+    const r = await h(null, [])
+
+    expect(r).toEqual({ success: true })
+    expect(syncRigsWithUserLights).toHaveBeenCalledTimes(1)
+    expect(restartControllers).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT restart controllers when rig sync reports no changes', async () => {
+    registerLightsRigsConfigHandlers(mockIpcMain as any, mockControllerManager as any)
+    validateDmx.mockReturnValue({ ok: true, value: [{ id: 'a' }] as any })
+    syncRigsWithUserLights.mockResolvedValue(false)
+
+    const h = getSaveMyLightsHandler()
+    const r = await h(null, [])
+
+    expect(r).toEqual({ success: true })
+    expect(syncRigsWithUserLights).toHaveBeenCalledTimes(1)
+    expect(restartControllers).not.toHaveBeenCalled()
   })
 })

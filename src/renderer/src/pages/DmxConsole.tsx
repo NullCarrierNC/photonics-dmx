@@ -17,8 +17,14 @@ import {
   sendConsoleDmx,
   enableSender,
 } from '../ipcApi'
-import { lightingPrefsAtom, previewRigIdAtom, resolveLastUsedRigId } from '../atoms'
+import {
+  lightingPrefsAtom,
+  myDmxLightsAtom,
+  previewRigIdAtom,
+  resolveLastUsedRigId,
+} from '../atoms'
 import LightsDmxPreview from '../components/LightsDmxPreview'
+import StrobeChannelPreviewNotice from '../components/StrobeChannelPreviewNotice'
 import { DmxRigSelectField } from '../components/DmxRigSelectField'
 import SacnToggle from '../components/SacnToggle'
 import ArtNetToggle from '../components/ArtNetToggle'
@@ -30,7 +36,7 @@ import { createLogger } from '../../../shared/logger'
 const log = createLogger('DmxConsole')
 
 function channelSortKey(name: string): number {
-  const order = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeSpeed', 'pan', 'tilt']
+  const order = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeChannel', 'pan', 'tilt']
   if (name === 'md') {
     return 0
   }
@@ -42,28 +48,76 @@ function channelsAsRecord(channels: DmxFixture['channels']): Record<string, numb
   return channels as unknown as Record<string, number>
 }
 
+/**
+ * Resolves the channel set to display for a rig light. The shape (which channels exist) comes from
+ * the live fixture template — so e.g. enabling "Strobe Channel?" on a template in MyLights surfaces
+ * the new channel here immediately, without needing to re-pick the fixture in LightsLayout. The
+ * channel NUMBERS are computed by applying the same offset-from-master-dimmer model used elsewhere
+ * (e.g. {@link createDmxLightInstance}, {@link LightChannelsConfig}).
+ *
+ * Falls back to the light's persisted channels when no template is found (legacy / orphaned light).
+ */
+function getTemplateAlignedChannels(
+  light: DmxLight,
+  templates: DmxFixture[],
+): Record<string, number> {
+  const template = templates.find((t) => t.id === light.fixtureId)
+  const persisted = channelsAsRecord(light.channels)
+  if (!template) {
+    return persisted
+  }
+  const templateChannels = channelsAsRecord(template.channels)
+  const templateMaster = templateChannels.masterDimmer ?? 0
+  const lightMaster = persisted.masterDimmer ?? templateMaster
+  const out: Record<string, number> = {}
+  for (const [name, templateValue] of Object.entries(templateChannels)) {
+    if (name === 'masterDimmer') {
+      out[name] = lightMaster
+    } else {
+      // Prefer the persisted offset if present (user may have nudged a single channel); otherwise
+      // derive from the template's offset relative to its master dimmer.
+      const persistedValue = persisted[name]
+      if (typeof persistedValue === 'number') {
+        out[name] = persistedValue
+      } else {
+        const offset = templateValue - templateMaster
+        out[name] = lightMaster + offset
+      }
+    }
+  }
+  return out
+}
+
 function getEffectiveChannelEntries(
-  light: DmxFixture,
+  light: DmxLight,
+  templates: DmxFixture[],
   overrides?: Record<string, number>,
 ): Array<[string, number]> {
-  const channels = channelsAsRecord(light.channels)
+  const channels = getTemplateAlignedChannels(light, templates)
   const effective = overrides ? { ...channels, ...overrides } : channels
   return (Object.entries(effective) as Array<[string, number]>).sort(
     (a, b) => channelSortKey(a[0]) - channelSortKey(b[0]),
   )
 }
 
-function isLightModified(light: DmxFixture, overrides?: Record<string, number>): boolean {
+function isLightModified(
+  light: DmxLight,
+  templates: DmxFixture[],
+  overrides?: Record<string, number>,
+): boolean {
   if (!overrides) {
     return false
   }
-  const channels = channelsAsRecord(light.channels)
-  return Object.entries(overrides).some(([name, num]) => channels[name] !== num)
+  const baseline = getTemplateAlignedChannels(light, templates)
+  return Object.entries(overrides).some(([name, num]) => baseline[name] !== num)
 }
 
 function channelLabel(name: string): string {
   if (name === 'md' || name === 'masterDimmer') {
     return 'MasterDimmer'
+  }
+  if (name === 'strobeChannel') {
+    return 'Strobe Speed'
   }
   return name
 }
@@ -81,6 +135,9 @@ const DmxConsole: React.FC = () => {
   const [prefs] = useAtom(lightingPrefsAtom)
   const advancedModeEnabled = prefs.advancedModeEnabled ?? false
   const [selectedRigId, setSelectedRigId] = useAtom(previewRigIdAtom)
+  // Templates drive which channels are displayed (so e.g. a newly-added Strobe Channel surfaces
+  // without needing to re-save the rig); per-light DMX channel numbers still come from the rig.
+  const [myLights] = useAtom(myDmxLightsAtom)
   const [selectedRig, setSelectedRig] = useState<DmxRig | null>(null)
   const [consoleEnabled, setConsoleEnabled] = useState(false)
   const [consoleBuffer, setConsoleBuffer] = useState<Record<number, number>>({})
@@ -244,7 +301,7 @@ const DmxConsole: React.FC = () => {
       return
     }
     setActionError(null)
-    const baseChannels = channelsAsRecord(light.channels)
+    const baseChannels = getTemplateAlignedChannels(light, myLights)
     const baseline = baseChannels[channelName]
     const lightId = light.id
 
@@ -276,9 +333,9 @@ const DmxConsole: React.FC = () => {
 
   const renderFixtureCard = (light: DmxLight) => {
     const lightOverrides = light.id ? channelOverrides[light.id] : undefined
-    const sorted = getEffectiveChannelEntries(light, lightOverrides)
-    const baseChannels = channelsAsRecord(light.channels)
-    const modified = isLightModified(light, lightOverrides)
+    const sorted = getEffectiveChannelEntries(light, myLights, lightOverrides)
+    const baseChannels = getTemplateAlignedChannels(light, myLights)
+    const modified = isLightModified(light, myLights, lightOverrides)
     const cardInactive = !consoleEnabled
     return (
       <div
@@ -488,6 +545,7 @@ const DmxConsole: React.FC = () => {
             <h2 className="text-lg font-semibold mb-1 text-gray-800 dark:text-gray-200">
               Light Preview
             </h2>
+            <StrobeChannelPreviewNotice lightingConfig={rigConfig} className="mb-3" />
             <LightsDmxPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
           </div>
 

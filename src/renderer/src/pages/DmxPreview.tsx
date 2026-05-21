@@ -5,6 +5,7 @@ import { getActiveRigs } from '@renderer/ipcApi'
 import { createLogger } from '../../../shared/logger'
 import LightsDmxPreview from '@renderer/components/LightsDmxPreview'
 import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPreview'
+import StrobeChannelPreviewNotice from '@renderer/components/StrobeChannelPreviewNotice'
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles'
 import CuePreview from '@renderer/components/CuePreview'
 import DmxRigSelector from '@renderer/components/DmxRigSelector'
@@ -70,6 +71,7 @@ const DmxPreview: React.FC = () => {
 
       {selectedRig !== null && rigConfig !== null && (
         <>
+          <StrobeChannelPreviewNotice lightingConfig={rigConfig} className="mb-3" />
           <LightsDmxPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
           <CuePreview
             className={platform === 'AUDIO' ? 'mt-6' : ''}

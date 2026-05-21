@@ -290,6 +290,8 @@ export interface LightingPreferences {
   cueDomains?: Record<CueDomain, CueDomainPrefs>
   activeAudioCueType?: AudioCueType
   cueConsistencyWindow?: number
+  /** Global publisher output cap (Hz); upstream of per-sender refresh rates. */
+  globalDmxPublishingRateHz?: number
   allowMultipleActiveRigs?: boolean
   advancedModeEnabled?: boolean
 

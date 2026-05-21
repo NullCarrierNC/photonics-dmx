@@ -38,7 +38,9 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
         </ul>
       </p>
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">COM:</label>
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
+          COM:
+        </label>
         <input
           type="text"
           value={comPort}
@@ -48,8 +50,8 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
         />
       </div>
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
-          Refresh:
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
+          Refresh Rate:
         </label>
         <input
           type="number"
@@ -57,8 +59,9 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
           onChange={onRefreshRateChange}
           min={1}
           max={44}
-          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
         />
+        <span className="text-xs text-gray-500 dark:text-gray-400">Hz (1–44)</span>
       </div>
       <p className="text-xs text-gray-600 dark:text-gray-400">
         Default is {OPEN_DMX_DEFAULT_REFRESH_RATE_HZ} Hz. Higher values reduce latency but can

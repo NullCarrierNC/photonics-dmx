@@ -42,6 +42,15 @@ export function registerPreferencesDiagnosticsConfigHandlers(
         }
       }
 
+      // Hot-swap the publisher's output-rate governor — no need to restart controllers
+      // (which would tear down senders / interrupt DMX output) just to change a single number.
+      if (typeof validation.value.globalDmxPublishingRateHz === 'number') {
+        const publisher = controllerManager.getDmxPublisher()
+        if (publisher) {
+          publisher.setOutputRateHz(validation.value.globalDmxPublishingRateHz)
+        }
+      }
+
       return { success: true }
     } catch (error) {
       log.error('Error saving preferences:', error)

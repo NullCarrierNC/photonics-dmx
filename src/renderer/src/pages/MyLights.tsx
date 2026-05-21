@@ -93,21 +93,38 @@ const MyLights = () => {
         be available in the <em>Lights Layout</em> where different channels can be assigned.
       </p>
 
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-        <strong>Note on Strobes:</strong> while some DMX fixtures support strobe channels, using
-        this feature with different models of can DMX lights cause the lights to stobe out of sync
-        with each other. To avoid this Photonics will use lights marked as strobe-capable as a
-        strobe by flashing regular DMX colour channels (E.g. RGB @ 255).
-      </p>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        <strong>NOTE:</strong> As LED lights usually use pulse-width modulation (PWM) to control
-        brightness, this isn't a problem. This is not recommended for tungsten-based lights.
-      </p>
-
-      <p className="mb-2 italic font-bold text-orange-400 text-[9pt]">
-        Physical strobe fixtures are not yet implemented. You can use regular RGB PAR lights as
-        either a dedicated strobe, or as a strobe-capable light.
-      </p>
+      <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+        <p className="mb-2">
+          <strong>Note on Strobes:</strong> there are four possible strobe configurations:
+        </p>
+        <ol className="mt-0 mb-0 ml-6 list-decimal list-outside space-y-2 pl-2 marker:font-normal marker:text-gray-700 dark:marker:text-gray-300">
+          <li className="pl-1">No strobes: strobe effects are just ignored.</li>
+          <li className="pl-1">
+            <span className="font-medium text-red-600 dark:text-red-400">Physical Strobe</span>: DMX
+            fixtures specifically designed as a strobe light. You can configure these, but in this
+            version of Photonics these are not yet supported in-game.
+          </li>
+          <li className="pl-1">
+            <span className="font-medium text-green-600 dark:text-green-400">
+              Strobe Enabled Lights
+            </span>
+            : Regular RGB PAR lights that also act as strobes. The flashing is achieved by manually
+            flashing the DMX channels. This works for most lights, but the speed of the strobe is
+            limited by your hardware. This is the recommended mode.
+          </li>
+          <li className="pl-1">
+            <span className="font-medium text-orange-600 dark:text-orange-400">
+              Strobe Channels
+            </span>
+            : Regular RGB PAR lights that have a dedicated strobe channel. The flashing is achieved
+            by the light's hardware itself. This generally provides the fastest strobe speeds, but
+            is difficult to exactly match in-game. No two lights use the same speed values, so you
+            will have to experiment with the values to get the best result. If you have a mix of
+            makes/models of lights, this is even more difficult to sync up. We recommend using
+            Strobe Enabled Lights.
+          </li>
+        </ol>
+      </div>
       <p className="mb-4 italic font-bold text-orange-400  text-[9pt]">
         Gobo (colour wheel) based lights are not supported.
       </p>

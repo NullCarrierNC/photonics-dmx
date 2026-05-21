@@ -54,8 +54,12 @@ export class DmxLightManager {
       }))
       .sort((a, b) => a.position - b.position)
 
+    // isStrobeEnabled is the authoritative gate for ALL strobe output on a fixture (both the
+    // opacity-flash path that targets the 'strobe' group and the hardware strobe-channel path
+    // gated again in DmxPublisher). A light placed in the strobe group but not strobe-enabled
+    // must never receive strobe output.
     this._strobeLights = this.config.strobeLights
-      .filter((light) => light.id !== null)
+      .filter((light) => light.id !== null && light.isStrobeEnabled === true)
       .map((light) => ({
         id: light.id as string,
         position: light.position,

@@ -9,7 +9,7 @@ interface LightPreviewProps {
 }
 
 // Define the channel rendering order
-const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeSpeed']
+const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeChannel']
 
 /**
  * Displays a preview card for a light fixture with its properties

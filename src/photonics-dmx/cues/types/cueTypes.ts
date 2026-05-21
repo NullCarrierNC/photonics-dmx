@@ -349,6 +349,45 @@ export enum CueType {
   DisableAll = 'DisableAll', // RB3 has a discreet disable all cue
 }
 
+/**
+ * Discrete strobe-speed slots used by hardware-strobe-channel fixtures. Maps each YARG/RB3 strobe
+ * cue to the per-fixture `strobeValues` entry written to the fixture's strobe DMX channel.
+ */
+export type StrobeSpeedSlot = 'slow' | 'medium' | 'fast' | 'fastest'
+
+/** Strobe cue types — all "active strobe" variants plus the off signal. */
+export const STROBE_CUE_TYPES: readonly CueType[] = [
+  CueType.Strobe_Fastest,
+  CueType.Strobe_Fast,
+  CueType.Strobe_Medium,
+  CueType.Strobe_Slow,
+  CueType.Strobe_Off,
+] as const
+
+/** True for any strobe cue including the off signal. */
+export function isStrobeCueType(cueType: CueType): boolean {
+  return STROBE_CUE_TYPES.includes(cueType)
+}
+
+/**
+ * Maps a strobe CueType to its speed slot. Returns null for {@link CueType.Strobe_Off} and any
+ * non-strobe cue type.
+ */
+export function cueTypeToStrobeSlot(cueType: CueType): StrobeSpeedSlot | null {
+  switch (cueType) {
+    case CueType.Strobe_Slow:
+      return 'slow'
+    case CueType.Strobe_Medium:
+      return 'medium'
+    case CueType.Strobe_Fast:
+      return 'fast'
+    case CueType.Strobe_Fastest:
+      return 'fastest'
+    default:
+      return null
+  }
+}
+
 export const lightingCueMap: Record<number, CueType> = {
   0: CueType.Default,
   1: CueType.Dischord,

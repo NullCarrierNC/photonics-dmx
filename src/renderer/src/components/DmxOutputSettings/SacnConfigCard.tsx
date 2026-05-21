@@ -34,7 +34,7 @@ export const SacnConfigCard: React.FC<SacnConfigCardProps> = ({
       </p>
       <div className="grid grid-cols-1 gap-4">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-24">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
             Universe:
           </label>
           <input
@@ -51,8 +51,8 @@ export const SacnConfigCard: React.FC<SacnConfigCardProps> = ({
         </div>
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-24 shrink-0">
-              Refresh rate:
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
+              Refresh Rate:
             </label>
             <input
               type="number"
@@ -69,13 +69,12 @@ export const SacnConfigCard: React.FC<SacnConfigCardProps> = ({
             />
             <span className="text-xs text-gray-500 dark:text-gray-400">Hz (10–44)</span>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 ml-[6.5rem] max-w-lg leading-snug">
-            If you&apos;re using the FatsCo adapter, or you see flickering, try lowering this value
-            to 20.
+          <p className="text-xs text-gray-500 dark:text-gray-400 ml-[5.5rem] max-w-lg leading-snug">
+            If you see flickering, try lowering this value to 20.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-24">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
             Network Interface:
           </label>
           <select
@@ -107,7 +106,7 @@ export const SacnConfigCard: React.FC<SacnConfigCardProps> = ({
           </div>
           {config.useUnicast && (
             <div className="flex items-center gap-2 ml-6">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-24">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
                 Destination IP:
               </label>
               <input

@@ -322,4 +322,151 @@ describe('ConfigurationManager', () => {
       )
     })
   })
+
+  describe('Rig sync against fixture templates', () => {
+    it('aligns stale rig snapshots to current templates on getDmxRigs() and persists the result', async () => {
+      // The user's saved rig was created before Strobe Channel? was enabled on the template, so
+      // its frontLights[0].channels record is missing strobeChannel and there is no strobeValues.
+      // The current template (lights.json) has both — getDmxRigs() should reconcile.
+      ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
+        if (path.includes('prefs.json')) {
+          return JSON.stringify({ effectDebounce: 0 })
+        }
+        if (path.includes('lights.json')) {
+          return JSON.stringify({
+            version: 1,
+            data: {
+              lights: [
+                {
+                  id: 'tpl-rgb',
+                  fixture: FixtureTypes.RGB,
+                  name: 'PAR 1',
+                  label: 'PAR 1',
+                  position: 0,
+                  isStrobeEnabled: false,
+                  channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, strobeChannel: 5 },
+                  strobeValues: { slow: 10, medium: 100, fast: 200, fastest: 250 },
+                },
+              ],
+            },
+          })
+        }
+        if (path.includes('lightsLayout.json')) {
+          return JSON.stringify({
+            numLights: 0,
+            lightLayout: { id: 'default-layout', label: 'Default Layout' },
+            strobeType: ConfigStrobeType.None,
+            frontLights: [],
+            backLights: [],
+            strobeLights: [],
+          })
+        }
+        if (path.includes('dmxRigs.json')) {
+          return JSON.stringify({
+            version: 3,
+            data: {
+              schemaVersion: 3,
+              rigs: [
+                {
+                  id: 'rig-1',
+                  name: 'Rig 1',
+                  active: true,
+                  config: {
+                    numLights: 1,
+                    lightLayout: {
+                      id: 'two-rows',
+                      label: 'Two Rows (one in front of the other)',
+                    },
+                    strobeType: ConfigStrobeType.AllCapable,
+                    frontLights: [
+                      {
+                        id: 'l-1',
+                        fixtureId: 'tpl-rgb',
+                        position: 1,
+                        fixture: FixtureTypes.RGB,
+                        label: 'PAR 1',
+                        name: 'PAR 1',
+                        isStrobeEnabled: true,
+                        group: 'front',
+                        universe: 1,
+                        mount: 'floor',
+                        // stale: no strobeChannel, no strobeValues
+                        channels: { masterDimmer: 11, red: 12, green: 13, blue: 14 },
+                      },
+                    ],
+                    backLights: [],
+                    strobeLights: [],
+                  },
+                },
+              ],
+            },
+          })
+        }
+        return '{}'
+      })
+
+      const cm = new ConfigurationManager()
+      const rigs = cm.getDmxRigs()
+      const synced = rigs[0]!.config.frontLights[0]!
+      // strobe channel filled from template offset (5 - 1 = 4, applied to master 11 → 15)
+      expect((synced.channels as unknown as Record<string, number>).strobeChannel).toBe(15)
+      // strobeValues materialised from the template
+      expect(synced.strobeValues).toEqual({ slow: 10, medium: 100, fast: 200, fastest: 250 })
+      // rig-owned fields preserved
+      expect(synced.id).toBe('l-1')
+      expect(synced.isStrobeEnabled).toBe(true)
+      expect(synced.mount).toBe('floor')
+      // change was persisted back to disk
+      const rigsWrites = (fsPromises.writeFile as jest.Mock).mock.calls.filter((c) =>
+        String(c[0]).includes('dmxRigs.json'),
+      )
+      expect(rigsWrites.length).toBeGreaterThan(0)
+    })
+
+    it('syncRigsWithUserLights returns false when nothing changed', async () => {
+      ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
+        if (path.includes('lights.json')) {
+          return JSON.stringify({
+            version: 1,
+            data: {
+              lights: [
+                {
+                  id: 'tpl-rgb',
+                  fixture: FixtureTypes.RGB,
+                  name: 'PAR 1',
+                  label: 'PAR 1',
+                  position: 0,
+                  isStrobeEnabled: false,
+                  channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
+                },
+              ],
+            },
+          })
+        }
+        if (path.includes('dmxRigs.json')) {
+          return JSON.stringify({
+            version: 3,
+            data: { schemaVersion: 3, rigs: [] },
+          })
+        }
+        if (path.includes('lightsLayout.json')) {
+          return JSON.stringify({
+            numLights: 0,
+            lightLayout: { id: 'default-layout', label: 'Default Layout' },
+            strobeType: ConfigStrobeType.None,
+            frontLights: [],
+            backLights: [],
+            strobeLights: [],
+          })
+        }
+        if (path.includes('prefs.json')) {
+          return JSON.stringify({ effectDebounce: 0 })
+        }
+        return '{}'
+      })
+      const cm = new ConfigurationManager()
+      const changed = await cm.syncRigsWithUserLights()
+      expect(changed).toBe(false)
+    })
+  })
 })

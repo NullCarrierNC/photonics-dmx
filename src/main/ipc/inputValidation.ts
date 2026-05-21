@@ -644,6 +644,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'cueDomains',
   'cueConsistencyWindow',
   'clockRate',
+  'globalDmxPublishingRateHz',
   'dmxOutputConfig',
   'stageKitPrefs',
   'dmxSettingsPrefs',
@@ -698,6 +699,14 @@ export function validatePreferencesPayload(
 
   if ('advancedModeEnabled' in cleaned && typeof cleaned.advancedModeEnabled !== 'boolean') {
     return { ok: false, error: 'advancedModeEnabled must be a boolean' }
+  }
+
+  if ('globalDmxPublishingRateHz' in cleaned) {
+    const hz = cleaned.globalDmxPublishingRateHz
+    if (typeof hz !== 'number' || !Number.isFinite(hz)) {
+      return { ok: false, error: 'globalDmxPublishingRateHz must be a finite number' }
+    }
+    cleaned.globalDmxPublishingRateHz = clampDmxOutputRefreshRateHz(hz)
   }
 
   if ('sacnConfig' in cleaned) {
@@ -1034,6 +1043,34 @@ export function validateDmxFixturesArray(
     if (!isPlainObject(el.channels)) {
       return { ok: false, error: `${fieldName}[${i}].channels must be an object` }
     }
+    if (el.strobeValues != null) {
+      const strobeValuesError = validateStrobeChannelValues(
+        el.strobeValues,
+        `${fieldName}[${i}].strobeValues`,
+      )
+      if (strobeValuesError) {
+        return { ok: false, error: strobeValuesError }
+      }
+    }
   }
   return { ok: true, value: value as DmxFixture[] }
+}
+
+const STROBE_VALUE_KEYS = ['slow', 'medium', 'fast', 'fastest'] as const
+
+/**
+ * Validates a {@link StrobeChannelValues} record (each slot must be a DMX 0–255 integer).
+ * Returns null when valid, or an error message string when not.
+ */
+function validateStrobeChannelValues(value: unknown, fieldName: string): string | null {
+  if (!isPlainObject(value)) {
+    return `${fieldName} must be a plain object`
+  }
+  for (const key of STROBE_VALUE_KEYS) {
+    const v = (value as Record<string, unknown>)[key]
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 255) {
+      return `${fieldName}.${key} must be an integer between 0 and 255`
+    }
+  }
+  return null
 }
