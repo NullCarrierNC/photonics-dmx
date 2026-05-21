@@ -21,6 +21,37 @@ import { getStrobeStateManager, StrobeStateManager } from './StrobeStateManager'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('DmxPublisher')
 
+/** Opaque timer handle so the output governor can be driven by injected fakes in tests. */
+type TimerHandle = ReturnType<typeof setTimeout>
+
+/**
+ * Time + timer source for the output-rate governor. Defaults to real wall-clock/timers;
+ * tests inject a deterministic implementation (mirrors the device-factory injection pattern
+ * used by the USB senders).
+ */
+export interface PublisherTiming {
+  now(): number
+  setTimer(cb: () => void, ms: number): TimerHandle
+  clearTimer(handle: TimerHandle): void
+}
+
+const REAL_TIMING: PublisherTiming = {
+  now: () => performance.now(),
+  setTimer: (cb, ms) => setTimeout(cb, ms),
+  clearTimer: (handle) => clearTimeout(handle),
+}
+
+/** Optional construction options. Omitting `outputRateHz` leaves the governor disabled. */
+export interface DmxPublisherOptions {
+  /**
+   * Max DMX output frames/sec. When set (> 0) the publisher coalesces redundant / over-rate
+   * frames so cheap USB / low-end sACN adapters aren't fire-hosed at the render tick rate.
+   * Unset/0 = legacy behaviour: every published frame is sent synchronously, no dirty-skip.
+   */
+  outputRateHz?: number
+  timing?: PublisherTiming
+}
+
 /**
  * Per-light snapshot of the brightest blended color seen during an active strobe cue.
  *
@@ -63,14 +94,36 @@ export class DmxPublisher {
   /** Tracks whether a strobe was active on the previous publish, so we can clear the latch on transition. */
   private _lastStrobeActive = false
 
+  // --- Output-rate governor (opt-in via DmxPublisherOptions.outputRateHz) ---
+  /** Min ms between wire sends. 0 = governor disabled (legacy synchronous pass-through). */
+  private _minIntervalMs = 0
+  private _timing: PublisherTiming = REAL_TIMING
+  /** Wall time of the last actual send. 0 = none yet (leading edge fires immediately). */
+  private _lastSendTimeMs = 0
+  /** Last buffer actually handed to the sender; used for dirty-skip. Persistent to limit GC. */
+  private _lastSentBuffer: Record<number, number> = {}
+  private _hasLastSent = false
+  /** Snapshot of the most recent rate-limited frame, flushed by the trailing timer. */
+  private _pendingBuffer: Record<number, number> = {}
+  private _hasPending = false
+  private _trailingTimer: TimerHandle | null = null
+
   constructor(
     senderManager: SenderManager,
     lightStateManager: LightStateManager,
     strobeStateManager: StrobeStateManager = getStrobeStateManager(),
+    options: DmxPublisherOptions = {},
   ) {
     this._sender = senderManager
     this._lightStateManager = lightStateManager
     this._strobeStateManager = strobeStateManager
+    if (options.timing) {
+      this._timing = options.timing
+    }
+    const hz = options.outputRateHz
+    if (typeof hz === 'number' && Number.isFinite(hz) && hz > 0) {
+      this._minIntervalMs = 1000 / hz
+    }
 
     this.publish = this.publish.bind(this)
     this._lightStateManager.on('LightStatesUpdated', this.publish)
@@ -97,6 +150,8 @@ export class DmxPublisher {
    */
   public setManualBuffer(buffer: Record<number, number>): void {
     this._manualMode = true
+    // Console takes over immediately; drop any in-flight governed/trailing cue frame.
+    this._resetGovernor()
     for (const key of Object.keys(this._mergedBuffer)) {
       delete this._mergedBuffer[Number(key)]
     }
@@ -124,9 +179,26 @@ export class DmxPublisher {
    */
   public clearManualBuffer(): void {
     this._manualMode = false
+    // Resume cue output at the leading edge (next frame sends immediately).
+    this._resetGovernor()
     for (const key of Object.keys(this._mergedBuffer)) {
       delete this._mergedBuffer[Number(key)]
     }
+  }
+
+  /**
+   * Hot-swap the output rate. Called when the user changes the Global DMX Publishing Rate
+   * preference so the change applies without tearing down senders. Values <= 0 disable the
+   * governor (legacy pass-through). Any in-flight trailing frame is dropped and the next
+   * publish goes out at the new leading edge.
+   */
+  public setOutputRateHz(hz: number): void {
+    const next = typeof hz === 'number' && Number.isFinite(hz) && hz > 0 ? 1000 / hz : 0
+    if (next === this._minIntervalMs) {
+      return
+    }
+    this._minIntervalMs = next
+    this._resetGovernor()
   }
 
   /**
@@ -336,12 +408,121 @@ export class DmxPublisher {
     }
 
     if (Object.keys(this._mergedBuffer).length > 0) {
-      try {
-        this._sender.send(this._mergedBuffer)
-      } catch (error) {
-        log.error('Failed to send DMX data:', error)
+      this._dispatch(this._mergedBuffer)
+    }
+  }
+
+  /**
+   * Output boundary. `publishNow` always runs every frame (the strobe peak-hold state machine
+   * depends on seeing every blended frame), but the actual wire send is governed here so weak
+   * adapters aren't fed at the render tick rate:
+   *
+   *  - Governor disabled (no `outputRateHz`): legacy behaviour — send every frame, no dirty-skip.
+   *  - Dirty-skip: identical to the last sent frame → don't send. sACN `minRefreshRate` /
+   *    Art-Net `base_refresh_interval` / the USB libs re-transmit their last buffer on their own
+   *    keep-alive timer, so DMX continuity is preserved while redundant traffic is dropped.
+   *  - Rate gate: leading-edge send when the interval has elapsed; otherwise snapshot the frame
+   *    and arm a single trailing timer so the latest state is always flushed (no stale tail).
+   */
+  private _dispatch(buffer: Record<number, number>): void {
+    if (this._minIntervalMs <= 0) {
+      this._send(buffer)
+      return
+    }
+
+    if (this._hasLastSent && this._buffersEqual(buffer, this._lastSentBuffer)) {
+      // Latest intent already matches the wire: nothing to send, and any earlier deferred
+      // frame is now superseded — drop it so the trailing timer can't flush a stale value.
+      this._cancelTrailing()
+      return
+    }
+
+    const now = this._timing.now()
+    const elapsed = now - this._lastSendTimeMs
+    if (!this._hasLastSent || elapsed >= this._minIntervalMs) {
+      this._cancelTrailing()
+      this._lastSendTimeMs = now
+      this._send(buffer)
+      return
+    }
+
+    // Within the rate window: keep the latest frame and arm a trailing flush if not already.
+    this._snapshotInto(this._pendingBuffer, buffer)
+    this._hasPending = true
+    if (this._trailingTimer === null) {
+      const delay = this._minIntervalMs - elapsed
+      this._trailingTimer = this._timing.setTimer(() => this._flushTrailing(), delay)
+    }
+  }
+
+  /** Trailing-timer callback: emit the most recent rate-limited frame (re-checking dirty). */
+  private _flushTrailing(): void {
+    this._trailingTimer = null
+    if (!this._hasPending) {
+      return
+    }
+    this._hasPending = false
+    if (this._hasLastSent && this._buffersEqual(this._pendingBuffer, this._lastSentBuffer)) {
+      return
+    }
+    this._lastSendTimeMs = this._timing.now()
+    this._send(this._pendingBuffer)
+  }
+
+  /** Hand a buffer to the sender and record it for dirty-skip. */
+  private _send(buffer: Record<number, number>): void {
+    try {
+      this._sender.send(buffer)
+    } catch (error) {
+      log.error('Failed to send DMX data:', error)
+      return
+    }
+    if (this._minIntervalMs > 0) {
+      this._snapshotInto(this._lastSentBuffer, buffer)
+      this._hasLastSent = true
+    }
+  }
+
+  private _cancelTrailing(): void {
+    if (this._trailingTimer !== null) {
+      this._timing.clearTimer(this._trailingTimer)
+      this._trailingTimer = null
+    }
+    this._hasPending = false
+  }
+
+  /** Reset governor state so cue output resumes cleanly (leading-edge) after manual mode. */
+  private _resetGovernor(): void {
+    this._cancelTrailing()
+    this._lastSendTimeMs = 0
+    this._hasLastSent = false
+    for (const key of Object.keys(this._lastSentBuffer)) {
+      delete this._lastSentBuffer[Number(key)]
+    }
+  }
+
+  /** Copy `src` into the persistent `dest` object (clear-then-fill) to keep allocations down. */
+  private _snapshotInto(dest: Record<number, number>, src: Record<number, number>): void {
+    for (const key of Object.keys(dest)) {
+      delete dest[Number(key)]
+    }
+    for (const [k, v] of Object.entries(src)) {
+      dest[Number(k)] = v
+    }
+  }
+
+  private _buffersEqual(a: Record<number, number>, b: Record<number, number>): boolean {
+    const aKeys = Object.keys(a)
+    const bKeys = Object.keys(b)
+    if (aKeys.length !== bKeys.length) {
+      return false
+    }
+    for (const k of aKeys) {
+      if (a[Number(k)] !== b[Number(k)]) {
+        return false
       }
     }
+    return true
   }
 
   public async shutdown(): Promise<void> {

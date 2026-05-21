@@ -43,6 +43,7 @@ import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoade
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues'
 import { createLogger } from '../../shared/logger'
+import { DMX_OUTPUT_REFRESH_RATE_HZ_MAX } from '../../shared/dmxOutputRefresh'
 
 const log = createLogger('ControllerManager')
 
@@ -347,9 +348,18 @@ export class ControllerManager {
     clock.start()
 
     // Set up DMX publisher (no longer takes DmxLightManager in constructor)
+    // Govern wire output so the render tick rate (clockRate, up to 100 Hz) doesn't fire-hose
+    // cheap USB / low-end sACN adapters. The Global DMX Publishing Rate pref sits upstream of
+    // all enabled senders; per-sender refresh settings still pace individual slow links below
+    // this cap. Falls back to the absolute DMX ceiling when the pref is absent so the governor
+    // never throttles a sender below what it could output.
+    const globalDmxRateHz =
+      this.config.getPreference('globalDmxPublishingRateHz') ?? DMX_OUTPUT_REFRESH_RATE_HZ_MAX
     this.dmxPublisher = new DmxPublisher(
       this.senderLifecycle.getSenderManager(),
       this.lightStateManager,
+      undefined,
+      { outputRateHz: globalDmxRateHz },
     )
 
     // Load active rigs and set them up in the publisher

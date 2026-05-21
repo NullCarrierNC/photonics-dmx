@@ -644,6 +644,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'cueDomains',
   'cueConsistencyWindow',
   'clockRate',
+  'globalDmxPublishingRateHz',
   'dmxOutputConfig',
   'stageKitPrefs',
   'dmxSettingsPrefs',
@@ -698,6 +699,14 @@ export function validatePreferencesPayload(
 
   if ('advancedModeEnabled' in cleaned && typeof cleaned.advancedModeEnabled !== 'boolean') {
     return { ok: false, error: 'advancedModeEnabled must be a boolean' }
+  }
+
+  if ('globalDmxPublishingRateHz' in cleaned) {
+    const hz = cleaned.globalDmxPublishingRateHz
+    if (typeof hz !== 'number' || !Number.isFinite(hz)) {
+      return { ok: false, error: 'globalDmxPublishingRateHz must be a finite number' }
+    }
+    cleaned.globalDmxPublishingRateHz = clampDmxOutputRefreshRateHz(hz)
   }
 
   if ('sacnConfig' in cleaned) {

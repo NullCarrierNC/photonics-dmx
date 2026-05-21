@@ -1,5 +1,6 @@
 import {
   DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+  DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
   OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
 } from '../../shared/dmxOutputRefresh'
 import {
@@ -54,6 +55,13 @@ export interface AppPreferences {
   motionEnabled?: boolean
   cueConsistencyWindow: number
   clockRate: number
+  /**
+   * Global publisher output rate cap (Hz). Sits upstream of all enabled senders and bounds how
+   * often the DmxPublisher hands frames to the SenderManager — protects cheap USB / low-end
+   * sACN adapters from being fed at the render tick rate. Per-sender refresh settings still
+   * pace individual wire links below this cap.
+   */
+  globalDmxPublishingRateHz?: number
 
   dmxOutputConfig?: {
     sacnEnabled: boolean
@@ -112,6 +120,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   cueConsistencyWindow: 60000,
   motionEnabled: true,
   clockRate: 10,
+  globalDmxPublishingRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
   activeAudioCueType: '' as AudioCueType,
   audioGameMode: DEFAULT_AUDIO_GAME_MODE,
 
