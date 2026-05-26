@@ -4,6 +4,7 @@ import {
   activeDmxLightsConfigAtom,
   currentPageAtom,
   dmxLightsLibraryAtom,
+  dmxRigsAtom,
   isSenderErrorAtom,
   lightingPrefsAtom,
   myDmxLightsAtom,
@@ -42,6 +43,7 @@ import {
   getLightLibrary,
   getMyLights,
   getLightLayout,
+  getDmxRigs,
   getSystemStatus,
 } from './ipcApi'
 import { registerIpcListener } from './utils/ipcHelpers'
@@ -60,6 +62,7 @@ export const App = (): JSX.Element => {
   // State atoms
   const setMyLights = useSetAtom(myDmxLightsAtom)
   const setLightLibrary = useSetAtom(dmxLightsLibraryAtom)
+  const setDmxRigs = useSetAtom(dmxRigsAtom)
   const [, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom)
   const [currentPage] = useAtom(currentPageAtom)
   const { isDarkMode, toggleDarkMode } = useDarkMode()
@@ -330,8 +333,9 @@ export const App = (): JSX.Element => {
     [setPrefs],
   )
 
-  // After a controller restart the main process auto-restores senders from preferences.
-  // Sync the renderer toggle atoms so the UI reflects the actual runtime sender state.
+  // After a controller restart the main process auto-restores senders from preferences and may
+  // mutate rigs via template-sync (see `syncRigsWithUserLights` in the main process). Sync the
+  // renderer atoms so the UI reflects the actual runtime state without waiting on a navigation.
   useEffect(() => {
     const handleControllersRestarted = () => {
       getSystemStatus()
@@ -343,10 +347,14 @@ export const App = (): JSX.Element => {
         .catch((err) => {
           log.error('App: failed to sync sender status after restart', err)
         })
+
+      getDmxRigs()
+        .then((rigs) => setDmxRigs(rigs || []))
+        .catch((err) => log.error('App: failed to refresh DMX rigs after restart', err))
     }
 
     return registerIpcListener(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, handleControllersRestarted)
-  }, [])
+  }, [setDmxRigs])
 
   const handleToggleLeftMenu = async (): Promise<void> => {
     const newCollapsed = !isLeftMenuCollapsed
@@ -399,6 +407,22 @@ export const App = (): JSX.Element => {
 
     loadLightLayout()
   }, [setActiveLightsConfig])
+
+  // Load DMX rigs at app start so any page that surfaces rig-aware UI (e.g. RoutedRigsHint
+  // under the wire-sender toggles on the Status page) has data on first paint instead of
+  // waiting for a route that happens to fetch rigs itself (Lights Layout, DMX Console, etc.).
+  useEffect(() => {
+    const loadDmxRigs = async (): Promise<void> => {
+      try {
+        const rigs = await getDmxRigs()
+        setDmxRigs(rigs || [])
+      } catch (error) {
+        log.error('Failed to load DMX rigs:', error)
+      }
+    }
+
+    loadDmxRigs()
+  }, [setDmxRigs])
 
   useAppIpcListeners({
     setAppVer,

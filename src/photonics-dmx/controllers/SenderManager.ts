@@ -8,7 +8,9 @@ import { ArtNetSender } from '../senders/ArtNetSender'
 import { SacnSender } from '../senders/SacnSender'
 import { EnttecProSender } from '../senders/EnttecProSender'
 import { OpenDmxSender } from '../senders/OpenDmxSender'
-import type { SenderConfig } from '../types'
+import type { SenderConfig, WireSenderId } from '../types'
+import { WIRE_SENDER_IDS } from '../types'
+import type { DmxValuesPayload } from '../../shared/ipcTypes'
 import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 
 const log = createLogger('SenderManager')
@@ -314,26 +316,67 @@ export class SenderManager {
   }
 
   /**
-   * Sends pre-built universe buffer to all enabled senders.
-   * Each sender uses its own configured universe for the protocol.
+   * Sends a pre-built universe buffer to the specified wire-sender slot. The publisher decides
+   * which slot receives which buffer (per-rig routing happens upstream); this method just
+   * dispatches. Calls for a slot that is not currently enabled are silently dropped — handles
+   * the race where a sender gets disabled between dispatch and send.
+   *
+   * IPC is **not** a wire sender and is dispatched separately via {@link sendIpc} because its
+   * payload shape (per-rig tagged union) differs from the flat wire buffer.
+   *
+   * @param slotId Which wire-sender slot to send to.
    * @param universeBuffer Complete DMX universe buffer (channel -> value mapping).
    */
-  public send(universeBuffer: Record<number, number>): void {
-    if (this.ipcSender) {
-      Promise.resolve(this.ipcSender.send(universeBuffer)).catch((error) => {
-        log.error('Error sending data to IPC sender:', error)
-      })
+  public send(slotId: WireSenderId, universeBuffer: Record<number, number>): void {
+    const sender = this.enabledSenders.get(slotId)
+    if (!sender) {
+      return
     }
+    Promise.resolve(sender.send(universeBuffer)).catch((error) => {
+      log.error(`Error sending data with ${sender.constructor.name}:`, error)
+      if (error instanceof SenderError && error.shouldDisable) {
+        this.handleSenderError(error)
+      }
+    })
+  }
 
-    const sendersToUse = Array.from(this.enabledSenders.entries())
-    for (const [_id, sender] of sendersToUse) {
-      Promise.resolve(sender.send(universeBuffer)).catch((error) => {
-        log.error(`Error sending data with ${sender.constructor.name}:`, error)
-        if (error instanceof SenderError && error.shouldDisable) {
-          this.handleSenderError(error)
-        }
-      })
+  /**
+   * Dispatches a {@link DmxValuesPayload} to the IPC preview channel. No-op if IPC is not
+   * currently enabled. IPC is handled separately from wire senders because its payload is a
+   * tagged per-rig (or manual) structure rather than a flat channel buffer — keeping it off
+   * the per-wire-slot governor pipeline keeps the IPC path simple and free of dirty-skip
+   * complexity it doesn't need.
+   */
+  public sendIpc(payload: DmxValuesPayload): void {
+    if (!this.ipcSender) {
+      return
     }
+    Promise.resolve(this.ipcSender.send(payload)).catch((error) => {
+      log.error('Error sending payload to IPC sender:', error)
+    })
+  }
+
+  /**
+   * Returns the currently enabled wire-sender ids (i.e. excluding the IPC preview channel).
+   * Used by the publisher to materialise per-rig output routing — rigs with `outputs: undefined`
+   * publish to whatever this returns at the current frame.
+   */
+  public getEnabledWireSenders(): WireSenderId[] {
+    const result: WireSenderId[] = []
+    for (const id of WIRE_SENDER_IDS) {
+      if (this.enabledSenders.has(id)) {
+        result.push(id)
+      }
+    }
+    return result
+  }
+
+  /**
+   * Returns true if the IPC preview slot is currently enabled. The IPC slot always receives
+   * every active rig (the renderer's existing preview rig-selector filters for display).
+   */
+  public isIpcEnabled(): boolean {
+    return this.ipcSender !== null
   }
 
   /**

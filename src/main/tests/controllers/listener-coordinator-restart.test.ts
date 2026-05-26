@@ -9,7 +9,9 @@ import {
 } from '../../controllers/ListenerCoordinator'
 import { DmxLightManager } from '../../../photonics-dmx/controllers/DmxLightManager'
 import { ILightingController } from '../../../photonics-dmx/controllers/sequencer/interfaces'
+import { ChainFanout } from '../../../photonics-dmx/controllers/ChainFanout'
 import { noopRuntimeBroadcaster } from '../../../photonics-dmx/runtime/broadcaster'
+import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
 
 function makeDeps(): ListenerCoordinatorDeps {
   const effects = {
@@ -17,9 +19,25 @@ function makeDeps(): ListenerCoordinatorDeps {
     blackout: jest.fn<() => Promise<void>>().mockImplementation(() => Promise.resolve()),
   } as unknown as ILightingController
   const dmx = {} as DmxLightManager
+  // Stub a single rig chain that exposes the effects controller as its sequencer so the
+  // disable paths' blackout loops have something to call.
+  const fakeChain = {
+    rigId: 'stub',
+    isPrimary: true,
+    dmxLightManager: dmx,
+    sequencer: effects,
+    yargCueHandler: null,
+    audioCueHandler: null,
+    rb3MenuCueHandler: null,
+  } as unknown as RigChain
+  const chains: RigChain[] = [fakeChain]
+  const chainFanout = new ChainFanout()
+  chainFanout.setChains(chains)
   return {
     getDmxLightManager: () => dmx,
     getEffectsController: () => effects,
+    getRigChains: () => chains,
+    getChainFanout: () => chainFanout,
     getMotionEnabled: () => true,
     getActiveYargMotionCueRef: () => null,
     getMotionCueMinimumHoldMs: () => 5000,
@@ -69,12 +87,10 @@ describe('ListenerCoordinator listener shutdown ordering', () => {
       isRb3Enabled: boolean
       rb3eListener: { shutdown: () => Promise<void> } | null
       processorManager: { destroy: () => void } | null
-      rb3MenuHandler: { shutdown: () => void } | null
     }
     co.isRb3Enabled = true
     co.rb3eListener = { shutdown: () => shutdownP }
     co.processorManager = { destroy: jest.fn() }
-    co.rb3MenuHandler = { shutdown: jest.fn() }
 
     const disableP = lc.disableRb3()
     await Promise.resolve()
@@ -84,6 +100,5 @@ describe('ListenerCoordinator listener shutdown ordering', () => {
     expect(co.isRb3Enabled).toBe(false)
     expect(co.rb3eListener).toBeNull()
     expect(co.processorManager).toBeNull()
-    expect(co.rb3MenuHandler).toBeNull()
   })
 })

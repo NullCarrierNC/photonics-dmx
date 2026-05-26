@@ -4,12 +4,14 @@ import {
   validateCueGroupSelectionMode,
   validateCueRefPayload,
   validateCueType,
+  validateDmxRigPayload,
   validateHost,
   validateLightingConfiguration,
   validateMotionSelectionMode,
   validateNumberInRange,
   validatePathUnderAllowedRoots,
   validatePreferencesPayload,
+  validateRigOutputs,
   validateSenderEnablePayload,
   validateSenderId,
   validateStageKitPriority,
@@ -58,6 +60,111 @@ describe('inputValidation', () => {
 
     it('rejects empty string', () => {
       expect(validateSenderId('').ok).toBe(false)
+    })
+  })
+
+  describe('validateRigOutputs', () => {
+    it('accepts undefined (legacy / publish-to-all default)', () => {
+      const result = validateRigOutputs(undefined)
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value).toBeUndefined()
+      }
+    })
+
+    it('accepts null as undefined (defensive — JSON round-trip)', () => {
+      const result = validateRigOutputs(null)
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value).toBeUndefined()
+      }
+    })
+
+    it('accepts an empty array (explicit "publish nowhere on wire")', () => {
+      const result = validateRigOutputs([])
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value).toEqual([])
+      }
+    })
+
+    it('accepts a valid wire-sender array', () => {
+      const result = validateRigOutputs(['sacn', 'opendmx'])
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value).toEqual(['sacn', 'opendmx'])
+      }
+    })
+
+    it('deduplicates repeated entries', () => {
+      const result = validateRigOutputs(['sacn', 'sacn', 'opendmx', 'sacn'])
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value).toEqual(['sacn', 'opendmx'])
+      }
+    })
+
+    it('rejects "ipc" (IPC is not a routable wire sender)', () => {
+      const result = validateRigOutputs(['ipc'])
+      expect(result.ok).toBe(false)
+    })
+
+    it('rejects unknown sender ids', () => {
+      const result = validateRigOutputs(['sacn', 'bogus'])
+      expect(result.ok).toBe(false)
+    })
+
+    it('rejects non-array values', () => {
+      expect(validateRigOutputs('sacn').ok).toBe(false)
+      expect(validateRigOutputs({}).ok).toBe(false)
+      expect(validateRigOutputs(42).ok).toBe(false)
+    })
+
+    it('rejects arrays containing non-string entries', () => {
+      const result = validateRigOutputs(['sacn', 123])
+      expect(result.ok).toBe(false)
+    })
+  })
+
+  describe('validateDmxRigPayload outputs handling', () => {
+    const baseRig = {
+      id: 'r1',
+      name: 'Rig 1',
+      active: true,
+      config: {
+        numLights: 1,
+        lightLayout: { id: 'two-rows', label: 'Two Rows' },
+        strobeType: 'None',
+        frontLights: [],
+        backLights: [],
+        strobeLights: [],
+      },
+    }
+
+    it('omits outputs when not supplied (legacy default preserved)', () => {
+      const result = validateDmxRigPayload(baseRig)
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect('outputs' in result.value).toBe(false)
+      }
+    })
+
+    it('passes through a valid outputs whitelist', () => {
+      const result = validateDmxRigPayload({ ...baseRig, outputs: ['sacn'] })
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value.outputs).toEqual(['sacn'])
+      }
+    })
+
+    it('rejects a rig whose outputs contain an invalid sender id', () => {
+      const result = validateDmxRigPayload({ ...baseRig, outputs: ['sacn', 'bogus'] })
+      expect(result.ok).toBe(false)
+    })
+
+    it('rejects a rig whose outputs is not an array', () => {
+      const result = validateDmxRigPayload({ ...baseRig, outputs: 'sacn' })
+      expect(result.ok).toBe(false)
     })
   })
 

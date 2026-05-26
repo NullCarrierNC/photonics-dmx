@@ -6,6 +6,8 @@ import { AudioCueProcessor } from '../../processors/AudioCueProcessor'
 import { AudioCueHandler } from '../../cueHandlers/AudioCueHandler'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
+import { ChainFanout } from '../../controllers/ChainFanout'
+import type { RigChain } from '../../controllers/RigChain'
 import { AudioCueRegistry } from '../../cues/registries/AudioCueRegistry'
 import { IAudioCue } from '../../cues/interfaces/IAudioCue'
 import { AudioCueType } from '../../cues/types/audioCueTypes'
@@ -103,9 +105,22 @@ describe('AudioCueProcessor', () => {
       },
     }
 
-    processor = new AudioCueProcessor(
-      lightManager,
+    // Wrap the stub light manager + sequencer in a fake chain so the processor's
+    // ChainFanout-based fanout has somewhere to dispatch.
+    const fakeChain = {
+      rigId: 'stub',
+      isPrimary: true,
+      dmxLightManager: lightManager,
       sequencer,
+      yargCueHandler: null,
+      audioCueHandler: null,
+      rb3MenuCueHandler: null,
+    } as unknown as RigChain
+    const chainFanout = new ChainFanout()
+    chainFanout.setChains([fakeChain])
+
+    processor = new AudioCueProcessor(
+      chainFanout,
       noopRuntimeBroadcaster(),
       audioConfig,
       'proc-primary',

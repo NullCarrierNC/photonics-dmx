@@ -9,8 +9,9 @@ import type {
   SacnSenderConfig,
   SenderConfig,
   SerialSenderConfig,
+  WireSenderId,
 } from '../../photonics-dmx/types'
-import { ConfigStrobeType } from '../../photonics-dmx/types'
+import { ConfigStrobeType, WIRE_SENDER_IDS } from '../../photonics-dmx/types'
 import type { AppPreferences } from '../../services/configuration/ConfigurationManager'
 import {
   CUE_DOMAINS,
@@ -42,6 +43,7 @@ import {
 export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
 const SENDER_IDS = new Set(['sacn', 'ipc', 'enttecpro', 'artnet', 'opendmx'])
+const WIRE_SENDER_ID_SET: ReadonlySet<string> = new Set<string>(WIRE_SENDER_IDS)
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -59,6 +61,31 @@ export function validateSenderId(value: unknown): ValidationResult<string> {
     return { ok: false, error: `Invalid sender: ${value}` }
   }
   return { ok: true, value }
+}
+
+/**
+ * Validates a per-rig `outputs` field. The field is optional on the wire payload — undefined or
+ * missing means "publish to every enabled wire sender" (legacy default). When present it must be
+ * an array of {@link WireSenderId} strings; duplicates are collapsed.
+ */
+export function validateRigOutputs(value: unknown): ValidationResult<WireSenderId[] | undefined> {
+  if (value === undefined || value === null) {
+    return { ok: true, value: undefined }
+  }
+  if (!Array.isArray(value)) {
+    return { ok: false, error: 'DmxRig.outputs must be an array of wire sender ids' }
+  }
+  const seen = new Set<WireSenderId>()
+  for (const entry of value) {
+    if (typeof entry !== 'string' || !WIRE_SENDER_ID_SET.has(entry)) {
+      return {
+        ok: false,
+        error: `DmxRig.outputs contains invalid wire sender id: ${String(entry)}`,
+      }
+    }
+    seen.add(entry as WireSenderId)
+  }
+  return { ok: true, value: Array.from(seen) }
 }
 
 export function validateNumberInRange(
@@ -455,15 +482,20 @@ export function validateDmxRigPayload(data: unknown): ValidationResult<DmxRig> {
   if (!cfg.ok) {
     return { ok: false, error: `DmxRig.config: ${cfg.error}` }
   }
-  return {
-    ok: true,
-    value: {
-      id: data.id.trim(),
-      name: data.name.trim(),
-      active: data.active,
-      config: cfg.value,
-    },
+  const outputs = validateRigOutputs(data.outputs)
+  if (!outputs.ok) {
+    return { ok: false, error: outputs.error }
   }
+  const rig: DmxRig = {
+    id: data.id.trim(),
+    name: data.name.trim(),
+    active: data.active,
+    config: cfg.value,
+  }
+  if (outputs.value !== undefined) {
+    rig.outputs = outputs.value
+  }
+  return { ok: true, value: rig }
 }
 
 export function validatePathUnderAllowedRoots(

@@ -1,24 +1,28 @@
-import { BaseSender, SenderError } from './BaseSender'
 import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import type { DmxValuesPayload } from '../../shared/ipcTypes'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('IpcSender')
 
 /**
- * IPC Sender uses Electron IPC's to communicate
- * with the front end UI. This is used for the
- * DMX preview so that it accurately reflects
- * the same DMX data going out over the wire.
+ * IPC Sender forwards the publisher's per-rig (cue mode) or manual (console mode) DMX state
+ * to the renderer over Electron IPC for the in-app preview.
+ *
+ * Note this does not extend {@link BaseSender}: wire senders share a flat `(buffer)` contract
+ * and a network/USB error model that doesn't apply to a local Electron IPC pipe. The publisher
+ * dispatches to wire senders and IPC through distinct {@link SenderManager} paths.
+ *
+ * The payload is per-rig in cue mode specifically so the preview can show a single rig's
+ * universe without collisions from other rigs that happen to share channel numbers — the
+ * common case when rigs target different wire outputs (separate physical universes).
  */
-export class IpcSender extends BaseSender {
+export class IpcSender {
   private enabled: boolean = false
 
   public constructor(
     private readonly broadcaster: RuntimeBroadcaster,
     private readonly hasReceivers: () => boolean,
-  ) {
-    super()
-  }
+  ) {}
 
   public async start(): Promise<void> {
     this.enabled = true
@@ -29,10 +33,11 @@ export class IpcSender extends BaseSender {
   }
 
   /**
-   * Sends DMX data using Electron IPC protocol.
-   * @param universeBuffer Pre-built universe buffer (channel -> value mapping).
+   * Forwards a {@link DmxValuesPayload} to the renderer. Tagged union: `kind: 'rigs'` carries
+   * one channel buffer per active rig (renderer picks by preview rig id); `kind: 'manual'`
+   * carries a single flat buffer (DMX Console takeover / shutdown blackout).
    */
-  public async send(universeBuffer: Record<number, number>): Promise<void> {
+  public async send(payload: DmxValuesPayload): Promise<void> {
     if (!this.enabled) {
       log.error('IPC Sender: Not enabled')
       return
@@ -43,25 +48,6 @@ export class IpcSender extends BaseSender {
       return
     }
 
-    this.broadcaster.emit(RENDERER_RECEIVE.DMX_VALUES, { universeBuffer })
-  }
-
-  protected verifySenderStarted(): void {}
-
-  /**
-   * Registers an event listener for SacnSenderError events.
-   * @param listener The listener function to handle the event.
-   */
-  public onSendError(_listener: (error: SenderError) => void): void {}
-
-  /**
-   * Removes an event listener for SacnSenderError events.
-   * @param _listener The listener function to remove.
-   */
-  public removeSendError(_listener: (error: SenderError) => void): void {}
-
-  public getUniverse(): number {
-    // Return -1 to indicate IPC sender handles all universes (for preview purposes)
-    return -1
+    this.broadcaster.emit(RENDERER_RECEIVE.DMX_VALUES, payload)
   }
 }

@@ -42,4 +42,11 @@ export interface IAudioCue {
    * Called when the cue is paused
    */
   onPause?(): void
+
+  /**
+   * Called when a rig chain is being disposed. Implementations that cache per-sequencer
+   * runtime state should drop the entry keyed by this sequencer so chains can be garbage
+   * collected and state doesn't accumulate across `restartControllers` cycles.
+   */
+  releaseSequencer?(sequencer: ILightingController): void
 }

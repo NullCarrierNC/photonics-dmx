@@ -17,8 +17,11 @@ const TWO_ROWS_LAYOUT = { id: 'two-rows', label: 'Two Rows (one in front of the 
  *  v3 — rig lights are aligned to their fixture templates on every load (see
  *       {@link syncRigsConfigWithUserLights}); the schema bump simply marks that one-time pass
  *       has run and the stored data is template-aligned at rest.
+ *  v4 — `DmxRig.outputs` field added (optional `WireSenderId[]`; undefined = publish to all
+ *       enabled wire senders). No data transformation needed — the bump is a marker that this
+ *       code understands the new field.
  */
-export const CURRENT_RIGS_SCHEMA_VERSION = 3
+export const CURRENT_RIGS_SCHEMA_VERSION = 4
 
 /**
  * Converts a single fixture/light from the pre-v2 strobe model. Only RGB-family fixtures are
@@ -185,17 +188,21 @@ export function migrateDmxRigsConfig(input: DmxRigsConfig): {
   config: DmxRigsConfig
   changed: boolean
 } {
-  const alreadyMigrated = input.schemaVersion === CURRENT_RIGS_SCHEMA_VERSION
+  // The legacy `front-back` → `two-rows` rename was the v1 migration. Any config that has been
+  // stamped at v1 or beyond has already had it applied — anything still named `front-back` at
+  // that point is intentional user-authored data and must be preserved across future schema bumps.
+  const renameMigrationApplied = (input.schemaVersion ?? 0) >= 1
+  const atCurrentVersion = input.schemaVersion === CURRENT_RIGS_SCHEMA_VERSION
 
   const nextRigs = input.rigs.map((rig) => {
     const { config, changed } = migrateLightingConfiguration(rig.config, {
-      skipLegacyRename: alreadyMigrated,
+      skipLegacyRename: renameMigrationApplied,
     })
     return changed ? { ...rig, config } : rig
   })
 
   const rigsMutated = nextRigs.some((rig, i) => rig !== input.rigs[i])
-  const needSchemaStamp = !alreadyMigrated
+  const needSchemaStamp = !atCurrentVersion
 
   if (!rigsMutated && !needSchemaStamp) {
     return { config: input, changed: false }

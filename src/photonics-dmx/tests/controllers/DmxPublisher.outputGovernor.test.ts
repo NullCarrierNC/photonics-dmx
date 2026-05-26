@@ -54,18 +54,29 @@ function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
 
 interface Ctx {
   publisher: DmxPublisher
-  send: jest.Mock<(buffer: Record<number, number>) => Promise<void>>
+  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<void>>
   timing: FakeTiming
   publish: (light: RGBIO) => void
   lastBuffer: () => Record<number, number>
 }
 
-/** RGB light at channels masterDimmer:1, red:2, green:3, blue:4. */
+/**
+ * RGB light at channels masterDimmer:1, red:2, green:3, blue:4. The mock SenderManager
+ * advertises a single 'sacn' wire sender (no IPC) so the governor runs against one slot —
+ * which exercises the same code paths as the legacy single-buffer pipeline.
+ */
 function setup(outputRateHz?: number): Ctx {
-  const send = jest.fn<(buffer: Record<number, number>) => Promise<void>>(() => Promise.resolve())
+  const send = jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<void>>(() =>
+    Promise.resolve(),
+  )
+  const mockSenderManager = {
+    send,
+    getEnabledWireSenders: () => ['sacn'],
+    isIpcEnabled: () => false,
+  }
   const timing = new FakeTiming()
   const publisher = new DmxPublisher(
-    { send } as unknown as SenderManager,
+    mockSenderManager as unknown as SenderManager,
     new LightStateManager(),
     new StrobeStateManager(),
     { outputRateHz, timing },
@@ -110,7 +121,8 @@ function setup(outputRateHz?: number): Ctx {
     publish: (light) => publisher.publish(new Map([['l1', light]])),
     lastBuffer: () => {
       const calls = send.mock.calls
-      return calls[calls.length - 1]![0] as Record<number, number>
+      // Calls are (slotId, buffer); the buffer is the second arg.
+      return calls[calls.length - 1]![1] as Record<number, number>
     },
   }
 }

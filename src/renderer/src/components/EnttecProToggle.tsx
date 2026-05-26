@@ -1,6 +1,7 @@
 import { useAtom } from 'jotai'
 import { enttecProComPortAtom, senderEnttecProEnabledAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
+import { RoutedRigsHint } from './RoutedRigsHint'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('EnttecProToggle')
 
@@ -33,12 +34,7 @@ const EnttecProToggle = ({ disabled = false, compact = false }: EnttecProToggleP
   }
 
   return (
-    <div
-      className={
-        compact
-          ? 'flex flex-col gap-1 shrink-0'
-          : 'flex flex-col gap-2 mb-4  w-[190px] justify-between'
-      }>
+    <div className={compact ? 'flex flex-col gap-1 shrink-0' : 'flex flex-col mb-4 w-[190px]'}>
       <div
         className={
           compact
@@ -65,6 +61,7 @@ const EnttecProToggle = ({ disabled = false, compact = false }: EnttecProToggleP
             }`}></div>
         </button>
       </div>
+      <RoutedRigsHint senderId="enttecpro" compact={compact} />
     </div>
   )
 }

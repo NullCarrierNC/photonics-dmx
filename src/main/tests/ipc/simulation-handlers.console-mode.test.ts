@@ -7,10 +7,12 @@ describe('simulation handlers console integration', () => {
       handle: jest.fn(),
       on: jest.fn(),
     } as any
-    const schedulePanTiltClear = jest.fn()
+    // The console-enter callback now drives the chain fanout so secondary rigs also get
+    // their pan/tilt cleared. Stub the fanout's `yargSchedulePanTiltClear` to verify it.
+    const yargSchedulePanTiltClear = jest.fn()
     const controllerManager = {
       setOnConsoleEnter: jest.fn(),
-      getLightingController: jest.fn(() => ({ schedulePanTiltClear })),
+      getChainFanout: jest.fn(() => ({ yargSchedulePanTiltClear })),
     } as any
 
     setupSimulationHandlers(ipcMain, controllerManager)
@@ -22,6 +24,6 @@ describe('simulation handlers console integration', () => {
     expect(typeof onConsoleEnter).toBe('function')
     onConsoleEnter?.()
 
-    expect(schedulePanTiltClear).toHaveBeenCalledTimes(1)
+    expect(yargSchedulePanTiltClear).toHaveBeenCalledTimes(1)
   })
 })
