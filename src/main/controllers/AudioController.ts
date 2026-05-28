@@ -14,11 +14,15 @@ import { AudioCueType, AudioMotionCueRef } from '../../photonics-dmx/cues/types/
 import { RENDERER_RECEIVE, RENDERER_SEND } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { validateAudioLightingData } from '../ipc/audioLightingValidation'
+import type { RigChain } from './RigChain'
+import type { ChainFanout } from './ChainFanout'
 const log = createLogger('AudioController')
 
 export interface AudioControllerDeps {
   getDmxLightManager: () => DmxLightManager | null
   getEffectsController: () => ILightingController | null
+  getRigChains: () => RigChain[]
+  getChainFanout: () => ChainFanout
   config: ConfigurationManager
   sendToAllWindows: (channel: string, ...args: unknown[]) => void
   runtimeBroadcaster: RuntimeBroadcaster
@@ -50,10 +54,9 @@ export class AudioController {
   }
 
   public async enableAudioInternal(): Promise<void> {
-    const dmxLightManager = this.deps.getDmxLightManager()
-    const effectsController = this.deps.getEffectsController()
-    if (this.isAudioEnabled || !effectsController || !dmxLightManager) {
-      log.info('Cannot enable Audio: already enabled or missing required components')
+    const chains = this.deps.getRigChains()
+    if (this.isAudioEnabled || chains.length === 0) {
+      log.info('Cannot enable Audio: already enabled or no rig chains')
       return
     }
     const audioConfig = this.deps.config.getAudioConfig()
@@ -61,8 +64,7 @@ export class AudioController {
       log.info('Enabling audio with Web Audio API...')
       const preferredCueType = this.deps.config.getPreference('activeAudioCueType')
       this.audioProcessor = new AudioCueProcessor(
-        dmxLightManager,
-        effectsController,
+        this.deps.getChainFanout(),
         this.deps.runtimeBroadcaster,
         audioConfig,
         preferredCueType,
@@ -139,18 +141,17 @@ export class AudioController {
       return
     }
     log.info('Disabling audio...')
-    const effectsController = this.deps.getEffectsController()
-    if (effectsController) {
+    // Blackout via every chain's sequencer so multi-rig setups don't leave secondary rigs
+    // lit when the audio listener is turned off.
+    for (const chain of this.deps.getRigChains()) {
       try {
-        effectsController.removeAllEffects()
-        await effectsController.blackout(0)
-        log.info(
-          'AudioController: Cleared all running effects and initiated blackout when disabling Audio',
-        )
+        chain.sequencer.removeAllEffects()
+        await chain.sequencer.blackout(0)
       } catch (error) {
-        log.error('Error clearing effects when disabling Audio:', error)
+        log.error(`Error clearing effects on rig ${chain.rigId} when disabling Audio:`, error)
       }
     }
+    log.info('AudioController: Cleared running effects and blacked out every rig (disable Audio)')
     this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_DISABLE, undefined)
     log.info('Sent audio:disable to renderer')
     if (this.audioDataHandler) {

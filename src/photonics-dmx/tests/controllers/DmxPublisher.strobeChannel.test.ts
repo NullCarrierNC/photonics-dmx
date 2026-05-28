@@ -38,10 +38,33 @@ function makeBrightRgbio(overrides: Partial<RGBIO> = {}): RGBIO {
 
 interface ScenarioContext {
   publisher: DmxPublisher
-  sender: { send: jest.Mock<(buffer: Record<number, number>) => Promise<void>> }
+  sender: {
+    send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<void>>
+    getEnabledWireSenders: () => string[]
+    isIpcEnabled: () => boolean
+  }
   strobe: StrobeStateManager
   rig: DmxRig
   lastBuffer(): Record<number, number>
+}
+
+/**
+ * Mock SenderManager surface used across this file. Advertises a single 'sacn' wire sender so
+ * the publisher routes every test rig through that one slot; the assertions read the buffer
+ * arg of the (slotId, buffer) call signature.
+ */
+function makeMockSender(): {
+  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<void>>
+  getEnabledWireSenders: () => string[]
+  isIpcEnabled: () => boolean
+} {
+  return {
+    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<void>>(() =>
+      Promise.resolve(),
+    ),
+    getEnabledWireSenders: () => ['sacn'],
+    isIpcEnabled: () => false,
+  }
 }
 
 /**
@@ -52,9 +75,7 @@ function setupScenario(options: {
   withStrobeChannel: boolean
   isStrobeEnabled: boolean
 }): ScenarioContext {
-  const sender = {
-    send: jest.fn<(buffer: Record<number, number>) => Promise<void>>(() => Promise.resolve()),
-  }
+  const sender = makeMockSender()
   const lightStateManager = new LightStateManager()
   const strobe = new StrobeStateManager()
   const publisher = new DmxPublisher(sender as unknown as SenderManager, lightStateManager, strobe)
@@ -106,7 +127,8 @@ function setupScenario(options: {
     rig,
     lastBuffer(): Record<number, number> {
       const calls = sender.send.mock.calls
-      return calls[calls.length - 1]![0] as Record<number, number>
+      // Calls are (slotId, buffer); the buffer is the second arg.
+      return calls[calls.length - 1]![1] as Record<number, number>
     },
   }
 }
@@ -227,9 +249,7 @@ describe('DmxPublisher strobe-channel runtime', () => {
   })
 
   it('falls back to default strobe values when the light has none configured', () => {
-    const sender = {
-      send: jest.fn<(buffer: Record<number, number>) => Promise<void>>(() => Promise.resolve()),
-    }
+    const sender = makeMockSender()
     const strobe = new StrobeStateManager()
     const publisher = new DmxPublisher(
       sender as unknown as SenderManager,
@@ -248,7 +268,7 @@ describe('DmxPublisher strobe-channel runtime', () => {
 
     strobe.setActive('fastest')
     publisher.publish(new Map<string, RGBIO>([['light-1', makeBrightRgbio()]]))
-    const [buf] = sender.send.mock.calls[0]!
+    const [, buf] = sender.send.mock.calls[0]!
     expect((buf as Record<number, number>)[5]).toBe(255) // DEFAULT_STROBE_CHANNEL_VALUES.fastest
   })
 })
@@ -258,9 +278,7 @@ describe('DmxPublisher dedicated STROBE fixtures', () => {
     // A dedicated STROBE fixture is a separate device class — it has its own strobe channel by
     // design and is not part of the new "RGB light with optional strobe channel" feature. The
     // publisher should leave it alone: no per-cue speed-value write, no RGB latch.
-    const sender = {
-      send: jest.fn<(buffer: Record<number, number>) => Promise<void>>(() => Promise.resolve()),
-    }
+    const sender = makeMockSender()
     const strobe = new StrobeStateManager()
     const publisher = new DmxPublisher(
       sender as unknown as SenderManager,
@@ -304,7 +322,8 @@ describe('DmxPublisher dedicated STROBE fixtures', () => {
     strobe.setActive('fast')
 
     publisher.publish(new Map<string, RGBIO>([['pure-strobe-1', makeBrightRgbio()]]))
-    const buf = sender.send.mock.calls[sender.send.mock.calls.length - 1]![0] as Record<
+    // Calls are (slotId, buffer); buffer is at index [1].
+    const buf = sender.send.mock.calls[sender.send.mock.calls.length - 1]![1] as Record<
       number,
       number
     >

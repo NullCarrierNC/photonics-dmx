@@ -2,6 +2,7 @@ import { useAtom } from 'jotai'
 import { openDmxComPortAtom, senderOpenDmxEnabledAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
 import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../../shared/dmxOutputRefresh'
+import { RoutedRigsHint } from './RoutedRigsHint'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('OpenDmxToggle')
 
@@ -34,12 +35,7 @@ const OpenDmxToggle = ({ disabled = false, compact = false }: OpenDmxToggleProps
   }
 
   return (
-    <div
-      className={
-        compact
-          ? 'flex flex-col gap-1 shrink-0'
-          : 'flex flex-col gap-2 mb-4 w-[190px] justify-between'
-      }>
+    <div className={compact ? 'flex flex-col gap-1 shrink-0' : 'flex flex-col mb-4 w-[190px]'}>
       <div
         className={
           compact
@@ -67,10 +63,11 @@ const OpenDmxToggle = ({ disabled = false, compact = false }: OpenDmxToggleProps
         </button>
       </div>
       {isOpenDmxEnabled && (
-        <p className="text-xs text-gray-600 dark:text-gray-400">
+        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
           *OpenDMX USB adapters aren't recommended. You may experience flickering or other issues.
         </p>
       )}
+      <RoutedRigsHint senderId="opendmx" compact={compact} />
     </div>
   )
 }

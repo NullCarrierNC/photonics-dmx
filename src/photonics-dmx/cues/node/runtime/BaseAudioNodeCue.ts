@@ -71,8 +71,35 @@ function spectralGatesPass(
 }
 
 /**
+ * Per-rig (per-sequencer) runtime state for an audio node cue. Each rig running the same cue
+ * keeps its own event-edge detector state, trigger phase, smoothed band energy, execution
+ * engine, and variable stores — sharing them across rigs would mean rig A's events advance
+ * state that rig B then reads, missing its own events.
+ */
+interface AudioCueRunState {
+  eventStates: Map<string, AudioEventState>
+  triggerPhase: Map<string, 'idle' | 'active'>
+  triggerEnterTime: Map<string, number>
+  lastTriggerTime: Map<string, number>
+  activeLevelEffects: Map<string, number>
+  smoothedBandEnergy: Map<string, number>
+  cueLevelVarStore: Map<string, VariableValue>
+  groupLevelVarStore: Map<string, VariableValue>
+  executionEngine: NodeExecutionEngine | null
+  cueStartedFired: boolean
+  /** Shared ref handed to the execution engine; when `.use` is true, the next effect submission
+   *  uses setEffect (clearing the sequencer) before adding. The engine sets `.use = false`
+   *  after consuming it. */
+  firstSubmissionUsesSetEffectRef: { use: boolean }
+}
+
+/**
  * Shared audio node-graph runtime for lighting (`AudioNodeCue`) and motion (`AudioMotionNodeCue`).
  * Subclasses control primary-slot clearing and cue-data transforms (e.g. BPM cap for motion safety).
+ *
+ * Per-rig state is keyed by sequencer reference: when multiple rigs run the same cue
+ * concurrently, each rig's execute call sees its own state map and engine. `onStop()` clears
+ * every rig's entry for this cue so a stop can't leak state into the next activation.
  */
 export abstract class BaseAudioNodeCue {
   public readonly id: string
@@ -80,28 +107,20 @@ export abstract class BaseAudioNodeCue {
   public readonly description: string
   public readonly name: string
 
-  private readonly eventStates = new Map<string, AudioEventState>()
-  private readonly triggerPhase = new Map<string, 'idle' | 'active'>()
-  /** Timestamp (ms) when trigger entered active phase; used for holdMs */
-  private readonly triggerEnterTime = new Map<string, number>()
-  private readonly lastTriggerTime = new Map<string, number>()
-  private readonly activeLevelEffects = new Map<string, number>()
-  /** Smoothed band energy per audio-trigger node id (EMA of getBandEnergy) */
-  private readonly smoothedBandEnergy = new Map<string, number>()
-  private static cueLevelVarStores = new Map<string, Map<string, VariableValue>>()
-  private static groupLevelVarStores = new Map<string, Map<string, VariableValue>>()
-  private cueLevelVarStore: Map<string, VariableValue>
-  private groupLevelVarStore: Map<string, VariableValue>
-  private executionEngine?: NodeExecutionEngine
-  private effectRegistry: EffectRegistry
-  /** True after `cue-started` events have run for this activation; reset in onStop. */
-  private cueStartedFired = false
   /**
-   * When `use` is true, the next graph effect submission uses setEffect (clears sequencer).
-   * Primary lighting cues arm this on first activation; the first submission (engine or level path) clears
-   * atomically with `addEffect`, avoiding a black gap before beat/FFT-driven events.
+   * Persisted group-level variable stores keyed by (sequencer, groupId). Per-sequencer so
+   * each rig accumulates its own group-level state — rigs running the same cue in lockstep
+   * see the same counter values rather than each one's mutations leaking into the others.
+   * Per-groupId so different cues in the same group still share state for a given rig
+   * (which is the group-var semantic cue authors expect).
    */
-  private readonly firstSubmissionUsesSetEffectRef = { use: false }
+  private static groupLevelVarStores = new Map<
+    ILightingController,
+    Map<string, Map<string, VariableValue>>
+  >()
+  protected readonly groupId: string
+  private readonly effectRegistry: EffectRegistry
+  private readonly states = new Map<ILightingController, AudioCueRunState>()
 
   constructor(
     groupId: string,
@@ -116,24 +135,48 @@ export abstract class BaseAudioNodeCue {
     this.name = definition.name || definition.id
     this.description = definition.description || definition.name || 'Node-based audio cue'
     this.effectRegistry = effectRegistry ?? new EffectRegistry()
+    this.groupId = groupId
+  }
 
-    const existingCueStore = BaseAudioNodeCue.cueLevelVarStores.get(this.id)
-    if (existingCueStore) {
-      this.cueLevelVarStore = existingCueStore
-    } else {
-      this.cueLevelVarStore = new Map()
-      BaseAudioNodeCue.cueLevelVarStores.set(this.id, this.cueLevelVarStore)
+  private getGroupVarStore(sequencer: ILightingController): Map<string, VariableValue> {
+    let perSeq = BaseAudioNodeCue.groupLevelVarStores.get(sequencer)
+    if (!perSeq) {
+      perSeq = new Map()
+      BaseAudioNodeCue.groupLevelVarStores.set(sequencer, perSeq)
     }
-
-    const existingGroupStore = BaseAudioNodeCue.groupLevelVarStores.get(groupId)
-    if (existingGroupStore) {
-      this.groupLevelVarStore = existingGroupStore
-    } else {
-      this.groupLevelVarStore = new Map()
-      BaseAudioNodeCue.groupLevelVarStores.set(groupId, this.groupLevelVarStore)
+    let store = perSeq.get(this.groupId)
+    if (!store) {
+      store = new Map()
+      perSeq.set(this.groupId, store)
     }
+    return store
+  }
 
-    this.initializeVariables()
+  private getOrCreateState(sequencer: ILightingController): AudioCueRunState {
+    const existing = this.states.get(sequencer)
+    if (existing) {
+      this.initializeVariables(existing)
+      return existing
+    }
+    const state: AudioCueRunState = {
+      eventStates: new Map(),
+      triggerPhase: new Map(),
+      triggerEnterTime: new Map(),
+      lastTriggerTime: new Map(),
+      activeLevelEffects: new Map(),
+      smoothedBandEnergy: new Map(),
+      cueLevelVarStore: new Map(),
+      // Group-level variables are per-rig (per-sequencer): when several chains run the same
+      // cue group in lockstep each chain accumulates its own counters/state, so they stay in
+      // sync even when cue logic mutates group state during execute().
+      groupLevelVarStore: this.getGroupVarStore(sequencer),
+      executionEngine: null,
+      cueStartedFired: false,
+      firstSubmissionUsesSetEffectRef: { use: false },
+    }
+    this.initializeVariables(state)
+    this.states.set(sequencer, state)
+    return state
   }
 
   /** Optional transform before graph execution (e.g. cap BPM for motion hardware safety). */
@@ -158,29 +201,29 @@ export abstract class BaseAudioNodeCue {
     const tasks: Promise<unknown>[] = []
     const safeData = this.transformCueDataForExecution(data)
 
-    this.initializeVariables()
+    const state = this.getOrCreateState(sequencer)
 
-    if (!this.executionEngine) {
+    if (!state.executionEngine) {
       const definition = this.compiledCue.definition as AudioNodeCueDefinition
       const variableDefinitions = definition.variables ?? []
 
-      this.executionEngine = new NodeExecutionEngine(
+      state.executionEngine = new NodeExecutionEngine(
         this.compiledCue,
         this.id,
         sequencer,
         lightManager,
         this.runtimeBroadcaster,
-        this.cueLevelVarStore,
-        this.groupLevelVarStore,
+        state.cueLevelVarStore,
+        state.groupLevelVarStore,
         this.effectRegistry,
         variableDefinitions,
-        this.firstSubmissionUsesSetEffectRef,
+        state.firstSubmissionUsesSetEffectRef,
       )
     }
 
-    if (!this.cueStartedFired) {
+    if (!state.cueStartedFired) {
       if (this.shouldArmPrimarySetEffectOnFirstFrame()) {
-        this.firstSubmissionUsesSetEffectRef.use = true
+        state.firstSubmissionUsesSetEffectRef.use = true
       }
       for (const event of this.compiledCue.eventMap.values()) {
         if (event.eventType !== 'cue-started') continue
@@ -189,12 +232,12 @@ export abstract class BaseAudioNodeCue {
           ...safeData,
           eventContext,
         }
-        this.executionEngine.startExecution(
+        state.executionEngine.startExecution(
           event,
           cueData as unknown as import('../../types/cueTypes').CueData,
         )
       }
-      this.cueStartedFired = true
+      state.cueStartedFired = true
     }
 
     for (const event of this.compiledCue.eventMap.values()) {
@@ -207,18 +250,18 @@ export abstract class BaseAudioNodeCue {
           ...safeData,
           eventContext,
         }
-        this.executionEngine.startExecution(
+        state.executionEngine.startExecution(
           event,
           cueData as unknown as import('../../types/cueTypes').CueData,
         )
         continue
       }
       if (event.eventType === 'audio-trigger') {
-        this.executeAudioTriggerNode(event as AudioTriggerNode, safeData)
+        this.executeAudioTriggerNode(state, event as AudioTriggerNode, safeData)
         continue
       }
-      const state = this.getEventState(event.id)
-      const evaluation = this.evaluateEvent(event as AudioEventNode, safeData, state)
+      const eventState = this.getEventState(state, event.id)
+      const evaluation = this.evaluateEvent(event as AudioEventNode, safeData, eventState)
       const effectKey = this.effectKey(event.id)
 
       if (evaluation.mode === 'edge') {
@@ -227,9 +270,9 @@ export abstract class BaseAudioNodeCue {
         const cooldownMs = (event as AudioEventNode).cooldownMs ?? 0
         if (cooldownMs > 0) {
           const now = Date.now()
-          const last = this.lastTriggerTime.get(event.id) ?? 0
+          const last = state.lastTriggerTime.get(event.id) ?? 0
           if (now - last < cooldownMs) continue
-          this.lastTriggerTime.set(event.id, now)
+          state.lastTriggerTime.set(event.id, now)
         }
 
         const eventContext: EventContext = { eventRawValue: evaluation.intensity }
@@ -237,14 +280,14 @@ export abstract class BaseAudioNodeCue {
           ...safeData,
           eventContext,
         }
-        this.executionEngine.startExecution(
+        state.executionEngine.startExecution(
           event,
           cueData as unknown as import('../../types/cueTypes').CueData,
         )
       } else {
         let actionStep: { actionId: string; delay: number } | null = null
         try {
-          actionStep = this.findFirstAction(event.id)
+          actionStep = this.findFirstAction(state, event.id)
         } catch (error) {
           if (error instanceof UninitializedVariableError) {
             this.runtimeBroadcaster.emit(
@@ -266,8 +309,8 @@ export abstract class BaseAudioNodeCue {
           lightManager,
           action.target,
           (varName: string) => {
-            const cueVar = this.cueLevelVarStore.get(varName)
-            const groupVar = this.groupLevelVarStore.get(varName)
+            const cueVar = state.cueLevelVarStore.get(varName)
+            const groupVar = state.groupLevelVarStore.get(varName)
             return cueVar ?? groupVar
           },
         )
@@ -283,19 +326,19 @@ export abstract class BaseAudioNodeCue {
 
           if (effect) {
             const layer = action.layer?.source === 'literal' ? Number(action.layer.value) : 0
-            if (this.firstSubmissionUsesSetEffectRef.use) {
-              this.firstSubmissionUsesSetEffectRef.use = false
+            if (state.firstSubmissionUsesSetEffectRef.use) {
+              state.firstSubmissionUsesSetEffectRef.use = false
               sequencer.removeAllEffects()
             } else {
               sequencer.removeEffect(effectKey, layer)
             }
             sequencer.addEffect(effectKey, effect)
-            this.activeLevelEffects.set(effectKey, layer)
+            state.activeLevelEffects.set(effectKey, layer)
           }
-        } else if (this.activeLevelEffects.has(effectKey)) {
+        } else if (state.activeLevelEffects.has(effectKey)) {
           const layer = action.layer?.source === 'literal' ? Number(action.layer.value) : 0
           sequencer.removeEffect(effectKey, layer)
-          this.activeLevelEffects.delete(effectKey)
+          state.activeLevelEffects.delete(effectKey)
         }
       }
     }
@@ -307,28 +350,50 @@ export abstract class BaseAudioNodeCue {
 
   onStop(): void {
     const skipEffectRemoval = this.skipEffectRemovalOnStop()
-    if (this.executionEngine) {
-      this.executionEngine.cancelAll(skipEffectRemoval)
+    for (const state of this.states.values()) {
+      if (state.executionEngine) {
+        state.executionEngine.cancelAll(skipEffectRemoval)
+      }
+      state.executionEngine = null
+      state.cueStartedFired = false
+      state.eventStates.clear()
+      state.triggerPhase.clear()
+      state.triggerEnterTime.clear()
+      state.lastTriggerTime.clear()
+      state.activeLevelEffects.clear()
+      state.smoothedBandEnergy.clear()
+      state.cueLevelVarStore.clear()
+      state.firstSubmissionUsesSetEffectRef.use = false
     }
-
-    this.cueStartedFired = false
-    this.eventStates.clear()
-    this.triggerPhase.clear()
-    this.triggerEnterTime.clear()
-    this.lastTriggerTime.clear()
-    this.activeLevelEffects.clear()
-    this.smoothedBandEnergy.clear()
-    this.cueLevelVarStore.clear()
-    BaseAudioNodeCue.cueLevelVarStores.delete(this.id)
   }
 
-  private initializeVariables(): void {
+  /**
+   * Drops the per-sequencer state entry (and the per-sequencer group var store) so a
+   * disposed chain's sequencer can be garbage collected. Without this hook the cue
+   * instance (a registry singleton) would accumulate one stale entry per
+   * `restartControllers` cycle, plus stale group var stores in the static map.
+   */
+  releaseSequencer(sequencer: ILightingController): void {
+    const state = this.states.get(sequencer)
+    if (state) {
+      if (state.executionEngine) {
+        state.executionEngine.cancelAll(this.skipEffectRemovalOnStop())
+      }
+      this.states.delete(sequencer)
+    }
+    // Different cues in the same group share the per-sequencer group-var inner Map, so we
+    // only need to drop the outer entry on the first cue's release. Subsequent releases
+    // for the same sequencer find no entry and no-op.
+    BaseAudioNodeCue.groupLevelVarStores.delete(sequencer)
+  }
+
+  private initializeVariables(state: AudioCueRunState): void {
     const definition = this.compiledCue.definition as AudioNodeCueDefinition
 
     const cueVariables = definition.variables ?? []
     for (const varDef of cueVariables) {
-      if (!this.cueLevelVarStore.has(varDef.name)) {
-        this.cueLevelVarStore.set(varDef.name, {
+      if (!state.cueLevelVarStore.has(varDef.name)) {
+        state.cueLevelVarStore.set(varDef.name, {
           type: varDef.type,
           value: varDef.initialValue,
         })
@@ -337,8 +402,8 @@ export abstract class BaseAudioNodeCue {
 
     const groupVariables = this.compiledCue.groupVariables ?? []
     for (const varDef of groupVariables) {
-      if (!this.groupLevelVarStore.has(varDef.name)) {
-        this.groupLevelVarStore.set(varDef.name, {
+      if (!state.groupLevelVarStore.has(varDef.name)) {
+        state.groupLevelVarStore.set(varDef.name, {
           type: varDef.type,
           value: varDef.initialValue,
         })
@@ -368,7 +433,11 @@ export abstract class BaseAudioNodeCue {
     return peakBin * binSize
   }
 
-  private executeAudioTriggerNode(trigger: AudioTriggerNode, data: AudioCueData): void {
+  private executeAudioTriggerNode(
+    state: AudioCueRunState,
+    trigger: AudioTriggerNode,
+    data: AudioCueData,
+  ): void {
     const audioData = data.audioData
     const { rawFrequencyData, sampleRate, fftSize } = audioData
     if (!rawFrequencyData?.length || sampleRate == null || fftSize == null) return
@@ -384,9 +453,9 @@ export abstract class BaseAudioNodeCue {
     const bandEnergy = getBandEnergy(rawFrequencyData, sampleRate, fftSize, minHz, maxHz)
     const smoothing = clamp(trigger.smoothing ?? DEFAULT_EMA_SMOOTHING, 0, 1)
     const alpha = 1 - smoothing
-    const prevSmoothed = this.smoothedBandEnergy.get(trigger.id) ?? bandEnergy
+    const prevSmoothed = state.smoothedBandEnergy.get(trigger.id) ?? bandEnergy
     const smoothedEnergy = alpha * bandEnergy + (1 - alpha) * prevSmoothed
-    this.smoothedBandEnergy.set(trigger.id, smoothedEnergy)
+    state.smoothedBandEnergy.set(trigger.id, smoothedEnergy)
     const peakFreq = this.getPeakFrequencyInRange(
       rawFrequencyData,
       sampleRate,
@@ -418,9 +487,9 @@ export abstract class BaseAudioNodeCue {
       }
     }
 
-    const phase = this.triggerPhase.get(trigger.id) ?? 'idle'
+    const phase = state.triggerPhase.get(trigger.id) ?? 'idle'
     const now = Date.now()
-    const enterTime = this.triggerEnterTime.get(trigger.id) ?? 0
+    const enterTime = state.triggerEnterTime.get(trigger.id) ?? 0
 
     let energyActive: boolean
     if (phase === 'idle') {
@@ -454,10 +523,10 @@ export abstract class BaseAudioNodeCue {
 
     if (!shouldBeActive) {
       if (phase === 'active') {
-        this.triggerPhase.set(trigger.id, 'idle')
-        this.triggerEnterTime.delete(trigger.id)
+        state.triggerPhase.set(trigger.id, 'idle')
+        state.triggerEnterTime.delete(trigger.id)
         const cueData: AudioCueData = { ...data, triggerContext }
-        this.executionEngine!.startExecutionWithCallback(
+        state.executionEngine!.startExecutionWithCallback(
           trigger,
           cueData as unknown as import('../../types/cueTypes').CueData,
           undefined,
@@ -468,10 +537,10 @@ export abstract class BaseAudioNodeCue {
     }
 
     if (phase === 'idle') {
-      this.triggerPhase.set(trigger.id, 'active')
-      this.triggerEnterTime.set(trigger.id, now)
+      state.triggerPhase.set(trigger.id, 'active')
+      state.triggerEnterTime.set(trigger.id, now)
       const cueData: AudioCueData = { ...data, triggerContext }
-      this.executionEngine!.startExecutionWithCallback(
+      state.executionEngine!.startExecutionWithCallback(
         trigger,
         cueData as unknown as import('../../types/cueTypes').CueData,
         undefined,
@@ -479,9 +548,9 @@ export abstract class BaseAudioNodeCue {
       )
     }
 
-    this.triggerPhase.set(trigger.id, 'active')
+    state.triggerPhase.set(trigger.id, 'active')
     const cueDataDuring: AudioCueData = { ...data, triggerContext }
-    this.executionEngine!.startExecutionWithCallback(
+    state.executionEngine!.startExecutionWithCallback(
       trigger,
       cueDataDuring as unknown as import('../../types/cueTypes').CueData,
       undefined,
@@ -489,11 +558,11 @@ export abstract class BaseAudioNodeCue {
     )
   }
 
-  private getEventState(eventId: string): AudioEventState {
-    if (!this.eventStates.has(eventId)) {
-      this.eventStates.set(eventId, { previousValue: 0, active: false })
+  private getEventState(state: AudioCueRunState, eventId: string): AudioEventState {
+    if (!state.eventStates.has(eventId)) {
+      state.eventStates.set(eventId, { previousValue: 0, active: false })
     }
-    return this.eventStates.get(eventId)!
+    return state.eventStates.get(eventId)!
   }
 
   private evaluateEvent(
@@ -563,7 +632,11 @@ export abstract class BaseAudioNodeCue {
     }
   }
 
-  private evaluateLogicNode(logicNode: LogicNode, nodeId: string): string[] {
+  private evaluateLogicNode(
+    runState: AudioCueRunState,
+    logicNode: LogicNode,
+    nodeId: string,
+  ): string[] {
     const { adjacency } = this.compiledCue
     const edges = adjacency.get(nodeId) ?? []
 
@@ -578,8 +651,8 @@ export abstract class BaseAudioNodeCue {
           }
 
           if (logicNode.valueType === 'cue-type') {
-            const value = this.resolveValue('string', logicNode.value)
-            const varStore = this.getVariableStore(logicNode.varName)
+            const value = this.resolveValue(runState, 'string', logicNode.value)
+            const varStore = this.getVariableStore(runState, logicNode.varName)
 
             if (logicNode.mode === 'init') {
               if (!varStore.has(logicNode.varName)) {
@@ -591,8 +664,8 @@ export abstract class BaseAudioNodeCue {
             return edges.map((edge) => edge.to)
           }
 
-          const value = this.resolveValue(logicNode.valueType, logicNode.value)
-          const varStore = this.getVariableStore(logicNode.varName)
+          const value = this.resolveValue(runState, logicNode.valueType, logicNode.value)
+          const varStore = this.getVariableStore(runState, logicNode.varName)
 
           if (logicNode.mode === 'init') {
             if (!varStore.has(logicNode.varName)) {
@@ -605,8 +678,8 @@ export abstract class BaseAudioNodeCue {
         return edges.map((edge) => edge.to)
       }
       case 'math': {
-        const left = Number(this.resolveValue('number', logicNode.left))
-        const right = Number(this.resolveValue('number', logicNode.right))
+        const left = Number(this.resolveValue(runState, 'number', logicNode.left))
+        const right = Number(this.resolveValue(runState, 'number', logicNode.right))
         let result = 0
         switch (logicNode.operator) {
           case 'add':
@@ -626,14 +699,14 @@ export abstract class BaseAudioNodeCue {
             break
         }
         if (logicNode.assignTo) {
-          const varStore = this.getVariableStore(logicNode.assignTo)
+          const varStore = this.getVariableStore(runState, logicNode.assignTo)
           varStore.set(logicNode.assignTo, { type: 'number', value: result })
         }
         return edges.map((edge) => edge.to)
       }
       case 'conditional': {
-        const left = Number(this.resolveValue('number', logicNode.left))
-        const right = Number(this.resolveValue('number', logicNode.right))
+        const left = Number(this.resolveValue(runState, 'number', logicNode.left))
+        const right = Number(this.resolveValue(runState, 'number', logicNode.right))
         let outcome = false
         switch (logicNode.comparator) {
           case '>':
@@ -664,15 +737,19 @@ export abstract class BaseAudioNodeCue {
     return edges.map((edge) => edge.to)
   }
 
-  private getVariableStore(varName: string): Map<string, VariableValue> {
+  private getVariableStore(
+    runState: AudioCueRunState,
+    varName: string,
+  ): Map<string, VariableValue> {
     const definition = this.compiledCue.definition as AudioNodeCueDefinition
     const cueVariables = definition.variables ?? []
     const isCueLevel = cueVariables.some((v) => v.name === varName)
 
-    return isCueLevel ? this.cueLevelVarStore : this.groupLevelVarStore
+    return isCueLevel ? runState.cueLevelVarStore : runState.groupLevelVarStore
   }
 
   private resolveValue(
+    runState: AudioCueRunState,
     expectedType: 'number' | 'boolean' | 'string' | 'color' | 'event',
     source?: ValueSource,
   ): number | boolean | string {
@@ -697,8 +774,8 @@ export abstract class BaseAudioNodeCue {
       return source.value === true || source.value === 'true'
     }
 
-    const cueVar = this.cueLevelVarStore.get(source.name)
-    const groupVar = this.groupLevelVarStore.get(source.name)
+    const cueVar = runState.cueLevelVarStore.get(source.name)
+    const groupVar = runState.groupLevelVarStore.get(source.name)
     const existing = cueVar ?? groupVar
 
     if (existing) {
@@ -718,7 +795,10 @@ export abstract class BaseAudioNodeCue {
     throw new UninitializedVariableError(source.name)
   }
 
-  private findFirstAction(eventId: string): { actionId: string; delay: number } | null {
+  private findFirstAction(
+    runState: AudioCueRunState,
+    eventId: string,
+  ): { actionId: string; delay: number } | null {
     const visited = new Set<string>()
     const queue: Array<{ nodeId: string; delay: number }> = []
     const outgoing = this.compiledCue.adjacency.get(eventId) ?? []
@@ -735,7 +815,7 @@ export abstract class BaseAudioNodeCue {
 
       const logicNode = this.compiledCue.logicMap.get(nodeId)
       if (logicNode) {
-        const nextTargets = this.evaluateLogicNode(logicNode, nodeId)
+        const nextTargets = this.evaluateLogicNode(runState, logicNode, nodeId)
         const nextDelay = delay
         nextTargets.forEach((nextId) => queue.push({ nodeId: nextId, delay: nextDelay }))
         continue

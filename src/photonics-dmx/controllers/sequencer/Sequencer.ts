@@ -431,23 +431,21 @@ export class Sequencer implements ILightingController {
   }
 
   /**
-   * Shuts down the lighting coordinator and all its components
+   * Tears down this sequencer's own resources: its tick callback on the shared `Clock`, its
+   * scheduled events, and every currently-active effect. The `Clock` itself is **not** stopped
+   * — it's owned externally (so it can be shared across multiple sequencers running in
+   * parallel) and its lifecycle is the owner's responsibility.
    */
   public shutdown(): void {
     log.info('PhotonicsSequencer shutdown: starting')
 
     try {
-      // Stop the clock
-      this.clock.stop()
-
-      // Unregister components from clock
+      // Unregister from the shared clock without stopping it; other sequencers may still be
+      // ticking against the same Clock.
       this.clock.offTick(this.handleClockTick)
       this.eventScheduler.unregisterFromClock()
 
-      // Remove all effects
       this.removeAllEffects()
-
-      // Clean up other resources
       this.eventScheduler.destroy()
 
       log.info('PhotonicsSequencer shutdown: completed')

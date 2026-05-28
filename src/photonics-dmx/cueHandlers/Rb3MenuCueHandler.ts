@@ -7,6 +7,16 @@ import { Effect, RGBIO } from '../types'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('Rb3MenuCueHandler')
 
+/**
+ * Minimal dispatch surface for RB3 menu lighting. Implemented directly by
+ * {@link Rb3MenuCueHandler} for the single-rig path and by a multi-chain fanout when each
+ * rig needs to render menu lighting against its own light layout.
+ */
+export interface Rb3MenuCueDispatch {
+  playMenuFrame(): void
+  clear(): void
+}
+
 const BASE_EFFECT_NAME = 'rb3-menu-base'
 const PER_LIGHT_EFFECT_PREFIX = 'rb3-menu-light-'
 

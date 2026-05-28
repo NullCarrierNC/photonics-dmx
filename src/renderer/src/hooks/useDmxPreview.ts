@@ -5,6 +5,7 @@ import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getDmxRig, enableSender } from '../ipcApi'
 import type { DmxRig, LightingConfiguration, IpcSenderConfig } from '../../../photonics-dmx/types'
+import type { DmxValuesPayload } from '../../../shared/ipcTypes'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('useDmxPreview')
 
@@ -88,14 +89,19 @@ export function useDmxPreview(): {
     return registerIpcListener(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, handleControllersRestarted)
   }, [])
 
-  // Listen for DMX values (one native listener per channel; subscribers fan out)
+  // Listen for DMX values (one native listener per channel; subscribers fan out). The payload
+  // is a tagged union: `kind: 'rigs'` carries one buffer per active rig (we pick by the current
+  // preview rig id, read through the ref so the closure stays correct across rig switches);
+  // `kind: 'manual'` is DMX Console / shutdown blackout — we store the flat buffer as-is.
   useEffect(() => {
-    const handleDmxValues = (data: { universeBuffer: Record<number, number> }) => {
-      setDmxValues(
-        typeof data.universeBuffer === 'object' && data.universeBuffer !== null
-          ? data.universeBuffer
-          : {},
-      )
+    const handleDmxValues = (payload: DmxValuesPayload) => {
+      if (payload.kind === 'manual') {
+        setDmxValues(payload.buffer ?? {})
+        return
+      }
+      const rigId = selectedRigIdRef.current
+      const rigBuffer = rigId != null ? payload.rigBuffers[rigId] : undefined
+      setDmxValues(rigBuffer ?? {})
     }
 
     return registerIpcListener(RENDERER_RECEIVE.DMX_VALUES, handleDmxValues)

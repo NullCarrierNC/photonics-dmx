@@ -194,6 +194,74 @@ describe('migrateDmxRigsConfig', () => {
     expect(config.rigs).toEqual([])
   })
 
+  it('bumps schemaVersion from 3 → current without losing rig.outputs', () => {
+    // Per-rig sender routing (v4) — a rig with an explicit `outputs` whitelist must survive a
+    // version stamp bump unchanged. The migration adds no transformation for this field; it
+    // only marks that code understands it.
+    const rig: DmxRig = {
+      id: 'rig-routed',
+      name: 'Routed',
+      active: true,
+      config: {
+        numLights: 1,
+        lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
+        strobeType: ConfigStrobeType.None,
+        frontLights: [],
+        backLights: [],
+        strobeLights: [],
+      },
+      outputs: ['sacn', 'opendmx'],
+    }
+    const { config, changed } = migrateDmxRigsConfig({ rigs: [rig], schemaVersion: 3 })
+    expect(changed).toBe(true) // stamp bumped 3 → 4
+    expect(config.schemaVersion).toBe(CURRENT_RIGS_SCHEMA_VERSION)
+    expect(config.rigs[0]!.outputs).toEqual(['sacn', 'opendmx'])
+  })
+
+  it('rig without outputs migrates 3 → 4 with outputs still undefined (legacy default)', () => {
+    const rig: DmxRig = {
+      id: 'rig-default',
+      name: 'Default',
+      active: true,
+      config: {
+        numLights: 1,
+        lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
+        strobeType: ConfigStrobeType.None,
+        frontLights: [],
+        backLights: [],
+        strobeLights: [],
+      },
+    }
+    const { config } = migrateDmxRigsConfig({ rigs: [rig], schemaVersion: 3 })
+    expect(config.schemaVersion).toBe(CURRENT_RIGS_SCHEMA_VERSION)
+    expect(config.rigs[0]!.outputs).toBeUndefined()
+  })
+
+  it('preserves new semantic front-back on a v3-stamped config (regression for stamp-bump rename guard)', () => {
+    // The legacy `front-back` → `two-rows` rename was the v1 migration. A v3-stamped config that
+    // *intentionally* uses the new semantic `front-back` layout must NOT be renamed when we bump
+    // its stamp to v4 — the rename guard checks "≥ v1" rather than "== current".
+    const rig: DmxRig = {
+      id: 'rig-fb',
+      name: 'FB',
+      active: true,
+      config: {
+        numLights: 2,
+        lightLayout: {
+          id: 'front-back',
+          label: 'Front and Back (back lights behind audience)',
+        },
+        strobeType: ConfigStrobeType.None,
+        frontLights: [],
+        backLights: [],
+        strobeLights: [],
+      },
+    }
+    const { config } = migrateDmxRigsConfig({ rigs: [rig], schemaVersion: 3 })
+    expect(config.rigs[0]!.config.lightLayout.id).toBe('front-back')
+    expect(config.schemaVersion).toBe(CURRENT_RIGS_SCHEMA_VERSION)
+  })
+
   it('migrates legacy rgb/s rig lights to rgb + strobeChannel and seeds strobeValues', () => {
     const legacyLight = {
       id: 'rgbs-1',

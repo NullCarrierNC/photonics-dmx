@@ -32,6 +32,7 @@ import EnttecProToggle from '../components/EnttecProToggle'
 import OpenDmxToggle from '../components/OpenDmxToggle'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import type { DmxValuesPayload } from '../../../shared/ipcTypes'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('DmxConsole')
 
@@ -148,10 +149,18 @@ const DmxConsole: React.FC = () => {
     {},
   )
   const consoleEnabledRef = useRef(false)
+  // Mirror the currently-selected rig id into a ref so the long-lived DMX_VALUES listener can
+  // pick the right per-rig buffer from `kind: 'rigs'` payloads without re-registering on every
+  // rig switch.
+  const selectedRigIdRef = useRef(selectedRigId)
 
   useEffect(() => {
     consoleEnabledRef.current = consoleEnabled
   }, [consoleEnabled])
+
+  useEffect(() => {
+    selectedRigIdRef.current = selectedRigId
+  }, [selectedRigId])
 
   useEffect(() => {
     let cancelled = false
@@ -217,12 +226,20 @@ const DmxConsole: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    return registerIpcListener(RENDERER_RECEIVE.DMX_VALUES, (data) => {
-      setDmxValues(
-        typeof data.universeBuffer === 'object' && data.universeBuffer !== null
-          ? data.universeBuffer
-          : {},
-      )
+    return registerIpcListener(RENDERER_RECEIVE.DMX_VALUES, (payload: DmxValuesPayload) => {
+      if (payload.kind === 'manual') {
+        // Console takeover loopback: the buffer the publisher just broadcast to every wire
+        // sender. Show it as-is — this is what the user just commanded.
+        setDmxValues(payload.buffer ?? {})
+        return
+      }
+      // Cue mode: show the currently-selected rig's own universe buffer. We follow the same
+      // rig selector as the live preview; the merged-universe view is no longer meaningful
+      // with per-rig sender routing (rigs targeting different physical universes can share
+      // channel numbers).
+      const rigId = selectedRigIdRef.current
+      const rigBuffer = rigId != null ? payload.rigBuffers[rigId] : undefined
+      setDmxValues(rigBuffer ?? {})
     })
   }, [])
 

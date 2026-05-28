@@ -622,6 +622,23 @@ export interface LightingConfiguration {
 }
 
 /**
+ * Sender ids whose DMX output goes on a wire (vs the in-app IPC preview).
+ * Per-rig `outputs` lists target only wire senders; IPC always receives every active rig
+ * and is filtered for display by the renderer's existing preview rig-selector.
+ */
+export type WireSenderId = 'sacn' | 'artnet' | 'enttecpro' | 'opendmx'
+
+export const WIRE_SENDER_IDS: readonly WireSenderId[] = [
+  'sacn',
+  'artnet',
+  'enttecpro',
+  'opendmx',
+] as const
+
+/** A sender slot id used by the publisher: wire senders plus the IPC preview channel. */
+export type SenderSlotId = WireSenderId | 'ipc'
+
+/**
  * DMX Rig Interface
  * Represents a complete DMX configuration with its own active state.
  * Universe is configured at the sender/adapter level.
@@ -631,6 +648,14 @@ export interface DmxRig {
   name: string
   active: boolean // Default true
   config: LightingConfiguration
+  /**
+   * Wire senders this rig publishes to.
+   *  - `undefined` → publish to every currently enabled wire sender (legacy/default).
+   *  - explicit array → publish only to listed wire senders that are currently enabled.
+   *    Empty array means "publish nowhere on the wire" (the rig still feeds the IPC preview).
+   * IPC is always populated for every active rig regardless of this field.
+   */
+  outputs?: WireSenderId[]
 }
 
 /**

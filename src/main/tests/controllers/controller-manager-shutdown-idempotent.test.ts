@@ -16,7 +16,12 @@ type ShutdownStub = Record<string, unknown> & {
   nodeCueLoader: null
   effectLoader: null
   cueHandler: null
-  effectsController: { shutdown: jest.Mock }
+  /** Per-rig sequencer chains; shutdown awaits dispose() on each. The single stub chain's
+   *  dispose() forwards to the `effectsShutdown` mock so callers can assert against it. */
+  rigChains: Array<{ rigId: string; dispose: jest.Mock }>
+  clock: { destroy: jest.Mock } | null
+  dmxLightManager: null
+  effectsController: null
   dmxPublisher: { shutdown: jest.Mock }
   senderLifecycle: { shutdownSenderOnAppExit: jest.Mock }
   controllerShutdownPromise?: Promise<void> | null
@@ -53,7 +58,12 @@ function makeShutdownStub(overrides: {
   stub.nodeCueLoader = null
   stub.effectLoader = null
   stub.cueHandler = null
-  stub.effectsController = { shutdown: effectsShutdown }
+  // One stub chain whose dispose() forwards to the `effectsShutdown` mock so call-count
+  // assertions can target it.
+  stub.rigChains = [{ rigId: 'merged', dispose: effectsShutdown }]
+  stub.clock = { destroy: jest.fn() }
+  stub.dmxLightManager = null
+  stub.effectsController = null
   stub.dmxPublisher = { shutdown: publisherShutdown }
   stub.senderLifecycle = { shutdownSenderOnAppExit: senderShutdown }
   return stub
