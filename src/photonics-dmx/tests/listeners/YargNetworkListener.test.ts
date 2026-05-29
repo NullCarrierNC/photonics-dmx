@@ -265,6 +265,61 @@ describe('YargNetworkListener', () => {
     })
   })
 
+  describe('beat-byte decode (Bug #1 regression)', () => {
+    /** Byte offset of the beat field in the YARG datagram. */
+    const BEAT_BYTE_OFFSET = 38
+
+    function buildPacketWithBeat(beatByte: number): Buffer {
+      const buf = buildYargFullSizedPacket(1)
+      buf.writeUInt8(beatByte, BEAT_BYTE_OFFSET)
+      return buf
+    }
+
+    // Wire protocol per YARG.Core BeatlineType (verified against live YARG output):
+    // Measure=0, Strong=1, Weak=2, with 3 used as the no-beat sentinel ("Off").
+    // NOTE: YALCY's published BeatByte enum (Off=0, Measure=1, ...) disagrees with the
+    // wire and is incorrect; mapping that way fires measures on every strong beat.
+    it('byte 0 (Measure / downbeat) fires handleMeasure only', () => {
+      deserializePacket(listener, buildPacketWithBeat(0))
+      expect(cueHandler.handleMeasure).toHaveBeenCalledTimes(1)
+      expect(cueHandler.handleBeat).not.toHaveBeenCalled()
+    })
+
+    it('byte 1 (Strong beat) fires handleBeat only', () => {
+      deserializePacket(listener, buildPacketWithBeat(1))
+      expect(cueHandler.handleBeat).toHaveBeenCalledTimes(1)
+      expect(cueHandler.handleMeasure).not.toHaveBeenCalled()
+    })
+
+    it('byte 2 (Weak subdivision) fires neither handleMeasure nor handleBeat', () => {
+      deserializePacket(listener, buildPacketWithBeat(2))
+      expect(cueHandler.handleMeasure).not.toHaveBeenCalled()
+      expect(cueHandler.handleBeat).not.toHaveBeenCalled()
+    })
+
+    it('byte 3 (Off / no beat this frame) fires neither handleMeasure nor handleBeat', () => {
+      deserializePacket(listener, buildPacketWithBeat(3))
+      expect(cueHandler.handleMeasure).not.toHaveBeenCalled()
+      expect(cueHandler.handleBeat).not.toHaveBeenCalled()
+    })
+
+    it('decodes each beat byte to its canonical string in the dispatched cue data', () => {
+      const cases: Array<[number, CueData['beat']]> = [
+        [0, 'Measure'],
+        [1, 'Strong'],
+        [2, 'Weak'],
+        [3, 'Off'],
+      ]
+      for (const [beatByte, expected] of cases) {
+        cueHandler.handleCue.mockClear()
+        deserializePacket(listener, buildPacketWithBeat(beatByte))
+        const lastCall = cueHandler.handleCue.mock.calls.at(-1)
+        expect(lastCall).toBeDefined()
+        expect((lastCall![1] as CueData).beat).toBe(expected)
+      }
+    })
+  })
+
   describe('identical-frame throttling (30 Hz)', () => {
     const throttleMs = 1000 / 30
 
