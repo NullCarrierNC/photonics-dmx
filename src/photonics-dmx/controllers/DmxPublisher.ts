@@ -15,6 +15,7 @@ import { DmxLightManager } from './DmxLightManager'
 import {
   castToChannelType,
   mirrorDmxForMovingHeadInvert,
+  mirrorPercentAroundHome,
   percentToDmx,
 } from '../helpers/dmxHelpers'
 import { SenderManager } from './SenderManager'
@@ -495,7 +496,14 @@ export class DmxPublisher {
             ? mirrorDmxForMovingHeadInvert(homeTiltDmxLogical, cfg.tiltMin, cfg.tiltMax)
             : homeTiltDmxLogical
           if (pan != null) {
-            const panDmx = percentToDmx(pan, cfg.panMin, cfg.panMax)
+            // Rig-level Horiz mirror: invert cue-driven pan around the fixture's calibrated home
+            // BEFORE percent→DMX, so a "look 15% stage-left of home" cue becomes
+            // "look 15% stage-right of home" on the mirrored rig. Idle home (pan == null) is
+            // untouched — mirror is a choreographic overlay, not a calibration override. Composes
+            // with cfg.invertPan, which is applied at the DMX layer below for hardware mounting.
+            const panEffective =
+              rig.mirrorHoriz === true ? mirrorPercentAroundHome(pan, cfg.panHome) : pan
+            const panDmx = percentToDmx(panEffective, cfg.panMin, cfg.panMax)
             panOut = cfg.invertPan
               ? mirrorDmxForMovingHeadInvert(panDmx, cfg.panMin, cfg.panMax)
               : panDmx
