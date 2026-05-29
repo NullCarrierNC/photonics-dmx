@@ -64,6 +64,25 @@ export function validateSenderId(value: unknown): ValidationResult<string> {
 }
 
 /**
+ * Validates a per-rig mirror flag (`mirrorHoriz` / `mirrorVert`). The field is optional on the
+ * wire payload — undefined, missing, or explicit `false` all normalize to `undefined`, which
+ * the caller drops from the saved rig so we don't persist the no-op default. Anything other
+ * than a boolean is rejected.
+ */
+export function validateRigMirrorFlag(
+  value: unknown,
+  field: 'mirrorHoriz' | 'mirrorVert',
+): ValidationResult<boolean | undefined> {
+  if (value === undefined || value === null) {
+    return { ok: true, value: undefined }
+  }
+  if (typeof value !== 'boolean') {
+    return { ok: false, error: `DmxRig.${field} must be a boolean` }
+  }
+  return { ok: true, value: value === true ? true : undefined }
+}
+
+/**
  * Validates a per-rig `outputs` field. The field is optional on the wire payload — undefined or
  * missing means "publish to every enabled wire sender" (legacy default). When present it must be
  * an array of {@link WireSenderId} strings; duplicates are collapsed.
@@ -486,6 +505,14 @@ export function validateDmxRigPayload(data: unknown): ValidationResult<DmxRig> {
   if (!outputs.ok) {
     return { ok: false, error: outputs.error }
   }
+  const mirrorHoriz = validateRigMirrorFlag(data.mirrorHoriz, 'mirrorHoriz')
+  if (!mirrorHoriz.ok) {
+    return { ok: false, error: mirrorHoriz.error }
+  }
+  const mirrorVert = validateRigMirrorFlag(data.mirrorVert, 'mirrorVert')
+  if (!mirrorVert.ok) {
+    return { ok: false, error: mirrorVert.error }
+  }
   const rig: DmxRig = {
     id: data.id.trim(),
     name: data.name.trim(),
@@ -494,6 +521,12 @@ export function validateDmxRigPayload(data: unknown): ValidationResult<DmxRig> {
   }
   if (outputs.value !== undefined) {
     rig.outputs = outputs.value
+  }
+  if (mirrorHoriz.value !== undefined) {
+    rig.mirrorHoriz = mirrorHoriz.value
+  }
+  if (mirrorVert.value !== undefined) {
+    rig.mirrorVert = mirrorVert.value
   }
   return { ok: true, value: rig }
 }

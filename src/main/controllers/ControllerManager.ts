@@ -327,6 +327,7 @@ export class ControllerManager {
             config: rig.config,
             clock: this.clock!,
             isPrimary: index === 0,
+            mirror: { horiz: rig.mirrorHoriz, vert: rig.mirrorVert },
           }),
       )
     }

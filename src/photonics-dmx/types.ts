@@ -656,6 +656,19 @@ export interface DmxRig {
    * IPC is always populated for every active rig regardless of this field.
    */
   outputs?: WireSenderId[]
+  /**
+   * Mirror this rig horizontally (left/right) at runtime: positions within `frontLights`,
+   * `backLights`, and `strobeLights` are independently reversed, so cues using `'linear'`
+   * walk in the opposite direction and `'even'`/`'odd'` swap. Absence = false. See
+   * `helpers/mirrorRig.ts` for the transform.
+   */
+  mirrorHoriz?: boolean
+  /**
+   * Mirror this rig vertically (front/back) at runtime: `frontLights` and `backLights` arrays
+   * are swapped. `strobeLights` is not affected. Combine with `mirrorHoriz` for 180° rotation.
+   * Absence = false.
+   */
+  mirrorVert?: boolean
 }
 
 /**

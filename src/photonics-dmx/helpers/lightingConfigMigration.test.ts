@@ -237,6 +237,42 @@ describe('migrateDmxRigsConfig', () => {
     expect(config.rigs[0]!.outputs).toBeUndefined()
   })
 
+  it('bumps schemaVersion 4 → 5 with no data transformation (mirror flags marker)', () => {
+    // v5 added optional `DmxRig.mirrorHoriz` / `DmxRig.mirrorVert` flags. Absence = false. A
+    // v4 config without the flags must round-trip unchanged except for the stamp; a v4 config
+    // that already carries the flags (e.g. user hand-edited the JSON) must preserve them.
+    const plainRig: DmxRig = {
+      id: 'rig-plain',
+      name: 'Plain',
+      active: true,
+      config: {
+        numLights: 1,
+        lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
+        strobeType: ConfigStrobeType.None,
+        frontLights: [],
+        backLights: [],
+        strobeLights: [],
+      },
+    }
+    const mirroredRig: DmxRig = {
+      ...plainRig,
+      id: 'rig-mirrored',
+      name: 'Mirrored',
+      mirrorHoriz: true,
+      mirrorVert: true,
+    }
+    const { config, changed } = migrateDmxRigsConfig({
+      rigs: [plainRig, mirroredRig],
+      schemaVersion: 4,
+    })
+    expect(changed).toBe(true) // stamp bumped 4 → 5
+    expect(config.schemaVersion).toBe(CURRENT_RIGS_SCHEMA_VERSION)
+    expect(config.rigs[0]!.mirrorHoriz).toBeUndefined()
+    expect(config.rigs[0]!.mirrorVert).toBeUndefined()
+    expect(config.rigs[1]!.mirrorHoriz).toBe(true)
+    expect(config.rigs[1]!.mirrorVert).toBe(true)
+  })
+
   it('preserves new semantic front-back on a v3-stamped config (regression for stamp-bump rename guard)', () => {
     // The legacy `front-back` → `two-rows` rename was the v1 migration. A v3-stamped config that
     // *intentionally* uses the new semantic `front-back` layout must NOT be renamed when we bump

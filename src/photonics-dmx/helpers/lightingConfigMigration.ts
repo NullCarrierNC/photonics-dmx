@@ -20,8 +20,12 @@ const TWO_ROWS_LAYOUT = { id: 'two-rows', label: 'Two Rows (one in front of the 
  *  v4 — `DmxRig.outputs` field added (optional `WireSenderId[]`; undefined = publish to all
  *       enabled wire senders). No data transformation needed — the bump is a marker that this
  *       code understands the new field.
+ *  v5 — `DmxRig.mirrorHoriz` / `DmxRig.mirrorVert` flags added (optional booleans; absence =
+ *       false). `mirrorHoriz` reverses left/right within each row; `mirrorVert` swaps the
+ *       front and back rows. No data transformation needed — the bump is a marker that this
+ *       code understands the new fields.
  */
-export const CURRENT_RIGS_SCHEMA_VERSION = 4
+export const CURRENT_RIGS_SCHEMA_VERSION = 5
 
 /**
  * Converts a single fixture/light from the pre-v2 strobe model. Only RGB-family fixtures are
