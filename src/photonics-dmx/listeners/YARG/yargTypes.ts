@@ -94,11 +94,14 @@ export enum KeyFrameByte {
   KeyframePrevious = 29,
 }
 
+/** Beat type (byte 38).
+ * Doesn't match YALCY's BeatByte enum, but this appears to be the correct mapping.
+ */
 export enum BeatByte {
-  Off = 0,
-  Measure = 1,
-  Strong = 2,
-  Weak = 3,
+  Measure = 0,
+  Strong = 1,
+  Weak = 2,
+  Off = 3,
 }
 
 /** Performer bitmask for Spotlight and Singalong bytes (Guitar=1, Bass=2, Drums=4, Vocals=8, Keyboard=16). */

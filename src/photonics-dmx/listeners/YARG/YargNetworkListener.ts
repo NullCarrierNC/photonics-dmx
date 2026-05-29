@@ -13,6 +13,18 @@ import {
   DrumNoteType,
 } from '../../cues/types/cueTypes'
 import { createLogger } from '../../../shared/logger'
+import {
+  PlatformByte,
+  VenueSizeByte,
+  SceneIndexByte,
+  PauseStateByte,
+  SongSectionByte,
+  GuitarBassKeyboardNotesByte,
+  DrumNotesByte,
+  PostProcessingByte,
+  KeyFrameByte,
+  BeatByte,
+} from './yargTypes'
 
 const log = createLogger('YargNetworkListener')
 
@@ -29,109 +41,6 @@ export interface YargCueRuntime {
   handleGuitarNote(noteType: InstrumentNoteType, data: CueData): void
   handleBassNote(noteType: InstrumentNoteType, data: CueData): void
   handleKeysNote(noteType: InstrumentNoteType, data: CueData): void
-}
-
-enum PlatformByte {
-  Unknown = 0,
-  Windows = 1,
-  Linux = 2,
-  Mac = 3,
-}
-
-enum VenueSizeByte {
-  NoVenue = 0,
-  Small = 1,
-  Large = 2,
-}
-
-enum SceneIndexByte {
-  Unknown = 0,
-  Menu = 1,
-  Gameplay = 2,
-  Score = 3,
-  Calibration = 4,
-  Practice = 5,
-}
-
-enum PauseStateByte {
-  AtMenu = 0,
-  Unpaused = 1,
-  Paused = 2,
-}
-
-enum SongSectionByte {
-  None = 0,
-  Chorus = 2,
-  Verse = 5,
-}
-
-enum GuitarBassKeyboardNotesByte {
-  None = 0,
-  Open = 1 << 0,
-  Green = 1 << 1,
-  Red = 1 << 2,
-  Yellow = 1 << 3,
-  Blue = 1 << 4,
-  Orange = 1 << 5,
-}
-
-enum DrumNotesByte {
-  None = 0,
-  Kick = 1 << 0,
-  RedDrum = 1 << 1,
-  YellowDrum = 1 << 2,
-  BlueDrum = 1 << 3,
-  GreenDrum = 1 << 4,
-  YellowCymbal = 1 << 5,
-  BlueCymbal = 1 << 6,
-  GreenCymbal = 1 << 7,
-}
-
-enum PostProcessingByte {
-  Default = 0,
-  Bloom = 1,
-  Bright = 2,
-  Contrast = 3,
-  Posterize = 4,
-  PhotoNegative = 5,
-  Mirror = 6,
-  BlackAndWhite = 7,
-  SepiaTone = 8,
-  SilverTone = 9,
-  Choppy_BlackAndWhite = 10,
-  PhotoNegative_RedAndBlack = 11,
-  Polarized_BlackAndWhite = 12,
-  Polarized_RedAndBlue = 13,
-  Desaturated_Blue = 14,
-  Desaturated_Red = 15,
-  Contrast_Red = 16,
-  Contrast_Green = 17,
-  Contrast_Blue = 18,
-  Grainy_Film = 19,
-  Grainy_ChromaticAbberation = 20,
-  Scanlines = 21,
-  Scanlines_BlackAndWhite = 22,
-  Scanlines_Blue = 23,
-  Scanlines_Security = 24,
-  Trails = 25,
-  Trails_Long = 26,
-  Trails_Desaturated = 27,
-  Trails_Flickery = 28,
-  Trails_Spacey = 29,
-}
-
-enum KeyFrameByte {
-  Off = 0,
-  KeyframeFirst = 27,
-  KeyframeNext = 28,
-  KeyframePrevious = 29,
-}
-
-enum BeatByte {
-  Measure = 0,
-  Strong = 1,
-  Weak = 2,
-  Off = 3,
 }
 
 const PORT = 36107
