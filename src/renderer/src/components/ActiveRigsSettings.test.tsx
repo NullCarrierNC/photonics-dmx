@@ -194,3 +194,66 @@ describe('ActiveRigsSettings — clears outputs on UI-hide transitions', () => {
     expect(saveByRig.get('r2')?.outputs).toBeUndefined()
   })
 })
+
+describe('ActiveRigsSettings — mirror controls', () => {
+  function mirrorCheckbox(rigId: string, axis: 'horiz' | 'vert'): HTMLInputElement {
+    return document.getElementById(`rig-${rigId}-mirror-${axis}`) as HTMLInputElement
+  }
+
+  it('renders Mirror column with Horiz and Vert checkboxes for a single rig (no multi-rig gate)', async () => {
+    renderWith({ rigs: [makeRig('r1', 'Solo')], allowMultipleActiveRigs: false })
+    await waitFor(() => expect(screen.queryByText('Solo')).toBeTruthy())
+    expect(screen.queryByRole('columnheader', { name: /Mirror/i })).toBeTruthy()
+    expect(mirrorCheckbox('r1', 'horiz')).toBeTruthy()
+    expect(mirrorCheckbox('r1', 'vert')).toBeTruthy()
+    expect(mirrorCheckbox('r1', 'horiz').checked).toBe(false)
+  })
+
+  it('toggling Horiz dispatches a save with mirrorHoriz: true', async () => {
+    renderWith({ rigs: [makeRig('r1', 'Solo')], allowMultipleActiveRigs: false })
+    await waitFor(() => expect(screen.queryByText('Solo')).toBeTruthy())
+
+    await act(async () => {
+      fireEvent.click(mirrorCheckbox('r1', 'horiz'))
+    })
+
+    await waitFor(() => expect(saveDmxRigMock).toHaveBeenCalled())
+    const saved = saveDmxRigMock.mock.calls.at(-1)![0] as DmxRig
+    expect(saved.id).toBe('r1')
+    expect(saved.mirrorHoriz).toBe(true)
+    expect('mirrorVert' in saved).toBe(false)
+  })
+
+  it('un-toggling Horiz strips the field from the saved rig', async () => {
+    const rig: DmxRig = {
+      ...makeRig('r1', 'Solo'),
+      mirrorHoriz: true,
+    }
+    renderWith({ rigs: [rig], allowMultipleActiveRigs: false })
+    await waitFor(() => expect(screen.queryByText('Solo')).toBeTruthy())
+    expect(mirrorCheckbox('r1', 'horiz').checked).toBe(true)
+
+    await act(async () => {
+      fireEvent.click(mirrorCheckbox('r1', 'horiz'))
+    })
+
+    await waitFor(() => expect(saveDmxRigMock).toHaveBeenCalled())
+    const saved = saveDmxRigMock.mock.calls.at(-1)![0] as DmxRig
+    expect(saved.id).toBe('r1')
+    expect('mirrorHoriz' in saved).toBe(false)
+  })
+
+  it('mirrorHoriz and mirrorVert toggles are independent', async () => {
+    renderWith({ rigs: [makeRig('r1', 'Solo')], allowMultipleActiveRigs: false })
+    await waitFor(() => expect(screen.queryByText('Solo')).toBeTruthy())
+
+    await act(async () => {
+      fireEvent.click(mirrorCheckbox('r1', 'vert'))
+    })
+
+    await waitFor(() => expect(saveDmxRigMock).toHaveBeenCalled())
+    const saved = saveDmxRigMock.mock.calls.at(-1)![0] as DmxRig
+    expect(saved.mirrorVert).toBe(true)
+    expect('mirrorHoriz' in saved).toBe(false)
+  })
+})

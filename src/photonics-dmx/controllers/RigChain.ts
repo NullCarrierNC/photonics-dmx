@@ -9,6 +9,7 @@ import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
 import { Rb3MenuCueHandler } from '../cueHandlers/Rb3MenuCueHandler'
 import { YargCueRegistry } from '../cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
+import { applyMirrorToConfig, RigMirror } from '../helpers/mirrorRig'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('RigChain')
@@ -23,6 +24,12 @@ export interface RigChainOptions {
    * one event per logical cue rather than one per rig.
    */
   isPrimary?: boolean
+  /**
+   * Per-rig mirror flags. When set, the `LightingConfiguration` passed to this chain's
+   * `DmxLightManager` is transformed at construction time (positions reversed within each
+   * row for `horiz`; front/back swapped for `vert`). See `helpers/mirrorRig.ts` for details.
+   */
+  mirror?: RigMirror
 }
 
 /**
@@ -55,7 +62,8 @@ export class RigChain {
   constructor(options: RigChainOptions) {
     this.rigId = options.rigId
     this.isPrimary = options.isPrimary ?? true
-    this.dmxLightManager = new DmxLightManager(options.config)
+    const effectiveConfig = applyMirrorToConfig(options.config, options.mirror ?? {})
+    this.dmxLightManager = new DmxLightManager(effectiveConfig)
     this.lightStateManager = new LightStateManager()
     this.lightTransitionController = new LightTransitionController(this.lightStateManager)
     this.sequencer = new Sequencer(this.lightTransitionController, options.clock)

@@ -60,6 +60,23 @@ function clearRigOutputs(rig: DmxRig): DmxRig {
   return rest
 }
 
+/**
+ * Applies a mirror-flag change to a rig: setting `true` stamps the field, setting `false`
+ * (the no-op default) strips it from the stored shape so on-disk configs stay minimal. Mirrors
+ * the {@link clearRigOutputs} strip pattern used for the legacy "publish to all" default.
+ */
+function setRigMirrorFlag(rig: DmxRig, axis: 'horiz' | 'vert', enabled: boolean): DmxRig {
+  const field = axis === 'horiz' ? 'mirrorHoriz' : 'mirrorVert'
+  if (enabled) {
+    return { ...rig, [field]: true }
+  }
+  if (rig[field] === undefined) {
+    return rig
+  }
+  const { [field]: _omit, ...rest } = rig
+  return rest
+}
+
 const ActiveRigsSettings: React.FC = () => {
   const [rigs, setRigs] = useAtom(dmxRigsAtom)
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
@@ -191,6 +208,19 @@ const ActiveRigsSettings: React.FC = () => {
     }
   }
 
+  const handleMirrorToggle = async (rigId: string, axis: 'horiz' | 'vert', enabled: boolean) => {
+    try {
+      const rig = rigs.find((r) => r.id === rigId)
+      if (!rig) return
+      const updatedRig = setRigMirrorFlag(rig, axis, enabled)
+      if (updatedRig === rig) return
+      await saveDmxRig(updatedRig)
+      setRigs((prev) => prev.map((r) => (r.id === rigId ? updatedRig : r)))
+    } catch (error) {
+      log.error('Failed to update rig mirror:', error)
+    }
+  }
+
   const handleDelete = async (rigId: string) => {
     try {
       await deleteDmxRig(rigId)
@@ -281,6 +311,11 @@ const ActiveRigsSettings: React.FC = () => {
                 <th className="text-left p-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                   Active
                 </th>
+                <th
+                  className="text-left p-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+                  title="Mirror this rig at runtime: Horiz reverses left/right within each row; Vert swaps front and back. Combine both for a 180° rotation.">
+                  Mirror
+                </th>
                 {showRouting && (
                   <th className="text-left p-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                     Outputs
@@ -314,6 +349,36 @@ const ActiveRigsSettings: React.FC = () => {
                         className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                       />
                     )}
+                  </td>
+                  <td className="p-2">
+                    <div className="flex items-center gap-3">
+                      <label
+                        htmlFor={`rig-${rig.id}-mirror-horiz`}
+                        className="flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300"
+                        title="Mirror left/right: reverse light order within each row.">
+                        <input
+                          type="checkbox"
+                          id={`rig-${rig.id}-mirror-horiz`}
+                          checked={rig.mirrorHoriz === true}
+                          onChange={(e) => handleMirrorToggle(rig.id, 'horiz', e.target.checked)}
+                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                        />
+                        Horiz
+                      </label>
+                      <label
+                        htmlFor={`rig-${rig.id}-mirror-vert`}
+                        className="flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300"
+                        title="Mirror front/back: swap the front and back rows.">
+                        <input
+                          type="checkbox"
+                          id={`rig-${rig.id}-mirror-vert`}
+                          checked={rig.mirrorVert === true}
+                          onChange={(e) => handleMirrorToggle(rig.id, 'vert', e.target.checked)}
+                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                        />
+                        Vert
+                      </label>
+                    </div>
                   </td>
                   {showRouting && (
                     <td className="p-2">
