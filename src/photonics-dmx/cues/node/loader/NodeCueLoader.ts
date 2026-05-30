@@ -1,7 +1,5 @@
-import { EventEmitter } from 'events'
 import * as fs from 'fs/promises'
 import * as path from 'path'
-import chokidar, { FSWatcher } from 'chokidar'
 import {
   validateNodeCueFile,
   validateAudioNodeCueFile,
@@ -20,7 +18,6 @@ import type { ICueGroup } from '../../interfaces/INetCueGroup'
 import { INetCue } from '../../interfaces/INetCue'
 import { YargNodeCue } from '../runtime/YargNodeCue'
 import { YargMotionNodeCue } from '../runtime/YargMotionNodeCue'
-import { CompiledEffectIndex } from '../runtime/CompiledEffectIndex'
 import { AudioNodeCue } from '../runtime/AudioNodeCue'
 import { AudioMotionNodeCue } from '../runtime/AudioMotionNodeCue'
 import { CueType } from '../../types/cueTypes'
@@ -33,6 +30,7 @@ import { migrateLegacyBearings } from './migrateLegacyBearings'
 import type { EffectMode, EffectReference } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { BaseNodeFileLoader, BaseListSummary, BaseLoadResult } from './BaseNodeFileLoader'
 const log = createLogger('NodeCueLoader')
 
 export interface NodeCueFileSummary {
@@ -48,16 +46,9 @@ export interface NodeCueFileSummary {
   bundled?: boolean
 }
 
-export interface NodeCueListSummary {
-  yarg: NodeCueFileSummary[]
-  audio: NodeCueFileSummary[]
-}
+export type NodeCueListSummary = BaseListSummary<NodeCueFileSummary>
 
-export interface NodeCueLoadResult {
-  loaded: number
-  failed: number
-  errors: string[]
-}
+export type NodeCueLoadResult = BaseLoadResult
 
 /** Optional host callbacks for node cue debug/error emission; used when the host provides them. */
 export type NodeRuntimeCallbacks = import('../runtime/executionTypes').NodeRuntimeCallbacks
@@ -71,8 +62,6 @@ interface NodeCueLoaderOptions {
   runtimeBroadcaster: RuntimeBroadcaster
   /** When provided, passed to YargNodeCue for debug/error emission. */
   getNodeRuntimeCallbacks?: () => NodeRuntimeCallbacks | undefined
-  /** When provided, compiled effects are cached here and reused across cues. */
-  getCompiledEffectIndex?: () => CompiledEffectIndex | undefined
 }
 
 interface FileRegistration {
@@ -80,52 +69,16 @@ interface FileRegistration {
   groupId: string
 }
 
-const isJsonFile = (filename: string): boolean => filename.toLowerCase().endsWith('.json')
-
-export class NodeCueLoader extends EventEmitter {
-  private readonly baseDir: string
-  private readonly yargDir: string
-  private readonly audioDir: string
-  private watcher: FSWatcher | null = null
-  private summaries: NodeCueListSummary = { yarg: [], audio: [] }
+export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSummary> {
   private fileRegistrations: Map<string, FileRegistration> = new Map()
   private customAudioCueTypes: Set<AudioCueType> = new Set()
 
   constructor(private readonly options: NodeCueLoaderOptions) {
-    super()
-    this.baseDir = options.baseDir
-    this.yargDir = path.join(this.baseDir, 'node-data', 'cues', 'yarg')
-    this.audioDir = path.join(this.baseDir, 'node-data', 'cues', 'audio')
+    super(options.baseDir, 'cues')
   }
 
-  public async loadAll(): Promise<NodeCueLoadResult> {
-    await this.ensureDirectories()
+  protected onBeforeLoadAll(): void {
     this.customAudioCueTypes.clear()
-
-    const results = await Promise.all([this.loadDirectory('yarg'), this.loadDirectory('audio')])
-
-    const summary = results.reduce<NodeCueLoadResult>(
-      (acc, curr) => ({
-        loaded: acc.loaded + curr.loaded,
-        failed: acc.failed + curr.failed,
-        errors: acc.errors.concat(curr.errors),
-      }),
-      { loaded: 0, failed: 0, errors: [] },
-    )
-
-    this.emit('changed', this.getSummary())
-    return summary
-  }
-
-  public async reload(): Promise<NodeCueLoadResult> {
-    return this.loadAll()
-  }
-
-  public getSummary(): NodeCueListSummary {
-    return {
-      yarg: [...this.summaries.yarg],
-      audio: [...this.summaries.audio],
-    }
   }
 
   public async readFile(filePath: string): Promise<NodeCueFile> {
@@ -198,30 +151,6 @@ export class NodeCueLoader extends EventEmitter {
     return { success: true }
   }
 
-  public async startWatching(): Promise<void> {
-    await this.ensureDirectories()
-
-    this.watcher = chokidar.watch([this.yargDir, this.audioDir], {
-      ignoreInitial: true,
-      persistent: true,
-      awaitWriteFinish: {
-        stabilityThreshold: 300,
-        pollInterval: 100,
-      },
-    })
-
-    this.watcher.on('add', (file) => this.handleFileChange(file))
-    this.watcher.on('change', (file) => this.handleFileChange(file))
-    this.watcher.on('unlink', (file) => this.handleFileRemoved(file))
-  }
-
-  public async dispose(): Promise<void> {
-    if (this.watcher) {
-      await this.watcher.close()
-      this.watcher = null
-    }
-  }
-
   public getAvailableCueTypes(mode: NodeCueMode, kind?: 'lighting' | 'motion'): string[] {
     if (kind === 'motion') {
       return []
@@ -235,55 +164,10 @@ export class NodeCueLoader extends EventEmitter {
     return Array.from(registryTypes)
   }
 
-  private async ensureDirectories(): Promise<void> {
-    await fs.mkdir(this.yargDir, { recursive: true })
-    await fs.mkdir(this.audioDir, { recursive: true })
-  }
-
-  private async loadDirectory(mode: NodeCueMode): Promise<NodeCueLoadResult> {
-    const dir = mode === 'yarg' ? this.yargDir : this.audioDir
-    const files = await fs.readdir(dir).catch(() => [])
-
-    let loaded = 0
-    let failed = 0
-    const errors: string[] = []
-    const summaries: NodeCueFileSummary[] = []
-
-    for (const file of files) {
-      if (!isJsonFile(file)) {
-        continue
-      }
-
-      const filePath = path.join(dir, file)
-      try {
-        const summary = await this.loadFile(mode, filePath)
-        if (summary) {
-          summaries.push(summary)
-        }
-        loaded++
-      } catch (error) {
-        failed++
-        const message = error instanceof Error ? error.message : String(error)
-        summaries.push({
-          path: filePath,
-          groupId: path.basename(file, '.json'),
-          groupName: path.basename(file, '.json'),
-          cueCount: 0,
-          lightingCueCount: 0,
-          motionCueCount: 0,
-          mode,
-          updatedAt: Date.now(),
-          errors: [message],
-        })
-        errors.push(`${path.basename(file)}: ${message}`)
-      }
-    }
-
-    this.summaries[mode] = summaries
-    return { loaded, failed, errors }
-  }
-
-  private async loadFile(mode: NodeCueMode, filePath: string): Promise<NodeCueFileSummary | null> {
+  protected async loadFile(
+    mode: NodeCueMode,
+    filePath: string,
+  ): Promise<NodeCueFileSummary | null> {
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed = JSON.parse(contents)
     migrateLegacyBearings(parsed)
@@ -549,98 +433,37 @@ export class NodeCueLoader extends EventEmitter {
     }
   }
 
-  private updateSummary(summary: NodeCueFileSummary): void {
-    const summaries = summary.mode === 'yarg' ? this.summaries.yarg : this.summaries.audio
-    const existingIndex = summaries.findIndex((item) => item.path === summary.path)
-    if (existingIndex >= 0) {
-      summaries[existingIndex] = summary
-    } else {
-      summaries.push(summary)
-    }
-  }
-
-  private async handleFileChange(filePath: string): Promise<void> {
-    const mode = this.getModeFromPath(filePath)
-    if (!mode || !isJsonFile(filePath)) {
-      return
-    }
-
-    try {
-      await this.loadFile(mode, filePath)
-      this.emit('changed', this.getSummary())
-    } catch (error) {
-      log.error('Failed to reload node cue file', filePath, error)
-    }
-  }
-
-  private handleFileRemoved(filePath: string): void {
+  protected removeRegistration(filePath: string): void {
     this.unregisterFile(filePath)
-    this.emit('changed', this.getSummary())
   }
 
-  private getModeFromPath(filePath: string): NodeCueMode | null {
-    if (this.isPathWithinDir(filePath, this.yargDir)) {
-      return 'yarg'
+  protected makeErrorSummary(
+    mode: NodeCueMode,
+    filePath: string,
+    message: string,
+  ): NodeCueFileSummary {
+    return {
+      path: filePath,
+      groupId: path.basename(filePath, '.json'),
+      groupName: path.basename(filePath, '.json'),
+      cueCount: 0,
+      lightingCueCount: 0,
+      motionCueCount: 0,
+      mode,
+      updatedAt: Date.now(),
+      errors: [message],
     }
-    if (this.isPathWithinDir(filePath, this.audioDir)) {
-      return 'audio'
-    }
-    return null
   }
 
-  private sanitizeFilename(filename: string): string {
-    const baseName = path.basename(filename)
-    if (!baseName || baseName === '.' || baseName === '..') {
-      throw new Error('Invalid filename.')
-    }
-    if (baseName !== filename) {
-      throw new Error('Invalid filename. Subdirectories are not allowed.')
-    }
-    return baseName.endsWith('.json') ? baseName : `${baseName}.json`
+  protected onFileChangeError(filePath: string, error: unknown): void {
+    log.error('Failed to reload node cue file', filePath, error)
   }
 
-  private resolvePath(targetPath: string): string {
-    return path.resolve(targetPath)
-  }
-
-  /**
-   * Resolves a user-supplied path to an absolute path that must lie under the YARG or audio cue roots.
-   * Relative segments are anchored to {@link NodeCueLoaderOptions.baseDir} so paths cannot escape via cwd.
-   */
   private resolveExistingCueFilePath(userPath: string): string {
-    if (typeof userPath !== 'string' || userPath.trim().length === 0) {
-      throw new Error('Node cue path is required.')
-    }
-    if (userPath.includes('\0')) {
-      throw new Error('Node cue path must not contain null bytes.')
-    }
-    const trimmed = userPath.trim()
-    const resolved = path.isAbsolute(trimmed)
-      ? path.resolve(trimmed)
-      : path.resolve(this.baseDir, trimmed)
-    if (
-      !this.isPathWithinDir(resolved, this.yargDir) &&
-      !this.isPathWithinDir(resolved, this.audioDir)
-    ) {
-      throw new Error('Node cue file path must be under the YARG or audio cue directories.')
-    }
-    return resolved
-  }
-
-  private resolveInDir(baseDir: string, filename: string): string {
-    const resolvedBase = this.resolvePath(baseDir)
-    const resolvedPath = this.resolvePath(path.join(resolvedBase, filename))
-    if (!this.isPathWithinDir(resolvedPath, resolvedBase)) {
-      throw new Error('Resolved path is outside of the allowed directory.')
-    }
-    return resolvedPath
-  }
-
-  private isPathWithinDir(targetPath: string, baseDir: string): boolean {
-    const resolvedBase = this.resolvePath(baseDir)
-    const resolvedTarget = this.resolvePath(targetPath)
-    return (
-      resolvedTarget === resolvedBase || resolvedTarget.startsWith(`${resolvedBase}${path.sep}`)
+    return this.resolveExistingFilePath(
+      userPath,
+      'Node cue path',
+      'Node cue file path must be under the YARG or audio cue directories.',
     )
   }
 
@@ -655,18 +478,9 @@ export class NodeCueLoader extends EventEmitter {
     }
 
     const effectLoaderMode: EffectMode = mode === 'audio' ? 'audio' : 'yarg'
-    const effectIndexMode: NodeCueMode = mode
-
-    const effectIndex = this.options.getCompiledEffectIndex?.()
 
     for (const effectRef of effectReferences) {
       try {
-        const cached = effectIndex?.get(effectIndexMode, effectRef.effectFileId, effectRef.effectId)
-        if (cached) {
-          registry.registerEffect(effectRef.effectId, cached)
-          continue
-        }
-
         const effectFile = await this.options.effectLoader.loadEffectByReference(
           effectRef,
           effectLoaderMode,
@@ -689,12 +503,6 @@ export class NodeCueLoader extends EventEmitter {
         }
 
         const compiledEffect = EffectCompiler.compile(effect)
-        effectIndex?.set(
-          effectIndexMode,
-          effectRef.effectFileId,
-          effectRef.effectId,
-          compiledEffect,
-        )
         registry.registerEffect(effectRef.effectId, compiledEffect)
       } catch (error) {
         log.error(`Failed to load/compile effect ${effectRef.effectId}:`, error)

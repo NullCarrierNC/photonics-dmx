@@ -1,8 +1,10 @@
 /**
- * Event-driven execution engine for node graphs.
- * Executes nodes sequentially, respecting blocking semantics.
+ * Event-driven execution engine for cue node graphs. Executes nodes
+ * sequentially, respecting blocking semantics; extends
+ * {@link BaseNodeExecutionEngine} with the cue-specific behaviour (strict
+ * revisit policy, cue/group variable stores, effect-raiser dispatch).
  *
- * This module has been refactored for maintainability:
+ * Value, logic, and data work is delegated to focused helpers:
  * - dataExtractors.ts: CueData and config data extraction
  * - valueResolver.ts: ValueSource resolution and type inference
  * - logicNodeEvaluator.ts: Logic node evaluation (variable, math, conditional, loops)
@@ -11,14 +13,10 @@
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../types/cueTypes'
+import { AudioCueData } from '../../types/audioCueTypes'
 import { CompiledYargCue, CompiledAudioCue } from '../compiler/NodeCueCompiler'
 import {
   ActionEffectFactory,
-  ResolvedActionTarget,
-  ResolvedColorSetting,
-  ResolvedActionTiming,
-  ResolvedPositionSetting,
-  buildSetPositionSubmissionFingerprint,
   resolvedMotionPatternSettingsEqual,
   resolvedMotionPatternSettingsEqualExceptBearing,
   trackedLightIdsEqualOrder,
@@ -26,7 +24,6 @@ import {
 import {
   ActionNode,
   BaseEventNode,
-  EventRaiserNode,
   EventListenerNode,
   EffectRaiserNode,
   LogicNode,
@@ -34,37 +31,15 @@ import {
   ValueSource,
   VariableType,
 } from '../../types/nodeCueTypes'
-import type { Connection } from '../../types/nodeCueTypes'
 import { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
 import { ExecutionState, VariableValue, NodeRuntimeCallbacks } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
 import { EffectExecutionEngine } from './EffectExecutionEngine'
-
-// Import refactored modules
-import {
-  resolveValue,
-  resolveLocationGroups,
-  resolveLightTarget,
-  getVariableStore,
-} from './valueResolver'
-import {
-  resolveActionTiming,
-  resolveActionColor,
-  resolveActionLayer,
-  resolveActionPosition,
-  resolveMotionPattern,
-} from './actionResolver'
-import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
-import { collectReachableNodes } from './engineUtils'
-import {
-  buildActionChain,
-  markConsecutiveActionChainTailVisited,
-  mapSetColorChainStepsForEffectFactory,
-  resolveChainStep,
-  runContextBatch,
-  tryBuildHomogeneousSetColorChainData,
-} from './graphActionHelpers'
+import { BaseNodeExecutionEngine, CompiledGraph } from './BaseNodeExecutionEngine'
+import { RevisitPolicy } from './GraphExecutionPolicy'
+import { resolveValue } from './valueResolver'
+import { resolveActionTiming, resolveActionLayer, resolveMotionPattern } from './actionResolver'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { createLogger } from '../../../../shared/logger'
@@ -84,7 +59,7 @@ function inferEffectParameterType(source: ValueSource | undefined): VariableType
   return 'string'
 }
 
-export class NodeExecutionEngine {
+export class NodeExecutionEngine extends BaseNodeExecutionEngine {
   /**
    * Global runtime toggle for node-cue debug logging.
    * This is useful in packaged builds where env vars are inconvenient.
@@ -101,35 +76,19 @@ export class NodeExecutionEngine {
 
   private compiledCue: CompiledYargCue | CompiledAudioCue
   private cueId: string
-  private activeContexts: Map<string, ExecutionContext> = new Map()
-  private sequencer: ILightingController
-  private lightManager: DmxLightManager
-  private runtimeBroadcaster: RuntimeBroadcaster
   private cueLevelVarStore: Map<string, VariableValue>
   private groupLevelVarStore: Map<string, VariableValue>
-  private variableDefinitions: VariableDefinition[]
-  private eventListeners: Map<string, EventListenerNode[]> = new Map()
   private effectRegistry: EffectRegistry
   private activeEffectEngines: Map<string, EffectExecutionEngine> = new Map()
-  /** Effect names and layers submitted via addEffect/addEffectUnblockedNameWithCallback, for cancelAll to remove. */
-  private submittedEffects: Map<string, number> = new Map()
-  /** motion-pattern effect names for cancelAll → removeMotionPattern. */
-  private submittedMotionPatterns: Set<string> = new Set()
-  /** Last submitted set-position payload per effect name (cue-called idempotency after transition ends). */
-  private setPositionSubmissionFingerprint: Map<string, string> = new Map()
   /** Node IDs that have emitted 'activated' but not yet 'deactivated', so cancelAll can flush them. */
   private pendingActivations: Set<string> = new Set()
+  private readonly revisitPolicyValue: RevisitPolicy
   /**
    * Instance snapshot of env-based debug setting. Note that runtime toggles are handled via
    * the static global flag so existing engines can start logging immediately.
    */
   private debugEnabled: boolean
-  /** When .use is true, the next effect submission must use setEffect (then set .use = false). */
-  private firstSubmissionUsesSetEffectRef?: { use: boolean }
-  /** When provided (e.g. by V2 CueSession), use instead of reading/mutating the ref. */
-  private readonly consumeInitialClearPolicy?: () => boolean
-  private readonly runtimeCallbacks?: NodeRuntimeCallbacks
-  /** When provided (e.g. by V2), called for each context start/complete/cancel/blocked/running so caller can drive ExecutionStateMachine. */
+  /** When set (GraphExecutionEngine supplies it), invoked on each context start/complete/cancel/blocked/running so the owner can drive its ExecutionStateMachine. */
   private readonly onContextLifecycle?: (
     contextId: string,
     event: 'started' | 'completed' | 'cancelled' | 'blocked' | 'running',
@@ -152,20 +111,24 @@ export class NodeExecutionEngine {
       contextId: string,
       event: 'started' | 'completed' | 'cancelled' | 'blocked' | 'running',
     ) => void,
+    revisitPolicy: RevisitPolicy = 'strict',
   ) {
+    super({
+      sequencer,
+      lightManager,
+      broadcaster: runtimeBroadcaster,
+      variableDefinitions,
+      firstSubmissionUsesSetEffectRef,
+      runtimeCallbacks,
+      consumeInitialClearPolicy,
+    })
     this.compiledCue = compiledCue
     this.cueId = cueId
-    this.sequencer = sequencer
-    this.lightManager = lightManager
-    this.runtimeBroadcaster = runtimeBroadcaster
     this.cueLevelVarStore = cueLevelVarStore
     this.groupLevelVarStore = groupLevelVarStore
     this.effectRegistry = effectRegistry
-    this.variableDefinitions = variableDefinitions
-    this.firstSubmissionUsesSetEffectRef = firstSubmissionUsesSetEffectRef
-    this.consumeInitialClearPolicy = consumeInitialClearPolicy
-    this.runtimeCallbacks = runtimeCallbacks
     this.onContextLifecycle = onContextLifecycle
+    this.revisitPolicyValue = revisitPolicy
 
     // Debug logging is opt-in to avoid noisy logs in normal operation.
     // Enable with either env var:
@@ -178,19 +141,159 @@ export class NodeExecutionEngine {
     this.registerEventListeners()
   }
 
-  /** Returns whether the next effect submission should use setEffect, and consumes the policy (session or ref). */
-  private getAndConsumeInitialClearPolicy(): boolean {
-    if (this.consumeInitialClearPolicy) {
-      return this.consumeInitialClearPolicy()
-    }
-    const v = this.firstSubmissionUsesSetEffectRef?.use === true
-    if (this.firstSubmissionUsesSetEffectRef) {
-      this.firstSubmissionUsesSetEffectRef.use = false
-    }
-    return v
+  protected get compiled(): CompiledGraph {
+    return this.compiledCue
   }
 
-  private debugLog(message: string, data?: unknown): void {
+  protected get revisitPolicy(): RevisitPolicy {
+    return this.revisitPolicyValue
+  }
+
+  protected getEmitCueId(): string {
+    return this.cueId
+  }
+
+  /** Cue effect naming: `${cueId}:${nodeId}` (+ `:${iterIdx}` inside a for-each-light loop). */
+  protected buildEffectName(actionNodeId: string, iterationIndex = -1): string {
+    return iterationIndex >= 0
+      ? `${this.cueId}:${actionNodeId}:${iterationIndex}`
+      : `${this.cueId}:${actionNodeId}`
+  }
+
+  /** Cue chain naming inserts a `:chain:` infix off the first node id. */
+  protected override buildChainEffectName(firstActionNodeId: string, iterationIndex = -1): string {
+    return iterationIndex >= 0
+      ? `${this.cueId}:chain:${firstActionNodeId}:${iterationIndex}`
+      : `${this.cueId}:chain:${firstActionNodeId}`
+  }
+
+  /**
+   * Blackout uses sequencer.blackout() directly (cue-only). Blocks downstream execution until the
+   * blackout transition completes.
+   */
+  protected override handleBlackoutAction(
+    actionNode: ActionNode,
+    context: ExecutionContext,
+  ): boolean {
+    if (actionNode.effectType !== 'blackout') {
+      return false
+    }
+    const resolvedTiming = resolveActionTiming(actionNode.timing, context)
+
+    // Register this action as active (waiting for completion)
+    context.registerActiveAction(actionNode.id, actionNode)
+
+    // Call sequencer.blackout() which returns a Promise<void>
+    this.sequencer
+      .blackout(resolvedTiming.duration)
+      .then(() => {
+        // Blackout completed
+        if (context.hasVisited(actionNode.id)) {
+          this.emitNodeExecution('deactivated', actionNode.id)
+          context.completeAction(actionNode.id)
+        }
+      })
+      .catch((error) => {
+        log.error(`Error during blackout for action node ${actionNode.id}:`, error)
+        // Continue execution despite error
+        if (context.hasVisited(actionNode.id)) {
+          this.emitNodeExecution('deactivated', actionNode.id)
+          context.completeAction(actionNode.id)
+        }
+      })
+    return true
+  }
+
+  /**
+   * Submit / update a motion-pattern effect on the sequencer (cue-only). Skips re-adding when the
+   * resolved config already matches an active run (or updates only the bearing where possible).
+   */
+  protected handleMotionPatternAction(actionNode: ActionNode, context: ExecutionContext): boolean {
+    if (!actionNode.motionPattern) {
+      log.warn(`motion-pattern action ${actionNode.id} is missing motionPattern`)
+      this.continueToNextNodes(actionNode.id, context)
+      return true
+    }
+
+    const resolvedMotion = resolveMotionPattern(actionNode.motionPattern, context)
+    const resolvedTiming = resolveActionTiming(actionNode.timing, context)
+    const resolvedLayer = resolveActionLayer(actionNode.layer, context)
+
+    if (
+      !Number.isFinite(resolvedMotion.speedHz) ||
+      resolvedMotion.speedHz <= 0 ||
+      !Number.isFinite(resolvedMotion.sizeDeg) ||
+      resolvedMotion.sizeDeg <= 0
+    ) {
+      log.warn(
+        `motion-pattern action ${actionNode.id}: speed (Hz) and size (deg) must be finite and positive`,
+      )
+      this.continueToNextNodes(actionNode.id, context)
+      return true
+    }
+
+    const lights = ActionEffectFactory.resolveLights(
+      this.lightManager,
+      actionNode.target,
+      (varName: string) => this.lookupVar(varName, context),
+    )
+
+    if (!lights || lights.length === 0) {
+      this.continueToNextNodes(actionNode.id, context)
+      return true
+    }
+
+    const iterIdx = context.getForEachIterationIndex()
+    const effectName = this.buildEffectName(actionNode.id, iterIdx)
+
+    const rampUpMs = resolvedTiming.duration > 0 ? resolvedTiming.duration : 0
+
+    const existingPattern = this.sequencer.getMotionPattern(effectName)
+    if (
+      existingPattern &&
+      existingPattern.layer === resolvedLayer &&
+      existingPattern.rampUpDurationMs === rampUpMs &&
+      trackedLightIdsEqualOrder(existingPattern.lights, lights)
+    ) {
+      if (resolvedMotionPatternSettingsEqual(existingPattern.config, resolvedMotion)) {
+        this.submittedMotionPatterns.add(effectName)
+        this.emitNodeExecution('deactivated', actionNode.id)
+        this.continueToNextNodes(actionNode.id, context)
+        return true
+      }
+      if (resolvedMotionPatternSettingsEqualExceptBearing(existingPattern.config, resolvedMotion)) {
+        this.sequencer.updateMotionPatternConfig(effectName, resolvedMotion)
+        this.submittedMotionPatterns.add(effectName)
+        this.emitNodeExecution('deactivated', actionNode.id)
+        this.continueToNextNodes(actionNode.id, context)
+        return true
+      }
+    }
+
+    this.sequencer.cancelPanTiltClear()
+    this.sequencer.addMotionPattern(effectName, resolvedMotion, lights, resolvedLayer, rampUpMs)
+    this.submittedMotionPatterns.add(effectName)
+    this.emitNodeExecution('deactivated', actionNode.id)
+    this.continueToNextNodes(actionNode.id, context)
+    return true
+  }
+
+  protected override trackActivation(type: 'activated' | 'deactivated', nodeId: string): void {
+    if (type === 'activated') {
+      this.pendingActivations.add(nodeId)
+    } else {
+      this.pendingActivations.delete(nodeId)
+    }
+  }
+
+  protected override batchOptions(context: ExecutionContext): {
+    onBlocked?: () => void
+    onNodeError?: (nodeId: string, error: unknown) => void
+  } {
+    return { onBlocked: () => this.onContextLifecycle?.(context.id, 'blocked') }
+  }
+
+  protected override debugLog(message: string, data?: unknown): void {
     // Allow enabling debug at runtime via NodeExecutionEngine.setDebugEnabled(...)
     if (!this.debugEnabled && !NodeExecutionEngine.globalDebugEnabled) return
     // Use console.log (not debug) so it shows up consistently in packaged builds.
@@ -246,22 +349,6 @@ export class NodeExecutionEngine {
 
   private getVariableValue(name: string, context: ExecutionContext): VariableValue | undefined {
     return context.cueLevelVarStore.get(name) ?? context.groupLevelVarStore.get(name)
-  }
-
-  /**
-   * Register all event listeners from the compiled cue.
-   */
-  private registerEventListeners(): void {
-    const { eventListenerMap } = this.compiledCue
-    for (const listener of eventListenerMap.values()) {
-      // Skip listeners with no event selected
-      if (!listener.eventName) {
-        continue
-      }
-      const listeners = this.eventListeners.get(listener.eventName) ?? []
-      listeners.push(listener)
-      this.eventListeners.set(listener.eventName, listeners)
-    }
   }
 
   /**
@@ -348,732 +435,52 @@ export class NodeExecutionEngine {
     }
   }
 
-  private runtimeEmit(channel: string, payload: unknown): void {
-    if (this.runtimeCallbacks) {
-      this.runtimeCallbacks.emit(channel, payload)
-    } else {
-      this.runtimeBroadcaster.emit(channel, payload)
+  /** Rich debug logging for a logic node before it executes (cue-only). */
+  protected override logLogicNode(logicNode: LogicNode, context: ExecutionContext): void {
+    if (!this.debugEnabled && !NodeExecutionEngine.globalDebugEnabled) return
+    const logicLog: Record<string, unknown> = {
+      logicType: logicNode.logicType,
+      nodeId: logicNode.id,
+      ctx: context.id,
     }
+    if ('sourceVariable' in logicNode && logicNode.sourceVariable) {
+      const src = logicNode.sourceVariable as string
+      logicLog.sourceVariable = src
+      logicLog.sourceValue = this.getVariableValue(src, context)
+    }
+    if ('varName' in logicNode && logicNode.varName) {
+      logicLog.varName = logicNode.varName
+      logicLog.varValueBefore = this.getVariableValue(logicNode.varName, context)
+    }
+    if ('assignTo' in logicNode && logicNode.assignTo) {
+      logicLog.assignTo = logicNode.assignTo
+      logicLog.assignToBefore = this.getVariableValue(logicNode.assignTo, context)
+    }
+    this.debugLog(`exec logic nodeId=${logicNode.id} ctx=${context.id}`, logicLog)
   }
 
-  private emitNodeExecution(type: 'activated' | 'deactivated', nodeId: string): void {
-    if (type === 'activated') {
-      this.pendingActivations.add(nodeId)
-    } else {
-      this.pendingActivations.delete(nodeId)
-    }
-    this.runtimeEmit(RENDERER_RECEIVE.NODE_EXECUTION, {
-      type,
-      cueId: this.cueId,
-      nodeId,
-      timestamp: Date.now(),
-    })
-  }
-
-  /**
-   * Execute a single node within a context.
-   * Dispatches to appropriate handler based on node type.
-   */
-  private executeNode(nodeId: string, context: ExecutionContext): void {
-    const { actionMap, logicMap, eventRaiserMap, effectRaiserMap } = this.compiledCue
-
-    // Prevent re-execution of any node within the same context (avoids infinite loops from cycles)
-    if (context.hasVisited(nodeId)) {
-      this.debugLog(`skip visited nodeId=${nodeId} ctx=${context.id}`)
-      return
-    }
-    context.markVisited(nodeId)
-    this.emitNodeExecution('activated', nodeId)
-
-    // Check if it's an action node
-    const actionNode = actionMap.get(nodeId)
-    if (actionNode) {
-      this.debugLog(`exec action nodeId=${nodeId} ctx=${context.id}`, {
-        effectType: actionNode.effectType,
-        target: actionNode.target,
-        color: actionNode.color,
-        timing: actionNode.timing,
-        layer: actionNode.layer,
-      })
-      this.executeActionNode(actionNode, context)
-      return
-    }
-
-    // Check if it's a logic node
-    const logicNode = logicMap.get(nodeId)
-    if (logicNode) {
-      const logicLog: Record<string, unknown> = {
-        logicType: logicNode.logicType,
-        nodeId,
-        ctx: context.id,
-      }
-      if ('sourceVariable' in logicNode && logicNode.sourceVariable) {
-        const src = logicNode.sourceVariable as string
-        logicLog.sourceVariable = src
-        logicLog.sourceValue = this.getVariableValue(src, context)
-      }
-      if ('varName' in logicNode && logicNode.varName) {
-        logicLog.varName = logicNode.varName
-        logicLog.varValueBefore = this.getVariableValue(logicNode.varName, context)
-      }
-      if ('assignTo' in logicNode && logicNode.assignTo) {
-        logicLog.assignTo = logicNode.assignTo
-        logicLog.assignToBefore = this.getVariableValue(logicNode.assignTo, context)
-      }
-      this.debugLog(`exec logic nodeId=${nodeId} ctx=${context.id}`, logicLog)
-      this.executeLogicNode(logicNode, nodeId, context)
-      return
-    }
-
-    // Check if it's an event raiser node
-    const eventRaiserNode = eventRaiserMap.get(nodeId)
-    if (eventRaiserNode) {
-      this.debugLog(`exec event-raiser nodeId=${nodeId} ctx=${context.id}`, {
-        eventName: eventRaiserNode.eventName,
-      })
-      this.executeEventRaiserNode(eventRaiserNode, context)
-      return
-    }
-
-    // Check if it's an effect raiser node
-    const effectRaiserNode = effectRaiserMap?.get(nodeId)
+  /** Cue-specific node kind: effect-raiser. */
+  protected override dispatchSpecialNode(nodeId: string, context: ExecutionContext): boolean {
+    const effectRaiserNode = this.compiledCue.effectRaiserMap?.get(nodeId)
     if (effectRaiserNode) {
       this.debugLog(`exec effect-raiser nodeId=${nodeId} ctx=${context.id}`, {
         effectId: effectRaiserNode.effectId,
         parameterValues: effectRaiserNode.parameterValues,
       })
       this.executeEffectRaiserNode(effectRaiserNode, context)
-      return
+      return true
     }
+    return false
+  }
 
-    // Unknown node type - skip and continue
-    log.warn(`Unknown node type for node ${nodeId}`)
+  /** Cue behavior for unknown nodes: skip and continue downstream. */
+  protected override onUnknownNode(nodeId: string, context: ExecutionContext): void {
     this.continueToNextNodes(nodeId, context)
   }
 
-  /**
-   * Execute an action node: create effect and submit to sequencer.
-   * The action blocks further execution until it completes.
-   */
-  private executeActionNode(actionNode: ActionNode, context: ExecutionContext): void {
-    try {
-      // Handle blackout specially - it uses sequencer.blackout() directly
-      if (actionNode.effectType === 'blackout') {
-        const resolvedTiming = resolveActionTiming(actionNode.timing, context)
-
-        // Register this action as active (waiting for completion)
-        context.registerActiveAction(actionNode.id, actionNode)
-
-        // Call sequencer.blackout() which returns a Promise<void>
-        this.sequencer
-          .blackout(resolvedTiming.duration)
-          .then(() => {
-            // Blackout completed
-            if (context.hasVisited(actionNode.id)) {
-              this.emitNodeExecution('deactivated', actionNode.id)
-              context.completeAction(actionNode.id)
-            }
-          })
-          .catch((error) => {
-            log.error(`Error during blackout for action node ${actionNode.id}:`, error)
-            // Continue execution despite error
-            if (context.hasVisited(actionNode.id)) {
-              this.emitNodeExecution('deactivated', actionNode.id)
-              context.completeAction(actionNode.id)
-            }
-          })
-        return
-      }
-
-      if (actionNode.effectType === 'set-position') {
-        if (!actionNode.position) {
-          log.warn(`set-position action ${actionNode.id} is missing position`)
-          this.continueToNextNodes(actionNode.id, context)
-          return
-        }
-
-        const resolvedTarget: ResolvedActionTarget = {
-          groups: resolveLocationGroups(actionNode.target.groups, context),
-          filter: resolveLightTarget(actionNode.target.filter, context),
-        }
-        const resolvedPosition: ResolvedPositionSetting = resolveActionPosition(
-          actionNode.position,
-          context,
-        )
-        const resolvedTiming = resolveActionTiming(actionNode.timing, context)
-        const resolvedLayer = resolveActionLayer(actionNode.layer, context)
-
-        const resolvedAction = {
-          ...actionNode,
-          target: resolvedTarget,
-          timing: resolvedTiming,
-          layer: resolvedLayer,
-        } as ActionNode & {
-          target: ResolvedActionTarget
-          timing: ResolvedActionTiming
-          layer: number
-        }
-
-        const lights = ActionEffectFactory.resolveLights(
-          this.lightManager,
-          actionNode.target,
-          (varName: string) => {
-            const cueVar = context.cueLevelVarStore.get(varName)
-            const groupVar = context.groupLevelVarStore.get(varName)
-            return cueVar ?? groupVar
-          },
-        )
-
-        if (!lights || lights.length === 0) {
-          this.continueToNextNodes(actionNode.id, context)
-          return
-        }
-
-        const submitPositionAction = (): void => {
-          const iterIdx = context.getForEachIterationIndex()
-          const effectName =
-            iterIdx >= 0
-              ? `${this.cueId}:${actionNode.id}:${iterIdx}`
-              : `${this.cueId}:${actionNode.id}`
-
-          const positionFp = buildSetPositionSubmissionFingerprint(
-            resolvedTarget,
-            resolvedPosition,
-            resolvedLayer,
-            resolvedTiming,
-          )
-          if (this.setPositionSubmissionFingerprint.get(effectName) === positionFp) {
-            this.emitNodeExecution('deactivated', actionNode.id)
-            this.continueToNextNodes(actionNode.id, context)
-            return
-          }
-
-          const effect = ActionEffectFactory.buildEffect({
-            action: resolvedAction,
-            lights,
-            waitCondition: undefined,
-            waitTime: 0,
-            resolvedTarget,
-            resolvedTiming,
-            resolvedLayer,
-            resolvedPosition,
-          })
-
-          if (!effect) {
-            this.continueToNextNodes(actionNode.id, context)
-            return
-          }
-
-          const shouldBlock = resolvedTiming.waitUntilCondition !== 'none'
-          const useSetEffect = this.getAndConsumeInitialClearPolicy()
-
-          if (shouldBlock) {
-            context.registerActiveAction(actionNode.id, actionNode)
-            const callback = (): void => {
-              this.submittedEffects.delete(effectName)
-              this.setPositionSubmissionFingerprint.set(effectName, positionFp)
-              this.emitNodeExecution('deactivated', actionNode.id)
-              context.completeAction(actionNode.id)
-            }
-            this.submittedEffects.set(effectName, resolvedLayer)
-            if (useSetEffect) {
-              this.sequencer.setEffectUnblockedNameWithCallback(effectName, effect, callback)
-            } else {
-              this.sequencer.addEffectUnblockedNameWithCallback(effectName, effect, callback)
-            }
-          } else {
-            this.submittedEffects.set(effectName, resolvedLayer)
-            if (useSetEffect) {
-              this.sequencer.setEffectUnblockedName(effectName, effect)
-            } else {
-              // set-position is a state-target effect: each new resolved position
-              // must take effect immediately. Queueing behind a stale in-flight
-              // transition would desynchronise per-light motion across beats.
-              this.sequencer.replaceEffect(effectName, effect)
-            }
-            this.setPositionSubmissionFingerprint.set(effectName, positionFp)
-            this.emitNodeExecution('deactivated', actionNode.id)
-            this.continueToNextNodes(actionNode.id, context)
-          }
-        }
-
-        submitPositionAction()
-        return
-      }
-
-      if (actionNode.effectType === 'motion-pattern') {
-        if (!actionNode.motionPattern) {
-          log.warn(`motion-pattern action ${actionNode.id} is missing motionPattern`)
-          this.continueToNextNodes(actionNode.id, context)
-          return
-        }
-
-        const resolvedMotion = resolveMotionPattern(actionNode.motionPattern, context)
-        const resolvedTiming = resolveActionTiming(actionNode.timing, context)
-        const resolvedLayer = resolveActionLayer(actionNode.layer, context)
-
-        if (
-          !Number.isFinite(resolvedMotion.speedHz) ||
-          resolvedMotion.speedHz <= 0 ||
-          !Number.isFinite(resolvedMotion.sizeDeg) ||
-          resolvedMotion.sizeDeg <= 0
-        ) {
-          log.warn(
-            `motion-pattern action ${actionNode.id}: speed (Hz) and size (deg) must be finite and positive`,
-          )
-          this.continueToNextNodes(actionNode.id, context)
-          return
-        }
-
-        const lights = ActionEffectFactory.resolveLights(
-          this.lightManager,
-          actionNode.target,
-          (varName: string) => {
-            const cueVar = context.cueLevelVarStore.get(varName)
-            const groupVar = context.groupLevelVarStore.get(varName)
-            return cueVar ?? groupVar
-          },
-        )
-
-        if (!lights || lights.length === 0) {
-          this.continueToNextNodes(actionNode.id, context)
-          return
-        }
-
-        const iterIdx = context.getForEachIterationIndex()
-        const effectName =
-          iterIdx >= 0
-            ? `${this.cueId}:${actionNode.id}:${iterIdx}`
-            : `${this.cueId}:${actionNode.id}`
-
-        const rampUpMs = resolvedTiming.duration > 0 ? resolvedTiming.duration : 0
-
-        const existingPattern = this.sequencer.getMotionPattern(effectName)
-        if (
-          existingPattern &&
-          existingPattern.layer === resolvedLayer &&
-          existingPattern.rampUpDurationMs === rampUpMs &&
-          trackedLightIdsEqualOrder(existingPattern.lights, lights)
-        ) {
-          if (resolvedMotionPatternSettingsEqual(existingPattern.config, resolvedMotion)) {
-            this.submittedMotionPatterns.add(effectName)
-            this.emitNodeExecution('deactivated', actionNode.id)
-            this.continueToNextNodes(actionNode.id, context)
-            return
-          }
-          if (
-            resolvedMotionPatternSettingsEqualExceptBearing(existingPattern.config, resolvedMotion)
-          ) {
-            this.sequencer.updateMotionPatternConfig(effectName, resolvedMotion)
-            this.submittedMotionPatterns.add(effectName)
-            this.emitNodeExecution('deactivated', actionNode.id)
-            this.continueToNextNodes(actionNode.id, context)
-            return
-          }
-        }
-
-        this.sequencer.cancelPanTiltClear()
-        this.sequencer.addMotionPattern(effectName, resolvedMotion, lights, resolvedLayer, rampUpMs)
-        this.submittedMotionPatterns.add(effectName)
-        this.emitNodeExecution('deactivated', actionNode.id)
-        this.continueToNextNodes(actionNode.id, context)
-        return
-      }
-
-      // Resolve target
-      const resolvedTarget: ResolvedActionTarget = {
-        groups: resolveLocationGroups(actionNode.target.groups, context),
-        filter: resolveLightTarget(actionNode.target.filter, context),
-      }
-
-      if (!actionNode.color) {
-        log.warn(`Action ${actionNode.id} (${actionNode.effectType}) is missing color`)
-        this.continueToNextNodes(actionNode.id, context)
-        return
-      }
-
-      const resolvedColor = resolveActionColor(actionNode.color, context)
-      const resolvedTiming = resolveActionTiming(actionNode.timing, context)
-      const resolvedLayer = resolveActionLayer(actionNode.layer, context)
-
-      /**
-       * Action chaining / pre-queueing
-       * -----------------------------
-       * When we have a simple linear chain of action nodes (action -> action -> ...),
-       * we want those transitions to run back-to-back on the sequencer without the
-       * layer being cleared between actions.
-       *
-       * If we wait for action A to fully complete before submitting action B, there can
-       * be a visible "flash" of lower layers between them (e.g. base blue showing between
-       * red and yellow). By submitting action B while action A is still active, the
-       * sequencer queues it and preserves layer state, allowing smooth fades.
-       */
-      const actionChain = buildActionChain(
-        actionNode,
-        this.compiledCue.adjacency,
-        this.compiledCue.actionMap,
-      )
-
-      const resolvedAction = {
-        ...actionNode,
-        target: resolvedTarget,
-        color: resolvedColor,
-        timing: resolvedTiming,
-        layer: resolvedLayer,
-      } as ActionNode & {
-        target: ResolvedActionTarget
-        color: ResolvedColorSetting
-        timing: ResolvedActionTiming
-        layer: number
-      }
-
-      const lights = ActionEffectFactory.resolveLights(
-        this.lightManager,
-        actionNode.target, // Pass the ORIGINAL target with ValueSource intact
-        (varName: string) => {
-          const cueVar = context.cueLevelVarStore.get(varName)
-          const groupVar = context.groupLevelVarStore.get(varName)
-          return cueVar ?? groupVar
-        },
-      )
-
-      // Log resolved lights + any variable target
-      if (actionNode.target?.groups?.source === 'variable') {
-        const varName = actionNode.target.groups.name
-        this.debugLog(`action target groups from var=$${varName} ctx=${context.id}`, {
-          varValue: this.getVariableValue(varName, context),
-          resolvedLightsCount: lights?.length ?? 0,
-          resolvedLights: (lights ?? []).map((l) => ({ id: l.id, position: l.position })),
-        })
-      } else {
-        this.debugLog(`action resolved lights ctx=${context.id}`, {
-          resolvedLightsCount: lights?.length ?? 0,
-          resolvedLights: (lights ?? []).map((l) => ({ id: l.id, position: l.position })),
-        })
-      }
-
-      if (!lights || lights.length === 0) {
-        // No lights to target, continue immediately
-        this.debugLog(`action skipped (no lights) nodeId=${actionNode.id} ctx=${context.id}`)
-        this.continueToNextNodes(actionNode.id, context)
-        return
-      }
-
-      const submitSingleAction = (): void => {
-        const effect = ActionEffectFactory.buildEffect({
-          action: resolvedAction,
-          lights,
-          waitCondition: undefined,
-          waitTime: 0,
-          resolvedTarget,
-          resolvedColor,
-          resolvedTiming,
-          resolvedLayer,
-        })
-
-        if (!effect) {
-          // Failed to build effect, continue immediately
-          this.continueToNextNodes(actionNode.id, context)
-          return
-        }
-
-        // Stable effect name so repeated submissions (e.g. cue-called) queue in the sequencer.
-        // Inside for-each-light, append iteration index for unique per-light effect names.
-        const iterIdx = context.getForEachIterationIndex()
-        const effectName =
-          iterIdx >= 0
-            ? `${this.cueId}:${actionNode.id}:${iterIdx}`
-            : `${this.cueId}:${actionNode.id}`
-
-        this.debugLog(`submit effect nodeId=${actionNode.id} ctx=${context.id}`, {
-          effectName,
-          layer: resolvedLayer,
-          timing: resolvedTiming,
-          color: resolvedColor,
-        })
-
-        const shouldBlock = resolvedTiming.waitUntilCondition !== 'none'
-        const useSetEffect = this.getAndConsumeInitialClearPolicy()
-
-        if (shouldBlock) {
-          context.registerActiveAction(actionNode.id, actionNode)
-          const callback = (): void => {
-            this.submittedEffects.delete(effectName)
-            this.emitNodeExecution('deactivated', actionNode.id)
-            context.completeAction(actionNode.id)
-          }
-          this.submittedEffects.set(effectName, resolvedLayer)
-          if (useSetEffect) {
-            this.sequencer.setEffectUnblockedNameWithCallback(effectName, effect, callback)
-          } else {
-            this.sequencer.addEffectUnblockedNameWithCallback(effectName, effect, callback)
-          }
-        } else {
-          this.submittedEffects.set(effectName, resolvedLayer)
-          if (useSetEffect) {
-            this.sequencer.setEffectUnblockedName(effectName, effect)
-          } else {
-            this.sequencer.addEffect(effectName, effect)
-          }
-          this.emitNodeExecution('deactivated', actionNode.id)
-          this.continueToNextNodes(actionNode.id, context)
-        }
-      }
-
-      // If we're not actually chaining anything, fall back to single-action behavior.
-      if (actionChain.length === 1) {
-        submitSingleAction()
-        return
-      }
-
-      const getChainVar = (varName: string): VariableValue | undefined => {
-        const cueVar = context.cueLevelVarStore.get(varName)
-        const groupVar = context.groupLevelVarStore.get(varName)
-        return cueVar ?? groupVar
-      }
-
-      const chainData = tryBuildHomogeneousSetColorChainData(actionChain, (a) =>
-        resolveChainStep(a, context, this.lightManager, getChainVar),
-      )
-
-      if (!chainData) {
-        submitSingleAction()
-        return
-      }
-
-      const iterIdx = context.getForEachIterationIndex()
-      const chainEffectName =
-        iterIdx >= 0
-          ? `${this.cueId}:chain:${actionChain[0].id}:${iterIdx}`
-          : `${this.cueId}:chain:${actionChain[0].id}`
-      this.debugLog(`submit action-chain ctx=${context.id}`, {
-        effectName: chainEffectName,
-        layer: chainData.baseLayer,
-        actions: actionChain.map((a) => ({ id: a.id, effectType: a.effectType })),
-      })
-
-      markConsecutiveActionChainTailVisited(context, actionChain, (nodeId) =>
-        this.emitNodeExecution('activated', nodeId),
-      )
-
-      const composedEffect = ActionEffectFactory.buildEffectChain(
-        mapSetColorChainStepsForEffectFactory(
-          chainData.steps,
-          chainData.baseLights,
-          chainData.baseLayer,
-        ),
-      )
-
-      if (!composedEffect) {
-        submitSingleAction()
-        return
-      }
-
-      this.debugLog(`submit composed action-chain ctx=${context.id}`, {
-        effectName: chainEffectName,
-        layer: chainData.baseLayer,
-        transitions: composedEffect.transitions.map((t) => ({
-          waitForCondition: t.waitForCondition,
-          waitForTime: t.waitForTime,
-          duration: t.transform.duration,
-          waitUntilCondition: t.waitUntilCondition,
-          waitUntilTime: t.waitUntilTime,
-        })),
-      })
-
-      const chainHasBlockingStep = chainData.steps.some(
-        (step) => step.resolvedTiming.waitUntilCondition !== 'none',
-      )
-      const lastChainNode = actionChain[actionChain.length - 1]
-
-      const useSetEffectChain = this.getAndConsumeInitialClearPolicy()
-      if (chainHasBlockingStep) {
-        context.registerActiveAction(lastChainNode.id, lastChainNode)
-        const callback = (): void => {
-          this.submittedEffects.delete(chainEffectName)
-          for (const a of actionChain) {
-            this.emitNodeExecution('deactivated', a.id)
-          }
-          context.completeAction(lastChainNode.id)
-        }
-        this.submittedEffects.set(chainEffectName, chainData.baseLayer)
-        if (useSetEffectChain) {
-          this.sequencer.setEffectUnblockedNameWithCallback(
-            chainEffectName,
-            composedEffect,
-            callback,
-          )
-        } else {
-          this.sequencer.addEffectUnblockedNameWithCallback(
-            chainEffectName,
-            composedEffect,
-            callback,
-          )
-        }
-      } else {
-        this.submittedEffects.set(chainEffectName, chainData.baseLayer)
-        if (useSetEffectChain) {
-          this.sequencer.setEffectUnblockedName(chainEffectName, composedEffect)
-        } else {
-          this.sequencer.addEffectUnblockedName(chainEffectName, composedEffect)
-        }
-        for (const a of actionChain) {
-          this.emitNodeExecution('deactivated', a.id)
-        }
-        this.continueToNextNodes(lastChainNode.id, context)
-      }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${actionNode.id}: ${msg}`)
-      log.error(`Error executing action node ${actionNode.id}:`, error)
-      this.emitNodeExecution('deactivated', actionNode.id)
-    }
-  }
-
-  /**
-   * Execute a logic node: evaluate at runtime and continue to next nodes.
-   * Logic nodes don't block - they execute immediately.
-   * Exception: Delay nodes block execution for the specified delay time.
-   */
-  private executeLogicNode(logicNode: LogicNode, nodeId: string, context: ExecutionContext): void {
-    try {
-      // Handle delay nodes specially - they block execution
-      if (logicNode.logicType === 'delay') {
-        this.executeDelayNode(logicNode, nodeId, context)
-        return
-      }
-
-      // Handle for-each-light in the engine
-      if (logicNode.logicType === 'for-each-light') {
-        this.executeForEachLight(logicNode, nodeId, context)
-        return
-      }
-
-      const { adjacency } = this.compiledCue
-      const edges = adjacency.get(nodeId) ?? []
-
-      const evaluatorContext: LogicNodeEvaluatorContext = {
-        cueId: this.cueId,
-        lightManager: this.lightManager,
-        cueLevelVarStore: this.cueLevelVarStore,
-        groupLevelVarStore: this.groupLevelVarStore,
-        variableDefinitions: this.variableDefinitions,
-        executeNode: (nextNodeId: string, ctx: ExecutionContext) =>
-          this.executeNode(nextNodeId, ctx),
-        debugOutput: (channel: string, payload: unknown) => this.runtimeEmit(channel, payload),
-      }
-
-      const nextNodes = evaluateLogicNode(logicNode, nodeId, edges, context, evaluatorContext)
-
-      context.markVisited(nodeId)
-
-      // Logic nodes execute immediately - continue to next nodes without waiting
-      if (nextNodes.length > 0) {
-        this.continueExecution(nextNodes, context)
-      } else {
-        // No more nodes, check if context is complete
-        if (context.tryComplete()) {
-          context.dispose()
-        }
-      }
-      this.emitNodeExecution('deactivated', nodeId)
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
-      log.error(`Error executing logic node ${nodeId}:`, error)
-      this.emitNodeExecution('deactivated', nodeId)
-    }
-  }
-
-  /**
-   * Execute a delay node: wait for the specified delay time before continuing.
-   * Delay nodes block execution like action nodes.
-   */
-  private executeDelayNode(
-    delayNode: LogicNode & { logicType: 'delay'; delayTime: ValueSource },
-    nodeId: string,
-    context: ExecutionContext,
-  ): void {
-    try {
-      // Resolve delay time from ValueSource
-      const delayMs = Number(resolveValue('number', delayNode.delayTime, context))
-      const actualDelay = Math.max(0, delayMs) // Ensure non-negative
-
-      this.debugLog(`exec delay nodeId=${nodeId} ctx=${context.id}`, { delayMs: actualDelay })
-
-      // Register as active to block execution
-      // We use a dummy action node structure for compatibility with ExecutionContext
-      const dummyAction: ActionNode = {
-        id: nodeId,
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'blue' },
-          brightness: { source: 'literal', value: 'medium' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 0 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-      context.registerActiveAction(nodeId, dummyAction)
-
-      const timerId = setTimeout(() => {
-        context.removeTimer(timerId)
-        // Guard on isActionActive rather: other blocking nodes (e.g. from a
-        // for-each-light body) can advance the execution phase while the delay waits
-        if (context.isActionActive(nodeId)) {
-          this.debugLog(`delay complete nodeId=${nodeId} ctx=${context.id}`)
-          this.emitNodeExecution('deactivated', nodeId)
-          context.completeAction(nodeId)
-        }
-      }, actualDelay)
-      context.addTimer(timerId)
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
-      log.error(`Error executing delay node ${nodeId}:`, error)
-      this.emitNodeExecution('deactivated', nodeId)
-    }
-  }
-
-  /**
-   * Execute an event raiser node: raise the event and continue immediately (non-blocking).
-   */
-  private executeEventRaiserNode(raiserNode: EventRaiserNode, context: ExecutionContext): void {
-    try {
-      const { eventName } = raiserNode
-
-      // Skip if no event selected
-      if (!eventName) {
-        log.warn(`Event raiser ${raiserNode.id} has no event selected, skipping`)
-        this.continueToNextNodes(raiserNode.id, context)
-        return
-      }
-
-      // Fire all registered listeners for this event
-      const listeners = this.eventListeners.get(eventName) ?? []
-      for (const listener of listeners) {
-        // Create new execution context for each listener, passing cue data
-        this.startListenerExecution(listener, context.cueData as CueData)
-      }
-
-      this.emitNodeExecution('deactivated', raiserNode.id)
-      // Continue immediately to raiser's child (non-blocking)
-      this.continueToNextNodes(raiserNode.id, context)
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${raiserNode.id}: ${msg}`)
-      log.error(`Error executing event raiser node ${raiserNode.id}:`, error)
-      this.emitNodeExecution('deactivated', raiserNode.id)
-    }
+  /** Cue marks the logic node visited after evaluation (safe under strict re-entry). */
+  protected override afterLogicEval(nodeId: string, context: ExecutionContext): void {
+    context.markVisited(nodeId)
   }
 
   /**
@@ -1137,7 +544,7 @@ export class NodeExecutionEngine {
         compiledEffect,
         this.sequencer,
         this.lightManager,
-        this.runtimeBroadcaster,
+        this.broadcaster,
         paramValues,
         context.cueData, // Pass caller's cue data
         this.firstSubmissionUsesSetEffectRef,
@@ -1178,7 +585,10 @@ export class NodeExecutionEngine {
    * Start execution from a listener node.
    * Creates a new execution context for the listener chain.
    */
-  private startListenerExecution(listenerNode: EventListenerNode, cueData: CueData): void {
+  protected startListenerExecution(
+    listenerNode: EventListenerNode,
+    cueData: CueData | AudioCueData,
+  ): void {
     try {
       // Create new context for listener chain (listener has id; ExecutionContext only needs event-like shape)
       const context = new ExecutionContext(
@@ -1246,132 +656,8 @@ export class NodeExecutionEngine {
     }
   }
 
-  /**
-   * Collect all node IDs reachable from startNodeIds, excluding excludeNodeId.
-   * Delegates to shared engineUtils for de-duplication.
-   */
-  private collectReachableNodes(
-    adjacency: Map<string, Connection[]>,
-    startNodeIds: string[],
-    excludeNodeId: string,
-  ): Set<string> {
-    return collectReachableNodes(adjacency, startNodeIds, excludeNodeId)
-  }
-
-  /**
-   * Execute a for-each-light node by eagerly iterating all lights, running the body for each.
-   * Prevents premature context completion and ensures unique effect names per iteration.
-   */
-  private executeForEachLight(
-    logicNode: LogicNode & { logicType: 'for-each-light' },
-    nodeId: string,
-    context: ExecutionContext,
-  ): void {
-    const { adjacency } = this.compiledCue
-    const edges = adjacency.get(nodeId) ?? []
-    const eachEdges = edges.filter((e) => e.fromPort === 'each')
-    const doneEdges = edges.filter((e) => e.fromPort === 'done')
-    const eachTargets = eachEdges.length > 0 ? eachEdges.map((e) => e.to) : []
-    const doneTargets = doneEdges.length > 0 ? doneEdges.map((e) => e.to) : []
-
-    const getVarStore = (varName: string) =>
-      getVariableStore(
-        varName,
-        this.variableDefinitions,
-        this.cueLevelVarStore,
-        this.groupLevelVarStore,
-      )
-
-    const sourceVar = getVarStore(logicNode.sourceVariable).get(logicNode.sourceVariable)
-    if (!sourceVar || sourceVar.type !== 'light-array') {
-      this.debugLog(
-        `for-each-light ${nodeId}: source "${logicNode.sourceVariable}" is not a light-array`,
-        {
-          sourceVar: sourceVar ?? null,
-        },
-      )
-      context.markVisited(nodeId)
-      if (doneTargets.length > 0) {
-        this.continueExecution(doneTargets, context)
-      } else if (context.tryComplete()) {
-        context.dispose()
-      }
-      this.emitNodeExecution('deactivated', nodeId)
-      return
-    }
-
-    const lightsArray = sourceVar.value as TrackedLight[]
-    const length = lightsArray.length
-
-    const bodyNodeIds = this.collectReachableNodes(adjacency, eachTargets, nodeId)
-    context.setForEachLightState(nodeId, { index: 0, length })
-
-    for (let i = 0; i < length; i++) {
-      const currentLight = lightsArray[i]
-      const currentLightArray = currentLight ? [currentLight] : []
-      getVarStore(logicNode.currentLightVariable).set(logicNode.currentLightVariable, {
-        type: 'light-array',
-        value: currentLightArray,
-      })
-      getVarStore(logicNode.currentIndexVariable).set(logicNode.currentIndexVariable, {
-        type: 'number',
-        value: i,
-      })
-      context.setForEachIterationIndex(i)
-      for (const bodyId of bodyNodeIds) {
-        context.unmarkVisited(bodyId)
-      }
-      this.continueExecution(eachTargets, context)
-    }
-
-    context.clearForEachLightState(nodeId)
-    context.setForEachIterationIndex(-1)
-    context.markVisited(nodeId)
-
-    this.emitNodeExecution('deactivated', nodeId)
-    if (doneTargets.length > 0) {
-      this.continueExecution(doneTargets, context)
-    } else if (context.tryComplete()) {
-      context.dispose()
-    }
-  }
-
-  /**
-   * Get the next nodes after the current node and continue execution.
-   */
-  private continueToNextNodes(nodeId: string, context: ExecutionContext): void {
-    const { adjacency } = this.compiledCue
-    const outgoing = adjacency.get(nodeId) ?? []
-    const nextNodes = outgoing.map((conn) => conn.to)
-
-    if (nextNodes.length > 0) {
-      this.continueExecution(nextNodes, context)
-    } else {
-      // No more nodes, check if context is complete
-      if (context.tryComplete()) {
-        context.dispose()
-      }
-    }
-  }
-
-  /**
-   * Continue execution to the next nodes.
-   *
-   * Wraps the dispatch loop with beginBatch/endBatch so that a dead-end branch
-   * encountered partway through the batch cannot prematurely dispose the context
-   * before sibling branches have had a chance to register blocking nodes (e.g. delays).
-   */
-  private continueExecution(nodeIds: string[], context: ExecutionContext): void {
-    runContextBatch(context, nodeIds, (nodeId) => this.executeNode(nodeId, context), {
-      onBlocked: () => this.onContextLifecycle?.(context.id, 'blocked'),
-    })
-  }
-
-  /**
-   * Cancel all active executions (called on cue stop).
-   * @param skipEffectRemoval When true, leave submitted effects on the sequencer so the next cue's setEffect can transition from them instead of from black.
-   */
-  public cancelAll(skipEffectRemoval = false): void {
+  /** Flush any node activations that never deactivated so the UI doesn't leave nodes lit. */
+  protected override onCancelStart(): void {
     for (const nodeId of this.pendingActivations) {
       this.runtimeEmit(RENDERER_RECEIVE.NODE_EXECUTION, {
         type: 'deactivated',
@@ -1381,31 +667,14 @@ export class NodeExecutionEngine {
       })
     }
     this.pendingActivations.clear()
+  }
 
-    for (const [contextId, context] of this.activeContexts) {
-      this.onContextLifecycle?.(contextId, 'cancelled')
-      context.dispose()
-    }
-    this.activeContexts.clear()
+  protected override onContextCancelled(contextId: string): void {
+    this.onContextLifecycle?.(contextId, 'cancelled')
+  }
 
-    // Remove callbacks but optionally keep effects on the sequencer
-    for (const [name, layer] of this.submittedEffects) {
-      this.sequencer.removeEffectCallback(name)
-      if (!skipEffectRemoval) {
-        this.sequencer.removeEffect(name, layer)
-      }
-    }
-    this.submittedEffects.clear()
-
-    for (const name of this.submittedMotionPatterns) {
-      if (!skipEffectRemoval) {
-        this.sequencer.removeMotionPattern(name)
-      }
-    }
-    this.submittedMotionPatterns.clear()
-    this.setPositionSubmissionFingerprint.clear()
-
-    // Cancel all active effect engines
+  /** Cancel nested effect engines spawned by effect-raiser nodes. */
+  protected override onCancelFinish(skipEffectRemoval: boolean): void {
     for (const effectEngine of this.activeEffectEngines.values()) {
       effectEngine.cancelAll(skipEffectRemoval)
     }

@@ -32,7 +32,7 @@ export const COLOR_OPTIONS: Color[] = [
 
 export const BRIGHTNESS_OPTIONS: Brightness[] = ['low', 'medium', 'high', 'max', 'linear']
 
-export const BLEND_MODE_OPTIONS: BlendMode[] = ['replace', 'add', 'multiply', 'overlay']
+export const BLEND_MODE_OPTIONS: BlendMode[] = ['replace', 'add', 'multiply', 'overlay', 'mix']
 
 export const LOCATION_OPTIONS: LocationGroup[] = ['front', 'back', 'strobe']
 

@@ -491,6 +491,65 @@ describe('LightTransitionController', () => {
       expect(mockLightStateManager.setLightState).toHaveBeenCalledWith(lightId, expectedState)
     })
 
+    // 'mix' is an alpha crossfade: a higher layer blends with the composited lower layers
+    // by opacity (opacity 0 = underlying, 1 = this layer). Used so a yellow flash can
+    // crossfade over a blue base into pure yellow and back, rather than fading from black
+    // ('replace') or summing to white ('add').
+    describe('mix blend mode (alpha crossfade)', () => {
+      const blendBlueUnderYellow = (overlayOpacity: number): RGBIO => {
+        const mockLightStateManager = {
+          setLightState: jest.fn(),
+          getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
+          publishLightStates: jest.fn(),
+          getTrackedLightIds: jest.fn().mockReturnValue([]),
+        }
+        const ltc = new LightTransitionController(
+          mockLightStateManager as unknown as LightStateManager,
+        )
+        const blueBase = createMockRGBIP({
+          red: 0,
+          green: 0,
+          blue: 255,
+          intensity: 255,
+          opacity: 1.0,
+          blendMode: 'replace',
+        })
+        const yellowOverlay = createMockRGBIP({
+          red: 255,
+          green: 255,
+          blue: 0,
+          intensity: 255,
+          opacity: overlayOpacity,
+          blendMode: 'mix',
+        })
+        const layerStates = new Map<number, RGBIO>()
+        layerStates.set(0, blueBase)
+        layerStates.set(1, yellowOverlay)
+        ltcAccess(ltc)._currentLayerStates.set('mix-light', layerStates)
+        ltcAccess(ltc).calculateFinalColorForLight('mix-light')
+        return (mockLightStateManager.setLightState as jest.Mock).mock.calls.at(-1)![1] as RGBIO
+      }
+
+      it('opacity 0 shows the underlying blue', () => {
+        const out = blendBlueUnderYellow(0)
+        expect([out.red, out.green, out.blue]).toEqual([0, 0, 255])
+      })
+
+      it('opacity 1 shows pure yellow with the blue fully replaced', () => {
+        const out = blendBlueUnderYellow(1)
+        expect([out.red, out.green, out.blue]).toEqual([255, 255, 0])
+      })
+
+      it('opacity 0.5 crossfades — all channels present, not white, not black', () => {
+        const out = blendBlueUnderYellow(0.5)
+        expect(out.red).toBeGreaterThan(0)
+        expect(out.green).toBeGreaterThan(0)
+        expect(out.blue).toBeGreaterThan(0)
+        expect(out.blue).toBeLessThan(255) // blue is fading out
+        expect(out.red).toBeLessThan(255) // yellow is fading in
+      })
+    })
+
     it('should blend each RGB channel based on its individual opacity', () => {
       // Create a controller with known light states
       const mockLightStateManager = {

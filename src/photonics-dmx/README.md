@@ -262,7 +262,7 @@ export type RGBIO = {
   blue: number; // 0-255
   intensity: number; // 0-255
   opacity: number; // 0.0-1.0, required
-  blendMode: BlendMode; // required, enum: 'replace', 'add', 'multiply', 'overlay'
+  blendMode: BlendMode; // required, enum: 'replace', 'add', 'multiply', 'overlay', 'mix'
 
   pan?: number;
   tilt?: number;

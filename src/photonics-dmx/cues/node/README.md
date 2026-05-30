@@ -43,29 +43,31 @@ node/
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `NodeCueCompiler`            | Compiles `YargNodeCueDefinition` / `AudioNodeCueDefinition` to `CompiledYargCue` / `CompiledAudioCue`                    |
 | `EffectCompiler`             | Compiles `YargEffectDefinition` / `AudioEffectDefinition` to executable effect                                           |
+| `AbstractGraphBuilder`       | Shared compile core both compilers extend: map build, endpoint/reachability/unreachable-action checks via per-compiler hooks |
+| `CompilationError`           | Unified base error; `NodeCueCompilationError` / `EffectCompilationError` are thin back-compat subclasses                 |
 | `sharedActionNodeValidation` | Shared structural checks for action targets, set-position, set-color, and motion-pattern payloads used by both compilers |
-| `GraphCompiler`              | Facade that delegates to NodeCueCompiler and EffectCompiler for cues and effects                                         |
 | `ActionEffectFactory`        | Builds concrete Effect objects from ActionNode config (color, timing, targets)                                           |
 
 ### loader/
 
-| File            | Role                                                                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `NodeCueLoader` | Loads cue JSON from `yarg/` and `audio/` dirs; validates with AJV; watches via chokidar; registers with YargCueRegistry / AudioCueRegistry |
-| `EffectLoader`  | Loads effect JSON; validates; watches; registers with EffectRegistry                                                                       |
+| File                 | Role                                                                                                                                       |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BaseNodeFileLoader` | Shared base for both loaders: directory layout, chokidar watching, per-mode summary bookkeeping, and path sandboxing                        |
+| `NodeCueLoader`      | Extends `BaseNodeFileLoader`: loads cue JSON from `yarg/` and `audio/` dirs; validates with AJV; registers with YargCueRegistry / AudioCueRegistry |
+| `EffectLoader`       | Extends `BaseNodeFileLoader`: loads effect JSON; validates; registers with EffectRegistry                                                  |
 
 ### runtime/
 
 | File                    | Role                                                                                                                          |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `NodeExecutionEngine`   | Central execution: evaluates logic nodes, resolves values, dispatches actions to sequencer                                    |
-| `EffectExecutionEngine` | Executes effect definitions (used when an Action references a reusable effect)                                                |
+| `BaseNodeExecutionEngine` | Shared node dispatcher both engines extend (action/logic/for-each/delay/cancel); cue-vs-effect differences via template-method hooks |
+| `NodeExecutionEngine`   | Cue execution (extends `BaseNodeExecutionEngine`): strict revisit policy, cue/group variable stores, effect-raiser dispatch         |
+| `EffectExecutionEngine` | Effect execution (extends `BaseNodeExecutionEngine`): relaxed revisit policy, effect-local parameter store, idle tracking           |
 | `GraphExecutionEngine`  | Unified engine for cue/effect graphs; wraps NodeExecutionEngine/EffectExecutionEngine, queuing, state machine                 |
 | `GraphExecutionPolicy`  | Policy for GraphExecutionEngine (cue vs effect entry events, queuing, revisit)                                                |
 | `graphActionHelpers`    | Small shared pieces for homogeneous set-color chains (visit marking, step collection, effect-factory argument mapping)        |
 | `CueSession`            | Per-cue session state: variable stores, first-submission policy, cue-started flag                                             |
 | `ExecutionStateMachine` | Lifecycle phases (IDLE, RUNNING, BLOCKED, COMPLETED, CANCELLED) per context                                                   |
-| `CompiledEffectIndex`   | Cache of compiled effects for reuse across cues when loader provides it                                                       |
 | `YargNodeCue`           | Runtime cue instance for YARG lighting; receives game events, drives GraphExecutionEngine                                     |
 | `YargMotionNodeCue`     | YARG motion program runtime (parallel with lighting; same graph execution model)                                              |
 | `BaseAudioNodeCue`      | Shared audio graph execution (events, triggers, variables, `NodeExecutionEngine`) for lighting and motion                     |
@@ -111,6 +113,10 @@ Compilers additionally enforce graph shape: cues require actions reachable from 
 effects require effect-listener entry points. Shared physical action rules (targets, set-position, set-color,
 motion-pattern) live in `sharedActionNodeValidation.ts` so cues and effects stay aligned. Cues still differ from
 effects in revisit/reachability rules and entry wiring (see `GraphExecutionPolicy` and compiler reachability starts).
+
+Effect files run the same graph-level semantic checks as cue files — logic-only cycle detection (`detectCycles`)
+and conditional literal-vs-variable `validValues` checks (`checkConditionalValidValues`), via `checkEffectSemantics`
+in `validation.ts` — so an invalid effect graph is rejected at validation time just like an invalid cue graph.
 
 ## Related
 
