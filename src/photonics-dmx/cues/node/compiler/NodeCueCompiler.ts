@@ -4,40 +4,31 @@ import {
   AudioEventNodeUnion,
   AudioNodeCueDefinition,
   BaseEventNode,
-  Connection,
   createDefaultActionTiming,
-  EventDefinition,
-  EventRaiserNode,
-  EventListenerNode,
   EffectRaiserNode,
-  LogicNode,
   VariableDefinition,
   YargEventNode,
   YargNodeCueDefinition,
   ValueSource,
 } from '../../types/nodeCueTypes'
-import { createLogger } from '../../../../shared/logger'
-import { validateSharedActionNodePayload } from './sharedActionNodeValidation'
+import { AbstractGraphBuilder, CompiledGraphBase } from './AbstractGraphBuilder'
+import { CompilationError } from './CompilationError'
 
-const log = createLogger('NodeCueCompiler')
-
-export class NodeCueCompilationError extends Error {
+/**
+ * Error thrown by {@link NodeCueCompiler} when a cue graph is invalid. A
+ * {@link CompilationError} subclass so callers can distinguish cue-compile
+ * failures from effect-compile failures via `instanceof` / `error.name`.
+ */
+export class NodeCueCompilationError extends CompilationError {
   constructor(message: string) {
     super(message)
     this.name = 'NodeCueCompilationError'
   }
 }
 
-export interface CompiledNodeCue<TEvent extends BaseEventNode> {
+export interface CompiledNodeCue<TEvent extends BaseEventNode> extends CompiledGraphBase<TEvent> {
   definition: YargNodeCueDefinition | AudioNodeCueDefinition
-  eventMap: Map<string, TEvent>
-  actionMap: Map<string, ActionNode>
-  logicMap: Map<string, LogicNode>
-  eventRaiserMap: Map<string, EventRaiserNode>
-  eventListenerMap: Map<string, EventListenerNode>
   effectRaiserMap: Map<string, EffectRaiserNode>
-  eventDefinitions: EventDefinition[]
-  adjacency: Map<string, Connection[]>
   /** Group-level variable definitions; set by loader from file.group.variables */
   groupVariables?: VariableDefinition[]
 }
@@ -70,7 +61,7 @@ export const calculateActionDuration = (action: ActionNode): number => {
   )
 }
 
-export class NodeCueCompiler {
+export class NodeCueCompiler extends AbstractGraphBuilder {
   public static compileYargCue(definition: YargNodeCueDefinition): CompiledYargCue {
     return this.buildCompiled(definition)
   }
@@ -90,10 +81,12 @@ export class NodeCueCompiler {
     const effectRaisers = definition.nodes.effectRaisers ?? []
     const eventDefinitions = definition.events ?? []
 
+    // Cue-specific policy: at least one event node is required.
     if (!events.length) {
       throw new NodeCueCompilationError('At least one event node is required.')
     }
 
+    // Cue-specific policy: at least one action/raiser/listener node is required.
     if (
       !actions.length &&
       !eventRaisers.length &&
@@ -111,122 +104,36 @@ export class NodeCueCompiler {
       )
     }
 
-    const eventMap = new Map(events.map((event) => [event.id, event]))
-    const actionMap = new Map(actions.map((action) => [action.id, action]))
-    const logicMap = new Map(logic.map((node) => [node.id, node]))
-    const eventRaiserMap = new Map(eventRaisers.map((raiser) => [raiser.id, raiser]))
-    const eventListenerMap = new Map(eventListeners.map((listener) => [listener.id, listener]))
+    // Cue-specific extra map: effect-raiser nodes (also valid connection endpoints).
     const effectRaiserMap = new Map(effectRaisers.map((raiser) => [raiser.id, raiser]))
-    const eventNameSet = new Set(eventDefinitions.map((e) => e.name))
 
-    // Validate that all event raiser/listener nodes reference valid registered events
-    for (const raiser of eventRaisers) {
-      if (!raiser.eventName) {
-        log.warn(`Event raiser '${raiser.label ?? raiser.id}' has no event selected.`)
-        continue // Allow empty during editing, skip validation
-      }
-      if (!eventNameSet.has(raiser.eventName)) {
-        throw new NodeCueCompilationError(
-          `Event raiser '${raiser.label ?? raiser.id}' references undefined event '${raiser.eventName}'.`,
-        )
-      }
-    }
-
-    for (const listener of eventListeners) {
-      if (!listener.eventName) {
-        log.warn(`Event listener '${listener.label ?? listener.id}' has no event selected.`)
-        continue // Allow empty during editing, skip validation
-      }
-      if (!eventNameSet.has(listener.eventName)) {
-        throw new NodeCueCompilationError(
-          `Event listener '${listener.label ?? listener.id}' references undefined event '${listener.eventName}'.`,
-        )
-      }
-    }
-
-    // Ensure all connection endpoints exist
-    for (const conn of definition.connections) {
-      if (
-        !eventMap.has(conn.from) &&
-        !actionMap.has(conn.from) &&
-        !logicMap.has(conn.from) &&
-        !eventRaiserMap.has(conn.from) &&
-        !eventListenerMap.has(conn.from) &&
-        !effectRaiserMap.has(conn.from)
-      ) {
-        throw new NodeCueCompilationError(`Connection 'from' id '${conn.from}' does not exist.`)
-      }
-      if (
-        !eventMap.has(conn.to) &&
-        !actionMap.has(conn.to) &&
-        !logicMap.has(conn.to) &&
-        !eventRaiserMap.has(conn.to) &&
-        !eventListenerMap.has(conn.to) &&
-        !effectRaiserMap.has(conn.to)
-      ) {
-        throw new NodeCueCompilationError(`Connection 'to' id '${conn.to}' does not exist.`)
-      }
-    }
-
-    // Build adjacency for all nodes
-    const adjacency = new Map<string, Connection[]>()
-    for (const conn of definition.connections) {
-      const list = adjacency.get(conn.from) ?? []
-      list.push(conn)
-      adjacency.set(conn.from, list)
-    }
-
-    // Validate actions and reachability (event listeners don't need to be reachable from events)
-    const reachableActions = new Set<string>()
-    const visited = new Set<string>()
-
-    const traverseReachability = (nodeId: string): void => {
-      if (visited.has(nodeId)) return
-      visited.add(nodeId)
-      if (actionMap.has(nodeId)) {
-        reachableActions.add(nodeId)
-      }
-      const edges = adjacency.get(nodeId) ?? []
-      for (const edge of edges) {
-        traverseReachability(edge.to)
-      }
-    }
-
-    // Start from system event nodes
-    for (const event of events) {
-      traverseReachability(event.id)
-    }
-
-    // Also start from event listeners (they are triggered by runtime events)
-    for (const listener of eventListeners) {
-      traverseReachability(listener.id)
-    }
-
-    for (const action of actions) {
-      this.validateAction(action)
-    }
-
-    const unreachableActions = actions.filter((action) => !reachableActions.has(action.id))
-    if (unreachableActions.length > 0) {
-      throw new NodeCueCompilationError(
-        `Action node(s) ${unreachableActions.map((node) => `'${node.label ?? node.id}'`).join(', ')} are not reachable from any event.`,
-      )
-    }
+    const core = this.buildCompiledCore<TEvent>(
+      { events, actions, logic, eventRaisers, eventListeners },
+      definition.connections,
+      eventDefinitions,
+      {
+        createError: (message) => new NodeCueCompilationError(message),
+        extraEndpointMaps: [effectRaiserMap],
+        // Reachability starts from every event then every event listener
+        // (listeners are triggered by runtime events).
+        reachabilityEntryIds: [
+          ...events.map((event) => event.id),
+          ...eventListeners.map((listener) => listener.id),
+        ],
+        unreachableSuffix: 'any event',
+      },
+    )
 
     return {
       definition,
-      eventMap,
-      actionMap,
-      logicMap,
-      eventRaiserMap,
-      eventListenerMap,
+      eventMap: core.eventMap,
+      actionMap: core.actionMap,
+      logicMap: core.logicMap,
+      eventRaiserMap: core.eventRaiserMap,
+      eventListenerMap: core.eventListenerMap,
       effectRaiserMap,
       eventDefinitions,
-      adjacency,
+      adjacency: core.adjacency,
     }
-  }
-
-  private static validateAction(action: ActionNode): void {
-    validateSharedActionNodePayload(action, (message) => new NodeCueCompilationError(message))
   }
 }

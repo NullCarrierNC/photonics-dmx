@@ -37,7 +37,7 @@ export type Color =
 /**
  * Represents how a color should blend with colors on lower layers
  */
-export type BlendMode = 'replace' | 'add' | 'multiply' | 'overlay'
+export type BlendMode = 'replace' | 'add' | 'multiply' | 'overlay' | 'mix'
 
 /**
  * Represents brightness levels for lights

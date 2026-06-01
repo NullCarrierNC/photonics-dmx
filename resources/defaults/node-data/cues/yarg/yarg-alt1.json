@@ -454,7 +454,7 @@
               },
               "blendMode": {
                 "source": "literal",
-                "value": "replace"
+                "value": "mix"
               },
               "startCondition": {
                 "source": "literal",

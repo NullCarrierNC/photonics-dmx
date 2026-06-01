@@ -1,4 +1,5 @@
-import { RGBIO, Transition } from '../../types'
+import { RGBIO, Transition, BlendMode } from '../../types'
+import { BLEND_MODE_OPTIONS } from '../../constants/options'
 
 import { getEasingFunction } from '../../easing'
 
@@ -678,6 +679,18 @@ export class LightTransitionController {
         out.blue = this.blendOverlay(current.blue, newState.blue, opacity)
         out.intensity = this.blendOverlay(current.intensity, newState.intensity, opacity)
         break
+
+      case 'mix': {
+        // Alpha crossfade: interpolate between the underlying composited colour and this
+        // layer's colour by opacity. opacity 0 → underlying, 1 → this layer, between →
+        // a smooth blend of the two (a true colour crossfade, not a fade up from black).
+        const a = Math.max(0, Math.min(1, opacity))
+        out.red = Math.round(current.red * (1 - a) + newState.red * a)
+        out.green = Math.round(current.green * (1 - a) + newState.green * a)
+        out.blue = Math.round(current.blue * (1 - a) + newState.blue * a)
+        out.intensity = Math.round(current.intensity * (1 - a) + newState.intensity * a)
+        break
+      }
     }
 
     // Handle optional properties: carry forward from the lower layer when the incoming layer omits them
@@ -849,7 +862,7 @@ export class LightTransitionController {
     corrected.opacity = Math.max(0, Math.min(1, corrected.opacity ?? 1))
 
     // Ensure blend mode is valid
-    if (!['replace', 'add', 'multiply', 'overlay'].includes(corrected.blendMode ?? '')) {
+    if (!BLEND_MODE_OPTIONS.includes(corrected.blendMode as BlendMode)) {
       corrected.blendMode = 'replace'
     }
 

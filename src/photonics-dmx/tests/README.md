@@ -121,7 +121,7 @@ The system uses an opacity-based blending approach:
 ### Opacity-Based System
 
 - **opacity**: 0.0 to 1.0, controls contribution strength
-- **blendMode**: How colors interact ('replace', 'add', 'multiply', 'overlay')
+- **blendMode**: How colors interact ('replace', 'add', 'multiply', 'overlay', 'mix' = alpha crossfade)
 - **Intuitive**: 0.5 opacity = 50% contribution
 - **Predictable**: Colors blend naturally based on blend mode
 

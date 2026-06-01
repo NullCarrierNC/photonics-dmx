@@ -214,6 +214,7 @@ export class GraphExecutionEngine {
       this.callbacks,
       () => this.session.consumeInitialClearPolicy(),
       this.getContextLifecycleCallback(),
+      this.policy.revisitPolicy,
     )
     return this.nodeEngine
   }
@@ -236,6 +237,7 @@ export class GraphExecutionEngine {
       undefined,
       this.callbacks,
       () => this.session.consumeInitialClearPolicy(),
+      this.policy.revisitPolicy,
     )
     return this.effectEngine
   }

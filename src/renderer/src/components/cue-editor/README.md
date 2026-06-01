@@ -54,7 +54,7 @@ The editor communicates with the main process via:
 It also subscribes to two main → renderer push channels for live editor feedback during cue execution:
 
 - **`RENDERER_RECEIVE.NODE_EXECUTION`** – Node activation/deactivation events emitted by the runtime engines; consumed by `useActiveNodes` to highlight currently-running nodes in the canvas.
-- **`RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR`** – Per-node runtime errors emitted by `EffectExecutionEngine` (and surfaced in `DebugPanel`); consumed by `useErrorNodes` to flag failing nodes.
+- **`RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR`** – Per-node runtime errors emitted by the runtime engines (`NodeExecutionEngine` / `EffectExecutionEngine`, both via their shared `BaseNodeExecutionEngine`, plus `BaseAudioNodeCue`) and surfaced in `DebugPanel`; consumed by `useErrorNodes` to flag failing nodes.
 
 See `src/shared/ipcChannels.ts` for channel constants.
 

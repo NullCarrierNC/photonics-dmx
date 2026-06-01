@@ -12,7 +12,7 @@ import {
   TrackedLight,
 } from '../../../types'
 import { ValueSource, VariableType } from '../../types/nodeCueTypes'
-import { COLOR_OPTIONS, LIGHT_TARGET_OPTIONS } from '../../../constants/options'
+import { BLEND_MODE_OPTIONS, COLOR_OPTIONS, LIGHT_TARGET_OPTIONS } from '../../../constants/options'
 import { ExecutionContext } from './ExecutionContext'
 import { VariableValue } from './executionTypes'
 
@@ -165,8 +165,7 @@ export function resolveBlendMode(
 ): BlendMode | undefined {
   if (!source) return undefined
   const value = resolveValue('string', source, context)
-  const valid: BlendMode[] = ['replace', 'add', 'multiply', 'overlay']
-  return valid.includes(value as BlendMode) ? (value as BlendMode) : 'replace'
+  return BLEND_MODE_OPTIONS.includes(value as BlendMode) ? (value as BlendMode) : 'replace'
 }
 
 /**

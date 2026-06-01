@@ -2,16 +2,12 @@
  * Owns per-activation runtime state for a node cue instance. Responsibilities:
  * - Cue- and group-level variable stores (shared with the execution engine).
  * - First-submission policy: whether the next effect submission should use setEffect (consumed once per activation).
- * - cue-started fired flag and lifecycle callback that drives ExecutionStateMachine per context (started/completed/cancelled).
+ * - cue-started fired flag.
  * - resetForStop(): clears cue-level state on stop; this instance's groupLevelVarStore is preserved so state can accumulate across activations of this cue (one CueSession per YargNodeCue instance).
  */
 
 import { VariableValue } from './executionTypes'
 import type { VariableDefinition } from '../../types/nodeCueTypes'
-import { ExecutionStateMachine } from './ExecutionStateMachine'
-import { ExecutionPhase } from './executionTypes'
-
-export type ContextLifecycleEvent = 'started' | 'completed' | 'cancelled'
 
 export class CueSession {
   private readonly cueLevelVarStore = new Map<string, VariableValue>()
@@ -20,8 +16,6 @@ export class CueSession {
   /** Shared ref for engine: when true, next effect submission uses setEffect; engine sets .use = false when consumed. */
   private readonly firstSubmissionUsesSetEffectRef = { use: false }
   private clearedForThisActivation = false
-  /** Per-context state machines when lifecycle callback is used  */
-  private readonly contextStateMachines = new Map<string, ExecutionStateMachine>()
 
   getCueLevelVarStore(): Map<string, VariableValue> {
     return this.cueLevelVarStore
@@ -56,30 +50,6 @@ export class CueSession {
   setFirstSubmissionUsesSetEffect(): void {
     this.firstSubmissionUsesSetEffectRef.use = true
     this.clearedForThisActivation = true
-  }
-
-  /**
-   * Returns a callback for the engine to report context lifecycle so we can drive ExecutionStateMachine.
-   * Each context gets a state machine: started -> RUNNING, completed -> COMPLETED, cancelled -> CANCELLED.
-   */
-  getContextLifecycleCallback(): (contextId: string, event: ContextLifecycleEvent) => void {
-    return (contextId: string, event: ContextLifecycleEvent) => {
-      if (event === 'started') {
-        const sm = new ExecutionStateMachine()
-        sm.transitionTo(ExecutionPhase.RUNNING)
-        this.contextStateMachines.set(contextId, sm)
-        return
-      }
-      const sm = this.contextStateMachines.get(contextId)
-      if (sm) {
-        if (event === 'completed') {
-          sm.transitionTo(ExecutionPhase.COMPLETED)
-        } else if (event === 'cancelled') {
-          sm.transitionTo(ExecutionPhase.CANCELLED)
-        }
-        this.contextStateMachines.delete(contextId)
-      }
-    }
   }
 
   hasCueStartedFired(): boolean {
@@ -145,6 +115,5 @@ export class CueSession {
     this.cueStartedFired = false
     this.firstSubmissionUsesSetEffectRef.use = false
     this.clearedForThisActivation = false
-    this.contextStateMachines.clear()
   }
 }
