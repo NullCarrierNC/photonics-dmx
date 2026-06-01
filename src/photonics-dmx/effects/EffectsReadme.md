@@ -1,38 +1,52 @@
 # Effects
 
-Effects represent a group of one or more transitions (changes to light states) that are applied to
-one or more lights. These are the building blocks of cues.
+Legacy programmatic effect builders. An effect is a group of one or more transitions (timed changes
+to light state) applied to one or more lights; each builder returns an `Effect` object the sequencer
+can run.
+
+These builders predate the node-based cue system and are not the primary way cues are authored. The
+node-graph system in [../cues/node/README.md](../cues/node/README.md) is the primary mechanism —
+cues and reusable effects are defined as JSON graphs and compiled at runtime. The builders here
+remain in use by a small number of non-node cues and handlers (see [Usage](#usage)); the rest are
+exported from `effects/index.ts` but not currently wired into any cue.
 
 ## Base Interface
 
-All effects extend the base `IEffect` interface which provides common properties:
+All effect params extend `IEffect`:
 
 ```typescript
 interface IEffect {
-  /** The lights to apply the effect to */
-  lights: TrackedLight[]
-  /** The layer to apply the effect on */
-  layer?: number
-  /** When to start the effect */
-  waitFor?: WaitCondition
-  /** How long to wait before starting */
-  forTime?: number
-  /** When to end the effect */
-  waitUntil?: WaitCondition
-  /** How long to wait before ending */
-  untilTime?: number
-  /** The easing function to use for transitions */
-  easing?: EasingType | string
-  /** The colour configuration for the effect (optional) */
-  color?: RGBIO
-  /** Duration of the effect (optional) */
-  duration?: number
+  lights: TrackedLight[] // lights to apply the effect to
+  layer?: number // layer to apply the effect on
+  waitFor?: WaitCondition // when to start the effect
+  forTime?: number // delay before starting (ms)
+  waitUntil?: WaitCondition // when to end the effect
+  untilTime?: number // delay before ending (ms)
+  easing?: EasingType | string // easing function for transitions
+  color?: RGBIO // colour configuration (optional)
+  duration?: number // effect duration (optional)
 }
 ```
 
+Each builder returns an `Effect` with an `id`, a `description`, and a `transitions` array that
+defines how the effect behaves over time.
+
+## Usage
+
+| Builder                                                                                              | Used by                                                                                |
+| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `getEffectSingleColor`                                                                               | `cueHandlers/Rb3MenuCueHandler.ts`, `processors/AudioCueProcessor.ts`, `cues/menuCues.ts` |
+| `getEffectFlashColor`                                                                                | `cues/menuCues.ts`                                                                     |
+| `getSweepEffect`                                                                                     | `cues/menuCues.ts`, `cues/searchlightsCues.ts`                                         |
+| `getEffectCrossFadeColors`                                                                           | exported, not currently used                                                           |
+| `getEffectBlackout`                                                                                  | exported, not currently used                                                           |
+| `getEffectFadeInColorFadeOut`                                                                        | exported, not currently used                                                           |
+| `getEffectCycleLights`                                                                               | exported, not currently used                                                           |
+| `getEffectClockwiseRotation` / `getEffectCounterClockwiseRotation` / `getEffectDualModeRotation` / `getEffectAlternatingPatterns` | exported, not currently used                              |
+
 ## Available Effects
 
-### Single Color Effect
+### Single Color (`getEffectSingleColor`)
 
 Sets all specified lights to a single colour.
 
@@ -45,7 +59,7 @@ interface SingleColorEffectParams extends IEffect {
 }
 ```
 
-### Cross Fade Colors Effect
+### Cross Fade Colors (`getEffectCrossFadeColors`)
 
 Transitions lights from one colour to another.
 
@@ -66,7 +80,7 @@ interface CrossFadeColorsEffectParams extends IEffect {
 }
 ```
 
-### Flash Color Effect
+### Flash Color (`getEffectFlashColor`)
 
 Flashes lights with a specified colour.
 
@@ -91,7 +105,7 @@ interface FlashColorEffectParams extends IEffect {
 }
 ```
 
-### Blackout Effect
+### Blackout (`getEffectBlackout`)
 
 Turns off all specified lights.
 
@@ -102,7 +116,7 @@ interface BlackoutEffectParams extends IEffect {
 }
 ```
 
-### Fade In Color Fade Out Effect
+### Fade In Color Fade Out (`getEffectFadeInColorFadeOut`)
 
 Fades in to a colour and then fades out.
 
@@ -119,9 +133,10 @@ interface FadeInColorFadeOutEffectParams extends IEffect {
 }
 ```
 
-### Sweep Effect
+### Sweep (`getSweepEffect`)
 
-Creates a sweeping motion across the lights or light groups.
+Creates a sweeping motion across the lights or light groups. Accepts either
+`SweepEffectSingleParams` or `SweepEffectGroupedParams` as a union.
 
 ```typescript
 interface SweepEffectSingleParams extends IEffect {
@@ -133,9 +148,9 @@ interface SweepEffectSingleParams extends IEffect {
   low: RGBIO
   /** Total time (ms) for one complete sweep across all groups */
   sweepTime: number
-  /** Desired fade‐in duration (ms) */
+  /** Desired fade-in duration (ms) */
   fadeInDuration: number
-  /** Desired fade‐out duration (ms) */
+  /** Desired fade-out duration (ms) */
   fadeOutDuration: number
   /** Percentage (0 to 100) by which subsequent lights overlap. 0 means no overlap */
   lightOverlap?: number
@@ -152,9 +167,9 @@ interface SweepEffectGroupedParams {
   low: RGBIO
   /** Total time (ms) for one complete sweep across all groups */
   sweepTime: number
-  /** Desired fade‐in duration (ms) */
+  /** Desired fade-in duration (ms) */
   fadeInDuration: number
-  /** Desired fade‐out duration (ms) */
+  /** Desired fade-out duration (ms) */
   fadeOutDuration: number
   /** Percentage (0 to 100) by which subsequent lights overlap. 0 means no overlap */
   lightOverlap?: number
@@ -169,9 +184,7 @@ interface SweepEffectGroupedParams {
 }
 ```
 
-**Note:** The `getSweepEffect` function accepts either `SweepEffectSingleParams` or `SweepEffectGroupedParams` as a union type.
-
-### Cycle Lights Effect
+### Cycle Lights (`getEffectCycleLights`)
 
 Sequentially activates one light at a time through the provided array.
 
@@ -190,6 +203,18 @@ interface CycleLightsEffectParams extends IEffect {
 }
 ```
 
+### Rotation Patterns (`effectRotationPatterns.ts`)
+
+Beat-driven patterns that move an active colour through a set of lights. `RotationPatternEffectParams`
+(active/base colour, `beatsPerCycle`, `startOffset`, `reverse`, plus the standard wait conditions)
+backs the rotation builders; `DualModeRotationEffectParams` adds a solid/rotating mode switch and
+`AlternatingPatternEffectParams` alternates between two light sets.
+
+- `getEffectClockwiseRotation` — advances the active light in index order.
+- `getEffectCounterClockwiseRotation` — advances in reverse index order.
+- `getEffectDualModeRotation` — switches between a solid colour and a rotating pattern.
+- `getEffectAlternatingPatterns` — alternates the active colour between two light sets.
+
 ## Usage Example
 
 ```typescript
@@ -200,9 +225,3 @@ const effect = getEffectSingleColor({
   easing: EasingType.SIN_OUT,
 })
 ```
-
-Each effect function returns an `Effect` object that can be applied to the lighting system. The effect object contains:
-
-- `id`: A unique identifier for the effect
-- `description`: A description of what the effect does
-- `transitions`: An array of transitions that define how the effect behaves over time

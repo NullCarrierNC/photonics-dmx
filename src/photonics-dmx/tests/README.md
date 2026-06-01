@@ -131,6 +131,7 @@ The system uses an opacity-based blending approach:
 - **add**: Adds to lower layer colors (good for additive blending)
 - **multiply**: Multiplies with lower layer colors (good for darkening)
 - **overlay**: Combines multiply and screen blending (good for contrast)
+- **mix**: Alpha-crossfades between the lower layers and this layer by opacity
 
 ## For Proper Additive Blending (Blue + Green = Cyan)
 
