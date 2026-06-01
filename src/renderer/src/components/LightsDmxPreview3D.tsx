@@ -154,14 +154,42 @@ const LensFlareBillboard: React.FC<{
   </Billboard>
 )
 
-const FixtureBeam: React.FC<{
+type FixtureBeamProps = {
   position: [number, number, number]
   direction: StageVector3
   rgb: { r: number; g: number; b: number }
   dimmer01: number
   isMovingHead: boolean
   flareTexture: THREE.Texture
-}> = ({ position, direction, rgb, dimmer01, isMovingHead, flareTexture }) => {
+}
+
+/**
+ * Value-equality for the beam props. The parent recomputes rgb/direction/position arrays every
+ * DMX frame, so reference comparison never matches; comparing by value lets a fixture whose
+ * channels did not change skip re-rendering (and re-allocating its THREE objects) that frame.
+ */
+const beamPropsEqual = (a: FixtureBeamProps, b: FixtureBeamProps): boolean =>
+  a.isMovingHead === b.isMovingHead &&
+  a.flareTexture === b.flareTexture &&
+  a.dimmer01 === b.dimmer01 &&
+  a.position[0] === b.position[0] &&
+  a.position[1] === b.position[1] &&
+  a.position[2] === b.position[2] &&
+  a.direction.x === b.direction.x &&
+  a.direction.y === b.direction.y &&
+  a.direction.z === b.direction.z &&
+  a.rgb.r === b.rgb.r &&
+  a.rgb.g === b.rgb.g &&
+  a.rgb.b === b.rgb.b
+
+const FixtureBeam = React.memo(function FixtureBeam({
+  position,
+  direction,
+  rgb,
+  dimmer01,
+  isMovingHead,
+  flareTexture,
+}: FixtureBeamProps) {
   const { scene } = useThree()
   const { r, g, b } = rgb
   const { x: dx, y: dy, z: dz } = direction
@@ -221,7 +249,93 @@ const FixtureBeam: React.FC<{
       <LensFlareBillboard color={color} opacity={flareOpacity} texture={flareTexture} />
     </group>
   )
-}
+}, beamPropsEqual)
+
+/**
+ * Static scene elements (background, ambient lights, floor, grid, labels, TV, audience, truss bar).
+ * None depend on DMX values, so this is memoized on the layout-derived scalars and does not
+ * re-render on every DMX frame the way the fixtures do.
+ */
+const StaticStage = React.memo(function StaticStage({
+  isStacked,
+  audienceZ,
+  downstageLabelZ,
+  audienceLabelZ,
+}: {
+  isStacked: boolean
+  audienceZ: number
+  downstageLabelZ: number
+  audienceLabelZ: number
+}) {
+  return (
+    <>
+      <color attach="background" args={['#0a0a12']} />
+      <ambientLight intensity={0.35} />
+      <hemisphereLight args={['#606080', '#202020', 0.4]} />
+
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[24, 24]} />
+        <meshStandardMaterial color="#1a1a22" roughness={0.85} metalness={0.05} />
+      </mesh>
+
+      <Grid
+        position={[0, 0.01, 0]}
+        args={[20, 20]}
+        cellSize={0.5}
+        cellThickness={0.4}
+        sectionSize={2}
+        sectionThickness={0.8}
+        fadeDistance={22}
+        fadeStrength={1}
+        infiniteGrid
+        sectionColor="#444466"
+        cellColor="#2a2a38"
+      />
+
+      <Suspense fallback={null}>
+        <FloorLabel text="Upstage" position={[0, 0.02, -3]} />
+        <FloorLabel text="Downstage" position={[0, 0.02, downstageLabelZ]} />
+        <FloorLabel text="Audience" position={[0, 0.02, audienceLabelZ]} />
+        <FloorLabel text="Stage Right" position={[-3.2, 0.02, 0]} yawRad={Math.PI / 2} />
+        <FloorLabel text="Stage Left" position={[3.2, 0.02, 0]} yawRad={-Math.PI / 2} />
+      </Suspense>
+
+      {isStacked && (
+        <mesh position={[0, 2.35, 0]} castShadow>
+          <boxGeometry args={[9, 0.22, 0.42]} />
+          <meshStandardMaterial color="#5a5a6a" roughness={0.55} metalness={0.12} />
+        </mesh>
+      )}
+
+      <group position={[0, 0, -1]}>
+        <mesh position={[0, 1.5, -0.02]} castShadow>
+          <boxGeometry args={[2.9, 1.5, 0.06]} />
+          <meshStandardMaterial color="#1c1c24" roughness={0.75} metalness={0.1} />
+        </mesh>
+        <mesh position={[0, 1.5, 0]} castShadow>
+          <boxGeometry args={[2.8, 1.4, 0.08]} />
+          <meshStandardMaterial
+            color="#1a2840"
+            emissive="#1a2840"
+            emissiveIntensity={0.6}
+            roughness={0.4}
+          />
+        </mesh>
+        <mesh position={[0, 0.45, 0]} castShadow>
+          <cylinderGeometry args={[0.06, 0.06, 0.9, 12]} />
+          <meshStandardMaterial color="#1c1c24" roughness={0.75} metalness={0.1} />
+        </mesh>
+      </group>
+
+      {[0, 1, 2, 3, 4].map((i) => (
+        <mesh key={`aud-${i}`} position={[-1.8 + i * 0.9, 0.35, audienceZ]}>
+          <cylinderGeometry args={[0.14, 0.16, 0.7, 10]} />
+          <meshStandardMaterial color="#7a7a8c" roughness={0.65} metalness={0.08} />
+        </mesh>
+      ))}
+    </>
+  )
+})
 
 function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
   const layoutId = lightingConfig.lightLayout?.id ?? 'front'
@@ -321,70 +435,12 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
 
   return (
     <>
-      <color attach="background" args={['#0a0a12']} />
-      <ambientLight intensity={0.35} />
-      <hemisphereLight args={['#606080', '#202020', 0.4]} />
-
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[24, 24]} />
-        <meshStandardMaterial color="#1a1a22" roughness={0.85} metalness={0.05} />
-      </mesh>
-
-      <Grid
-        position={[0, 0.01, 0]}
-        args={[20, 20]}
-        cellSize={0.5}
-        cellThickness={0.4}
-        sectionSize={2}
-        sectionThickness={0.8}
-        fadeDistance={22}
-        fadeStrength={1}
-        infiniteGrid
-        sectionColor="#444466"
-        cellColor="#2a2a38"
+      <StaticStage
+        isStacked={isStacked}
+        audienceZ={audienceZ}
+        downstageLabelZ={downstageLabelZ}
+        audienceLabelZ={audienceLabelZ}
       />
-
-      <Suspense fallback={null}>
-        <FloorLabel text="Upstage" position={[0, 0.02, -3]} />
-        <FloorLabel text="Downstage" position={[0, 0.02, downstageLabelZ]} />
-        <FloorLabel text="Audience" position={[0, 0.02, audienceLabelZ]} />
-        <FloorLabel text="Stage Right" position={[-3.2, 0.02, 0]} yawRad={Math.PI / 2} />
-        <FloorLabel text="Stage Left" position={[3.2, 0.02, 0]} yawRad={-Math.PI / 2} />
-      </Suspense>
-
-      {isStacked && (
-        <mesh position={[0, 2.35, 0]} castShadow>
-          <boxGeometry args={[9, 0.22, 0.42]} />
-          <meshStandardMaterial color="#5a5a6a" roughness={0.55} metalness={0.12} />
-        </mesh>
-      )}
-
-      <group position={[0, 0, -1]}>
-        <mesh position={[0, 1.5, -0.02]} castShadow>
-          <boxGeometry args={[2.9, 1.5, 0.06]} />
-          <meshStandardMaterial color="#1c1c24" roughness={0.75} metalness={0.1} />
-        </mesh>
-        <mesh position={[0, 1.5, 0]} castShadow>
-          <boxGeometry args={[2.8, 1.4, 0.08]} />
-          <meshStandardMaterial
-            color="#1a2840"
-            emissive="#1a2840"
-            emissiveIntensity={0.6}
-            roughness={0.4}
-          />
-        </mesh>
-        <mesh position={[0, 0.45, 0]} castShadow>
-          <cylinderGeometry args={[0.06, 0.06, 0.9, 12]} />
-          <meshStandardMaterial color="#1c1c24" roughness={0.75} metalness={0.1} />
-        </mesh>
-      </group>
-
-      {[0, 1, 2, 3, 4].map((i) => (
-        <mesh key={`aud-${i}`} position={[-1.8 + i * 0.9, 0.35, audienceZ]}>
-          <cylinderGeometry args={[0.14, 0.16, 0.7, 10]} />
-          <meshStandardMaterial color="#7a7a8c" roughness={0.65} metalness={0.08} />
-        </mesh>
-      ))}
 
       {adjustedItems.map((it) => {
         const rgb = getDmxPreviewLightColor(it.light, dmxValues, true)
@@ -456,13 +512,31 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
   )
 }
 
-const FixtureBody: React.FC<{
+type FixtureBodyProps = {
   position: [number, number, number]
   rgb: { r: number; g: number; b: number }
   movingHead: boolean
   /** Upside-down for truss / bottom-of-bar so the body reads as hanging. */
   fixtureOrientation?: 'up' | 'down'
-}> = ({ position, rgb, movingHead, fixtureOrientation = 'up' }) => {
+}
+
+/** Value-equality for the fixture body; see {@link beamPropsEqual} for why reference compare is insufficient. */
+const bodyPropsEqual = (a: FixtureBodyProps, b: FixtureBodyProps): boolean =>
+  a.movingHead === b.movingHead &&
+  (a.fixtureOrientation ?? 'up') === (b.fixtureOrientation ?? 'up') &&
+  a.position[0] === b.position[0] &&
+  a.position[1] === b.position[1] &&
+  a.position[2] === b.position[2] &&
+  a.rgb.r === b.rgb.r &&
+  a.rgb.g === b.rgb.g &&
+  a.rgb.b === b.rgb.b
+
+const FixtureBody = React.memo(function FixtureBody({
+  position,
+  rgb,
+  movingHead,
+  fixtureOrientation = 'up',
+}: FixtureBodyProps) {
   const c = rgbToThreeColor(rgb)
   const flip = fixtureOrientation === 'down' ? Math.PI : 0
   return (
@@ -498,7 +572,7 @@ const FixtureBody: React.FC<{
       </group>
     </group>
   )
-}
+}, bodyPropsEqual)
 
 function SceneEffects() {
   return (
