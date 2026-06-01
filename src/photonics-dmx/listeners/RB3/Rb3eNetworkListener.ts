@@ -97,6 +97,8 @@ export class Rb3eNetworkListener extends EventEmitter {
   private _currentBrightness: 'low' | 'medium' | 'high' = 'medium'
   // Track persistent strobe state across all packet types
   private _currentStrobeState: StrobeState = 'Strobe_Off'
+  // Track persistent fog state (StageKit FogOn/FogOff commands) across all packet types
+  private _currentFogState: boolean = false
   // Packet counter for debugging
   private packetCount = 0
 
@@ -257,7 +259,7 @@ export class Rb3eNetworkListener extends EventEmitter {
         harmony2Note: 0,
         lightingCue: 'NoCue',
         postProcessing: 'Default',
-        fogState: false,
+        fogState: this._currentFogState, // Use persistent fog state
         strobeState: this._currentStrobeState, // Use persistent strobe state
         performer: 0,
         trackMode: 'tracked',
@@ -612,9 +614,11 @@ export class Rb3eNetworkListener extends EventEmitter {
     // Parse RB3E bytes into clean StageKit data
     const stageKitData = this.parseStageKitData(leftChannel, rightChannel)
 
-    // Update the cueData with the current persistent strobe state
-    // (parseStageKitData already updated _currentStrobeState if this was a strobe command)
+    // Update the cueData with the current persistent strobe and fog state
+    // (parseStageKitData already updated _currentStrobeState / _currentFogState if this packet
+    // was a strobe or fog command).
     cueData.strobeState = this._currentStrobeState
+    cueData.fogState = this._currentFogState
 
     this.emit('stagekit:data', stageKitData)
   }
@@ -632,6 +636,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     positions: number[]
     color: string
     brightness: 'low' | 'medium' | 'high'
+    fog: boolean
     strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off'
     timestamp: number
   } {
@@ -650,6 +655,14 @@ export class Rb3eNetworkListener extends EventEmitter {
 
     // Check for strobe effects first and update persistent state
     switch (rightChannel) {
+      case 1: // FogOn
+        this._currentFogState = true
+        color = 'off'
+        break
+      case 2: // FogOff
+        this._currentFogState = false
+        color = 'off'
+        break
       case 3: // StrobeSlow
         strobeEffect = 'slow'
         if (this._currentStrobeState !== 'Strobe_Slow') {
@@ -714,6 +727,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       positions,
       color,
       brightness: this._currentBrightness,
+      fog: this._currentFogState,
       strobeEffect,
       timestamp: Date.now(),
     }
