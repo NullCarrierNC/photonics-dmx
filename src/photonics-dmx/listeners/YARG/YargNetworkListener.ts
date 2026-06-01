@@ -8,6 +8,7 @@ import {
   Beat,
   StrobeState,
   CueType,
+  isCueType,
   lightingCueMap,
   InstrumentNoteType,
   DrumNoteType,
@@ -67,9 +68,6 @@ export class YargNetworkListener extends EventEmitter {
 
   /** Timestamp (ms) when we last forwarded an identical frame; used to throttle unchanged packets to 30 Hz. */
   private lastForwardedIdenticalAt = 0
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- log payload shape varies
-  private lastLogData: Record<string, any> | null = null
 
   // Track the last scene to detect transitions
   private lastScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | 'Practice' | null =
@@ -376,7 +374,9 @@ export class YargNetworkListener extends EventEmitter {
         postProcessing: this.getPostProcessing(postProcessingByte),
         fogState,
         strobeState: this.getStrobeState(strobeStateValue),
-        performer: 0,
+        // Union of performers currently spotlighted or singing along (PerformerByte bitmask).
+        // NOTE: verify the intended `performer` semantics against live YARG before relying on it.
+        performer: spotlight | singalong,
         spotlight,
         singalong,
         ...(cameraCutConstraint !== undefined && {
@@ -409,27 +409,6 @@ export class YargNetworkListener extends EventEmitter {
 
     this.handleSceneTransition(YargCueData.currentScene)
 
-    const logData = {
-      currentScene: YargCueData.currentScene,
-      songSection: YargCueData.songSection,
-      beatsPerMinute: YargCueData.beatsPerMinute,
-      lightingCue: YargCueData.lightingCue,
-      guitarNotes: YargCueData.guitarNotes,
-      bassNotes: YargCueData.bassNotes,
-      drumNotes: YargCueData.drumNotes,
-      keysNotes: YargCueData.keysNotes,
-      postProcessing: YargCueData.postProcessing,
-      fogState: YargCueData.fogState,
-      beat: YargCueData.beat,
-      keyframe: YargCueData.keyframe,
-      performer: YargCueData.performer,
-      strobeState: YargCueData.strobeState,
-    }
-    if (this.lastLogData && !this.isDataEqual(this.lastLogData, logData)) {
-      this.lastLogData = logData
-    }
-    this.lastLogData = logData
-
     switch (YargCueData.beat) {
       case 'Strong':
         this.cueHandler.handleBeat()
@@ -452,8 +431,8 @@ export class YargNetworkListener extends EventEmitter {
     }
 
     const cueType = YargCueData.lightingCue
-    if (cueType) {
-      this.cueHandler.handleCue(cueType as CueType, YargCueData)
+    if (cueType && isCueType(cueType)) {
+      this.cueHandler.handleCue(cueType, YargCueData)
     } else {
       log.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
     }

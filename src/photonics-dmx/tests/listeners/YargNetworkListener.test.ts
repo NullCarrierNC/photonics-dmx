@@ -187,6 +187,22 @@ describe('YargNetworkListener', () => {
     })
   })
 
+  describe('lighting cue dispatch guard (Bug #2 regression)', () => {
+    it('dispatches a known lighting cue', () => {
+      listener.processCueData({ ...defaultCueData, lightingCue: CueType.Frenzy })
+      expect(cueHandler.handleCue).toHaveBeenCalledWith(
+        CueType.Frenzy,
+        expect.objectContaining({ lightingCue: CueType.Frenzy }),
+      )
+    })
+
+    it('drops an unrecognised lighting cue value instead of dispatching it', () => {
+      listener.processCueData({ ...defaultCueData, lightingCue: 'Unknown (99)' })
+      const dispatched = (cueHandler.handleCue as jest.Mock).mock.calls.map((c) => c[0])
+      expect(dispatched).not.toContain('Unknown (99)')
+    })
+  })
+
   describe('scene transitions (song start / song end)', () => {
     it('calls notifySongStart when transitioning Menu -> Gameplay', () => {
       const notifySongStartSpy = jest.spyOn(cueHandler, 'notifySongStart')
