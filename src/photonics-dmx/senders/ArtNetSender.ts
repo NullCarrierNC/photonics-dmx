@@ -86,9 +86,9 @@ export class ArtNetSender extends BaseSender {
 
     try {
       this.lastSendTimeMs = 0
-      // First set all channels to zero (blackout)
+      // First set all channels to zero (blackout). A DMX universe is 512 channels.
       const zeroPayload: Record<number, number> = {}
-      for (let channel = 1; channel <= 255; channel++) {
+      for (let channel = 1; channel <= 512; channel++) {
         zeroPayload[channel] = 0
       }
 

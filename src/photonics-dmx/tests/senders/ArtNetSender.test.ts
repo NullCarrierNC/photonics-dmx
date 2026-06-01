@@ -1,12 +1,17 @@
 import { ArtNetSender } from '../../senders/ArtNetSender'
 
+// Shared update spy so tests can assert on the channel payload (must be `mock`-prefixed
+// to be referenceable inside the hoisted jest.mock factory).
+const mockUpdate = jest.fn()
+
 // Mock the dmx-ts library
 jest.mock('dmx-ts', () => ({
   DMX: jest.fn().mockImplementation(() => ({
     addUniverse: jest.fn().mockResolvedValue({
-      update: jest.fn(),
+      update: mockUpdate,
       close: jest.fn(),
     }),
+    on: jest.fn(),
     close: jest.fn().mockResolvedValue(undefined),
   })),
   ArtnetDriver: jest.fn().mockImplementation(() => ({
@@ -65,6 +70,21 @@ describe('ArtNetSender', () => {
 
       // The send method catches errors and emits them, so we expect it to not throw
       await expect(artNetSender.send(universeBuffer)).resolves.not.toThrow()
+    })
+  })
+
+  describe('stop (Bug #11 regression)', () => {
+    it('blacks out the full 512-channel universe, not just 255', async () => {
+      await artNetSender.start()
+      mockUpdate.mockClear()
+      await artNetSender.stop()
+
+      expect(mockUpdate).toHaveBeenCalledTimes(1)
+      const payload = mockUpdate.mock.calls[0][0] as Record<number, number>
+      expect(Object.keys(payload)).toHaveLength(512)
+      expect(payload[1]).toBe(0)
+      expect(payload[256]).toBe(0)
+      expect(payload[512]).toBe(0)
     })
   })
 
