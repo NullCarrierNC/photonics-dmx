@@ -883,6 +883,7 @@ export class ControllerManager {
     const activeSendersBeforeRestart = this.senderLifecycle.getActiveOutputSenderSnapshotIfAny()
     const wasConsoleMode = this.consoleMode.getConsoleRestore() !== null
 
+    let teardownSucceeded = false
     try {
       if (wasYargEnabled) {
         await this.listenerLifecycle.yargRb3.disableYarg()
@@ -928,6 +929,7 @@ export class ControllerManager {
 
       this.isInitialized = false
 
+      teardownSucceeded = true
       log.info('Controllers shutdown completed, reinitializing')
     } catch (error) {
       log.error('Error shutting down controllers:', error)
@@ -944,6 +946,16 @@ export class ControllerManager {
       throw new LifecycleAbortedError(
         'restartControllers aborted: shutdown started before reinitialization',
       )
+    }
+
+    // A teardown failure (with no concurrent shutdown) leaves controllers partially torn down.
+    // Reinitializing on top of that risks dangling listeners/timers and double-published state,
+    // so fail the restart instead of building a fresh graph over a broken one.
+    if (!teardownSucceeded) {
+      log.error('Restart aborted: controller teardown did not complete; not reinitializing')
+      this.setLifecyclePhase('failed')
+      this.isInitialized = false
+      throw new Error('Controller teardown failed during restart; reinitialization aborted')
     }
 
     try {
@@ -1121,7 +1133,7 @@ export class ControllerManager {
     }
     const r = await this.consoleMode.enableConsoleMode(rigId)
     if (r.success) {
-      this.lifecyclePhase = 'consoleMode'
+      this.setLifecyclePhase('consoleMode')
     }
     return r
   }
@@ -1131,7 +1143,7 @@ export class ControllerManager {
   > {
     const r = await this.consoleMode.disableConsoleMode()
     if (r.success && this.lifecyclePhase === 'consoleMode') {
-      this.lifecyclePhase = 'running'
+      this.setLifecyclePhase('running')
     }
     return r
   }

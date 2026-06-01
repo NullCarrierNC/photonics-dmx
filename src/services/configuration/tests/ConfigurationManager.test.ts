@@ -250,6 +250,42 @@ describe('ConfigurationManager', () => {
       expect(reported.some((r) => r.fileName === 'prefs.json' && r.reason === 'parse')).toBe(true)
     })
 
+    it('renames an unreadable prefs file, uses defaults, and reports recovery (Bug #5)', () => {
+      ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
+        if (path.includes('prefs.json')) {
+          throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+        }
+        if (path.includes('lights.json')) {
+          return JSON.stringify({ lights: [] })
+        }
+        if (path.includes('lightsLayout.json')) {
+          return JSON.stringify({
+            numLights: 0,
+            lightLayout: { id: 'default-layout', label: 'Default Layout' },
+            strobeType: ConfigStrobeType.None,
+            frontLights: [],
+            backLights: [],
+            strobeLights: [],
+          })
+        }
+        if (path.includes('dmxRigs.json')) {
+          return JSON.stringify({ version: 1, data: { rigs: [] } })
+        }
+        return '{}'
+      })
+
+      const cm = new ConfigurationManager()
+
+      const renameCall = (fs.renameSync as jest.Mock).mock.calls.find((c) =>
+        String(c[0]).endsWith('prefs.json'),
+      )
+      expect(renameCall).toBeDefined()
+      expect(String(renameCall![1])).toMatch(/\.corrupt-.*\.json$/)
+
+      const reported = cm.drainConfigCorruptRecovery()
+      expect(reported.some((r) => r.fileName === 'prefs.json' && r.reason === 'read')).toBe(true)
+    })
+
     it('does not write default prefs to disk if preserving the corrupt file by rename fails', () => {
       ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
         if (path.includes('prefs.json')) {
