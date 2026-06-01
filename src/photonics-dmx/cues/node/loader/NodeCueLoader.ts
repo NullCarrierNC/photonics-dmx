@@ -179,7 +179,10 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     }
 
     const file = validation.data
-    await this.registerFile(filePath, mode, file)
+    // Per-cue compile failures are collected here rather than only logged, so the editor
+    // can surface them on the file's summary instead of the file appearing to load cleanly.
+    const compileErrors: string[] = []
+    await this.registerFile(filePath, mode, file, compileErrors)
 
     const lightingCueCount = file.cues.filter((c) => c.kind === 'lighting').length
     const motionCueCount = file.cues.filter((c) => c.kind === 'motion').length
@@ -194,6 +197,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       mode,
       updatedAt: Date.now(),
       bundled: file.bundled ?? false,
+      errors: compileErrors.length > 0 ? compileErrors : undefined,
     }
 
     this.updateSummary(summary)
@@ -204,6 +208,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     filePath: string,
     mode: NodeCueMode,
     file: NodeCueFile,
+    compileErrors: string[],
   ): Promise<void> {
     let wasAudioGroupEnabled = false
     if (mode === 'audio') {
@@ -218,7 +223,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     this.unregisterFile(filePath)
 
     if (mode === 'yarg') {
-      const group = await this.buildYargGroup(file as YargNodeCueFile)
+      const group = await this.buildYargGroup(file as YargNodeCueFile, compileErrors)
       this.options.yargRegistry.registerGroup(group)
       const groupMeta = file.group
       if (groupMeta.isDefault) {
@@ -228,7 +233,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
         this.options.yargRegistry.setStageKitGroup(group.id)
       }
     } else {
-      const group = await this.buildAudioGroup(file as AudioNodeCueFile)
+      const group = await this.buildAudioGroup(file as AudioNodeCueFile, compileErrors)
       this.options.audioRegistry.registerGroup(group)
       if (wasAudioGroupEnabled) {
         this.options.audioRegistry.enableGroup(group.id)
@@ -260,7 +265,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     this.fileRegistrations.delete(filePath)
   }
 
-  private async buildYargGroup(file: YargNodeCueFile): Promise<ICueGroup> {
+  private async buildYargGroup(file: YargNodeCueFile, compileErrors: string[]): Promise<ICueGroup> {
     const cueMap = new Map<CueType, INetCue>()
     const motionMap = new Map<string, INetCue>()
 
@@ -288,6 +293,9 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
           )
         } catch (err) {
           log.warn(`Skipping cue '${cue.cueType}':`, err)
+          compileErrors.push(
+            `cue '${cue.cueType}': ${err instanceof Error ? err.message : String(err)}`,
+          )
         }
       } else {
         if (motionMap.has(cue.id)) {
@@ -312,6 +320,9 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
           )
         } catch (err) {
           log.warn(`Skipping motion cue '${cue.id}':`, err)
+          compileErrors.push(
+            `motion cue '${cue.id}': ${err instanceof Error ? err.message : String(err)}`,
+          )
         }
       }
     }
@@ -334,7 +345,10 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     return result
   }
 
-  private async buildAudioGroup(file: AudioNodeCueFile): Promise<AudioCueGroup> {
+  private async buildAudioGroup(
+    file: AudioNodeCueFile,
+    compileErrors: string[],
+  ): Promise<AudioCueGroup> {
     const cueMap = new Map<AudioCueType, IAudioCue>()
     const motionMap = new Map<string, IAudioCue>()
 
@@ -360,6 +374,9 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
           )
         } catch (err) {
           log.warn(`Skipping audio cue '${cue.cueTypeId}':`, err)
+          compileErrors.push(
+            `audio cue '${cue.cueTypeId}': ${err instanceof Error ? err.message : String(err)}`,
+          )
         }
       } else {
         if (motionMap.has(cue.id)) {
@@ -382,6 +399,9 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
           )
         } catch (err) {
           log.warn(`Skipping audio motion cue '${cue.id}':`, err)
+          compileErrors.push(
+            `audio motion cue '${cue.id}': ${err instanceof Error ? err.message : String(err)}`,
+          )
         }
       }
     }

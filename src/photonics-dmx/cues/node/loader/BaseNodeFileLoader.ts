@@ -190,7 +190,13 @@ export abstract class BaseNodeFileLoader<
       await this.loadFile(mode, filePath)
       this.emit('changed', this.getSummary())
     } catch (error) {
+      // A watch-triggered load failure (invalid JSON / failed validation) must not pass
+      // silently: record an error summary for the file and emit it so the editor flags the
+      // file instead of showing the last good state as if nothing changed.
       this.onFileChangeError(filePath, error)
+      const message = error instanceof Error ? error.message : String(error)
+      this.updateSummary(this.makeErrorSummary(mode, filePath, message))
+      this.emit('changed', this.getSummary())
     }
   }
 
