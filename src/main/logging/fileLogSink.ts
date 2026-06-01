@@ -120,6 +120,17 @@ export function createFileLogSink(options: FileLogSinkOptions): {
 
   let currentDateKey: string | null = null
   let currentStream: fs.WriteStream | null = null
+  // Streams that have been rotated away (or are the final stream) and are flushing to disk.
+  // close() awaits these so a file is never read back before its buffered writes have landed.
+  const flushing: Promise<void>[] = []
+
+  // Ends a stream and resolves once it has finished flushing its buffer to disk.
+  function endStream(s: fs.WriteStream): Promise<void> {
+    return new Promise((resolve) => {
+      s.once('finish', () => resolve())
+      s.end()
+    })
+  }
 
   function openStreamForDateKey(dateKey: string): void {
     const filePath = path.join(logsDir, `photonics-${dateKey}.log`)
@@ -137,7 +148,9 @@ export function createFileLogSink(options: FileLogSinkOptions): {
     const key = localDateKeyFromMs(clock())
     if (key !== currentDateKey) {
       if (currentStream) {
-        currentStream.end()
+        // Track the rotated-away stream's flush so close() can await it, otherwise the
+        // previous day's last lines may not have reached disk yet when the file is read.
+        flushing.push(endStream(currentStream))
         currentStream = null
         currentDateKey = null
       }
@@ -154,18 +167,12 @@ export function createFileLogSink(options: FileLogSinkOptions): {
   return {
     sink,
     close: () => {
-      if (!currentStream) {
-        return Promise.resolve()
+      if (currentStream) {
+        flushing.push(endStream(currentStream))
+        currentStream = null
+        currentDateKey = null
       }
-      const s = currentStream
-      currentStream = null
-      currentDateKey = null
-      return new Promise((resolve) => {
-        s.once('finish', () => {
-          resolve()
-        })
-        s.end()
-      })
+      return Promise.all(flushing).then(() => undefined)
     },
   }
 }
