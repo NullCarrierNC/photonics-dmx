@@ -22,8 +22,21 @@ const MAX_BEAT_HISTORY = 8
 const MINIMUM_ENERGY_FOR_BEAT = 0.05
 const MAX_BEAT_FREQUENCY = 2000
 const NOISE_FLOOR_MIN = 0.01
-const NOISE_FLOOR_DECAY = 0.9995
+/** Per-frame noise-floor decay at the default `decayRate`; see {@link noiseFloorDecayFor}. */
+const NOISE_FLOOR_DECAY_AT_DEFAULT = 0.9995
 const DOUBLE_TRIGGER_WINDOW = 0.25
+
+/**
+ * Maps the configurable `decayRate` (0-1) to the per-frame multiplier applied to the adaptive
+ * noise floor while audio is present. A higher `decayRate` keeps the floor up longer (more onset
+ * suppression, fewer beats); a lower one lets it fall faster (more sensitive). The default
+ * `decayRate` (0.8) reproduces the historic fixed 0.9995, so default behaviour is unchanged.
+ */
+export function noiseFloorDecayFor(decayRate: number): number {
+  const clamped = Math.max(0, Math.min(1, decayRate))
+  const slope = (1 - NOISE_FLOOR_DECAY_AT_DEFAULT) / (1 - DEFAULT_BEAT_CONFIG.decayRate)
+  return 1 - (1 - clamped) * slope
+}
 
 export interface BeatDetectorResult {
   beatDetected: boolean
@@ -81,7 +94,8 @@ export class BeatDetector {
     if (analysisEnergy < this.noiseFloor * 1.2) {
       this.noiseFloor = Math.max(NOISE_FLOOR_MIN, Math.min(this.noiseFloor * 1.001, analysisEnergy))
     } else {
-      this.noiseFloor = Math.max(NOISE_FLOOR_MIN, this.noiseFloor * NOISE_FLOOR_DECAY)
+      const noiseFloorDecay = noiseFloorDecayFor(this.config.decayRate)
+      this.noiseFloor = Math.max(NOISE_FLOOR_MIN, this.noiseFloor * noiseFloorDecay)
     }
     const normalisedEnergy = Math.max(0, analysisEnergy - this.noiseFloor)
 
