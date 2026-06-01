@@ -73,7 +73,7 @@ describe('ArtNetSender', () => {
     })
   })
 
-  describe('stop (Bug #11 regression)', () => {
+  describe('stop', () => {
     it('blacks out the full 512-channel universe, not just 255', async () => {
       await artNetSender.start()
       mockUpdate.mockClear()

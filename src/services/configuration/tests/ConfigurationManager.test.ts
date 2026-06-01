@@ -250,7 +250,7 @@ describe('ConfigurationManager', () => {
       expect(reported.some((r) => r.fileName === 'prefs.json' && r.reason === 'parse')).toBe(true)
     })
 
-    it('renames an unreadable prefs file, uses defaults, and reports recovery (Bug #5)', () => {
+    it('renames an unreadable prefs file, uses defaults, and reports recovery', () => {
       ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
         if (path.includes('prefs.json')) {
           throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })

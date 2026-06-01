@@ -152,6 +152,8 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
   }
 
   public getAvailableCueTypes(mode: NodeCueMode, kind?: 'lighting' | 'motion'): string[] {
+    // Motion cues are keyed by user-defined id, not by a fixed enum like lighting CueTypes, so
+    // there is no enumerable "type" set to return for them.
     if (kind === 'motion') {
       return []
     }

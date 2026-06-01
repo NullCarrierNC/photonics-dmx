@@ -744,7 +744,12 @@ export class EffectManager implements IEffectManager {
   }
 
   /**
-   * Removes an effect from a specific layer
+   * Removes an effect from a specific layer.
+   *
+   * Intentionally layer-wide: it clears the effect for every light on the layer, treating a
+   * non-base layer as a single shared effect "slot" rather than per-light state. This matches the
+   * current shared-layer effect model, even though `interfaces.ts` types effects per-light;
+   * scoping removal to individual lights would require reworking how persistent runs are tracked.
    * @param layer The layer from which to remove the effect
    * @param shouldRemoveTransitions Whether to remove transition (colour) data too
    */

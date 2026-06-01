@@ -375,7 +375,7 @@ export class YargNetworkListener extends EventEmitter {
         fogState,
         strobeState: this.getStrobeState(strobeStateValue),
         // Union of performers currently spotlighted or singing along (PerformerByte bitmask).
-        // NOTE: verify the intended `performer` semantics against live YARG before relying on it.
+        // TODO: verify the intended performer against live YARG data.
         performer: spotlight | singalong,
         spotlight,
         singalong,

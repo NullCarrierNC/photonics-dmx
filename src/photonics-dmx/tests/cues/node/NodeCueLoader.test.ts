@@ -154,7 +154,7 @@ describe('NodeCueLoader', () => {
     expect(loader.getAvailableCueTypes('yarg', 'motion')).toEqual([])
   })
 
-  it('surfaces a per-cue compile failure on the file summary (Bug #8)', async () => {
+  it('surfaces a per-cue compile failure on the file summary', async () => {
     const file = yargMotionOnlyFile()
     // Second motion cue whose action has no incoming connection: schema-valid but fails
     // compilation (unreachable action). Reachability is a compile-time, not schema, check.

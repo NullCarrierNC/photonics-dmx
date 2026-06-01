@@ -10,10 +10,11 @@ jest.mock('../../utils/windowUtils', () => ({
 import { ControllerManager } from '../../controllers/ControllerManager'
 
 /**
- * Bug #6: a teardown failure during restart (with no concurrent shutdown) must abort
- * reinitialization rather than calling init() on a partially torn-down graph.
+ * When tearing controllers down during a restart fails and no shutdown is concurrently running,
+ * the restart must abort and surface the failure instead of calling init() on top of a partially
+ * torn-down graph, which would leave dangling listeners/timers publishing alongside the new ones.
  */
-describe('ControllerManager.runRestartControllers teardown failure (Bug #6)', () => {
+describe('ControllerManager.runRestartControllers when teardown fails', () => {
   it('aborts reinitialization and enters the failed phase when teardown throws', async () => {
     const init = jest.fn(() => Promise.resolve())
     const stub = Object.create(ControllerManager.prototype) as Record<string, unknown>

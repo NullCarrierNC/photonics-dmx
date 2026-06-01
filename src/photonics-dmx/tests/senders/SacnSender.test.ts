@@ -47,7 +47,7 @@ describe('SacnSender', () => {
     expect(mockSend).toHaveBeenCalledWith({ payload: { 1: 255, 2: 128 } })
   })
 
-  it('flushes the last throttled frame on the trailing edge (Bug #12 regression)', async () => {
+  it('flushes the last throttled frame on the trailing edge', async () => {
     // 50 Hz => 20 ms minimum interval between sends.
     const throttled = new SacnSender({ universe: 7, maxOutputRate: 50 })
     await throttled.start()

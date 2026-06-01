@@ -136,7 +136,7 @@ describe('BeatDetector', () => {
     })
   })
 
-  describe('decayRate (Bug #13)', () => {
+  describe('decayRate', () => {
     it('default decayRate reproduces the historic noise-floor decay', () => {
       expect(noiseFloorDecayFor(0.8)).toBeCloseTo(0.9995, 6)
     })
