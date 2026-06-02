@@ -27,7 +27,12 @@ const cueDomainEntrySchema = {
       type: 'object',
       additionalProperties: { type: 'array', items: { type: 'string' } },
     },
-    selectionMode: { type: 'string' },
+    // Enum (not a bare string) so a corrupt/hand-edited value routes through corruption-recovery
+    // instead of being silently coerced to a default by the cue/motion getters. The schema is
+    // shared across all cue domains, so it lists every CueDomainSelectionMode (lighting uses
+    // oncePerSong|withinSong; motion uses oncePerSong|perCueChange|none). Optional, and
+    // additionalProperties:true is preserved, so absent/newer fields still validate.
+    selectionMode: { type: 'string', enum: ['oncePerSong', 'perCueChange', 'withinSong', 'none'] },
     activeCueRef: {
       anyOf: [
         { type: 'null' },
