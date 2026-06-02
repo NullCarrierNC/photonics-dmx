@@ -14,7 +14,6 @@ import {
 } from './interfaces'
 import { LayerManager } from './LayerManager'
 import { SystemEffectsController } from './SystemEffectsController'
-import { EventScheduler } from './EventScheduler'
 import { TransitionEngine } from './TransitionEngine'
 import { MotionPatternEngine } from './MotionPatternEngine'
 import { Clock } from './Clock'
@@ -35,7 +34,6 @@ export class Sequencer implements ILightingController {
   private layerManager: LayerManager
   private transitionEngine: TransitionEngine
   private effectTransformer: EffectTransformer
-  private eventScheduler: EventScheduler
   private effectManager: EffectManager
   private eventHandler: SongEventHandler
   private systemEffectsController: SystemEffectsController
@@ -54,7 +52,6 @@ export class Sequencer implements ILightingController {
     this.clock = clock
     this.lightTransitionController = lightTransitionController
     this.effectTransformer = new EffectTransformer()
-    this.eventScheduler = new EventScheduler()
     this.layerManager = new LayerManager(this.lightTransitionController)
     this.transitionEngine = new TransitionEngine(this.lightTransitionController, this.layerManager)
     this.systemEffectsController = new SystemEffectsController(
@@ -84,7 +81,6 @@ export class Sequencer implements ILightingController {
     }
 
     this.clock.onTick(this.handleClockTick)
-    this.eventScheduler.registerWithClock(this.clock)
   }
 
   /**
@@ -431,8 +427,8 @@ export class Sequencer implements ILightingController {
   }
 
   /**
-   * Tears down this sequencer's own resources: its tick callback on the shared `Clock`, its
-   * scheduled events, and every currently-active effect. The `Clock` itself is **not** stopped
+   * Tears down this sequencer's own resources: its tick callback on the shared `Clock` and
+   * every currently-active effect. The `Clock` itself is **not** stopped
    * — it's owned externally (so it can be shared across multiple sequencers running in
    * parallel) and its lifecycle is the owner's responsibility.
    */
@@ -443,10 +439,8 @@ export class Sequencer implements ILightingController {
       // Unregister from the shared clock without stopping it; other sequencers may still be
       // ticking against the same Clock.
       this.clock.offTick(this.handleClockTick)
-      this.eventScheduler.unregisterFromClock()
 
       this.removeAllEffects()
-      this.eventScheduler.destroy()
 
       log.info('PhotonicsSequencer shutdown: completed')
     } catch (error) {

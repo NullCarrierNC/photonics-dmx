@@ -813,18 +813,11 @@ export class EffectManager implements IEffectManager {
     const transitions = nextEffect.effect.transitions.filter((t) => t.layer === layer)
     if (transitions.length === 0) return false
 
-    // Find out what lights were tracked in the previous effect so we can
-    // use their final states
-    const previousEffect = this.layerManager.getActiveEffect(layer, lightId)
-    const trackedLights = previousEffect
-      ? [previousEffect.transitions[0].lights.find((l) => l.id === lightId)!]
-      : []
-
     // Start the effect
     this.startEffect(
       nextEffect.name,
       nextEffect.effect,
-      trackedLights.length > 0 ? trackedLights : transitions[0].lights,
+      transitions[0].lights,
       layer,
       transitions,
       nextEffect.isPersistent,

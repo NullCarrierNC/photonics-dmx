@@ -77,7 +77,6 @@ The sequencing system contains several other components, though these are mainly
 - `TransitionEngine`: Handles the animation and timing of transitions between light states using the shared frame context captured by the Sequencer.
 - `SongEventHandler`: Processes beat, measure, and other musical events.
 - `SystemEffectsController`: Manages system-level effects blackout, which don't act like normal cue/effects.
-- `EventScheduler`: Handles scheduling and management of timed events within the system using the centralized clock.
 - `Clock`: Provides centralized timing control with configurable precision (default 10 ms) for all system components. Each tick yields a `FrameContext` that is passed to TransitionEngine and LightTransitionController.
 - `EffectTransformer`: Transforms generic effect definitions into concrete transition specifications.
 - `LightStateManager`: Manages the final merged RGBIO state for each light and publishes the output of each atomic frame calculation to external listeners.
