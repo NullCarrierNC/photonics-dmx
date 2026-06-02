@@ -303,6 +303,12 @@ export class AudioCueHandler extends EventEmitter {
     const cue = this.registry.getCueImplementation(cueType)
     if (!cue) {
       log.warn(`Audio cue not found: ${cueType}`)
+      // Clear the existing overlay when the requested cue is unavailable, matching
+      // assignPrimarySlot — otherwise a stale secondary keeps running indefinitely.
+      if (this.currentSecondaryCue) {
+        this.currentSecondaryCue.onStop?.()
+        this.currentSecondaryCue = null
+      }
       return
     }
 

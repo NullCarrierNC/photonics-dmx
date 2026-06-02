@@ -148,6 +148,24 @@ class YargCueHandler extends EventEmitter {
   private addHistoryToCueData(cueType: CueType, parameters: CueData): CueData {
     const now = Date.now()
 
+    // Strobe cues (including Strobe_Off) run in their own slot on top of the primary/secondary
+    // look. They must not disturb the primary-cue history/executionCount accounting: a held
+    // strobe is re-dispatched ~30x/s alongside the lighting cue, and mutating currentCue here
+    // would thrash cueHistory/executionCount and defeat the executionCount-gated motion pick.
+    // Report the current (unchanged) primary state instead of advancing it.
+    if (isStrobeCueType(cueType)) {
+      return {
+        ...parameters,
+        previousCue:
+          this.cueHistory.length > 0 ? this.cueHistory[this.cueHistory.length - 1] : undefined,
+        cueHistory: [...this.cueHistory],
+        executionCount: this.executionCount,
+        cueStartTime: this.cueStartTime,
+        timeSinceLastCue: now - this.lastCueChangeTime,
+        previousFrame: this.previousCueData,
+      }
+    }
+
     if (this.currentCue !== cueType) {
       if (this.currentCue && this.currentCue !== cueType) {
         this.cueHistory.push(this.currentCue)
@@ -244,7 +262,9 @@ class YargCueHandler extends EventEmitter {
   }
 
   public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
-    // Update CueData with history and context information
+    const incomingIsStrobe = isStrobeCueType(cueType)
+    // Update CueData with history and context information. addHistoryToCueData no-ops the
+    // primary-cue accounting for strobe cues so a held strobe does not thrash it.
     const historicCueData = this.addHistoryToCueData(cueType, parameters)
 
     // Special cases that need to be handled differently
@@ -301,7 +321,6 @@ class YargCueHandler extends EventEmitter {
         : this.registry.getCueImplementation(cueType, trackMode)
 
     if (cue) {
-      const incomingIsStrobe = isStrobeCueType(cueType)
       const incomingIsSecondary = cue.style === CueStyle.Secondary
 
       if (incomingIsStrobe) {
@@ -333,7 +352,9 @@ class YargCueHandler extends EventEmitter {
       log.error(`No implementation found for cue: ${cueType}`)
     }
 
-    if (trackMode !== 'simulated') {
+    // Strobe cues run in their own slot and must not drive motion selection (which is gated on
+    // the primary cue's executionCount); only non-strobe cues touch the motion pick.
+    if (trackMode !== 'simulated' && !incomingIsStrobe) {
       if (!this.motionEnabled) {
         if (this.currentMotionCue) {
           this.currentMotionCue.onStop?.()

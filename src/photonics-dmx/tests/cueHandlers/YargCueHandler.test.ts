@@ -137,3 +137,37 @@ describe('YargCueHandler shutdown lifecycle', () => {
     expect(getStrobeStateManager().getActive()).toBeNull()
   })
 })
+
+describe('YargCueHandler strobe history isolation (B6)', () => {
+  beforeEach(() => {
+    __resetStrobeStateManagerForTests()
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('a held strobe does not thrash the primary cue executionCount', async () => {
+    const registry = YargCueRegistry.getInstance()
+    const primary = makeFakeCue(CueStyle.Primary, 'frenzy')
+    const strobe = makeFakeCue(CueStyle.Primary, 'strobe')
+    jest
+      .spyOn(registry, 'getCueImplementation')
+      .mockImplementation((cueType) =>
+        cueType === CueType.Frenzy ? primary : cueType === CueType.Strobe_Fast ? strobe : null,
+      )
+
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    const execCounts: Array<number | undefined> = []
+    handler.addCueHandledListener((data) => execCounts.push(data.executionCount))
+
+    await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
+    await handler.handleCue(CueType.Strobe_Fast, gameplayCueData({ lightingCue: CueType.Frenzy }))
+    await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
+
+    // Frenzy = 1; the interleaved strobe reports the unchanged primary count (1); Frenzy = 2.
+    // Before the fix the strobe stole currentCue and the second Frenzy reset to 1 ([1, 1, 1]).
+    expect(execCounts).toEqual([1, 1, 2])
+    handler.shutdown()
+  })
+})
