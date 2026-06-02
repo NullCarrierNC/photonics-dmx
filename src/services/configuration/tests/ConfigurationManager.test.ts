@@ -459,6 +459,87 @@ describe('ConfigurationManager', () => {
       expect(rigsWrites.length).toBeGreaterThan(0)
     })
 
+    it('coalesces identical heal-writes across a getDmxRigs() read storm', async () => {
+      // Same stale-rig setup: the saved rig is missing strobeChannel/strobeValues, so getDmxRigs()
+      // heals it. getActiveRigs/getDmxRig call getDmxRigs() in bursts, so a single read storm must
+      // persist the heal only once, not once per call.
+      ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
+        if (path.includes('prefs.json')) {
+          return JSON.stringify({ effectDebounce: 0 })
+        }
+        if (path.includes('lights.json')) {
+          return JSON.stringify({
+            version: 1,
+            data: {
+              lights: [
+                {
+                  id: 'tpl-rgb',
+                  fixture: FixtureTypes.RGB,
+                  name: 'PAR 1',
+                  label: 'PAR 1',
+                  position: 0,
+                  isStrobeEnabled: false,
+                  channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, strobeChannel: 5 },
+                  strobeValues: { slow: 10, medium: 100, fast: 200, fastest: 250 },
+                },
+              ],
+            },
+          })
+        }
+        if (path.includes('dmxRigs.json')) {
+          return JSON.stringify({
+            version: 3,
+            data: {
+              schemaVersion: 3,
+              rigs: [
+                {
+                  id: 'rig-1',
+                  name: 'Rig 1',
+                  active: true,
+                  config: {
+                    numLights: 1,
+                    lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
+                    strobeType: ConfigStrobeType.AllCapable,
+                    frontLights: [
+                      {
+                        id: 'l-1',
+                        fixtureId: 'tpl-rgb',
+                        position: 1,
+                        fixture: FixtureTypes.RGB,
+                        label: 'PAR 1',
+                        name: 'PAR 1',
+                        isStrobeEnabled: true,
+                        group: 'front',
+                        universe: 1,
+                        mount: 'floor',
+                        channels: { masterDimmer: 11, red: 12, green: 13, blue: 14 },
+                      },
+                    ],
+                    backLights: [],
+                    strobeLights: [],
+                  },
+                },
+              ],
+            },
+          })
+        }
+        return '{}'
+      })
+
+      const cm = new ConfigurationManager()
+      ;(fsPromises.writeFile as jest.Mock).mockClear()
+
+      cm.getDmxRigs()
+      cm.getDmxRigs()
+      cm.getActiveRigs()
+      cm.getDmxRig('rig-1')
+
+      const rigsWrites = (fsPromises.writeFile as jest.Mock).mock.calls.filter((c) =>
+        String(c[0]).includes('dmxRigs.json'),
+      )
+      expect(rigsWrites.length).toBe(1)
+    })
+
     it('syncRigsWithUserLights returns false when nothing changed', async () => {
       ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
         if (path.includes('lights.json')) {
