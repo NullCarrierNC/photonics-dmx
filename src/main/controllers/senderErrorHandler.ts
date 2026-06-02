@@ -20,7 +20,7 @@ export function createSenderErrorHandler(
     const shouldDisable = error.shouldDisable
 
     if (shouldDisable && senderId) {
-      log.info(`Automatically disabling ${senderId} sender due to network error`)
+      log.info(`Automatically disabling ${senderId} sender due to a sender error`)
       try {
         const senderManager = getSenderManager()
         if (senderManager.isSenderEnabled(senderId)) {

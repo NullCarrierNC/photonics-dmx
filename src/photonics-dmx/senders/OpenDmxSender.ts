@@ -165,14 +165,14 @@ export class OpenDmxSender extends BaseSender {
       ? this.deviceFactory(this.port, {
           dmxSpeed: this.options.dmxSpeed,
           onError: (err) => {
-            const errorEvent = new SenderError(err, { senderId: 'opendmx' })
+            const errorEvent = new SenderError(err, { senderId: 'opendmx', shouldDisable: true })
             this.eventEmitter.emit('SenderError', errorEvent)
           },
         })
       : new OpenDmxDeviceAdapter(this.port, {
           dmxSpeed: this.options.dmxSpeed,
           onError: (err) => {
-            const errorEvent = new SenderError(err, { senderId: 'opendmx' })
+            const errorEvent = new SenderError(err, { senderId: 'opendmx', shouldDisable: true })
             this.eventEmitter.emit('SenderError', errorEvent)
           },
         })

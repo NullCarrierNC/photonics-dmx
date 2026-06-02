@@ -86,18 +86,16 @@ export class ArtNetSender extends BaseSender {
 
     try {
       this.lastSendTimeMs = 0
-      // First set all channels to zero (blackout). A DMX universe is 512 channels.
+      // Blackout all 512 channels. Route through send() so the 1-based DMX channels are
+      // converted to 0-based Art-Net keys: dmxnet's prepChannel rejects channel 512, so a
+      // direct universe.update() with 1-based keys throws and the blackout never transmits.
       const zeroPayload: Record<number, number> = {}
       for (let channel = 1; channel <= 512; channel++) {
         zeroPayload[channel] = 0
       }
-
-      // Try to update one last time
       try {
-        if (this.universe) {
-          this.universe.update(zeroPayload)
-          log.info('Sent zero values to all ArtNet channels')
-        }
+        await this.send(zeroPayload)
+        log.info('Sent zero values to all ArtNet channels')
       } catch (err) {
         log.error('Failed to send zero values before stopping:', err)
       }

@@ -1,8 +1,17 @@
 import { ArtNetSender } from '../../senders/ArtNetSender'
 
 // Shared update spy so tests can assert on the channel payload (must be `mock`-prefixed
-// to be referenceable inside the hoisted jest.mock factory).
-const mockUpdate = jest.fn()
+// to be referenceable inside the hoisted jest.mock factory). It simulates dmxnet's
+// prepChannel bounds check so a regression to 1-based keys (which would include the
+// out-of-range channel 512) throws here instead of silently passing.
+const mockUpdate = jest.fn((channels: Record<number, number>) => {
+  for (const key of Object.keys(channels)) {
+    const ch = Number(key)
+    if (ch < 0 || ch > 511) {
+      throw new Error('Channel must be between 0 and 512')
+    }
+  }
+})
 
 // Mock the dmx-ts library
 jest.mock('dmx-ts', () => ({
@@ -74,17 +83,20 @@ describe('ArtNetSender', () => {
   })
 
   describe('stop', () => {
-    it('blacks out the full 512-channel universe, not just 255', async () => {
+    it('blacks out the full 512-channel universe using 0-based Art-Net keys (does not throw at channel 512)', async () => {
       await artNetSender.start()
       mockUpdate.mockClear()
       await artNetSender.stop()
 
       expect(mockUpdate).toHaveBeenCalledTimes(1)
       const payload = mockUpdate.mock.calls[0][0] as Record<number, number>
+      // DMX channels 1..512 are converted to 0-based Art-Net keys 0..511; the bounds-checking
+      // mock would throw on a 1-based key of 512, so this also guards the original regression.
       expect(Object.keys(payload)).toHaveLength(512)
-      expect(payload[1]).toBe(0)
-      expect(payload[256]).toBe(0)
-      expect(payload[512]).toBe(0)
+      expect(payload[0]).toBe(0)
+      expect(payload[255]).toBe(0)
+      expect(payload[511]).toBe(0)
+      expect(payload[512]).toBeUndefined()
     })
   })
 

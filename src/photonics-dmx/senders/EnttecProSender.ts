@@ -36,9 +36,9 @@ export class EnttecProSender extends BaseSender {
     log.info(`Stopping Enttec Pro sender on port ${this.port}...`)
 
     try {
-      // First set all channels to zero (blackout)
+      // First set all channels to zero (blackout). A DMX universe is 512 channels.
       const zeroPayload: Record<number, number> = {}
-      for (let channel = 1; channel <= 255; channel++) {
+      for (let channel = 1; channel <= 512; channel++) {
         zeroPayload[channel] = 0
       }
 
@@ -102,7 +102,11 @@ export class EnttecProSender extends BaseSender {
       this.universe!.update(universeBuffer)
     } catch (err) {
       log.error('EnttecProSender error:', err)
-      const errorEvent = new SenderError(err, { senderId: 'enttecpro' })
+      // Disable the sender on failure so the user gets a true on/off indicator and can
+      // re-enable once corrected. dmx-ts does not surface the driver's async serial-write
+      // errors (the SerialPort is private and not re-emitted), so this synchronous catch is
+      // the only error signal available for the Enttec Pro.
+      const errorEvent = new SenderError(err, { senderId: 'enttecpro', shouldDisable: true })
       this.eventEmitter.emit('SenderError', errorEvent)
     }
   }
