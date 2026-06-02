@@ -560,7 +560,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * @param event The StageKit event data
    */
   private emitCueDataForStageKit(event: StageKitData): void {
-    const { positions, color, strobeEffect } = event
+    const { positions, color, strobeEffect, fog } = event
 
     const cueData: CueData = {
       datagramVersion: 1,
@@ -580,7 +580,9 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       harmony2Note: 0,
       lightingCue: 'StageKitDirect',
       postProcessing: 'Default',
-      fogState: false,
+      // Carry the StageKit fog state through for downstream/debug consumers. There is no DMX fog
+      // output yet (a future fixture/channel concept), so nothing renders it today.
+      fogState: fog ?? false,
       strobeState:
         strobeEffect === 'off'
           ? 'Strobe_Off'
