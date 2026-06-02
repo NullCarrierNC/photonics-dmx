@@ -14,9 +14,14 @@ const literal = (value: string): ValueSource => ({ source: 'literal', value })
 
 describe('resolveBlendMode', () => {
   it('preserves every supported blend mode, including mix', () => {
-    for (const mode of ['replace', 'add', 'multiply', 'overlay', 'mix']) {
+    for (const mode of ['replace', 'add', 'mix']) {
       expect(resolveBlendMode(literal(mode), ctx)).toBe(mode)
     }
+  })
+
+  it('coerces the removed modes (multiply, overlay) to replace', () => {
+    expect(resolveBlendMode(literal('multiply'), ctx)).toBe('replace')
+    expect(resolveBlendMode(literal('overlay'), ctx)).toBe('replace')
   })
 
   it('falls back to replace for an unknown mode', () => {
