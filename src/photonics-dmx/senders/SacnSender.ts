@@ -156,8 +156,11 @@ export class SacnSender extends BaseSender {
         const elapsed = now - this.lastSendTimeMs
         if (elapsed < this.minIntervalMs && this.lastSendTimeMs !== 0) {
           // Throttled: keep the latest frame and schedule a trailing-edge flush so the
-          // final frame of a burst still reaches the wire instead of being dropped.
-          this.pendingBuffer = universeBuffer
+          // final frame of a burst still reaches the wire instead of being dropped. Snapshot
+          // the frame: the publisher reuses and mutates its slot buffer in place each frame, so
+          // holding it by reference would let the trailing flush send a newer frame than the one
+          // withheld. The buffer is a flat channel->value record, so a shallow copy suffices.
+          this.pendingBuffer = { ...universeBuffer }
           if (!this.flushTimer) {
             this.flushTimer = setTimeout(() => {
               this.flushTimer = null
