@@ -31,7 +31,14 @@ function finalizePreviewRgb(
   use3dOffGrey: boolean,
 ): { r: number; g: number; b: number } {
   if (!use3dOffGrey) {
-    return rgb
+    // 2D CSS preview clamps each channel to the 0–255 sRGB range. RGBW fixtures sum red+white
+    // (up to 510) before scaling, which can exceed 255. The 3D path keeps raw values so THREE
+    // bloom can drive HDR highlights.
+    return {
+      r: Math.min(255, rgb.r),
+      g: Math.min(255, rgb.g),
+      b: Math.min(255, rgb.b),
+    }
   }
   return blackToOffStateGrey3d(rgb, masterDimmerIsZero)
 }

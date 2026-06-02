@@ -70,6 +70,18 @@ function createFlareTexture(): THREE.Texture {
   return tex
 }
 
+let sharedFlareTexture: THREE.Texture | null = null
+/**
+ * One shared flare texture for all preview instances, built on first use. It is stateless and
+ * lives for the module's lifetime — a single bounded GPU allocation that every mount reuses.
+ */
+function getFlareTexture(): THREE.Texture {
+  if (sharedFlareTexture === null) {
+    sharedFlareTexture = createFlareTexture()
+  }
+  return sharedFlareTexture
+}
+
 /** Align local +Y with world direction `dir`. */
 function quatFromYToDir(dir: THREE.Vector3): THREE.Quaternion {
   const up = new THREE.Vector3(0, 1, 0)
@@ -344,7 +356,7 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
   const audienceZ = layoutId === 'front-back' ? 3 : 4
   const audienceLabelZ = audienceZ + 0.8
   const downstageLabelZ = audienceZ - 1.5
-  const flareTex = useMemo(() => createFlareTexture(), [])
+  const flareTex = useMemo(() => getFlareTexture(), [])
 
   const items = useMemo(() => {
     type RowKey = 'front' | 'back' | 'top' | 'bottom'

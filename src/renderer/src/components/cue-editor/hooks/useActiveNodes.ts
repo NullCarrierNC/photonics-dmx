@@ -85,5 +85,20 @@ export function useActiveNodes(currentGraphId: string | null): Set<string> {
     }
   }, [currentGraphId])
 
+  useEffect(() => {
+    // Clear pending highlight timers and the queued animation frame on unmount so their
+    // callbacks do not run setState after the component is gone.
+    const timers = timersRef.current
+    const raf = rafRef
+    return () => {
+      for (const t of timers.values()) clearTimeout(t)
+      timers.clear()
+      if (raf.current !== null) {
+        cancelAnimationFrame(raf.current)
+        raf.current = null
+      }
+    }
+  }, [])
+
   return activeNodeIds
 }
