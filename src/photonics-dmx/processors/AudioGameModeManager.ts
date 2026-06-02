@@ -85,7 +85,7 @@ export class AudioGameModeManager {
       this.emitScheduleChange()
       return
     }
-    // Active cue is empty or no longer eligible: pick a fresh one and (re)schedule.
+    // Active cue is empty or not in the eligible pool: pick a fresh one and (re)schedule.
     this.start()
   }
 

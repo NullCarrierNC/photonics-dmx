@@ -522,8 +522,8 @@ export class Rb3eNetworkListener extends EventEmitter {
 
     log.info(`RB3E_EVENT_STATE => ${gameState}`)
 
-    // Emit the freshly-parsed packet's data. The previous code read this.lastData (the prior
-    // packet), which is null on the first STATE packet and otherwise lags a packet behind.
+    // Emit this packet's parsed data. lastData is assigned only at the end of deserializePacket,
+    // so it still holds the previous packet here; read from the cueData parameter instead.
     this.emit('rb3e:gameState', {
       gameState,
       platform: cueData.rb3Platform || 'Unknown',

@@ -659,8 +659,8 @@ export class LightTransitionController {
 
       case 'replace':
       default:
-        // Replace (and the safe fallback for any unrecognised/removed mode): opacity
-        // controls the intensity of the replacement colour.
+        // Replace (and the fallback for any unrecognised mode): opacity controls the
+        // intensity of the replacement colour.
         // 0.0 = transparent (show underlying); 1.0 = full replacement; 0.5 = half intensity.
         if (opacity <= 0.0) {
           out.red = current.red

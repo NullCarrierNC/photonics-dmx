@@ -86,9 +86,8 @@ export class ArtNetSender extends BaseSender {
 
     try {
       this.lastSendTimeMs = 0
-      // Blackout all 512 channels. Route through send() so the 1-based DMX channels are
-      // converted to 0-based Art-Net keys: dmxnet's prepChannel rejects channel 512, so a
-      // direct universe.update() with 1-based keys throws and the blackout never transmits.
+      // Blackout all 512 channels through send(), which converts the 1-based DMX channels to the
+      // 0-based keys dmxnet expects (its prepChannel rejects channel 512).
       const zeroPayload: Record<number, number> = {}
       for (let channel = 1; channel <= 512; channel++) {
         zeroPayload[channel] = 0

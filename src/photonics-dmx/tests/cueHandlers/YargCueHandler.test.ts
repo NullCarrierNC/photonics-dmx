@@ -138,7 +138,7 @@ describe('YargCueHandler shutdown lifecycle', () => {
   })
 })
 
-describe('YargCueHandler strobe history isolation (B6)', () => {
+describe('YargCueHandler strobe history isolation', () => {
   beforeEach(() => {
     __resetStrobeStateManagerForTests()
   })
@@ -165,8 +165,8 @@ describe('YargCueHandler strobe history isolation (B6)', () => {
     await handler.handleCue(CueType.Strobe_Fast, gameplayCueData({ lightingCue: CueType.Frenzy }))
     await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
 
-    // Frenzy = 1; the interleaved strobe reports the unchanged primary count (1); Frenzy = 2.
-    // Before the fix the strobe stole currentCue and the second Frenzy reset to 1 ([1, 1, 1]).
+    // A strobe interleaved between two Frenzy dispatches must not touch the primary
+    // executionCount: it reports the current count (1), and the second Frenzy advances to 2.
     expect(execCounts).toEqual([1, 1, 2])
     handler.shutdown()
   })

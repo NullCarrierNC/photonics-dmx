@@ -13,7 +13,7 @@ function validPrefs(): Prefs {
   } as unknown as Prefs
 }
 
-describe('validateAppPreferencesData selectionMode enum (B15/Q36)', () => {
+describe('validateAppPreferencesData selectionMode enum', () => {
   it('accepts the default cue domains', () => {
     expect(validateAppPreferencesData(validPrefs()).valid).toBe(true)
   })

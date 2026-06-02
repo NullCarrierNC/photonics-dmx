@@ -32,9 +32,8 @@ export const COLOR_OPTIONS: Color[] = [
 
 export const BRIGHTNESS_OPTIONS: Brightness[] = ['low', 'medium', 'high', 'max', 'linear']
 
-// 'multiply' and 'overlay' were removed: unused by any cue, no clear physical-lighting
-// semantics, and broken at opacity 0 (they blacked out lower layers). Stale cue values
-// are coerced to 'replace' at runtime (valueResolver / LightTransitionController).
+// The supported layer blend modes. A cue blendMode outside this set is coerced to 'replace'
+// at runtime (valueResolver / LightTransitionController).
 export const BLEND_MODE_OPTIONS: BlendMode[] = ['replace', 'add', 'mix']
 
 export const LOCATION_OPTIONS: LocationGroup[] = ['front', 'back', 'strobe']

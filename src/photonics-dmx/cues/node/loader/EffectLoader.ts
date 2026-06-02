@@ -158,9 +158,9 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       } as EffectFileSummary
     }
 
-    // Compile each effect at load (and therefore at save, which calls loadFile) so structurally
-    // invalid action payloads surface on the summary instead of being silently dropped the first
-    // time a cue references the effect at runtime. Mirrors NodeCueLoader's per-cue compile.
+    // Compile each effect at load (and so at save, which calls loadFile) so invalid action
+    // payloads surface on the file summary for the editor rather than only at runtime when a
+    // cue first references the effect.
     const compileErrors: string[] = []
     for (const effect of file.effects) {
       try {

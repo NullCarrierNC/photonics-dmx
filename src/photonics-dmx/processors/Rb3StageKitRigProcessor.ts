@@ -182,8 +182,8 @@ export class Rb3StageKitRigProcessor {
       if (effectData && effectData.interval) {
         clearInterval(effectData.interval)
         if (effectData.targetLights) {
-          // Restore using the stored DMX light indices (effectData.positions), not synthesised
-          // positional indices — restoreColorsAfterStrobe keys strobedLights/reblend by DMX index.
+          // restoreColorsAfterStrobe keys strobedLights and the reblend by DMX light index, so
+          // pass the stored DMX indices (effectData.positions).
           this.restoreColorsAfterStrobe(effectData.targetLights, effectData.positions)
         }
       }
@@ -233,7 +233,8 @@ export class Rb3StageKitRigProcessor {
         if (effectData.interval) {
           clearInterval(effectData.interval)
           if (effectData.targetLights) {
-            // Restore using the stored DMX light indices, not synthesised positional ones.
+            // Pass the stored DMX light indices (effectData.positions); restoreColorsAfterStrobe
+            // keys by DMX index.
             this.restoreColorsAfterStrobe(effectData.targetLights, effectData.positions)
           }
         }
