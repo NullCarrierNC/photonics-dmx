@@ -514,7 +514,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     log.info(`RB3E_EVENT_ALIVE => ${txt}`)
   }
 
-  private handleGameState(payload: Buffer, _cueData: CueData) {
+  private handleGameState(payload: Buffer, cueData: CueData) {
     // Single byte: 0 = menus, 1 = in‐game
     if (payload.length < 1) return
     const stateByte = payload.readUInt8(0)
@@ -522,12 +522,13 @@ export class Rb3eNetworkListener extends EventEmitter {
 
     log.info(`RB3E_EVENT_STATE => ${gameState}`)
 
+    // Emit the freshly-parsed packet's data. The previous code read this.lastData (the prior
+    // packet), which is null on the first STATE packet and otherwise lags a packet behind.
     this.emit('rb3e:gameState', {
       gameState,
-      platform: this.lastData?.cueData?.rb3Platform || 'Unknown',
+      platform: cueData.rb3Platform || 'Unknown',
       timestamp: Date.now(),
-      // Include real data from current cue data
-      cueData: this.lastData?.cueData || null,
+      cueData,
     })
   }
 

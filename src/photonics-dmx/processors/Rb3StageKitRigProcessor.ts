@@ -182,8 +182,9 @@ export class Rb3StageKitRigProcessor {
       if (effectData && effectData.interval) {
         clearInterval(effectData.interval)
         if (effectData.targetLights) {
-          const lightIndices = effectData.targetLights.map((_, index) => index)
-          this.restoreColorsAfterStrobe(effectData.targetLights, lightIndices)
+          // Restore using the stored DMX light indices (effectData.positions), not synthesised
+          // positional indices — restoreColorsAfterStrobe keys strobedLights/reblend by DMX index.
+          this.restoreColorsAfterStrobe(effectData.targetLights, effectData.positions)
         }
       }
       this.activeStrobeEffects.delete(effectName)
@@ -232,8 +233,8 @@ export class Rb3StageKitRigProcessor {
         if (effectData.interval) {
           clearInterval(effectData.interval)
           if (effectData.targetLights) {
-            const lightIndices = effectData.targetLights.map((_, index) => index)
-            this.restoreColorsAfterStrobe(effectData.targetLights, lightIndices)
+            // Restore using the stored DMX light indices, not synthesised positional ones.
+            this.restoreColorsAfterStrobe(effectData.targetLights, effectData.positions)
           }
         }
       }
