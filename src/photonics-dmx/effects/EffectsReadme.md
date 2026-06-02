@@ -39,10 +39,8 @@ defines how the effect behaves over time.
 | `getEffectFlashColor`                                                                                | `cues/menuCues.ts`                                                                     |
 | `getSweepEffect`                                                                                     | `cues/menuCues.ts`, `cues/searchlightsCues.ts`                                         |
 | `getEffectCrossFadeColors`                                                                           | exported, not currently used                                                           |
-| `getEffectBlackout`                                                                                  | exported, not currently used                                                           |
 | `getEffectFadeInColorFadeOut`                                                                        | exported, not currently used                                                           |
 | `getEffectCycleLights`                                                                               | exported, not currently used                                                           |
-| `getEffectClockwiseRotation` / `getEffectCounterClockwiseRotation` / `getEffectDualModeRotation` / `getEffectAlternatingPatterns` | exported, not currently used                              |
 
 ## Available Effects
 
@@ -102,17 +100,6 @@ interface FlashColorEffectParams extends IEffect {
   durationIn: number
   /** Duration of the fade out */
   durationOut: number
-}
-```
-
-### Blackout (`getEffectBlackout`)
-
-Turns off all specified lights.
-
-```typescript
-interface BlackoutEffectParams extends IEffect {
-  /** Duration of the blackout transition */
-  duration: number
 }
 ```
 
@@ -202,18 +189,6 @@ interface CycleLightsEffectParams extends IEffect {
   waitFor?: WaitCondition
 }
 ```
-
-### Rotation Patterns (`effectRotationPatterns.ts`)
-
-Beat-driven patterns that move an active colour through a set of lights. `RotationPatternEffectParams`
-(active/base colour, `beatsPerCycle`, `startOffset`, `reverse`, plus the standard wait conditions)
-backs the rotation builders; `DualModeRotationEffectParams` adds a solid/rotating mode switch and
-`AlternatingPatternEffectParams` alternates between two light sets.
-
-- `getEffectClockwiseRotation` — advances the active light in index order.
-- `getEffectCounterClockwiseRotation` — advances in reverse index order.
-- `getEffectDualModeRotation` — switches between a solid colour and a rotating pattern.
-- `getEffectAlternatingPatterns` — alternates the active colour between two light sets.
 
 ## Usage Example
 

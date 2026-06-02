@@ -50,26 +50,6 @@ export class ArtNetSender extends BaseSender {
         'artnet-universe',
         new ArtnetDriver(this.host, this.options),
       )
-
-      // Listen for error events from the DMX instance
-      this.dmx.on('error', (err: unknown) => {
-        log.error('ArtNetSender DMX error event:', err)
-        const errObj =
-          err && typeof err === 'object' ? (err as { code?: string; syscall?: string }) : null
-        const isNetworkError =
-          errObj &&
-          (errObj.code === 'EHOSTUNREACH' ||
-            errObj.code === 'EHOSTDOWN' ||
-            errObj.code === 'ENETUNREACH' ||
-            errObj.code === 'ETIMEDOUT' ||
-            errObj.syscall === 'send')
-        const errorEvent = new SenderError(err, {
-          senderId: 'artnet',
-          shouldDisable: Boolean(isNetworkError),
-          code: errObj && 'code' in errObj ? String(errObj.code) : undefined,
-        })
-        this.eventEmitter.emit('SenderError', errorEvent)
-      })
     } catch (err) {
       const errorEvent = new SenderError(err, { senderId: 'artnet' })
       this.eventEmitter.emit('SenderError', errorEvent)
