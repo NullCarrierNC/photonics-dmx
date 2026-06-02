@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { validateEffectFile } from '../schema/validation'
+import { EffectCompiler } from '../compiler/EffectCompiler'
 import { EffectFile, EffectMode, EffectReference } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
 import {
@@ -157,6 +158,19 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       } as EffectFileSummary
     }
 
+    // Compile each effect at load (and therefore at save, which calls loadFile) so structurally
+    // invalid action payloads surface on the summary instead of being silently dropped the first
+    // time a cue references the effect at runtime. Mirrors NodeCueLoader's per-cue compile.
+    const compileErrors: string[] = []
+    for (const effect of file.effects) {
+      try {
+        EffectCompiler.compile(effect)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        compileErrors.push(`Effect '${effect.name ?? effect.id}': ${message}`)
+      }
+    }
+
     const summary: EffectFileSummary = {
       path: filePath,
       groupId: file.group.id,
@@ -165,6 +179,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       mode,
       updatedAt: Date.now(),
       bundled: file.bundled ?? false,
+      errors: compileErrors.length > 0 ? compileErrors : undefined,
     }
 
     this.updateSummary(summary)
