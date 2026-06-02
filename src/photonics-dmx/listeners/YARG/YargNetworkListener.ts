@@ -50,6 +50,40 @@ const YARG_DATAGRAM_VERSION = 1
 /** Max rate for forwarding identical-state packets (30 updates per second). */
 const IDENTICAL_FRAME_THROTTLE_MS = 1000 / 30
 
+/** Maps post-processing byte values to their string literal names. */
+const POST_PROCESSING_MAP: Record<number, PostProcessing> = {
+  [PostProcessingByte.Default]: 'Default',
+  [PostProcessingByte.Bloom]: 'Bloom',
+  [PostProcessingByte.Bright]: 'Bright',
+  [PostProcessingByte.Contrast]: 'Contrast',
+  [PostProcessingByte.Posterize]: 'Posterize',
+  [PostProcessingByte.PhotoNegative]: 'PhotoNegative',
+  [PostProcessingByte.Mirror]: 'Mirror',
+  [PostProcessingByte.BlackAndWhite]: 'BlackAndWhite',
+  [PostProcessingByte.SepiaTone]: 'SepiaTone',
+  [PostProcessingByte.SilverTone]: 'SilverTone',
+  [PostProcessingByte.Choppy_BlackAndWhite]: 'Choppy_BlackAndWhite',
+  [PostProcessingByte.PhotoNegative_RedAndBlack]: 'PhotoNegative_RedAndBlack',
+  [PostProcessingByte.Polarized_BlackAndWhite]: 'Polarized_BlackAndWhite',
+  [PostProcessingByte.Polarized_RedAndBlue]: 'Polarized_RedAndBlue',
+  [PostProcessingByte.Desaturated_Blue]: 'Desaturated_Blue',
+  [PostProcessingByte.Desaturated_Red]: 'Desaturated_Red',
+  [PostProcessingByte.Contrast_Red]: 'Contrast_Red',
+  [PostProcessingByte.Contrast_Green]: 'Contrast_Green',
+  [PostProcessingByte.Contrast_Blue]: 'Contrast_Blue',
+  [PostProcessingByte.Grainy_Film]: 'Grainy_Film',
+  [PostProcessingByte.Grainy_ChromaticAbberation]: 'Grainy_ChromaticAbberation',
+  [PostProcessingByte.Scanlines]: 'Scanlines',
+  [PostProcessingByte.Scanlines_BlackAndWhite]: 'Scanlines_BlackAndWhite',
+  [PostProcessingByte.Scanlines_Blue]: 'Scanlines_Blue',
+  [PostProcessingByte.Scanlines_Security]: 'Scanlines_Security',
+  [PostProcessingByte.Trails]: 'Trails',
+  [PostProcessingByte.Trails_Long]: 'Trails_Long',
+  [PostProcessingByte.Trails_Desaturated]: 'Trails_Desaturated',
+  [PostProcessingByte.Trails_Flickery]: 'Trails_Flickery',
+  [PostProcessingByte.Trails_Spacey]: 'Trails_Spacey',
+}
+
 export class YargNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null
   private cueHandler: YargCueRuntime
@@ -609,39 +643,7 @@ export class YargNetworkListener extends EventEmitter {
    * @private
    */
   private getPostProcessing(byteValue: number): PostProcessing {
-    const map: Record<number, PostProcessing> = {
-      [PostProcessingByte.Default]: 'Default',
-      [PostProcessingByte.Bloom]: 'Bloom',
-      [PostProcessingByte.Bright]: 'Bright',
-      [PostProcessingByte.Contrast]: 'Contrast',
-      [PostProcessingByte.Posterize]: 'Posterize',
-      [PostProcessingByte.PhotoNegative]: 'PhotoNegative',
-      [PostProcessingByte.Mirror]: 'Mirror',
-      [PostProcessingByte.BlackAndWhite]: 'BlackAndWhite',
-      [PostProcessingByte.SepiaTone]: 'SepiaTone',
-      [PostProcessingByte.SilverTone]: 'SilverTone',
-      [PostProcessingByte.Choppy_BlackAndWhite]: 'Choppy_BlackAndWhite',
-      [PostProcessingByte.PhotoNegative_RedAndBlack]: 'PhotoNegative_RedAndBlack',
-      [PostProcessingByte.Polarized_BlackAndWhite]: 'Polarized_BlackAndWhite',
-      [PostProcessingByte.Polarized_RedAndBlue]: 'Polarized_RedAndBlue',
-      [PostProcessingByte.Desaturated_Blue]: 'Desaturated_Blue',
-      [PostProcessingByte.Desaturated_Red]: 'Desaturated_Red',
-      [PostProcessingByte.Contrast_Red]: 'Contrast_Red',
-      [PostProcessingByte.Contrast_Green]: 'Contrast_Green',
-      [PostProcessingByte.Contrast_Blue]: 'Contrast_Blue',
-      [PostProcessingByte.Grainy_Film]: 'Grainy_Film',
-      [PostProcessingByte.Grainy_ChromaticAbberation]: 'Grainy_ChromaticAbberation',
-      [PostProcessingByte.Scanlines]: 'Scanlines',
-      [PostProcessingByte.Scanlines_BlackAndWhite]: 'Scanlines_BlackAndWhite',
-      [PostProcessingByte.Scanlines_Blue]: 'Scanlines_Blue',
-      [PostProcessingByte.Scanlines_Security]: 'Scanlines_Security',
-      [PostProcessingByte.Trails]: 'Trails',
-      [PostProcessingByte.Trails_Long]: 'Trails_Long',
-      [PostProcessingByte.Trails_Desaturated]: 'Trails_Desaturated',
-      [PostProcessingByte.Trails_Flickery]: 'Trails_Flickery',
-      [PostProcessingByte.Trails_Spacey]: 'Trails_Spacey',
-    }
-    return map[byteValue] ?? 'Unknown'
+    return POST_PROCESSING_MAP[byteValue] ?? 'Unknown'
   }
 
   /**
