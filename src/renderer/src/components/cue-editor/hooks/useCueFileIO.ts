@@ -374,6 +374,30 @@ export function useCueFileIO({
     setIsDirty,
   ])
 
+  /**
+   * Discards in-memory edits by re-reading the current file from disk. The editor mutates
+   * `editorDoc` directly (Add Cue, JSON Apply, metadata), so clearing the dirty flag alone
+   * leaves those edits in place — reverting to the on-disk copy is what truly discards them.
+   * No-op for an unsaved file (no `path` to revert to). Selection/flow are left to the caller.
+   */
+  const revertCurrentFileToDisk = useCallback(async (): Promise<void> => {
+    const currentPath = editorDoc?.path
+    if (!currentPath) return
+    try {
+      if (editorDoc?.mode === 'effect') {
+        const file = await readEffectFile(currentPath)
+        setEditorDoc({ mode: 'effect', file, path: currentPath })
+      } else {
+        const file = await readNodeCueFile(currentPath)
+        setEditorDoc({ mode: 'cue', file, path: currentPath })
+      }
+      setValidationErrors([])
+      setIsDirty(false)
+    } catch (error) {
+      log.error('Failed to revert current file', error)
+    }
+  }, [editorDoc, setEditorDoc, setValidationErrors, setIsDirty])
+
   return {
     selectFile,
     selectEffectFile,
@@ -381,6 +405,7 @@ export function useCueFileIO({
     handleDelete,
     handleExport,
     handleReload,
+    revertCurrentFileToDisk,
     refreshFiles,
     refreshEffectFiles,
   }

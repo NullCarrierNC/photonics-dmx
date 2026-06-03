@@ -13,6 +13,7 @@ import type {
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { validateNodeCue } from '../../../ipcApi'
+import { resolveCueCollisions } from '../lib/cueUtils'
 
 /**
  * Resolve a JSON Pointer path (e.g. ["nodes", "events", "0", "type"]) to character
@@ -79,6 +80,7 @@ type CueJsonEditorProps = {
   cueDefinition: YargNodeCueDefinition | AudioNodeCueDefinition
   editorDoc: EditorDocument
   selectedCueId: string
+  availableCueTypes: string[]
   onSave: (updatedCue: YargNodeCueDefinition | AudioNodeCueDefinition) => void
   onCancel: () => void
   onDirtyChange?: (dirty: boolean) => void
@@ -88,6 +90,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
   cueDefinition,
   editorDoc,
   selectedCueId,
+  availableCueTypes,
   onSave,
   onCancel,
   onDirtyChange,
@@ -99,6 +102,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
   const validationPassedRef = useRef(false)
   const [contentChangedAfterValidation, setContentChangedAfterValidation] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [notices, setNotices] = useState<string[]>([])
 
   useEffect(() => {
     onDirtyChange?.(hasEdits)
@@ -127,9 +131,10 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
 
     const raw = view.state.doc.toString()
     setValidationErrors([])
+    setNotices([])
     view.dispatch(setDiagnostics(view.state, []))
 
-    let parsed: unknown
+    let parsed: YargNodeCueDefinition | AudioNodeCueDefinition
     try {
       parsed = JSON.parse(raw) as YargNodeCueDefinition | AudioNodeCueDefinition
     } catch (e) {
@@ -139,7 +144,30 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
       return
     }
 
-    const fileWithCue = buildFileWithCue(parsed as YargNodeCueDefinition | AudioNodeCueDefinition)
+    // Reconcile identity collisions (id / name / cue type) against the other cues in this
+    // file so a cue pasted from elsewhere can be saved without clobbering a sibling.
+    const file = editorDoc.file as NodeCueFile
+    const siblings = file.cues.filter((c) => c.id !== selectedCueId)
+    const { cue: normalized, notices: collisionNotices } = resolveCueCollisions(
+      parsed,
+      siblings,
+      availableCueTypes,
+    )
+    if (collisionNotices.length > 0) {
+      // Rewrite the editor text with the resolved cue before validation passes, so the
+      // doc-change listener does not flip contentChangedAfterValidation.
+      view.dispatch({
+        changes: {
+          from: 0,
+          to: view.state.doc.length,
+          insert: JSON.stringify(normalized, null, 2),
+        },
+      })
+      setNotices(collisionNotices)
+    }
+    parsed = normalized
+
+    const fileWithCue = buildFileWithCue(parsed)
     const result = await validateNodeCue({ content: fileWithCue })
 
     if (!result.valid) {
@@ -176,7 +204,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
     setValidationErrors([])
     setValidationPassed(true)
     setContentChangedAfterValidation(false)
-  }, [buildFileWithCue, selectedCueId])
+  }, [buildFileWithCue, selectedCueId, editorDoc.file, availableCueTypes])
 
   const handleSave = useCallback(() => {
     const view = viewRef.current
@@ -206,6 +234,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
           setHasEdits(true)
           if (validationPassedRef.current) {
             setContentChangedAfterValidation(true)
+            setNotices([])
           }
           update.view.dispatch(setDiagnostics(update.state, []))
         }
@@ -243,7 +272,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
             type="button"
             onClick={handleSave}
             className="px-3 py-1.5 text-sm font-medium rounded text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
-            Save
+            Apply
           </button>
         ) : (
           <button
@@ -255,6 +284,13 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
         )}
       </div>
       <div ref={containerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" />
+      {notices.length > 0 && (
+        <div className="px-3 py-2 text-xs text-blue-100 bg-blue-900/50 border-t border-blue-800 overflow-auto max-h-24">
+          {notices.map((msg, i) => (
+            <div key={i}>{msg}</div>
+          ))}
+        </div>
+      )}
       {validationErrors.length > 0 && (
         <div className="px-3 py-2 text-xs text-red-200 bg-red-900/50 border-t border-red-800 overflow-auto max-h-24">
           {validationErrors.map((msg, i) => (

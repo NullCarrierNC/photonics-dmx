@@ -559,6 +559,7 @@ const useCueFiles = ({
     handleExport: fileIO.handleExport,
     refreshFiles: fileIO.refreshFiles,
     handleReload: fileIO.handleReload,
+    revertCurrentFileToDisk: fileIO.revertCurrentFileToDisk,
     existingGroupIdsForNewFileModal,
     pendingImport,
     clearPendingImport,

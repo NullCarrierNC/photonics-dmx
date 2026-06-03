@@ -216,6 +216,7 @@ const CueEditor: React.FC = () => {
     handleImport,
     handleExport,
     handleReload,
+    revertCurrentFileToDisk,
     pendingImport,
     clearPendingImport,
     commitPendingImport,
@@ -767,12 +768,15 @@ const CueEditor: React.FC = () => {
         cues: file.cues.map((c) => (c.id === selectedCueId ? updatedCue : c)),
       }
       setEditorDoc({ mode: 'cue', file: updatedFile, path: editorDoc.path })
+      // Collision resolution may have regenerated the cue's id; follow it so the editor
+      // keeps the same cue selected instead of falling back to another one.
+      setSelectedCueId(updatedCue.id)
       loadCueIntoFlow(updatedCue)
       setShowJsonEditor(false)
       setJsonEditorDirty(false)
       setIsDirty(true)
     },
-    [editorDoc, selectedCueId, loadCueIntoFlow, setEditorDoc, setIsDirty],
+    [editorDoc, selectedCueId, loadCueIntoFlow, setEditorDoc, setSelectedCueId, setIsDirty],
   )
 
   const handleJsonEffectSave = useCallback(
@@ -784,12 +788,13 @@ const CueEditor: React.FC = () => {
         effects: file.effects.map((e) => (e.id === selectedCueId ? updatedEffect : e)),
       }
       setEditorDoc({ mode: 'effect', file: updatedFile, path: editorDoc.path })
+      setSelectedCueId(updatedEffect.id)
       loadCueIntoFlow(updatedEffect)
       setShowJsonEditor(false)
       setJsonEditorDirty(false)
       setIsDirty(true)
     },
-    [editorDoc, selectedCueId, loadCueIntoFlow, setEditorDoc, setIsDirty],
+    [editorDoc, selectedCueId, loadCueIntoFlow, setEditorDoc, setSelectedCueId, setIsDirty],
   )
 
   const handleGraphPrettify = useCallback(() => {
@@ -837,15 +842,17 @@ const CueEditor: React.FC = () => {
     [showJsonEditor, jsonEditorDirty, isDirty],
   )
 
-  const handleDiscardNavigation = useCallback(() => {
-    if (pendingNavigation) {
-      pendingNavigation()
-      setPendingNavigation(null)
-      setShowJsonEditor(false)
-      setJsonEditorDirty(false)
-      setIsDirty(false)
-    }
-  }, [pendingNavigation, setIsDirty])
+  const handleDiscardNavigation = useCallback(async () => {
+    if (!pendingNavigation) return
+    // Edits live in the in-memory editorDoc (Add Cue / JSON Apply / metadata), so truly
+    // discarding them means reverting to the on-disk copy before performing the navigation.
+    await revertCurrentFileToDisk()
+    pendingNavigation()
+    setPendingNavigation(null)
+    setShowJsonEditor(false)
+    setJsonEditorDirty(false)
+    setIsDirty(false)
+  }, [pendingNavigation, revertCurrentFileToDisk, setIsDirty])
 
   const fileList = mode === 'yarg' ? groupedFiles.yarg : groupedFiles.audio
   const effectFiles = mode === 'yarg' ? groupedEffectFiles.yarg : groupedEffectFiles.audio
@@ -972,6 +979,7 @@ const CueEditor: React.FC = () => {
                 cueDefinition={currentCueDefinition}
                 editorDoc={editorDoc}
                 selectedCueId={selectedCueId}
+                availableCueTypes={availableCueTypes}
                 onSave={handleJsonEditorSave}
                 onCancel={() => {
                   setShowJsonEditor(false)
