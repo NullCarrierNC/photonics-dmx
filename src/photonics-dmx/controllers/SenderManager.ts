@@ -243,14 +243,20 @@ export class SenderManager {
       return
     }
 
+    // Detach the sender before stopping it. stop() blacks the universe out and then waits briefly
+    // before closing; while it runs, the publisher must no longer route frames here (send() gates
+    // on enabledSenders) or a live cue frame would land after the blackout and hold the last state
+    // on the wire. Removing the error handler first also prevents a stop()-time error from
+    // re-entering disableSender.
+    sender.removeSendError(this.handleSenderError)
+    this.enabledSenders.delete(id)
+    this.initializingSenders.delete(id)
+
     try {
       await sender.stop()
     } catch (err) {
       log.error(`Error stopping sender with ID "${id}":`, err)
     }
-    sender.removeSendError(this.handleSenderError)
-    this.enabledSenders.delete(id)
-    this.initializingSenders.delete(id)
     log.info(`Sender with ID "${id}" disabled.`)
   }
 

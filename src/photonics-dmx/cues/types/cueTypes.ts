@@ -349,6 +349,14 @@ export enum CueType {
   DisableAll = 'DisableAll', // RB3 has a discreet disable all cue
 }
 
+/** All valid {@link CueType} string values, for membership checks against wire data. */
+const CUE_TYPE_VALUES: ReadonlySet<string> = new Set<string>(Object.values(CueType))
+
+/** True if `value` is a known {@link CueType}. Used to drop unrecognised wire cue values. */
+export function isCueType(value: string): value is CueType {
+  return CUE_TYPE_VALUES.has(value)
+}
+
 /**
  * Discrete strobe-speed slots used by hardware-strobe-channel fixtures. Maps each YARG/RB3 strobe
  * cue to the per-fixture `strobeValues` entry written to the fixture's strobe DMX channel.

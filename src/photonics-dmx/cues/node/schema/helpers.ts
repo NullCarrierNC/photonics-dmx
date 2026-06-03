@@ -125,7 +125,8 @@ export const detectCycles = (
  * with validValues must use a literal that is in the variable's validValues list.
  */
 export const checkConditionalValidValues = (
-  cueName: string,
+  name: string,
+  domain: 'cue' | 'effect',
   logicNodes: LogicNode[],
   variableDefinitions: VariableDefinition[],
   errors: string[],
@@ -147,7 +148,7 @@ export const checkConditionalValidValues = (
       const def = varMap.get(rightVar)
       if (def?.validValues?.length && !def.validValues.includes(leftLiteral)) {
         errors.push(
-          `cue '${cueName}': Conditional '${node.id}' compares literal "${leftLiteral}" against variable "${rightVar}" — valid values are: ${def.validValues.join(', ')}`,
+          `${domain} '${name}': Conditional '${node.id}' compares literal "${leftLiteral}" against variable "${rightVar}" — valid values are: ${def.validValues.join(', ')}`,
         )
       }
     }
@@ -155,7 +156,7 @@ export const checkConditionalValidValues = (
       const def = varMap.get(leftVar)
       if (def?.validValues?.length && !def.validValues.includes(rightLiteral)) {
         errors.push(
-          `cue '${cueName}': Conditional '${node.id}' compares literal "${rightLiteral}" against variable "${leftVar}" — valid values are: ${def.validValues.join(', ')}`,
+          `${domain} '${name}': Conditional '${node.id}' compares literal "${rightLiteral}" against variable "${leftVar}" — valid values are: ${def.validValues.join(', ')}`,
         )
       }
     }

@@ -19,6 +19,7 @@ import {
   migrateUserLightsForStrobeChannel,
 } from '../../photonics-dmx/helpers/lightingConfigMigration'
 import { syncRigsConfigWithUserLights } from '../../photonics-dmx/helpers/rigTemplateSync'
+import equal from 'fast-deep-equal'
 
 import {
   type AudioConfig,
@@ -75,6 +76,12 @@ export class ConfigurationManager {
   private userLights: ConfigFile<UserLightsConfig>
   private lightingLayout: ConfigFile<LightingConfiguration>
   private dmxRigs: ConfigFile<DmxRigsConfig>
+  /**
+   * Last DmxRigsConfig getDmxRigs() scheduled to persist. Lets a read storm coalesce identical
+   * heal-writes while the async update() is still in flight (the in-memory config is not updated
+   * until save() resolves). Reset to null by other dmxRigs writers so a real change still persists.
+   */
+  private lastScheduledDmxRigsPersist: DmxRigsConfig | null = null
   private configCorruptRecovery: ConfigCorruptInfo[] = []
 
   /** Clears and returns batched config recovery events (for one main → renderer send). */
@@ -99,6 +106,9 @@ export class ConfigurationManager {
       onCorruptRecovery: onCorrupt,
       validate: validateLightingLayoutData,
     })
+    // The ConfigFile envelope version stays at 1; rig migrations run on read through a separate
+    // internal schemaVersion (migrateDmxRigsConfig) because they need the userLights library to
+    // realign each rig against its template, which ConfigFile.applyMigration has no access to.
     this.dmxRigs = new ConfigFile('dmxRigs.json', DEFAULT_DMX_RIGS, 1, {
       onCorruptRecovery: onCorrupt,
       validate: validateDmxRigsData,
@@ -485,11 +495,22 @@ export class ConfigurationManager {
       this.getUserLights(),
     )
     if (migrationChanged || syncChanged) {
-      void this.dmxRigs
-        .update(synced)
-        .catch((err) =>
-          log.error('[Photonics Config] Failed to persist migrated/synced DMX rigs:', err),
-        )
+      // Coalesce identical heal-writes during a read storm. getActiveRigs/getDmxRig call this in
+      // bursts, and the in-memory config is not updated until the async update() resolves, so each
+      // call would otherwise re-detect the same change and schedule another identical write. Skip
+      // when an equal payload is already scheduled; other dmxRigs writers reset the memo so a real
+      // change still persists.
+      if (
+        this.lastScheduledDmxRigsPersist === null ||
+        !equal(this.lastScheduledDmxRigsPersist, synced)
+      ) {
+        this.lastScheduledDmxRigsPersist = synced
+        void this.dmxRigs
+          .update(synced)
+          .catch((err) =>
+            log.error('[Photonics Config] Failed to persist migrated/synced DMX rigs:', err),
+          )
+      }
     }
     return synced.rigs
   }
@@ -505,6 +526,7 @@ export class ConfigurationManager {
     if (!changed) {
       return false
     }
+    this.lastScheduledDmxRigsPersist = null
     await this.dmxRigs.update(synced)
     return true
   }
@@ -531,6 +553,7 @@ export class ConfigurationManager {
       rigs.push(rig)
     }
 
+    this.lastScheduledDmxRigsPersist = null
     await this.dmxRigs.update({ ...current, rigs })
   }
 
@@ -540,6 +563,7 @@ export class ConfigurationManager {
   async deleteDmxRig(id: string): Promise<void> {
     const current = this.dmxRigs.get()
     const rigs = current.rigs.filter((rig) => rig.id !== id)
+    this.lastScheduledDmxRigsPersist = null
     await this.dmxRigs.update({ ...current, rigs })
   }
 

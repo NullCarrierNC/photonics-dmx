@@ -160,7 +160,9 @@ export class ConfigFile<T> {
       fileContent = fs.readFileSync(this.filePath, 'utf-8')
     } catch (error) {
       log.error(`[Photonics Config] Failed to read ${this.filePath}:`, error)
-      return this.defaultData
+      // Treat an unreadable file like a parse/schema failure: back it up and surface a
+      // recovery event instead of silently masking the user's config with defaults.
+      return this.recoverToDefault('read', { parseOrMigrateError: error })
     }
 
     let parsed: unknown

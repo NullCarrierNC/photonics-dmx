@@ -4,6 +4,7 @@ import { dmxValuesAtom, previewRigIdAtom } from '@renderer/atoms'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getDmxRig, enableSender } from '../ipcApi'
+import { selectDmxBufferForRig } from '../utils/dmxPreviewBuffer'
 import type { DmxRig, LightingConfiguration, IpcSenderConfig } from '../../../photonics-dmx/types'
 import type { DmxValuesPayload } from '../../../shared/ipcTypes'
 import { createLogger } from '../../../shared/logger'
@@ -95,13 +96,7 @@ export function useDmxPreview(): {
   // `kind: 'manual'` is DMX Console / shutdown blackout — we store the flat buffer as-is.
   useEffect(() => {
     const handleDmxValues = (payload: DmxValuesPayload) => {
-      if (payload.kind === 'manual') {
-        setDmxValues(payload.buffer ?? {})
-        return
-      }
-      const rigId = selectedRigIdRef.current
-      const rigBuffer = rigId != null ? payload.rigBuffers[rigId] : undefined
-      setDmxValues(rigBuffer ?? {})
+      setDmxValues(selectDmxBufferForRig(payload, selectedRigIdRef.current))
     }
 
     return registerIpcListener(RENDERER_RECEIVE.DMX_VALUES, handleDmxValues)

@@ -108,23 +108,6 @@ export interface ILayerManager {
 }
 
 /**
- * @interface IEventScheduler
- * @description Centralized tracking of scheduled events
- */
-export interface IEventScheduler {
-  // Clock integration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- clock interface from external lib
-  registerWithClock(clock: any): void
-  unregisterFromClock(): void
-
-  // Additional scheduling methods
-  scheduleEventAt(targetTime: number, callback: () => void): string
-  scheduleRepeatingEvent(callback: () => void, interval: number, initialDelay?: number): string
-  removeEvent(eventId: string): void
-  destroy(): void
-}
-
-/**
  * @interface ITransitionEngine
  * @description Handles moving effect transitions through their states
  */

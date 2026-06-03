@@ -113,7 +113,7 @@ export const validateYargNodeCueFile = (
 
     // Check conditional nodes: literal vs variable validValues
     const cueVarDefs: VariableDefinition[] = [...groupVariables, ...cueVariables]
-    checkConditionalValidValues(cue.name, cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
+    checkConditionalValidValues(cue.name, 'cue', cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
   }
 
   if (semanticErrors.length > 0) {
@@ -196,7 +196,7 @@ export const validateAudioNodeCueFile = (
 
     // Check conditional nodes: literal vs variable validValues
     const cueVarDefs: VariableDefinition[] = [...groupVariables, ...cueVariables]
-    checkConditionalValidValues(cue.name, cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
+    checkConditionalValidValues(cue.name, 'cue', cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
   }
 
   if (semanticErrors.length > 0) {
@@ -271,7 +271,7 @@ const checkEffectSemantics = (effect: EffectDefinition, semanticErrors: string[]
 
   // Check conditional nodes: literal vs variable validValues
   const effectVarDefs: VariableDefinition[] = effect.variables ?? []
-  checkConditionalValidValues(effect.name, logicNodes, effectVarDefs, semanticErrors)
+  checkConditionalValidValues(effect.name, 'effect', logicNodes, effectVarDefs, semanticErrors)
 }
 
 /**

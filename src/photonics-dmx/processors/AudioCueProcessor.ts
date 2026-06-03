@@ -294,7 +294,9 @@ export class AudioCueProcessor {
    */
   public refreshCueSelection(): void {
     if (this.gameModeManager) {
-      this.gameModeManager.start()
+      // Re-validate the running Game Mode cue rather than restarting it: an incidental refresh
+      // (cue-group toggle, cue hot-reload) must not re-roll the cue and reset its dwell timer.
+      this.gameModeManager.ensureValidPrimary()
       this.chainFanout.audioSyncSlots(this.gameModeManager.getActivePrimaryCue(), null, null, true)
       return
     }

@@ -47,6 +47,25 @@ describe('SacnSender', () => {
     expect(mockSend).toHaveBeenCalledWith({ payload: { 1: 255, 2: 128 } })
   })
 
+  it('flushes the last throttled frame on the trailing edge', async () => {
+    // 50 Hz => 20 ms minimum interval between sends.
+    const throttled = new SacnSender({ universe: 7, maxOutputRate: 50 })
+    await throttled.start()
+    mockSend.mockClear()
+
+    await throttled.send({ 1: 10 }) // leading frame goes out immediately
+    await throttled.send({ 1: 20 }) // within the interval: withheld, not dropped
+
+    expect(mockSend).toHaveBeenCalledTimes(1)
+    expect(mockSend).not.toHaveBeenCalledWith({ payload: { 1: 20 } })
+
+    // Wait past the interval for the trailing-edge flush.
+    await new Promise((resolve) => setTimeout(resolve, 40))
+
+    expect(mockSend).toHaveBeenCalledWith({ payload: { 1: 20 } })
+    await throttled.stop().catch(() => {})
+  })
+
   it('stop closes sender', async () => {
     await sender.start()
     await sender.stop()

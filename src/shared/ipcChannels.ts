@@ -39,7 +39,6 @@ export const WINDOW = {
 export const SHELL = {
   SHOW_ITEM_IN_FOLDER: 'shell:showItemInFolder',
   OPEN_PATH: 'shell:openPath',
-  RUN_NODE_SCRIPT: 'shell:runNodeScript',
 } as const
 
 // ---- Lifecycle ----

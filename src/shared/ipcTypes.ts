@@ -260,10 +260,6 @@ export interface IpcInvokeMap {
     request: string
     response: IpcErrorResult | { success: true; result: string }
   }
-  [SHELL.RUN_NODE_SCRIPT]: {
-    request: { scriptName: string; args: string[] }
-    response: { success: true; stdout: string; stderr: string } | IpcErrorResult
-  }
 
   // ---- Cue / listeners ----
   [CUE.DISABLE_YARG]: {

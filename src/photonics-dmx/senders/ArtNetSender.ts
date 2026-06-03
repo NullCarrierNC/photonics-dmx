@@ -50,26 +50,6 @@ export class ArtNetSender extends BaseSender {
         'artnet-universe',
         new ArtnetDriver(this.host, this.options),
       )
-
-      // Listen for error events from the DMX instance
-      this.dmx.on('error', (err: unknown) => {
-        log.error('ArtNetSender DMX error event:', err)
-        const errObj =
-          err && typeof err === 'object' ? (err as { code?: string; syscall?: string }) : null
-        const isNetworkError =
-          errObj &&
-          (errObj.code === 'EHOSTUNREACH' ||
-            errObj.code === 'EHOSTDOWN' ||
-            errObj.code === 'ENETUNREACH' ||
-            errObj.code === 'ETIMEDOUT' ||
-            errObj.syscall === 'send')
-        const errorEvent = new SenderError(err, {
-          senderId: 'artnet',
-          shouldDisable: Boolean(isNetworkError),
-          code: errObj && 'code' in errObj ? String(errObj.code) : undefined,
-        })
-        this.eventEmitter.emit('SenderError', errorEvent)
-      })
     } catch (err) {
       const errorEvent = new SenderError(err, { senderId: 'artnet' })
       this.eventEmitter.emit('SenderError', errorEvent)
@@ -86,18 +66,15 @@ export class ArtNetSender extends BaseSender {
 
     try {
       this.lastSendTimeMs = 0
-      // First set all channels to zero (blackout)
+      // Blackout all 512 channels through send(), which converts the 1-based DMX channels to the
+      // 0-based keys dmxnet expects (its prepChannel rejects channel 512).
       const zeroPayload: Record<number, number> = {}
-      for (let channel = 1; channel <= 255; channel++) {
+      for (let channel = 1; channel <= 512; channel++) {
         zeroPayload[channel] = 0
       }
-
-      // Try to update one last time
       try {
-        if (this.universe) {
-          this.universe.update(zeroPayload)
-          log.info('Sent zero values to all ArtNet channels')
-        }
+        await this.send(zeroPayload)
+        log.info('Sent zero values to all ArtNet channels')
       } catch (err) {
         log.error('Failed to send zero values before stopping:', err)
       }

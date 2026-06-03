@@ -86,6 +86,8 @@ export function evaluateLogicNode(
         case 'multiply':
           result = left * right
           break
+        // Divide/modulus by zero intentionally clamp to 0 rather than throwing: math nodes absorb
+        // bad operands as a data condition instead of surfacing a runtime error.
         case 'divide':
           result = right === 0 ? 0 : left / right
           break

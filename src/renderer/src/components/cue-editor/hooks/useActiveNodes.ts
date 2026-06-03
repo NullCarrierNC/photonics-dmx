@@ -14,7 +14,7 @@ type NodeExecutionPayload = {
 /**
  * Tracks which nodes are currently executing for active-node highlighting.
  * Listens to node-cues:node-execution IPC, filters by current graph (cue or effect id),
- * and enforces a minimum highlight duration (200ms) so fast logic nodes remain visible.
+ * and enforces a minimum highlight duration (`MIN_HIGHLIGHT_MS`) so fast logic nodes stay visible.
  */
 export function useActiveNodes(currentGraphId: string | null): Set<string> {
   const [activeNodeIds, setActiveNodeIds] = useState<Set<string>>(() => new Set())
@@ -84,6 +84,21 @@ export function useActiveNodes(currentGraphId: string | null): Set<string> {
       pendingRef.current.clear()
     }
   }, [currentGraphId])
+
+  useEffect(() => {
+    // Clear pending highlight timers and the queued animation frame on unmount so their
+    // callbacks do not run setState after the component is gone.
+    const timers = timersRef.current
+    const raf = rafRef
+    return () => {
+      for (const t of timers.values()) clearTimeout(t)
+      timers.clear()
+      if (raf.current !== null) {
+        cancelAnimationFrame(raf.current)
+        raf.current = null
+      }
+    }
+  }, [])
 
   return activeNodeIds
 }

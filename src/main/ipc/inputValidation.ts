@@ -531,6 +531,13 @@ export function validateDmxRigPayload(data: unknown): ValidationResult<DmxRig> {
   return { ok: true, value: rig }
 }
 
+/**
+ * Resolves `targetPath` and confirms it sits under one of `allowedRoots` after normalization,
+ * rejecting empty input, null bytes, and paths that escape the roots. The default roots include the
+ * user's home directory by design: users import/export cue and effect libraries to arbitrary
+ * locations they choose, so shell open/show operations are scoped to the home tree rather than a
+ * single app directory.
+ */
 export function validatePathUnderAllowedRoots(
   targetPath: unknown,
   allowedRoots: string[] = [process.cwd(), os.homedir(), os.tmpdir()],
@@ -556,41 +563,6 @@ export function validatePathUnderAllowedRoots(
   }
 
   return { ok: true, value: resolvedTarget }
-}
-
-/**
- * Resolves a script name to an absolute path under `appPath/scripts`.
- * `scriptName` must be a single file segment (no path separators, `..`, or NUL).
- */
-export function validateNodeScriptPath(
-  appPath: string,
-  scriptName: string,
-): ValidationResult<string> {
-  if (typeof scriptName !== 'string' || scriptName.length === 0) {
-    return { ok: false, error: 'Script name is required' }
-  }
-  if (scriptName.includes('\0')) {
-    return { ok: false, error: 'Script name must not contain null bytes' }
-  }
-  if (scriptName === '.' || scriptName === '..') {
-    return { ok: false, error: 'Script name must be a base filename' }
-  }
-  if (scriptName.includes('/') || scriptName.includes('\\')) {
-    return { ok: false, error: 'Script name must not contain path separators' }
-  }
-  if (scriptName !== path.basename(scriptName)) {
-    return { ok: false, error: 'Script name must not include path segments' }
-  }
-
-  const scriptsRoot = path.resolve(path.join(appPath, 'scripts'))
-  const scriptPath = path.join(scriptsRoot, scriptName)
-  const resolved = path.resolve(scriptPath)
-  const rel = path.relative(scriptsRoot, resolved)
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
-    return { ok: false, error: 'Script must resolve under the app scripts directory' }
-  }
-
-  return { ok: true, value: resolved }
 }
 
 function isStringArray(x: unknown): x is string[] {

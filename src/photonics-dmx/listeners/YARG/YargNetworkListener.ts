@@ -8,6 +8,7 @@ import {
   Beat,
   StrobeState,
   CueType,
+  isCueType,
   lightingCueMap,
   InstrumentNoteType,
   DrumNoteType,
@@ -49,6 +50,40 @@ const YARG_DATAGRAM_VERSION = 1
 /** Max rate for forwarding identical-state packets (30 updates per second). */
 const IDENTICAL_FRAME_THROTTLE_MS = 1000 / 30
 
+/** Maps post-processing byte values to their string literal names. */
+const POST_PROCESSING_MAP: Record<number, PostProcessing> = {
+  [PostProcessingByte.Default]: 'Default',
+  [PostProcessingByte.Bloom]: 'Bloom',
+  [PostProcessingByte.Bright]: 'Bright',
+  [PostProcessingByte.Contrast]: 'Contrast',
+  [PostProcessingByte.Posterize]: 'Posterize',
+  [PostProcessingByte.PhotoNegative]: 'PhotoNegative',
+  [PostProcessingByte.Mirror]: 'Mirror',
+  [PostProcessingByte.BlackAndWhite]: 'BlackAndWhite',
+  [PostProcessingByte.SepiaTone]: 'SepiaTone',
+  [PostProcessingByte.SilverTone]: 'SilverTone',
+  [PostProcessingByte.Choppy_BlackAndWhite]: 'Choppy_BlackAndWhite',
+  [PostProcessingByte.PhotoNegative_RedAndBlack]: 'PhotoNegative_RedAndBlack',
+  [PostProcessingByte.Polarized_BlackAndWhite]: 'Polarized_BlackAndWhite',
+  [PostProcessingByte.Polarized_RedAndBlue]: 'Polarized_RedAndBlue',
+  [PostProcessingByte.Desaturated_Blue]: 'Desaturated_Blue',
+  [PostProcessingByte.Desaturated_Red]: 'Desaturated_Red',
+  [PostProcessingByte.Contrast_Red]: 'Contrast_Red',
+  [PostProcessingByte.Contrast_Green]: 'Contrast_Green',
+  [PostProcessingByte.Contrast_Blue]: 'Contrast_Blue',
+  [PostProcessingByte.Grainy_Film]: 'Grainy_Film',
+  [PostProcessingByte.Grainy_ChromaticAbberation]: 'Grainy_ChromaticAbberation',
+  [PostProcessingByte.Scanlines]: 'Scanlines',
+  [PostProcessingByte.Scanlines_BlackAndWhite]: 'Scanlines_BlackAndWhite',
+  [PostProcessingByte.Scanlines_Blue]: 'Scanlines_Blue',
+  [PostProcessingByte.Scanlines_Security]: 'Scanlines_Security',
+  [PostProcessingByte.Trails]: 'Trails',
+  [PostProcessingByte.Trails_Long]: 'Trails_Long',
+  [PostProcessingByte.Trails_Desaturated]: 'Trails_Desaturated',
+  [PostProcessingByte.Trails_Flickery]: 'Trails_Flickery',
+  [PostProcessingByte.Trails_Spacey]: 'Trails_Spacey',
+}
+
 export class YargNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null
   private cueHandler: YargCueRuntime
@@ -67,9 +102,6 @@ export class YargNetworkListener extends EventEmitter {
 
   /** Timestamp (ms) when we last forwarded an identical frame; used to throttle unchanged packets to 30 Hz. */
   private lastForwardedIdenticalAt = 0
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- log payload shape varies
-  private lastLogData: Record<string, any> | null = null
 
   // Track the last scene to detect transitions
   private lastScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | 'Practice' | null =
@@ -376,7 +408,9 @@ export class YargNetworkListener extends EventEmitter {
         postProcessing: this.getPostProcessing(postProcessingByte),
         fogState,
         strobeState: this.getStrobeState(strobeStateValue),
-        performer: 0,
+        // Union of performers currently spotlighted or singing along (PerformerByte bitmask).
+        // TODO: verify the intended performer against live YARG data.
+        performer: spotlight | singalong,
         spotlight,
         singalong,
         ...(cameraCutConstraint !== undefined && {
@@ -409,27 +443,6 @@ export class YargNetworkListener extends EventEmitter {
 
     this.handleSceneTransition(YargCueData.currentScene)
 
-    const logData = {
-      currentScene: YargCueData.currentScene,
-      songSection: YargCueData.songSection,
-      beatsPerMinute: YargCueData.beatsPerMinute,
-      lightingCue: YargCueData.lightingCue,
-      guitarNotes: YargCueData.guitarNotes,
-      bassNotes: YargCueData.bassNotes,
-      drumNotes: YargCueData.drumNotes,
-      keysNotes: YargCueData.keysNotes,
-      postProcessing: YargCueData.postProcessing,
-      fogState: YargCueData.fogState,
-      beat: YargCueData.beat,
-      keyframe: YargCueData.keyframe,
-      performer: YargCueData.performer,
-      strobeState: YargCueData.strobeState,
-    }
-    if (this.lastLogData && !this.isDataEqual(this.lastLogData, logData)) {
-      this.lastLogData = logData
-    }
-    this.lastLogData = logData
-
     switch (YargCueData.beat) {
       case 'Strong':
         this.cueHandler.handleBeat()
@@ -452,8 +465,8 @@ export class YargNetworkListener extends EventEmitter {
     }
 
     const cueType = YargCueData.lightingCue
-    if (cueType) {
-      this.cueHandler.handleCue(cueType as CueType, YargCueData)
+    if (cueType && isCueType(cueType)) {
+      this.cueHandler.handleCue(cueType, YargCueData)
     } else {
       log.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
     }
@@ -630,39 +643,7 @@ export class YargNetworkListener extends EventEmitter {
    * @private
    */
   private getPostProcessing(byteValue: number): PostProcessing {
-    const map: Record<number, PostProcessing> = {
-      [PostProcessingByte.Default]: 'Default',
-      [PostProcessingByte.Bloom]: 'Bloom',
-      [PostProcessingByte.Bright]: 'Bright',
-      [PostProcessingByte.Contrast]: 'Contrast',
-      [PostProcessingByte.Posterize]: 'Posterize',
-      [PostProcessingByte.PhotoNegative]: 'PhotoNegative',
-      [PostProcessingByte.Mirror]: 'Mirror',
-      [PostProcessingByte.BlackAndWhite]: 'BlackAndWhite',
-      [PostProcessingByte.SepiaTone]: 'SepiaTone',
-      [PostProcessingByte.SilverTone]: 'SilverTone',
-      [PostProcessingByte.Choppy_BlackAndWhite]: 'Choppy_BlackAndWhite',
-      [PostProcessingByte.PhotoNegative_RedAndBlack]: 'PhotoNegative_RedAndBlack',
-      [PostProcessingByte.Polarized_BlackAndWhite]: 'Polarized_BlackAndWhite',
-      [PostProcessingByte.Polarized_RedAndBlue]: 'Polarized_RedAndBlue',
-      [PostProcessingByte.Desaturated_Blue]: 'Desaturated_Blue',
-      [PostProcessingByte.Desaturated_Red]: 'Desaturated_Red',
-      [PostProcessingByte.Contrast_Red]: 'Contrast_Red',
-      [PostProcessingByte.Contrast_Green]: 'Contrast_Green',
-      [PostProcessingByte.Contrast_Blue]: 'Contrast_Blue',
-      [PostProcessingByte.Grainy_Film]: 'Grainy_Film',
-      [PostProcessingByte.Grainy_ChromaticAbberation]: 'Grainy_ChromaticAbberation',
-      [PostProcessingByte.Scanlines]: 'Scanlines',
-      [PostProcessingByte.Scanlines_BlackAndWhite]: 'Scanlines_BlackAndWhite',
-      [PostProcessingByte.Scanlines_Blue]: 'Scanlines_Blue',
-      [PostProcessingByte.Scanlines_Security]: 'Scanlines_Security',
-      [PostProcessingByte.Trails]: 'Trails',
-      [PostProcessingByte.Trails_Long]: 'Trails_Long',
-      [PostProcessingByte.Trails_Desaturated]: 'Trails_Desaturated',
-      [PostProcessingByte.Trails_Flickery]: 'Trails_Flickery',
-      [PostProcessingByte.Trails_Spacey]: 'Trails_Spacey',
-    }
-    return map[byteValue] ?? 'Unknown'
+    return POST_PROCESSING_MAP[byteValue] ?? 'Unknown'
   }
 
   /**

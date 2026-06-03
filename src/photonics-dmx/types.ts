@@ -37,7 +37,7 @@ export type Color =
 /**
  * Represents how a color should blend with colors on lower layers
  */
-export type BlendMode = 'replace' | 'add' | 'multiply' | 'overlay' | 'mix'
+export type BlendMode = 'replace' | 'add' | 'mix'
 
 /**
  * Represents brightness levels for lights
@@ -676,7 +676,7 @@ export interface DmxRig {
  */
 export interface DmxRigsConfig {
   rigs: DmxRig[]
-  /** Bumped once the legacy `front-back` → `two-rows` rename and initial mount backfill have run. */
+  /** Schema version driving the on-read rig migrations; see `CURRENT_RIGS_SCHEMA_VERSION` and `migrateDmxRigsConfig`. */
   schemaVersion?: number
 }
 

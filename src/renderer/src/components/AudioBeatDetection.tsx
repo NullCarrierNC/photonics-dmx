@@ -5,7 +5,7 @@ const log = createLogger('AudioBeatDetection')
 
 const AudioBeatDetection: React.FC = () => {
   const [threshold, setThreshold] = useState(0.3)
-  const [decayRate, setDecayRate] = useState(0.95)
+  const [decayRate, setDecayRate] = useState(0.8)
   const [minInterval, setMinInterval] = useState(100)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -15,7 +15,7 @@ const AudioBeatDetection: React.FC = () => {
         const config = await getAudioConfig()
         if (config?.beatDetection) {
           setThreshold(config.beatDetection.threshold || 0.3)
-          setDecayRate(config.beatDetection.decayRate || 0.95)
+          setDecayRate(config.beatDetection.decayRate || 0.8)
           setMinInterval(config.beatDetection.minInterval || 100)
         }
       } catch (error) {

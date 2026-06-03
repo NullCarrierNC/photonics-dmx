@@ -120,7 +120,10 @@ export interface AudioConfig {
   beatDetection: {
     /** Minimum threshold for beat detection (0.0-1.0, default: 0.3) */
     threshold: number
-    /** Decay rate for beat detection (0.0-1.0). Currently unused: `BeatDetector` does not read this value. */
+    /**
+     * Adaptive noise-floor decay (0.0-1.0), read by `BeatDetector` via `noiseFloorDecayFor`.
+     * Higher keeps the floor up longer (fewer onsets); lower lets it fall faster (more sensitive).
+     */
     decayRate: number
     /** Minimum time between beats in milliseconds (default: 100) */
     minInterval: number

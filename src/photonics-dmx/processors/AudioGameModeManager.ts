@@ -67,6 +67,28 @@ export class AudioGameModeManager {
     this.onCueSwitch?.(this.primaryCue)
   }
 
+  /**
+   * Re-validate the active primary cue against the current eligible pool WITHOUT restarting a
+   * still-valid run. Re-rolls and reschedules only when the active cue is empty or no longer
+   * eligible (e.g. after the user toggles cue groups); otherwise the running cue and its dwell
+   * timer are left untouched. Used by `refreshCueSelection` so incidental refreshes (settings
+   * edits, cue hot-reloads) don't yank the lights to a new cue and reset the schedule.
+   */
+  public ensureValidPrimary(): void {
+    let pool = filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes())
+    if (pool.length === 0) {
+      pool = filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes(true))
+    }
+    const eligible = pool.length > 0 ? pool : this.registry.getAvailableCueTypes()
+    if (this.primaryCue !== '' && eligible.includes(this.primaryCue)) {
+      // Active cue still valid: leave it and its dwell timer running; just re-broadcast state.
+      this.emitScheduleChange()
+      return
+    }
+    // Active cue is empty or not in the eligible pool: pick a fresh one and (re)schedule.
+    this.start()
+  }
+
   public setOnCueSwitch(cb: ((cueType: AudioCueType) => void) | null): void {
     this.onCueSwitch = cb
   }

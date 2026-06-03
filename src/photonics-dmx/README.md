@@ -77,7 +77,6 @@ The sequencing system contains several other components, though these are mainly
 - `TransitionEngine`: Handles the animation and timing of transitions between light states using the shared frame context captured by the Sequencer.
 - `SongEventHandler`: Processes beat, measure, and other musical events.
 - `SystemEffectsController`: Manages system-level effects blackout, which don't act like normal cue/effects.
-- `EventScheduler`: Handles scheduling and management of timed events within the system using the centralized clock.
 - `Clock`: Provides centralized timing control with configurable precision (default 10 ms) for all system components. Each tick yields a `FrameContext` that is passed to TransitionEngine and LightTransitionController.
 - `EffectTransformer`: Transforms generic effect definitions into concrete transition specifications.
 - `LightStateManager`: Manages the final merged RGBIO state for each light and publishes the output of each atomic frame calculation to external listeners.
@@ -190,8 +189,8 @@ This allows effects to transition smoothly into another and prevents the lights 
 if there is a gap between effects. Layers above 0 are cleaned up when their effects complete with no
 queued effects to maintain a clean state.
 
-`EffectManager.setEffect`: Set effect will clear all states above layer 0 before adding the effect.
-Layer 0 will transition into the new effect.
+`EffectManager.setEffect`: Clears all running effects on every layer (via `removeAllEffects`) before
+adding the new effect, so it becomes the only thing playing.
 `EffectManager.addEffect`: Adds the effect without clearing other layers. This lets us add effects on
 top of running ones without clearing them inadvertently.
 `EffectManager.addEffectUnblockedName`: Adds an effect only if no effect with the same name is already running. Prevents queue breaking timing issues.

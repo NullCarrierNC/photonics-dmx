@@ -35,59 +35,6 @@ export class StageKitLightMapper {
   }
 
   /**
-   * Map StageKit color groups to DMX light indices
-   * @param color The color group to light (red, yellow, green, blue)
-   * @returns Array of DMX light indices to control
-   */
-  mapColorToDmxLights(color: string): number[] {
-    if (!color || color === 'off') {
-      return []
-    }
-
-    if (this.dmxLightCount === 8) {
-      return this.mapColorTo8Lights(color)
-    } else {
-      return this.mapColorTo4Lights(color)
-    }
-  }
-
-  /**
-   * Map color to 8 DMX lights using the color-based layout
-   */
-  private mapColorTo8Lights(color: string): number[] {
-    switch (color.toLowerCase()) {
-      case 'red':
-      case 'yellow':
-        // Red/Yellow lights: Front and back rings
-        return [0, 1, 2, 3, 4, 5, 6, 7] // All 8 DMX lights
-      case 'green':
-      case 'blue':
-        // Green/Blue lights: All positions
-        return [0, 1, 2, 3, 4, 5, 6, 7] // All 8 DMX lights
-      default:
-        return []
-    }
-  }
-
-  /**
-   * Map color to 4 DMX lights using the color-based layout
-   */
-  private mapColorTo4Lights(color: string): number[] {
-    switch (color.toLowerCase()) {
-      case 'red':
-      case 'yellow':
-        // Red/Yellow lights: Front and Back
-        return [0, 2] // DMX lights 1 and 5
-      case 'green':
-      case 'blue':
-        // Green/Blue lights: Left and Right
-        return [1, 3] // DMX lights 3 and 7
-      default:
-        return []
-    }
-  }
-
-  /**
    * Direct 1:1 mapping from 8 StageKit LEDs to 8 DMX lights
    */
   private map8to8(ledPositions: number[]): number[] {

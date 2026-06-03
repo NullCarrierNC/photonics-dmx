@@ -744,7 +744,12 @@ export class EffectManager implements IEffectManager {
   }
 
   /**
-   * Removes an effect from a specific layer
+   * Removes an effect from a specific layer.
+   *
+   * Intentionally layer-wide: it clears the effect for every light on the layer, treating a
+   * non-base layer as a single shared effect "slot" rather than per-light state. This matches the
+   * current shared-layer effect model, even though `interfaces.ts` types effects per-light;
+   * scoping removal to individual lights would require reworking how persistent runs are tracked.
    * @param layer The layer from which to remove the effect
    * @param shouldRemoveTransitions Whether to remove transition (colour) data too
    */
@@ -808,18 +813,11 @@ export class EffectManager implements IEffectManager {
     const transitions = nextEffect.effect.transitions.filter((t) => t.layer === layer)
     if (transitions.length === 0) return false
 
-    // Find out what lights were tracked in the previous effect so we can
-    // use their final states
-    const previousEffect = this.layerManager.getActiveEffect(layer, lightId)
-    const trackedLights = previousEffect
-      ? [previousEffect.transitions[0].lights.find((l) => l.id === lightId)!]
-      : []
-
     // Start the effect
     this.startEffect(
       nextEffect.name,
       nextEffect.effect,
-      trackedLights.length > 0 ? trackedLights : transitions[0].lights,
+      transitions[0].lights,
       layer,
       transitions,
       nextEffect.isPersistent,

@@ -31,6 +31,7 @@ import ArtNetToggle from '../components/ArtNetToggle'
 import EnttecProToggle from '../components/EnttecProToggle'
 import OpenDmxToggle from '../components/OpenDmxToggle'
 import { registerIpcListener } from '../utils/ipcHelpers'
+import { selectDmxBufferForRig } from '../utils/dmxPreviewBuffer'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import type { DmxValuesPayload } from '../../../shared/ipcTypes'
 import { createLogger } from '../../../shared/logger'
@@ -227,19 +228,11 @@ const DmxConsole: React.FC = () => {
 
   useEffect(() => {
     return registerIpcListener(RENDERER_RECEIVE.DMX_VALUES, (payload: DmxValuesPayload) => {
-      if (payload.kind === 'manual') {
-        // Console takeover loopback: the buffer the publisher just broadcast to every wire
-        // sender. Show it as-is — this is what the user just commanded.
-        setDmxValues(payload.buffer ?? {})
-        return
-      }
-      // Cue mode: show the currently-selected rig's own universe buffer. We follow the same
-      // rig selector as the live preview; the merged-universe view is no longer meaningful
-      // with per-rig sender routing (rigs targeting different physical universes can share
-      // channel numbers).
-      const rigId = selectedRigIdRef.current
-      const rigBuffer = rigId != null ? payload.rigBuffers[rigId] : undefined
-      setDmxValues(rigBuffer ?? {})
+      // `kind: 'manual'` is the console-takeover/blackout loopback (shown as-is); `kind: 'rigs'`
+      // carries one buffer per rig, of which we show the currently-selected rig's own universe.
+      // This uses the same rig selector as the live preview; a merged-universe view is not
+      // meaningful with per-rig sender routing (rigs on separate universes can share channel numbers).
+      setDmxValues(selectDmxBufferForRig(payload, selectedRigIdRef.current))
     })
   }, [])
 
