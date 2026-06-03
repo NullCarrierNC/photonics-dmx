@@ -14,7 +14,7 @@ type NodeExecutionPayload = {
 /**
  * Tracks which nodes are currently executing for active-node highlighting.
  * Listens to node-cues:node-execution IPC, filters by current graph (cue or effect id),
- * and enforces a minimum highlight duration (200ms) so fast logic nodes remain visible.
+ * and enforces a minimum highlight duration (`MIN_HIGHLIGHT_MS`) so fast logic nodes stay visible.
  */
 export function useActiveNodes(currentGraphId: string | null): Set<string> {
   const [activeNodeIds, setActiveNodeIds] = useState<Set<string>>(() => new Set())

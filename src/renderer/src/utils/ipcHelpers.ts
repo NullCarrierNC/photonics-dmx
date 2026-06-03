@@ -15,6 +15,10 @@ interface ChannelState {
   cleanup: () => void
 }
 
+// One native listener per channel for the renderer's lifetime. Each entry keeps a `cleanup` to
+// detach its native listener, but the registry itself is never torn down: the RENDERER_RECEIVE
+// channel set is fixed and these listeners live as long as the renderer process, so individual
+// subscribers unsubscribe via removeIpcListener while the native listener stays put.
 const registry = new Map<string, ChannelState>()
 
 /**

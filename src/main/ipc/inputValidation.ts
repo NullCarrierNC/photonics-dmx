@@ -531,6 +531,13 @@ export function validateDmxRigPayload(data: unknown): ValidationResult<DmxRig> {
   return { ok: true, value: rig }
 }
 
+/**
+ * Resolves `targetPath` and confirms it sits under one of `allowedRoots` after normalization,
+ * rejecting empty input, null bytes, and paths that escape the roots. The default roots include the
+ * user's home directory by design: users import/export cue and effect libraries to arbitrary
+ * locations they choose, so shell open/show operations are scoped to the home tree rather than a
+ * single app directory.
+ */
 export function validatePathUnderAllowedRoots(
   targetPath: unknown,
   allowedRoots: string[] = [process.cwd(), os.homedir(), os.tmpdir()],

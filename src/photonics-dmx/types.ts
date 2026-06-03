@@ -676,7 +676,7 @@ export interface DmxRig {
  */
 export interface DmxRigsConfig {
   rigs: DmxRig[]
-  /** Bumped once the legacy `front-back` → `two-rows` rename and initial mount backfill have run. */
+  /** Schema version driving the on-read rig migrations; see `CURRENT_RIGS_SCHEMA_VERSION` and `migrateDmxRigsConfig`. */
   schemaVersion?: number
 }
 

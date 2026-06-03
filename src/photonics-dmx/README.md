@@ -189,8 +189,8 @@ This allows effects to transition smoothly into another and prevents the lights 
 if there is a gap between effects. Layers above 0 are cleaned up when their effects complete with no
 queued effects to maintain a clean state.
 
-`EffectManager.setEffect`: Set effect will clear all states above layer 0 before adding the effect.
-Layer 0 will transition into the new effect.
+`EffectManager.setEffect`: Clears all running effects on every layer (via `removeAllEffects`) before
+adding the new effect, so it becomes the only thing playing.
 `EffectManager.addEffect`: Adds the effect without clearing other layers. This lets us add effects on
 top of running ones without clearing them inadvertently.
 `EffectManager.addEffectUnblockedName`: Adds an effect only if no effect with the same name is already running. Prevents queue breaking timing issues.

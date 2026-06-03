@@ -106,6 +106,9 @@ export class ConfigurationManager {
       onCorruptRecovery: onCorrupt,
       validate: validateLightingLayoutData,
     })
+    // The ConfigFile envelope version stays at 1; rig migrations run on read through a separate
+    // internal schemaVersion (migrateDmxRigsConfig) because they need the userLights library to
+    // realign each rig against its template, which ConfigFile.applyMigration has no access to.
     this.dmxRigs = new ConfigFile('dmxRigs.json', DEFAULT_DMX_RIGS, 1, {
       onCorruptRecovery: onCorrupt,
       validate: validateDmxRigsData,

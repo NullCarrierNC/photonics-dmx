@@ -249,6 +249,9 @@ export class YargCueRegistry {
     // Check if we should prefer stage kit group based on priority and trackMode
     // When trackMode='tracked' and stageKitPriority='prefer-for-tracked', prefer stage kit group
     // When trackMode='simulated', ignore stage kit priority to allow testing all groups
+    // This serves tracked cues from the stage kit group directly and does not engage the
+    // once-per-song group lock: with a single group serving the whole song there is no group
+    // switching to constrain.
     if (
       trackMode === 'tracked' &&
       this.stageKitPriority === 'prefer-for-tracked' &&

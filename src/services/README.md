@@ -19,7 +19,7 @@ Stored in `{appData}/Photonics.rocks/`:
 | `prefs.json`        | AppPreferences                            |
 | `lights.json`       | User light definitions (fixtures, groups) |
 | `lightsLayout.json` | Physical layout order of lights           |
-| `dmxRigs.json`      | DMX rig definitions (universes, fixtures) |
+| `dmxRigs.json`      | DMX rig definitions (per-rig light layout, sender-output routing, mirror flags) |
 
 ## Related
 
