@@ -1,20 +1,21 @@
 import { AudioCueData, AudioCueType, EventContext, TriggerContext } from '../../types/audioCueTypes'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
-import { calculateActionDuration, CompiledAudioCue } from '../compiler/NodeCueCompiler'
+import { CompiledAudioCue } from '../compiler/NodeCueCompiler'
 import { ActionEffectFactory } from '../compiler/ActionEffectFactory'
 import {
   AudioEventNode,
   AudioTriggerNode,
   AudioTriggerSpectralGates,
-  LogicNode,
-  ValueSource,
+  BaseEventNode,
   AudioNodeCueDefinition,
 } from '../../types/nodeCueTypes'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { NodeExecutionEngine } from './NodeExecutionEngine'
-import { UninitializedVariableError } from './valueResolver'
+import { ExecutionContext } from './ExecutionContext'
+import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
+import { createExecutionStateMachineLifecycle } from './executionStateMachineLifecycle'
 import { VariableValue } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
 import { findBestMatchingBandId, getBandEnergy } from '../../../listeners/Audio/bandEnergy'
@@ -86,6 +87,8 @@ interface AudioCueRunState {
   cueLevelVarStore: Map<string, VariableValue>
   groupLevelVarStore: Map<string, VariableValue>
   executionEngine: NodeExecutionEngine | null
+  /** Per-context ExecutionStateMachine tracking for the engine-driven event paths. */
+  esmLifecycle: ReturnType<typeof createExecutionStateMachineLifecycle>
   cueStartedFired: boolean
   /** Shared ref handed to the execution engine; when `.use` is true, the next effect submission
    *  uses setEffect (clearing the sequencer) before adding. The engine sets `.use = false`
@@ -171,6 +174,7 @@ export abstract class BaseAudioNodeCue {
       // sync even when cue logic mutates group state during execute().
       groupLevelVarStore: this.getGroupVarStore(sequencer),
       executionEngine: null,
+      esmLifecycle: createExecutionStateMachineLifecycle(),
       cueStartedFired: false,
       firstSubmissionUsesSetEffectRef: { use: false },
     }
@@ -217,7 +221,10 @@ export abstract class BaseAudioNodeCue {
         state.groupLevelVarStore,
         this.effectRegistry,
         variableDefinitions,
-        state.firstSubmissionUsesSetEffectRef,
+        {
+          firstSubmissionUsesSetEffectRef: state.firstSubmissionUsesSetEffectRef,
+          onContextLifecycle: state.esmLifecycle.onContextLifecycle,
+        },
       )
     }
 
@@ -285,24 +292,28 @@ export abstract class BaseAudioNodeCue {
           cueData as unknown as import('../../types/cueTypes').CueData,
         )
       } else {
-        let actionStep: { actionId: string; delay: number } | null = null
+        const eventContext: EventContext = { eventRawValue: evaluation.intensity }
+        const cueData: AudioCueData & { eventContext: EventContext } = {
+          ...safeData,
+          eventContext,
+        }
+        let actionId: string | null = null
         try {
-          actionStep = this.findFirstAction(state, event.id)
+          actionId = this.findFirstAction(state, event, cueData, lightManager)
         } catch (error) {
-          if (error instanceof UninitializedVariableError) {
-            this.runtimeBroadcaster.emit(
-              RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
-              `${event.id}: ${error.message}`,
-            )
-          }
+          const msg = error instanceof Error ? error.message : String(error)
+          this.runtimeBroadcaster.emit(
+            RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
+            `${event.id}: ${msg}`,
+          )
           log.error(`Error in findFirstAction for event ${event.id}:`, error)
           continue
         }
-        if (!actionStep) {
+        if (!actionId) {
           continue
         }
 
-        const action = this.compiledCue.actionMap.get(actionStep.actionId)
+        const action = this.compiledCue.actionMap.get(actionId)
         if (!action) continue
 
         const lights = ActionEffectFactory.resolveLights(
@@ -354,6 +365,7 @@ export abstract class BaseAudioNodeCue {
       if (state.executionEngine) {
         state.executionEngine.cancelAll(skipEffectRemoval)
       }
+      state.esmLifecycle.cancelAll()
       state.executionEngine = null
       state.cueStartedFired = false
       state.eventStates.clear()
@@ -379,6 +391,7 @@ export abstract class BaseAudioNodeCue {
       if (state.executionEngine) {
         state.executionEngine.cancelAll(this.skipEffectRemovalOnStop())
       }
+      state.esmLifecycle.cancelAll()
       this.states.delete(sequencer)
     }
     // Different cues in the same group share the per-sequencer group-var inner Map, so we
@@ -632,206 +645,66 @@ export abstract class BaseAudioNodeCue {
     }
   }
 
-  private evaluateLogicNode(
-    runState: AudioCueRunState,
-    logicNode: LogicNode,
-    nodeId: string,
-  ): string[] {
-    const { adjacency } = this.compiledCue
-    const edges = adjacency.get(nodeId) ?? []
-
-    switch (logicNode.logicType) {
-      case 'variable': {
-        if (logicNode.mode !== 'get') {
-          if (logicNode.valueType === 'light-array') {
-            log.warn(
-              'Cannot set light-array variable from variable node, use config-data node instead',
-            )
-            return edges.map((edge) => edge.to)
-          }
-
-          if (logicNode.valueType === 'cue-type') {
-            const value = this.resolveValue(runState, 'string', logicNode.value)
-            const varStore = this.getVariableStore(runState, logicNode.varName)
-
-            if (logicNode.mode === 'init') {
-              if (!varStore.has(logicNode.varName)) {
-                varStore.set(logicNode.varName, { type: logicNode.valueType, value })
-              }
-            } else {
-              varStore.set(logicNode.varName, { type: logicNode.valueType, value })
-            }
-            return edges.map((edge) => edge.to)
-          }
-
-          const value = this.resolveValue(runState, logicNode.valueType, logicNode.value)
-          const varStore = this.getVariableStore(runState, logicNode.varName)
-
-          if (logicNode.mode === 'init') {
-            if (!varStore.has(logicNode.varName)) {
-              varStore.set(logicNode.varName, { type: logicNode.valueType, value })
-            }
-          } else {
-            varStore.set(logicNode.varName, { type: logicNode.valueType, value })
-          }
-        }
-        return edges.map((edge) => edge.to)
-      }
-      case 'math': {
-        const left = Number(this.resolveValue(runState, 'number', logicNode.left))
-        const right = Number(this.resolveValue(runState, 'number', logicNode.right))
-        let result = 0
-        switch (logicNode.operator) {
-          case 'add':
-            result = left + right
-            break
-          case 'subtract':
-            result = left - right
-            break
-          case 'multiply':
-            result = left * right
-            break
-          case 'divide':
-            result = right === 0 ? 0 : left / right
-            break
-          case 'modulus':
-            result = right === 0 ? 0 : left % right
-            break
-        }
-        if (logicNode.assignTo) {
-          const varStore = this.getVariableStore(runState, logicNode.assignTo)
-          varStore.set(logicNode.assignTo, { type: 'number', value: result })
-        }
-        return edges.map((edge) => edge.to)
-      }
-      case 'conditional': {
-        const left = Number(this.resolveValue(runState, 'number', logicNode.left))
-        const right = Number(this.resolveValue(runState, 'number', logicNode.right))
-        let outcome = false
-        switch (logicNode.comparator) {
-          case '>':
-            outcome = left > right
-            break
-          case '>=':
-            outcome = left >= right
-            break
-          case '<':
-            outcome = left < right
-            break
-          case '<=':
-            outcome = left <= right
-            break
-          case '==':
-            outcome = left === right
-            break
-          case '!=':
-            outcome = left !== right
-            break
-        }
-        const branch = outcome ? 'true' : 'false'
-        const targeted = edges.filter((edge) => edge.fromPort === branch)
-        return targeted.map((edge) => edge.to)
-      }
-    }
-
-    return edges.map((edge) => edge.to)
-  }
-
-  private getVariableStore(
-    runState: AudioCueRunState,
-    varName: string,
-  ): Map<string, VariableValue> {
-    const definition = this.compiledCue.definition as AudioNodeCueDefinition
-    const cueVariables = definition.variables ?? []
-    const isCueLevel = cueVariables.some((v) => v.name === varName)
-
-    return isCueLevel ? runState.cueLevelVarStore : runState.groupLevelVarStore
-  }
-
-  private resolveValue(
-    runState: AudioCueRunState,
-    expectedType: 'number' | 'boolean' | 'string' | 'color' | 'event',
-    source?: ValueSource,
-  ): number | boolean | string {
-    if (!source) {
-      return expectedType === 'number' ? 0 : expectedType === 'boolean' ? false : ''
-    }
-
-    if (source.source === 'literal') {
-      if (expectedType === 'string' || expectedType === 'color' || expectedType === 'event') {
-        return String(source.value)
-      }
-      if (expectedType === 'number') {
-        if (typeof source.value === 'boolean') {
-          return source.value ? 1 : 0
-        }
-        if (typeof source.value === 'string') {
-          const parsed = parseFloat(source.value)
-          return isNaN(parsed) ? 0 : parsed
-        }
-        return typeof source.value === 'number' ? source.value : 0
-      }
-      return source.value === true || source.value === 'true'
-    }
-
-    const cueVar = runState.cueLevelVarStore.get(source.name)
-    const groupVar = runState.groupLevelVarStore.get(source.name)
-    const existing = cueVar ?? groupVar
-
-    if (existing) {
-      if (expectedType === 'string' || expectedType === 'color' || expectedType === 'event') {
-        return String(existing.value)
-      }
-      if (expectedType === 'number') {
-        if (typeof existing.value === 'string') {
-          const parsed = parseFloat(existing.value)
-          return isNaN(parsed) ? 0 : parsed
-        }
-        return typeof existing.value === 'number' ? existing.value : existing.value ? 1 : 0
-      }
-      return existing.value === true || existing.value === 'true'
-    }
-
-    throw new UninitializedVariableError(source.name)
-  }
-
+  /**
+   * Walk from a level-mode event to the first action node, evaluating logic nodes through the
+   * shared evaluator so light-deriving logic (config-data, lights-from-index, random, etc.)
+   * populates the variable stores the action's target then resolves against. Returns the action
+   * node id, or null when the chain reaches no action.
+   */
   private findFirstAction(
     runState: AudioCueRunState,
-    eventId: string,
-  ): { actionId: string; delay: number } | null {
+    event: BaseEventNode,
+    cueData: AudioCueData,
+    lightManager: DmxLightManager,
+  ): string | null {
+    const definition = this.compiledCue.definition as AudioNodeCueDefinition
+    const execContext = new ExecutionContext(
+      event,
+      cueData,
+      runState.cueLevelVarStore,
+      runState.groupLevelVarStore,
+    )
+    const evaluatorContext: LogicNodeEvaluatorContext = {
+      cueId: this.id,
+      lightManager,
+      cueLevelVarStore: runState.cueLevelVarStore,
+      groupLevelVarStore: runState.groupLevelVarStore,
+      variableDefinitions: definition.variables ?? [],
+      // Level mode walks the graph itself, so the evaluator never needs to dispatch a node.
+      executeNode: () => {},
+      debugOutput: (channel, payload) => this.runtimeBroadcaster.emit(channel, payload),
+    }
+
     const visited = new Set<string>()
-    const queue: Array<{ nodeId: string; delay: number }> = []
-    const outgoing = this.compiledCue.adjacency.get(eventId) ?? []
-    outgoing.forEach((conn) => queue.push({ nodeId: conn.to, delay: 0 }))
+    const queue: string[] = []
+    const outgoing = this.compiledCue.adjacency.get(event.id) ?? []
+    outgoing.forEach((conn) => queue.push(conn.to))
 
     while (queue.length) {
-      const { nodeId, delay } = queue.shift()!
+      const nodeId = queue.shift()!
       if (visited.has(nodeId)) continue
       visited.add(nodeId)
 
       if (this.compiledCue.actionMap.has(nodeId)) {
-        return { actionId: nodeId, delay }
+        return nodeId
       }
 
       const logicNode = this.compiledCue.logicMap.get(nodeId)
       if (logicNode) {
-        const nextTargets = this.evaluateLogicNode(runState, logicNode, nodeId)
-        const nextDelay = delay
-        nextTargets.forEach((nextId) => queue.push({ nodeId: nextId, delay: nextDelay }))
+        const edges = this.compiledCue.adjacency.get(nodeId) ?? []
+        const nextTargets = evaluateLogicNode(
+          logicNode,
+          nodeId,
+          edges,
+          execContext,
+          evaluatorContext,
+        )
+        nextTargets.forEach((nextId) => queue.push(nextId))
         continue
       }
 
       const nextEdges = this.compiledCue.adjacency.get(nodeId) ?? []
-      nextEdges.forEach((edge) =>
-        queue.push({
-          nodeId: edge.to,
-          delay:
-            delay +
-            (this.compiledCue.actionMap.has(nodeId)
-              ? calculateActionDuration(this.compiledCue.actionMap.get(nodeId)!)
-              : 0),
-        }),
-      )
+      nextEdges.forEach((edge) => queue.push(edge.to))
     }
 
     return null

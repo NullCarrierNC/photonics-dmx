@@ -15,8 +15,7 @@ import type { NodeRuntimeCallbacks } from './executionTypes'
 import { NodeExecutionEngine } from './NodeExecutionEngine'
 import { EffectExecutionEngine } from './EffectExecutionEngine'
 import { EffectRegistry } from './EffectRegistry'
-import { ExecutionStateMachine } from './ExecutionStateMachine'
-import { ExecutionPhase } from './executionTypes'
+import { createExecutionStateMachineLifecycle } from './executionStateMachineLifecycle'
 import type { GraphExecutionPolicy } from './GraphExecutionPolicy'
 import type { ExecutionParameters } from './GraphExecutionPolicy'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
@@ -58,8 +57,8 @@ export class GraphExecutionEngine {
   private readonly cueId: string
   private nodeEngine: NodeExecutionEngine | null = null
   private effectEngine: EffectExecutionEngine | null = null
-  /** Per-context state machines (cue graph only when using nodeEngine). */
-  private readonly contextStateMachines = new Map<string, ExecutionStateMachine>()
+  /** Per-context state-machine tracking (cue graph only, when delegating to nodeEngine). */
+  private readonly esmLifecycle = createExecutionStateMachineLifecycle()
   /** Cue queuing: when a cue-started/cue-called run is in progress, queue incoming execute params. */
   private isExecutingCueStarted = false
   private queuedParameters: ExecutionParameters[] = []
@@ -152,49 +151,6 @@ export class GraphExecutionEngine {
     this.cueId = cueId
   }
 
-  /**
-   * Build the lifecycle callback that creates and drives ExecutionStateMachine per context.
-   * Used when we delegate to NodeExecutionEngine so we own the state machine.
-   * Emits: started -> (blocked <-> running)* -> completed | cancelled.
-   */
-  private getContextLifecycleCallback(): (
-    contextId: string,
-    event: 'started' | 'completed' | 'cancelled' | 'blocked' | 'running',
-  ) => void {
-    return (
-      contextId: string,
-      event: 'started' | 'completed' | 'cancelled' | 'blocked' | 'running',
-    ) => {
-      if (event === 'started') {
-        const sm = new ExecutionStateMachine()
-        sm.transitionTo(ExecutionPhase.RUNNING)
-        this.contextStateMachines.set(contextId, sm)
-        return
-      }
-      const sm = this.contextStateMachines.get(contextId)
-      if (sm) {
-        if (event === 'blocked') {
-          if (!sm.isTerminal() && sm.phase !== ExecutionPhase.BLOCKED) {
-            sm.transitionTo(ExecutionPhase.BLOCKED)
-          }
-          return
-        }
-        if (event === 'running') {
-          if (sm.phase === ExecutionPhase.BLOCKED) {
-            sm.transitionTo(ExecutionPhase.RUNNING)
-          }
-          return
-        }
-        if (event === 'completed') {
-          sm.transitionTo(ExecutionPhase.COMPLETED)
-        } else if (event === 'cancelled') {
-          sm.transitionTo(ExecutionPhase.CANCELLED)
-        }
-        this.contextStateMachines.delete(contextId)
-      }
-    }
-  }
-
   private getOrCreateNodeEngine(): NodeExecutionEngine {
     if (this.nodeEngine) return this.nodeEngine
     if (!this.compiledCue || !this.effectRegistry) {
@@ -210,11 +166,12 @@ export class GraphExecutionEngine {
       this.session.getGroupLevelVarStore(),
       this.effectRegistry,
       this.variableDefinitions,
-      undefined,
-      this.callbacks,
-      () => this.session.consumeInitialClearPolicy(),
-      this.getContextLifecycleCallback(),
-      this.policy.revisitPolicy,
+      {
+        runtimeCallbacks: this.callbacks,
+        consumeInitialClearPolicy: () => this.session.consumeInitialClearPolicy(),
+        onContextLifecycle: this.esmLifecycle.onContextLifecycle,
+        revisitPolicy: this.policy.revisitPolicy,
+      },
     )
     return this.nodeEngine
   }
@@ -234,10 +191,11 @@ export class GraphExecutionEngine {
       this.runtimeBroadcaster,
       parameterValues as Record<string, unknown>,
       callerCueData as CueData,
-      undefined,
-      this.callbacks,
-      () => this.session.consumeInitialClearPolicy(),
-      this.policy.revisitPolicy,
+      {
+        runtimeCallbacks: this.callbacks,
+        consumeInitialClearPolicy: () => this.session.consumeInitialClearPolicy(),
+        revisitPolicy: this.policy.revisitPolicy,
+      },
     )
     return this.effectEngine
   }
@@ -439,12 +397,7 @@ export class GraphExecutionEngine {
   cancelAll(skipEffectRemoval = false): void {
     this.queuedParameters.length = 0
     this.isExecutingCueStarted = false
-    for (const sm of this.contextStateMachines.values()) {
-      if (!sm.isTerminal()) {
-        sm.transitionTo(ExecutionPhase.CANCELLED)
-      }
-    }
-    this.contextStateMachines.clear()
+    this.esmLifecycle.cancelAll()
     if (this.nodeEngine) {
       this.nodeEngine.cancelAll(skipEffectRemoval)
     }
@@ -455,7 +408,7 @@ export class GraphExecutionEngine {
 
   hasActiveContexts(): boolean {
     return (
-      this.contextStateMachines.size > 0 ||
+      this.esmLifecycle.hasActiveContexts() ||
       (this.effectEngine != null && this.effectEngine.hasActiveContexts())
     )
   }

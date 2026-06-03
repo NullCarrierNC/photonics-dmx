@@ -38,6 +38,7 @@ import { EffectRegistry } from './EffectRegistry'
 import { EffectExecutionEngine } from './EffectExecutionEngine'
 import { BaseNodeExecutionEngine, CompiledGraph } from './BaseNodeExecutionEngine'
 import { RevisitPolicy } from './GraphExecutionPolicy'
+import { ContextLifecycleEvent } from './executionStateMachineLifecycle'
 import { resolveValue } from './valueResolver'
 import { resolveActionTiming, resolveActionLayer, resolveMotionPattern } from './actionResolver'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
@@ -57,6 +58,17 @@ function inferEffectParameterType(source: ValueSource | undefined): VariableType
   if (typeof v === 'boolean') return 'boolean'
   if (Array.isArray(v)) return 'light-array'
   return 'string'
+}
+
+/** Optional collaborators for a {@link NodeExecutionEngine}; omitted fields fall back to defaults. */
+export interface NodeExecutionEngineOptions {
+  firstSubmissionUsesSetEffectRef?: { use: boolean }
+  runtimeCallbacks?: NodeRuntimeCallbacks
+  consumeInitialClearPolicy?: () => boolean
+  /** Invoked on each context start/complete/cancel/blocked/running so the owner can drive its ExecutionStateMachine. */
+  onContextLifecycle?: (contextId: string, event: ContextLifecycleEvent) => void
+  /** Re-entry policy; defaults to 'strict'. */
+  revisitPolicy?: RevisitPolicy
 }
 
 export class NodeExecutionEngine extends BaseNodeExecutionEngine {
@@ -89,10 +101,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
    */
   private debugEnabled: boolean
   /** When set (GraphExecutionEngine supplies it), invoked on each context start/complete/cancel/blocked/running so the owner can drive its ExecutionStateMachine. */
-  private readonly onContextLifecycle?: (
-    contextId: string,
-    event: 'started' | 'completed' | 'cancelled' | 'blocked' | 'running',
-  ) => void
+  private readonly onContextLifecycle?: (contextId: string, event: ContextLifecycleEvent) => void
 
   constructor(
     compiledCue: CompiledYargCue | CompiledAudioCue,
@@ -104,31 +113,24 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
     groupLevelVarStore: Map<string, VariableValue>,
     effectRegistry: EffectRegistry,
     variableDefinitions: VariableDefinition[] = [],
-    firstSubmissionUsesSetEffectRef?: { use: boolean },
-    runtimeCallbacks?: NodeRuntimeCallbacks,
-    consumeInitialClearPolicy?: () => boolean,
-    onContextLifecycle?: (
-      contextId: string,
-      event: 'started' | 'completed' | 'cancelled' | 'blocked' | 'running',
-    ) => void,
-    revisitPolicy: RevisitPolicy = 'strict',
+    options: NodeExecutionEngineOptions = {},
   ) {
     super({
       sequencer,
       lightManager,
       broadcaster: runtimeBroadcaster,
       variableDefinitions,
-      firstSubmissionUsesSetEffectRef,
-      runtimeCallbacks,
-      consumeInitialClearPolicy,
+      firstSubmissionUsesSetEffectRef: options.firstSubmissionUsesSetEffectRef,
+      runtimeCallbacks: options.runtimeCallbacks,
+      consumeInitialClearPolicy: options.consumeInitialClearPolicy,
     })
     this.compiledCue = compiledCue
     this.cueId = cueId
     this.cueLevelVarStore = cueLevelVarStore
     this.groupLevelVarStore = groupLevelVarStore
     this.effectRegistry = effectRegistry
-    this.onContextLifecycle = onContextLifecycle
-    this.revisitPolicyValue = revisitPolicy
+    this.onContextLifecycle = options.onContextLifecycle
+    this.revisitPolicyValue = options.revisitPolicy ?? 'strict'
 
     // Debug logging is opt-in to avoid noisy logs in normal operation.
     // Enable with either env var:
@@ -547,9 +549,11 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
         this.broadcaster,
         paramValues,
         context.cueData, // Pass caller's cue data
-        this.firstSubmissionUsesSetEffectRef,
-        this.runtimeCallbacks,
-        this.consumeInitialClearPolicy,
+        {
+          firstSubmissionUsesSetEffectRef: this.firstSubmissionUsesSetEffectRef,
+          runtimeCallbacks: this.runtimeCallbacks,
+          consumeInitialClearPolicy: this.consumeInitialClearPolicy,
+        },
       )
 
       // Set up completion callback: when effect is idle, do cleanup/persistent logic then continue
