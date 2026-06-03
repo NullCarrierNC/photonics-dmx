@@ -1,7 +1,8 @@
 /**
  * Explicit execution state machine for graph runs.
  * Layered alongside the existing ExecutionContext-based runtime; provides testable lifecycle transitions (RUNNING, COMPLETED, CANCELLED).
- * Currently instantiated by GraphExecutionEngine per execution context when running cue graphs.
+ * Instantiated per execution context by `createExecutionStateMachineLifecycle`, which both the
+ * cue/effect GraphExecutionEngine and the audio node-cue runtime use to track context lifecycles.
  */
 
 import { ExecutionPhase } from './executionTypes'

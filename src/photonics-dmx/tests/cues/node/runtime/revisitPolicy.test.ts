@@ -119,11 +119,7 @@ function countSubmissionsForNodeC(revisitPolicy: RevisitPolicy): number {
     new Map(),
     new EffectRegistry(),
     [],
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    revisitPolicy,
+    { revisitPolicy },
   )
   engine.startExecution(diamondCue.nodes.events[0], cueData())
   // Non-blocking set-color actions submit via addEffect(effectName, effect).

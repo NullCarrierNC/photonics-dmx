@@ -679,7 +679,7 @@ describe('Runtime Event System', () => {
         groupLevelVarStore,
         new EffectRegistry(),
         [],
-        firstSubmissionRef,
+        { firstSubmissionUsesSetEffectRef: firstSubmissionRef },
       )
       engine.startExecution(cueStartedEvent, createCueData())
       expect(mockSequencer.setEffectUnblockedName).toHaveBeenCalledTimes(1)

@@ -27,6 +27,15 @@ import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('EffectExecutionEngine')
 
+/** Optional collaborators for an {@link EffectExecutionEngine}; omitted fields fall back to defaults. */
+export interface EffectExecutionEngineOptions {
+  firstSubmissionUsesSetEffectRef?: { use: boolean }
+  runtimeCallbacks?: NodeRuntimeCallbacks
+  consumeInitialClearPolicy?: () => boolean
+  /** Re-entry policy; defaults to 'relaxed'. */
+  revisitPolicy?: RevisitPolicy
+}
+
 export class EffectExecutionEngine extends BaseNodeExecutionEngine {
   private static nextInstanceId = 0
   private instanceId: number
@@ -65,25 +74,22 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     broadcaster: RuntimeBroadcaster,
     parameterValues: Record<string, any>,
     callerCueData: CueData | AudioCueData,
-    firstSubmissionUsesSetEffectRef?: { use: boolean },
-    runtimeCallbacks?: NodeRuntimeCallbacks,
-    consumeInitialClearPolicy?: () => boolean,
-    revisitPolicy: RevisitPolicy = 'relaxed',
+    options: EffectExecutionEngineOptions = {},
   ) {
     super({
       sequencer,
       lightManager,
       broadcaster,
       variableDefinitions: compiledEffect.definition.variables ?? [],
-      firstSubmissionUsesSetEffectRef,
-      runtimeCallbacks,
-      consumeInitialClearPolicy,
+      firstSubmissionUsesSetEffectRef: options.firstSubmissionUsesSetEffectRef,
+      runtimeCallbacks: options.runtimeCallbacks,
+      consumeInitialClearPolicy: options.consumeInitialClearPolicy,
     })
     this.instanceId = ++EffectExecutionEngine.nextInstanceId
     this.compiledEffect = compiledEffect
     this.parameterValues = parameterValues
     this.callerCueData = callerCueData
-    this.revisitPolicyValue = revisitPolicy
+    this.revisitPolicyValue = options.revisitPolicy ?? 'relaxed'
 
     // Initialize effect-local variable store
     this.effectVarStore = new Map()
