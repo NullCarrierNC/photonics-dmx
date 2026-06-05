@@ -595,13 +595,21 @@ const CueEditor: React.FC = () => {
               checkValueSource(logicNode.index, nodeType, nodeId, nodeLabel, 'index')
               checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
               break
+            case 'color-from-index':
+              checkValueSource(logicNode.colors, nodeType, nodeId, nodeLabel, 'colors')
+              checkValueSource(logicNode.index, nodeType, nodeId, nodeLabel, 'index')
+              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
+              break
             case 'array-length':
             case 'reverse-lights':
             case 'create-pairs':
+            case 'reverse-colors':
+            case 'shuffle-colors':
               checkVarName(logicNode.sourceVariable, nodeType, nodeId, nodeLabel, 'sourceVariable')
               checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
               break
             case 'concat-lights':
+            case 'concat-colors':
               for (const sourceVar of logicNode.sourceVariables ?? []) {
                 checkVarName(sourceVar, nodeType, nodeId, nodeLabel, 'sourceVariables')
               }

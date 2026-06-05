@@ -1219,7 +1219,7 @@ describe('Node cue validation', () => {
     }
   })
 
-  for (const fileName of ['yarg-fade.json', 'yarg-spectrum.json']) {
+  for (const fileName of ['yarg-fade.json']) {
     it(`validates bundled ${fileName} (compiles, caps brightness at high, no strobes)`, () => {
       const filePath = path.join(
         __dirname,

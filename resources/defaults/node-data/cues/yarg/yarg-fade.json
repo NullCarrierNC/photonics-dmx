@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 1,
+  "cueVersion": 3,
   "mode": "yarg",
   "group": {
     "id": "yarg-fade",
@@ -3520,13 +3520,13 @@
         ],
         "actions": [
           {
-            "id": "fade-frenzy-f-set0",
+            "id": "fade-frenzy-set",
             "type": "action",
             "effectType": "set-color",
             "target": {
               "groups": {
                 "source": "variable",
-                "name": "curF"
+                "name": "pair"
               },
               "filter": {
                 "source": "literal",
@@ -3535,611 +3535,8 @@
             },
             "color": {
               "name": {
-                "source": "literal",
-                "value": "green"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "high"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 80
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "fade-frenzy-f-set1",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
                 "source": "variable",
-                "name": "curF"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "red"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "high"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 80
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "fade-frenzy-f-set2",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "variable",
-                "name": "curF"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "yellow"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "high"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 80
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "fade-frenzy-f-set3",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "variable",
-                "name": "curF"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "blue"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "high"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 80
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "fade-frenzy-f-set4",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "variable",
-                "name": "curF"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "orange"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "high"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 80
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "fade-frenzy-b-set0",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "variable",
-                "name": "curB"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "green"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "high"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 80
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "fade-frenzy-b-set1",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "variable",
-                "name": "curB"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "red"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "high"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 80
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "fade-frenzy-b-set2",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "variable",
-                "name": "curB"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "yellow"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "high"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 80
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "fade-frenzy-b-set3",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "variable",
-                "name": "curB"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "blue"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "high"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 80
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "fade-frenzy-b-set4",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "variable",
-                "name": "curB"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "orange"
+                "name": "curColor"
               },
               "brightness": {
                 "source": "literal",
@@ -4285,6 +3682,61 @@
             "assignTo": "backLights"
           },
           {
+            "id": "fade-frenzy-each",
+            "type": "logic",
+            "logicType": "for-each-light",
+            "sourceVariable": "frontLights",
+            "currentLightVariable": "curF",
+            "currentIndexVariable": "idxF"
+          },
+          {
+            "id": "fade-frenzy-bpick",
+            "type": "logic",
+            "logicType": "lights-from-index",
+            "sourceVariable": "backLights",
+            "index": {
+              "source": "variable",
+              "name": "idxF"
+            },
+            "assignTo": "curBpick"
+          },
+          {
+            "id": "fade-frenzy-pair",
+            "type": "logic",
+            "logicType": "concat-lights",
+            "sourceVariables": ["curF", "curBpick"],
+            "assignTo": "pair"
+          },
+          {
+            "id": "fade-frenzy-sum",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "idxF"
+            },
+            "right": {
+              "source": "variable",
+              "name": "step"
+            },
+            "assignTo": "sum"
+          },
+          {
+            "id": "fade-frenzy-pick",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "variable",
+              "name": "palette"
+            },
+            "index": {
+              "source": "variable",
+              "name": "sum"
+            },
+            "assignTo": "curColor"
+          },
+          {
             "id": "fade-frenzy-inc-add",
             "type": "logic",
             "logicType": "math",
@@ -4313,194 +3765,6 @@
               "value": 5
             },
             "assignTo": "step"
-          },
-          {
-            "id": "fade-frenzy-f-each",
-            "type": "logic",
-            "logicType": "for-each-light",
-            "sourceVariable": "frontLights",
-            "currentLightVariable": "curF",
-            "currentIndexVariable": "idxF"
-          },
-          {
-            "id": "fade-frenzy-f-sum",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "add",
-            "left": {
-              "source": "variable",
-              "name": "idxF"
-            },
-            "right": {
-              "source": "variable",
-              "name": "step"
-            },
-            "assignTo": "sumF"
-          },
-          {
-            "id": "fade-frenzy-f-mod",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "modulus",
-            "left": {
-              "source": "variable",
-              "name": "sumF"
-            },
-            "right": {
-              "source": "literal",
-              "value": 5
-            },
-            "assignTo": "mF"
-          },
-          {
-            "id": "fade-frenzy-f-c0",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "mF"
-            },
-            "right": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "fade-frenzy-f-c1",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "mF"
-            },
-            "right": {
-              "source": "literal",
-              "value": 1
-            }
-          },
-          {
-            "id": "fade-frenzy-f-c2",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "mF"
-            },
-            "right": {
-              "source": "literal",
-              "value": 2
-            }
-          },
-          {
-            "id": "fade-frenzy-f-c3",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "mF"
-            },
-            "right": {
-              "source": "literal",
-              "value": 3
-            }
-          },
-          {
-            "id": "fade-frenzy-b-each",
-            "type": "logic",
-            "logicType": "for-each-light",
-            "sourceVariable": "backLights",
-            "currentLightVariable": "curB",
-            "currentIndexVariable": "idxB"
-          },
-          {
-            "id": "fade-frenzy-b-sum",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "add",
-            "left": {
-              "source": "variable",
-              "name": "idxB"
-            },
-            "right": {
-              "source": "variable",
-              "name": "step"
-            },
-            "assignTo": "sumB"
-          },
-          {
-            "id": "fade-frenzy-b-mod",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "modulus",
-            "left": {
-              "source": "variable",
-              "name": "sumB"
-            },
-            "right": {
-              "source": "literal",
-              "value": 5
-            },
-            "assignTo": "mB"
-          },
-          {
-            "id": "fade-frenzy-b-c0",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "mB"
-            },
-            "right": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "fade-frenzy-b-c1",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "mB"
-            },
-            "right": {
-              "source": "literal",
-              "value": 1
-            }
-          },
-          {
-            "id": "fade-frenzy-b-c2",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "mB"
-            },
-            "right": {
-              "source": "literal",
-              "value": 2
-            }
-          },
-          {
-            "id": "fade-frenzy-b-c3",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "mB"
-            },
-            "right": {
-              "source": "literal",
-              "value": 3
-            }
           }
         ],
         "eventRaisers": [],
@@ -4509,112 +3773,6 @@
         "notes": []
       },
       "connections": [
-        {
-          "from": "fade-frenzy-f-each",
-          "to": "fade-frenzy-f-sum",
-          "fromPort": "each"
-        },
-        {
-          "from": "fade-frenzy-f-sum",
-          "to": "fade-frenzy-f-mod"
-        },
-        {
-          "from": "fade-frenzy-f-mod",
-          "to": "fade-frenzy-f-c0"
-        },
-        {
-          "from": "fade-frenzy-f-c0",
-          "to": "fade-frenzy-f-set0",
-          "fromPort": "true"
-        },
-        {
-          "from": "fade-frenzy-f-c0",
-          "to": "fade-frenzy-f-c1",
-          "fromPort": "false"
-        },
-        {
-          "from": "fade-frenzy-f-c1",
-          "to": "fade-frenzy-f-set1",
-          "fromPort": "true"
-        },
-        {
-          "from": "fade-frenzy-f-c1",
-          "to": "fade-frenzy-f-c2",
-          "fromPort": "false"
-        },
-        {
-          "from": "fade-frenzy-f-c2",
-          "to": "fade-frenzy-f-set2",
-          "fromPort": "true"
-        },
-        {
-          "from": "fade-frenzy-f-c2",
-          "to": "fade-frenzy-f-c3",
-          "fromPort": "false"
-        },
-        {
-          "from": "fade-frenzy-f-c3",
-          "to": "fade-frenzy-f-set3",
-          "fromPort": "true"
-        },
-        {
-          "from": "fade-frenzy-f-c3",
-          "to": "fade-frenzy-f-set4",
-          "fromPort": "false"
-        },
-        {
-          "from": "fade-frenzy-b-each",
-          "to": "fade-frenzy-b-sum",
-          "fromPort": "each"
-        },
-        {
-          "from": "fade-frenzy-b-sum",
-          "to": "fade-frenzy-b-mod"
-        },
-        {
-          "from": "fade-frenzy-b-mod",
-          "to": "fade-frenzy-b-c0"
-        },
-        {
-          "from": "fade-frenzy-b-c0",
-          "to": "fade-frenzy-b-set0",
-          "fromPort": "true"
-        },
-        {
-          "from": "fade-frenzy-b-c0",
-          "to": "fade-frenzy-b-c1",
-          "fromPort": "false"
-        },
-        {
-          "from": "fade-frenzy-b-c1",
-          "to": "fade-frenzy-b-set1",
-          "fromPort": "true"
-        },
-        {
-          "from": "fade-frenzy-b-c1",
-          "to": "fade-frenzy-b-c2",
-          "fromPort": "false"
-        },
-        {
-          "from": "fade-frenzy-b-c2",
-          "to": "fade-frenzy-b-set2",
-          "fromPort": "true"
-        },
-        {
-          "from": "fade-frenzy-b-c2",
-          "to": "fade-frenzy-b-c3",
-          "fromPort": "false"
-        },
-        {
-          "from": "fade-frenzy-b-c3",
-          "to": "fade-frenzy-b-set3",
-          "fromPort": "true"
-        },
-        {
-          "from": "fade-frenzy-b-c3",
-          "to": "fade-frenzy-b-set4",
-          "fromPort": "false"
-        },
         {
           "from": "fade-frenzy-start",
           "to": "fade-frenzy-init"
@@ -4629,15 +3787,31 @@
         },
         {
           "from": "fade-frenzy-called",
-          "to": "fade-frenzy-f-each"
+          "to": "fade-frenzy-each"
         },
         {
-          "from": "fade-frenzy-f-each",
-          "to": "fade-frenzy-b-each",
-          "fromPort": "done"
+          "from": "fade-frenzy-each",
+          "to": "fade-frenzy-bpick",
+          "fromPort": "each"
         },
         {
-          "from": "fade-frenzy-b-each",
+          "from": "fade-frenzy-bpick",
+          "to": "fade-frenzy-pair"
+        },
+        {
+          "from": "fade-frenzy-pair",
+          "to": "fade-frenzy-sum"
+        },
+        {
+          "from": "fade-frenzy-sum",
+          "to": "fade-frenzy-pick"
+        },
+        {
+          "from": "fade-frenzy-pick",
+          "to": "fade-frenzy-set"
+        },
+        {
+          "from": "fade-frenzy-each",
           "to": "fade-frenzy-inc-add",
           "fromPort": "done"
         },
@@ -4653,138 +3827,66 @@
       "layout": {
         "nodePositions": {
           "fade-frenzy-start": {
-            "x": 489.523692574352,
+            "x": 480,
             "y": 0
           },
           "fade-frenzy-called": {
-            "x": -128.93816410377622,
+            "x": -140,
             "y": 16
           },
-          "fade-frenzy-f-set0": {
-            "x": -558.6101925376165,
-            "y": 660.4218274435968
-          },
-          "fade-frenzy-f-set1": {
-            "x": -554.9174790611872,
-            "y": 852.8816788581692
-          },
-          "fade-frenzy-f-set2": {
-            "x": -437.8730986339471,
-            "y": 1068.450095689257
-          },
-          "fade-frenzy-f-set3": {
-            "x": -466.269664757804,
-            "y": 1391.6629874335244
-          },
-          "fade-frenzy-f-set4": {
-            "x": -217.21702759766117,
-            "y": 1396.8060785916405
-          },
-          "fade-frenzy-b-set0": {
-            "x": -95.11007921300188,
-            "y": 878.5773020984725
-          },
-          "fade-frenzy-b-set1": {
-            "x": -53.02707427489122,
-            "y": 1058.1805818193693
-          },
-          "fade-frenzy-b-set2": {
-            "x": 80.95848061889421,
-            "y": 1229.1991243548691
-          },
-          "fade-frenzy-b-set3": {
-            "x": 191.36062870478895,
-            "y": 1421.8398663351527
-          },
-          "fade-frenzy-b-set4": {
-            "x": 436.35536152484906,
-            "y": 1425.8067332581059
-          },
-          "fade-frenzy-gate": {
-            "x": 246.86096328869462,
-            "y": 704.9145961627364
-          },
           "fade-frenzy-init": {
-            "x": 483.3374872431159,
-            "y": 97.98862140998244
+            "x": 480,
+            "y": 110
           },
           "fade-frenzy-cfg-f": {
-            "x": 478.9584806188941,
-            "y": 230.26099007949233
+            "x": 480,
+            "y": 230
           },
           "fade-frenzy-cfg-b": {
-            "x": 482.0748786833137,
-            "y": 354.3997081182897
+            "x": 480,
+            "y": 350
+          },
+          "fade-frenzy-each": {
+            "x": -140,
+            "y": 130
+          },
+          "fade-frenzy-bpick": {
+            "x": -360,
+            "y": 270
+          },
+          "fade-frenzy-pair": {
+            "x": -360,
+            "y": 390
+          },
+          "fade-frenzy-sum": {
+            "x": -360,
+            "y": 510
+          },
+          "fade-frenzy-pick": {
+            "x": -360,
+            "y": 630
+          },
+          "fade-frenzy-set": {
+            "x": -360,
+            "y": 760
           },
           "fade-frenzy-inc-add": {
-            "x": 242.01700289624955,
-            "y": 448.45593464501326
+            "x": 240,
+            "y": 470
           },
           "fade-frenzy-inc-mod": {
-            "x": 247.07047403790057,
-            "y": 585.1127864271402
+            "x": 240,
+            "y": 590
           },
-          "fade-frenzy-f-each": {
-            "x": -140,
-            "y": 123.25776902586222
-          },
-          "fade-frenzy-f-sum": {
-            "x": -384.60551749133674,
-            "y": 273.9668210120394
-          },
-          "fade-frenzy-f-mod": {
-            "x": -401.1319077740046,
-            "y": 392.00358138517595
-          },
-          "fade-frenzy-f-c0": {
-            "x": -404.3719530469326,
-            "y": 515.1847524991279
-          },
-          "fade-frenzy-f-c1": {
-            "x": -333.21498825434367,
-            "y": 657.3711594915073
-          },
-          "fade-frenzy-f-c2": {
-            "x": -326.6540032693757,
-            "y": 852.7607243565974
-          },
-          "fade-frenzy-f-c3": {
-            "x": -286.10609674591143,
-            "y": 1232.6383020126787
-          },
-          "fade-frenzy-b-each": {
-            "x": 136.74636871513792,
-            "y": 273.1379403675702
-          },
-          "fade-frenzy-b-sum": {
-            "x": 58.49095688125806,
-            "y": 455.8491271333337
-          },
-          "fade-frenzy-b-mod": {
-            "x": 28.87949870751538,
-            "y": 596.8114738055435
-          },
-          "fade-frenzy-b-c0": {
-            "x": 26.885963132277993,
-            "y": 756.3606923158331
-          },
-          "fade-frenzy-b-c1": {
-            "x": 114.64524881175623,
-            "y": 880.4029917284397
-          },
-          "fade-frenzy-b-c2": {
-            "x": 208,
-            "y": 1055.1991243548691
-          },
-          "fade-frenzy-b-c3": {
-            "x": 344.0036045830832,
-            "y": 1256.789512053117
+          "fade-frenzy-gate": {
+            "x": 240,
+            "y": 720
           }
         },
         "viewport": {
-          "x": 355.27607744276816,
-          "y": -81.43889699298893,
-          "zoom": 0.6597539553864472
+          "x": 300,
+          "y": -50,
+          "zoom": 0.7
         }
       },
       "variables": [
@@ -4824,6 +3926,20 @@
           "isParameter": false
         },
         {
+          "name": "curBpick",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "pair",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
           "name": "idxF",
           "type": "number",
           "scope": "cue",
@@ -4831,45 +3947,24 @@
           "isParameter": false
         },
         {
-          "name": "sumF",
+          "name": "sum",
           "type": "number",
           "scope": "cue",
           "initialValue": 0,
           "isParameter": false
         },
         {
-          "name": "mF",
-          "type": "number",
+          "name": "curColor",
+          "type": "color",
           "scope": "cue",
-          "initialValue": 0,
+          "initialValue": "green",
           "isParameter": false
         },
         {
-          "name": "curB",
-          "type": "light-array",
+          "name": "palette",
+          "type": "color-array",
           "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
-        {
-          "name": "idxB",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "sumB",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "mB",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
+          "initialValue": ["green", "red", "yellow", "blue", "orange"],
           "isParameter": false
         }
       ]

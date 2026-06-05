@@ -13,6 +13,10 @@ import {
   type CueDataLogicNode,
   type ConfigDataLogicNode,
   type LightsFromIndexLogicNode,
+  type ColorFromIndexLogicNode,
+  type ReverseColorsLogicNode,
+  type ConcatColorsLogicNode,
+  type ShuffleColorsLogicNode,
   type ArrayLengthLogicNode,
   type ReverseLightsLogicNode,
   type CreatePairsLogicNode,
@@ -197,6 +201,47 @@ const useNodeCreation = ({
           index: { source: 'literal', value: 0 },
           assignTo: '',
         }) satisfies LightsFromIndexLogicNode as LogicNode,
+      'color-from-index': (id) =>
+        ({
+          id,
+          type: 'logic',
+          logicType: 'color-from-index',
+          label: 'color-from-index',
+          outputs: [],
+          colors: { source: 'literal', value: ['blue'] },
+          index: { source: 'literal', value: 0 },
+          assignTo: '',
+        }) satisfies ColorFromIndexLogicNode as LogicNode,
+      'reverse-colors': (id) =>
+        ({
+          id,
+          type: 'logic',
+          logicType: 'reverse-colors',
+          label: 'reverse-colors',
+          outputs: [],
+          sourceVariable: '',
+          assignTo: '',
+        }) satisfies ReverseColorsLogicNode as LogicNode,
+      'concat-colors': (id) =>
+        ({
+          id,
+          type: 'logic',
+          logicType: 'concat-colors',
+          label: 'concat-colors',
+          outputs: [],
+          sourceVariables: [],
+          assignTo: '',
+        }) satisfies ConcatColorsLogicNode as LogicNode,
+      'shuffle-colors': (id) =>
+        ({
+          id,
+          type: 'logic',
+          logicType: 'shuffle-colors',
+          label: 'shuffle-colors',
+          outputs: [],
+          sourceVariable: '',
+          assignTo: '',
+        }) satisfies ShuffleColorsLogicNode as LogicNode,
       'array-length': (id) =>
         ({
           id,

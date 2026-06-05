@@ -1,11 +1,19 @@
-import { TrackedLight } from '../../../types'
+import { TrackedLight, Color } from '../../../types'
 
 /**
  * Variable value stored in variable stores.
  */
 export interface VariableValue {
-  type: 'number' | 'boolean' | 'string' | 'color' | 'light-array' | 'cue-type' | 'event'
-  value: number | boolean | string | TrackedLight[]
+  type:
+    | 'number'
+    | 'boolean'
+    | 'string'
+    | 'color'
+    | 'light-array'
+    | 'color-array'
+    | 'cue-type'
+    | 'event'
+  value: number | boolean | string | TrackedLight[] | Color[]
 }
 
 /**

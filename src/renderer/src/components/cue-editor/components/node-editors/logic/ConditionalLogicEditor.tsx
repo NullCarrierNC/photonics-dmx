@@ -14,6 +14,7 @@ type ExpectedType =
   | 'color'
   | 'cue-type'
   | 'light-array'
+  | 'color-array'
   | 'event'
   | 'either'
 
@@ -43,7 +44,7 @@ function coerceToExpected(
   ) {
     return String(val ?? '')
   }
-  if (expected === 'light-array') return undefined
+  if (expected === 'light-array' || expected === 'color-array') return undefined
   return undefined
 }
 
@@ -66,6 +67,7 @@ const ConditionalLogicEditor: React.FC<ConditionalLogicEditorProps> = ({
       t === 'color' ||
       t === 'cue-type' ||
       t === 'light-array' ||
+      t === 'color-array' ||
       t === 'event'
     ) {
       return { expected: t, validLiterals: varDef.validValues }
