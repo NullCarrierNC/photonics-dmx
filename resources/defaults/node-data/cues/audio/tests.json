@@ -1,0 +1,195 @@
+{
+  "version": 1,
+  "mode": "audio",
+  "group": {
+    "id": "tests",
+    "name": "For testing",
+    "description": "All test files"
+  },
+  "cues": [
+    {
+      "id": "cue-80916fb2-17dc-4d96-87f4-088bd0a1a2cd",
+      "name": "my-test",
+      "description": "sdfasd",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-41268f7f-6deb-4e4e-bdf7-79acf7dde5f1",
+            "type": "event",
+            "eventType": "audio-energy",
+            "triggerMode": "edge",
+            "threshold": 0.5
+          },
+          {
+            "id": "event-104285a9-e88e-4976-b8b6-c7e4af6d5a1b",
+            "type": "event",
+            "eventType": "audio-trigger",
+            "frequencyRange": {
+              "minHz": 120,
+              "maxHz": 500
+            },
+            "threshold": 0.5,
+            "hysteresis": 0.05,
+            "holdMs": 0,
+            "color": "#60a5fa",
+            "nodeLabel": "Audio Trigger",
+            "outputs": ["enter", "during", "exit"]
+          }
+        ],
+        "actions": [
+          {
+            "id": "action-fe655c4d-85a9-4321-ae5c-53a7f125c434",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "audio-trigger"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 200
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 2000
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "logic-9987f851-7931-47c2-be19-7f199201107c",
+            "type": "logic",
+            "logicType": "delay",
+            "label": "delay",
+            "outputs": [],
+            "delayTime": {
+              "source": "literal",
+              "value": 1000
+            }
+          },
+          {
+            "id": "logic-5fd8b703-31eb-4b4f-b754-41072a6ad7f6",
+            "type": "logic",
+            "logicType": "delay",
+            "label": "delay",
+            "outputs": [],
+            "delayTime": {
+              "source": "literal",
+              "value": 1000
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-41268f7f-6deb-4e4e-bdf7-79acf7dde5f1",
+          "to": "logic-9987f851-7931-47c2-be19-7f199201107c"
+        },
+        {
+          "from": "logic-9987f851-7931-47c2-be19-7f199201107c",
+          "to": "action-fe655c4d-85a9-4321-ae5c-53a7f125c434"
+        },
+        {
+          "from": "event-104285a9-e88e-4976-b8b6-c7e4af6d5a1b",
+          "to": "logic-5fd8b703-31eb-4b4f-b754-41072a6ad7f6",
+          "fromPort": "during"
+        },
+        {
+          "from": "logic-5fd8b703-31eb-4b4f-b754-41072a6ad7f6",
+          "to": "action-fe655c4d-85a9-4321-ae5c-53a7f125c434"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-41268f7f-6deb-4e4e-bdf7-79acf7dde5f1": {
+            "x": 100,
+            "y": 100
+          },
+          "action-fe655c4d-85a9-4321-ae5c-53a7f125c434": {
+            "x": 128.0428251598879,
+            "y": 307.9672513483208
+          },
+          "logic-9987f851-7931-47c2-be19-7f199201107c": {
+            "x": 150.6901785191542,
+            "y": 181.05390308960204
+          },
+          "event-104285a9-e88e-4976-b8b6-c7e4af6d5a1b": {
+            "x": 382.62216208874395,
+            "y": 86.38639671391797
+          },
+          "logic-5fd8b703-31eb-4b4f-b754-41072a6ad7f6": {
+            "x": 392.25820229325905,
+            "y": 190.89697393287943
+          }
+        },
+        "viewport": {
+          "x": 443.67332979538565,
+          "y": 39.50000000000006,
+          "zoom": 0.9376476283441263
+        }
+      },
+      "kind": "lighting",
+      "cueTypeId": "custom-audio-cue",
+      "style": "primary"
+    }
+  ],
+  "bundled": false
+}

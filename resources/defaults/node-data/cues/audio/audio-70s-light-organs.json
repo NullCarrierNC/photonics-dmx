@@ -683,13 +683,17 @@
               },
               "waitUntilTime": {
                 "source": "literal",
-                "value": 0
+                "value": 2000
               },
               "easing": {
                 "source": "literal",
                 "value": "linear"
               },
               "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 1
               }
@@ -822,9 +826,9 @@
           }
         },
         "viewport": {
-          "x": 120.9162021542005,
-          "y": 140.5439202628806,
-          "zoom": 1.0837259668447805
+          "x": 72.94771981115252,
+          "y": 85.96179717703154,
+          "zoom": 1.5104232254438539
         }
       },
       "kind": "lighting"

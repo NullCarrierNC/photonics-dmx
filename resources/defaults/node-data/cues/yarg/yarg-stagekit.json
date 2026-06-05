@@ -4,8 +4,8 @@
   "mode": "yarg",
   "group": {
     "id": "yarg-stagekit",
-    "name": "StageKit",
-    "description": "Cues that mimic the original Stage Kit, but mapped to a DMX light array",
+    "name": "Stage Kit",
+    "description": "Cues that mimic the original Stage Kit, but mapped to a DMX light array. Stepping lights is the primary animation.",
     "isStageKit": true
   },
   "cues": [
@@ -1018,9 +1018,9 @@
           }
         },
         "viewport": {
-          "x": 307.38987873752507,
-          "y": 202.7788427916215,
-          "zoom": 0.5456319385274675
+          "x": 332.3442725435028,
+          "y": 275.7974007086138,
+          "zoom": 0.7263340603491304
         }
       },
       "variables": [
@@ -7079,6 +7079,309 @@
           "scope": "cue",
           "initialValue": 0,
           "isParameter": false
+        }
+      ],
+      "kind": "lighting"
+    },
+    {
+      "id": "cue-sk-big-rock-ending",
+      "name": "Big Rock Ending",
+      "description": "Chaotic random color flash per light",
+      "cueType": "BigRockEnding",
+      "style": "secondary",
+      "nodes": {
+        "events": [
+          {
+            "id": "y1-bre-event-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "y1-bre-logic-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "y1-bre-logic-foreach",
+            "type": "logic",
+            "logicType": "for-each-light",
+            "sourceVariable": "allLights",
+            "currentLightVariable": "currentLight",
+            "currentIndexVariable": "idx"
+          },
+          {
+            "id": "y1-bre-logic-layer",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "idx"
+            },
+            "right": {
+              "source": "literal",
+              "value": 10
+            },
+            "assignTo": "layerVal"
+          },
+          {
+            "id": "y1-bre-logic-rand",
+            "type": "logic",
+            "logicType": "random",
+            "mode": "random-choice",
+            "choices": ["red", "green", "blue", "orange"],
+            "assignTo": "flashColor"
+          },
+          {
+            "id": "y1-bre-logic-rand-delay",
+            "type": "logic",
+            "logicType": "random",
+            "mode": "random-integer",
+            "min": {
+              "source": "literal",
+              "value": 0
+            },
+            "max": {
+              "source": "literal",
+              "value": 100
+            },
+            "assignTo": "randDelay"
+          },
+          {
+            "id": "y1-bre-logic-rand-hold",
+            "type": "logic",
+            "logicType": "random",
+            "mode": "random-integer",
+            "min": {
+              "source": "literal",
+              "value": 20
+            },
+            "max": {
+              "source": "literal",
+              "value": 80
+            },
+            "assignTo": "randHold"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "y1-bre-action-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "currentLight"
+              },
+              "layer": {
+                "source": "variable",
+                "name": "layerVal"
+              },
+              "color": {
+                "source": "variable",
+                "name": "flashColor"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "startDelay": {
+                "source": "variable",
+                "name": "randDelay"
+              },
+              "holdTime": {
+                "source": "variable",
+                "name": "randHold"
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 10
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 60
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "endWait": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": [
+          {
+            "id": "notes-5e925f84-44c8-4284-9ee1-60d4e27278d2",
+            "type": "notes",
+            "label": "Notes",
+            "note": "Randomly flashes a colour on each light. \nRandomizes the duration and delay between flashes.",
+            "style": "notes",
+            "title": "Big Rock Ending"
+          },
+          {
+            "id": "notes-1da819e8-d790-408e-9610-919c0ac3f3dc",
+            "type": "notes",
+            "label": "Info",
+            "note": "Effects are references to external Effect files. \nThis lets us create reusable effects that can be used \nacross different cues.",
+            "style": "info",
+            "title": "Effects are External Files"
+          }
+        ]
+      },
+      "connections": [
+        {
+          "from": "y1-bre-event-called",
+          "to": "y1-bre-logic-all"
+        },
+        {
+          "from": "y1-bre-logic-all",
+          "to": "y1-bre-logic-foreach"
+        },
+        {
+          "from": "y1-bre-logic-foreach",
+          "to": "y1-bre-logic-layer",
+          "fromPort": "each"
+        },
+        {
+          "from": "y1-bre-logic-layer",
+          "to": "y1-bre-logic-rand"
+        },
+        {
+          "from": "y1-bre-logic-rand",
+          "to": "y1-bre-logic-rand-delay"
+        },
+        {
+          "from": "y1-bre-logic-rand-delay",
+          "to": "y1-bre-logic-rand-hold"
+        },
+        {
+          "from": "y1-bre-logic-rand-hold",
+          "to": "y1-bre-action-flash"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "y1-bre-event-called": {
+            "x": 1.8911600690335035,
+            "y": 5.549032103270292
+          },
+          "y1-bre-logic-all": {
+            "x": 2.0878445729613304,
+            "y": 117.12639093771577
+          },
+          "y1-bre-logic-foreach": {
+            "x": 0.7907165251672268,
+            "y": 255.83898573741317
+          },
+          "y1-bre-logic-layer": {
+            "x": 3.034528059884906,
+            "y": 378.5915673337877
+          },
+          "y1-bre-logic-rand": {
+            "x": 0.09271489083766937,
+            "y": 497.2685569189489
+          },
+          "y1-bre-logic-rand-delay": {
+            "x": -7.275777194648981,
+            "y": 631.3462330289185
+          },
+          "y1-bre-logic-rand-hold": {
+            "x": 6.7193444184958935,
+            "y": 753.7608922310174
+          },
+          "y1-bre-action-flash": {
+            "x": -11.193297944962978,
+            "y": 880.3378836512566
+          },
+          "notes-5e925f84-44c8-4284-9ee1-60d4e27278d2": {
+            "x": 231.30576506612692,
+            "y": 7.877061421929966
+          },
+          "notes-1da819e8-d790-408e-9610-919c0ac3f3dc": {
+            "x": 247.74083192377782,
+            "y": 809.5837499765005
+          }
+        },
+        "viewport": {
+          "x": 382.02783626936537,
+          "y": 31.144618866188125,
+          "zoom": 0.5882957571968175
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "currentLight",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "idx",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "layerVal",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 10,
+          "isParameter": false
+        },
+        {
+          "name": "flashColor",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "red",
+          "isParameter": false
+        },
+        {
+          "name": "randDelay",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 50,
+          "isParameter": false
+        },
+        {
+          "name": "randHold",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 50,
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
         }
       ],
       "kind": "lighting"

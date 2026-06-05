@@ -1204,6 +1204,43 @@ describe('Node cue validation', () => {
     }
   })
 
+  it('validates bundled yarg-stagekit-negative-space.json', () => {
+    const filePath = path.join(
+      __dirname,
+      '../../../../../resources/defaults/node-data/cues/yarg/yarg-stagekit-negative-space.json',
+    )
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const result = validateYargNodeCueFile(JSON.parse(raw))
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      for (const cue of result.data.cues) {
+        expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+      }
+    }
+  })
+
+  for (const fileName of ['yarg-fade.json', 'yarg-spectrum.json']) {
+    it(`validates bundled ${fileName} (compiles, caps brightness at high, no strobes)`, () => {
+      const filePath = path.join(
+        __dirname,
+        `../../../../../resources/defaults/node-data/cues/yarg/${fileName}`,
+      )
+      const raw = fs.readFileSync(filePath, 'utf8')
+      const result = validateYargNodeCueFile(JSON.parse(raw))
+      expect(result.valid).toBe(true)
+      if (result.valid) {
+        for (const cue of result.data.cues) {
+          expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+        }
+      }
+      // max/linear brightness is reserved for strobes; these libraries must not use it
+      expect(raw).not.toMatch(
+        /"brightness":\s*\{\s*"source":\s*"literal",\s*"value":\s*"(max|linear)"\s*\}/,
+      )
+      expect(raw).not.toContain('Strobe')
+    })
+  }
+
   it('audio stagekit rotation effect raisers are persistent (seamless loop at wrap)', () => {
     const filePath = path.join(
       __dirname,
@@ -1440,6 +1477,17 @@ describe('Node cue validation', () => {
       const result = validateEffectFile(JSON.parse(raw))
       expect(result.valid).toBe(true)
       expect(result.mode).toBe('audio')
+    })
+
+    it('validates bundled yarg-fade-effects.json', () => {
+      const filePath = path.join(
+        __dirname,
+        '../../../../../resources/defaults/node-data/effects/yarg/yarg-fade-effects.json',
+      )
+      const raw = fs.readFileSync(filePath, 'utf8')
+      const result = validateEffectFile(JSON.parse(raw))
+      expect(result.valid).toBe(true)
+      expect(result.mode).toBe('yarg')
     })
   })
 })
