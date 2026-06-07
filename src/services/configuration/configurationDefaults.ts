@@ -117,7 +117,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   effectDebounce: 0,
   complex: true,
   cueDomains: createDefaultCueDomains(),
-  cueConsistencyWindow: 60000,
+  cueConsistencyWindow: 10000,
   motionEnabled: true,
   clockRate: 10,
   globalDmxPublishingRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
@@ -160,7 +160,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
     refreshRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
   },
   stageKitPrefs: {
-    yargPriority: 'prefer-for-tracked',
+    yargPriority: 'random',
   },
   dmxSettingsPrefs: {
     artNetExpanded: false,

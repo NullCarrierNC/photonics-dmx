@@ -90,7 +90,7 @@ async function loadAndApplyPrefs(
 
   if (!prefs.stageKitPrefs) {
     const defaultStageKitPrefs = {
-      yargPriority: 'prefer-for-tracked' as 'prefer-for-tracked' | 'random' | 'never',
+      yargPriority: 'random' as 'prefer-for-tracked' | 'random' | 'never',
     }
     log.info('No saved Stage Kit preferences, using defaults:', defaultStageKitPrefs)
     updatedPrefs.stageKitPrefs = defaultStageKitPrefs

@@ -32,7 +32,7 @@ export function registerCueSelectionConfigHandlers(
     }
 
     const currentPriority = registry.getStageKitPriority()
-    const configPriority = prefs.stageKitPrefs?.yargPriority || 'prefer-for-tracked'
+    const configPriority = prefs.stageKitPrefs?.yargPriority || 'random'
 
     if (currentPriority !== configPriority) {
       registry.setStageKitPriority(configPriority)

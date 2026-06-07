@@ -73,7 +73,7 @@ export function setupCueSelectionPrefsHandlers(
     try {
       const percent =
         controllerManager.getConfig().getPreference('cueDomains').yargMotion.probabilityPercent ??
-        100
+        50
       return { success: true, percent }
     } catch (error) {
       log.error('Error getting motion cue probability percent:', error)
@@ -90,7 +90,7 @@ export function setupCueSelectionPrefsHandlers(
       await controllerManager.getConfig().setMotionCueProbabilityPercent(validated.value)
       const stored =
         controllerManager.getConfig().getPreference('cueDomains').yargMotion.probabilityPercent ??
-        100
+        50
       return { success: true, percent: stored }
     } catch (error) {
       log.error('Error setting motion cue probability percent:', error)
@@ -102,7 +102,7 @@ export function setupCueSelectionPrefsHandlers(
     try {
       const percent =
         controllerManager.getConfig().getPreference('cueDomains').audioMotion.probabilityPercent ??
-        100
+        50
       return { success: true, percent }
     } catch (error) {
       log.error('Error getting audio motion cue probability percent:', error)
@@ -119,7 +119,7 @@ export function setupCueSelectionPrefsHandlers(
       await controllerManager.getConfig().setAudioMotionCueProbabilityPercent(validated.value)
       const stored =
         controllerManager.getConfig().getPreference('cueDomains').audioMotion.probabilityPercent ??
-        100
+        50
       return { success: true, percent: stored }
     } catch (error) {
       log.error('Error setting audio motion cue probability percent:', error)

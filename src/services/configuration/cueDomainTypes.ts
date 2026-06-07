@@ -44,7 +44,7 @@ export function createDefaultCueDomainPrefs(
     base.selectionMode = 'withinSong'
   } else if (domain === 'yargMotion' || domain === 'audioMotion') {
     base.selectionMode = 'perCueChange'
-    base.probabilityPercent = 100
+    base.probabilityPercent = 50
     base.minimumHoldMs = 5000
     base.activeCueRef = null
   }
