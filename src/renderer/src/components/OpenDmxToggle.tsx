@@ -62,11 +62,6 @@ const OpenDmxToggle = ({ disabled = false, compact = false }: OpenDmxToggleProps
             }`}></div>
         </button>
       </div>
-      {isOpenDmxEnabled && (
-        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-          *OpenDMX USB adapters aren't recommended. You may experience flickering or other issues.
-        </p>
-      )}
       <RoutedRigsHint senderId="opendmx" compact={compact} />
     </div>
   )
