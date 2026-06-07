@@ -2,13 +2,11 @@
  * OpenDMX USB sender using enttec-open-dmx-usb.
  *
  * dmxSpeed (Hz) is mapped to send interval (ms) as: interval = 1000 / dmxSpeed.
- * Optional usleep: On some systems Node's setTimeout is too imprecise for DMX
- * break/MAB timing; pass a microsecond sleep (e.g. easy-sleep) as options.usleep
- * to reduce flicker / timing issues.
  *
- * NOTE: usleep is part of the underling enttec-open-dmx-usb library, but is not
- * implemented in the rest of the Photonics system. It's included here in case
- * we add it down the road.
+ * usleep: enttec-open-dmx-usb bit-bangs DMX512 and times the BREAK/MAB with
+ * setTimeout unless given a microsecond sleep. We supply a precise busy-wait
+ * (see ./usleep) so the break/mark-after-break framing meets the DMX spec,
+ * which avoids flicker on FTDI adapters.
  */
 
 import { EventEmitter } from 'events'
@@ -16,6 +14,7 @@ import { EnttecOpenDMXUSBDevice } from 'enttec-open-dmx-usb'
 import { createLogger } from '../../shared/logger'
 import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../shared/dmxOutputRefresh'
 import { BaseSender, SenderError } from './BaseSender'
+import { usleep } from './usleep'
 
 const log = createLogger('OpenDmxSender')
 
@@ -161,21 +160,18 @@ export class OpenDmxSender extends BaseSender {
   }
 
   public async start(): Promise<void> {
+    const onError = (err: Error): void => {
+      const errorEvent = new SenderError(err, { senderId: 'opendmx', shouldDisable: true })
+      this.eventEmitter.emit('SenderError', errorEvent)
+    }
+    const options: OpenDmxDeviceOptions = {
+      dmxSpeed: this.options.dmxSpeed,
+      onError,
+      usleep,
+    }
     const adapter = this.deviceFactory
-      ? this.deviceFactory(this.port, {
-          dmxSpeed: this.options.dmxSpeed,
-          onError: (err) => {
-            const errorEvent = new SenderError(err, { senderId: 'opendmx', shouldDisable: true })
-            this.eventEmitter.emit('SenderError', errorEvent)
-          },
-        })
-      : new OpenDmxDeviceAdapter(this.port, {
-          dmxSpeed: this.options.dmxSpeed,
-          onError: (err) => {
-            const errorEvent = new SenderError(err, { senderId: 'opendmx', shouldDisable: true })
-            this.eventEmitter.emit('SenderError', errorEvent)
-          },
-        })
+      ? this.deviceFactory(this.port, options)
+      : new OpenDmxDeviceAdapter(this.port, options)
     try {
       await adapter.start()
       this.device = adapter

@@ -39,46 +39,46 @@ node/
 
 ### compiler/
 
-| File                         | Role                                                                                                                     |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `NodeCueCompiler`            | Compiles `YargNodeCueDefinition` / `AudioNodeCueDefinition` to `CompiledYargCue` / `CompiledAudioCue`                    |
-| `EffectCompiler`             | Compiles `YargEffectDefinition` / `AudioEffectDefinition` to executable effect                                           |
+| File                         | Role                                                                                                                         |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `NodeCueCompiler`            | Compiles `YargNodeCueDefinition` / `AudioNodeCueDefinition` to `CompiledYargCue` / `CompiledAudioCue`                        |
+| `EffectCompiler`             | Compiles `YargEffectDefinition` / `AudioEffectDefinition` to executable effect                                               |
 | `AbstractGraphBuilder`       | Shared compile core both compilers extend: map build, endpoint/reachability/unreachable-action checks via per-compiler hooks |
-| `CompilationError`           | Unified base error; `NodeCueCompilationError` / `EffectCompilationError` are thin back-compat subclasses                 |
-| `sharedActionNodeValidation` | Shared structural checks for action targets, set-position, set-color, and motion-pattern payloads used by both compilers |
-| `ActionEffectFactory`        | Builds concrete Effect objects from ActionNode config (color, timing, targets)                                           |
+| `CompilationError`           | Unified base error; `NodeCueCompilationError` / `EffectCompilationError` are thin back-compat subclasses                     |
+| `sharedActionNodeValidation` | Shared structural checks for action targets, set-position, set-color, and motion-pattern payloads used by both compilers     |
+| `ActionEffectFactory`        | Builds concrete Effect objects from ActionNode config (color, timing, targets)                                               |
 
 ### loader/
 
-| File                 | Role                                                                                                                                       |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `BaseNodeFileLoader` | Shared base for both loaders: directory layout, chokidar watching, per-mode summary bookkeeping, and path sandboxing                        |
+| File                 | Role                                                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BaseNodeFileLoader` | Shared base for both loaders: directory layout, chokidar watching, per-mode summary bookkeeping, and path sandboxing                               |
 | `NodeCueLoader`      | Extends `BaseNodeFileLoader`: loads cue JSON from `yarg/` and `audio/` dirs; validates with AJV; registers with YargCueRegistry / AudioCueRegistry |
-| `EffectLoader`       | Extends `BaseNodeFileLoader`: loads effect JSON; validates; registers with EffectRegistry                                                  |
+| `EffectLoader`       | Extends `BaseNodeFileLoader`: loads effect JSON; validates; registers with EffectRegistry                                                          |
 
 ### runtime/
 
-| File                    | Role                                                                                                                          |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| File                      | Role                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `BaseNodeExecutionEngine` | Shared node dispatcher both engines extend (action/logic/for-each/delay/cancel); cue-vs-effect differences via template-method hooks |
-| `NodeExecutionEngine`   | Cue execution (extends `BaseNodeExecutionEngine`): strict revisit policy, cue/group variable stores, effect-raiser dispatch         |
-| `EffectExecutionEngine` | Effect execution (extends `BaseNodeExecutionEngine`): relaxed revisit policy, effect-local parameter store, idle tracking           |
-| `GraphExecutionEngine`  | Unified engine for cue/effect graphs; wraps NodeExecutionEngine/EffectExecutionEngine, queuing, state machine                 |
-| `GraphExecutionPolicy`  | Policy for GraphExecutionEngine (cue vs effect entry events, queuing, revisit)                                                |
-| `graphActionHelpers`    | Small shared pieces for homogeneous set-color chains (visit marking, step collection, effect-factory argument mapping)        |
-| `CueSession`            | Per-cue session state: variable stores, first-submission policy, cue-started flag                                             |
-| `ExecutionStateMachine` | Lifecycle phases (IDLE, RUNNING, BLOCKED, COMPLETED, CANCELLED) per context                                                   |
-| `YargNodeCue`           | Runtime cue instance for YARG lighting; receives game events, drives GraphExecutionEngine                                     |
-| `YargMotionNodeCue`     | YARG motion program runtime (parallel with lighting; same graph execution model)                                              |
-| `BaseAudioNodeCue`      | Shared audio graph execution (events, triggers, variables, `NodeExecutionEngine`) for lighting and motion                     |
-| `AudioNodeCue`          | Audio lighting runtime (`kind: 'lighting'`); primary/secondary/strobe slot semantics via `style`                              |
-| `AudioMotionNodeCue`    | Audio motion runtime (`kind: 'motion'`); no lighting `style`; clamps detected BPM for fixture safety; receives `AudioCueData` |
-| `ExecutionContext`      | Per-execution state: variables, light arrays, beat/measure, etc.                                                              |
-| `EffectRegistry`        | Maps effect IDs to compiled effect definitions                                                                                |
-| `valueResolver`         | Resolves ValueSource (literal/variable) to concrete values                                                                    |
-| `actionResolver`        | Resolves ActionNode → Effect; handles effect references                                                                       |
-| `logicNodeEvaluator`    | Evaluates logic nodes (variable, math, conditional, loops, light selectors)                                                   |
-| `dataExtractors`        | Extract game/audio data for node execution                                                                                    |
+| `NodeExecutionEngine`     | Cue execution (extends `BaseNodeExecutionEngine`): strict revisit policy, cue/group variable stores, effect-raiser dispatch          |
+| `EffectExecutionEngine`   | Effect execution (extends `BaseNodeExecutionEngine`): relaxed revisit policy, effect-local parameter store, idle tracking            |
+| `GraphExecutionEngine`    | Unified engine for cue/effect graphs; wraps NodeExecutionEngine/EffectExecutionEngine, queuing, state machine                        |
+| `GraphExecutionPolicy`    | Policy for GraphExecutionEngine (cue vs effect entry events, queuing, revisit)                                                       |
+| `graphActionHelpers`      | Small shared pieces for homogeneous set-color chains (visit marking, step collection, effect-factory argument mapping)               |
+| `CueSession`              | Per-cue session state: variable stores, first-submission policy, cue-started flag                                                    |
+| `ExecutionStateMachine`   | Lifecycle phases (IDLE, RUNNING, BLOCKED, COMPLETED, CANCELLED) per context                                                          |
+| `YargNodeCue`             | Runtime cue instance for YARG lighting; receives game events, drives GraphExecutionEngine                                            |
+| `YargMotionNodeCue`       | YARG motion program runtime (parallel with lighting; same graph execution model)                                                     |
+| `BaseAudioNodeCue`        | Shared audio graph execution (events, triggers, variables, `NodeExecutionEngine`) for lighting and motion                            |
+| `AudioNodeCue`            | Audio lighting runtime (`kind: 'lighting'`); primary/secondary/strobe slot semantics via `style`                                     |
+| `AudioMotionNodeCue`      | Audio motion runtime (`kind: 'motion'`); no lighting `style`; clamps detected BPM for fixture safety; receives `AudioCueData`        |
+| `ExecutionContext`        | Per-execution state: variables, light arrays, beat/measure, etc.                                                                     |
+| `EffectRegistry`          | Maps effect IDs to compiled effect definitions                                                                                       |
+| `valueResolver`           | Resolves ValueSource (literal/variable) to concrete values                                                                           |
+| `actionResolver`          | Resolves ActionNode → Effect; handles effect references                                                                              |
+| `logicNodeEvaluator`      | Evaluates logic nodes (variable, math, conditional, loops, light selectors)                                                          |
+| `dataExtractors`          | Extract game/audio data for node execution                                                                                           |
 
 ### schema/
 

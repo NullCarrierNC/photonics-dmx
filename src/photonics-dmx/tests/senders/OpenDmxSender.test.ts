@@ -94,6 +94,29 @@ describe('OpenDmxSender', () => {
     expect(listener).toHaveBeenCalledWith(expect.any(SenderError))
     expect((listener.mock.calls[0][0] as SenderError).senderId).toBe('opendmx')
   })
+
+  it('passes a usleep function to the device adapter for precise DMX framing', async () => {
+    let capturedUsleep: unknown
+    const capturingFactory = (
+      _path: string,
+      options: { usleep?: unknown },
+    ): {
+      start(): Promise<void>
+      writeChannels(b: Record<number, number>): void
+      stop(): Promise<void>
+    } => {
+      capturedUsleep = options.usleep
+      return {
+        start: mockStart as () => Promise<void>,
+        writeChannels: mockWriteChannels,
+        stop: mockStop as () => Promise<void>,
+      }
+    }
+    const s = new OpenDmxSender('/dev/ttyUSB0', { dmxSpeed: 40 }, 'uni1', 0, capturingFactory)
+    await s.start()
+    expect(typeof capturedUsleep).toBe('function')
+    await s.stop().catch(() => {})
+  })
 })
 
 describe('OpenDmxSender stop() and port close', () => {

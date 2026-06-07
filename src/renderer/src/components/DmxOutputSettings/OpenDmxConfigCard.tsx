@@ -25,18 +25,6 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
         OpenDMX USB adapters rely on your PC for timing, this can cause flickering or other issues
         on some systems.
       </p>
-      <p className="text-sm text-red-600 dark:text-red-500">
-        If you want to use one, please be aware that:
-        <ul className="list-disc list-inside">
-          <li>
-            They are not electrically isolated between DMX and USB. This increases the chances you
-            could damage your computer.
-          </li>
-          <li>
-            You may experience DMX drop-outs or other timing issues which can cause flickering.
-          </li>
-        </ul>
-      </p>
       <div className="flex items-center gap-2">
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
           COM:
@@ -64,9 +52,9 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
         <span className="text-xs text-gray-500 dark:text-gray-400">Hz (1–44)</span>
       </div>
       <p className="text-xs text-gray-600 dark:text-gray-400">
-        Default is {OPEN_DMX_DEFAULT_REFRESH_RATE_HZ} Hz. Higher values reduce latency but can
-        increase flicker on lower-quality adapters. If you experience flickering, try lowering the
-        value.
+        Default is {OPEN_DMX_DEFAULT_REFRESH_RATE_HZ} Hz. If you see flickering, try seting your
+        FTDI adapter&apos;s latency timer to 1 ms rather than lowering this rate. Failing that, try
+        turning this down to 20 Hz.
         <br />
         Strobes may not work as expected if the value is too low.
       </p>

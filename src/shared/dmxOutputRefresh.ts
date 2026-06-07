@@ -8,7 +8,7 @@ export const DMX_OUTPUT_REFRESH_RATE_HZ_MAX = 44
 export const DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT = 40
 
 /** Default OpenDMX USB send rate (Hz); used as `dmxSpeed` default for OpenDMX serial output. */
-export const OPEN_DMX_DEFAULT_REFRESH_RATE_HZ = 20
+export const OPEN_DMX_DEFAULT_REFRESH_RATE_HZ = 40
 
 export function clampDmxOutputRefreshRateHz(hz: number): number {
   const rounded = Math.round(hz)

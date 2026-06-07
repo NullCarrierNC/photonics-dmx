@@ -14,11 +14,11 @@ Shared services used across main and (where applicable) renderer. Currently focu
 
 Stored in `{appData}/Photonics.rocks/`:
 
-| File                | Content                                   |
-| ------------------- | ----------------------------------------- |
-| `prefs.json`        | AppPreferences                            |
-| `lights.json`       | User light definitions (fixtures, groups) |
-| `lightsLayout.json` | Physical layout order of lights           |
+| File                | Content                                                                         |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `prefs.json`        | AppPreferences                                                                  |
+| `lights.json`       | User light definitions (fixtures, groups)                                       |
+| `lightsLayout.json` | Physical layout order of lights                                                 |
 | `dmxRigs.json`      | DMX rig definitions (per-rig light layout, sender-output routing, mirror flags) |
 
 ## Related
