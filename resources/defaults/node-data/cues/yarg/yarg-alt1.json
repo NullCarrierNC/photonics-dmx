@@ -635,6 +635,73 @@
               "source": "literal",
               "value": 0
             }
+          },
+          {
+            "id": "action-063f1f08-bf61-4692-87b9-a931998b0aea",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 200
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
           }
         ],
         "logic": [
@@ -763,6 +830,10 @@
         {
           "from": "y1-ss-event-drum-red",
           "to": "effect-raiser-adcf93f1-b18b-47d5-bec0-35292ec7e32f"
+        },
+        {
+          "from": "y1-ss-action-off",
+          "to": "action-063f1f08-bf61-4692-87b9-a931998b0aea"
         }
       ],
       "layout": {
@@ -798,12 +869,16 @@
           "effect-raiser-adcf93f1-b18b-47d5-bec0-35292ec7e32f": {
             "x": 711.8460109250134,
             "y": 137.10987773519844
+          },
+          "action-063f1f08-bf61-4692-87b9-a931998b0aea": {
+            "x": 432.46360349955205,
+            "y": 242.98489373250084
           }
         },
         "viewport": {
-          "x": 321.15487727073196,
-          "y": 139.66204963178205,
-          "zoom": 0.5
+          "x": -2.995889854349798,
+          "y": 75.40909090909093,
+          "zoom": 1.021671329466658
         }
       },
       "variables": [

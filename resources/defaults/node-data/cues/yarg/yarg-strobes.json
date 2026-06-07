@@ -5,7 +5,7 @@
     "id": "yarg-strobes",
     "name": "Strobes",
     "description": "All the strobe cues",
-    "isStageKit": true
+    "isStageKit": false
   },
   "cues": [
     {
