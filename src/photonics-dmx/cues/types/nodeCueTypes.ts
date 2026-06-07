@@ -464,6 +464,10 @@ export interface AudioTriggerNode extends BaseEventNode {
   holdMs?: number
   /** Energy smoothing (0–1). 0 = raw/immediate, 1 = maximum smoothing (slow response). Default 0.45. */
   smoothing?: number
+  /** Rising-edge time constant (ms) for the band envelope. Smaller = snappier fade-up. Set with releaseMs to opt into asymmetric (fast-up/slow-down) smoothing instead of the symmetric `smoothing` path. */
+  attackMs?: number
+  /** Falling-edge time constant (ms) for the band envelope. Larger = slower fade-down (eg. 1970s light-organ feel). Set with attackMs to opt into asymmetric smoothing. */
+  releaseMs?: number
   /** Optional spectral conditions (flatness, ZCR, HFC, crest). AND with band energy. */
   spectralGates?: AudioTriggerSpectralGates
   /** When true, also require per-band onset strength above onsetThreshold for the matched band */

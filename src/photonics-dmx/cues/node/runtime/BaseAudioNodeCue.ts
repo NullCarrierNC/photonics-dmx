@@ -47,6 +47,33 @@ const clamp = (value: number, min: number, max: number): number =>
 /** Default energy smoothing (0–1) when trigger.smoothing is omitted */
 const DEFAULT_EMA_SMOOTHING = 0.45
 
+/**
+ * Default attack/release time constants (ms) used to fill in whichever of attackMs/releaseMs
+ * is omitted once a trigger opts into asymmetric smoothing by setting either one. The attack
+ * default is snappy and the release default is slow, matching 1970s light-organ decay.
+ */
+const DEFAULT_ATTACK_MS = 20
+const DEFAULT_RELEASE_MS = 250
+
+/**
+ * One step of a fast-attack / slow-release envelope follower. Rising targets use the attack
+ * time constant, falling targets the release time constant; each is converted to a single-pole
+ * coefficient from the actual frame delta `dtMs`, so the smoothing is frame-rate independent.
+ * A zero time constant means "snap instantly" for that edge.
+ */
+export function asymmetricEnvelopeStep(
+  prev: number,
+  target: number,
+  dtMs: number,
+  attackMs: number,
+  releaseMs: number,
+): number {
+  const rising = target >= prev
+  const tau = Math.max(0, rising ? attackMs : releaseMs)
+  const a = tau > 0 ? 1 - Math.exp(-Math.max(0, dtMs) / tau) : 1
+  return prev + a * (target - prev)
+}
+
 function checkSpectralGateRange(
   range: { min?: number; max?: number } | undefined,
   value: number,
@@ -84,6 +111,8 @@ interface AudioCueRunState {
   lastTriggerTime: Map<string, number>
   activeLevelEffects: Map<string, number>
   smoothedBandEnergy: Map<string, number>
+  /** Wall-clock ms of the last band-energy smoothing update per trigger, for frame-rate-independent attack/release. */
+  bandSmoothTime: Map<string, number>
   cueLevelVarStore: Map<string, VariableValue>
   groupLevelVarStore: Map<string, VariableValue>
   executionEngine: NodeExecutionEngine | null
@@ -168,6 +197,7 @@ export abstract class BaseAudioNodeCue {
       lastTriggerTime: new Map(),
       activeLevelEffects: new Map(),
       smoothedBandEnergy: new Map(),
+      bandSmoothTime: new Map(),
       cueLevelVarStore: new Map(),
       // Group-level variables are per-rig (per-sequencer): when several chains run the same
       // cue group in lockstep each chain accumulates its own counters/state, so they stay in
@@ -374,6 +404,7 @@ export abstract class BaseAudioNodeCue {
       state.lastTriggerTime.clear()
       state.activeLevelEffects.clear()
       state.smoothedBandEnergy.clear()
+      state.bandSmoothTime.clear()
       state.cueLevelVarStore.clear()
       state.firstSubmissionUsesSetEffectRef.use = false
     }
@@ -446,6 +477,49 @@ export abstract class BaseAudioNodeCue {
     return peakBin * binSize
   }
 
+  /**
+   * Envelope-follow a trigger's raw band energy. By default (no attackMs/releaseMs set) this
+   * is the legacy symmetric single-pole EMA driven by `smoothing`. When a trigger opts into
+   * asymmetric smoothing by setting attackMs and/or releaseMs, the rising edge uses the attack
+   * time constant and the falling edge the (typically slower) release time constant, giving the
+   * fast-up/slow-down "light organ" decay. Time constants are in ms and converted to a per-frame
+   * coefficient with the actual frame delta, so behaviour is independent of frame rate.
+   */
+  private smoothBandEnergy(
+    state: AudioCueRunState,
+    trigger: AudioTriggerNode,
+    bandEnergy: number,
+  ): number {
+    const prevSmoothed = state.smoothedBandEnergy.get(trigger.id) ?? bandEnergy
+
+    const asymmetric = trigger.attackMs != null || trigger.releaseMs != null
+    let smoothedEnergy: number
+    if (asymmetric) {
+      const now = Date.now()
+      const prevTime = state.bandSmoothTime.get(trigger.id)
+      // First frame (or after a stop): seed without decay, like the symmetric path's `?? bandEnergy`.
+      if (prevTime == null) {
+        smoothedEnergy = bandEnergy
+      } else {
+        smoothedEnergy = asymmetricEnvelopeStep(
+          prevSmoothed,
+          bandEnergy,
+          now - prevTime,
+          trigger.attackMs ?? DEFAULT_ATTACK_MS,
+          trigger.releaseMs ?? DEFAULT_RELEASE_MS,
+        )
+      }
+      state.bandSmoothTime.set(trigger.id, now)
+    } else {
+      const smoothing = clamp(trigger.smoothing ?? DEFAULT_EMA_SMOOTHING, 0, 1)
+      const alpha = 1 - smoothing
+      smoothedEnergy = alpha * bandEnergy + (1 - alpha) * prevSmoothed
+    }
+
+    state.smoothedBandEnergy.set(trigger.id, smoothedEnergy)
+    return smoothedEnergy
+  }
+
   private executeAudioTriggerNode(
     state: AudioCueRunState,
     trigger: AudioTriggerNode,
@@ -464,11 +538,7 @@ export abstract class BaseAudioNodeCue {
     const releaseThreshold = Math.max(0, triggerThreshold - hysteresis)
 
     const bandEnergy = getBandEnergy(rawFrequencyData, sampleRate, fftSize, minHz, maxHz)
-    const smoothing = clamp(trigger.smoothing ?? DEFAULT_EMA_SMOOTHING, 0, 1)
-    const alpha = 1 - smoothing
-    const prevSmoothed = state.smoothedBandEnergy.get(trigger.id) ?? bandEnergy
-    const smoothedEnergy = alpha * bandEnergy + (1 - alpha) * prevSmoothed
-    state.smoothedBandEnergy.set(trigger.id, smoothedEnergy)
+    const smoothedEnergy = this.smoothBandEnergy(state, trigger, bandEnergy)
     const peakFreq = this.getPeakFrequencyInRange(
       rawFrequencyData,
       sampleRate,

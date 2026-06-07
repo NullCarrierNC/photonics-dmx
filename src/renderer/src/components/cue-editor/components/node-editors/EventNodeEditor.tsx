@@ -128,9 +128,19 @@ const AUDIO_TRIGGER_PROPERTY_DOCS = {
   },
   smoothing: {
     description:
-      'Band energy smoothing (0–1). 0 = raw/immediate response; 1 = maximum smoothing (slow, analogue-style response).',
+      'Band energy smoothing (0–1). 0 = raw/immediate response; 1 = maximum smoothing (slow, analogue-style response). Ignored when Attack/Release are set.',
     bestUsedFor:
       'Vintage light organ look: raise; beat detection or strobes: lower. Uses higher values for smoother, less flickery brightness.',
+  },
+  attackMs: {
+    description:
+      'Rising-edge time constant (ms). Smaller = snappier fade-up. Setting Attack or Release switches to asymmetric (fast-up/slow-down) smoothing and overrides Smoothing.',
+    bestUsedFor: 'Asymetric fade in vs. fade out. Eg. Light-organ with quick in, but longer out.',
+  },
+  releaseMs: {
+    description:
+      'Falling-edge time constant (ms). Larger = slower fade-down. Setting Attack or Release switches to asymmetric (fast-up/slow-down) smoothing and overrides Smoothing.',
+    bestUsedFor: 'Asymetric fade out vs. fade in. Eg. Light-organ with quick in, but longer out.',
   },
   color: {
     description: 'Colour used for the trigger node on the canvas (visual only).',
@@ -463,6 +473,52 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
               {AUDIO_TRIGGER_PROPERTY_DOCS.smoothing.description}
               <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
                 Best used for: {AUDIO_TRIGGER_PROPERTY_DOCS.smoothing.bestUsedFor}
+              </span>
+            </div>
+          </label>
+          <label className="flex flex-col font-medium">
+            Attack (ms)
+            <input
+              type="number"
+              min={0}
+              step={5}
+              placeholder="off"
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={trigger.attackMs ?? ''}
+              onChange={(e) =>
+                patchTrigger({
+                  attackMs:
+                    e.target.value === '' ? undefined : Math.max(0, Number(e.target.value) || 0),
+                })
+              }
+            />
+            <div className={DOC_BLOCK_CLASS}>
+              {AUDIO_TRIGGER_PROPERTY_DOCS.attackMs.description}
+              <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
+                Best used for: {AUDIO_TRIGGER_PROPERTY_DOCS.attackMs.bestUsedFor}
+              </span>
+            </div>
+          </label>
+          <label className="flex flex-col font-medium">
+            Release (ms)
+            <input
+              type="number"
+              min={0}
+              step={10}
+              placeholder="off"
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={trigger.releaseMs ?? ''}
+              onChange={(e) =>
+                patchTrigger({
+                  releaseMs:
+                    e.target.value === '' ? undefined : Math.max(0, Number(e.target.value) || 0),
+                })
+              }
+            />
+            <div className={DOC_BLOCK_CLASS}>
+              {AUDIO_TRIGGER_PROPERTY_DOCS.releaseMs.description}
+              <span className="mt-0.5 block font-medium text-gray-700 dark:text-gray-300">
+                Best used for: {AUDIO_TRIGGER_PROPERTY_DOCS.releaseMs.bestUsedFor}
               </span>
             </div>
           </label>
