@@ -232,6 +232,42 @@ export function migratePrefsV3ToV4(legacy: unknown, defaults: AppPreferences): A
   return normalizeCueDomains(out)
 }
 
+/**
+ * Settings whose shipped defaults changed in v5. Existing prefs carried over from earlier
+ * versions are bumped to these values once (when the file is below v5); every other field is
+ * preserved. New installs never run this — they start at v5 with the current DEFAULT_PREFERENCES.
+ *
+ * This is a deliberate one-time overwrite of these specific fields, including any value the user
+ * had previously set for them; it is not a general "reset to defaults".
+ */
+export function migratePrefsV4ToV5(legacy: unknown, defaults: AppPreferences): AppPreferences {
+  const base =
+    legacy != null && typeof legacy === 'object' && !Array.isArray(legacy)
+      ? (legacy as AppPreferences)
+      : defaults
+
+  const out: AppPreferences = { ...base }
+
+  out.cueConsistencyWindow = defaults.cueConsistencyWindow
+  out.stageKitPrefs = {
+    ...base.stageKitPrefs,
+    yargPriority: defaults.stageKitPrefs!.yargPriority,
+  }
+
+  const currentDomains =
+    base.cueDomains != null &&
+    typeof base.cueDomains === 'object' &&
+    !Array.isArray(base.cueDomains)
+      ? base.cueDomains
+      : createDefaultCueDomains()
+  out.cueDomains = mergePartialCueDomains(currentDomains, {
+    yargMotion: { probabilityPercent: defaults.cueDomains.yargMotion.probabilityPercent },
+    audioMotion: { probabilityPercent: defaults.cueDomains.audioMotion.probabilityPercent },
+  })
+
+  return normalizeCueDomains(out)
+}
+
 function pickNonLegacyTopLevel(src: Record<string, unknown>): Partial<AppPreferences> {
   const o: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(src)) {
