@@ -1,5 +1,10 @@
 import { DEFAULT_PREFERENCES } from '../configurationDefaults'
-import { applyLegacySenderFlatToNested, migratePrefsV3ToV4 } from '../preferencesMigration'
+import {
+  applyLegacySenderFlatToNested,
+  migratePrefsV3ToV4,
+  migratePrefsV4ToV5,
+} from '../preferencesMigration'
+import { createDefaultCueDomains } from '../cueDomainTypes'
 
 describe('migratePrefsV3ToV4', () => {
   it('maps flat v3 keys into cueDomains and drops legacy top-level fields', () => {
@@ -71,6 +76,85 @@ describe('migratePrefsV3ToV4', () => {
     }
     const once = migratePrefsV3ToV4(flatV3, DEFAULT_PREFERENCES)
     const again = migratePrefsV3ToV4(once, DEFAULT_PREFERENCES)
+    expect(again).toEqual(once)
+  })
+})
+
+describe('migratePrefsV4ToV5', () => {
+  it('applies the new defaults to the four changed settings', () => {
+    const v4 = {
+      ...DEFAULT_PREFERENCES,
+      cueConsistencyWindow: 60000,
+      stageKitPrefs: { yargPriority: 'prefer-for-tracked' as const },
+      cueDomains: {
+        ...createDefaultCueDomains(),
+        yargMotion: { ...createDefaultCueDomains().yargMotion, probabilityPercent: 100 },
+        audioMotion: { ...createDefaultCueDomains().audioMotion, probabilityPercent: 100 },
+      },
+    }
+    const out = migratePrefsV4ToV5(v4, DEFAULT_PREFERENCES)
+    expect(out.cueConsistencyWindow).toBe(10000)
+    expect(out.stageKitPrefs!.yargPriority).toBe('random')
+    expect(out.cueDomains.yargMotion.probabilityPercent).toBe(50)
+    expect(out.cueDomains.audioMotion.probabilityPercent).toBe(50)
+  })
+
+  it('overwrites previously customized values for the changed settings', () => {
+    const v4 = {
+      ...DEFAULT_PREFERENCES,
+      cueConsistencyWindow: 25000,
+      stageKitPrefs: { yargPriority: 'never' as const },
+      cueDomains: {
+        ...createDefaultCueDomains(),
+        yargMotion: { ...createDefaultCueDomains().yargMotion, probabilityPercent: 80 },
+        audioMotion: { ...createDefaultCueDomains().audioMotion, probabilityPercent: 30 },
+      },
+    }
+    const out = migratePrefsV4ToV5(v4, DEFAULT_PREFERENCES)
+    expect(out.cueConsistencyWindow).toBe(10000)
+    expect(out.stageKitPrefs!.yargPriority).toBe('random')
+    expect(out.cueDomains.yargMotion.probabilityPercent).toBe(50)
+    expect(out.cueDomains.audioMotion.probabilityPercent).toBe(50)
+  })
+
+  it('preserves unrelated preferences and selection modes', () => {
+    const v4 = {
+      ...DEFAULT_PREFERENCES,
+      effectDebounce: 42,
+      cueDomains: {
+        ...createDefaultCueDomains(),
+        yarg: {
+          ...createDefaultCueDomains().yarg,
+          enabledGroups: ['stagekit', 'custom'],
+          selectionMode: 'oncePerSong' as const,
+        },
+        yargMotion: {
+          ...createDefaultCueDomains().yargMotion,
+          selectionMode: 'none' as const,
+          minimumHoldMs: 8000,
+        },
+      },
+    }
+    const out = migratePrefsV4ToV5(v4, DEFAULT_PREFERENCES)
+    expect(out.effectDebounce).toBe(42)
+    expect(out.cueDomains.yarg.enabledGroups).toEqual(['stagekit', 'custom'])
+    expect(out.cueDomains.yarg.selectionMode).toBe('oncePerSong')
+    expect(out.cueDomains.yargMotion.selectionMode).toBe('none')
+    expect(out.cueDomains.yargMotion.minimumHoldMs).toBe(8000)
+  })
+
+  it('falls back to defaults when cueDomains or stageKitPrefs are missing', () => {
+    const partial = { effectDebounce: 7 } as unknown
+    const out = migratePrefsV4ToV5(partial, DEFAULT_PREFERENCES)
+    expect(out.cueConsistencyWindow).toBe(10000)
+    expect(out.stageKitPrefs!.yargPriority).toBe('random')
+    expect(out.cueDomains.yargMotion.probabilityPercent).toBe(50)
+    expect(out.cueDomains.audioMotion.probabilityPercent).toBe(50)
+  })
+
+  it('is idempotent once already at v5 defaults', () => {
+    const once = migratePrefsV4ToV5(DEFAULT_PREFERENCES, DEFAULT_PREFERENCES)
+    const again = migratePrefsV4ToV5(once, DEFAULT_PREFERENCES)
     expect(again).toEqual(once)
   })
 })

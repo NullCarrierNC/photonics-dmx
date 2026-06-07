@@ -77,7 +77,7 @@ const StageKitYargPrioritySettings: React.FC = () => {
             </label>
             <select
               id="stagekit-priority"
-              value={prefs.stageKitPrefs?.yargPriority || 'prefer-for-tracked'}
+              value={prefs.stageKitPrefs?.yargPriority || 'random'}
               onChange={(e) =>
                 handlePriorityChange(e.target.value as 'prefer-for-tracked' | 'random')
               }
@@ -89,7 +89,7 @@ const StageKitYargPrioritySettings: React.FC = () => {
               ))}
             </select>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              {getPriorityDescription(prefs.stageKitPrefs?.yargPriority || 'prefer-for-tracked')}
+              {getPriorityDescription(prefs.stageKitPrefs?.yargPriority || 'random')}
             </p>
           </div>
         </div>
