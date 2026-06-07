@@ -6,6 +6,8 @@ import {
 } from '../../../constants/nodeConstants'
 import type {
   ArrayLengthLogicNode,
+  ColorFromIndexLogicNode,
+  ConcatColorsLogicNode,
   ConcatLightsLogicNode,
   ConditionalLogicNode,
   ConfigDataLogicNode,
@@ -18,12 +20,14 @@ import type {
   LogicNode,
   MathLogicNode,
   RandomLogicNode,
+  ReverseColorsLogicNode,
   ReverseLightsLogicNode,
+  ShuffleColorsLogicNode,
   ShuffleLightsLogicNode,
   VariableLogicNode,
 } from '../../types/nodeCueTypes'
 import { LOGIC_COMPARATORS, MATH_OPERATORS } from './helpers'
-import { stringIdSchema, valueSourceSchema } from './primitives'
+import { stringIdSchema, valueSourceSchema, colorArrayValueSourceSchema } from './primitives'
 
 // Combine cue data properties without duplicates (dedupe overlapping properties like 'cue-name', 'bpm', 'execution-count')
 const CUE_DATA_PROPERTIES = [
@@ -51,7 +55,16 @@ const variableLogicSchema = {
     varName: { type: 'string' },
     valueType: {
       type: 'string',
-      enum: ['number', 'boolean', 'string', 'color', 'light-array', 'cue-type', 'event'] as const,
+      enum: [
+        'number',
+        'boolean',
+        'string',
+        'color',
+        'light-array',
+        'color-array',
+        'cue-type',
+        'event',
+      ] as const,
     },
     value: { ...valueSourceSchema, nullable: true },
   },
@@ -155,6 +168,73 @@ const lightsFromIndexLogicSchema = {
     assignTo: { type: 'string' },
   },
 } as unknown as JSONSchemaType<LightsFromIndexLogicNode>
+
+const colorFromIndexLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'colors', 'index', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'color-from-index' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    // Palette: an inline literal Color[] (each entry enum-validated against COLOR_OPTIONS, so
+    // typos are rejected at load) or a reference to a color-array variable.
+    colors: colorArrayValueSourceSchema,
+    index: valueSourceSchema,
+    assignTo: { type: 'string' },
+  },
+} as unknown as JSONSchemaType<ColorFromIndexLogicNode>
+
+const reverseColorsLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'sourceVariable', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'reverse-colors' },
+    label: { type: 'string', nullable: true },
+    outputs: { type: 'array', nullable: true, items: { type: 'string' } },
+    sourceVariable: { type: 'string' },
+    assignTo: { type: 'string' },
+  },
+} as unknown as JSONSchemaType<ReverseColorsLogicNode>
+
+const concatColorsLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'sourceVariables', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'concat-colors' },
+    label: { type: 'string', nullable: true },
+    outputs: { type: 'array', nullable: true, items: { type: 'string' } },
+    sourceVariables: { type: 'array', items: { type: 'string' }, minItems: 1 },
+    assignTo: { type: 'string' },
+  },
+} as unknown as JSONSchemaType<ConcatColorsLogicNode>
+
+const shuffleColorsLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'sourceVariable', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'shuffle-colors' },
+    label: { type: 'string', nullable: true },
+    outputs: { type: 'array', nullable: true, items: { type: 'string' } },
+    sourceVariable: { type: 'string' },
+    assignTo: { type: 'string' },
+  },
+} as unknown as JSONSchemaType<ShuffleColorsLogicNode>
 
 const arrayLengthLogicSchema = {
   type: 'object',
@@ -360,6 +440,10 @@ export const logicNodeSchema = {
     cueDataLogicSchema,
     configDataLogicSchema,
     lightsFromIndexLogicSchema,
+    colorFromIndexLogicSchema,
+    reverseColorsLogicSchema,
+    concatColorsLogicSchema,
+    shuffleColorsLogicSchema,
     arrayLengthLogicSchema,
     reverseLightsLogicSchema,
     createPairsLogicSchema,

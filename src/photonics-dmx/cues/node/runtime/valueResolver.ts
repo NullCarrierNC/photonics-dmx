@@ -38,15 +38,18 @@ export function resolveValue(
   source: ValueSource | undefined,
   context: ExecutionContext,
   variableDefinitions?: VariableDefinitionsForScope,
-): number | boolean | string | TrackedLight[] {
+): number | boolean | string | TrackedLight[] | Color[] {
   if (!source) {
-    if (expectedType === 'light-array') return []
+    if (expectedType === 'light-array' || expectedType === 'color-array') return []
     return expectedType === 'number' ? 0 : expectedType === 'boolean' ? false : ''
   }
 
   if (source.source === 'literal') {
     if (expectedType === 'light-array') {
       return Array.isArray(source.value) ? (source.value as TrackedLight[]) : []
+    }
+    if (expectedType === 'color-array') {
+      return Array.isArray(source.value) ? (source.value as Color[]) : []
     }
     if (
       expectedType === 'string' ||
@@ -80,6 +83,9 @@ export function resolveValue(
   if (existing) {
     if (expectedType === 'light-array') {
       return existing.type === 'light-array' ? (existing.value as TrackedLight[]) : []
+    }
+    if (expectedType === 'color-array') {
+      return existing.type === 'color-array' ? (existing.value as Color[]) : []
     }
     if (
       expectedType === 'string' ||

@@ -1,46 +1,28 @@
 import React from 'react'
-import type { ArrayLengthLogicNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { ShuffleColorsLogicNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
 
-export interface ArrayLengthLogicEditorProps extends LogicEditorCommonProps {
-  node: ArrayLengthLogicNode
+export interface ShuffleColorsLogicEditorProps extends LogicEditorCommonProps {
+  node: ShuffleColorsLogicNode
 }
 
-const ArrayLengthLogicEditor: React.FC<ArrayLengthLogicEditorProps> = ({
+const ShuffleColorsLogicEditor: React.FC<ShuffleColorsLogicEditorProps> = ({
   node,
   availableVariables,
   updateNode,
 }) => {
-  const arrayVars = availableVariables.filter(
-    (v) => v.type === 'light-array' || v.type === 'color-array',
-  )
-  const numberVars = availableVariables.filter((v) => v.type === 'number')
+  const colorArrayVars = availableVariables.filter((v) => v.type === 'color-array')
 
   return (
     <div className="space-y-2 text-xs">
       <label className="flex flex-col font-medium">
-        Source Variable (light-array or color-array)
+        Source Variable (color-array)
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={node.sourceVariable}
           onChange={(event) => updateNode({ sourceVariable: event.target.value })}>
-          <option value="">-- Select array --</option>
-          {arrayVars.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.type}, {v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="flex flex-col font-medium">
-        Assign To (number variable)
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.assignTo}
-          onChange={(event) => updateNode({ assignTo: event.target.value })}>
-          <option value="">-- Select variable --</option>
-          {numberVars.map((v) => (
+          <option value="">-- Select color-array --</option>
+          {colorArrayVars.map((v) => (
             <option key={v.name} value={v.name}>
               {v.name} ({v.scope})
             </option>
@@ -48,11 +30,24 @@ const ArrayLengthLogicEditor: React.FC<ArrayLengthLogicEditorProps> = ({
         </select>
       </label>
 
-      <p className="text-[10px] text-gray-500 italic">
-        Gets the number of items in the source array (lights or colours).
-      </p>
+      <label className="flex flex-col font-medium">
+        Assign To (color-array variable)
+        <select
+          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+          value={node.assignTo}
+          onChange={(event) => updateNode({ assignTo: event.target.value })}>
+          <option value="">-- Select variable --</option>
+          {colorArrayVars.map((v) => (
+            <option key={v.name} value={v.name}>
+              {v.name} ({v.scope})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <p className="text-[10px] text-gray-500 italic">Randomises the order of a colour palette.</p>
     </div>
   )
 }
 
-export default ArrayLengthLogicEditor
+export default ShuffleColorsLogicEditor

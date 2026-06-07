@@ -5,7 +5,8 @@ import type {
   NodeCueKind,
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import type { TrackedLight } from '../../../../../../photonics-dmx/types'
+import type { TrackedLight, Color } from '../../../../../../photonics-dmx/types'
+import ColorListEditor from '../shared/ColorListEditor'
 import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
 import {
   AUDIO_EVENT_OPTIONS,
@@ -28,8 +29,8 @@ type VariableFormDialogProps = {
 
 function getInitialValueInput(
   type: VariableType,
-  value: number | boolean | string | TrackedLight[] | undefined,
-  onChange: (val: number | boolean | string | TrackedLight[]) => void,
+  value: number | boolean | string | TrackedLight[] | Color[] | undefined,
+  onChange: (val: number | boolean | string | TrackedLight[] | Color[]) => void,
   activeMode: NodeCueMode,
   cueKind: NodeCueKind,
 ) {
@@ -106,6 +107,13 @@ function getInitialValueInput(
           Empty array (populated via config-data node)
         </div>
       )
+    case 'color-array':
+      return (
+        <ColorListEditor
+          colors={Array.isArray(value) ? (value as Color[]) : []}
+          onColorsChange={(colors) => onChange(colors)}
+        />
+      )
     case 'number':
     default:
       return (
@@ -135,12 +143,12 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
   if (!isOpen) return null
 
   const handleTypeChange = (newType: VariableType) => {
-    let newValue: number | boolean | string | TrackedLight[] = 0
+    let newValue: number | boolean | string | TrackedLight[] | Color[] = 0
     if (newType === 'boolean') newValue = false
     else if (newType === 'string' || newType === 'cue-type') newValue = ''
     else if (newType === 'event') newValue = getDefaultEventOption(activeMode, cueKind)?.value ?? ''
     else if (newType === 'color') newValue = 'blue'
-    else if (newType === 'light-array') newValue = []
+    else if (newType === 'light-array' || newType === 'color-array') newValue = []
     onFormDataChange({ ...formData, type: newType, initialValue: newValue })
   }
 
@@ -176,6 +184,7 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
               <option value="string">String</option>
               <option value="color">Color</option>
               <option value="light-array">Light Array</option>
+              <option value="color-array">Color Array</option>
               <option value="cue-type">Cue Type</option>
               <option value="event">Event</option>
             </select>

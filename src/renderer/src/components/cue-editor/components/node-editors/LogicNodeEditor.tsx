@@ -7,6 +7,10 @@ import type {
   CueDataLogicNode,
   ConfigDataLogicNode,
   LightsFromIndexLogicNode,
+  ColorFromIndexLogicNode,
+  ReverseColorsLogicNode,
+  ConcatColorsLogicNode,
+  ShuffleColorsLogicNode,
   ArrayLengthLogicNode,
   ReverseLightsLogicNode,
   CreatePairsLogicNode,
@@ -25,6 +29,10 @@ import CueDataLogicEditor from './logic/CueDataLogicEditor'
 import ConfigDataLogicEditor from './logic/ConfigDataLogicEditor'
 import ConditionalLogicEditor from './logic/ConditionalLogicEditor'
 import LightsFromIndexLogicEditor from './logic/LightsFromIndexLogicEditor'
+import ColorFromIndexLogicEditor from './logic/ColorFromIndexLogicEditor'
+import ReverseColorsLogicEditor from './logic/ReverseColorsLogicEditor'
+import ConcatColorsLogicEditor from './logic/ConcatColorsLogicEditor'
+import ShuffleColorsLogicEditor from './logic/ShuffleColorsLogicEditor'
 import ArrayLengthLogicEditor from './logic/ArrayLengthLogicEditor'
 import ReverseLightsLogicEditor from './logic/ReverseLightsLogicEditor'
 import CreatePairsLogicEditor from './logic/CreatePairsLogicEditor'
@@ -106,6 +114,46 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     return (
       <LightsFromIndexLogicEditor
         node={node as LightsFromIndexLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'color-from-index') {
+    return (
+      <ColorFromIndexLogicEditor
+        node={node as ColorFromIndexLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'reverse-colors') {
+    return (
+      <ReverseColorsLogicEditor
+        node={node as ReverseColorsLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'concat-colors') {
+    return (
+      <ConcatColorsLogicEditor
+        node={node as ConcatColorsLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'shuffle-colors') {
+    return (
+      <ShuffleColorsLogicEditor
+        node={node as ShuffleColorsLogicNode}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />

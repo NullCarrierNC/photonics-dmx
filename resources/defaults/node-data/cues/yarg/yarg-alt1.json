@@ -3923,7 +3923,75 @@
             "eventType": "cue-called"
           }
         ],
-        "actions": [],
+        "actions": [
+          {
+            "id": "action-93b897fa-eea8-4d1d-8ad1-c193734a97f4",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 200
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
         "logic": [
           {
             "id": "y1-menu-logic-front",
@@ -4025,6 +4093,10 @@
         {
           "from": "y1-menu-event-start",
           "to": "y1-menu-logic-front"
+        },
+        {
+          "from": "y1-menu-logic-concat",
+          "to": "action-93b897fa-eea8-4d1d-8ad1-c193734a97f4"
         }
       ],
       "layout": {
@@ -4052,12 +4124,16 @@
           "y1-menu-action-sweep": {
             "x": 268.74377020448446,
             "y": 103.18730382248759
+          },
+          "action-93b897fa-eea8-4d1d-8ad1-c193734a97f4": {
+            "x": -9.754345455615805,
+            "y": 526.9582787181213
           }
         },
         "viewport": {
-          "x": 364.3923280623276,
-          "y": 121.96273959707469,
-          "zoom": 0.75
+          "x": 329.6373326140538,
+          "y": -119.62269938681777,
+          "zoom": 1.2745606273192622
         }
       },
       "variables": [

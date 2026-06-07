@@ -4,7 +4,7 @@
   "mode": "yarg",
   "group": {
     "id": "yarg-stagekit-negative-space",
-    "name": "Negative Stage Kit",
+    "name": "Stage Kit Inverted",
     "description": "Negative-space inversions of the Stage Kit cues: most lights are one with animations turning lights off.",
     "isStageKit": true
   },
@@ -429,9 +429,9 @@
           }
         },
         "viewport": {
-          "x": 306.9386574183358,
-          "y": 169.3971133240155,
-          "zoom": 0.7677482052632294
+          "x": 332.3442725435028,
+          "y": 275.7974007086138,
+          "zoom": 0.7263340603491304
         }
       },
       "variables": [

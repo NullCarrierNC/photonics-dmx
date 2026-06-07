@@ -1,0 +1,917 @@
+{
+  "version": 1,
+  "mode": "yarg",
+  "group": {
+    "id": "yarg-strobes",
+    "name": "Strobes",
+    "description": "All the strobe cues",
+    "isStageKit": true
+  },
+  "cues": [
+    {
+      "id": "cue-sk-strobe-slow",
+      "name": "Strobe Slow",
+      "description": "Strobe white at BPM/8, 70ms hold",
+      "cueType": "Strobe_Slow",
+      "style": "secondary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-strobe-slow-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-strobe-slow-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-strobe-slow-setup",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "strobe-lights-array",
+            "outputs": [],
+            "dataProperty": "strobe-lights-array",
+            "assignTo": "strobeLights"
+          },
+          {
+            "id": "sk-strobe-slow-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "bpmVar"
+          },
+          {
+            "id": "sk-strobe-slow-beat-ms",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "literal",
+              "value": 60000
+            },
+            "right": {
+              "source": "variable",
+              "name": "bpmVar"
+            },
+            "assignTo": "beatMs"
+          },
+          {
+            "id": "sk-strobe-slow-endwait",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "beatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 8
+            },
+            "assignTo": "endWait"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-strobe-slow-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "strobeLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 255
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 70
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 0
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 0
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "endWait": {
+                "source": "variable",
+                "name": "endWait"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-strobe-slow-start",
+          "to": "sk-strobe-slow-setup"
+        },
+        {
+          "from": "sk-strobe-slow-setup",
+          "to": "sk-strobe-slow-bpm"
+        },
+        {
+          "from": "sk-strobe-slow-bpm",
+          "to": "sk-strobe-slow-beat-ms"
+        },
+        {
+          "from": "sk-strobe-slow-beat-ms",
+          "to": "sk-strobe-slow-endwait"
+        },
+        {
+          "from": "event-sk-strobe-slow-called",
+          "to": "sk-strobe-slow-flash"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-strobe-slow-start": {
+            "x": 5,
+            "y": -6
+          },
+          "event-sk-strobe-slow-called": {
+            "x": 268,
+            "y": 2
+          },
+          "sk-strobe-slow-setup": {
+            "x": 2,
+            "y": 124
+          },
+          "sk-strobe-slow-bpm": {
+            "x": -1,
+            "y": 248
+          },
+          "sk-strobe-slow-beat-ms": {
+            "x": -8,
+            "y": 368
+          },
+          "sk-strobe-slow-endwait": {
+            "x": -11,
+            "y": 501
+          },
+          "sk-strobe-slow-flash": {
+            "x": 254,
+            "y": 121
+          }
+        },
+        "viewport": {
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
+        }
+      },
+      "variables": [
+        {
+          "name": "strobeLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "bpmVar",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120,
+          "isParameter": false
+        },
+        {
+          "name": "beatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 500,
+          "isParameter": false
+        },
+        {
+          "name": "endWait",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 125,
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
+        }
+      ],
+      "kind": "lighting"
+    },
+    {
+      "id": "cue-sk-strobe-medium",
+      "name": "Strobe Medium",
+      "description": "Strobe white at BPM/16, 60ms hold",
+      "cueType": "Strobe_Medium",
+      "style": "secondary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-strobe-medium-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-strobe-medium-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-strobe-medium-setup",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "strobe-lights-array",
+            "outputs": [],
+            "dataProperty": "strobe-lights-array",
+            "assignTo": "strobeLights"
+          },
+          {
+            "id": "sk-strobe-medium-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "bpmVar"
+          },
+          {
+            "id": "sk-strobe-medium-beat-ms",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "literal",
+              "value": 60000
+            },
+            "right": {
+              "source": "variable",
+              "name": "bpmVar"
+            },
+            "assignTo": "beatMs"
+          },
+          {
+            "id": "sk-strobe-medium-endwait",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "beatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 16
+            },
+            "assignTo": "endWait"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-strobe-medium-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "strobeLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 255
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 60
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 0
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 0
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "endWait": {
+                "source": "variable",
+                "name": "endWait"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-strobe-medium-start",
+          "to": "sk-strobe-medium-setup"
+        },
+        {
+          "from": "sk-strobe-medium-setup",
+          "to": "sk-strobe-medium-bpm"
+        },
+        {
+          "from": "sk-strobe-medium-bpm",
+          "to": "sk-strobe-medium-beat-ms"
+        },
+        {
+          "from": "sk-strobe-medium-beat-ms",
+          "to": "sk-strobe-medium-endwait"
+        },
+        {
+          "from": "event-sk-strobe-medium-called",
+          "to": "sk-strobe-medium-flash"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-strobe-medium-start": {
+            "x": 285.2032749512447,
+            "y": 50.83098895099704
+          },
+          "event-sk-strobe-medium-called": {
+            "x": 609.7187478746647,
+            "y": 126.22347255946829
+          },
+          "sk-strobe-medium-setup": {
+            "x": 260,
+            "y": 120
+          },
+          "sk-strobe-medium-bpm": {
+            "x": 232.13756040556495,
+            "y": 236.36665948264056
+          },
+          "sk-strobe-medium-beat-ms": {
+            "x": 225.58169226569782,
+            "y": 336.34364861561335
+          },
+          "sk-strobe-medium-endwait": {
+            "x": 215.7478900558973,
+            "y": 457.62720920315405
+          },
+          "sk-strobe-medium-flash": {
+            "x": 517.3178244897824,
+            "y": 263.3009449369606
+          }
+        },
+        "viewport": {
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
+        }
+      },
+      "variables": [
+        {
+          "name": "strobeLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "bpmVar",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120,
+          "isParameter": false
+        },
+        {
+          "name": "beatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 500,
+          "isParameter": false
+        },
+        {
+          "name": "endWait",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 62,
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
+        }
+      ],
+      "kind": "lighting"
+    },
+    {
+      "id": "cue-sk-strobe-fast",
+      "name": "Strobe Fast",
+      "description": "Strobe white at BPM/32, 50ms hold",
+      "cueType": "Strobe_Fast",
+      "style": "secondary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-strobe-fast-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-strobe-fast-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-strobe-fast-setup",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "strobe-lights-array",
+            "outputs": [],
+            "dataProperty": "strobe-lights-array",
+            "assignTo": "strobeLights"
+          },
+          {
+            "id": "sk-strobe-fast-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "bpmVar"
+          },
+          {
+            "id": "sk-strobe-fast-beat-ms",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "literal",
+              "value": 60000
+            },
+            "right": {
+              "source": "variable",
+              "name": "bpmVar"
+            },
+            "assignTo": "beatMs"
+          },
+          {
+            "id": "sk-strobe-fast-endwait",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "beatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 32
+            },
+            "assignTo": "endWait"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-strobe-fast-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "strobeLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 255
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 50
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 0
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 0
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "endWait": {
+                "source": "variable",
+                "name": "endWait"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-strobe-fast-start",
+          "to": "sk-strobe-fast-setup"
+        },
+        {
+          "from": "sk-strobe-fast-setup",
+          "to": "sk-strobe-fast-bpm"
+        },
+        {
+          "from": "sk-strobe-fast-bpm",
+          "to": "sk-strobe-fast-beat-ms"
+        },
+        {
+          "from": "sk-strobe-fast-beat-ms",
+          "to": "sk-strobe-fast-endwait"
+        },
+        {
+          "from": "event-sk-strobe-fast-called",
+          "to": "sk-strobe-fast-flash"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-strobe-fast-start": {
+            "x": 100,
+            "y": 100
+          },
+          "event-sk-strobe-fast-called": {
+            "x": 440.90514327308756,
+            "y": 149.16901104900296
+          },
+          "sk-strobe-fast-setup": {
+            "x": 141.9943734823928,
+            "y": 190.475582503571
+          },
+          "sk-strobe-fast-bpm": {
+            "x": 223.94272523073118,
+            "y": 305.2032749512448
+          },
+          "sk-strobe-fast-beat-ms": {
+            "x": 220.66479116079756,
+            "y": 405.18026408421747
+          },
+          "sk-strobe-fast-endwait": {
+            "x": 235.41549447549846,
+            "y": 560.8821324060605
+          },
+          "sk-strobe-fast-flash": {
+            "x": 441.9253408813112,
+            "y": 263.3009449369606
+          }
+        },
+        "viewport": {
+          "x": 324.1494822616082,
+          "y": 199.6914118300823,
+          "zoom": 0.7084244533816175
+        }
+      },
+      "variables": [
+        {
+          "name": "strobeLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "bpmVar",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120,
+          "isParameter": false
+        },
+        {
+          "name": "beatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 500,
+          "isParameter": false
+        },
+        {
+          "name": "endWait",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 31,
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
+        }
+      ],
+      "kind": "lighting"
+    },
+    {
+      "id": "cue-sk-strobe-fastest",
+      "name": "Strobe Fastest",
+      "description": "Strobe white at BPM/64, 40ms hold",
+      "cueType": "Strobe_Fastest",
+      "style": "secondary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-strobe-fastest-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-strobe-fastest-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-strobe-fastest-setup",
+            "type": "logic",
+            "logicType": "config-data",
+            "label": "strobe-lights-array",
+            "outputs": [],
+            "dataProperty": "strobe-lights-array",
+            "assignTo": "strobeLights"
+          },
+          {
+            "id": "sk-strobe-fastest-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "bpmVar"
+          },
+          {
+            "id": "sk-strobe-fastest-beat-ms",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "literal",
+              "value": 60000
+            },
+            "right": {
+              "source": "variable",
+              "name": "bpmVar"
+            },
+            "assignTo": "beatMs"
+          },
+          {
+            "id": "sk-strobe-fastest-endwait",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "beatMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 64
+            },
+            "assignTo": "endWait"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-strobe-fastest-flash",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "strobeLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 255
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "max"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 40
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 0
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 0
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "endWait": {
+                "source": "variable",
+                "name": "endWait"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-strobe-fastest-start",
+          "to": "sk-strobe-fastest-setup"
+        },
+        {
+          "from": "sk-strobe-fastest-setup",
+          "to": "sk-strobe-fastest-bpm"
+        },
+        {
+          "from": "sk-strobe-fastest-bpm",
+          "to": "sk-strobe-fastest-beat-ms"
+        },
+        {
+          "from": "sk-strobe-fastest-beat-ms",
+          "to": "sk-strobe-fastest-endwait"
+        },
+        {
+          "from": "event-sk-strobe-fastest-called",
+          "to": "sk-strobe-fastest-flash"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-strobe-fastest-start": {
+            "x": 100,
+            "y": 100
+          },
+          "event-sk-strobe-fastest-called": {
+            "x": 535.96523130116,
+            "y": 93.44413186013298
+          },
+          "sk-strobe-fastest-setup": {
+            "x": 187.88545046146226,
+            "y": 197.03145064343823
+          },
+          "sk-strobe-fastest-bpm": {
+            "x": 220.66479116079768,
+            "y": 301.9253408813113
+          },
+          "sk-strobe-fastest-beat-ms": {
+            "x": 205.91408784609655,
+            "y": 428.12580257375237
+          },
+          "sk-strobe-fastest-endwait": {
+            "x": 204.2751208111299,
+            "y": 537.9365939165258
+          },
+          "sk-strobe-fastest-flash": {
+            "x": 510.7619563499153,
+            "y": 248.55024162225982
+          }
+        },
+        "viewport": {
+          "x": 306.3906413058846,
+          "y": 114.71862801416893,
+          "zoom": 0.6101403985958002
+        }
+      },
+      "variables": [
+        {
+          "name": "strobeLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": []
+        },
+        {
+          "name": "bpmVar",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120,
+          "isParameter": false
+        },
+        {
+          "name": "beatMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 500,
+          "isParameter": false
+        },
+        {
+          "name": "endWait",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 15,
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
+        }
+      ],
+      "kind": "lighting"
+    }
+  ],
+  "bundled": true
+}

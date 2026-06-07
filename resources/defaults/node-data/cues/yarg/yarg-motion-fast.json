@@ -2059,6 +2059,175 @@
         }
       },
       "kind": "motion"
+    },
+    {
+      "id": "motion-pendulum-spread",
+      "name": "Pendulum Fan Spread",
+      "description": "Pan/tilt parabolic back-and-forth (sine pan, cosine tilt at 2x); one full cycle per two beats (speed = BPM / 120). Started on cue-started.",
+      "variables": [
+        {
+          "name": "penBpm",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 120
+        },
+        {
+          "name": "penSpeed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1
+        }
+      ],
+      "nodes": {
+        "events": [
+          {
+            "id": "pen-event-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "pen-action-motion",
+            "type": "action",
+            "effectType": "motion-pattern",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "easeInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 120
+            },
+            "motionPattern": {
+              "pattern": {
+                "source": "literal",
+                "value": "pendulum"
+              },
+              "speed": {
+                "source": "variable",
+                "name": "penSpeed"
+              },
+              "size": {
+                "source": "literal",
+                "value": 25
+              },
+              "fanSpread": {
+                "source": "literal",
+                "value": 45
+              },
+              "reverse": {
+                "source": "literal",
+                "value": false
+              }
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "pen-logic-bpm",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "bpm",
+            "assignTo": "penBpm"
+          },
+          {
+            "id": "pen-logic-speed",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "penBpm"
+            },
+            "right": {
+              "source": "literal",
+              "value": 120
+            },
+            "assignTo": "penSpeed"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "pen-event-start",
+          "to": "pen-logic-bpm"
+        },
+        {
+          "from": "pen-logic-bpm",
+          "to": "pen-logic-speed"
+        },
+        {
+          "from": "pen-logic-speed",
+          "to": "pen-action-motion"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "pen-event-start": {
+            "x": 7.47164848074317,
+            "y": -5.142417438328266
+          },
+          "pen-action-motion": {
+            "x": 4.18859326466918,
+            "y": 318.7527578547597
+          },
+          "pen-logic-bpm": {
+            "x": 11.432236863300204,
+            "y": 97.46139249578118
+          },
+          "pen-logic-speed": {
+            "x": 5.3145598489791155,
+            "y": 208.93652665615082
+          }
+        },
+        "viewport": {
+          "x": 436.2277016863185,
+          "y": 140.5036683482672,
+          "zoom": 1.1612130613153409
+        }
+      },
+      "kind": "motion"
     }
   ],
   "bundled": true

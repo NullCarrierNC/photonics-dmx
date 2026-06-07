@@ -113,6 +113,7 @@ const EffectRaiserEditor: React.FC<EffectRaiserEditorProps> = ({
                       | 'color'
                       | 'cue-type'
                       | 'light-array'
+                      | 'color-array'
                       | 'event'
                   }
                   validLiterals={validLiterals}

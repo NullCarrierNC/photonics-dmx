@@ -4,6 +4,8 @@ import type {
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { isVariableSource } from './nodeEditorUtils'
+import ColorListEditor from './ColorListEditor'
+import type { Color } from '../../../../../../photonics-dmx/types'
 import {
   COLOR_OPTIONS,
   YARG_EVENT_OPTIONS,
@@ -24,6 +26,7 @@ interface ValueSourceEditorProps {
     | 'color'
     | 'cue-type'
     | 'light-array'
+    | 'color-array'
     | 'event'
     | 'either'
   validLiterals?: string[]
@@ -52,6 +55,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
   activeMode,
 }) => {
   const isLightArray = expected === 'light-array'
+  const isColorArray = expected === 'color-array'
   const effectiveValidLiterals = (() => {
     if (validLiterals) return validLiterals
     if (expected === 'color') return COLOR_OPTIONS
@@ -116,6 +120,60 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
           </select>
         </label>
         <p className="text-[10px] text-gray-500">Light arrays must be provided by variables.</p>
+      </div>
+    )
+  }
+
+  if (isColorArray) {
+    const colorArrayVars = availableVariables.filter((v) => v.type === 'color-array')
+    const useVariable = isVariableSource(source)
+    const literalColors =
+      !useVariable && Array.isArray(source.value) ? (source.value as Color[]) : []
+
+    return (
+      <div className="space-y-1">
+        <label className="flex items-center justify-between font-medium text-xs">
+          <span>{label}</span>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <span className="text-xs text-gray-600 dark:text-gray-400">Use Variable</span>
+            <input
+              type="checkbox"
+              checked={useVariable}
+              onChange={(e) =>
+                e.target.checked
+                  ? onChange({
+                      source: 'variable',
+                      name: isVariableSource(source) ? source.name ?? '' : '',
+                    })
+                  : onChange({ source: 'literal', value: literalColors })
+              }
+              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-600 dark:bg-gray-700"
+            />
+          </label>
+        </label>
+        {useVariable ? (
+          <label className="flex flex-col font-medium text-xs">
+            Variable
+            <select
+              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+              value={isVariableSource(source) ? source.name ?? '' : ''}
+              onChange={(event) =>
+                onChange({ source: 'variable', name: event.target.value || '' })
+              }>
+              <option value="">-- Select color-array --</option>
+              {colorArrayVars.map((v) => (
+                <option key={v.name} value={v.name}>
+                  {v.name} ({v.scope})
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <ColorListEditor
+            colors={literalColors}
+            onColorsChange={(colors) => onChange({ source: 'literal', value: colors })}
+          />
+        )}
       </div>
     )
   }

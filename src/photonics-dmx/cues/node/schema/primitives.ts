@@ -9,6 +9,7 @@ import {
   ValueSource,
   VariableDefinition,
 } from '../../types/nodeCueTypes'
+import { COLOR_OPTIONS } from '../../../constants/options'
 export const stringIdSchema: JSONSchemaType<string> = {
   type: 'string',
   minLength: 1,
@@ -45,6 +46,35 @@ export const valueSourceSchema: JSONSchemaType<ValueSource> = {
       },
       then: {
         required: ['name'],
+      },
+    },
+  ],
+} as unknown as JSONSchemaType<ValueSource>
+
+// A ValueSource constrained to a colour palette: either an inline literal Color[] (each entry
+// enum-validated against COLOR_OPTIONS at load) or a reference to a color-array variable.
+export const colorArrayValueSourceSchema = {
+  oneOf: [
+    {
+      type: 'object',
+      required: ['source', 'value'],
+      additionalProperties: false,
+      properties: {
+        source: { type: 'string', const: 'literal' },
+        value: {
+          type: 'array',
+          minItems: 1,
+          items: { type: 'string', enum: COLOR_OPTIONS },
+        },
+      },
+    },
+    {
+      type: 'object',
+      required: ['source', 'name'],
+      additionalProperties: false,
+      properties: {
+        source: { type: 'string', const: 'variable' },
+        name: { type: 'string' },
       },
     },
   ],
@@ -170,7 +200,16 @@ export const variableDefinitionSchema = {
     name: { type: 'string', minLength: 1, pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$' },
     type: {
       type: 'string',
-      enum: ['number', 'boolean', 'string', 'color', 'light-array', 'cue-type', 'event'],
+      enum: [
+        'number',
+        'boolean',
+        'string',
+        'color',
+        'light-array',
+        'color-array',
+        'cue-type',
+        'event',
+      ],
     },
     scope: { type: 'string', enum: ['cue', 'cue-group'] },
     initialValue: { type: ['number', 'boolean', 'string', 'array'] },

@@ -5,7 +5,7 @@
 
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
-import { TrackedLight } from '../../../types'
+import { TrackedLight, Color } from '../../../types'
 import { randomBetween } from '../../../helpers/utils'
 import { LogicNode, ValueSource, VariableDefinition, VariableType } from '../../types/nodeCueTypes'
 import { ExecutionContext } from './ExecutionContext'
@@ -327,18 +327,104 @@ export function evaluateLogicNode(
       return edges.map((edge) => edge.to)
     }
 
+    case 'color-from-index': {
+      // Pick a colour from a palette by index, with wraparound. The colour analogue of
+      // lights-from-index. The palette is a ValueSource resolving to a color-array: an inline
+      // literal Color[] (enum-validated at load) or a color-array variable.
+      const colors = resolveValue(
+        'color-array',
+        logicNode.colors,
+        context,
+        variableDefinitions,
+      ) as Color[]
+      if (!colors || colors.length === 0) {
+        log.warn(`color-from-index node ${nodeId}: colors palette is empty`)
+        return edges.map((edge) => edge.to)
+      }
+
+      const rawIndex = Number(resolveValue('number', logicNode.index, context, variableDefinitions))
+      const idx = Math.floor(isNaN(rawIndex) ? 0 : rawIndex)
+      const wrapped = ((idx % colors.length) + colors.length) % colors.length
+
+      const targetVarStore = getVarStore(logicNode.assignTo)
+      targetVarStore.set(logicNode.assignTo, { type: 'color', value: colors[wrapped] })
+
+      return edges.map((edge) => edge.to)
+    }
+
+    case 'reverse-colors': {
+      const sourceVarStore = getVarStore(logicNode.sourceVariable)
+      const sourceVar = sourceVarStore.get(logicNode.sourceVariable)
+
+      if (!sourceVar || sourceVar.type !== 'color-array') {
+        log.warn(
+          `reverse-colors node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a color-array`,
+        )
+        return edges.map((edge) => edge.to)
+      }
+
+      const colorsArray = sourceVar.value as Color[]
+      const reversed = [...colorsArray].reverse()
+
+      const targetVarStore = getVarStore(logicNode.assignTo)
+      targetVarStore.set(logicNode.assignTo, { type: 'color-array', value: reversed })
+
+      return edges.map((edge) => edge.to)
+    }
+
+    case 'concat-colors': {
+      const concatResult: Color[] = []
+
+      for (const varName of logicNode.sourceVariables) {
+        const sourceVarStore = getVarStore(varName)
+        const sourceVar = sourceVarStore.get(varName)
+
+        if (sourceVar && sourceVar.type === 'color-array') {
+          concatResult.push(...(sourceVar.value as Color[]))
+        } else {
+          log.warn(
+            `concat-colors node ${nodeId}: variable "${varName}" is not a color-array, skipping`,
+          )
+        }
+      }
+
+      const targetVarStore = getVarStore(logicNode.assignTo)
+      targetVarStore.set(logicNode.assignTo, { type: 'color-array', value: concatResult })
+
+      return edges.map((edge) => edge.to)
+    }
+
+    case 'shuffle-colors': {
+      const sourceVarStore = getVarStore(logicNode.sourceVariable)
+      const sourceVar = sourceVarStore.get(logicNode.sourceVariable)
+
+      if (!sourceVar || sourceVar.type !== 'color-array') {
+        log.warn(
+          `shuffle-colors node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a color-array`,
+        )
+        return edges.map((edge) => edge.to)
+      }
+
+      const colorsArray = sourceVar.value as Color[]
+      const shuffled = [...colorsArray].sort(() => Math.random() - 0.5)
+
+      const targetVarStore = getVarStore(logicNode.assignTo)
+      targetVarStore.set(logicNode.assignTo, { type: 'color-array', value: shuffled })
+
+      return edges.map((edge) => edge.to)
+    }
+
     case 'array-length': {
-      // Get the source light array variable
+      // Get the source array variable (light-array or color-array)
       const sourceVarStore = getVarStore(logicNode.sourceVariable)
       const sourceVar = sourceVarStore.get(logicNode.sourceVariable)
 
       let length = 0
-      if (sourceVar && sourceVar.type === 'light-array') {
-        const lightsArray = sourceVar.value as TrackedLight[]
-        length = lightsArray.length
+      if (sourceVar && (sourceVar.type === 'light-array' || sourceVar.type === 'color-array')) {
+        length = (sourceVar.value as unknown[]).length
       } else {
         log.warn(
-          `array-length node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`,
+          `array-length node ${nodeId}: source variable "${logicNode.sourceVariable}" is not an array`,
         )
       }
 
