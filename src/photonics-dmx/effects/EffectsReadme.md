@@ -33,14 +33,14 @@ defines how the effect behaves over time.
 
 ## Usage
 
-| Builder                                                                                              | Used by                                                                                |
-| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `getEffectSingleColor`                                                                               | `cueHandlers/Rb3MenuCueHandler.ts`, `processors/AudioCueProcessor.ts`, `cues/menuCues.ts` |
-| `getEffectFlashColor`                                                                                | `cues/menuCues.ts`                                                                     |
-| `getSweepEffect`                                                                                     | `cues/menuCues.ts`, `cues/searchlightsCues.ts`                                         |
-| `getEffectCrossFadeColors`                                                                           | exported, not currently used                                                           |
-| `getEffectFadeInColorFadeOut`                                                                        | exported, not currently used                                                           |
-| `getEffectCycleLights`                                                                               | exported, not currently used                                                           |
+| Builder                       | Used by                                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------------------------- |
+| `getEffectSingleColor`        | `cueHandlers/Rb3MenuCueHandler.ts`, `processors/AudioCueProcessor.ts`, `cues/menuCues.ts` |
+| `getEffectFlashColor`         | `cues/menuCues.ts`                                                                        |
+| `getSweepEffect`              | `cues/menuCues.ts`, `cues/searchlightsCues.ts`                                            |
+| `getEffectCrossFadeColors`    | exported, not currently used                                                              |
+| `getEffectFadeInColorFadeOut` | exported, not currently used                                                              |
+| `getEffectCycleLights`        | exported, not currently used                                                              |
 
 ## Available Effects
 
