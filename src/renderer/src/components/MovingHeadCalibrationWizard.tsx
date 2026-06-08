@@ -428,8 +428,8 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
         body = (
           <div className="space-y-4">
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              Use the slider to move pan. Does the beam rotate <strong>clockwise</strong> when
-              viewed from above?
+              Use the slider to adjust the pan, move it from left-to-right. Does the beam rotate
+              <strong>clockwise</strong> when viewed from above?
             </p>
             <DmxSlider label="Pan (DMX)" value={panDmxLive} onChange={setPanDmx} />
             <div className="flex items-center gap-3">
