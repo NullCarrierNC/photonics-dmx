@@ -76,7 +76,7 @@ const buildDefaultAction = (): ActionNode => ({
   color: {
     name: { source: 'literal', value: 'blue' },
     brightness: { source: 'literal', value: 'medium' },
-    blendMode: { source: 'literal', value: 'replace' },
+    blendMode: { source: 'literal', value: 'mix' },
     opacity: { source: 'literal', value: 1.0 },
   },
   timing: createDefaultActionTiming(),
