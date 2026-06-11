@@ -5,6 +5,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { performance } from 'perf_hooks'
 import { YargNetworkListener, YargCueRuntime } from '../../listeners/YARG/YargNetworkListener'
 import { CueData, CueType, defaultCueData } from '../../cues/types/cueTypes'
 
@@ -51,6 +52,7 @@ class MockCueHandler implements YargCueRuntime {
   public handleGuitarNote = jest.fn()
   public handleBassNote = jest.fn()
   public handleKeysNote = jest.fn()
+  public handleVocalNote = jest.fn()
 }
 
 const mockBind = jest.fn((_port: number, callback: () => void) => {
@@ -338,13 +340,18 @@ describe('YargNetworkListener', () => {
 
   describe('identical-frame throttling (30 Hz)', () => {
     const throttleMs = 1000 / 30
+    let perfNowSpy: ReturnType<typeof jest.spyOn>
 
     beforeEach(() => {
       jest.useFakeTimers()
       jest.setSystemTime(0)
+      // The throttle uses monotonicNowMs() (perf_hooks performance.now), which Jest's fake
+      // timers don't patch; delegate it to the faked Date clock so advanceTimersByTime drives it.
+      perfNowSpy = jest.spyOn(performance, 'now').mockImplementation(() => Date.now())
     })
 
     afterEach(() => {
+      perfNowSpy.mockRestore()
       jest.useRealTimers()
     })
 

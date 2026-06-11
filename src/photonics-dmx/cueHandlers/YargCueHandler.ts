@@ -6,6 +6,7 @@ import {
   InstrumentNoteType,
   cueTypeToStrobeSlot,
   isStrobeCueType,
+  isVocalActive,
 } from '../cues/types/cueTypes'
 import { YargMotionCueRef } from '../cues/types/audioCueTypes'
 import { ILightingController } from '../controllers/sequencer/interfaces'
@@ -17,6 +18,7 @@ import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
 import { createLogger } from '../../shared/logger'
+import { monotonicNowMs } from '../../shared/time'
 const log = createLogger('YargCueHandler')
 
 /**
@@ -65,6 +67,8 @@ class YargCueHandler extends EventEmitter {
   private cueStartTime = 0
   private lastCueChangeTime = 0
   private previousCueData?: Partial<CueData>
+  /** Tracks whether any vocal/harmony part was active on the previous frame, for note-on/off edge detection. */
+  private wasVocalActive = false
 
   public setManualMotionRef(ref: YargMotionCueRef | null): void {
     this.manualMotionRef = ref
@@ -143,10 +147,11 @@ class YargCueHandler extends EventEmitter {
     this.cueStartTime = 0
     this.lastCueChangeTime = 0
     this.previousCueData = undefined
+    this.wasVocalActive = false
   }
 
   private addHistoryToCueData(cueType: CueType, parameters: CueData): CueData {
-    const now = Date.now()
+    const now = monotonicNowMs()
 
     // Strobe cues (including Strobe_Off) run in their own slot on top of the primary/secondary
     // look. They must not disturb the primary-cue history/executionCount accounting: a held
@@ -261,6 +266,20 @@ class YargCueHandler extends EventEmitter {
     this._sequencer.onKeysNote(noteType)
   }
 
+  /**
+   * Detect vocal note-on / note-off edges from the current frame's vocal and harmony
+   * values and forward them to the sequencer. "Singing" is any vocal or harmony part
+   * above zero; an edge fires only when that aggregate active state changes.
+   */
+  public handleVocalNote(data: CueData): void {
+    const isActive = isVocalActive(data)
+
+    if (isActive !== this.wasVocalActive) {
+      this._sequencer.onVocalNote(isActive)
+      this.wasVocalActive = isActive
+    }
+  }
+
   public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
     const incomingIsStrobe = isStrobeCueType(cueType)
     // Update CueData with history and context information. addHistoryToCueData no-ops the
@@ -367,7 +386,7 @@ class YargCueHandler extends EventEmitter {
         const registry = YargCueRegistry.getInstance()
         const isNewCue = historicCueData.executionCount === 1
         const isManualChange = this.manualMotionRef !== this.lastManualMotionRefForMotion
-        const now = Date.now()
+        const now = monotonicNowMs()
         const minHold = this.getMotionCueMinimumHoldMs()
         const heldLongEnough =
           this.currentMotionCueStartTime == null || now - this.currentMotionCueStartTime >= minHold

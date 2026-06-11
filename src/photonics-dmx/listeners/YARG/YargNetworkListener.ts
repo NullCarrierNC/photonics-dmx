@@ -14,6 +14,7 @@ import {
   DrumNoteType,
 } from '../../cues/types/cueTypes'
 import { createLogger } from '../../../shared/logger'
+import { monotonicNowMs } from '../../../shared/time'
 import {
   PlatformByte,
   VenueSizeByte,
@@ -42,6 +43,7 @@ export interface YargCueRuntime {
   handleGuitarNote(noteType: InstrumentNoteType, data: CueData): void
   handleBassNote(noteType: InstrumentNoteType, data: CueData): void
   handleKeysNote(noteType: InstrumentNoteType, data: CueData): void
+  handleVocalNote(data: CueData): void
 }
 
 const PORT = 36107
@@ -437,7 +439,10 @@ export class YargNetworkListener extends EventEmitter {
    */
   public processCueData(YargCueData: CueData): void {
     const isIdentical = this.lastData !== null && this.isDataEqual(this.lastData, YargCueData)
-    if (isIdentical && Date.now() - this.lastForwardedIdenticalAt < IDENTICAL_FRAME_THROTTLE_MS) {
+    if (
+      isIdentical &&
+      monotonicNowMs() - this.lastForwardedIdenticalAt < IDENTICAL_FRAME_THROTTLE_MS
+    ) {
       return
     }
 
@@ -530,9 +535,11 @@ export class YargNetworkListener extends EventEmitter {
       }
     })
 
+    this.cueHandler.handleVocalNote(YargCueData)
+
     this.lastData = YargCueData
     if (isIdentical) {
-      this.lastForwardedIdenticalAt = Date.now()
+      this.lastForwardedIdenticalAt = monotonicNowMs()
     }
   }
 

@@ -6,6 +6,7 @@
 import { describe, expect, it, jest } from '@jest/globals'
 
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
+import { monotonicNowMs } from '../../../../../shared/time'
 import { YargNodeCue } from '../../../../cues/node/runtime/YargNodeCue'
 import { YargMotionNodeCue } from '../../../../cues/node/runtime/YargMotionNodeCue'
 import { AudioNodeCue } from '../../../../cues/node/runtime/AudioNodeCue'
@@ -73,7 +74,7 @@ function minimalYargCueData(): CueData {
     bonusEffect: true,
     beat: 'Strong',
     executionCount: 1,
-    cueStartTime: Date.now() - 1000,
+    cueStartTime: monotonicNowMs() - 1000,
     timeSinceLastCue: 100,
   } as CueData
 }

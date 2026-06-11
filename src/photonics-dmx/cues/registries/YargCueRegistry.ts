@@ -5,6 +5,7 @@ import { INetCue, CueStyle } from '../interfaces/INetCue'
 import { YargMotionNodeCue } from '../node/runtime/YargMotionNodeCue'
 import { MotionSelectionState } from './MotionSelectionState'
 import { createLogger } from '../../../shared/logger'
+import { monotonicNowMs } from '../../../shared/time'
 const log = createLogger('YargCueRegistry')
 
 /**
@@ -430,7 +431,7 @@ export class YargCueRegistry {
       }
     }
 
-    const now = Date.now()
+    const now = monotonicNowMs()
     const lastExecutionTime = this.lastCueExecutionTime.get(cueType)
     const lastSelection = this.lastCueGroupSelection.get(cueType)
 
@@ -517,7 +518,7 @@ export class YargCueRegistry {
     cueType: CueType,
     selection: { groupId: string; isFallback: boolean },
   ): void {
-    const now = Date.now()
+    const now = monotonicNowMs()
     this.lastCueExecutionTime.set(cueType, now)
     this.lastCueGroupSelection.set(cueType, selection)
     //  console.log(`[Consistency] Recorded execution of ${cueType} with group ${selection.groupId} at ${now}`);
@@ -1223,7 +1224,7 @@ export class YargCueRegistry {
       isWithinWindow: boolean
     }>
   } {
-    const now = Date.now()
+    const now = monotonicNowMs()
     const trackedCues: Array<{
       cueType: CueType
       lastExecutionTime: number

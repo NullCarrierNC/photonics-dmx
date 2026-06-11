@@ -16,6 +16,7 @@ import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import { Rb3StageKitRigProcessor } from './Rb3StageKitRigProcessor'
 import { ChainFanout } from '../controllers/ChainFanout'
 import { createLogger } from '../../shared/logger'
+import { monotonicNowMs } from '../../shared/time'
 const log = createLogger('Rb3StageKitDirectProcessor')
 
 const RB3_MAIN_HUB_SCREEN = 'main_hub_screen'
@@ -213,7 +214,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       measureOrBeat: realCueData?.measureOrBeat || 0,
       cueHistory: [],
       executionCount: 1,
-      cueStartTime: Date.now(),
+      cueStartTime: monotonicNowMs(),
       timeSinceLastCue: 0,
     }
   }
@@ -382,7 +383,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
               measureOrBeat: realCueData?.measureOrBeat || 0,
               cueHistory: [],
               executionCount: 1,
-              cueStartTime: Date.now(),
+              cueStartTime: monotonicNowMs(),
               timeSinceLastCue: 0,
             }
           : this.buildMenusCueData(realCueData, event.platform)
@@ -618,7 +619,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       measureOrBeat: 0,
       cueHistory: [],
       executionCount: 1,
-      cueStartTime: Date.now(),
+      cueStartTime: monotonicNowMs(),
       timeSinceLastCue: 0,
     }
 

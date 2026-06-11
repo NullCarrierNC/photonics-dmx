@@ -508,13 +508,22 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
       const existingEngine = this.activeEffectEngines.get(engineKey)
       if (existingEngine) {
         if (existingEngine.isBusy()) {
-          this.debugLog(`Effect raiser ${raiserNode.id} blocked: effect still running`)
-          this.emitNodeExecution('deactivated', raiserNode.id)
-          this.continueToNextNodes(raiserNode.id, context)
-          return
+          if (!raiserNode.interruptible) {
+            this.debugLog(`Effect raiser ${raiserNode.id} blocked: effect still running`)
+            this.emitNodeExecution('deactivated', raiserNode.id)
+            this.continueToNextNodes(raiserNode.id, context)
+            return
+          }
+          // Interruptible: cancel the in-flight effect so a fresh one restarts from the top.
+          // Removes its submitted effects from the sequencer and clears its idle callback.
+          this.debugLog(
+            `Effect raiser ${raiserNode.id} interruptible: cancelling running effect to restart`,
+          )
+          existingEngine.cancelAll()
+        } else {
+          // Engine is idle - clean it up and allow new trigger
+          this.debugLog(`Effect raiser ${raiserNode.id} cleaning up idle engine`)
         }
-        // Engine is idle - clean it up and allow new trigger
-        this.debugLog(`Effect raiser ${raiserNode.id} cleaning up idle engine`)
         this.activeEffectEngines.delete(engineKey)
       }
 

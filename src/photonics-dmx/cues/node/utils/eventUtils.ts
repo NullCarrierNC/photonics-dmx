@@ -80,5 +80,12 @@ export function getYargEventCategories(): EventCategory[] {
           .join(' '),
       })),
     },
+    {
+      category: 'Vocals',
+      events: [
+        { value: 'vocal-note', label: 'Vocal Note On' },
+        { value: 'vocal-note-off', label: 'Vocal Note Off' },
+      ],
+    },
   ]
 }

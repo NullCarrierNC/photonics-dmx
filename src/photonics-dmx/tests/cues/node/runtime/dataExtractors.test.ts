@@ -12,6 +12,7 @@ import type { CueData } from '../../../../cues/types/cueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import type { TrackedLight } from '../../../../types'
+import { monotonicNowMs } from '../../../../../shared/time'
 
 function minimalCueData(overrides?: Partial<CueData>): CueData {
   return {
@@ -40,7 +41,7 @@ function minimalCueData(overrides?: Partial<CueData>): CueData {
     beat: 'Strong',
     previousCue: 'Intro',
     executionCount: 5,
-    cueStartTime: Date.now() - 10000,
+    cueStartTime: monotonicNowMs() - 10000,
     timeSinceLastCue: 500,
     totalScore: 10000,
     ...overrides,
@@ -90,7 +91,7 @@ describe('dataExtractors', () => {
     })
 
     it('extracts time-since-cue-start', () => {
-      const start = Date.now() - 5000
+      const start = monotonicNowMs() - 5000
       const cueData = minimalCueData({ cueStartTime: start })
       const result = extractYargCueDataValue('time-since-cue-start', cueData, 'my-cue') as number
       expect(result).toBeGreaterThanOrEqual(4000)

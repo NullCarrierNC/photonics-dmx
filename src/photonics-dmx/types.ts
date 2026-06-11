@@ -165,6 +165,9 @@ export const WAIT_CONDITIONS = [
   'drum-yellow-cymbal',
   'drum-blue-cymbal',
   'drum-green-cymbal',
+  // Vocal events (note-on/note-off edges from any vocal or harmony part)
+  'vocal-note',
+  'vocal-note-off',
 ] as const
 
 /**

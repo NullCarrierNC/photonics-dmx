@@ -3,7 +3,10 @@
  * - Cue- and group-level variable stores (shared with the execution engine).
  * - First-submission policy: whether the next effect submission should use setEffect (consumed once per activation).
  * - cue-started fired flag.
- * - resetForStop(): clears cue-level state on stop; this instance's groupLevelVarStore is preserved so state can accumulate across activations of this cue (one CueSession per YargNodeCue instance).
+ * - resetForStop(): clears cue-level state on stop; the groupLevelVarStore is preserved so state can accumulate across activations.
+ *
+ * The group-level store may be supplied by the caller so it can be shared across every cue
+ * in the same group (per sequencer). When omitted, the session owns a private store.
  */
 
 import { VariableValue } from './executionTypes'
@@ -11,11 +14,19 @@ import type { VariableDefinition } from '../../types/nodeCueTypes'
 
 export class CueSession {
   private readonly cueLevelVarStore = new Map<string, VariableValue>()
-  private readonly groupLevelVarStore = new Map<string, VariableValue>()
+  private readonly groupLevelVarStore: Map<string, VariableValue>
   private cueStartedFired = false
   /** Shared ref for engine: when true, next effect submission uses setEffect; engine sets .use = false when consumed. */
   private readonly firstSubmissionUsesSetEffectRef = { use: false }
   private clearedForThisActivation = false
+
+  /**
+   * @param groupLevelVarStore Optional shared group-level store. Pass the same Map to every
+   * CueSession in a group (per sequencer) so cue-group-scoped variables are shared between cues.
+   */
+  constructor(groupLevelVarStore?: Map<string, VariableValue>) {
+    this.groupLevelVarStore = groupLevelVarStore ?? new Map<string, VariableValue>()
+  }
 
   getCueLevelVarStore(): Map<string, VariableValue> {
     return this.cueLevelVarStore
