@@ -4,6 +4,7 @@
  */
 
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
+import { monotonicNowMs } from '../../../../shared/time'
 import { CueData } from '../../types/cueTypes'
 import { AudioCueData } from '../../types/audioCueTypes'
 import { TrackedLight, LightTarget } from '../../../types'
@@ -80,7 +81,7 @@ export function extractYargCueDataValue(
     case 'fog-state':
       return cueData.fogState
     case 'time-since-cue-start':
-      return Date.now() - (cueData.cueStartTime ?? Date.now())
+      return monotonicNowMs() - (cueData.cueStartTime ?? monotonicNowMs())
     case 'time-since-last-cue':
       return cueData.timeSinceLastCue ?? 0
     default:

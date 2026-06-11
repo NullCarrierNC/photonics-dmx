@@ -84,6 +84,10 @@ export class ChainFanout implements YargCueRuntime, Rb3MenuCueDispatch {
     for (const c of this.chains) c.yargCueHandler?.handleKeysNote(noteType, data)
   }
 
+  public handleVocalNote(data: CueData): void {
+    for (const c of this.chains) c.yargCueHandler?.handleVocalNote(data)
+  }
+
   // ── Audio ─────────────────────────────────────────────────────────────────────────────
 
   public audioSetMotionEnabled(enabled: boolean): void {

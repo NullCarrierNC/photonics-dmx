@@ -2,6 +2,7 @@
  * AudioCueProcessor: strobe slot independent from secondary; getEffective* accessors.
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { performance } from 'perf_hooks'
 import { AudioCueProcessor } from '../../processors/AudioCueProcessor'
 import { AudioCueHandler } from '../../cueHandlers/AudioCueHandler'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
@@ -155,7 +156,7 @@ describe('AudioCueProcessor', () => {
 
   it('applies idle look and skips cue execution when game mode idle threshold sustained', () => {
     let t = 0
-    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => {
+    const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => {
       t += 500
       return t
     })
@@ -188,7 +189,7 @@ describe('AudioCueProcessor', () => {
     const setMotionSpy = jest.spyOn(AudioCueHandler.prototype, 'setMotionEnabled')
     const handleDataSpy = jest.spyOn(AudioCueHandler.prototype, 'handleAudioData')
     let t = 0
-    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => {
+    const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => {
       t += 500
       return t
     })

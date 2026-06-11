@@ -4,7 +4,7 @@ import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CompiledYargCue } from '../compiler/NodeCueCompiler'
 import { EffectRegistry } from './EffectRegistry'
-import type { NodeRuntimeCallbacks } from './executionTypes'
+import type { NodeRuntimeCallbacks, VariableValue } from './executionTypes'
 import { CueSession } from './CueSession'
 import { GraphExecutionEngine } from './GraphExecutionEngine'
 import { cueGraphPolicy } from './GraphExecutionPolicy'
@@ -29,6 +29,35 @@ interface YargCueRunState {
 }
 
 export class YargNodeCue implements INetCue {
+  /**
+   * Group-level variable stores shared across every cue in a group, per sequencer:
+   * sequencer -> groupId -> store. Cues in the same group (running on the same rig) read and
+   * write the same cue-group-scoped variables, so one cue can hand state to another (e.g. Stomp
+   * recording its on/off state for Silhouettes_Spotlight). Keyed per sequencer so rigs running
+   * the same group in parallel keep isolated state.
+   */
+  private static groupLevelVarStores = new Map<
+    ILightingController,
+    Map<string, Map<string, VariableValue>>
+  >()
+
+  private static getSharedGroupStore(
+    sequencer: ILightingController,
+    groupId: string,
+  ): Map<string, VariableValue> {
+    let perSeq = YargNodeCue.groupLevelVarStores.get(sequencer)
+    if (!perSeq) {
+      perSeq = new Map()
+      YargNodeCue.groupLevelVarStores.set(sequencer, perSeq)
+    }
+    let store = perSeq.get(groupId)
+    if (!store) {
+      store = new Map()
+      perSeq.set(groupId, store)
+    }
+    return store
+  }
+
   private readonly groupId: string
   private readonly compiledCue: CompiledYargCue
   private readonly effectRegistry: EffectRegistry
@@ -57,7 +86,7 @@ export class YargNodeCue implements INetCue {
     let state = this.states.get(sequencer)
     if (!state) {
       const definition = this.compiledCue.definition as YargLightingNodeCueDefinition
-      const session = new CueSession()
+      const session = new CueSession(YargNodeCue.getSharedGroupStore(sequencer, this.groupId))
       session.initializeVariables(definition.variables ?? [], this.compiledCue.groupVariables ?? [])
       state = { engine: null, session }
       this.states.set(sequencer, state)
@@ -129,6 +158,10 @@ export class YargNodeCue implements INetCue {
     if (!state) return
     state.engine?.cancelAll(this.style === CueStyle.Primary)
     this.states.delete(sequencer)
+    // The disposed sequencer's shared group stores can be dropped wholesale; other cues that
+    // shared them are releasing the same sequencer in the same teardown. Idempotent: a later
+    // release for the same sequencer finds no entry and no-ops.
+    YargNodeCue.groupLevelVarStores.delete(sequencer)
   }
 
   onPause(): void {

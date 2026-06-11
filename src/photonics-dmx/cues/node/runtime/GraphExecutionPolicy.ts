@@ -6,7 +6,7 @@ import type { BaseEventNode } from '../../types/nodeCueTypes'
 import type { CompiledYargCue } from '../compiler/NodeCueCompiler'
 import type { CompiledEffect } from '../compiler/EffectCompiler'
 import type { CueData } from '../../types/cueTypes'
-import { isInstrumentEventTriggered } from '../../types/cueTypes'
+import { isInstrumentEventTriggered, isVocalActive } from '../../types/cueTypes'
 
 /** Cue data or effect parameter payload. */
 export type ExecutionParameters = CueData | Record<string, unknown>
@@ -93,6 +93,17 @@ function cueLikeGraphPolicy(
         if (eventType === 'keyframe-first') return cueData.keyframe === 'First'
         if (eventType === 'keyframe-next') return cueData.keyframe === 'Next'
         if (eventType === 'keyframe-previous') return cueData.keyframe === 'Previous'
+        // Vocal events are edge-triggered: compare singing state against the previous frame
+        // (stamped by YargCueHandler.addHistoryToCueData) so each node fires once per edge.
+        // A missing previousFrame (first frame of the cue) counts as not-singing. When a strobe
+        // is active these edges fire only in the primary cue's graph: handleCue updates the
+        // previous-frame snapshot on the primary call, so the strobe slot sees prev == current.
+        if (eventType === 'vocal-note') {
+          return isVocalActive(cueData) && !isVocalActive(cueData.previousFrame ?? {})
+        }
+        if (eventType === 'vocal-note-off') {
+          return !isVocalActive(cueData) && isVocalActive(cueData.previousFrame ?? {})
+        }
         const instrumentResult = isInstrumentEventTriggered(
           eventType,
           cueData.guitarNotes,

@@ -9,6 +9,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 import { YargCueHandler } from '../../cueHandlers/YargCueHandler'
+import { monotonicNowMs } from '../../../shared/time'
 import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
 import { CueStyle, INetCue } from '../../cues/interfaces/INetCue'
 import { CueData, CueType, defaultCueData } from '../../cues/types/cueTypes'
@@ -49,6 +50,7 @@ function makeSequencer(): ILightingController {
     onGuitarNote: jest.fn(),
     onBassNote: jest.fn(),
     onKeysNote: jest.fn(),
+    onVocalNote: jest.fn(),
   } as unknown as ILightingController
 }
 
@@ -108,7 +110,7 @@ describe('YargCueHandler shutdown lifecycle', () => {
     internals.currentSecondaryCue = secondary
     internals.currentStrobeCue = strobe
     internals.currentMotionCue = motion
-    internals.currentMotionCueStartTime = Date.now()
+    internals.currentMotionCueStartTime = monotonicNowMs()
 
     handler.shutdown()
 
@@ -169,5 +171,48 @@ describe('YargCueHandler strobe history isolation', () => {
     // executionCount: it reports the current count (1), and the second Frenzy advances to 2.
     expect(execCounts).toEqual([1, 1, 2])
     handler.shutdown()
+  })
+})
+
+describe('YargCueHandler vocal note edge detection', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('fires note-on then note-off only on the active-state edges', () => {
+    const sequencer = makeSequencer()
+    const handler = new YargCueHandler(makeLightManager(), sequencer)
+    const onVocalNote = sequencer.onVocalNote as jest.Mock
+
+    // Silence -> no edge
+    handler.handleVocalNote(gameplayCueData({ vocalNote: 0 }))
+    expect(onVocalNote).not.toHaveBeenCalled()
+
+    // Singing starts -> note-on edge (true)
+    handler.handleVocalNote(gameplayCueData({ vocalNote: 0.7 }))
+    expect(onVocalNote).toHaveBeenNthCalledWith(1, true)
+
+    // Still singing (different pitch) -> no new edge
+    handler.handleVocalNote(gameplayCueData({ vocalNote: 0.4 }))
+    expect(onVocalNote).toHaveBeenCalledTimes(1)
+
+    // Goes silent -> note-off edge (false)
+    handler.handleVocalNote(gameplayCueData({ vocalNote: 0 }))
+    expect(onVocalNote).toHaveBeenNthCalledWith(2, false)
+    expect(onVocalNote).toHaveBeenCalledTimes(2)
+  })
+
+  it('treats any harmony part as singing', () => {
+    const sequencer = makeSequencer()
+    const handler = new YargCueHandler(makeLightManager(), sequencer)
+    const onVocalNote = sequencer.onVocalNote as jest.Mock
+
+    handler.handleVocalNote(gameplayCueData({ vocalNote: 0, harmony1Note: 0.9 }))
+    expect(onVocalNote).toHaveBeenNthCalledWith(1, true)
+
+    handler.handleVocalNote(
+      gameplayCueData({ vocalNote: 0, harmony0Note: 0, harmony1Note: 0, harmony2Note: 0 }),
+    )
+    expect(onVocalNote).toHaveBeenNthCalledWith(2, false)
   })
 })

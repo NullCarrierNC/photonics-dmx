@@ -6,6 +6,7 @@ import type {
 import type { IAudioCue } from '../cues/interfaces/IAudioCue'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import type { AudioCueType } from '../cues/types/audioCueTypes'
+import { monotonicNowMs } from '../../shared/time'
 
 function randomInRange(minSec: number, maxSec: number): number {
   return minSec + Math.random() * (maxSec - minSec)
@@ -106,7 +107,7 @@ export class AudioGameModeManager {
     const wasPending = this.pendingSwitch
     this.config = { ...config }
     if (!this.pendingSwitch && this.switchDeadlineMs > 0) {
-      const remaining = this.switchDeadlineMs - Date.now()
+      const remaining = this.switchDeadlineMs - monotonicNowMs()
       if (remaining < 0) {
         this.pendingSwitch = true
       }
@@ -124,7 +125,7 @@ export class AudioGameModeManager {
    * Run once per audio frame before cue execution.
    */
   public processFrame(audioData: AudioLightingData): void {
-    const now = Date.now()
+    const now = monotonicNowMs()
     if (!this.pendingSwitch && now >= this.switchDeadlineMs) {
       this.pendingSwitch = true
       this.emitScheduleChange()
@@ -148,7 +149,7 @@ export class AudioGameModeManager {
   private scheduleNextSwitch(): void {
     const { cueDurationMin, cueDurationMax } = this.config
     const durationSec = randomInRange(cueDurationMin, cueDurationMax)
-    this.switchDeadlineMs = Date.now() + Math.round(durationSec * 1000)
+    this.switchDeadlineMs = monotonicNowMs() + Math.round(durationSec * 1000)
   }
 
   private switchToNextCue(): void {

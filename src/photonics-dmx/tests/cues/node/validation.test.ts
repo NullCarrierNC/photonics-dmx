@@ -1288,6 +1288,27 @@ describe('Node cue validation', () => {
     }
   })
 
+  it('validates bundled yarg-stagekit-v2.json', () => {
+    const filePath = path.join(
+      __dirname,
+      '../../../../../resources/defaults/node-data/cues/yarg/yarg-stagekit-v2.json',
+    )
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const result = validateYargNodeCueFile(JSON.parse(raw))
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      expect(result.data.group.id).toBe('yarg-stagekit-v2')
+      for (const cue of result.data.cues) {
+        expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+      }
+      // every cue must lay its nodes out (no stacking at the origin in the editor)
+      for (const cue of result.data.cues) {
+        const positions = cue.layout?.nodePositions ?? {}
+        expect(Object.keys(positions).length).toBeGreaterThan(0)
+      }
+    }
+  })
+
   for (const fileName of ['yarg-fade.json']) {
     it(`validates bundled ${fileName} (compiles, caps brightness at high, no strobes)`, () => {
       const filePath = path.join(

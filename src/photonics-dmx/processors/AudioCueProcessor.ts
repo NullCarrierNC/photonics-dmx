@@ -18,6 +18,7 @@ import { getIntensityScale } from '../cues/audio/utils/bandUtils'
 import { getColor } from '../helpers/dmxHelpers'
 import { getEffectSingleColor } from '../effects/effectSingleColor'
 import { createLogger } from '../../shared/logger'
+import { monotonicNowMs } from '../../shared/time'
 import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 const log = createLogger('AudioCueProcessor')
 
@@ -166,7 +167,7 @@ export class AudioCueProcessor {
   public processAudioData(data: AudioLightingData): void {
     if (!this.isActive) return
 
-    const now = Date.now()
+    const now = monotonicNowMs()
     if (data.beatDetected && now - this.lastBeatTimestamp >= 100) {
       this.lastBeatTimestamp = now
       this.chainFanout.audioOnBeat()

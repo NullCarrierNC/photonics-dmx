@@ -20,6 +20,7 @@ import { VariableValue } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
 import { findBestMatchingBandId, getBandEnergy } from '../../../listeners/Audio/bandEnergy'
 import { createLogger } from '../../../../shared/logger'
+import { monotonicNowMs } from '../../../../shared/time'
 const log = createLogger('BaseAudioNodeCue')
 
 interface AudioEventState {
@@ -306,7 +307,7 @@ export abstract class BaseAudioNodeCue {
 
         const cooldownMs = (event as AudioEventNode).cooldownMs ?? 0
         if (cooldownMs > 0) {
-          const now = Date.now()
+          const now = monotonicNowMs()
           const last = state.lastTriggerTime.get(event.id) ?? 0
           if (now - last < cooldownMs) continue
           state.lastTriggerTime.set(event.id, now)
@@ -495,7 +496,7 @@ export abstract class BaseAudioNodeCue {
     const asymmetric = trigger.attackMs != null || trigger.releaseMs != null
     let smoothedEnergy: number
     if (asymmetric) {
-      const now = Date.now()
+      const now = monotonicNowMs()
       const prevTime = state.bandSmoothTime.get(trigger.id)
       // First frame (or after a stop): seed without decay, like the symmetric path's `?? bandEnergy`.
       if (prevTime == null) {
@@ -571,7 +572,7 @@ export abstract class BaseAudioNodeCue {
     }
 
     const phase = state.triggerPhase.get(trigger.id) ?? 'idle'
-    const now = Date.now()
+    const now = monotonicNowMs()
     const enterTime = state.triggerEnterTime.get(trigger.id) ?? 0
 
     let energyActive: boolean

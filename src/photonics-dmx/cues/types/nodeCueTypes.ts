@@ -284,6 +284,11 @@ export interface EffectRaiserNode {
   /** When true, the effect automatically re-triggers when it completes, creating a continuous loop.
    *  Used for effects like sweeps or cross-fades that should run indefinitely until the cue stops. */
   isPersistent?: boolean
+  /** When true, re-triggering this raiser while its effect is still running cancels the in-flight
+   *  effect and restarts it from the top, instead of dropping the trigger. Used for event-driven
+   *  flashes (e.g. a drum-red blink) that must fire on every event even when they arrive faster than
+   *  the flash duration. Default false keeps the drop-while-busy behaviour. */
+  interruptible?: boolean
 }
 
 export type NotesStyle = 'notes' | 'info' | 'important'

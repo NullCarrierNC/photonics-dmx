@@ -394,6 +394,13 @@ export class Sequencer implements ILightingController {
   }
 
   /**
+   * Handle a vocal note edge (true = note-on, false = note-off).
+   */
+  public onVocalNote(active: boolean): void {
+    this.eventHandler.onVocalNote(active)
+  }
+
+  /**
    * Initiates a blackout effect that fades out all lights.
    *
    * @param duration The duration of the blackout fade in milliseconds.

@@ -10,6 +10,7 @@ import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
 import { createLogger } from '../../shared/logger'
+import { monotonicNowMs } from '../../shared/time'
 const log = createLogger('AudioCueHandler')
 
 export type AudioCueHandlerOptions = {
@@ -209,7 +210,7 @@ export class AudioCueHandler extends EventEmitter {
     const bypassMinHold = manualChanged || gameModeActive
     if (primaryChanged && !bypassMinHold) {
       const minHold = this.getMotionCueMinimumHoldMs()
-      const now = Date.now()
+      const now = monotonicNowMs()
       const heldLongEnough =
         this.currentMotionCueStartTime == null || now - this.currentMotionCueStartTime >= minHold
       if (!heldLongEnough) {
@@ -269,7 +270,7 @@ export class AudioCueHandler extends EventEmitter {
       source = 'auto'
     }
 
-    const nowMs = Date.now()
+    const nowMs = monotonicNowMs()
     if (motionCue && this.currentMotionCue !== motionCue) {
       const prev = this.currentMotionCue
       this.currentMotionCue?.onStop?.()

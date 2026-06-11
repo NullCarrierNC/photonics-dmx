@@ -96,6 +96,19 @@ export function isInstrumentEventTriggered(
   return null
 }
 
+/**
+ * Whether any vocal or harmony part is sounding on the given frame. Used both for vocal note
+ * edge detection (the sequencer wait-condition path) and for triggering vocal event nodes.
+ */
+export function isVocalActive(frame: Partial<CueData>): boolean {
+  return (
+    (frame.vocalNote ?? 0) > 0 ||
+    (frame.harmony0Note ?? 0) > 0 ||
+    (frame.harmony1Note ?? 0) > 0 ||
+    (frame.harmony2Note ?? 0) > 0
+  )
+}
+
 // Import RB3E types
 import { Rb3Difficulty, Rb3TrackType } from '../../listeners/RB3/rb3eTypes'
 

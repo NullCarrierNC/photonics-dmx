@@ -86,6 +86,7 @@ export const effectRaiserNodeSchema = {
       items: { type: 'string' },
     },
     isPersistent: { type: 'boolean', nullable: true },
+    interruptible: { type: 'boolean', nullable: true },
     parameterValues: {
       type: 'object',
       nullable: true,
