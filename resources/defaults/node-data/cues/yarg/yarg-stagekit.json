@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 4,
+  "cueVersion": 7,
   "mode": "yarg",
   "group": {
     "id": "yarg-stagekit",
@@ -488,9 +488,9 @@
           }
         },
         "viewport": {
-          "x": 280.2860900442754,
-          "y": 85.50853091245358,
-          "zoom": 0.5743491774985175
+          "x": 80,
+          "y": 60,
+          "zoom": 0.5
         }
       },
       "variables": [
@@ -611,9 +611,9 @@
           }
         },
         "viewport": {
-          "x": 280.2860900442754,
-          "y": 85.50853091245358,
-          "zoom": 0.5743491774985175
+          "x": 80,
+          "y": 60,
+          "zoom": 0.5
         }
       }
     },
@@ -708,83 +708,26 @@
         ],
         "logic": [
           {
-            "id": "cue-skv2-menu-nl",
+            "id": "cue-skv2-menu-ring",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "total-lights",
-            "assignTo": "numLights"
+            "logicType": "build-ring",
+            "assignTo": "ring",
+            "assignGroupSize": "ringGroupSize"
           },
           {
-            "id": "cue-skv2-menu-al",
+            "id": "cue-skv2-menu-pgs",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "all-lights-array",
-            "assignTo": "allLights"
-          },
-          {
-            "id": "cue-skv2-menu-c4",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
+            "logicType": "math",
+            "operator": "multiply",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "ringGroupSize"
             },
             "right": {
-              "source": "literal",
-              "value": 4
-            }
-          },
-          {
-            "id": "cue-skv2-menu-c16",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 16
-            }
-          },
-          {
-            "id": "cue-skv2-menu-r4",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights", "allLights"],
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-menu-r16",
-            "type": "logic",
-            "logicType": "lights-from-index",
-            "sourceVariable": "allLights",
-            "index": {
-              "source": "literal",
-              "value": "0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15"
-            },
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-menu-gs16",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "ringGroupSize",
-            "valueType": "number",
-            "value": {
               "source": "literal",
               "value": 2
-            }
-          },
-          {
-            "id": "cue-skv2-menu-rdef",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights"],
-            "assignTo": "ring"
+            },
+            "assignTo": "pairGroupSize"
           }
         ],
         "eventRaisers": [],
@@ -847,44 +790,33 @@
             "isPersistent": true
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-menu-note-1",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue start",
+            "style": "notes",
+            "note": "Sets all lights to a dim blue, the cue-called steps a bright blue above this. This is an intentional deviation from YALCY's menu handling which turns all other non-stepping lights off."
+          },
+          {
+            "id": "cue-skv2-menu-note-3",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called",
+            "style": "notes",
+            "note": "Persistent blue CW chase: one bright LED steps the ring every 250 ms (wall-clock — 8 steps / 2 s, independent of BPM)."
+          }
+        ]
       },
       "connections": [
         {
           "from": "cue-skv2-menu-start",
-          "to": "cue-skv2-menu-nl"
+          "to": "cue-skv2-menu-ring"
         },
         {
-          "from": "cue-skv2-menu-nl",
-          "to": "cue-skv2-menu-al"
-        },
-        {
-          "from": "cue-skv2-menu-al",
-          "to": "cue-skv2-menu-c4"
-        },
-        {
-          "from": "cue-skv2-menu-c4",
-          "to": "cue-skv2-menu-r4",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-menu-c4",
-          "to": "cue-skv2-menu-c16",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-menu-c16",
-          "to": "cue-skv2-menu-r16",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-menu-r16",
-          "to": "cue-skv2-menu-gs16"
-        },
-        {
-          "from": "cue-skv2-menu-c16",
-          "to": "cue-skv2-menu-rdef",
-          "fromPort": "false"
+          "from": "cue-skv2-menu-ring",
+          "to": "cue-skv2-menu-pgs"
         },
         {
           "from": "cue-skv2-menu-start",
@@ -898,8 +830,8 @@
       "layout": {
         "nodePositions": {
           "cue-skv2-menu-start": {
-            "x": 0,
-            "y": 0
+            "x": 67.52882822403888,
+            "y": 33.764414112019494
           },
           "cue-skv2-menu-called": {
             "x": 560.464107860982,
@@ -909,64 +841,34 @@
             "x": 171.71271909856046,
             "y": 145.4585528112956
           },
-          "cue-skv2-menu-nl": {
-            "x": -104.93555056023138,
-            "y": 140.46040449452448
+          "cue-skv2-menu-ring": {
+            "x": 0,
+            "y": 150
           },
-          "cue-skv2-menu-al": {
-            "x": -89.67219775147055,
-            "y": 268.7476853959638
-          },
-          "cue-skv2-menu-c4": {
-            "x": -53.42173483066324,
-            "y": 405.3922516882981
-          },
-          "cue-skv2-menu-c16": {
-            "x": 114.47514606570701,
-            "y": 543.2191280952134
-          },
-          "cue-skv2-menu-r4": {
-            "x": -141.18601348103857,
-            "y": 538.2209797784421
-          },
-          "cue-skv2-menu-r16": {
-            "x": -198.42358651389213,
-            "y": 714.2062382072595
-          },
-          "cue-skv2-menu-gs16": {
-            "x": 89.67219775147043,
-            "y": 876.8360629284116
-          },
-          "cue-skv2-menu-rdef": {
-            "x": 234.6740494346991,
-            "y": 705.8489528163652
+          "cue-skv2-menu-pgs": {
+            "x": -12.2779687680071,
+            "y": 276.5736911518999
           },
           "cue-skv2-menu-blue": {
             "x": 560.464107860982,
             "y": 155.7237573032853
+          },
+          "cue-skv2-menu-note-1": {
+            "x": -84.41103528004874,
+            "y": -112.66437478391504
+          },
+          "cue-skv2-menu-note-3": {
+            "x": 497.0754100639638,
+            "y": -129.54658183992467
           }
         },
         "viewport": {
-          "x": 277.54508808738126,
-          "y": 204.15977159016063,
-          "zoom": 0.5241312377584644
+          "x": 134.61767863298283,
+          "y": 315.53068006628314,
+          "zoom": 0.6515735746816476
         }
       },
       "variables": [
-        {
-          "name": "numLights",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "allLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
         {
           "name": "ring",
           "type": "light-array",
@@ -979,6 +881,13 @@
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "pairGroupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 2,
           "isParameter": false
         }
       ],
@@ -1010,154 +919,29 @@
             "eventType": "cue-called"
           }
         ],
-        "actions": [
-          {
-            "id": "cue-skv2-score-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          }
-        ],
+        "actions": [],
         "logic": [
           {
-            "id": "cue-skv2-score-nl",
+            "id": "cue-skv2-score-ring",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "total-lights",
-            "assignTo": "numLights"
+            "logicType": "build-ring",
+            "assignTo": "ring",
+            "assignGroupSize": "ringGroupSize"
           },
           {
-            "id": "cue-skv2-score-al",
+            "id": "cue-skv2-score-pgs",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "all-lights-array",
-            "assignTo": "allLights"
-          },
-          {
-            "id": "cue-skv2-score-c4",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
+            "logicType": "math",
+            "operator": "multiply",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "ringGroupSize"
             },
             "right": {
-              "source": "literal",
-              "value": 4
-            }
-          },
-          {
-            "id": "cue-skv2-score-c16",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 16
-            }
-          },
-          {
-            "id": "cue-skv2-score-r4",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights", "allLights"],
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-score-r16",
-            "type": "logic",
-            "logicType": "lights-from-index",
-            "sourceVariable": "allLights",
-            "index": {
-              "source": "literal",
-              "value": "0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15"
-            },
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-score-gs16",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "ringGroupSize",
-            "valueType": "number",
-            "value": {
               "source": "literal",
               "value": 2
-            }
-          },
-          {
-            "id": "cue-skv2-score-rdef",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights"],
-            "assignTo": "ring"
+            },
+            "assignTo": "pairGroupSize"
           },
           {
             "id": "cue-skv2-score-venue",
@@ -1238,8 +1022,8 @@
                 "value": 250
               },
               "groupSize": {
-                "source": "literal",
-                "value": 2
+                "source": "variable",
+                "name": "pairGroupSize"
               },
               "gapSteps": {
                 "source": "literal",
@@ -1350,8 +1134,8 @@
                 "value": 500
               },
               "groupSize": {
-                "source": "literal",
-                "value": 2
+                "source": "variable",
+                "name": "pairGroupSize"
               },
               "gapSteps": {
                 "source": "literal",
@@ -1361,48 +1145,25 @@
             "isPersistent": true
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-score-note-3",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called",
+            "style": "notes",
+            "note": "Branches on venue. Large: red opposite-pair chase (250 ms/step) + yellow pair chase (500 ms). Small: blue reverse single chase (125 ms) + the same yellow pairs."
+          }
+        ]
       },
       "connections": [
         {
           "from": "cue-skv2-score-start",
-          "to": "cue-skv2-score-nl"
+          "to": "cue-skv2-score-ring"
         },
         {
-          "from": "cue-skv2-score-nl",
-          "to": "cue-skv2-score-al"
-        },
-        {
-          "from": "cue-skv2-score-al",
-          "to": "cue-skv2-score-c4"
-        },
-        {
-          "from": "cue-skv2-score-c4",
-          "to": "cue-skv2-score-r4",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-score-c4",
-          "to": "cue-skv2-score-c16",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-score-c16",
-          "to": "cue-skv2-score-r16",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-score-r16",
-          "to": "cue-skv2-score-gs16"
-        },
-        {
-          "from": "cue-skv2-score-c16",
-          "to": "cue-skv2-score-rdef",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-score-start",
-          "to": "cue-skv2-score-base"
+          "from": "cue-skv2-score-ring",
+          "to": "cue-skv2-score-pgs"
         },
         {
           "from": "cue-skv2-score-called",
@@ -1447,41 +1208,13 @@
             "x": 650.1363056124525,
             "y": -13.355433707665838
           },
-          "cue-skv2-score-base": {
-            "x": 131.64641797556305,
-            "y": 124.47144269924934
+          "cue-skv2-score-ring": {
+            "x": 6.1389843840036065,
+            "y": 90.14490225596546
           },
-          "cue-skv2-score-nl": {
-            "x": -62.96133033613887,
-            "y": 123.28913258466844
-          },
-          "cue-skv2-score-al": {
-            "x": 20.987110112046366,
-            "y": 291.64271460910527
-          },
-          "cue-skv2-score-c4": {
-            "x": 74.4088449427095,
-            "y": 424.47144269924934
-          },
-          "cue-skv2-score-c16": {
-            "x": 146.909770784324,
-            "y": 571.8379146116399
-          },
-          "cue-skv2-score-r4": {
-            "x": -106.84346966132648,
-            "y": 564.9318471937738
-          },
-          "cue-skv2-score-r16": {
-            "x": -192.69982921060682,
-            "y": 723.7458337127352
-          },
-          "cue-skv2-score-gs16": {
-            "x": 59.14549213394855,
-            "y": 916.9023640514088
-          },
-          "cue-skv2-score-rdef": {
-            "x": 192.69982921060682,
-            "y": 753.546930343743
+          "cue-skv2-score-pgs": {
+            "x": -7.673730480004451,
+            "y": 210.57960902386185
           },
           "cue-skv2-score-venue": {
             "x": 652.0442247135476,
@@ -1506,29 +1239,19 @@
           "cue-skv2-score-yellow": {
             "x": 638.6887910058817,
             "y": 852.3020224726222
+          },
+          "cue-skv2-score-note-3": {
+            "x": 537.9635349919354,
+            "y": -155.63726547193983
           }
         },
         "viewport": {
-          "x": 230.54508808738126,
-          "y": 132.15977159016063,
-          "zoom": 0.5241312377584644
+          "x": -2.382321367017312,
+          "y": 223.53068006628314,
+          "zoom": 0.6515735746816476
         }
       },
       "variables": [
-        {
-          "name": "numLights",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "allLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
         {
           "name": "ring",
           "type": "light-array",
@@ -1541,6 +1264,13 @@
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "pairGroupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 2,
           "isParameter": false
         },
         {
@@ -1592,154 +1322,29 @@
             "eventType": "cue-called"
           }
         ],
-        "actions": [
-          {
-            "id": "cue-skv2-warm-automatic-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          }
-        ],
+        "actions": [],
         "logic": [
           {
-            "id": "cue-skv2-warm-automatic-nl",
+            "id": "cue-skv2-warm-automatic-ring",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "total-lights",
-            "assignTo": "numLights"
+            "logicType": "build-ring",
+            "assignTo": "ring",
+            "assignGroupSize": "ringGroupSize"
           },
           {
-            "id": "cue-skv2-warm-automatic-al",
+            "id": "cue-skv2-warm-automatic-pgs",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "all-lights-array",
-            "assignTo": "allLights"
-          },
-          {
-            "id": "cue-skv2-warm-automatic-c4",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
+            "logicType": "math",
+            "operator": "multiply",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "ringGroupSize"
             },
             "right": {
-              "source": "literal",
-              "value": 4
-            }
-          },
-          {
-            "id": "cue-skv2-warm-automatic-c16",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 16
-            }
-          },
-          {
-            "id": "cue-skv2-warm-automatic-r4",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights", "allLights"],
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-warm-automatic-r16",
-            "type": "logic",
-            "logicType": "lights-from-index",
-            "sourceVariable": "allLights",
-            "index": {
-              "source": "literal",
-              "value": "0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15"
-            },
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-warm-automatic-gs16",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "ringGroupSize",
-            "valueType": "number",
-            "value": {
               "source": "literal",
               "value": 2
-            }
-          },
-          {
-            "id": "cue-skv2-warm-automatic-rdef",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights"],
-            "assignTo": "ring"
+            },
+            "assignTo": "pairGroupSize"
           },
           {
             "id": "cue-skv2-warm-automatic-pairs",
@@ -1799,8 +1404,8 @@
                 "value": 0
               },
               "groupSize": {
-                "source": "literal",
-                "value": 2
+                "source": "variable",
+                "name": "pairGroupSize"
               },
               "gapSteps": {
                 "source": "literal",
@@ -1866,48 +1471,25 @@
             "isPersistent": true
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-warm-automatic-note-3",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called",
+            "style": "notes",
+            "note": "Two beat-synced chases: red opposite-pair CW (1 step/beat -> 4-beat cycle) and a reverse yellow single CCW (8-beat cycle)."
+          }
+        ]
       },
       "connections": [
         {
           "from": "cue-skv2-warm-automatic-start",
-          "to": "cue-skv2-warm-automatic-nl"
+          "to": "cue-skv2-warm-automatic-ring"
         },
         {
-          "from": "cue-skv2-warm-automatic-nl",
-          "to": "cue-skv2-warm-automatic-al"
-        },
-        {
-          "from": "cue-skv2-warm-automatic-al",
-          "to": "cue-skv2-warm-automatic-c4"
-        },
-        {
-          "from": "cue-skv2-warm-automatic-c4",
-          "to": "cue-skv2-warm-automatic-r4",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-warm-automatic-c4",
-          "to": "cue-skv2-warm-automatic-c16",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-warm-automatic-c16",
-          "to": "cue-skv2-warm-automatic-r16",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-warm-automatic-r16",
-          "to": "cue-skv2-warm-automatic-gs16"
-        },
-        {
-          "from": "cue-skv2-warm-automatic-c16",
-          "to": "cue-skv2-warm-automatic-rdef",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-warm-automatic-start",
-          "to": "cue-skv2-warm-automatic-base"
+          "from": "cue-skv2-warm-automatic-ring",
+          "to": "cue-skv2-warm-automatic-pgs"
         },
         {
           "from": "cue-skv2-warm-automatic-called",
@@ -1932,41 +1514,13 @@
             "x": 566.8015657504702,
             "y": -1.9779418327618714
           },
-          "cue-skv2-warm-automatic-base": {
-            "x": 128.5662191295212,
-            "y": 125.94111871695611
+          "cue-skv2-warm-automatic-ring": {
+            "x": 4,
+            "y": 90
           },
-          "cue-skv2-warm-automatic-nl": {
-            "x": -77.13973147771264,
-            "y": 130.2205816723814
-          },
-          "cue-skv2-warm-automatic-al": {
-            "x": -52.36003365061538,
-            "y": 253.25320688859665
-          },
-          "cue-skv2-warm-automatic-c4": {
-            "x": -26.973350668498824,
-            "y": 357.23984398351024
-          },
-          "cue-skv2-warm-automatic-c16": {
-            "x": 136.4534210288765,
-            "y": 498.5730753452817
-          },
-          "cue-skv2-warm-automatic-r4": {
-            "x": -111.06673804675995,
-            "y": 513.5865147290394
-          },
-          "cue-skv2-warm-automatic-r16": {
-            "x": -111.06673804675995,
-            "y": 695.2211053249209
-          },
-          "cue-skv2-warm-automatic-gs16": {
-            "x": -19.040012236587472,
-            "y": 824.8129958074637
-          },
-          "cue-skv2-warm-automatic-rdef": {
-            "x": 257.0401651939302,
-            "y": 725.2690282344199
+          "cue-skv2-warm-automatic-pgs": {
+            "x": -8,
+            "y": 214
           },
           "cue-skv2-warm-automatic-pairs": {
             "x": 572.7353912487561,
@@ -1979,29 +1533,19 @@
           "cue-skv2-warm-automatic-single": {
             "x": 456.0368231158061,
             "y": 307.58818804114594
+          },
+          "cue-skv2-warm-automatic-note-3": {
+            "x": 442.1229354493247,
+            "y": -119.11305537872528
           }
         },
         "viewport": {
-          "x": 207.76945516703194,
-          "y": 92.37667081884126,
-          "zoom": 0.6302516957914929
+          "x": 214.0640810951956,
+          "y": 385.0698479546411,
+          "zoom": 0.7361134310840893
         }
       },
       "variables": [
-        {
-          "name": "numLights",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "allLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
         {
           "name": "ring",
           "type": "light-array",
@@ -2014,6 +1558,13 @@
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "pairGroupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 2,
           "isParameter": false
         },
         {
@@ -2057,154 +1608,29 @@
             "eventType": "cue-called"
           }
         ],
-        "actions": [
-          {
-            "id": "cue-skv2-warm-manual-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          }
-        ],
+        "actions": [],
         "logic": [
           {
-            "id": "cue-skv2-warm-manual-nl",
+            "id": "cue-skv2-warm-manual-ring",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "total-lights",
-            "assignTo": "numLights"
+            "logicType": "build-ring",
+            "assignTo": "ring",
+            "assignGroupSize": "ringGroupSize"
           },
           {
-            "id": "cue-skv2-warm-manual-al",
+            "id": "cue-skv2-warm-manual-pgs",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "all-lights-array",
-            "assignTo": "allLights"
-          },
-          {
-            "id": "cue-skv2-warm-manual-c4",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
+            "logicType": "math",
+            "operator": "multiply",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "ringGroupSize"
             },
             "right": {
-              "source": "literal",
-              "value": 4
-            }
-          },
-          {
-            "id": "cue-skv2-warm-manual-c16",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 16
-            }
-          },
-          {
-            "id": "cue-skv2-warm-manual-r4",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights", "allLights"],
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-warm-manual-r16",
-            "type": "logic",
-            "logicType": "lights-from-index",
-            "sourceVariable": "allLights",
-            "index": {
-              "source": "literal",
-              "value": "0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15"
-            },
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-warm-manual-gs16",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "ringGroupSize",
-            "valueType": "number",
-            "value": {
               "source": "literal",
               "value": 2
-            }
-          },
-          {
-            "id": "cue-skv2-warm-manual-rdef",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights"],
-            "assignTo": "ring"
+            },
+            "assignTo": "pairGroupSize"
           },
           {
             "id": "cue-skv2-warm-manual-pairs",
@@ -2264,8 +1690,8 @@
                 "value": 0
               },
               "groupSize": {
-                "source": "literal",
-                "value": 2
+                "source": "variable",
+                "name": "pairGroupSize"
               },
               "gapSteps": {
                 "source": "literal",
@@ -2331,48 +1757,25 @@
             "isPersistent": true
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-warm-manual-note-3",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called",
+            "style": "notes",
+            "note": "Same red/yellow chases as Warm Automatic, but each step advances on a KEYFRAME instead of the beat (waitUntil \"keyframe\")."
+          }
+        ]
       },
       "connections": [
         {
           "from": "cue-skv2-warm-manual-start",
-          "to": "cue-skv2-warm-manual-nl"
+          "to": "cue-skv2-warm-manual-ring"
         },
         {
-          "from": "cue-skv2-warm-manual-nl",
-          "to": "cue-skv2-warm-manual-al"
-        },
-        {
-          "from": "cue-skv2-warm-manual-al",
-          "to": "cue-skv2-warm-manual-c4"
-        },
-        {
-          "from": "cue-skv2-warm-manual-c4",
-          "to": "cue-skv2-warm-manual-r4",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-warm-manual-c4",
-          "to": "cue-skv2-warm-manual-c16",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-warm-manual-c16",
-          "to": "cue-skv2-warm-manual-r16",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-warm-manual-r16",
-          "to": "cue-skv2-warm-manual-gs16"
-        },
-        {
-          "from": "cue-skv2-warm-manual-c16",
-          "to": "cue-skv2-warm-manual-rdef",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-warm-manual-start",
-          "to": "cue-skv2-warm-manual-base"
+          "from": "cue-skv2-warm-manual-ring",
+          "to": "cue-skv2-warm-manual-pgs"
         },
         {
           "from": "cue-skv2-warm-manual-called",
@@ -2397,41 +1800,13 @@
             "x": 552.9068420577531,
             "y": 6.346670745529309
           },
-          "cue-skv2-warm-manual-base": {
-            "x": 101.54673192846633,
-            "y": 115.94654837965481
+          "cue-skv2-warm-manual-ring": {
+            "x": 6.7924314227446985,
+            "y": 94.30206233349315
           },
-          "cue-skv2-warm-manual-nl": {
-            "x": -98.37339655570173,
-            "y": 123.02664933150118
-          },
-          "cue-skv2-warm-manual-al": {
-            "x": -60.293372082526844,
-            "y": 256.4265422613612
-          },
-          "cue-skv2-warm-manual-c4": {
-            "x": -26.973350668498824,
-            "y": 379.45319159286214
-          },
-          "cue-skv2-warm-manual-c16": {
-            "x": 101.54673192846633,
-            "y": 538.2397675048389
-          },
-          "cue-skv2-warm-manual-r4": {
-            "x": -130.10675028334742,
-            "y": 542.1465330839208
-          },
-          "cue-skv2-warm-manual-r16": {
-            "x": -160,
-            "y": 729.6000000000001
-          },
-          "cue-skv2-warm-manual-gs16": {
-            "x": 46,
-            "y": 888
-          },
-          "cue-skv2-warm-manual-rdef": {
-            "x": 214.0000000000001,
-            "y": 728
+          "cue-skv2-warm-manual-pgs": {
+            "x": -5.4339451381957815,
+            "y": 228.83843287543198
           },
           "cue-skv2-warm-manual-pairs": {
             "x": 552.9068420577531,
@@ -2444,29 +1819,19 @@
           "cue-skv2-warm-manual-single": {
             "x": 429.1467625199348,
             "y": 240.5598653975386
+          },
+          "cue-skv2-warm-manual-note-3": {
+            "x": 423.94380296785016,
+            "y": -118.71742640690985
           }
         },
         "viewport": {
-          "x": 234.42169324178803,
-          "y": 140.878521323217,
-          "zoom": 0.5
+          "x": -259.08485269705375,
+          "y": 140.3839987476788,
+          "zoom": 0.9486843151404533
         }
       },
       "variables": [
-        {
-          "name": "numLights",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "allLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
         {
           "name": "ring",
           "type": "light-array",
@@ -2479,6 +1844,13 @@
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "pairGroupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 2,
           "isParameter": false
         },
         {
@@ -2522,154 +1894,29 @@
             "eventType": "cue-called"
           }
         ],
-        "actions": [
-          {
-            "id": "cue-skv2-cool-automatic-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          }
-        ],
+        "actions": [],
         "logic": [
           {
-            "id": "cue-skv2-cool-automatic-nl",
+            "id": "cue-skv2-cool-automatic-ring",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "total-lights",
-            "assignTo": "numLights"
+            "logicType": "build-ring",
+            "assignTo": "ring",
+            "assignGroupSize": "ringGroupSize"
           },
           {
-            "id": "cue-skv2-cool-automatic-al",
+            "id": "cue-skv2-cool-automatic-pgs",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "all-lights-array",
-            "assignTo": "allLights"
-          },
-          {
-            "id": "cue-skv2-cool-automatic-c4",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
+            "logicType": "math",
+            "operator": "multiply",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "ringGroupSize"
             },
             "right": {
-              "source": "literal",
-              "value": 4
-            }
-          },
-          {
-            "id": "cue-skv2-cool-automatic-c16",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 16
-            }
-          },
-          {
-            "id": "cue-skv2-cool-automatic-r4",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights", "allLights"],
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-cool-automatic-r16",
-            "type": "logic",
-            "logicType": "lights-from-index",
-            "sourceVariable": "allLights",
-            "index": {
-              "source": "literal",
-              "value": "0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15"
-            },
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-cool-automatic-gs16",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "ringGroupSize",
-            "valueType": "number",
-            "value": {
               "source": "literal",
               "value": 2
-            }
-          },
-          {
-            "id": "cue-skv2-cool-automatic-rdef",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights"],
-            "assignTo": "ring"
+            },
+            "assignTo": "pairGroupSize"
           },
           {
             "id": "cue-skv2-cool-automatic-pairs",
@@ -2729,8 +1976,8 @@
                 "value": 0
               },
               "groupSize": {
-                "source": "literal",
-                "value": 2
+                "source": "variable",
+                "name": "pairGroupSize"
               },
               "gapSteps": {
                 "source": "literal",
@@ -2796,48 +2043,41 @@
             "isPersistent": true
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-cool-automatic-note-1",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue start",
+            "style": "notes",
+            "note": "Builds the ring + opposite-pairs."
+          },
+          {
+            "id": "cue-skv2-cool-automatic-note-2",
+            "type": "notes",
+            "label": "Important",
+            "title": "Ring build",
+            "style": "important",
+            "note": "Builds a virtual 8-step ring scaled to the rig: counts dividing 8 repeat (4 doubled, 8 one-to-one), multiples of 8 interleave (16 front/back), other counts resample to 8 steps . Every chase keeps its 8-step shape and timing on any sized rig."
+          },
+          {
+            "id": "cue-skv2-cool-automatic-note-3",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called",
+            "style": "notes",
+            "note": "Two beat-synced chases: blue opposite-pair CW (4-beat cycle) and a reverse green single CCW (8-beat cycle)."
+          }
+        ]
       },
       "connections": [
         {
           "from": "cue-skv2-cool-automatic-start",
-          "to": "cue-skv2-cool-automatic-nl"
+          "to": "cue-skv2-cool-automatic-ring"
         },
         {
-          "from": "cue-skv2-cool-automatic-nl",
-          "to": "cue-skv2-cool-automatic-al"
-        },
-        {
-          "from": "cue-skv2-cool-automatic-al",
-          "to": "cue-skv2-cool-automatic-c4"
-        },
-        {
-          "from": "cue-skv2-cool-automatic-c4",
-          "to": "cue-skv2-cool-automatic-r4",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-cool-automatic-c4",
-          "to": "cue-skv2-cool-automatic-c16",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-cool-automatic-c16",
-          "to": "cue-skv2-cool-automatic-r16",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-cool-automatic-r16",
-          "to": "cue-skv2-cool-automatic-gs16"
-        },
-        {
-          "from": "cue-skv2-cool-automatic-c16",
-          "to": "cue-skv2-cool-automatic-rdef",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-cool-automatic-start",
-          "to": "cue-skv2-cool-automatic-base"
+          "from": "cue-skv2-cool-automatic-ring",
+          "to": "cue-skv2-cool-automatic-pgs"
         },
         {
           "from": "cue-skv2-cool-automatic-called",
@@ -2862,76 +2102,46 @@
             "x": 0,
             "y": 0
           },
-          "cue-skv2-cool-automatic-base": {
-            "x": 386.87248008325696,
-            "y": 108
+          "cue-skv2-cool-automatic-ring": {
+            "x": 447.84821664464994,
+            "y": 90.95891677675024
           },
-          "cue-skv2-cool-automatic-nl": {
-            "x": 685.7138317041099,
-            "y": 174
-          },
-          "cue-skv2-cool-automatic-al": {
-            "x": 669.5276824571192,
-            "y": 312.4297020882368
-          },
-          "cue-skv2-cool-automatic-c4": {
-            "x": 667.3087201248854,
-            "y": 428.6859875433147
-          },
-          "cue-skv2-cool-automatic-c16": {
-            "x": 740.872480083257,
-            "y": 594.6859875433147
-          },
-          "cue-skv2-cool-automatic-r4": {
-            "x": 503.30872012488544,
-            "y": 570.6859875433147
-          },
-          "cue-skv2-cool-automatic-r16": {
-            "x": 404.4362400416285,
-            "y": 773.3719750866294
-          },
-          "cue-skv2-cool-automatic-gs16": {
-            "x": 496.62044312618673,
-            "y": 905.1176008097827
-          },
-          "cue-skv2-cool-automatic-rdef": {
-            "x": 848,
-            "y": 755.3719750866294
+          "cue-skv2-cool-automatic-pgs": {
+            "x": 437.76803170409505,
+            "y": 223.9158520475562
           },
           "cue-skv2-cool-automatic-pairs": {
-            "x": 22.43624004162848,
-            "y": 136.51549442112446
+            "x": -9.2443412001154,
+            "y": 97.63478107898436
           },
           "cue-skv2-cool-automatic-pair": {
             "x": 136.4362400416286,
             "y": 312.6859875433147
           },
           "cue-skv2-cool-automatic-single": {
-            "x": -128,
-            "y": 318.6859875433147
+            "x": -133.7601056803171,
+            "y": 299.96564408228437
+          },
+          "cue-skv2-cool-automatic-note-1": {
+            "x": 407.5990752972259,
+            "y": -120.31743725231166
+          },
+          "cue-skv2-cool-automatic-note-2": {
+            "x": 649.5235138705416,
+            "y": 57.049669749009354
+          },
+          "cue-skv2-cool-automatic-note-3": {
+            "x": -194.40356671070003,
+            "y": -136.1577278731836
           }
         },
         "viewport": {
-          "x": 252.5038337406392,
-          "y": 81.05393313088763,
-          "zoom": 0.5
+          "x": 46.06408109519566,
+          "y": 209.8698479546411,
+          "zoom": 0.7361134310840893
         }
       },
       "variables": [
-        {
-          "name": "numLights",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "allLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
         {
           "name": "ring",
           "type": "light-array",
@@ -2944,6 +2154,13 @@
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "pairGroupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 2,
           "isParameter": false
         },
         {
@@ -2987,154 +2204,29 @@
             "eventType": "cue-called"
           }
         ],
-        "actions": [
-          {
-            "id": "cue-skv2-cool-manual-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          }
-        ],
+        "actions": [],
         "logic": [
           {
-            "id": "cue-skv2-cool-manual-nl",
+            "id": "cue-skv2-cool-manual-ring",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "total-lights",
-            "assignTo": "numLights"
+            "logicType": "build-ring",
+            "assignTo": "ring",
+            "assignGroupSize": "ringGroupSize"
           },
           {
-            "id": "cue-skv2-cool-manual-al",
+            "id": "cue-skv2-cool-manual-pgs",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "all-lights-array",
-            "assignTo": "allLights"
-          },
-          {
-            "id": "cue-skv2-cool-manual-c4",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
+            "logicType": "math",
+            "operator": "multiply",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "ringGroupSize"
             },
             "right": {
-              "source": "literal",
-              "value": 4
-            }
-          },
-          {
-            "id": "cue-skv2-cool-manual-c16",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 16
-            }
-          },
-          {
-            "id": "cue-skv2-cool-manual-r4",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights", "allLights"],
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-cool-manual-r16",
-            "type": "logic",
-            "logicType": "lights-from-index",
-            "sourceVariable": "allLights",
-            "index": {
-              "source": "literal",
-              "value": "0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15"
-            },
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-cool-manual-gs16",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "ringGroupSize",
-            "valueType": "number",
-            "value": {
               "source": "literal",
               "value": 2
-            }
-          },
-          {
-            "id": "cue-skv2-cool-manual-rdef",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights"],
-            "assignTo": "ring"
+            },
+            "assignTo": "pairGroupSize"
           },
           {
             "id": "cue-skv2-cool-manual-pairs",
@@ -3194,8 +2286,8 @@
                 "value": 0
               },
               "groupSize": {
-                "source": "literal",
-                "value": 2
+                "source": "variable",
+                "name": "pairGroupSize"
               },
               "gapSteps": {
                 "source": "literal",
@@ -3261,48 +2353,25 @@
             "isPersistent": true
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-cool-manual-note-3",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called",
+            "style": "notes",
+            "note": "Same blue/green chases as Cool Automatic, but each step advances on a KEYFRAME instead of the beat."
+          }
+        ]
       },
       "connections": [
         {
           "from": "cue-skv2-cool-manual-start",
-          "to": "cue-skv2-cool-manual-nl"
+          "to": "cue-skv2-cool-manual-ring"
         },
         {
-          "from": "cue-skv2-cool-manual-nl",
-          "to": "cue-skv2-cool-manual-al"
-        },
-        {
-          "from": "cue-skv2-cool-manual-al",
-          "to": "cue-skv2-cool-manual-c4"
-        },
-        {
-          "from": "cue-skv2-cool-manual-c4",
-          "to": "cue-skv2-cool-manual-r4",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-cool-manual-c4",
-          "to": "cue-skv2-cool-manual-c16",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-cool-manual-c16",
-          "to": "cue-skv2-cool-manual-r16",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-cool-manual-r16",
-          "to": "cue-skv2-cool-manual-gs16"
-        },
-        {
-          "from": "cue-skv2-cool-manual-c16",
-          "to": "cue-skv2-cool-manual-rdef",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-cool-manual-start",
-          "to": "cue-skv2-cool-manual-base"
+          "from": "cue-skv2-cool-manual-ring",
+          "to": "cue-skv2-cool-manual-pgs"
         },
         {
           "from": "cue-skv2-cool-manual-called",
@@ -3327,41 +2396,13 @@
             "x": 496,
             "y": 42
           },
-          "cue-skv2-cool-manual-base": {
-            "x": 118,
-            "y": 87.99999999999989
+          "cue-skv2-cool-manual-ring": {
+            "x": 0,
+            "y": 150
           },
-          "cue-skv2-cool-manual-nl": {
-            "x": -68,
-            "y": 122
-          },
-          "cue-skv2-cool-manual-al": {
-            "x": -70,
-            "y": 250
-          },
-          "cue-skv2-cool-manual-c4": {
-            "x": -12,
-            "y": 368
-          },
-          "cue-skv2-cool-manual-c16": {
-            "x": 94,
-            "y": 530
-          },
-          "cue-skv2-cool-manual-r4": {
-            "x": -122,
-            "y": 526
-          },
-          "cue-skv2-cool-manual-r16": {
-            "x": -226,
-            "y": 722
-          },
-          "cue-skv2-cool-manual-gs16": {
-            "x": -52,
-            "y": 878
-          },
-          "cue-skv2-cool-manual-rdef": {
-            "x": 162,
-            "y": 716
+          "cue-skv2-cool-manual-pgs": {
+            "x": 0,
+            "y": 450
           },
           "cue-skv2-cool-manual-pairs": {
             "x": 492,
@@ -3374,29 +2415,19 @@
           "cue-skv2-cool-manual-single": {
             "x": 356,
             "y": 348
+          },
+          "cue-skv2-cool-manual-note-3": {
+            "x": 360.6375165125496,
+            "y": -75.67661822985463
           }
         },
         "viewport": {
-          "x": 256.5038337406392,
-          "y": 148.05393313088757,
-          "zoom": 0.5
+          "x": 223.78414824328047,
+          "y": 178.79199156040733,
+          "zoom": 0.6944317035134391
         }
       },
       "variables": [
-        {
-          "name": "numLights",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "allLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
         {
           "name": "ring",
           "type": "light-array",
@@ -3409,6 +2440,13 @@
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "pairGroupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 2,
           "isParameter": false
         },
         {
@@ -3452,154 +2490,29 @@
             "eventType": "cue-called"
           }
         ],
-        "actions": [
-          {
-            "id": "cue-skv2-harmony-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          }
-        ],
+        "actions": [],
         "logic": [
           {
-            "id": "cue-skv2-harmony-nl",
+            "id": "cue-skv2-harmony-ring",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "total-lights",
-            "assignTo": "numLights"
+            "logicType": "build-ring",
+            "assignTo": "ring",
+            "assignGroupSize": "ringGroupSize"
           },
           {
-            "id": "cue-skv2-harmony-al",
+            "id": "cue-skv2-harmony-pgs",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "all-lights-array",
-            "assignTo": "allLights"
-          },
-          {
-            "id": "cue-skv2-harmony-c4",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
+            "logicType": "math",
+            "operator": "multiply",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "ringGroupSize"
             },
             "right": {
-              "source": "literal",
-              "value": 4
-            }
-          },
-          {
-            "id": "cue-skv2-harmony-c16",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 16
-            }
-          },
-          {
-            "id": "cue-skv2-harmony-r4",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights", "allLights"],
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-harmony-r16",
-            "type": "logic",
-            "logicType": "lights-from-index",
-            "sourceVariable": "allLights",
-            "index": {
-              "source": "literal",
-              "value": "0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15"
-            },
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-harmony-gs16",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "ringGroupSize",
-            "valueType": "number",
-            "value": {
               "source": "literal",
               "value": 2
-            }
-          },
-          {
-            "id": "cue-skv2-harmony-rdef",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights"],
-            "assignTo": "ring"
+            },
+            "assignTo": "pairGroupSize"
           },
           {
             "id": "cue-skv2-harmony-venue",
@@ -3851,48 +2764,25 @@
             "isPersistent": true
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-harmony-note-3",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called",
+            "style": "notes",
+            "note": "Branches on venue (1 step/beat). Large: yellow forward + red reverse single chases. Small: green forward + blue forward single chases."
+          }
+        ]
       },
       "connections": [
         {
           "from": "cue-skv2-harmony-start",
-          "to": "cue-skv2-harmony-nl"
+          "to": "cue-skv2-harmony-ring"
         },
         {
-          "from": "cue-skv2-harmony-nl",
-          "to": "cue-skv2-harmony-al"
-        },
-        {
-          "from": "cue-skv2-harmony-al",
-          "to": "cue-skv2-harmony-c4"
-        },
-        {
-          "from": "cue-skv2-harmony-c4",
-          "to": "cue-skv2-harmony-r4",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-harmony-c4",
-          "to": "cue-skv2-harmony-c16",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-harmony-c16",
-          "to": "cue-skv2-harmony-r16",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-harmony-r16",
-          "to": "cue-skv2-harmony-gs16"
-        },
-        {
-          "from": "cue-skv2-harmony-c16",
-          "to": "cue-skv2-harmony-rdef",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-harmony-start",
-          "to": "cue-skv2-harmony-base"
+          "from": "cue-skv2-harmony-ring",
+          "to": "cue-skv2-harmony-pgs"
         },
         {
           "from": "cue-skv2-harmony-called",
@@ -3933,41 +2823,13 @@
             "x": 760,
             "y": 20
           },
-          "cue-skv2-harmony-base": {
-            "x": 92,
-            "y": 128
+          "cue-skv2-harmony-ring": {
+            "x": 1.5347460960008448,
+            "y": 94.74914054396811
           },
-          "cue-skv2-harmony-nl": {
-            "x": -122,
-            "y": 130
-          },
-          "cue-skv2-harmony-al": {
-            "x": -80,
-            "y": 276
-          },
-          "cue-skv2-harmony-c4": {
-            "x": 12,
-            "y": 408
-          },
-          "cue-skv2-harmony-c16": {
-            "x": 128,
-            "y": 552
-          },
-          "cue-skv2-harmony-r4": {
-            "x": -116,
-            "y": 556
-          },
-          "cue-skv2-harmony-r16": {
-            "x": -182,
-            "y": 734
-          },
-          "cue-skv2-harmony-gs16": {
-            "x": -76.31676404380471,
-            "y": 888.2835775349822
-          },
-          "cue-skv2-harmony-rdef": {
-            "x": 220,
-            "y": 766
+          "cue-skv2-harmony-pgs": {
+            "x": -13.812714864008058,
+            "y": 198.30164025585486
           },
           "cue-skv2-harmony-venue": {
             "x": 748,
@@ -3992,29 +2854,19 @@
           "cue-skv2-harmony-blue": {
             "x": 930,
             "y": 762
+          },
+          "cue-skv2-harmony-note-3": {
+            "x": 631.0813279359256,
+            "y": -118.80335916791853
           }
         },
         "viewport": {
-          "x": 302.5450880873813,
-          "y": 136.15977159016063,
-          "zoom": 0.5241312377584644
+          "x": 158.6176786329828,
+          "y": 335.53068006628314,
+          "zoom": 0.6515735746816476
         }
       },
       "variables": [
-        {
-          "name": "numLights",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "allLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
         {
           "name": "ring",
           "type": "light-array",
@@ -4027,6 +2879,13 @@
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "pairGroupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 2,
           "isParameter": false
         },
         {
@@ -4071,154 +2930,29 @@
             "eventType": "cue-called"
           }
         ],
-        "actions": [
-          {
-            "id": "cue-skv2-searchlights-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          }
-        ],
+        "actions": [],
         "logic": [
           {
-            "id": "cue-skv2-searchlights-nl",
+            "id": "cue-skv2-searchlights-ring",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "total-lights",
-            "assignTo": "numLights"
+            "logicType": "build-ring",
+            "assignTo": "ring",
+            "assignGroupSize": "ringGroupSize"
           },
           {
-            "id": "cue-skv2-searchlights-al",
+            "id": "cue-skv2-searchlights-pgs",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "all-lights-array",
-            "assignTo": "allLights"
-          },
-          {
-            "id": "cue-skv2-searchlights-c4",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
+            "logicType": "math",
+            "operator": "multiply",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "ringGroupSize"
             },
             "right": {
-              "source": "literal",
-              "value": 4
-            }
-          },
-          {
-            "id": "cue-skv2-searchlights-c16",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 16
-            }
-          },
-          {
-            "id": "cue-skv2-searchlights-r4",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights", "allLights"],
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-searchlights-r16",
-            "type": "logic",
-            "logicType": "lights-from-index",
-            "sourceVariable": "allLights",
-            "index": {
-              "source": "literal",
-              "value": "0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15"
-            },
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-searchlights-gs16",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "ringGroupSize",
-            "valueType": "number",
-            "value": {
               "source": "literal",
               "value": 2
-            }
-          },
-          {
-            "id": "cue-skv2-searchlights-rdef",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights"],
-            "assignTo": "ring"
+            },
+            "assignTo": "pairGroupSize"
           },
           {
             "id": "cue-skv2-searchlights-bd",
@@ -4433,44 +3167,25 @@
             }
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-searchlights-note-3",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called",
+            "style": "notes",
+            "note": "A yellow forward (CW) chase plus reverse (CCW) red/blue searchlights; venue-gated, with step time derived from live BPM."
+          }
+        ]
       },
       "connections": [
         {
           "from": "cue-skv2-searchlights-start",
-          "to": "cue-skv2-searchlights-nl"
+          "to": "cue-skv2-searchlights-ring"
         },
         {
-          "from": "cue-skv2-searchlights-nl",
-          "to": "cue-skv2-searchlights-al"
-        },
-        {
-          "from": "cue-skv2-searchlights-al",
-          "to": "cue-skv2-searchlights-c4"
-        },
-        {
-          "from": "cue-skv2-searchlights-c4",
-          "to": "cue-skv2-searchlights-r4",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-searchlights-c4",
-          "to": "cue-skv2-searchlights-c16",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-searchlights-c16",
-          "to": "cue-skv2-searchlights-r16",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-searchlights-r16",
-          "to": "cue-skv2-searchlights-gs16"
-        },
-        {
-          "from": "cue-skv2-searchlights-c16",
-          "to": "cue-skv2-searchlights-rdef",
-          "fromPort": "false"
+          "from": "cue-skv2-searchlights-ring",
+          "to": "cue-skv2-searchlights-pgs"
         },
         {
           "from": "cue-skv2-searchlights-called",
@@ -4479,10 +3194,6 @@
         {
           "from": "cue-skv2-searchlights-bd",
           "to": "cue-skv2-searchlights-sm"
-        },
-        {
-          "from": "cue-skv2-searchlights-start",
-          "to": "cue-skv2-searchlights-base"
         },
         {
           "from": "cue-skv2-searchlights-sm",
@@ -4523,41 +3234,13 @@
             "x": 589.0828943774089,
             "y": -30.526705617521884
           },
-          "cue-skv2-searchlights-base": {
-            "x": 122,
-            "y": 112
+          "cue-skv2-searchlights-ring": {
+            "x": 3.0694921920016895,
+            "y": 82.47117177596101
           },
-          "cue-skv2-searchlights-nl": {
-            "x": -74,
-            "y": 96
-          },
-          "cue-skv2-searchlights-al": {
-            "x": -92,
-            "y": 224
-          },
-          "cue-skv2-searchlights-c4": {
-            "x": -2,
-            "y": 370
-          },
-          "cue-skv2-searchlights-c16": {
-            "x": 90,
-            "y": 516
-          },
-          "cue-skv2-searchlights-r4": {
-            "x": -144,
-            "y": 536
-          },
-          "cue-skv2-searchlights-r16": {
-            "x": -264,
-            "y": 750
-          },
-          "cue-skv2-searchlights-gs16": {
-            "x": -36,
-            "y": 961.2000000000003
-          },
-          "cue-skv2-searchlights-rdef": {
-            "x": 134,
-            "y": 744.0000000000002
+          "cue-skv2-searchlights-pgs": {
+            "x": -10.743222672006254,
+            "y": 190.6279097758504
           },
           "cue-skv2-searchlights-bd": {
             "x": 587.0828943774089,
@@ -4586,29 +3269,19 @@
           "cue-skv2-searchlights-red": {
             "x": 825.0828943774088,
             "y": 518.8029483142363
+          },
+          "cue-skv2-searchlights-note-3": {
+            "x": 475.42878889593453,
+            "y": -151.03302718393718
           }
         },
         "viewport": {
-          "x": 252.45170968314585,
-          "y": 114.11042013013162,
-          "zoom": 0.5
+          "x": 140.6176786329827,
+          "y": 406.53068006628314,
+          "zoom": 0.6515735746816476
         }
       },
       "variables": [
-        {
-          "name": "numLights",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "allLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
         {
           "name": "ring",
           "type": "light-array",
@@ -4621,6 +3294,13 @@
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "pairGroupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 2,
           "isParameter": false
         },
         {
@@ -4679,154 +3359,29 @@
             "eventType": "cue-called"
           }
         ],
-        "actions": [
-          {
-            "id": "cue-skv2-sweep-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          }
-        ],
+        "actions": [],
         "logic": [
           {
-            "id": "cue-skv2-sweep-nl",
+            "id": "cue-skv2-sweep-ring",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "total-lights",
-            "assignTo": "numLights"
+            "logicType": "build-ring",
+            "assignTo": "ring",
+            "assignGroupSize": "ringGroupSize"
           },
           {
-            "id": "cue-skv2-sweep-al",
+            "id": "cue-skv2-sweep-pgs",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "all-lights-array",
-            "assignTo": "allLights"
-          },
-          {
-            "id": "cue-skv2-sweep-c4",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
+            "logicType": "math",
+            "operator": "multiply",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "ringGroupSize"
             },
             "right": {
-              "source": "literal",
-              "value": 4
-            }
-          },
-          {
-            "id": "cue-skv2-sweep-c16",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 16
-            }
-          },
-          {
-            "id": "cue-skv2-sweep-r4",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights", "allLights"],
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-sweep-r16",
-            "type": "logic",
-            "logicType": "lights-from-index",
-            "sourceVariable": "allLights",
-            "index": {
-              "source": "literal",
-              "value": "0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15"
-            },
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-sweep-gs16",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "ringGroupSize",
-            "valueType": "number",
-            "value": {
               "source": "literal",
               "value": 2
-            }
-          },
-          {
-            "id": "cue-skv2-sweep-rdef",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights"],
-            "assignTo": "ring"
+            },
+            "assignTo": "pairGroupSize"
           },
           {
             "id": "cue-skv2-sweep-bd",
@@ -4929,8 +3484,8 @@
                 "value": 0
               },
               "groupSize": {
-                "source": "literal",
-                "value": 2
+                "source": "variable",
+                "name": "pairGroupSize"
               },
               "gapSteps": {
                 "source": "literal",
@@ -4985,8 +3540,8 @@
                 "name": "stepMs"
               },
               "groupSize": {
-                "source": "literal",
-                "value": 2
+                "source": "variable",
+                "name": "pairGroupSize"
               },
               "gapSteps": {
                 "source": "literal",
@@ -5105,44 +3660,25 @@
             }
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-sweep-note-3",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called",
+            "style": "notes",
+            "note": "Branches on venue. Large: red opposite-pair CW chase on the beat. Small: a yellow pair chase, a blue CW chase (2 trailing dark steps) and a reverse green chase (4 leading dark steps), all on the quarter-beat."
+          }
+        ]
       },
       "connections": [
         {
           "from": "cue-skv2-sweep-start",
-          "to": "cue-skv2-sweep-nl"
+          "to": "cue-skv2-sweep-ring"
         },
         {
-          "from": "cue-skv2-sweep-nl",
-          "to": "cue-skv2-sweep-al"
-        },
-        {
-          "from": "cue-skv2-sweep-al",
-          "to": "cue-skv2-sweep-c4"
-        },
-        {
-          "from": "cue-skv2-sweep-c4",
-          "to": "cue-skv2-sweep-r4",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-sweep-c4",
-          "to": "cue-skv2-sweep-c16",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-sweep-c16",
-          "to": "cue-skv2-sweep-r16",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-sweep-r16",
-          "to": "cue-skv2-sweep-gs16"
-        },
-        {
-          "from": "cue-skv2-sweep-c16",
-          "to": "cue-skv2-sweep-rdef",
-          "fromPort": "false"
+          "from": "cue-skv2-sweep-ring",
+          "to": "cue-skv2-sweep-pgs"
         },
         {
           "from": "cue-skv2-sweep-called",
@@ -5151,10 +3687,6 @@
         {
           "from": "cue-skv2-sweep-bd",
           "to": "cue-skv2-sweep-sm"
-        },
-        {
-          "from": "cue-skv2-sweep-start",
-          "to": "cue-skv2-sweep-base"
         },
         {
           "from": "cue-skv2-sweep-sm",
@@ -5192,48 +3724,20 @@
       "layout": {
         "nodePositions": {
           "cue-skv2-sweep-start": {
-            "x": 0,
-            "y": 0
+            "x": 342.67471464929537,
+            "y": 52.620461800079056
           },
           "cue-skv2-sweep-called": {
             "x": 778.4413418559894,
             "y": 1.9779418327618714
           },
-          "cue-skv2-sweep-base": {
-            "x": 116.69856813294984,
-            "y": 96.27199122552804
+          "cue-skv2-sweep-ring": {
+            "x": 352.9421218297986,
+            "y": 117.91435256092745
           },
-          "cue-skv2-sweep-nl": {
-            "x": -92.96326613980762,
-            "y": 104.50733784647718
-          },
-          "cue-skv2-sweep-al": {
-            "x": -94.94120797256937,
-            "y": 224.5146310651478
-          },
-          "cue-skv2-sweep-c4": {
-            "x": 13.845592829332986,
-            "y": 360.6690382358147
-          },
-          "cue-skv2-sweep-c16": {
-            "x": 146.36769562437792,
-            "y": 486.6101569527707
-          },
-          "cue-skv2-sweep-r4": {
-            "x": -94.94120797256937,
-            "y": 494.8455035737197
-          },
-          "cue-skv2-sweep-r16": {
-            "x": -179.99270678132962,
-            "y": 630.6763314544851
-          },
-          "cue-skv2-sweep-gs16": {
-            "x": -53.4044294845703,
-            "y": 750.6836246731555
-          },
-          "cue-skv2-sweep-rdef": {
-            "x": 221.52948526932857,
-            "y": 624.4189266662979
+          "cue-skv2-sweep-pgs": {
+            "x": 341.3912887517325,
+            "y": 220.26676433624016
           },
           "cue-skv2-sweep-bd": {
             "x": 780.4192836887513,
@@ -5256,8 +3760,8 @@
             "y": 526.4925728979094
           },
           "cue-skv2-sweep-red": {
-            "x": 552.955972921137,
-            "y": 664.6249219013382
+            "x": 456.955972921137,
+            "y": 670.6249219013382
           },
           "cue-skv2-sweep-yellow": {
             "x": 1179.9635339066476,
@@ -5268,31 +3772,21 @@
             "y": 1107.0367338601925
           },
           "cue-skv2-sweep-green": {
-            "x": 742.8383888662759,
-            "y": 1177.9190605497176
+            "x": 744.8383888662759,
+            "y": 1107.9190605497176
+          },
+          "cue-skv2-sweep-note-3": {
+            "x": 639.3900030632064,
+            "y": -148.3419469120273
           }
         },
         "viewport": {
-          "x": 274.4367985417731,
-          "y": 126.53257104640534,
-          "zoom": 0.5055760404256521
+          "x": 48.08648265385534,
+          "y": 207.84374958526973,
+          "zoom": 0.5
         }
       },
       "variables": [
-        {
-          "name": "numLights",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "allLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
         {
           "name": "ring",
           "type": "light-array",
@@ -5305,6 +3799,13 @@
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "pairGroupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 2,
           "isParameter": false
         },
         {
@@ -5360,151 +3861,12 @@
       "nodes": {
         "events": [
           {
-            "id": "cue-skv2-bre-start",
-            "type": "event",
-            "eventType": "cue-started"
-          },
-          {
             "id": "cue-skv2-bre-called",
             "type": "event",
             "eventType": "cue-called"
           }
         ],
         "actions": [
-          {
-            "id": "cue-skv2-bre-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
-          {
-            "id": "cue-skv2-bre-wash",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "white"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "high"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "add"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 6
-            }
-          },
           {
             "id": "cue-skv2-bre-red",
             "type": "action",
@@ -5569,7 +3931,7 @@
             },
             "layer": {
               "source": "literal",
-              "value": 20
+              "value": 0
             }
           },
           {
@@ -5636,7 +3998,7 @@
             },
             "layer": {
               "source": "literal",
-              "value": 20
+              "value": 0
             }
           },
           {
@@ -5703,7 +4065,7 @@
             },
             "layer": {
               "source": "literal",
-              "value": 20
+              "value": 0
             }
           },
           {
@@ -5770,7 +4132,7 @@
             },
             "layer": {
               "source": "literal",
-              "value": 20
+              "value": 0
             }
           }
         ],
@@ -5801,7 +4163,24 @@
         "eventRaisers": [],
         "eventListeners": [],
         "effectRaisers": [],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-bre-note-1",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called",
+            "style": "notes",
+            "note": "Full-rig colour cycle red -> green -> yellow -> blue, one step per eighth-beat (BPM-derived). Set on layer 0."
+          },
+          {
+            "id": "cue-skv2-bre-note-2",
+            "type": "notes",
+            "label": "Important",
+            "title": "Live BPM",
+            "style": "important",
+            "note": "Each cue-called reads beat-duration-ms and divides it (a quarter-beat) into the per-step delay, so the sub-beat chases re-time to the current tempo within one cycle."
+          }
+        ]
       },
       "connections": [
         {
@@ -5811,14 +4190,6 @@
         {
           "from": "cue-skv2-bre-bd",
           "to": "cue-skv2-bre-sm"
-        },
-        {
-          "from": "cue-skv2-bre-start",
-          "to": "cue-skv2-bre-base"
-        },
-        {
-          "from": "cue-skv2-bre-base",
-          "to": "cue-skv2-bre-wash"
         },
         {
           "from": "cue-skv2-bre-sm",
@@ -5839,21 +4210,9 @@
       ],
       "layout": {
         "nodePositions": {
-          "cue-skv2-bre-start": {
-            "x": 26.9832412038661,
-            "y": 18.55097832765796
-          },
           "cue-skv2-bre-called": {
-            "x": 280,
-            "y": 0
-          },
-          "cue-skv2-bre-base": {
-            "x": 0,
-            "y": 150
-          },
-          "cue-skv2-bre-wash": {
-            "x": 0,
-            "y": 300
+            "x": 285.760105680317,
+            "y": 47.520871862615536
           },
           "cue-skv2-bre-red": {
             "x": 280,
@@ -5876,14 +4235,22 @@
             "y": 150
           },
           "cue-skv2-bre-sm": {
-            "x": 280,
-            "y": 300
+            "x": 278.55997357992067,
+            "y": 255.3591809775429
+          },
+          "cue-skv2-bre-note-1": {
+            "x": 203.67859973579914,
+            "y": -72.79656538969618
+          },
+          "cue-skv2-bre-note-2": {
+            "x": 451.36314398943205,
+            "y": 179.45191545574642
           }
         },
         "viewport": {
-          "x": 180.59833948152885,
-          "y": 121.03690116229919,
-          "zoom": 0.5929606409813943
+          "x": -201.2366858163059,
+          "y": 122.05126342208922,
+          "zoom": 1.2158792831830973
         }
       },
       "variables": [
@@ -5929,73 +4296,6 @@
           }
         ],
         "actions": [
-          {
-            "id": "cue-skv2-default-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
           {
             "id": "cue-skv2-default-blue",
             "type": "action",
@@ -6277,16 +4577,53 @@
             "interruptible": true
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-default-note-1",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue start",
+            "style": "notes",
+            "note": "Loads the all-lights array (used by the small-venue yellow wash)."
+          },
+          {
+            "id": "cue-skv2-default-note-2",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called -> toggle",
+            "style": "notes",
+            "note": "Holds a full BLUE wash, then a full RED wash on layer 1, swapping on each keyframe. Cue-called re-raises the finished chain so it loops."
+          },
+          {
+            "id": "cue-skv2-default-note-3",
+            "type": "notes",
+            "label": "Important",
+            "title": "Keyframe toggle",
+            "style": "important",
+            "note": "Each colour is a BLOCKING set-color that waits on the keyframe event (so it advances on First/Next/Previous, not only Next). The chain loops via cue-called - that is what makes blue<->red alternate."
+          },
+          {
+            "id": "cue-skv2-default-note-4",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Small venue",
+            "style": "notes",
+            "note": "venue != Large raises a persistent YELLOW wash on layer 3 with REPLACE blend, so it reads solid yellow rather than blending to white over the blue/red."
+          },
+          {
+            "id": "cue-skv2-default-note-5",
+            "type": "notes",
+            "label": "Important",
+            "title": "Red-drum blink",
+            "style": "important",
+            "note": "On every red drum the yellow wash blinks off for 200 ms. The raiser is interruptible, so rapid red drums each restart the blink instead of being dropping it."
+          }
+        ]
       },
       "connections": [
         {
           "from": "cue-skv2-default-start",
           "to": "cue-skv2-default-all"
-        },
-        {
-          "from": "cue-skv2-default-start",
-          "to": "cue-skv2-default-base"
         },
         {
           "from": "cue-skv2-default-called",
@@ -6325,46 +4662,62 @@
             "y": 0
           },
           "cue-skv2-default-drum": {
-            "x": 659.0435931307793,
-            "y": 4.642668428005209
-          },
-          "cue-skv2-default-base": {
-            "x": 0,
-            "y": 300
+            "x": 1148.6525759577278,
+            "y": 24.803038309114754
           },
           "cue-skv2-default-blue": {
-            "x": 382.1387054161162,
-            "y": 275.2391017173052
+            "x": 390.77886393659173,
+            "y": 239.23844121532363
           },
           "cue-skv2-default-red": {
-            "x": 388.32892998679006,
-            "y": 403.1723910171729
+            "x": 395.5290620871864,
+            "y": 349.8914134742404
           },
           "cue-skv2-default-all": {
-            "x": 0,
-            "y": 150
+            "x": -12.960237780713328,
+            "y": 89.51889035667091
           },
           "cue-skv2-default-venue": {
             "x": 280,
             "y": 150
           },
           "cue-skv2-default-small": {
-            "x": 219.64531043593126,
-            "y": 467.0231175693525
+            "x": 144.76393659180974,
+            "y": 431.0224570673711
           },
           "cue-skv2-default-yellow": {
-            "x": 283.0951122853369,
-            "y": 666.4319682959049
+            "x": 180.85323645970936,
+            "y": 561.310039630119
           },
           "cue-skv2-default-blink": {
-            "x": 659.0435931307793,
-            "y": 154.6426684280052
+            "x": 1145.7725231175693,
+            "y": 104.24174372523112
+          },
+          "cue-skv2-default-note-1": {
+            "x": -223.20409511228536,
+            "y": -101.5970937912814
+          },
+          "cue-skv2-default-note-2": {
+            "x": 220.95891677675036,
+            "y": -134.71770145310438
+          },
+          "cue-skv2-default-note-3": {
+            "x": 652.9668428005283,
+            "y": 267.2935270805815
+          },
+          "cue-skv2-default-note-4": {
+            "x": 280,
+            "y": -680
+          },
+          "cue-skv2-default-note-5": {
+            "x": 1004.6063408190225,
+            "y": -123.19749009247028
           }
         },
         "viewport": {
-          "x": 256.5038337406392,
-          "y": 148.05393313088757,
-          "zoom": 0.5
+          "x": -119.36848436530238,
+          "y": 250.7776107031081,
+          "zoom": 0.8573760366341717
         }
       },
       "variables": [
@@ -6402,84 +4755,12 @@
       "nodes": {
         "events": [
           {
-            "id": "cue-skv2-stomp-start",
-            "type": "event",
-            "eventType": "cue-started"
-          },
-          {
             "id": "cue-skv2-stomp-called",
             "type": "event",
             "eventType": "cue-called"
           }
         ],
         "actions": [
-          {
-            "id": "cue-skv2-stomp-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
           {
             "id": "cue-skv2-stomp-fq1",
             "type": "action",
@@ -6912,13 +5193,34 @@
         "eventRaisers": [],
         "eventListeners": [],
         "effectRaisers": [],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-stomp-note-1",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called -> toggle",
+            "style": "notes",
+            "note": "Publishes stompState=1, lights five groups together, then publishes stompState=0 and clears to black — one keyframe per state, looped via cue-called."
+          },
+          {
+            "id": "cue-skv2-stomp-note-2",
+            "type": "notes",
+            "label": "Important",
+            "title": "5-group parallel hold",
+            "style": "important",
+            "note": "The five groups (front q1 yellow / q4 red, back q1 red / q4 yellow, inner green) are BLOCKING set-colors raised in PARALLEL from one node, so they all hold together until the next keyframe. A non-blocking set-color above layer 0 would be cleared before it showed."
+          },
+          {
+            "id": "cue-skv2-stomp-note-3",
+            "type": "notes",
+            "label": "Important",
+            "title": "Shared state handoff",
+            "style": "important",
+            "note": "stompState (cue-group scope) records the on/off look so Silhouettes Spotlight can reproduce it after Stomp."
+          }
+        ]
       },
       "connections": [
-        {
-          "from": "cue-skv2-stomp-start",
-          "to": "cue-skv2-stomp-base"
-        },
         {
           "from": "cue-skv2-stomp-called",
           "to": "cue-skv2-stomp-seton"
@@ -6954,17 +5256,9 @@
       ],
       "layout": {
         "nodePositions": {
-          "cue-skv2-stomp-start": {
-            "x": 0,
-            "y": 0
-          },
           "cue-skv2-stomp-called": {
             "x": 468,
             "y": 4
-          },
-          "cue-skv2-stomp-base": {
-            "x": -46,
-            "y": 126
           },
           "cue-skv2-stomp-fq1": {
             "x": 280,
@@ -6997,12 +5291,24 @@
           "cue-skv2-stomp-setoff": {
             "x": 502,
             "y": 886
+          },
+          "cue-skv2-stomp-note-1": {
+            "x": 340.17732273906836,
+            "y": -146.1579280644827
+          },
+          "cue-skv2-stomp-note-2": {
+            "x": 719.2685732150187,
+            "y": -5.032092000004127
+          },
+          "cue-skv2-stomp-note-3": {
+            "x": 831.2819562255406,
+            "y": 147.98564709974698
           }
         },
         "viewport": {
-          "x": 229.45170968314585,
-          "y": 222.11042013013162,
-          "zoom": 0.5
+          "x": -204.60992607843843,
+          "y": 50.460725186794605,
+          "zoom": 0.9150991681279277
         }
       },
       "variables": [
@@ -7040,154 +5346,29 @@
             "eventType": "drum-red"
           }
         ],
-        "actions": [
-          {
-            "id": "cue-skv2-dischord-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          }
-        ],
+        "actions": [],
         "logic": [
           {
-            "id": "cue-skv2-dischord-nl",
+            "id": "cue-skv2-dischord-ring",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "total-lights",
-            "assignTo": "numLights"
+            "logicType": "build-ring",
+            "assignTo": "ring",
+            "assignGroupSize": "ringGroupSize"
           },
           {
-            "id": "cue-skv2-dischord-al",
+            "id": "cue-skv2-dischord-pgs",
             "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "all-lights-array",
-            "assignTo": "allLights"
-          },
-          {
-            "id": "cue-skv2-dischord-c4",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
+            "logicType": "math",
+            "operator": "multiply",
             "left": {
               "source": "variable",
-              "name": "numLights"
+              "name": "ringGroupSize"
             },
             "right": {
-              "source": "literal",
-              "value": 4
-            }
-          },
-          {
-            "id": "cue-skv2-dischord-c16",
-            "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "numLights"
-            },
-            "right": {
-              "source": "literal",
-              "value": 16
-            }
-          },
-          {
-            "id": "cue-skv2-dischord-r4",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights", "allLights"],
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-dischord-r16",
-            "type": "logic",
-            "logicType": "lights-from-index",
-            "sourceVariable": "allLights",
-            "index": {
-              "source": "literal",
-              "value": "0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15"
-            },
-            "assignTo": "ring"
-          },
-          {
-            "id": "cue-skv2-dischord-gs16",
-            "type": "logic",
-            "logicType": "variable",
-            "mode": "set",
-            "varName": "ringGroupSize",
-            "valueType": "number",
-            "value": {
               "source": "literal",
               "value": 2
-            }
-          },
-          {
-            "id": "cue-skv2-dischord-rdef",
-            "type": "logic",
-            "logicType": "concat-lights",
-            "sourceVariables": ["allLights"],
-            "assignTo": "ring"
+            },
+            "assignTo": "pairGroupSize"
           },
           {
             "id": "cue-skv2-dischord-bd",
@@ -7422,44 +5603,41 @@
             "interruptible": true
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-dischord-note-3",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called",
+            "style": "notes",
+            "note": "Three overlaid looks: a yellow CW chase on the beat, a faster reverse green CCW chase (quarter-beat), and an alternating blue pattern."
+          },
+          {
+            "id": "cue-skv2-dischord-note-5",
+            "type": "notes",
+            "label": "Important",
+            "title": "Blue swaps on keyframe",
+            "style": "important",
+            "note": "Blue uses the KEYFRAME variant of the alternating-pattern effect, so its two light sets swap on EVERY keyframe — not gated by the beat as the plain alternating pattern is."
+          },
+          {
+            "id": "cue-skv2-dischord-note-6",
+            "type": "notes",
+            "label": "Important",
+            "title": "Red-drum flash",
+            "style": "important",
+            "note": "A full-rig red flash fires on each red drum (~120 ms). "
+          }
+        ]
       },
       "connections": [
         {
           "from": "cue-skv2-dischord-start",
-          "to": "cue-skv2-dischord-nl"
+          "to": "cue-skv2-dischord-ring"
         },
         {
-          "from": "cue-skv2-dischord-nl",
-          "to": "cue-skv2-dischord-al"
-        },
-        {
-          "from": "cue-skv2-dischord-al",
-          "to": "cue-skv2-dischord-c4"
-        },
-        {
-          "from": "cue-skv2-dischord-c4",
-          "to": "cue-skv2-dischord-r4",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-dischord-c4",
-          "to": "cue-skv2-dischord-c16",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-dischord-c16",
-          "to": "cue-skv2-dischord-r16",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-dischord-r16",
-          "to": "cue-skv2-dischord-gs16"
-        },
-        {
-          "from": "cue-skv2-dischord-c16",
-          "to": "cue-skv2-dischord-rdef",
-          "fromPort": "false"
+          "from": "cue-skv2-dischord-ring",
+          "to": "cue-skv2-dischord-pgs"
         },
         {
           "from": "cue-skv2-dischord-called",
@@ -7468,10 +5646,6 @@
         {
           "from": "cue-skv2-dischord-bd",
           "to": "cue-skv2-dischord-sm"
-        },
-        {
-          "from": "cue-skv2-dischord-start",
-          "to": "cue-skv2-dischord-base"
         },
         {
           "from": "cue-skv2-dischord-called",
@@ -7501,91 +5675,61 @@
             "y": 3.4822022531844823
           },
           "cue-skv2-dischord-drum": {
-            "x": 866.5183407194661,
-            "y": 27.061658204080004
+            "x": 1043.8100171282254,
+            "y": -23.37476698117041
           },
-          "cue-skv2-dischord-base": {
-            "x": -11.292984629109696,
-            "y": 106.40597778668973
+          "cue-skv2-dischord-ring": {
+            "x": -39.73778953989438,
+            "y": 87.33656264862816
           },
-          "cue-skv2-dischord-nl": {
-            "x": -196.82058925019896,
-            "y": 154.83985055533276
-          },
-          "cue-skv2-dischord-al": {
-            "x": -165.38738847197249,
-            "y": 304.9323009481652
-          },
-          "cue-skv2-dischord-c4": {
-            "x": -122.59563912286558,
-            "y": 448.52751226186797
-          },
-          "cue-skv2-dischord-c16": {
-            "x": -25.70193724125113,
-            "y": 590.5051996749994
-          },
-          "cue-skv2-dischord-r4": {
-            "x": -244.77338831270526,
-            "y": 579.5826896981694
-          },
-          "cue-skv2-dischord-r16": {
-            "x": -320.3626072929737,
-            "y": 734.860696086803
-          },
-          "cue-skv2-dischord-gs16": {
-            "x": -191.52112392514726,
-            "y": 850.6521968933434
-          },
-          "cue-skv2-dischord-rdef": {
-            "x": 64.42074168391309,
-            "y": 721.1971901871318
+          "cue-skv2-dischord-pgs": {
+            "x": -53.49317822678074,
+            "y": 208.51650971910385
           },
           "cue-skv2-dischord-bd": {
-            "x": 289.4028642943829,
-            "y": 179.37072638408222
+            "x": 258.8353338790796,
+            "y": 130.46267771959685
           },
           "cue-skv2-dischord-sm": {
-            "x": 308.6728690618436,
-            "y": 408.2748965214297
+            "x": 256.708067355828,
+            "y": 250.85211488261768
           },
           "cue-skv2-dischord-yellow": {
             "x": 558.7318144207027,
             "y": 119.56788115053973
           },
           "cue-skv2-dischord-green": {
-            "x": 290.92675035895684,
-            "y": 611.5132526300903
+            "x": 249.6605842982973,
+            "y": 389.89865711914126
           },
           "cue-skv2-dischord-blue": {
             "x": 536.1458451624835,
             "y": 509.9471253987334
           },
           "cue-skv2-dischord-red": {
-            "x": 843.8840260737668,
-            "y": 142.23963567223518
+            "x": 1021.175702482526,
+            "y": 91.80321048698477
+          },
+          "cue-skv2-dischord-note-3": {
+            "x": 211.08799573496083,
+            "y": -120.91773661036996
+          },
+          "cue-skv2-dischord-note-5": {
+            "x": 249.29740875409004,
+            "y": 778.0712008099683
+          },
+          "cue-skv2-dischord-note-6": {
+            "x": 900.6242834568336,
+            "y": -127.0312426934305
           }
         },
         "viewport": {
-          "x": 280.2860900442754,
-          "y": 85.50853091245358,
-          "zoom": 0.5743491774985175
+          "x": 108.14790997304056,
+          "y": 70.14276141313678,
+          "zoom": 1.029540083433998
         }
       },
       "variables": [
-        {
-          "name": "numLights",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "allLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
         {
           "name": "ring",
           "type": "light-array",
@@ -7598,6 +5742,13 @@
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "pairGroupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 2,
           "isParameter": false
         },
         {
@@ -7648,84 +5799,12 @@
       "nodes": {
         "events": [
           {
-            "id": "cue-skv2-frenzy-start",
-            "type": "event",
-            "eventType": "cue-started"
-          },
-          {
             "id": "cue-skv2-frenzy-called",
             "type": "event",
             "eventType": "cue-called"
           }
         ],
         "actions": [
-          {
-            "id": "cue-skv2-frenzy-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
           {
             "id": "cue-skv2-frenzy-l0",
             "type": "action",
@@ -8311,7 +6390,16 @@
         "eventRaisers": [],
         "eventListeners": [],
         "effectRaisers": [],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-frenzy-note-1",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called",
+            "style": "notes",
+            "note": "Branches on venue; full-rig colour cycle, one step per quarter-beat. Large: red -> off -> blue -> yellow. Small: red -> green -> blue -> red."
+          }
+        ]
       },
       "connections": [
         {
@@ -8321,10 +6409,6 @@
         {
           "from": "cue-skv2-frenzy-bd",
           "to": "cue-skv2-frenzy-sm"
-        },
-        {
-          "from": "cue-skv2-frenzy-start",
-          "to": "cue-skv2-frenzy-base"
         },
         {
           "from": "cue-skv2-frenzy-sm",
@@ -8371,17 +6455,9 @@
       ],
       "layout": {
         "nodePositions": {
-          "cue-skv2-frenzy-start": {
-            "x": 0,
-            "y": 0
-          },
           "cue-skv2-frenzy-called": {
             "x": 280,
             "y": 0
-          },
-          "cue-skv2-frenzy-base": {
-            "x": -46,
-            "y": 94
           },
           "cue-skv2-frenzy-l0": {
             "x": 122.52420198647451,
@@ -8430,11 +6506,15 @@
           "cue-skv2-frenzy-large": {
             "x": 286,
             "y": 392
+          },
+          "cue-skv2-frenzy-note-1": {
+            "x": 131.1296286879142,
+            "y": -129.54658183992467
           }
         },
         "viewport": {
-          "x": 264.5041992030831,
-          "y": 75.14593886954685,
+          "x": 204.2893276329473,
+          "y": 341.41504705168734,
           "zoom": 0.5
         }
       },
@@ -8484,73 +6564,6 @@
           }
         ],
         "actions": [
-          {
-            "id": "cue-skv2-silspot-base",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "black"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          },
           {
             "id": "cue-skv2-silspot-blue-on",
             "type": "action",
@@ -8940,13 +6953,42 @@
             }
           }
         ],
-        "notes": []
+        "notes": [
+          {
+            "id": "cue-skv2-silspot-note-1",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue start",
+            "style": "notes",
+            "note": "Loads the all-lights and odd-LED light sets."
+          },
+          {
+            "id": "cue-skv2-silspot-note-2",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Cue called -> branch on previous cue",
+            "style": "notes",
+            "note": "Reads the previous cue and reproduces a matching look so the Stage Kit is not left dark during the transition."
+          },
+          {
+            "id": "cue-skv2-silspot-note-3",
+            "type": "notes",
+            "label": "Important",
+            "title": "Previous-cue branch",
+            "style": "important",
+            "note": "Branches on prevCue: after Dischord -> blue on the odd LEDs over a green wash. After Intro -> blue flash on the red drum. After Stomp -> reproduce Stomp's last look from the shared stompState. Else all off."
+          },
+          {
+            "id": "cue-skv2-silspot-note-4",
+            "type": "notes",
+            "label": "Important",
+            "title": "Vocal-gated blue",
+            "style": "important",
+            "note": "The Dischord branch toggles the odd-LED blue on each vocal note-off (held blue -> held black, looped via cue-called)."
+          }
+        ]
       },
       "connections": [
-        {
-          "from": "cue-skv2-silspot-start",
-          "to": "cue-skv2-silspot-base"
-        },
         {
           "from": "cue-skv2-silspot-start",
           "to": "cue-skv2-silspot-all"
@@ -9011,10 +7053,6 @@
             "x": 280,
             "y": 0
           },
-          "cue-skv2-silspot-base": {
-            "x": -180,
-            "y": 160
-          },
           "cue-skv2-silspot-blue-on": {
             "x": 542,
             "y": 528
@@ -9024,12 +7062,12 @@
             "y": 724
           },
           "cue-skv2-silspot-all": {
-            "x": -404,
-            "y": 176
+            "x": -316.5194725279496,
+            "y": 96.19320300795403
           },
           "cue-skv2-silspot-odd": {
-            "x": -366,
-            "y": 310
+            "x": -296.9364256799602,
+            "y": 201.03302718393718
           },
           "cue-skv2-silspot-prev": {
             "x": 284,
@@ -9062,12 +7100,28 @@
           "cue-skv2-silspot-blue-flash": {
             "x": 34,
             "y": 448
+          },
+          "cue-skv2-silspot-note-1": {
+            "x": -369.94578137604964,
+            "y": -86.5736911519
+          },
+          "cue-skv2-silspot-note-2": {
+            "x": 174.10251937593887,
+            "y": -112.66437478391504
+          },
+          "cue-skv2-silspot-note-3": {
+            "x": 532.8576895823076,
+            "y": 60.2713167006292
+          },
+          "cue-skv2-silspot-note-4": {
+            "x": 654.3038444063665,
+            "y": -73.4403911550205
           }
         },
         "viewport": {
-          "x": 325.45170968314585,
-          "y": 151.11042013013162,
-          "zoom": 0.5
+          "x": -108.67541723606394,
+          "y": 322.2720130054311,
+          "zoom": 0.8526348917679577
         }
       },
       "variables": [
@@ -9283,6 +7337,10 @@
             "x": 0,
             "y": 0
           },
+          "cue-skv2-strobe-slow-called": {
+            "x": 280,
+            "y": 0
+          },
           "cue-skv2-strobe-slow-lights": {
             "x": 0,
             "y": 150
@@ -9302,10 +7360,6 @@
           "cue-skv2-strobe-slow-gap": {
             "x": 0,
             "y": 750
-          },
-          "cue-skv2-strobe-slow-called": {
-            "x": 280,
-            "y": 0
           },
           "cue-skv2-strobe-slow-flash": {
             "x": 280,
@@ -9538,6 +7592,10 @@
             "x": 0,
             "y": 0
           },
+          "cue-skv2-strobe-medium-called": {
+            "x": 280,
+            "y": 0
+          },
           "cue-skv2-strobe-medium-lights": {
             "x": 0,
             "y": 150
@@ -9557,10 +7615,6 @@
           "cue-skv2-strobe-medium-gap": {
             "x": 0,
             "y": 750
-          },
-          "cue-skv2-strobe-medium-called": {
-            "x": 280,
-            "y": 0
           },
           "cue-skv2-strobe-medium-flash": {
             "x": 280,
@@ -9793,6 +7847,10 @@
             "x": 0,
             "y": 0
           },
+          "cue-skv2-strobe-fast-called": {
+            "x": 280,
+            "y": 0
+          },
           "cue-skv2-strobe-fast-lights": {
             "x": 0,
             "y": 150
@@ -9812,10 +7870,6 @@
           "cue-skv2-strobe-fast-gap": {
             "x": 0,
             "y": 750
-          },
-          "cue-skv2-strobe-fast-called": {
-            "x": 280,
-            "y": 0
           },
           "cue-skv2-strobe-fast-flash": {
             "x": 280,
@@ -10048,6 +8102,10 @@
             "x": 0,
             "y": 0
           },
+          "cue-skv2-strobe-fastest-called": {
+            "x": 280,
+            "y": 0
+          },
           "cue-skv2-strobe-fastest-lights": {
             "x": 0,
             "y": 150
@@ -10067,10 +8125,6 @@
           "cue-skv2-strobe-fastest-gap": {
             "x": 0,
             "y": 750
-          },
-          "cue-skv2-strobe-fastest-called": {
-            "x": 280,
-            "y": 0
           },
           "cue-skv2-strobe-fastest-flash": {
             "x": 280,

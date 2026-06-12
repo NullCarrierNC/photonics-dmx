@@ -385,6 +385,183 @@ describe('Node cue logic runtime', () => {
     })
   })
 
+  describe('build-ring', () => {
+    const makeLights = (count: number): TrackedLight[] =>
+      Array.from({ length: count }, (_, i) => ({
+        id: `l${i}`,
+        position: i,
+        config: {} as any,
+      }))
+
+    const runBuildRing = (lights: TrackedLight[]) => {
+      const cueLevelVarStore = new Map<string, VariableValue>()
+      const groupLevelVarStore = new Map<string, VariableValue>()
+      const mockSequencer = {
+        addEffect: jest.fn(),
+        addEffectUnblockedName: jest.fn().mockReturnValue(true),
+        setEffectUnblockedName: jest.fn().mockReturnValue(true),
+        addEffectUnblockedNameWithCallback: jest
+          .fn()
+          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
+        setEffectUnblockedNameWithCallback: jest
+          .fn()
+          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
+      } as unknown as ILightingController
+      const mockLightManager = {
+        getLights: jest.fn(),
+        getLightsInGroup: jest.fn().mockReturnValue(lights),
+      } as unknown as DmxLightManager
+
+      const eventNode: YargEventNode = { id: 'e1', type: 'event', eventType: 'beat' }
+      const buildRingNode: LogicNode = {
+        id: 'ring1',
+        type: 'logic',
+        logicType: 'build-ring',
+        assignTo: 'ring',
+        assignGroupSize: 'ringGroupSize',
+      }
+      const action = minimalAction('action1')
+      const definition: YargNodeCueDefinition = {
+        id: 'build-ring-cue',
+        name: 'Build Ring Cue',
+        kind: 'lighting',
+        cueType: CueType.Chorus,
+        style: 'primary',
+        nodes: {
+          events: [eventNode],
+          actions: [action],
+          logic: [buildRingNode],
+        },
+        connections: [
+          { from: 'e1', to: 'ring1' },
+          { from: 'ring1', to: 'action1' },
+        ],
+        variables: [
+          { name: 'ring', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'ringGroupSize', type: 'number', scope: 'cue', initialValue: 1 },
+        ],
+      }
+      const compiled = NodeCueCompiler.compileYargCue(definition)
+      const engine = new NodeExecutionEngine(
+        compiled,
+        definition.id,
+        mockSequencer,
+        mockLightManager,
+        noopRuntimeBroadcaster(),
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        definition.variables,
+      )
+      engine.startExecution(eventNode, createCueData('Strong'))
+
+      const ring = cueLevelVarStore.get('ring')
+      const groupSize = cueLevelVarStore.get('ringGroupSize')
+      expect(ring?.type).toBe('light-array')
+      expect(groupSize?.type).toBe('number')
+      return {
+        ringIds: (ring?.value as TrackedLight[]).map((l) => l.id),
+        groupSize: groupSize?.value as number,
+      }
+    }
+
+    it('4 lights: ring is the array doubled with group size 1', () => {
+      const { ringIds, groupSize } = runBuildRing(makeLights(4))
+      expect(ringIds).toEqual(['l0', 'l1', 'l2', 'l3', 'l0', 'l1', 'l2', 'l3'])
+      expect(groupSize).toBe(1)
+    })
+
+    it('8 lights: ring is the array as-is with group size 1', () => {
+      const { ringIds, groupSize } = runBuildRing(makeLights(8))
+      expect(ringIds).toEqual(['l0', 'l1', 'l2', 'l3', 'l4', 'l5', 'l6', 'l7'])
+      expect(groupSize).toBe(1)
+    })
+
+    it('16 lights: ring is front/back interleaved with group size 2', () => {
+      const { ringIds, groupSize } = runBuildRing(makeLights(16))
+      expect(ringIds).toEqual([
+        'l0',
+        'l8',
+        'l1',
+        'l9',
+        'l2',
+        'l10',
+        'l3',
+        'l11',
+        'l4',
+        'l12',
+        'l5',
+        'l13',
+        'l6',
+        'l14',
+        'l7',
+        'l15',
+      ])
+      expect(groupSize).toBe(2)
+    })
+
+    it('0 lights: ring is empty with group size 1', () => {
+      const { ringIds, groupSize } = runBuildRing(makeLights(0))
+      expect(ringIds).toEqual([])
+      expect(groupSize).toBe(1)
+    })
+
+    it('1 light: ring repeats the single light 8 times with group size 1', () => {
+      const { ringIds, groupSize } = runBuildRing(makeLights(1))
+      expect(ringIds).toEqual(['l0', 'l0', 'l0', 'l0', 'l0', 'l0', 'l0', 'l0'])
+      expect(groupSize).toBe(1)
+    })
+
+    it('2 lights: ring repeats the pair to 8 steps with group size 1', () => {
+      const { ringIds, groupSize } = runBuildRing(makeLights(2))
+      expect(ringIds).toEqual(['l0', 'l1', 'l0', 'l1', 'l0', 'l1', 'l0', 'l1'])
+      expect(groupSize).toBe(1)
+    })
+
+    it('6 lights: ring resamples to 8 steps (dwell on l0,l3) with group size 1', () => {
+      const { ringIds, groupSize } = runBuildRing(makeLights(6))
+      expect(ringIds).toEqual(['l0', 'l0', 'l1', 'l2', 'l3', 'l3', 'l4', 'l5'])
+      expect(groupSize).toBe(1)
+    })
+
+    it('12 lights: ring resamples to 8 steps (skips l2,l5,l8,l11) with group size 1', () => {
+      const { ringIds, groupSize } = runBuildRing(makeLights(12))
+      expect(ringIds).toEqual(['l0', 'l1', 'l3', 'l4', 'l6', 'l7', 'l9', 'l10'])
+      expect(groupSize).toBe(1)
+    })
+
+    it('24 lights: ring is 3-way interleaved with group size 3', () => {
+      const { ringIds, groupSize } = runBuildRing(makeLights(24))
+      expect(ringIds).toEqual([
+        'l0',
+        'l8',
+        'l16',
+        'l1',
+        'l9',
+        'l17',
+        'l2',
+        'l10',
+        'l18',
+        'l3',
+        'l11',
+        'l19',
+        'l4',
+        'l12',
+        'l20',
+        'l5',
+        'l13',
+        'l21',
+        'l6',
+        'l14',
+        'l22',
+        'l7',
+        'l15',
+        'l23',
+      ])
+      expect(groupSize).toBe(3)
+    })
+  })
+
   describe('random', () => {
     it('random-integer: result is in [min, max] and min === max returns that value', () => {
       const cueLevelVarStore = new Map<string, VariableValue>()

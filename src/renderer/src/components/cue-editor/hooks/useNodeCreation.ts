@@ -21,6 +21,7 @@ import {
   type ReverseLightsLogicNode,
   type CreatePairsLogicNode,
   type ConcatLightsLogicNode,
+  type BuildRingLogicNode,
   type DebuggerLogicNode,
   type DelayLogicNode,
   type RandomLogicNode,
@@ -283,6 +284,16 @@ const useNodeCreation = ({
           sourceVariables: [],
           assignTo: '',
         }) satisfies ConcatLightsLogicNode as LogicNode,
+      'build-ring': (id) =>
+        ({
+          id,
+          type: 'logic',
+          logicType: 'build-ring',
+          label: 'build-ring',
+          outputs: [],
+          assignTo: '',
+          assignGroupSize: '',
+        }) satisfies BuildRingLogicNode as LogicNode,
       'delay': (id) =>
         ({
           id,

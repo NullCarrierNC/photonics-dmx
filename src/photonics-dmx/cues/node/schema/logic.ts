@@ -6,6 +6,7 @@ import {
 } from '../../../constants/nodeConstants'
 import type {
   ArrayLengthLogicNode,
+  BuildRingLogicNode,
   ColorFromIndexLogicNode,
   ConcatColorsLogicNode,
   ConcatLightsLogicNode,
@@ -317,6 +318,25 @@ const concatLightsLogicSchema = {
   },
 } as unknown as JSONSchemaType<ConcatLightsLogicNode>
 
+const buildRingLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'assignTo', 'assignGroupSize'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'build-ring' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    assignTo: { type: 'string' },
+    assignGroupSize: { type: 'string' },
+  },
+} as unknown as JSONSchemaType<BuildRingLogicNode>
+
 const delayLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'delayTime'],
@@ -448,6 +468,7 @@ export const logicNodeSchema = {
     reverseLightsLogicSchema,
     createPairsLogicSchema,
     concatLightsLogicSchema,
+    buildRingLogicSchema,
     delayLogicSchema,
     debuggerLogicSchema,
     randomLogicSchema,

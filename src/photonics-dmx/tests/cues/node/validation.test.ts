@@ -874,6 +874,26 @@ describe('Node cue validation', () => {
       expect(result.errors.length).toBeGreaterThan(0)
     })
 
+    it('rejects build-ring node missing assignGroupSize', () => {
+      const cue = validCue()
+      cue.nodes.logic = [
+        {
+          id: 'logic-1',
+          type: 'logic',
+          logicType: 'build-ring',
+          assignTo: 'ring',
+        } as any,
+      ]
+      cue.connections = [
+        { from: 'event-1', to: 'logic-1' },
+        { from: 'logic-1', to: 'action-1' },
+      ]
+      cue.variables = [{ name: 'ring', type: 'light-array', scope: 'cue', initialValue: [] }]
+      const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
+      expect(result.valid).toBe(false)
+      expect(result.errors.length).toBeGreaterThan(0)
+    })
+
     it('rejects invalid comparator on conditional node', () => {
       const cue = validCue()
       cue.nodes.logic = [
@@ -1149,6 +1169,13 @@ describe('Node cue validation', () => {
               assignTo: 'shuf',
             },
             {
+              id: 'ring-1',
+              type: 'logic',
+              logicType: 'build-ring',
+              assignTo: 'ring',
+              assignGroupSize: 'ringGroupSize',
+            },
+            {
               id: 'rand-1',
               type: 'logic',
               logicType: 'random',
@@ -1185,6 +1212,8 @@ describe('Node cue validation', () => {
           { name: 'len', type: 'number', scope: 'cue', initialValue: 0 },
           { name: 'shuf', type: 'light-array', scope: 'cue', initialValue: [] },
           { name: 'r', type: 'number', scope: 'cue', initialValue: 0 },
+          { name: 'ring', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'ringGroupSize', type: 'number', scope: 'cue', initialValue: 1 },
         ],
         layout: { nodePositions: {} },
       }
@@ -1288,16 +1317,16 @@ describe('Node cue validation', () => {
     }
   })
 
-  it('validates bundled yarg-stagekit-v2.json', () => {
+  it('validates bundled yarg-stagekit.json', () => {
     const filePath = path.join(
       __dirname,
-      '../../../../../resources/defaults/node-data/cues/yarg/yarg-stagekit-v2.json',
+      '../../../../../resources/defaults/node-data/cues/yarg/yarg-stagekit.json',
     )
     const raw = fs.readFileSync(filePath, 'utf8')
     const result = validateYargNodeCueFile(JSON.parse(raw))
     expect(result.valid).toBe(true)
     if (result.valid) {
-      expect(result.data.group.id).toBe('yarg-stagekit-v2')
+      expect(result.data.group.id).toBe('yarg-stagekit')
       for (const cue of result.data.cues) {
         expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
       }

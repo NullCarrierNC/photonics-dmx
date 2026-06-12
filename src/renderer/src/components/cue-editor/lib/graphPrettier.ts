@@ -104,7 +104,7 @@ function estimateNodeSize(meta: NodeMeta): { w: number; h: number } {
   if (type === 'logic') {
     const lt = logicType ?? ''
     if (lt === 'conditional' || lt === 'for-each-light') return { w: 200, h: 110 }
-    if (lt === 'cue-data' || lt === 'config-data') return { w: 200, h: 96 }
+    if (lt === 'cue-data' || lt === 'config-data' || lt === 'build-ring') return { w: 200, h: 96 }
     return { w: 180, h: 88 }
   }
   return { w: 150, h: 80 }

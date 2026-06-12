@@ -67,7 +67,7 @@ const HELP = `Cue Simulation CLI
 Usage: npm run sim -- [options]
 
 Options:
-  --library <id>      Cue library group id or filename (default: yarg-stagekit-v2)
+  --library <id>      Cue library group id or filename (default: yarg-stagekit)
   --cue <CueType>     Cue to simulate, e.g. Menu, Intro, Default (required)
   --venue <size>      Large | Small | NoVenue (default: Large)
   --bpm <n>           Beats per minute, 0 disables beats (default: 120)
@@ -171,7 +171,7 @@ async function main(): Promise<void> {
   }
 
   const options: CueSimulatorOptions = {
-    library: flags.library ?? 'yarg-stagekit-v2',
+    library: flags.library ?? 'yarg-stagekit',
     frontCount: num(flags.front, 4),
     backCount: num(flags.back, 4),
     strobeCount: num(flags.strobe, 0),

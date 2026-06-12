@@ -29,7 +29,7 @@ import {
 } from './types'
 
 export interface CueSimulatorOptions {
-  /** Cue library to simulate: a loaded group id (e.g. `yarg-stagekit-v2`) or its filename. */
+  /** Cue library to simulate: a loaded group id (e.g. `yarg-stagekit`) or its filename. */
   library: string
   /** Root of the cue/effect data tree; defaults to the bundled `resources/defaults`. */
   baseDir?: string
@@ -63,7 +63,7 @@ const EPSILON = 1e-6
  *
  * Usage:
  * ```ts
- * const sim = await CueSimulator.create({ library: 'yarg-stagekit-v2', frontCount: 4, backCount: 4 })
+ * const sim = await CueSimulator.create({ library: 'yarg-stagekit', frontCount: 4, backCount: 4 })
  * sim.setCue('Menu')
  * const timeline = await sim.run(4000)
  * sim.dispose()

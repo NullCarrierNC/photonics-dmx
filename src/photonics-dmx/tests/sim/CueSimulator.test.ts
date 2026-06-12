@@ -8,7 +8,7 @@ import type { SimSample, SimTimeline } from '../../sim/types'
  * they double as the first automated cue-behaviour regression tests.
  */
 
-const LIBRARY = 'yarg-stagekit-v2'
+const LIBRARY = 'yarg-stagekit'
 
 function sampleNearest(timeline: SimTimeline, timeMs: number): SimSample {
   let best = timeline.samples[0]

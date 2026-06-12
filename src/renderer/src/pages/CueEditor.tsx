@@ -615,6 +615,16 @@ const CueEditor: React.FC = () => {
               }
               checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
               break
+            case 'build-ring':
+              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
+              checkVarName(
+                logicNode.assignGroupSize,
+                nodeType,
+                nodeId,
+                nodeLabel,
+                'assignGroupSize',
+              )
+              break
             case 'delay':
               checkValueSource(logicNode.delayTime, nodeType, nodeId, nodeLabel, 'delayTime')
               break
