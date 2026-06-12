@@ -229,6 +229,18 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
         </>
       )
     }
+    if (logicType === 'build-ring') {
+      return (
+        <>
+          <div>
+            Ring → <Mono>{logic.assignTo || '?'}</Mono>
+          </div>
+          <div>
+            Size → <Mono>{logic.assignGroupSize || '?'}</Mono>
+          </div>
+        </>
+      )
+    }
     if (logicType === 'concat-lights') {
       const vars = logic.sourceVariables || []
       return (
@@ -350,6 +362,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
     logicType === 'array-length' ||
     logicType === 'reverse-lights' ||
     logicType === 'create-pairs' ||
+    logicType === 'build-ring' ||
     logicType === 'concat-lights' ||
     logicType === 'shuffle-lights' ||
     logicType === 'for-each-light' ||

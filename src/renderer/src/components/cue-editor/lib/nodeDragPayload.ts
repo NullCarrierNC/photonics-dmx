@@ -33,6 +33,7 @@ const LOGIC_TYPES: ReadonlyArray<LogicNode['logicType']> = [
   'reverse-lights',
   'create-pairs',
   'concat-lights',
+  'build-ring',
   'delay',
   'debugger',
   'random',

@@ -384,6 +384,7 @@ const CueFlowCanvas: React.FC<Props> = ({
               'reverse-lights',
               'create-pairs',
               'concat-lights',
+              'build-ring',
               'delay',
               'debugger',
               'random',

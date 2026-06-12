@@ -186,6 +186,12 @@ export interface ConcatLightsLogicNode extends BaseLogicNode {
   assignTo: string // Variable to store concatenated array
 }
 
+export interface BuildRingLogicNode extends BaseLogicNode {
+  logicType: 'build-ring'
+  assignTo: string // Variable to store the virtual ring (light-array)
+  assignGroupSize: string // Variable to store the ring group size (number)
+}
+
 export interface DelayLogicNode extends BaseLogicNode {
   logicType: 'delay'
   delayTime: ValueSource // Delay time in milliseconds
@@ -240,6 +246,7 @@ export type LogicNode =
   | ReverseLightsLogicNode
   | CreatePairsLogicNode
   | ConcatLightsLogicNode
+  | BuildRingLogicNode
   | DelayLogicNode
   | DebuggerLogicNode
   | RandomLogicNode

@@ -511,6 +511,46 @@ export function evaluateLogicNode(
       return edges.map((edge) => edge.to)
     }
 
+    case 'build-ring': {
+      // Build a virtual RING_STEPS-step (8) LED ring from the whole rig so every chase keeps
+      // its authored 8-step shape and timing on any light count. Three rules keyed on
+      // divisibility against the ring size:
+      //   - n divides 8 (1,2,4,8): repeat the array 8/n times, group size 1.
+      //   - n is a multiple of 8 (16,24,...): k-way interleave (k = n/8), step i drives
+      //     lights[i], lights[i+8], ..., group size k.
+      //   - anything else (3,5,6,10,12,...): resample to 8 steps (step i -> lights[floor(i*n/8)]),
+      //     group size 1.
+      // 4/8/16 are byte-identical to the prior special-cased folds (doubled / as-is /
+      // front-back interleave); other counts intentionally change to hold the 8-step shape.
+      const allLights = extractConfigDataValue('all-lights-array', lightManager)
+      const lights = Array.isArray(allLights) ? allLights : []
+      const n = lights.length
+
+      let ring: TrackedLight[]
+      let groupSize = 1
+      if (n === 0) {
+        ring = []
+      } else if (RING_STEPS % n === 0) {
+        ring = repeatRing(lights, RING_STEPS / n)
+      } else if (n % RING_STEPS === 0) {
+        groupSize = n / RING_STEPS
+        ring = interleaveRingGroups(lights, groupSize)
+      } else {
+        ring = resampleRing(lights)
+      }
+
+      getVarStore(logicNode.assignTo).set(logicNode.assignTo, {
+        type: 'light-array',
+        value: ring,
+      })
+      getVarStore(logicNode.assignGroupSize).set(logicNode.assignGroupSize, {
+        type: 'number',
+        value: groupSize,
+      })
+
+      return edges.map((edge) => edge.to)
+    }
+
     case 'delay': {
       // Delay nodes are handled specially in the execution engine (they block).
       // This case just returns the next nodes - the actual delay happens in NodeExecutionEngine.
@@ -626,6 +666,47 @@ export function evaluateLogicNode(
   }
 
   return edges.map((edge) => edge.to)
+}
+
+/** Number of steps in the virtual LED ring the Stage Kit cues chase around (build-ring node). */
+const RING_STEPS = 8
+
+/** Repeat a light array `times` times (build-ring fold for counts that divide RING_STEPS). */
+function repeatRing(lights: TrackedLight[], times: number): TrackedLight[] {
+  const result: TrackedLight[] = []
+  for (let r = 0; r < times; r++) {
+    result.push(...lights)
+  }
+  return result
+}
+
+/**
+ * Interleave `k` equal slices of a light array into a RING_STEPS-step ring: step i drives
+ * lights[i], lights[i + 8], ..., lights[i + 8*(k-1)] (build-ring fold for multiples of 8).
+ * For 16 lights (k=2) this is the front/back interleave [0,8,1,9,...,7,15].
+ */
+function interleaveRingGroups(lights: TrackedLight[], k: number): TrackedLight[] {
+  const result: TrackedLight[] = []
+  for (let step = 0; step < RING_STEPS; step++) {
+    for (let g = 0; g < k; g++) {
+      result.push(lights[step + g * RING_STEPS])
+    }
+  }
+  return result
+}
+
+/**
+ * Resample a light array to RING_STEPS steps by nearest-floor mapping: step i -> lights[floor(i*n/8)]
+ * (build-ring fold for counts that neither divide nor are a multiple of 8). Some lights serve two
+ * adjacent steps or are skipped, but the chase keeps its 8-step shape and offset/gap geometry.
+ */
+function resampleRing(lights: TrackedLight[]): TrackedLight[] {
+  const n = lights.length
+  const result: TrackedLight[] = []
+  for (let step = 0; step < RING_STEPS; step++) {
+    result.push(lights[Math.floor((step * n) / RING_STEPS)])
+  }
+  return result
 }
 
 /**

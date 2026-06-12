@@ -32,6 +32,7 @@ const getLogicNodeButtonClasses = (logicType: LogicNode['logicType']): string =>
     logicType === 'array-length' ||
     logicType === 'reverse-lights' ||
     logicType === 'create-pairs' ||
+    logicType === 'build-ring' ||
     logicType === 'concat-lights' ||
     logicType === 'shuffle-lights' ||
     logicType === 'for-each-light' ||
@@ -219,6 +220,12 @@ const LogicNodesSection: React.FC<{
         {...makeDragHandlers({ kind: 'logic', logicType: 'create-pairs' })}
         onClick={() => addLogicNode('create-pairs')}>
         Create Pairs
+      </button>
+      <button
+        className={getLogicNodeButtonClasses('build-ring')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'build-ring' })}
+        onClick={() => addLogicNode('build-ring')}>
+        Build Ring
       </button>
       <button
         className={getLogicNodeButtonClasses('reverse-lights')}

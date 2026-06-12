@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 4,
+  "cueVersion": 5,
   "mode": "yarg",
   "group": {
     "id": "yarg-core-effects",
@@ -4089,9 +4089,9 @@
       "variables": [
         {
           "name": "lights",
-          "type": "light-array",
+          "type": "string",
           "scope": "cue",
-          "initialValue": [],
+          "initialValue": "front,back",
           "description": "Pattern A lights",
           "isParameter": true
         },
@@ -4569,9 +4569,9 @@
       "variables": [
         {
           "name": "lights",
-          "type": "light-array",
+          "type": "string",
           "scope": "cue",
-          "initialValue": [],
+          "initialValue": "front,back",
           "description": "Pattern A lights",
           "isParameter": true
         },
