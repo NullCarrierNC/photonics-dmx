@@ -57,6 +57,12 @@ export const getMotionCueMinHoldMs = () =>
 export const setMotionCueMinHoldMs = (minHoldMs: number) =>
   window.api.invoke(LIGHT.SET_MOTION_CUE_MIN_HOLD_MS, minHoldMs)
 
+export const getYargFallbackCueTimeMs = () =>
+  window.api.invoke(LIGHT.GET_YARG_FALLBACK_CUE_TIME_MS, undefined)
+
+export const setYargFallbackCueTimeMs = (fallbackMs: number) =>
+  window.api.invoke(LIGHT.SET_YARG_FALLBACK_CUE_TIME_MS, fallbackMs)
+
 export const getMotionCueProbabilityPercent = () =>
   window.api.invoke(LIGHT.GET_MOTION_CUE_PROBABILITY_PERCENT, undefined)
 

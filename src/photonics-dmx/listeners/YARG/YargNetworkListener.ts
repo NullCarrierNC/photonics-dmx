@@ -52,6 +52,9 @@ const YARG_DATAGRAM_VERSION = 1
 /** Max rate for forwarding identical-state packets (30 updates per second). */
 const IDENTICAL_FRAME_THROTTLE_MS = 1000 / 30
 
+/** How often the fallback-cue condition is polled (ms). */
+const FALLBACK_POLL_MS = 500
+
 /** Maps post-processing byte values to their string literal names. */
 const POST_PROCESSING_MAP: Record<number, PostProcessing> = {
   [PostProcessingByte.Default]: 'Default',
@@ -112,9 +115,24 @@ export class YargNetworkListener extends EventEmitter {
   /** Bound while UDP bind() is pending; used to distinguish bind failures from runtime socket errors. */
   private startBindReject: ((reason: unknown) => void) | null = null
 
-  constructor(cueHandler: YargCueRuntime) {
+  // --- Fallback cue tracking ---
+  /** Reads the configured Fallback Time (ms). 0 disables the feature. */
+  private readonly getFallbackCueTimeMs: () => number
+  /** Last lighting cue value forwarded from YARG; used to detect a *changed* cue. */
+  private lastYargLightingCue: CueType | null = null
+  /** Monotonic time the YARG lighting cue last changed (reset on song start). */
+  private lastYargCueChangeAt = 0
+  /** True while the auto Fallback cue is the current look (stale YARG re-sends are suppressed). */
+  private fallbackActive = false
+  /** Monotonic time the Fallback cue last fired; gates the re-fire window. */
+  private lastFallbackFireAt = 0
+  /** Polls for the fallback condition independently of incoming packets (covers YARG going silent). */
+  private fallbackTimer: NodeJS.Timeout | null = null
+
+  constructor(cueHandler: YargCueRuntime, options?: { getFallbackCueTimeMs?: () => number }) {
     super() // Initialize EventEmitter
     this.cueHandler = cueHandler
+    this.getFallbackCueTimeMs = options?.getFallbackCueTimeMs ?? (() => 20000)
 
     log.info('YargNetworkListener initialized.')
 
@@ -160,6 +178,7 @@ export class YargNetworkListener extends EventEmitter {
       this.server!.bind(PORT, () => {
         this.startBindReject = null
         this.listening = true
+        this.startFallbackPolling()
         log.info(`YargNetworkListener started and listening on port ${PORT}`)
         resolve()
       })
@@ -174,6 +193,7 @@ export class YargNetworkListener extends EventEmitter {
     const sock = this.server
     this.server = null
     this.listening = false
+    this.stopFallbackPolling()
     if (!sock) {
       return Promise.resolve()
     }
@@ -195,6 +215,57 @@ export class YargNetworkListener extends EventEmitter {
 
   public shutdown(): Promise<void> {
     return this.stop()
+  }
+
+  /** Begin polling for the fallback condition. Idempotent. */
+  private startFallbackPolling(): void {
+    if (this.fallbackTimer) {
+      return
+    }
+    this.fallbackTimer = setInterval(() => this.checkFallback(), FALLBACK_POLL_MS)
+  }
+
+  /** Stop polling and reset the fallback state. */
+  private stopFallbackPolling(): void {
+    if (this.fallbackTimer) {
+      clearInterval(this.fallbackTimer)
+      this.fallbackTimer = null
+    }
+    this.fallbackActive = false
+  }
+
+  /**
+   * Fire the auto Fallback cue when a song is playing and no *new* YARG lighting cue has arrived
+   * within the configured window. Re-fires every window so the registry can re-select a (possibly
+   * different) implementation. Runs independently of incoming packets so it still triggers when
+   * YARG stops sending entirely. Only fires during Gameplay and never while paused; a Fallback Time
+   * of 0 disables it.
+   */
+  private checkFallback(): void {
+    const fallbackMs = this.getFallbackCueTimeMs()
+    if (fallbackMs <= 0) {
+      return
+    }
+    if (this.lastScene !== 'Gameplay') {
+      return
+    }
+    const data = this.lastData
+    if (!data || data.pauseState === 'Paused') {
+      return
+    }
+    const now = monotonicNowMs()
+    const reference = this.fallbackActive ? this.lastFallbackFireAt : this.lastYargCueChangeAt
+    if (now - reference < fallbackMs) {
+      return
+    }
+    this.fallbackActive = true
+    this.lastFallbackFireAt = now
+    log.info('YARG: Fallback cue triggered (no new lighting cue within fallback window)')
+    void this.cueHandler.handleCue(CueType.Fallback, {
+      ...data,
+      lightingCue: CueType.Fallback,
+      trackMode: 'tracked',
+    })
   }
 
   private setupServerEvents() {
@@ -471,7 +542,18 @@ export class YargNetworkListener extends EventEmitter {
 
     const cueType = YargCueData.lightingCue
     if (cueType && isCueType(cueType)) {
-      this.cueHandler.handleCue(cueType, YargCueData)
+      // Track changed cues for the fallback timer: a *different* lighting cue resets the window and
+      // cancels any active Fallback (the real cue takes over immediately). While the Fallback is
+      // active, stale re-sends of the same cue are suppressed so they don't clobber it.
+      const changed = cueType !== this.lastYargLightingCue
+      if (changed) {
+        this.lastYargLightingCue = cueType
+        this.lastYargCueChangeAt = monotonicNowMs()
+        this.fallbackActive = false
+        this.cueHandler.handleCue(cueType, YargCueData)
+      } else if (!this.fallbackActive) {
+        this.cueHandler.handleCue(cueType, YargCueData)
+      }
     } else {
       log.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
     }
@@ -877,6 +959,10 @@ export class YargNetworkListener extends EventEmitter {
       // Handle Menu -> Gameplay transition (song start)
       if (this.lastScene === 'Menu' && currentScene === 'Gameplay') {
         log.info('YARG: Song starting - triggering blackout to clear menu lighting')
+        // Reset the fallback timer so the first real cue counts as a change and the window starts fresh.
+        this.lastYargLightingCue = null
+        this.lastYargCueChangeAt = monotonicNowMs()
+        this.fallbackActive = false
         this.cueHandler.notifySongStart()
         // Trigger a fast blackout to clear any menu lighting
         this.cueHandler.handleCue(CueType.Blackout_Fast, {
@@ -909,6 +995,7 @@ export class YargNetworkListener extends EventEmitter {
 
       // Handle Gameplay -> other (song end)
       if (this.lastScene === 'Gameplay' && currentScene !== 'Gameplay') {
+        this.fallbackActive = false
         this.cueHandler.notifySongEnd()
       }
     }

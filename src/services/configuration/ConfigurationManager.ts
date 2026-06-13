@@ -336,6 +336,15 @@ export class ConfigurationManager {
     })
   }
 
+  /**
+   * Fallback cue time (ms): how long with no new YARG lighting cue before the auto Fallback cue
+   * fires while a song plays. Clamps to 0–600000; 0 disables the feature.
+   */
+  async setYargFallbackCueTimeMs(ms: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(600000, Math.round(ms)))
+    await this.setPreference('yargFallbackCueTimeMs', clamped)
+  }
+
   async setMotionCueProbabilityPercent(percent: number): Promise<void> {
     const clamped = Math.max(0, Math.min(100, Math.round(percent)))
     await this.updateCueDomain('yargMotion', { probabilityPercent: clamped })

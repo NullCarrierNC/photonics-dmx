@@ -69,6 +69,33 @@ export function setupCueSelectionPrefsHandlers(
     }
   })
 
+  ipcMain.handle(LIGHT.GET_YARG_FALLBACK_CUE_TIME_MS, async () => {
+    try {
+      const fallbackMs =
+        controllerManager.getConfig().getPreference('yargFallbackCueTimeMs') ?? 20000
+      return { success: true, fallbackMs }
+    } catch (error) {
+      log.error('Error getting YARG fallback cue time:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(LIGHT.SET_YARG_FALLBACK_CUE_TIME_MS, async (_, ms: unknown) => {
+    try {
+      const validated = validateNumberInRange(ms, 0, 600000, 'yargFallbackCueTimeMs')
+      if (!validated.ok) {
+        return ipcError(new Error(validated.error))
+      }
+      await controllerManager.getConfig().setYargFallbackCueTimeMs(validated.value)
+      const fallbackMs =
+        controllerManager.getConfig().getPreference('yargFallbackCueTimeMs') ?? 20000
+      return { success: true, fallbackMs }
+    } catch (error) {
+      log.error('Error setting YARG fallback cue time:', error)
+      return ipcError(error)
+    }
+  })
+
   ipcMain.handle(LIGHT.GET_MOTION_CUE_PROBABILITY_PERCENT, async () => {
     try {
       const percent =

@@ -425,6 +425,14 @@ export interface IpcInvokeMap {
     request: number
     response: { success: true; minHoldMs: number } | IpcErrorResult
   }
+  [LIGHT.GET_YARG_FALLBACK_CUE_TIME_MS]: {
+    request: void
+    response: { success: true; fallbackMs: number } | IpcErrorResult
+  }
+  [LIGHT.SET_YARG_FALLBACK_CUE_TIME_MS]: {
+    request: number
+    response: { success: true; fallbackMs: number } | IpcErrorResult
+  }
   [LIGHT.GET_MOTION_CUE_PROBABILITY_PERCENT]: {
     request: void
     response: { success: true; percent: number } | IpcErrorResult
