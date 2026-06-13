@@ -72,6 +72,9 @@ const appPreferencesDataSchema = {
     cueDomains: cueDomainsSchema,
     cueConsistencyWindow: { type: 'number' },
     clockRate: { type: 'number' },
+    // Optional (not required) so prefs.json from installs predating this field still validate;
+    // ConfigurationManager reads default to 20000 when absent.
+    yargFallbackCueTimeMs: { type: 'number' },
   },
   additionalProperties: true,
 }

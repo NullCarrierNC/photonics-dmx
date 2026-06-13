@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 7,
+  "cueVersion": 8,
   "mode": "yarg",
   "group": {
     "id": "yarg-stagekit",
@@ -9,6 +9,203 @@
     "isStageKit": true
   },
   "cues": [
+    {
+      "id": "cue-skv2-fallback",
+      "name": "Fallback",
+      "description": "Auto-triggered safety look when no new YARG lighting cue arrives within the Fallback Time. Slow warm/cool cross-fade driven by a wall-clock timer (no beats/measures needed); mirrored front to back. Persistent so it never goes black.",
+      "cueType": "Fallback",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "cue-skv2-fallback-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "cue-skv2-fallback-front",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "front-lights-array",
+            "assignTo": "frontLights"
+          },
+          {
+            "id": "cue-skv2-fallback-back",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "back-lights-array",
+            "assignTo": "backLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "cue-skv2-fallback-effect-front",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors-timed",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "frontLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "amber"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 1500
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 600
+              }
+            }
+          },
+          {
+            "id": "cue-skv2-fallback-effect-back",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors-timed",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "backLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 2
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "amber"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 1500
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 600
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "cue-skv2-fallback-start",
+          "to": "cue-skv2-fallback-front"
+        },
+        {
+          "from": "cue-skv2-fallback-front",
+          "to": "cue-skv2-fallback-back"
+        },
+        {
+          "from": "cue-skv2-fallback-back",
+          "to": "cue-skv2-fallback-effect-front"
+        },
+        {
+          "from": "cue-skv2-fallback-back",
+          "to": "cue-skv2-fallback-effect-back"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "cue-skv2-fallback-start": {
+            "x": 8,
+            "y": 51
+          },
+          "cue-skv2-fallback-front": {
+            "x": -2,
+            "y": 128
+          },
+          "cue-skv2-fallback-back": {
+            "x": -5,
+            "y": 246
+          },
+          "cue-skv2-fallback-effect-front": {
+            "x": -138,
+            "y": 374
+          },
+          "cue-skv2-fallback-effect-back": {
+            "x": 104,
+            "y": 377
+          }
+        },
+        "viewport": {
+          "x": 321,
+          "y": 140,
+          "zoom": 0.5
+        }
+      },
+      "variables": [
+        {
+          "name": "frontLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-cross-fade-colors-timed",
+          "effectFileId": "yarg-core-effects",
+          "name": "Cross-Fade Colours (Timed)"
+        }
+      ]
+    },
     {
       "id": "cue-skv2-intro",
       "name": "Intro",

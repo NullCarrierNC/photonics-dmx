@@ -42,6 +42,7 @@ function makeDeps(): ListenerCoordinatorDeps {
     getActiveYargMotionCueRef: () => null,
     getMotionCueMinimumHoldMs: () => 5000,
     getMotionCueProbabilityPercent: () => 100,
+    getFallbackCueTimeMs: () => 20000,
     sendSenderError: jest.fn(),
     sendToAllWindows: jest.fn(),
     runtimeBroadcaster: noopRuntimeBroadcaster(),

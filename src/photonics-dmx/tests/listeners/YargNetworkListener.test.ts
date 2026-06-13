@@ -338,6 +338,127 @@ describe('YargNetworkListener', () => {
     })
   })
 
+  describe('fallback cue', () => {
+    const FALLBACK_MS = 2000
+    let perfNowSpy: ReturnType<typeof jest.spyOn>
+    let fbListener: YargNetworkListener
+    let fallbackTime: number
+
+    beforeEach(async () => {
+      jest.useFakeTimers()
+      jest.setSystemTime(0)
+      // monotonicNowMs() reads performance.now(); delegate it to the faked Date clock so
+      // advanceTimersByTime drives both the poll interval and the elapsed-time math.
+      perfNowSpy = jest.spyOn(performance, 'now').mockImplementation(() => Date.now())
+      fallbackTime = FALLBACK_MS
+      fbListener = new YargNetworkListener(cueHandler, {
+        getFallbackCueTimeMs: () => fallbackTime,
+      })
+      await fbListener.start()
+      cueHandler.handleCue.mockClear()
+    })
+
+    afterEach(async () => {
+      await fbListener.shutdown()
+      perfNowSpy.mockRestore()
+      jest.useRealTimers()
+    })
+
+    const gameplayFrame = (cue: CueType, overrides: Partial<CueData> = {}): CueData => ({
+      ...defaultCueData,
+      currentScene: 'Gameplay',
+      pauseState: 'Unpaused',
+      lightingCue: cue,
+      beat: 'Off',
+      keyframe: 'Off',
+      ...overrides,
+    })
+
+    const dispatchedCues = (): unknown[] => cueHandler.handleCue.mock.calls.map((c) => c[0])
+
+    it('fires the Fallback cue after the window when no new cue arrives while playing', () => {
+      fbListener.processCueData(gameplayFrame(CueType.Verse))
+      cueHandler.handleCue.mockClear()
+
+      jest.advanceTimersByTime(FALLBACK_MS + 500)
+
+      const fallbackCalls = cueHandler.handleCue.mock.calls.filter((c) => c[0] === CueType.Fallback)
+      expect(fallbackCalls.length).toBeGreaterThanOrEqual(1)
+      // The fallback frame carries the Fallback cue value and is dispatched as a tracked cue.
+      const payload = fallbackCalls[0]![1] as CueData
+      expect(payload.lightingCue).toBe(CueType.Fallback)
+      expect(payload.trackMode).toBe('tracked')
+    })
+
+    it('does not fire at the menu', () => {
+      fbListener.processCueData({
+        ...defaultCueData,
+        currentScene: 'Menu',
+        lightingCue: CueType.Menu,
+        beat: 'Off',
+        keyframe: 'Off',
+      })
+      cueHandler.handleCue.mockClear()
+
+      jest.advanceTimersByTime(FALLBACK_MS * 3)
+
+      expect(dispatchedCues()).not.toContain(CueType.Fallback)
+    })
+
+    it('does not fire while the song is paused', () => {
+      fbListener.processCueData(gameplayFrame(CueType.Verse, { pauseState: 'Paused' }))
+      cueHandler.handleCue.mockClear()
+
+      jest.advanceTimersByTime(FALLBACK_MS * 3)
+
+      expect(dispatchedCues()).not.toContain(CueType.Fallback)
+    })
+
+    it('is disabled when the fallback time is 0', () => {
+      fallbackTime = 0
+      fbListener.processCueData(gameplayFrame(CueType.Verse))
+      cueHandler.handleCue.mockClear()
+
+      jest.advanceTimersByTime(60000)
+
+      expect(dispatchedCues()).not.toContain(CueType.Fallback)
+    })
+
+    it('re-fires the Fallback cue after each subsequent window', () => {
+      fbListener.processCueData(gameplayFrame(CueType.Verse))
+      cueHandler.handleCue.mockClear()
+
+      jest.advanceTimersByTime(FALLBACK_MS + 500)
+      jest.advanceTimersByTime(FALLBACK_MS + 500)
+
+      const fallbackCount = cueHandler.handleCue.mock.calls.filter(
+        (c) => c[0] === CueType.Fallback,
+      ).length
+      expect(fallbackCount).toBeGreaterThanOrEqual(2)
+    })
+
+    it('switches to a new YARG cue immediately, cancelling the fallback', () => {
+      fbListener.processCueData(gameplayFrame(CueType.Verse))
+      jest.advanceTimersByTime(FALLBACK_MS + 500) // fallback now active
+      cueHandler.handleCue.mockClear()
+
+      fbListener.processCueData(gameplayFrame(CueType.Chorus))
+
+      expect(dispatchedCues()).toContain(CueType.Chorus)
+    })
+
+    it('suppresses stale repeats of the same cue while the fallback is active', () => {
+      fbListener.processCueData(gameplayFrame(CueType.Verse))
+      jest.advanceTimersByTime(FALLBACK_MS + 500) // fallback now active
+      cueHandler.handleCue.mockClear()
+
+      // YARG keeps re-sending the same stale cue (beat differs so the 30 Hz throttle doesn't swallow it).
+      fbListener.processCueData(gameplayFrame(CueType.Verse, { beat: 'Strong' }))
+
+      expect(dispatchedCues()).not.toContain(CueType.Verse)
+    })
+  })
+
   describe('identical-frame throttling (30 Hz)', () => {
     const throttleMs = 1000 / 30
     let perfNowSpy: ReturnType<typeof jest.spyOn>

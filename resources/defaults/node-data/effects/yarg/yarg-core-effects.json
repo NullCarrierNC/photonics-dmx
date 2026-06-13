@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 5,
+  "cueVersion": 6,
   "mode": "yarg",
   "group": {
     "id": "yarg-core-effects",
@@ -5919,6 +5919,268 @@
               "waitUntilTime": {
                 "source": "literal",
                 "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectListeners": [
+          {
+            "id": "crossfade-listener",
+            "type": "effect-listener",
+            "label": "Cross-Fade Entry",
+            "outputs": []
+          }
+        ]
+      },
+      "connections": [
+        {
+          "from": "crossfade-listener",
+          "to": "crossfade-start"
+        },
+        {
+          "from": "crossfade-start",
+          "to": "crossfade-end"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "crossfade-start": {
+            "x": -10.413719438016415,
+            "y": 122.38872547075152
+          },
+          "crossfade-end": {
+            "x": 8.798411060124636,
+            "y": 242.30974163860083
+          },
+          "crossfade-listener": {
+            "x": 8.470411906018853,
+            "y": -0.9947500191628933
+          }
+        },
+        "viewport": {
+          "x": 600.6057406417094,
+          "y": 109.50687814271078,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "effect-cross-fade-colors-timed",
+      "mode": "yarg",
+      "name": "Cross-Fade Colours (Timed)",
+      "description": "Alternates between two colours on target lights, advancing on a wall-clock timer (independent of beats/measures). Used by self-driven looks like the Fallback cue.",
+      "parameters": [],
+      "variables": [
+        {
+          "name": "lights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "description": "Target lights",
+          "isParameter": true
+        },
+        {
+          "name": "layer",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "DMX layer",
+          "isParameter": true
+        },
+        {
+          "name": "startColor",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "blue",
+          "description": "First colour in the alternation",
+          "isParameter": true
+        },
+        {
+          "name": "startBrightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "medium",
+          "description": "Brightness for the first colour",
+          "isParameter": true
+        },
+        {
+          "name": "endColor",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "green",
+          "description": "Second colour in the alternation",
+          "isParameter": true
+        },
+        {
+          "name": "endBrightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "medium",
+          "description": "Brightness for the second colour",
+          "isParameter": true
+        },
+        {
+          "name": "blendMode",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "replace",
+          "description": "Blend mode",
+          "isParameter": true
+        },
+        {
+          "name": "duration",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 200,
+          "description": "Fade transition duration (ms)",
+          "isParameter": true
+        },
+        {
+          "name": "holdTime",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 600,
+          "description": "Dwell at each colour after the fade before advancing (ms)",
+          "isParameter": true
+        }
+      ],
+      "nodes": {
+        "events": [],
+        "actions": [
+          {
+            "id": "crossfade-start",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "lights"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "startColor"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "startBrightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "duration"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "holdTime"
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          },
+          {
+            "id": "crossfade-end",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "lights"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "endColor"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "endBrightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "duration"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "holdTime"
               },
               "easing": {
                 "source": "literal",

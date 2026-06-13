@@ -26,6 +26,7 @@ export interface ListenerCoordinatorDeps {
   getActiveYargMotionCueRef: () => { groupId: string; cueId: string } | null
   getMotionCueMinimumHoldMs: () => number
   getMotionCueProbabilityPercent: () => number
+  getFallbackCueTimeMs: () => number
   sendSenderError: (message: string) => void
   sendToAllWindows: (channel: string, payload: unknown) => void
   runtimeBroadcaster: RuntimeBroadcaster
@@ -91,7 +92,9 @@ export class ListenerCoordinator {
       await this.yargListener.shutdown()
     }
     // The listener calls into the fanout, which iterates every chain's handler.
-    this.yargListener = new YargNetworkListener(this.deps.getChainFanout())
+    this.yargListener = new YargNetworkListener(this.deps.getChainFanout(), {
+      getFallbackCueTimeMs: this.deps.getFallbackCueTimeMs,
+    })
     this.yargListener.on(
       'yarg-error',
       (errorData: { type: string; message: string; datagramVersion?: number }) => {
