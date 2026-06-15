@@ -332,6 +332,7 @@ export enum CueType {
   Cool_Automatic = 'Cool_Automatic',
   Default = 'Default',
   Dischord = 'Dischord',
+  Fallback = 'Fallback',
   Flare_Fast = 'Flare_Fast',
   Flare_Slow = 'Flare_Slow',
   Frenzy = 'Frenzy',
@@ -501,6 +502,13 @@ export const CueTypeDescriptions = [
     id: CueType.Dischord,
     yargDescription:
       'YARG: Front left/right halves alternate green/blue. Flashes bright red or yellow on the measure.',
+    rb3Description:
+      'RB3E: Does not currently use cues, lights are set directly from passed LED colour values.',
+  },
+  {
+    id: CueType.Fallback,
+    yargDescription:
+      'YARG: Auto-triggered look when no new YARG lighting cue has arrived for the configured Fallback Time while a song is playing. Persistent; re-selected each window. Not sent over the wire by YARG.',
     rb3Description:
       'RB3E: Does not currently use cues, lights are set directly from passed LED colour values.',
   },

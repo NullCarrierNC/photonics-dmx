@@ -53,6 +53,11 @@ export interface AppPreferences {
   cueDomains: Record<CueDomain, CueDomainPrefs>
   /** Master switch: when false, YARG and audio automatic motion layers are off. */
   motionEnabled?: boolean
+  /**
+   * Milliseconds with no new YARG lighting cue (while a song plays) before the auto Fallback cue
+   * fires, then re-fires each window. 0 disables the feature. Default 20000.
+   */
+  yargFallbackCueTimeMs: number
   cueConsistencyWindow: number
   clockRate: number
   /**
@@ -119,6 +124,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   cueDomains: createDefaultCueDomains(),
   cueConsistencyWindow: 10000,
   motionEnabled: true,
+  yargFallbackCueTimeMs: 20000,
   clockRate: 10,
   globalDmxPublishingRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
   activeAudioCueType: '' as AudioCueType,

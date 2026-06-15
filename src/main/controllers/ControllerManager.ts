@@ -153,6 +153,7 @@ export class ControllerManager {
           this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
         getMotionCueProbabilityPercent: () =>
           this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
+        getFallbackCueTimeMs: () => this.config.getPreference('yargFallbackCueTimeMs') ?? 20000,
         sendSenderError: (message: string) => {
           sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
         },
