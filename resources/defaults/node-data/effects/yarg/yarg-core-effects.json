@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 6,
+  "cueVersion": 7,
   "mode": "yarg",
   "group": {
     "id": "yarg-core-effects",
@@ -2208,37 +2208,41 @@
             "x": 51.56838946372727,
             "y": 135.51311212236578
           },
+          "rcw-cycle-steps": {
+            "x": 26,
+            "y": 282
+          },
           "rcw-phase2-count": {
-            "x": -3.0710418429225683,
-            "y": 242.5238067880273
+            "x": -21.07104184292257,
+            "y": 438.5238067880273
           },
           "rcw-foreach": {
-            "x": 57.606060981399196,
-            "y": 344.8109013219878
+            "x": 39.606060981399196,
+            "y": 540.8109013219878
           },
           "rcw-raw1": {
-            "x": 5.957706185057759,
-            "y": 493.7191869430244
+            "x": -12.04229381494224,
+            "y": 689.7191869430244
           },
           "rcw-raw2": {
-            "x": -8.61822547763586,
-            "y": 627.1159091852605
+            "x": -26.61822547763586,
+            "y": 823.1159091852605
           },
           "rcw-steps-on": {
-            "x": 7.073440158739686,
-            "y": 740.4274326591853
+            "x": -10.926559841260314,
+            "y": 936.4274326591853
           },
           "rcw-num-minus": {
-            "x": -7.229431226849556,
-            "y": 876.2184264026582
+            "x": -25.229431226849556,
+            "y": 1072.2184264026582
           },
           "rcw-steps-off": {
-            "x": -7.443002516403794,
-            "y": 995.986811876297
+            "x": -25.443002516403794,
+            "y": 1191.986811876297
           },
           "rcw-wait-beats": {
-            "x": 4.694199252873659,
-            "y": 1128.4931761659682
+            "x": -13.30580074712634,
+            "y": 1324.4931761659682
           },
           "rcw-p1-count": {
             "x": 433.816974459216,
@@ -2265,14 +2269,14 @@
             "y": -91.09577898681164
           },
           "notes-602af270-549c-43e5-939b-b9dae67901ed": {
-            "x": -344.7859663395264,
-            "y": 292.680286774842
+            "x": -362.78596633952634,
+            "y": 488.680286774842
           }
         },
         "viewport": {
-          "x": 277.7802475781683,
-          "y": 53.779012687154136,
-          "zoom": 0.6020686906157078
+          "x": 553.125609500748,
+          "y": 72.55287368800703,
+          "zoom": 0.5
         }
       }
     },
@@ -3082,12 +3086,16 @@
             "y": 1021.5539752580225
           },
           "rccw-num-lights": {
-            "x": 40.00873229838908,
-            "y": 46.35809352621436
+            "x": 50.00873229838908,
+            "y": -85.64190647378564
           },
           "rccw-num-groups": {
-            "x": 24,
-            "y": 142
+            "x": 34,
+            "y": 10
+          },
+          "rccw-cycle-steps": {
+            "x": 44,
+            "y": 132
           },
           "rccw-phase2-count": {
             "x": -7.79876465164125,
@@ -3142,14 +3150,14 @@
             "y": 473.54141522571445
           },
           "rccw-listener": {
-            "x": 9.216093447059393,
-            "y": -38.85966309159994
+            "x": 19.216093447059393,
+            "y": -170.85966309159994
           }
         },
         "viewport": {
-          "x": 189.78024757816831,
-          "y": 41.779012687154136,
-          "zoom": 0.6020686906157078
+          "x": 493.12560950074806,
+          "y": 135.55287368800703,
+          "zoom": 0.5
         }
       }
     },
@@ -4938,24 +4946,24 @@
       "layout": {
         "nodePositions": {
           "akf-listener": {
-            "x": 0.0,
-            "y": 0.0
+            "x": 0,
+            "y": 0
           },
           "akf-a-on": {
-            "x": 0.0,
-            "y": 150.0
+            "x": 0,
+            "y": 150
           },
           "akf-b-off": {
-            "x": 0.0,
-            "y": 300.0
+            "x": 0,
+            "y": 300
           },
           "akf-a-off": {
-            "x": 0.0,
-            "y": 450.0
+            "x": 0,
+            "y": 450
           },
           "akf-b-on": {
-            "x": 0.0,
-            "y": 600.0
+            "x": 0,
+            "y": 600
           }
         },
         "viewport": {
@@ -6237,6 +6245,208 @@
         "viewport": {
           "x": 600.6057406417094,
           "y": 109.50687814271078,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "effect-cross-fade-random-timed",
+      "mode": "yarg",
+      "name": "Cross-Fade to Random Colour (Timed)",
+      "description": "Continuously fades target lights to a new random colour on a wall-clock timer (independent of beats/measures): pick a random colour, fade over `duration`, dwell `holdTime`, then repeat with a fresh colour. Used by self-driven looks like the Fallback cue.",
+      "parameters": [],
+      "variables": [
+        {
+          "name": "lights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "description": "Target lights",
+          "isParameter": true
+        },
+        {
+          "name": "layer",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "DMX layer",
+          "isParameter": true
+        },
+        {
+          "name": "brightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "medium",
+          "description": "Brightness for the colour",
+          "isParameter": true
+        },
+        {
+          "name": "blendMode",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "replace",
+          "description": "Blend mode",
+          "isParameter": true
+        },
+        {
+          "name": "duration",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1000,
+          "description": "Fade transition duration (ms)",
+          "isParameter": true
+        },
+        {
+          "name": "holdTime",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 6000,
+          "description": "Dwell at the colour after the fade before advancing (ms)",
+          "isParameter": true
+        },
+        {
+          "name": "randomColor",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "blue",
+          "description": "Internal: the randomly chosen colour to fade to this cycle",
+          "isParameter": false
+        }
+      ],
+      "nodes": {
+        "events": [],
+        "actions": [
+          {
+            "id": "crossfade-random-set",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "lights"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "randomColor"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "duration"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "holdTime"
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "crossfade-random-pick",
+            "type": "logic",
+            "logicType": "random",
+            "mode": "random-choice",
+            "choices": [
+              "red",
+              "blue",
+              "yellow",
+              "green",
+              "cyan",
+              "orange",
+              "purple",
+              "chartreuse",
+              "teal",
+              "violet",
+              "magenta",
+              "vermilion",
+              "amber"
+            ],
+            "assignTo": "randomColor"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectListeners": [
+          {
+            "id": "crossfade-random-listener",
+            "type": "effect-listener",
+            "label": "Cross-Fade Entry",
+            "outputs": []
+          }
+        ]
+      },
+      "connections": [
+        {
+          "from": "crossfade-random-listener",
+          "to": "crossfade-random-pick"
+        },
+        {
+          "from": "crossfade-random-pick",
+          "to": "crossfade-random-set"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "crossfade-random-listener": {
+            "x": 8,
+            "y": 0
+          },
+          "crossfade-random-pick": {
+            "x": 8,
+            "y": 120
+          },
+          "crossfade-random-set": {
+            "x": 8,
+            "y": 240
+          }
+        },
+        "viewport": {
+          "x": 600,
+          "y": 110,
           "zoom": 0.75
         }
       }

@@ -959,9 +959,29 @@
       ],
       "layout": {
         "nodePositions": {
-          "diag-sweep-listener": {
-            "x": 0,
-            "y": 0
+          "action-a-wait-before": {
+            "x": -500,
+            "y": 1440
+          },
+          "action-a-active": {
+            "x": -280,
+            "y": 1560
+          },
+          "action-a-wait-after": {
+            "x": -280,
+            "y": 1680
+          },
+          "action-b-wait-before": {
+            "x": 137.9999999999999,
+            "y": 1448
+          },
+          "action-b-active": {
+            "x": 250,
+            "y": 1598
+          },
+          "action-b-wait-after": {
+            "x": 298,
+            "y": 1734
           },
           "diag-array-len": {
             "x": 0,
@@ -983,45 +1003,33 @@
             "x": -280,
             "y": 600
           },
+          "diag-for-each-b": {
+            "x": 280,
+            "y": 600
+          },
           "diag-a-t1": {
             "x": -280,
             "y": 720
           },
           "diag-a-t2": {
-            "x": -280,
-            "y": 840
+            "x": -278,
+            "y": 842
           },
           "diag-a-mod": {
-            "x": -280,
+            "x": -292,
             "y": 960
           },
           "diag-a-ta": {
-            "x": -280,
-            "y": 1080
+            "x": -302,
+            "y": 1078
           },
           "diag-a-sa": {
             "x": -280,
             "y": 1200
           },
           "diag-a-cond": {
-            "x": -280,
+            "x": -272,
             "y": 1320
-          },
-          "action-a-wait-before": {
-            "x": -500,
-            "y": 1440
-          },
-          "action-a-active": {
-            "x": -280,
-            "y": 1560
-          },
-          "action-a-wait-after": {
-            "x": -280,
-            "y": 1680
-          },
-          "diag-for-each-b": {
-            "x": 280,
-            "y": 600
           },
           "diag-b-t1": {
             "x": 280,
@@ -1032,38 +1040,30 @@
             "y": 840
           },
           "diag-b-mod": {
-            "x": 280,
+            "x": 268,
             "y": 960
           },
           "diag-b-ta": {
-            "x": 280,
-            "y": 1080
+            "x": 260,
+            "y": 1078
           },
           "diag-b-sa": {
             "x": 280,
             "y": 1200
           },
           "diag-b-cond": {
-            "x": 280,
-            "y": 1320
+            "x": 276,
+            "y": 1318
           },
-          "action-b-wait-before": {
-            "x": 500,
-            "y": 1440
-          },
-          "action-b-active": {
-            "x": 280,
-            "y": 1560
-          },
-          "action-b-wait-after": {
-            "x": 280,
-            "y": 1680
+          "diag-sweep-listener": {
+            "x": 0,
+            "y": 0
           }
         },
         "viewport": {
-          "x": 500,
-          "y": 0,
-          "zoom": 0.75
+          "x": 527.409268489248,
+          "y": 43.5941048919874,
+          "zoom": 0.5
         }
       }
     }

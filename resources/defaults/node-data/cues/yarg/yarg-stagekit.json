@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 8,
+  "cueVersion": 9,
   "mode": "yarg",
   "group": {
     "id": "yarg-stagekit",
@@ -12,7 +12,7 @@
     {
       "id": "cue-skv2-fallback",
       "name": "Fallback",
-      "description": "Auto-triggered safety look when no new YARG lighting cue arrives within the Fallback Time. Slow warm/cool cross-fade driven by a wall-clock timer (no beats/measures needed); mirrored front to back. Persistent so it never goes black.",
+      "description": "If the YARG fallback timer is exceeded, this cue is triggered to ensure the lights are on.",
       "cueType": "Fallback",
       "style": "primary",
       "kind": "lighting",
@@ -27,50 +27,31 @@
         "actions": [],
         "logic": [
           {
-            "id": "cue-skv2-fallback-front",
+            "id": "cue-skv2-fallback-all",
             "type": "logic",
             "logicType": "config-data",
-            "dataProperty": "front-lights-array",
-            "assignTo": "frontLights"
-          },
-          {
-            "id": "cue-skv2-fallback-back",
-            "type": "logic",
-            "logicType": "config-data",
-            "dataProperty": "back-lights-array",
-            "assignTo": "backLights"
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
           }
         ],
         "eventRaisers": [],
         "eventListeners": [],
         "effectRaisers": [
           {
-            "id": "cue-skv2-fallback-effect-front",
+            "id": "cue-skv2-fallback-effect",
             "type": "effect-raiser",
-            "effectId": "effect-cross-fade-colors-timed",
+            "effectId": "effect-cross-fade-random-timed",
             "isPersistent": true,
             "parameterValues": {
               "lights": {
                 "source": "variable",
-                "name": "frontLights"
+                "name": "allLights"
               },
               "layer": {
                 "source": "literal",
                 "value": 1
               },
-              "startColor": {
-                "source": "literal",
-                "value": "amber"
-              },
-              "startBrightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "endColor": {
-                "source": "literal",
-                "value": "blue"
-              },
-              "endBrightness": {
+              "brightness": {
                 "source": "literal",
                 "value": "medium"
               },
@@ -80,55 +61,11 @@
               },
               "duration": {
                 "source": "literal",
-                "value": 1500
+                "value": 1000
               },
               "holdTime": {
                 "source": "literal",
-                "value": 600
-              }
-            }
-          },
-          {
-            "id": "cue-skv2-fallback-effect-back",
-            "type": "effect-raiser",
-            "effectId": "effect-cross-fade-colors-timed",
-            "isPersistent": true,
-            "parameterValues": {
-              "lights": {
-                "source": "variable",
-                "name": "backLights"
-              },
-              "layer": {
-                "source": "literal",
-                "value": 2
-              },
-              "startColor": {
-                "source": "literal",
-                "value": "blue"
-              },
-              "startBrightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "endColor": {
-                "source": "literal",
-                "value": "amber"
-              },
-              "endBrightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "duration": {
-                "source": "literal",
-                "value": 1500
-              },
-              "holdTime": {
-                "source": "literal",
-                "value": 600
+                "value": 6000
               }
             }
           }
@@ -138,19 +75,11 @@
       "connections": [
         {
           "from": "cue-skv2-fallback-start",
-          "to": "cue-skv2-fallback-front"
+          "to": "cue-skv2-fallback-all"
         },
         {
-          "from": "cue-skv2-fallback-front",
-          "to": "cue-skv2-fallback-back"
-        },
-        {
-          "from": "cue-skv2-fallback-back",
-          "to": "cue-skv2-fallback-effect-front"
-        },
-        {
-          "from": "cue-skv2-fallback-back",
-          "to": "cue-skv2-fallback-effect-back"
+          "from": "cue-skv2-fallback-all",
+          "to": "cue-skv2-fallback-effect"
         }
       ],
       "layout": {
@@ -159,21 +88,13 @@
             "x": 8,
             "y": 51
           },
-          "cue-skv2-fallback-front": {
+          "cue-skv2-fallback-all": {
             "x": -2,
-            "y": 128
+            "y": 168
           },
-          "cue-skv2-fallback-back": {
+          "cue-skv2-fallback-effect": {
             "x": -5,
-            "y": 246
-          },
-          "cue-skv2-fallback-effect-front": {
-            "x": -138,
-            "y": 374
-          },
-          "cue-skv2-fallback-effect-back": {
-            "x": 104,
-            "y": 377
+            "y": 286
           }
         },
         "viewport": {
@@ -184,14 +105,7 @@
       },
       "variables": [
         {
-          "name": "frontLights",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
-        {
-          "name": "backLights",
+          "name": "allLights",
           "type": "light-array",
           "scope": "cue",
           "initialValue": [],
@@ -200,9 +114,9 @@
       ],
       "effects": [
         {
-          "effectId": "effect-cross-fade-colors-timed",
+          "effectId": "effect-cross-fade-random-timed",
           "effectFileId": "yarg-core-effects",
-          "name": "Cross-Fade Colours (Timed)"
+          "name": "Cross-Fade to Random Colour (Timed)"
         }
       ]
     },
@@ -2668,21 +2582,20 @@
       ]
     },
     {
-      "id": "cue-skv2-harmony",
+      "id": "cue-sk-harmony",
       "name": "Harmony",
-      "description": "Large: yellow forward and red reverse single chases on the beat. Small: green and blue forward single chases on the beat. Harmony.",
+      "description": "Large: yellow+red CW; Small: cyan CW",
       "cueType": "Harmony",
       "style": "primary",
-      "kind": "lighting",
       "nodes": {
         "events": [
           {
-            "id": "cue-skv2-harmony-start",
+            "id": "event-sk-harmony-start",
             "type": "event",
             "eventType": "cue-started"
           },
           {
-            "id": "cue-skv2-harmony-called",
+            "id": "event-sk-harmony-called",
             "type": "event",
             "eventType": "cue-called"
           }
@@ -2690,498 +2603,58 @@
         "actions": [],
         "logic": [
           {
-            "id": "cue-skv2-harmony-ring",
-            "type": "logic",
-            "logicType": "build-ring",
-            "assignTo": "ring",
-            "assignGroupSize": "ringGroupSize"
-          },
-          {
-            "id": "cue-skv2-harmony-pgs",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "multiply",
-            "left": {
-              "source": "variable",
-              "name": "ringGroupSize"
-            },
-            "right": {
-              "source": "literal",
-              "value": 2
-            },
-            "assignTo": "pairGroupSize"
-          },
-          {
-            "id": "cue-skv2-harmony-venue",
+            "id": "sk-harmony-venue",
             "type": "logic",
             "logicType": "cue-data",
             "dataProperty": "venue-size",
             "assignTo": "venueSize"
           },
           {
-            "id": "cue-skv2-harmony-large",
+            "id": "sk-harmony-num",
             "type": "logic",
-            "logicType": "conditional",
-            "comparator": "==",
-            "left": {
-              "source": "variable",
-              "name": "venueSize"
-            },
-            "right": {
-              "source": "literal",
-              "value": "Large"
-            }
-          }
-        ],
-        "eventRaisers": [],
-        "eventListeners": [],
-        "effectRaisers": [
-          {
-            "id": "cue-skv2-harmony-yellow",
-            "type": "effect-raiser",
-            "effectId": "effect-rotation-cw",
-            "parameterValues": {
-              "lights": {
-                "source": "variable",
-                "name": "ring"
-              },
-              "layer": {
-                "source": "literal",
-                "value": 3
-              },
-              "color": {
-                "source": "literal",
-                "value": "yellow"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "add"
-              },
-              "startOffset": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "beat"
-              },
-              "waitUntilConditionCount": {
-                "source": "literal",
-                "value": 0
-              },
-              "beatsPerCycle": {
-                "source": "literal",
-                "value": 1
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "groupSize": {
-                "source": "variable",
-                "name": "ringGroupSize"
-              },
-              "gapSteps": {
-                "source": "literal",
-                "value": 0
-              }
-            },
-            "isPersistent": true
+            "logicType": "config-data",
+            "dataProperty": "total-lights",
+            "assignTo": "numLights"
           },
           {
-            "id": "cue-skv2-harmony-red",
-            "type": "effect-raiser",
-            "effectId": "effect-rotation-ccw",
-            "parameterValues": {
-              "lights": {
-                "source": "variable",
-                "name": "ring"
-              },
-              "layer": {
-                "source": "literal",
-                "value": 4
-              },
-              "color": {
-                "source": "literal",
-                "value": "red"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "add"
-              },
-              "startOffset": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "beat"
-              },
-              "waitUntilConditionCount": {
-                "source": "literal",
-                "value": 0
-              },
-              "beatsPerCycle": {
-                "source": "literal",
-                "value": 1
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "groupSize": {
-                "source": "variable",
-                "name": "ringGroupSize"
-              },
-              "gapSteps": {
-                "source": "literal",
-                "value": 0
-              }
-            },
-            "isPersistent": true
-          },
-          {
-            "id": "cue-skv2-harmony-green",
-            "type": "effect-raiser",
-            "effectId": "effect-rotation-cw",
-            "parameterValues": {
-              "lights": {
-                "source": "variable",
-                "name": "ring"
-              },
-              "layer": {
-                "source": "literal",
-                "value": 2
-              },
-              "color": {
-                "source": "literal",
-                "value": "green"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "add"
-              },
-              "startOffset": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "beat"
-              },
-              "waitUntilConditionCount": {
-                "source": "literal",
-                "value": 0
-              },
-              "beatsPerCycle": {
-                "source": "literal",
-                "value": 1
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "groupSize": {
-                "source": "variable",
-                "name": "ringGroupSize"
-              },
-              "gapSteps": {
-                "source": "literal",
-                "value": 0
-              }
-            },
-            "isPersistent": true
-          },
-          {
-            "id": "cue-skv2-harmony-blue",
-            "type": "effect-raiser",
-            "effectId": "effect-rotation-cw",
-            "parameterValues": {
-              "lights": {
-                "source": "variable",
-                "name": "ring"
-              },
-              "layer": {
-                "source": "literal",
-                "value": 1
-              },
-              "color": {
-                "source": "literal",
-                "value": "blue"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "add"
-              },
-              "startOffset": {
-                "source": "literal",
-                "value": 1
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "beat"
-              },
-              "waitUntilConditionCount": {
-                "source": "literal",
-                "value": 0
-              },
-              "beatsPerCycle": {
-                "source": "literal",
-                "value": 1
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "groupSize": {
-                "source": "variable",
-                "name": "ringGroupSize"
-              },
-              "gapSteps": {
-                "source": "literal",
-                "value": 0
-              }
-            },
-            "isPersistent": true
-          }
-        ],
-        "notes": [
-          {
-            "id": "cue-skv2-harmony-note-3",
-            "type": "notes",
-            "label": "Notes",
-            "title": "Cue called",
-            "style": "notes",
-            "note": "Branches on venue (1 step/beat). Large: yellow forward + red reverse single chases. Small: green forward + blue forward single chases."
-          }
-        ]
-      },
-      "connections": [
-        {
-          "from": "cue-skv2-harmony-start",
-          "to": "cue-skv2-harmony-ring"
-        },
-        {
-          "from": "cue-skv2-harmony-ring",
-          "to": "cue-skv2-harmony-pgs"
-        },
-        {
-          "from": "cue-skv2-harmony-called",
-          "to": "cue-skv2-harmony-venue"
-        },
-        {
-          "from": "cue-skv2-harmony-venue",
-          "to": "cue-skv2-harmony-large"
-        },
-        {
-          "from": "cue-skv2-harmony-large",
-          "to": "cue-skv2-harmony-yellow",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-harmony-large",
-          "to": "cue-skv2-harmony-red",
-          "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-harmony-large",
-          "to": "cue-skv2-harmony-green",
-          "fromPort": "false"
-        },
-        {
-          "from": "cue-skv2-harmony-large",
-          "to": "cue-skv2-harmony-blue",
-          "fromPort": "false"
-        }
-      ],
-      "layout": {
-        "nodePositions": {
-          "cue-skv2-harmony-start": {
-            "x": 0,
-            "y": 0
-          },
-          "cue-skv2-harmony-called": {
-            "x": 760,
-            "y": 20
-          },
-          "cue-skv2-harmony-ring": {
-            "x": 1.5347460960008448,
-            "y": 94.74914054396811
-          },
-          "cue-skv2-harmony-pgs": {
-            "x": -13.812714864008058,
-            "y": 198.30164025585486
-          },
-          "cue-skv2-harmony-venue": {
-            "x": 748,
-            "y": 110
-          },
-          "cue-skv2-harmony-large": {
-            "x": 762,
-            "y": 242
-          },
-          "cue-skv2-harmony-yellow": {
-            "x": 480,
-            "y": 410
-          },
-          "cue-skv2-harmony-red": {
-            "x": 598,
-            "y": 770
-          },
-          "cue-skv2-harmony-green": {
-            "x": 1030,
-            "y": 376
-          },
-          "cue-skv2-harmony-blue": {
-            "x": 930,
-            "y": 762
-          },
-          "cue-skv2-harmony-note-3": {
-            "x": 631.0813279359256,
-            "y": -118.80335916791853
-          }
-        },
-        "viewport": {
-          "x": 158.6176786329828,
-          "y": 335.53068006628314,
-          "zoom": 0.6515735746816476
-        }
-      },
-      "variables": [
-        {
-          "name": "ring",
-          "type": "light-array",
-          "scope": "cue",
-          "initialValue": [],
-          "isParameter": false
-        },
-        {
-          "name": "ringGroupSize",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 1,
-          "isParameter": false
-        },
-        {
-          "name": "pairGroupSize",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 2,
-          "isParameter": false
-        },
-        {
-          "name": "venueSize",
-          "type": "string",
-          "scope": "cue",
-          "initialValue": "",
-          "isParameter": false,
-          "validValues": ["NoVenue", "Small", "Large"]
-        }
-      ],
-      "effects": [
-        {
-          "effectId": "effect-rotation-cw",
-          "effectFileId": "yarg-core-effects",
-          "name": "Rotation CW"
-        },
-        {
-          "effectId": "effect-rotation-ccw",
-          "effectFileId": "yarg-core-effects",
-          "name": "Rotation CCW"
-        }
-      ]
-    },
-    {
-      "id": "cue-skv2-searchlights",
-      "name": "Searchlights",
-      "description": "Yellow chase one way and a second chase the other way, a quarter beat per step (large: blue, small: red).",
-      "cueType": "Searchlights",
-      "style": "primary",
-      "kind": "lighting",
-      "nodes": {
-        "events": [
-          {
-            "id": "cue-skv2-searchlights-start",
-            "type": "event",
-            "eventType": "cue-started"
-          },
-          {
-            "id": "cue-skv2-searchlights-called",
-            "type": "event",
-            "eventType": "cue-called"
-          }
-        ],
-        "actions": [],
-        "logic": [
-          {
-            "id": "cue-skv2-searchlights-ring",
+            "id": "sk-harmony-all",
             "type": "logic",
-            "logicType": "build-ring",
-            "assignTo": "ring",
-            "assignGroupSize": "ringGroupSize"
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
           },
           {
-            "id": "cue-skv2-searchlights-pgs",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "multiply",
-            "left": {
-              "source": "variable",
-              "name": "ringGroupSize"
-            },
-            "right": {
-              "source": "literal",
-              "value": 2
-            },
-            "assignTo": "pairGroupSize"
-          },
-          {
-            "id": "cue-skv2-searchlights-bd",
-            "type": "logic",
-            "logicType": "cue-data",
-            "dataProperty": "beat-duration-ms",
-            "assignTo": "beatMs"
-          },
-          {
-            "id": "cue-skv2-searchlights-sm",
+            "id": "sk-harmony-yellow-off",
             "type": "logic",
             "logicType": "math",
             "operator": "divide",
             "left": {
               "source": "variable",
-              "name": "beatMs"
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 3
+            },
+            "assignTo": "yellowOffset"
+          },
+          {
+            "id": "sk-harmony-red-off",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
             },
             "right": {
               "source": "literal",
               "value": 4
             },
-            "assignTo": "stepMs"
+            "assignTo": "redOffset"
           },
           {
-            "id": "cue-skv2-searchlights-venue",
-            "type": "logic",
-            "logicType": "cue-data",
-            "dataProperty": "venue-size",
-            "assignTo": "venueSize"
-          },
-          {
-            "id": "cue-skv2-searchlights-large",
+            "id": "sk-harmony-is-large",
             "type": "logic",
             "logicType": "conditional",
             "comparator": "==",
@@ -3199,17 +2672,388 @@
         "eventListeners": [],
         "effectRaisers": [
           {
-            "id": "cue-skv2-searchlights-yellow",
+            "id": "sk-harmony-cyan",
             "type": "effect-raiser",
             "effectId": "effect-rotation-cw",
             "parameterValues": {
               "lights": {
                 "source": "variable",
-                "name": "ring"
+                "name": "allLights"
               },
               "layer": {
                 "source": "literal",
-                "value": 3
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "cyan"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "sk-harmony-yellow",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "yellowOffset"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "sk-harmony-red",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "startOffset": {
+                "source": "variable",
+                "name": "redOffset"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "event-sk-harmony-start",
+          "to": "sk-harmony-venue"
+        },
+        {
+          "from": "sk-harmony-venue",
+          "to": "sk-harmony-num"
+        },
+        {
+          "from": "sk-harmony-num",
+          "to": "sk-harmony-all"
+        },
+        {
+          "from": "sk-harmony-all",
+          "to": "sk-harmony-yellow-off"
+        },
+        {
+          "from": "sk-harmony-yellow-off",
+          "to": "sk-harmony-red-off"
+        },
+        {
+          "from": "event-sk-harmony-called",
+          "to": "sk-harmony-is-large"
+        },
+        {
+          "from": "sk-harmony-is-large",
+          "to": "sk-harmony-yellow",
+          "fromPort": "true"
+        },
+        {
+          "from": "sk-harmony-is-large",
+          "to": "sk-harmony-cyan",
+          "fromPort": "false"
+        },
+        {
+          "from": "sk-harmony-yellow",
+          "to": "sk-harmony-red"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "event-sk-harmony-start": {
+            "x": 11.186406841501594,
+            "y": -6.473227098584175
+          },
+          "event-sk-harmony-called": {
+            "x": 252.2667101211846,
+            "y": -2.5539770238101482
+          },
+          "sk-harmony-venue": {
+            "x": -8.770068442448974,
+            "y": 117.96040293574333
+          },
+          "sk-harmony-num": {
+            "x": -8.473050685599446,
+            "y": 254.7722670659423
+          },
+          "sk-harmony-all": {
+            "x": -0.8379587363451719,
+            "y": 380.22267051041126
+          },
+          "sk-harmony-yellow-off": {
+            "x": -11.65918698348105,
+            "y": 498.3883852735162
+          },
+          "sk-harmony-red-off": {
+            "x": 7.663006028160453,
+            "y": 627.2153034992516
+          },
+          "sk-harmony-is-large": {
+            "x": 263.7859390784065,
+            "y": 99.4651146843837
+          },
+          "sk-harmony-cyan": {
+            "x": 518.5744954161346,
+            "y": 251.41315881162882
+          },
+          "sk-harmony-yellow": {
+            "x": 265.3835455942899,
+            "y": 242.5049189440906
+          },
+          "sk-harmony-red": {
+            "x": 303.63982756955374,
+            "y": 655.5117717706546
+          }
+        },
+        "viewport": {
+          "x": 342.35891566968445,
+          "y": 233.39840000585446,
+          "zoom": 0.7774015044605205
+        }
+      },
+      "variables": [
+        {
+          "name": "venueSize",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "",
+          "isParameter": false,
+          "validValues": ["NoVenue", "Small", "Large"]
+        },
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "yellowOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "redOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-rotation-cw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CW"
+        }
+      ],
+      "kind": "lighting"
+    },
+    {
+      "id": "cue-sk-searchlights",
+      "name": "Searchlights",
+      "description": "CCW yellow; 8+ lights also CCW red offset 1",
+      "cueType": "Searchlights",
+      "style": "primary",
+      "nodes": {
+        "events": [
+          {
+            "id": "event-sk-searchlights-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "event-sk-searchlights-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "sk-searchlights-num",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "total-lights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "sk-searchlights-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "sk-searchlights-has-red",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": ">=",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "literal",
+              "value": 8
+            }
+          },
+          {
+            "id": "sk-searchlights-beat-dur",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "beat-duration-ms",
+            "assignTo": "beatDurationMs"
+          },
+          {
+            "id": "sk-searchlights-step-dur",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "beatDurationMs"
+            },
+            "right": {
+              "source": "literal",
+              "value": 4
+            },
+            "assignTo": "stepDurationMs"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "sk-searchlights-yellow",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
               },
               "color": {
                 "source": "literal",
@@ -3241,85 +3085,26 @@
               },
               "waitUntilTime": {
                 "source": "variable",
-                "name": "stepMs"
+                "name": "stepDurationMs"
               },
               "groupSize": {
-                "source": "variable",
-                "name": "ringGroupSize"
-              },
-              "gapSteps": {
                 "source": "literal",
-                "value": 0
+                "value": 1
               }
             }
           },
           {
-            "id": "cue-skv2-searchlights-blue",
+            "id": "sk-searchlights-red",
             "type": "effect-raiser",
             "effectId": "effect-rotation-ccw",
             "parameterValues": {
               "lights": {
                 "source": "variable",
-                "name": "ring"
+                "name": "allLights"
               },
               "layer": {
                 "source": "literal",
-                "value": 1
-              },
-              "color": {
-                "source": "literal",
-                "value": "blue"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "add"
-              },
-              "startOffset": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "delay"
-              },
-              "waitUntilConditionCount": {
-                "source": "literal",
-                "value": 0
-              },
-              "beatsPerCycle": {
-                "source": "literal",
-                "value": 1
-              },
-              "waitUntilTime": {
-                "source": "variable",
-                "name": "stepMs"
-              },
-              "groupSize": {
-                "source": "variable",
-                "name": "ringGroupSize"
-              },
-              "gapSteps": {
-                "source": "literal",
-                "value": 0
-              }
-            }
-          },
-          {
-            "id": "cue-skv2-searchlights-red",
-            "type": "effect-raiser",
-            "effectId": "effect-rotation-ccw",
-            "parameterValues": {
-              "lights": {
-                "source": "variable",
-                "name": "ring"
-              },
-              "layer": {
-                "source": "literal",
-                "value": 4
+                "value": 20
               },
               "color": {
                 "source": "literal",
@@ -3335,7 +3120,7 @@
               },
               "startOffset": {
                 "source": "literal",
-                "value": 0
+                "value": 1
               },
               "waitUntilCondition": {
                 "source": "literal",
@@ -3351,190 +3136,123 @@
               },
               "waitUntilTime": {
                 "source": "variable",
-                "name": "stepMs"
+                "name": "stepDurationMs"
               },
               "groupSize": {
-                "source": "variable",
-                "name": "ringGroupSize"
-              },
-              "gapSteps": {
                 "source": "literal",
-                "value": 0
+                "value": 1
               }
             }
           }
         ],
-        "notes": [
-          {
-            "id": "cue-skv2-searchlights-note-3",
-            "type": "notes",
-            "label": "Notes",
-            "title": "Cue called",
-            "style": "notes",
-            "note": "A yellow forward (CW) chase plus reverse (CCW) red/blue searchlights; venue-gated, with step time derived from live BPM."
-          }
-        ]
+        "notes": []
       },
       "connections": [
         {
-          "from": "cue-skv2-searchlights-start",
-          "to": "cue-skv2-searchlights-ring"
+          "from": "event-sk-searchlights-start",
+          "to": "sk-searchlights-num"
         },
         {
-          "from": "cue-skv2-searchlights-ring",
-          "to": "cue-skv2-searchlights-pgs"
+          "from": "sk-searchlights-num",
+          "to": "sk-searchlights-all"
         },
         {
-          "from": "cue-skv2-searchlights-called",
-          "to": "cue-skv2-searchlights-bd"
+          "from": "sk-searchlights-all",
+          "to": "sk-searchlights-beat-dur"
         },
         {
-          "from": "cue-skv2-searchlights-bd",
-          "to": "cue-skv2-searchlights-sm"
+          "from": "sk-searchlights-beat-dur",
+          "to": "sk-searchlights-step-dur"
         },
         {
-          "from": "cue-skv2-searchlights-sm",
-          "to": "cue-skv2-searchlights-venue"
+          "from": "event-sk-searchlights-called",
+          "to": "sk-searchlights-has-red"
         },
         {
-          "from": "cue-skv2-searchlights-venue",
-          "to": "cue-skv2-searchlights-large"
-        },
-        {
-          "from": "cue-skv2-searchlights-large",
-          "to": "cue-skv2-searchlights-yellow",
+          "from": "sk-searchlights-has-red",
+          "to": "sk-searchlights-yellow",
           "fromPort": "true"
         },
         {
-          "from": "cue-skv2-searchlights-large",
-          "to": "cue-skv2-searchlights-yellow",
+          "from": "sk-searchlights-has-red",
+          "to": "sk-searchlights-yellow",
           "fromPort": "false"
         },
         {
-          "from": "cue-skv2-searchlights-large",
-          "to": "cue-skv2-searchlights-blue",
+          "from": "sk-searchlights-has-red",
+          "to": "sk-searchlights-red",
           "fromPort": "true"
-        },
-        {
-          "from": "cue-skv2-searchlights-large",
-          "to": "cue-skv2-searchlights-red",
-          "fromPort": "false"
         }
       ],
       "layout": {
         "nodePositions": {
-          "cue-skv2-searchlights-start": {
-            "x": 0,
-            "y": 0
+          "event-sk-searchlights-start": {
+            "x": 261.80339159071445,
+            "y": 1.1990827694535255
           },
-          "cue-skv2-searchlights-called": {
-            "x": 589.0828943774089,
-            "y": -30.526705617521884
+          "event-sk-searchlights-called": {
+            "x": 520.1201393995434,
+            "y": -6.86790894344449
           },
-          "cue-skv2-searchlights-ring": {
-            "x": 3.0694921920016895,
-            "y": 82.47117177596101
+          "sk-searchlights-num": {
+            "x": 265.8935543183395,
+            "y": 87.62650177064768
           },
-          "cue-skv2-searchlights-pgs": {
-            "x": -10.743222672006254,
-            "y": 190.6279097758504
+          "sk-searchlights-all": {
+            "x": 256.4145216449624,
+            "y": 203.6432303664177
           },
-          "cue-skv2-searchlights-bd": {
-            "x": 587.0828943774089,
-            "y": 37.473294382478116
+          "sk-searchlights-has-red": {
+            "x": 528.5939066428691,
+            "y": 117.99012338370085
           },
-          "cue-skv2-searchlights-sm": {
-            "x": 583.0828943774089,
-            "y": 139.47329438247812
+          "sk-searchlights-beat-dur": {
+            "x": 256.4145216449624,
+            "y": 320
           },
-          "cue-skv2-searchlights-venue": {
-            "x": 577.0828943774089,
-            "y": 247.47329438247812
+          "sk-searchlights-step-dur": {
+            "x": 256.4145216449624,
+            "y": 436
           },
-          "cue-skv2-searchlights-large": {
-            "x": 579.0828943774089,
-            "y": 369.4732943824781
+          "sk-searchlights-yellow": {
+            "x": 680.8908121039353,
+            "y": 323.5132102964461
           },
-          "cue-skv2-searchlights-yellow": {
-            "x": 573.0828943774089,
-            "y": 643.4732943824781
-          },
-          "cue-skv2-searchlights-blue": {
-            "x": 333.68693932265296,
-            "y": 506.4493662897994
-          },
-          "cue-skv2-searchlights-red": {
-            "x": 825.0828943774088,
-            "y": 518.8029483142363
-          },
-          "cue-skv2-searchlights-note-3": {
-            "x": 475.42878889593453,
-            "y": -151.03302718393718
+          "sk-searchlights-red": {
+            "x": 460.6854608207227,
+            "y": 327.4881406075813
           }
         },
         "viewport": {
-          "x": 140.6176786329827,
-          "y": 406.53068006628314,
-          "zoom": 0.6515735746816476
+          "x": 113.07094410940383,
+          "y": 183.80438818130648,
+          "zoom": 0.505576040425652
         }
       },
       "variables": [
         {
-          "name": "ring",
+          "name": "allLights",
           "type": "light-array",
           "scope": "cue",
           "initialValue": [],
           "isParameter": false
         },
         {
-          "name": "ringGroupSize",
+          "name": "numLights",
           "type": "number",
           "scope": "cue",
-          "initialValue": 1,
+          "initialValue": 0,
           "isParameter": false
-        },
-        {
-          "name": "pairGroupSize",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 2,
-          "isParameter": false
-        },
-        {
-          "name": "beatMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 500,
-          "isParameter": false
-        },
-        {
-          "name": "stepMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 125,
-          "isParameter": false
-        },
-        {
-          "name": "venueSize",
-          "type": "string",
-          "scope": "cue",
-          "initialValue": "",
-          "isParameter": false,
-          "validValues": ["NoVenue", "Small", "Large"]
         }
       ],
       "effects": [
-        {
-          "effectId": "effect-rotation-cw",
-          "effectFileId": "yarg-core-effects",
-          "name": "Rotation CW"
-        },
         {
           "effectId": "effect-rotation-ccw",
           "effectFileId": "yarg-core-effects",
           "name": "Rotation CCW"
         }
-      ]
+      ],
+      "kind": "lighting"
     },
     {
       "id": "cue-skv2-sweep",
