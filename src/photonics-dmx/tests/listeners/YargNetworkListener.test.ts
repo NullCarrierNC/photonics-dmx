@@ -376,7 +376,7 @@ describe('YargNetworkListener', () => {
 
     const dispatchedCues = (): unknown[] => cueHandler.handleCue.mock.calls.map((c) => c[0])
 
-    it('fires the Fallback cue after the window when no new cue arrives while playing', () => {
+    it('fires the Fallback cue after the window when YARG goes silent while playing', () => {
       fbListener.processCueData(gameplayFrame(CueType.Verse))
       cueHandler.handleCue.mockClear()
 
@@ -447,15 +447,77 @@ describe('YargNetworkListener', () => {
       expect(dispatchedCues()).toContain(CueType.Chorus)
     })
 
-    it('suppresses stale repeats of the same cue while the fallback is active', () => {
+    it('resumes the real cue and cancels the fallback when YARG sends again', () => {
       fbListener.processCueData(gameplayFrame(CueType.Verse))
       jest.advanceTimersByTime(FALLBACK_MS + 500) // fallback now active
       cueHandler.handleCue.mockClear()
 
-      // YARG keeps re-sending the same stale cue (beat differs so the 30 Hz throttle doesn't swallow it).
+      // YARG comes back, re-sending the same cue (beat differs so the 30 Hz throttle doesn't swallow it):
+      // the real cue takes over immediately rather than being held off by the active fallback.
       fbListener.processCueData(gameplayFrame(CueType.Verse, { beat: 'Strong' }))
 
-      expect(dispatchedCues()).not.toContain(CueType.Verse)
+      expect(dispatchedCues()).toContain(CueType.Verse)
+    })
+
+    it('does not fire while YARG keeps streaming the same cue', () => {
+      // YARG holds one cue across a whole section, streaming it continuously. The window must reset
+      // on each received cue so the fallback never fires on top of the live cue.
+      for (let elapsed = 0; elapsed < FALLBACK_MS * 2 + 500; elapsed += 200) {
+        fbListener.processCueData(
+          gameplayFrame(CueType.Verse, { beat: elapsed % 400 === 0 ? 'Strong' : 'Off' }),
+        )
+        jest.advanceTimersByTime(200)
+      }
+
+      expect(dispatchedCues()).not.toContain(CueType.Fallback)
+    })
+
+    it.each([CueType.Blackout_Fast, CueType.NoCue])(
+      'triggers the fallback while YARG streams %s continuously',
+      (cue) => {
+        // A song with no real lighting streams a blackout / no-cue every frame. Unlike a real cue,
+        // these must not keep resetting the window, so the fallback still takes over.
+        for (let elapsed = 0; elapsed < FALLBACK_MS * 2; elapsed += 200) {
+          fbListener.processCueData(
+            gameplayFrame(cue, { beat: elapsed % 400 === 0 ? 'Strong' : 'Off' }),
+          )
+          jest.advanceTimersByTime(200)
+        }
+
+        expect(dispatchedCues()).toContain(CueType.Fallback)
+      },
+    )
+
+    it('suppresses blackout re-sends while the fallback is active', () => {
+      fbListener.processCueData(gameplayFrame(CueType.Blackout_Fast))
+      jest.advanceTimersByTime(FALLBACK_MS + 500) // fallback now active
+      cueHandler.handleCue.mockClear()
+
+      // YARG keeps streaming the blackout (beat differs so the 30 Hz throttle doesn't swallow it).
+      fbListener.processCueData(gameplayFrame(CueType.Blackout_Fast, { beat: 'Strong' }))
+
+      expect(dispatchedCues()).not.toContain(CueType.Blackout_Fast)
+    })
+
+    it('resumes a real cue immediately after a blackout fallback', () => {
+      fbListener.processCueData(gameplayFrame(CueType.Blackout_Fast))
+      jest.advanceTimersByTime(FALLBACK_MS + 500) // fallback now active
+      cueHandler.handleCue.mockClear()
+
+      fbListener.processCueData(gameplayFrame(CueType.Chorus))
+
+      expect(dispatchedCues()).toContain(CueType.Chorus)
+    })
+
+    it('treats the first blackout after a real cue as a window reset', () => {
+      // A real cue, then a single legitimate blackout: the blackout restarts the window, so the
+      // fallback must not fire just because the *real* cue is now older than the window.
+      fbListener.processCueData(gameplayFrame(CueType.Verse))
+      jest.advanceTimersByTime(FALLBACK_MS - 500)
+      fbListener.processCueData(gameplayFrame(CueType.Blackout_Fast)) // first blackout resets window
+      jest.advanceTimersByTime(FALLBACK_MS - 500) // older than the window since Verse, but not since the blackout
+
+      expect(dispatchedCues()).not.toContain(CueType.Fallback)
     })
   })
 

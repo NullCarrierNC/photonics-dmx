@@ -216,3 +216,54 @@ describe('YargCueHandler vocal note edge detection', () => {
     expect(onVocalNote).toHaveBeenNthCalledWith(2, false)
   })
 })
+
+describe('YargCueHandler Fallback motion suppression', () => {
+  let registry: YargCueRegistry
+
+  beforeEach(() => {
+    registry = YargCueRegistry.getInstance()
+    jest.restoreAllMocks()
+  })
+
+  it('does not pick a motion cue when the Fallback cue fires', async () => {
+    const primary = makeFakeCue(CueStyle.Primary, 'primary:Fallback')
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(primary)
+    const getRandomMotionCue = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
+
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+
+    await handler.handleCue(CueType.Fallback, gameplayCueData({ lightingCue: CueType.Fallback }))
+
+    // The Fallback look still runs, but no automatic motion cue is picked.
+    expect(primary.execute).toHaveBeenCalledTimes(1)
+    expect(getRandomMotionCue).not.toHaveBeenCalled()
+  })
+
+  it('clears a running motion cue when the Fallback fires', async () => {
+    const fallback = makeFakeCue(CueStyle.Primary, 'primary:Fallback')
+    const motion = makeFakeCue(CueStyle.Primary, 'motion')
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(fallback)
+    const getRandomMotionCue = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
+
+    const sequencer = makeSequencer()
+    const handler = new YargCueHandler(makeLightManager(), sequencer)
+
+    // Seed a freshly-started motion cue from a previous (real) cue. startTime = now keeps it inside
+    // the min-hold so the unpatched handler would re-execute it rather than clear it.
+    const internals = handler as unknown as {
+      currentMotionCue: INetCue | null
+      currentMotionCueStartTime: number | null
+    }
+    internals.currentMotionCue = motion
+    internals.currentMotionCueStartTime = monotonicNowMs()
+
+    await handler.handleCue(CueType.Fallback, gameplayCueData({ lightingCue: CueType.Fallback }))
+
+    // The leftover motion is stopped and the heads homed; nothing new is picked or executed.
+    expect(motion.onStop).toHaveBeenCalledTimes(1)
+    expect(sequencer.schedulePanTiltClear).toHaveBeenCalled()
+    expect(getRandomMotionCue).not.toHaveBeenCalled()
+    expect(motion.execute).not.toHaveBeenCalled()
+    expect(internals.currentMotionCue).toBeNull()
+  })
+})

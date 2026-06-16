@@ -374,7 +374,10 @@ class YargCueHandler extends EventEmitter {
     // Strobe cues run in their own slot and must not drive motion selection (which is gated on
     // the primary cue's executionCount); only non-strobe cues touch the motion pick.
     if (trackMode !== 'simulated' && !incomingIsStrobe) {
-      if (!this.motionEnabled) {
+      // The Fallback is a self-contained idle look; never layer an automatic motion cue on top of
+      // it. Treat it like motion-disabled so any motion left over from the previous cue is stopped
+      // (and the heads homed) and no new pick is made.
+      if (!this.motionEnabled || cueType === CueType.Fallback) {
         if (this.currentMotionCue) {
           this.currentMotionCue.onStop?.()
           this.currentMotionCue = null
