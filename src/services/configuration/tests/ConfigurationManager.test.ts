@@ -534,6 +534,9 @@ describe('ConfigurationManager', () => {
       cm.getActiveRigs()
       cm.getDmxRig('rig-1')
 
+      // Saves are serialized onto a promise chain, so the heal-write lands a microtask later.
+      await new Promise((resolve) => setImmediate(resolve))
+
       const rigsWrites = (fsPromises.writeFile as jest.Mock).mock.calls.filter((c) =>
         String(c[0]).includes('dmxRigs.json'),
       )
