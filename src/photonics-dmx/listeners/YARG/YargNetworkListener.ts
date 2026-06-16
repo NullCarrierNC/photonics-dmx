@@ -9,6 +9,7 @@ import {
   StrobeState,
   CueType,
   isCueType,
+  isNonDrivingCueType,
   lightingCueMap,
   InstrumentNoteType,
   DrumNoteType,
@@ -118,11 +119,11 @@ export class YargNetworkListener extends EventEmitter {
   // --- Fallback cue tracking ---
   /** Reads the configured Fallback Time (ms). 0 disables the feature. */
   private readonly getFallbackCueTimeMs: () => number
-  /** Last lighting cue value forwarded from YARG; used to detect a *changed* cue. */
-  private lastYargLightingCue: CueType | null = null
-  /** Monotonic time the YARG lighting cue last changed (reset on song start). */
-  private lastYargCueChangeAt = 0
-  /** True while the auto Fallback cue is the current look (stale YARG re-sends are suppressed). */
+  /** Monotonic time the fallback window last restarted: every real cue, and the first blackout / no-cue of a run, reset it; a continuing run of blackouts does not, so a song that only streams blackouts falls through to the Fallback. */
+  private lastCueReceivedAt = 0
+  /** True when the previous lighting cue was non-driving (blackout / no-cue). The first such cue after a real cue still resets the window; only a continuing run of them is treated as non-driving. */
+  private inNonDrivingRun = false
+  /** True while the auto Fallback cue is the current look; any received cue clears it. */
   private fallbackActive = false
   /** Monotonic time the Fallback cue last fired; gates the re-fire window. */
   private lastFallbackFireAt = 0
@@ -232,11 +233,14 @@ export class YargNetworkListener extends EventEmitter {
       this.fallbackTimer = null
     }
     this.fallbackActive = false
+    this.inNonDrivingRun = false
   }
 
   /**
-   * Fire the auto Fallback cue when a song is playing and no *new* YARG lighting cue has arrived
-   * within the configured window. Re-fires every window so the registry can re-select a (possibly
+   * Fire the auto Fallback cue when a song is playing and no *driving* YARG lighting cue has been
+   * received within the configured window — i.e. YARG has gone silent, or is only streaming a
+   * continuing run of blackout / no-cue cues (the first blackout of a run still counts as driving;
+   * see isNonDrivingCueType). Re-fires every window so the registry can re-select a (possibly
    * different) implementation. Runs independently of incoming packets so it still triggers when
    * YARG stops sending entirely. Only fires during Gameplay and never while paused; a Fallback Time
    * of 0 disables it.
@@ -254,7 +258,7 @@ export class YargNetworkListener extends EventEmitter {
       return
     }
     const now = monotonicNowMs()
-    const reference = this.fallbackActive ? this.lastFallbackFireAt : this.lastYargCueChangeAt
+    const reference = this.fallbackActive ? this.lastFallbackFireAt : this.lastCueReceivedAt
     if (now - reference < fallbackMs) {
       return
     }
@@ -542,18 +546,26 @@ export class YargNetworkListener extends EventEmitter {
 
     const cueType = YargCueData.lightingCue
     if (cueType && isCueType(cueType)) {
-      // Track changed cues for the fallback timer: a *different* lighting cue resets the window and
-      // cancels any active Fallback (the real cue takes over immediately). While the Fallback is
-      // active, stale re-sends of the same cue are suppressed so they don't clobber it.
-      const changed = cueType !== this.lastYargLightingCue
-      if (changed) {
-        this.lastYargLightingCue = cueType
-        this.lastYargCueChangeAt = monotonicNowMs()
+      // Fallback cue support: some songs contain a venue track that is just blackout cues, etc.
+      // YARG won't autogen for these, so we see if we keep getting non-driving cues, if so trigger the fallback.
+      const nonDriving = isNonDrivingCueType(cueType)
+      // A blackout/no-cue can be a legitimate look, so the *first* one after a real cue still resets
+      // the window like any cue. Only a continuing run of them is non-driving — that's what lets a
+      // song streaming blackouts fall through to the Fallback.
+      const continuingBlackoutRun = nonDriving && this.inNonDrivingRun
+      if (continuingBlackoutRun) {
+        // Non-driving: don't reset the window; suppress while the Fallback owns the look.
+        if (!this.fallbackActive) {
+          this.cueHandler.handleCue(cueType, YargCueData)
+        }
+      } else {
+        // Real cue, or the first blackout of a run: YARG is actively driving the lights. Reset the
+        // window and clear any active Fallback so this cue takes over immediately.
+        this.lastCueReceivedAt = monotonicNowMs()
         this.fallbackActive = false
         this.cueHandler.handleCue(cueType, YargCueData)
-      } else if (!this.fallbackActive) {
-        this.cueHandler.handleCue(cueType, YargCueData)
       }
+      this.inNonDrivingRun = nonDriving
     } else {
       log.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
     }
@@ -959,10 +971,10 @@ export class YargNetworkListener extends EventEmitter {
       // Handle Menu -> Gameplay transition (song start)
       if (this.lastScene === 'Menu' && currentScene === 'Gameplay') {
         log.info('YARG: Song starting - triggering blackout to clear menu lighting')
-        // Reset the fallback timer so the first real cue counts as a change and the window starts fresh.
-        this.lastYargLightingCue = null
-        this.lastYargCueChangeAt = monotonicNowMs()
+        // Reset the fallback window so it starts fresh from song start.
+        this.lastCueReceivedAt = monotonicNowMs()
         this.fallbackActive = false
+        this.inNonDrivingRun = false
         this.cueHandler.notifySongStart()
         // Trigger a fast blackout to clear any menu lighting
         this.cueHandler.handleCue(CueType.Blackout_Fast, {

@@ -392,6 +392,22 @@ export function isStrobeCueType(cueType: CueType): boolean {
 }
 
 /**
+ * Cues that signal "no real lighting" — YARG sends a fast blackout or an explicit no-cue when a
+ * song has no lighting to drive. The YARG Fallback treats a *continuing run* of these as
+ * non-driving (the first one after a real cue still resets the window), so it can take over when a
+ * song streams them past the window.
+ */
+export const NON_DRIVING_CUE_TYPES: readonly CueType[] = [
+  CueType.Blackout_Fast,
+  CueType.NoCue,
+] as const
+
+/** True for cues that signal "no real lighting" (see NON_DRIVING_CUE_TYPES). */
+export function isNonDrivingCueType(cueType: CueType): boolean {
+  return NON_DRIVING_CUE_TYPES.includes(cueType)
+}
+
+/**
  * Maps a strobe CueType to its speed slot. Returns null for {@link CueType.Strobe_Off} and any
  * non-strobe cue type.
  */
