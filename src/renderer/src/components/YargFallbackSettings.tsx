@@ -61,10 +61,16 @@ const YargFallbackSettings: React.FC = () => {
         Fallback Cue (YARG)
       </h2>
 
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+        If a song has a venue track that is just blackout cues, etc., YARG won't autogenerate a show
+        or send any cues, causing the lights to turn off for the duration of the song. To prevent
+        this, you can set a Fallback Time here. If Photonics hasn't received a new cue within the
+        Fallback Time, it will trigger a fallback cue.{' '}
+      </p>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        If a track has a bad lighting track, YARG won't autogenerate a show or send any cues,
-        causing the lights to turn off. If Photonics hasn't received a new cue within the Fallback
-        Time, it will trigger a fallback cue. Set to <strong>0</strong> to disable.
+        Set to <strong>0</strong> to disable. Increase if you notice the fallback triggering during
+        portions of the song where blackout is legitimately expected. Recommended to set it to at
+        least 10 seconds. Decrease to switch to fallback more quickly.
       </p>
 
       <div>
