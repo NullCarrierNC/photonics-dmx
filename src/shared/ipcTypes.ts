@@ -15,6 +15,7 @@
 import {
   NODE_CUES,
   EFFECTS,
+  RIGS,
   WINDOW,
   SHELL,
   LIFECYCLE,
@@ -233,6 +234,18 @@ export interface IpcInvokeMap {
   [EFFECTS.EXPORT]: {
     request: string
     response: { success: true; path: string } | IpcErrorResult
+  }
+
+  // ---- Rigs (import / export) ----
+  [RIGS.EXPORT]: {
+    request: string // rigId
+    response: { success: true; path: string } | IpcErrorResult
+  }
+  [RIGS.IMPORT_PICK]: {
+    request: void
+    response:
+      | { success: true; sourceBasename: string; rig: DmxRig; templates: DmxFixture[] }
+      | IpcErrorResult
   }
 
   // ---- Lifecycle ----

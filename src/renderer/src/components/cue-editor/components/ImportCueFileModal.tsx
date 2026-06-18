@@ -159,18 +159,6 @@ const ImportCueFileModal: React.FC<Props> = ({
             Import
           </button>
         </div>
-
-        <p className="text-xs text-gray-500 mt-3">
-          Press{' '}
-          <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600">
-            Cmd+Enter
-          </kbd>{' '}
-          to import,{' '}
-          <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600">
-            Esc
-          </kbd>{' '}
-          to cancel
-        </p>
       </div>
     </div>
   )

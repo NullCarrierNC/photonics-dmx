@@ -29,6 +29,12 @@ export const EFFECTS = {
   EXPORT: 'effects:export',
 } as const
 
+// ---- Rigs (import / export) ----
+export const RIGS = {
+  EXPORT: 'rigs:export',
+  IMPORT_PICK: 'rigs:import-pick',
+} as const
+
 // ---- Window ----
 export const WINDOW = {
   OPEN_CUE_EDITOR: 'open-cue-editor-window',
@@ -177,6 +183,7 @@ export const CONFIG = {
 export const CHANNELS = {
   ...NODE_CUES,
   ...EFFECTS,
+  ...RIGS,
   ...WINDOW,
   ...SHELL,
   ...LIFECYCLE,
