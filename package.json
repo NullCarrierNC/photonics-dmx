@@ -101,7 +101,9 @@
   },
   "overrides": {
     "esbuild": "0.25.12",
-    "three-mesh-bvh": "^0.8.0"
+    "three-mesh-bvh": "^0.8.0",
+    "js-yaml": "4.2.0",
+    "jest-mock": "30.4.1"
   },
   "engines": {
     "node": ">=22.12.0"
