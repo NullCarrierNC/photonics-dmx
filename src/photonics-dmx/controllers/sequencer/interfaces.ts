@@ -108,23 +108,6 @@ export interface ILayerManager {
 }
 
 /**
- * @interface IEventScheduler
- * @description Centralized tracking of scheduled events
- */
-export interface IEventScheduler {
-  // Clock integration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- clock interface from external lib
-  registerWithClock(clock: any): void
-  unregisterFromClock(): void
-
-  // Additional scheduling methods
-  scheduleEventAt(targetTime: number, callback: () => void): string
-  scheduleRepeatingEvent(callback: () => void, interval: number, initialDelay?: number): string
-  removeEvent(eventId: string): void
-  destroy(): void
-}
-
-/**
  * @interface ITransitionEngine
  * @description Handles moving effect transitions through their states
  */
@@ -232,6 +215,8 @@ export interface ISongEventHandler {
   onGuitarNote(noteType: InstrumentNoteType): void
   onBassNote(noteType: InstrumentNoteType): void
   onKeysNote(noteType: InstrumentNoteType): void
+  /** Vocal note edge: true = note-on (singing started), false = note-off (singing stopped). */
+  onVocalNote(active: boolean): void
   handleEvent(
     eventType:
       | 'beat'
@@ -265,7 +250,9 @@ export interface ISongEventHandler {
       | 'keys-red'
       | 'keys-yellow'
       | 'keys-blue'
-      | 'keys-orange',
+      | 'keys-orange'
+      | 'vocal-note'
+      | 'vocal-note-off',
   ): void
 }
 
@@ -395,6 +382,8 @@ export interface ILightingController {
   onGuitarNote(noteType: InstrumentNoteType): void
   onBassNote(noteType: InstrumentNoteType): void
   onKeysNote(noteType: InstrumentNoteType): void
+  /** Vocal note edge: true = note-on (singing started), false = note-off (singing stopped). */
+  onVocalNote(active: boolean): void
 
   // System effects methods
   blackout(duration: number): Promise<void>

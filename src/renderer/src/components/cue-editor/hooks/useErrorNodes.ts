@@ -64,5 +64,15 @@ export function useErrorNodes(currentGraphId: string | null): Set<string> {
     }
   }, [currentGraphId])
 
+  useEffect(() => {
+    // Clear pending error-highlight timers on unmount so their callbacks do not run setState
+    // after the component is gone.
+    const timers = timersRef.current
+    return () => {
+      for (const t of timers.values()) clearTimeout(t)
+      timers.clear()
+    }
+  }, [])
+
   return errorNodeIds
 }

@@ -8,6 +8,8 @@ import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { Rb3MenuCueHandler } from '../../cueHandlers/Rb3MenuCueHandler'
 import { Rb3StageKitDirectProcessor } from '../../processors/Rb3StageKitDirectProcessor'
+import { ChainFanout } from '../../controllers/ChainFanout'
+import type { RigChain } from '../../controllers/RigChain'
 import { getColor } from '../../helpers/dmxHelpers'
 import { CueData } from '../../cues/types/cueTypes'
 import { Effect, RGBIO } from '../../types'
@@ -142,7 +144,20 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     } as unknown as ILightingController
 
     menuHandler = new Rb3MenuCueHandler(lightManager, photonicsSequencer)
-    processor = new Rb3StageKitDirectProcessor(lightManager, photonicsSequencer, {}, menuHandler)
+    // Single-rig fanout: the processor builds one Rb3StageKitRigProcessor from the chain.
+    const chainFanout = new ChainFanout()
+    chainFanout.setChains([
+      {
+        rigId: 'primary',
+        isPrimary: true,
+        dmxLightManager: lightManager,
+        sequencer: photonicsSequencer,
+        yargCueHandler: null,
+        audioCueHandler: null,
+        rb3MenuCueHandler: menuHandler,
+      } as unknown as RigChain,
+    ])
+    processor = new Rb3StageKitDirectProcessor(chainFanout, {}, menuHandler)
     processor.startListening(networkListener)
   })
 

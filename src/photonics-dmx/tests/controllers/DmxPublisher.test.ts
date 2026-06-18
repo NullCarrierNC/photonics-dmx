@@ -11,13 +11,29 @@ import type { DmxRig, FixtureConfig, LightingConfiguration, RGBIO } from '../../
 import { FixtureTypes } from '../../types'
 import { mirrorDmxForMovingHeadInvert, percentToDmx } from '../../helpers/dmxHelpers'
 
+/**
+ * Minimal SenderManager stub: one wire sender ('sacn'), no IPC. With routing in place the
+ * publisher dispatches per slot, so tests assert against the single 'sacn' send call.
+ */
+function makeMockSenderManager(): {
+  send: ReturnType<typeof jest.fn>
+  getEnabledWireSenders: ReturnType<typeof jest.fn>
+  isIpcEnabled: ReturnType<typeof jest.fn>
+} {
+  return {
+    send: jest.fn().mockImplementation(() => Promise.resolve()),
+    getEnabledWireSenders: jest.fn(() => ['sacn']),
+    isIpcEnabled: jest.fn(() => false),
+  }
+}
+
 describe('DmxPublisher', () => {
-  let mockSenderManager: { send: ReturnType<typeof jest.fn> }
+  let mockSenderManager: ReturnType<typeof makeMockSenderManager>
   let mockLightStateManager: LightStateManager
   let publisher: DmxPublisher
 
   beforeEach(() => {
-    mockSenderManager = { send: jest.fn().mockImplementation(() => Promise.resolve()) }
+    mockSenderManager = makeMockSenderManager()
     mockLightStateManager = new LightStateManager()
     publisher = new DmxPublisher(
       mockSenderManager as unknown as SenderManager,
@@ -35,7 +51,8 @@ describe('DmxPublisher', () => {
     publisher.publish(lights)
 
     expect(mockSenderManager.send).toHaveBeenCalled()
-    const [buffer] = jest.mocked(mockSenderManager.send).mock.calls[0]
+    const [slotId, buffer] = jest.mocked(mockSenderManager.send).mock.calls[0]
+    expect(slotId).toBe('sacn')
     expect(typeof buffer).toBe('object')
   })
 
@@ -114,7 +131,7 @@ describe('DmxPublisher', () => {
         blendMode: 'replace',
       })
       pub.publish(lights)
-      const [sentBuffer] = jest.mocked(mockSenderManager.send).mock.calls[0]
+      const [, sentBuffer] = jest.mocked(mockSenderManager.send).mock.calls[0]
       return sentBuffer as Record<number, number>
     }
 
@@ -145,7 +162,7 @@ describe('DmxPublisher', () => {
       const bufFallback = publishWithNoPanTilt(rig)
 
       const pubLive = new DmxPublisher(
-        { send: jest.fn().mockImplementation(() => Promise.resolve()) } as unknown as SenderManager,
+        makeMockSenderManager() as unknown as SenderManager,
         new LightStateManager(),
       )
       pubLive.updateActiveRigs([rig])
@@ -161,7 +178,7 @@ describe('DmxPublisher', () => {
         tilt: tiltHome,
       })
       pubLive.publish(lightsLive)
-      const [liveBuf] = jest.mocked(
+      const [, liveBuf] = jest.mocked(
         (pubLive as unknown as { _sender: { send: jest.Mock } })._sender.send,
       ).mock.calls[0]
 
@@ -211,7 +228,7 @@ describe('DmxPublisher', () => {
       const bufFallback = publishWithNoPanTilt(rig)
 
       const pubLive = new DmxPublisher(
-        { send: jest.fn().mockImplementation(() => Promise.resolve()) } as unknown as SenderManager,
+        makeMockSenderManager() as unknown as SenderManager,
         new LightStateManager(),
       )
       pubLive.updateActiveRigs([rig])
@@ -227,7 +244,7 @@ describe('DmxPublisher', () => {
         tilt: tiltHome,
       })
       pubLive.publish(lightsLive)
-      const [liveBuf] = jest.mocked(
+      const [, liveBuf] = jest.mocked(
         (pubLive as unknown as { _sender: { send: jest.Mock } })._sender.send,
       ).mock.calls[0]
 
@@ -239,8 +256,10 @@ describe('DmxPublisher', () => {
   it('setManualBuffer with empty map sends full-universe blackout (512 channels at 0)', () => {
     mockSenderManager.send.mockClear()
     publisher.setManualBuffer({})
+    // Console mode broadcasts to every enabled slot; our mock advertises one ('sacn').
     expect(mockSenderManager.send).toHaveBeenCalledTimes(1)
-    const [sent] = jest.mocked(mockSenderManager.send).mock.calls[0]
+    const [slotId, sent] = jest.mocked(mockSenderManager.send).mock.calls[0]
+    expect(slotId).toBe('sacn')
     const buf = sent as Record<number, number>
     expect(Object.keys(buf).length).toBe(512)
     for (let ch = 1; ch <= 512; ch++) {
@@ -254,7 +273,10 @@ describe('DmxPublisher', () => {
     mockSenderManager.send.mockClear()
 
     publisher.setManualBuffer({ 1: 128, 2: 64 })
-    expect(mockSenderManager.send).toHaveBeenCalledWith(expect.objectContaining({ 1: 128, 2: 64 }))
+    expect(mockSenderManager.send).toHaveBeenCalledWith(
+      'sacn',
+      expect.objectContaining({ 1: 128, 2: 64 }),
+    )
 
     mockSenderManager.send.mockClear()
     const lights = new Map<string, import('../../types').RGBIO>()

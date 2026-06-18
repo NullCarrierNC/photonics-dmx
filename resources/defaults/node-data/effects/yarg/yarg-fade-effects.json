@@ -1,0 +1,2129 @@
+{
+  "version": 1,
+  "cueVersion": 1,
+  "mode": "yarg",
+  "group": {
+    "id": "yarg-fade-effects",
+    "name": "Fade Effects",
+    "description": "Reusable fade effects: a multi-colour dissolve and fading stepping rotations."
+  },
+  "effects": [
+    {
+      "id": "effect-color-cycle",
+      "mode": "yarg",
+      "name": "Colour Cycle",
+      "description": "Dissolves through up to four colours, advancing one colour per beat or measure.",
+      "parameters": [],
+      "variables": [
+        {
+          "name": "lights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "description": "Target lights",
+          "isParameter": true
+        },
+        {
+          "name": "layer",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "DMX layer",
+          "isParameter": true
+        },
+        {
+          "name": "color1",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "red",
+          "description": "Colour 1",
+          "isParameter": true
+        },
+        {
+          "name": "color2",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "green",
+          "description": "Colour 2",
+          "isParameter": true
+        },
+        {
+          "name": "color3",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "blue",
+          "description": "Colour 3",
+          "isParameter": true
+        },
+        {
+          "name": "color4",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "red",
+          "description": "Colour 4 (set equal to colour 1 for a 3-colour cycle)",
+          "isParameter": true
+        },
+        {
+          "name": "brightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "high",
+          "description": "Brightness",
+          "isParameter": true
+        },
+        {
+          "name": "blendMode",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "mix",
+          "description": "Blend mode",
+          "isParameter": true
+        },
+        {
+          "name": "duration",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 200,
+          "description": "Fade transition duration (ms)",
+          "isParameter": true
+        },
+        {
+          "name": "crossFadeTrigger",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "beat",
+          "description": "Event that advances to the next colour",
+          "isParameter": true
+        }
+      ],
+      "nodes": {
+        "events": [],
+        "actions": [
+          {
+            "id": "cycle-1",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "lights"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color1"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "duration"
+              },
+              "waitUntilCondition": {
+                "source": "variable",
+                "name": "crossFadeTrigger"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          },
+          {
+            "id": "cycle-2",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "lights"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color2"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "duration"
+              },
+              "waitUntilCondition": {
+                "source": "variable",
+                "name": "crossFadeTrigger"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          },
+          {
+            "id": "cycle-3",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "lights"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color3"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "duration"
+              },
+              "waitUntilCondition": {
+                "source": "variable",
+                "name": "crossFadeTrigger"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          },
+          {
+            "id": "cycle-4",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "lights"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color4"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "duration"
+              },
+              "waitUntilCondition": {
+                "source": "variable",
+                "name": "crossFadeTrigger"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectListeners": [
+          {
+            "id": "cycle-listener",
+            "type": "effect-listener",
+            "label": "Colour Cycle Entry",
+            "outputs": []
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "cycle-listener",
+          "to": "cycle-1"
+        },
+        {
+          "from": "cycle-1",
+          "to": "cycle-2"
+        },
+        {
+          "from": "cycle-2",
+          "to": "cycle-3"
+        },
+        {
+          "from": "cycle-3",
+          "to": "cycle-4"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "cycle-1": {
+            "x": -4.592828867956996,
+            "y": 95.86837397143245
+          },
+          "cycle-2": {
+            "x": 11.324557291343808,
+            "y": 247.14061065763235
+          },
+          "cycle-3": {
+            "x": 5.017678057774901,
+            "y": 392.21577168256044
+          },
+          "cycle-4": {
+            "x": -11.146157098934054,
+            "y": 551.3383744694293
+          },
+          "cycle-listener": {
+            "x": 3.73422166518867,
+            "y": 1.2503603249788284
+          }
+        },
+        "viewport": {
+          "x": 518.9330999278463,
+          "y": 160.77922445209697,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "effect-rotation-fade-cw",
+      "mode": "yarg",
+      "name": "Rotation CW (fade)",
+      "description": "A stepping rotation whose lit/dark gap fades in and out quickly instead of snapping on and off.",
+      "parameters": [],
+      "variables": [
+        {
+          "name": "lights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "description": "Target lights",
+          "isParameter": true
+        },
+        {
+          "name": "layer",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "DMX layer",
+          "isParameter": true
+        },
+        {
+          "name": "color",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "white",
+          "description": "Colour name",
+          "isParameter": true
+        },
+        {
+          "name": "brightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "medium",
+          "description": "Brightness level",
+          "isParameter": true
+        },
+        {
+          "name": "blendMode",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "add",
+          "description": "Blend mode",
+          "isParameter": true
+        },
+        {
+          "name": "beatsPerCycle",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "Beats per full rotation cycle",
+          "isParameter": true
+        },
+        {
+          "name": "startOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Starting light index offset",
+          "isParameter": true
+        },
+        {
+          "name": "waitUntilCondition",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "beat",
+          "description": "Event type to count per phase (beat, keyframe)",
+          "isParameter": true
+        },
+        {
+          "name": "waitUntilConditionCount",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Additional condition count offset applied to all phases",
+          "isParameter": true
+        },
+        {
+          "name": "waitUntilTime",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Ms to wait per phase when waitUntilCondition is delay",
+          "isParameter": true
+        },
+        {
+          "name": "groupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "Iterate in groups of this many lights (e.g. 2 for opposite pairs)",
+          "isParameter": true
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "numGroups",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "phase2Count",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "currentLight",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "idx",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "raw1",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "raw2",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "stepsOn",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "numMinus",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "stepsOff",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "waitBeats",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "p1Count",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "remainBeats",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "p3Count",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "groupLayer",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ],
+      "nodes": {
+        "events": [],
+        "actions": [
+          {
+            "id": "rcw-phase1",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "currentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 0
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 180
+              },
+              "waitUntilCondition": {
+                "source": "variable",
+                "name": "waitUntilCondition"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "waitUntilTime"
+              },
+              "waitUntilConditionCount": {
+                "source": "variable",
+                "name": "p1Count"
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "groupLayer"
+            }
+          },
+          {
+            "id": "rcw-phase2",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "currentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 180
+              },
+              "waitUntilCondition": {
+                "source": "variable",
+                "name": "waitUntilCondition"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "waitUntilTime"
+              },
+              "waitUntilConditionCount": {
+                "source": "variable",
+                "name": "phase2Count"
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "groupLayer"
+            }
+          },
+          {
+            "id": "rcw-phase3",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "currentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 0
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 180
+              },
+              "waitUntilCondition": {
+                "source": "variable",
+                "name": "waitUntilCondition"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "waitUntilTime"
+              },
+              "waitUntilConditionCount": {
+                "source": "variable",
+                "name": "p3Count"
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "groupLayer"
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "rcw-num-lights",
+            "type": "logic",
+            "logicType": "array-length",
+            "label": "numLights",
+            "outputs": [],
+            "sourceVariable": "lights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "rcw-num-groups",
+            "type": "logic",
+            "logicType": "math",
+            "label": "numGroups = numLights / groupSize",
+            "outputs": [],
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "variable",
+              "name": "groupSize"
+            },
+            "assignTo": "numGroups"
+          },
+          {
+            "id": "rcw-phase2-count",
+            "type": "logic",
+            "logicType": "math",
+            "label": "phase2Count",
+            "outputs": [],
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "beatsPerCycle"
+            },
+            "right": {
+              "source": "variable",
+              "name": "waitUntilConditionCount"
+            },
+            "assignTo": "phase2Count"
+          },
+          {
+            "id": "rcw-foreach",
+            "type": "logic",
+            "logicType": "for-each-light",
+            "label": "for-each-light",
+            "outputs": [],
+            "sourceVariable": "lights",
+            "currentLightVariable": "currentLight",
+            "currentIndexVariable": "idx",
+            "groupSize": {
+              "source": "variable",
+              "name": "groupSize"
+            }
+          },
+          {
+            "id": "rcw-raw1",
+            "type": "logic",
+            "logicType": "math",
+            "label": "raw1 = idx - startOffset",
+            "outputs": [],
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "idx"
+            },
+            "right": {
+              "source": "variable",
+              "name": "startOffset"
+            },
+            "assignTo": "raw1"
+          },
+          {
+            "id": "rcw-raw2",
+            "type": "logic",
+            "logicType": "math",
+            "label": "raw2 = raw1 + numGroups",
+            "outputs": [],
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "raw1"
+            },
+            "right": {
+              "source": "variable",
+              "name": "numGroups"
+            },
+            "assignTo": "raw2"
+          },
+          {
+            "id": "rcw-steps-on",
+            "type": "logic",
+            "logicType": "math",
+            "label": "stepsOn = raw2 % numGroups",
+            "outputs": [],
+            "operator": "modulus",
+            "left": {
+              "source": "variable",
+              "name": "raw2"
+            },
+            "right": {
+              "source": "variable",
+              "name": "numGroups"
+            },
+            "assignTo": "stepsOn"
+          },
+          {
+            "id": "rcw-num-minus",
+            "type": "logic",
+            "logicType": "math",
+            "label": "numMinus = numGroups - stepsOn",
+            "outputs": [],
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "numGroups"
+            },
+            "right": {
+              "source": "variable",
+              "name": "stepsOn"
+            },
+            "assignTo": "numMinus"
+          },
+          {
+            "id": "rcw-steps-off",
+            "type": "logic",
+            "logicType": "math",
+            "label": "stepsOff = numMinus - 1",
+            "outputs": [],
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "numMinus"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            },
+            "assignTo": "stepsOff"
+          },
+          {
+            "id": "rcw-wait-beats",
+            "type": "logic",
+            "logicType": "math",
+            "label": "waitBeats = stepsOn * beatsPerCycle",
+            "outputs": [],
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "stepsOn"
+            },
+            "right": {
+              "source": "variable",
+              "name": "beatsPerCycle"
+            },
+            "assignTo": "waitBeats"
+          },
+          {
+            "id": "rcw-p1-count",
+            "type": "logic",
+            "logicType": "math",
+            "label": "p1Count = waitBeats + offset",
+            "outputs": [],
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "waitBeats"
+            },
+            "right": {
+              "source": "variable",
+              "name": "waitUntilConditionCount"
+            },
+            "assignTo": "p1Count"
+          },
+          {
+            "id": "rcw-remain-beats",
+            "type": "logic",
+            "logicType": "math",
+            "label": "remainBeats = stepsOff * beatsPerCycle",
+            "outputs": [],
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "stepsOff"
+            },
+            "right": {
+              "source": "variable",
+              "name": "beatsPerCycle"
+            },
+            "assignTo": "remainBeats"
+          },
+          {
+            "id": "rcw-p3-count",
+            "type": "logic",
+            "logicType": "math",
+            "label": "p3Count = remainBeats + offset",
+            "outputs": [],
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "remainBeats"
+            },
+            "right": {
+              "source": "variable",
+              "name": "waitUntilConditionCount"
+            },
+            "assignTo": "p3Count"
+          },
+          {
+            "id": "rcw-group-layer",
+            "type": "logic",
+            "logicType": "math",
+            "label": "groupLayer = idx + layer",
+            "outputs": [],
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "idx"
+            },
+            "right": {
+              "source": "variable",
+              "name": "layer"
+            },
+            "assignTo": "groupLayer"
+          },
+          {
+            "id": "rcw-cond-skip-p1",
+            "type": "logic",
+            "logicType": "conditional",
+            "label": "stepsOn == 0 (skip phase1)",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "stepsOn"
+            },
+            "right": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectListeners": [
+          {
+            "id": "rcw-listener",
+            "type": "effect-listener",
+            "label": "Rotation CW Entry",
+            "outputs": []
+          }
+        ],
+        "notes": [
+          {
+            "id": "notes-602af270-549c-43e5-939b-b9dae67901ed",
+            "type": "notes",
+            "label": "Notes",
+            "note": "For each normally increments by 1.\nGroup Size lets us increment by X, while also reducing\nthe number of iterations / X.\n\nE.g. groupSize 2 means for each step we iterate two\nlights instead of one, and halve the total number\nof iterations. \n\nThis is used by cues like Score to move groups of two\ndefined lights in a clockwise pattern.",
+            "style": "notes",
+            "title": "For Each Light & Group Size"
+          }
+        ]
+      },
+      "connections": [
+        {
+          "from": "rcw-listener",
+          "to": "rcw-num-lights"
+        },
+        {
+          "from": "rcw-num-lights",
+          "to": "rcw-num-groups"
+        },
+        {
+          "from": "rcw-num-groups",
+          "to": "rcw-phase2-count"
+        },
+        {
+          "from": "rcw-phase2-count",
+          "to": "rcw-foreach"
+        },
+        {
+          "from": "rcw-foreach",
+          "to": "rcw-raw1",
+          "fromPort": "each"
+        },
+        {
+          "from": "rcw-raw1",
+          "to": "rcw-raw2"
+        },
+        {
+          "from": "rcw-raw2",
+          "to": "rcw-steps-on"
+        },
+        {
+          "from": "rcw-steps-on",
+          "to": "rcw-num-minus"
+        },
+        {
+          "from": "rcw-num-minus",
+          "to": "rcw-steps-off"
+        },
+        {
+          "from": "rcw-steps-off",
+          "to": "rcw-wait-beats"
+        },
+        {
+          "from": "rcw-wait-beats",
+          "to": "rcw-p1-count"
+        },
+        {
+          "from": "rcw-p1-count",
+          "to": "rcw-remain-beats"
+        },
+        {
+          "from": "rcw-remain-beats",
+          "to": "rcw-p3-count"
+        },
+        {
+          "from": "rcw-p3-count",
+          "to": "rcw-group-layer"
+        },
+        {
+          "from": "rcw-group-layer",
+          "to": "rcw-cond-skip-p1"
+        },
+        {
+          "from": "rcw-phase1",
+          "to": "rcw-phase2"
+        },
+        {
+          "from": "rcw-phase2",
+          "to": "rcw-phase3"
+        },
+        {
+          "from": "rcw-cond-skip-p1",
+          "to": "rcw-phase2",
+          "fromPort": "true"
+        },
+        {
+          "from": "rcw-cond-skip-p1",
+          "to": "rcw-phase1",
+          "fromPort": "false"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rcw-phase1": {
+            "x": 541.8337226850263,
+            "y": 726.5115696092917
+          },
+          "rcw-phase2": {
+            "x": 414.830193458125,
+            "y": 874.5821022465825
+          },
+          "rcw-phase3": {
+            "x": 512.5600661411881,
+            "y": 1071.5626748725772
+          },
+          "rcw-num-lights": {
+            "x": 18.74771647610646,
+            "y": 21.49379898607731
+          },
+          "rcw-num-groups": {
+            "x": 51.56838946372727,
+            "y": 135.51311212236578
+          },
+          "rcw-phase2-count": {
+            "x": -3.0710418429225683,
+            "y": 242.5238067880273
+          },
+          "rcw-foreach": {
+            "x": 57.606060981399196,
+            "y": 344.8109013219878
+          },
+          "rcw-raw1": {
+            "x": 5.957706185057759,
+            "y": 493.7191869430244
+          },
+          "rcw-raw2": {
+            "x": -8.61822547763586,
+            "y": 627.1159091852605
+          },
+          "rcw-steps-on": {
+            "x": 7.073440158739686,
+            "y": 740.4274326591853
+          },
+          "rcw-num-minus": {
+            "x": -7.229431226849556,
+            "y": 876.2184264026582
+          },
+          "rcw-steps-off": {
+            "x": -7.443002516403794,
+            "y": 995.986811876297
+          },
+          "rcw-wait-beats": {
+            "x": 4.694199252873659,
+            "y": 1128.4931761659682
+          },
+          "rcw-p1-count": {
+            "x": 433.816974459216,
+            "y": 115.58717913925648
+          },
+          "rcw-remain-beats": {
+            "x": 436.54985389485955,
+            "y": 248.1399392671883
+          },
+          "rcw-p3-count": {
+            "x": 425.0147430617362,
+            "y": 373.518596727401
+          },
+          "rcw-group-layer": {
+            "x": 437.68553806096315,
+            "y": 493.70473389700055
+          },
+          "rcw-cond-skip-p1": {
+            "x": 423.8441032078117,
+            "y": 618.8741846941411
+          },
+          "rcw-listener": {
+            "x": -26.446016296744347,
+            "y": -91.09577898681164
+          },
+          "notes-602af270-549c-43e5-939b-b9dae67901ed": {
+            "x": -344.7859663395264,
+            "y": 292.680286774842
+          }
+        },
+        "viewport": {
+          "x": 381.14670456389763,
+          "y": -6.1913163395785205,
+          "zoom": 0.7905685674680538
+        }
+      }
+    },
+    {
+      "id": "effect-rotation-fade-ccw",
+      "mode": "yarg",
+      "name": "Rotation CCW (fade)",
+      "description": "A stepping rotation whose lit/dark gap fades in and out quickly instead of snapping on and off.",
+      "parameters": [],
+      "variables": [
+        {
+          "name": "lights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "description": "Target lights",
+          "isParameter": true
+        },
+        {
+          "name": "layer",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "DMX layer",
+          "isParameter": true
+        },
+        {
+          "name": "color",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "white",
+          "description": "Colour name",
+          "isParameter": true
+        },
+        {
+          "name": "brightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "medium",
+          "description": "Brightness level",
+          "isParameter": true
+        },
+        {
+          "name": "blendMode",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "add",
+          "description": "Blend mode",
+          "isParameter": true
+        },
+        {
+          "name": "beatsPerCycle",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "Beats per full rotation cycle",
+          "isParameter": true
+        },
+        {
+          "name": "startOffset",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Starting light index offset",
+          "isParameter": true
+        },
+        {
+          "name": "waitUntilCondition",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "beat",
+          "description": "Event type to count per phase (beat, keyframe)",
+          "isParameter": true
+        },
+        {
+          "name": "waitUntilConditionCount",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Additional condition count offset applied to all phases",
+          "isParameter": true
+        },
+        {
+          "name": "waitUntilTime",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Ms to wait per phase when waitUntilCondition is delay",
+          "isParameter": true
+        },
+        {
+          "name": "groupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "Iterate in groups of this many lights (e.g. 2 for opposite pairs)",
+          "isParameter": true
+        },
+        {
+          "name": "numLights",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "numGroups",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "phase2Count",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "currentLight",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "idx",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "raw1",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "raw2",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "stepsOn",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "numMinus",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "stepsOff",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "waitBeats",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "p1Count",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "remainBeats",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "p3Count",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "groupLayer",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ],
+      "nodes": {
+        "events": [],
+        "actions": [
+          {
+            "id": "rccw-phase1",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "currentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 0
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 180
+              },
+              "waitUntilCondition": {
+                "source": "variable",
+                "name": "waitUntilCondition"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "waitUntilTime"
+              },
+              "waitUntilConditionCount": {
+                "source": "variable",
+                "name": "p1Count"
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "groupLayer"
+            }
+          },
+          {
+            "id": "rccw-phase2",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "currentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 180
+              },
+              "waitUntilCondition": {
+                "source": "variable",
+                "name": "waitUntilCondition"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "waitUntilTime"
+              },
+              "waitUntilConditionCount": {
+                "source": "variable",
+                "name": "phase2Count"
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "groupLayer"
+            }
+          },
+          {
+            "id": "rccw-phase3",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "currentLight"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 0
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 180
+              },
+              "waitUntilCondition": {
+                "source": "variable",
+                "name": "waitUntilCondition"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "waitUntilTime"
+              },
+              "waitUntilConditionCount": {
+                "source": "variable",
+                "name": "p3Count"
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "groupLayer"
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "rccw-num-lights",
+            "type": "logic",
+            "logicType": "array-length",
+            "label": "numLights",
+            "outputs": [],
+            "sourceVariable": "lights",
+            "assignTo": "numLights"
+          },
+          {
+            "id": "rccw-num-groups",
+            "type": "logic",
+            "logicType": "math",
+            "label": "numGroups = numLights / groupSize",
+            "outputs": [],
+            "operator": "divide",
+            "left": {
+              "source": "variable",
+              "name": "numLights"
+            },
+            "right": {
+              "source": "variable",
+              "name": "groupSize"
+            },
+            "assignTo": "numGroups"
+          },
+          {
+            "id": "rccw-phase2-count",
+            "type": "logic",
+            "logicType": "math",
+            "label": "phase2Count",
+            "outputs": [],
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "beatsPerCycle"
+            },
+            "right": {
+              "source": "variable",
+              "name": "waitUntilConditionCount"
+            },
+            "assignTo": "phase2Count"
+          },
+          {
+            "id": "rccw-foreach",
+            "type": "logic",
+            "logicType": "for-each-light",
+            "label": "for-each-light",
+            "outputs": [],
+            "sourceVariable": "lights",
+            "currentLightVariable": "currentLight",
+            "currentIndexVariable": "idx",
+            "groupSize": {
+              "source": "variable",
+              "name": "groupSize"
+            }
+          },
+          {
+            "id": "rccw-raw1",
+            "type": "logic",
+            "logicType": "math",
+            "label": "raw1 = startOffset - idx",
+            "outputs": [],
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "startOffset"
+            },
+            "right": {
+              "source": "variable",
+              "name": "idx"
+            },
+            "assignTo": "raw1"
+          },
+          {
+            "id": "rccw-raw2",
+            "type": "logic",
+            "logicType": "math",
+            "label": "raw2 = raw1 + numGroups",
+            "outputs": [],
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "raw1"
+            },
+            "right": {
+              "source": "variable",
+              "name": "numGroups"
+            },
+            "assignTo": "raw2"
+          },
+          {
+            "id": "rccw-steps-on",
+            "type": "logic",
+            "logicType": "math",
+            "label": "stepsOn = raw2 % numGroups",
+            "outputs": [],
+            "operator": "modulus",
+            "left": {
+              "source": "variable",
+              "name": "raw2"
+            },
+            "right": {
+              "source": "variable",
+              "name": "numGroups"
+            },
+            "assignTo": "stepsOn"
+          },
+          {
+            "id": "rccw-num-minus",
+            "type": "logic",
+            "logicType": "math",
+            "label": "numMinus = numGroups - stepsOn",
+            "outputs": [],
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "numGroups"
+            },
+            "right": {
+              "source": "variable",
+              "name": "stepsOn"
+            },
+            "assignTo": "numMinus"
+          },
+          {
+            "id": "rccw-steps-off",
+            "type": "logic",
+            "logicType": "math",
+            "label": "stepsOff = numMinus - 1",
+            "outputs": [],
+            "operator": "subtract",
+            "left": {
+              "source": "variable",
+              "name": "numMinus"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            },
+            "assignTo": "stepsOff"
+          },
+          {
+            "id": "rccw-wait-beats",
+            "type": "logic",
+            "logicType": "math",
+            "label": "waitBeats = stepsOn * beatsPerCycle",
+            "outputs": [],
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "stepsOn"
+            },
+            "right": {
+              "source": "variable",
+              "name": "beatsPerCycle"
+            },
+            "assignTo": "waitBeats"
+          },
+          {
+            "id": "rccw-p1-count",
+            "type": "logic",
+            "logicType": "math",
+            "label": "p1Count = waitBeats + offset",
+            "outputs": [],
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "waitBeats"
+            },
+            "right": {
+              "source": "variable",
+              "name": "waitUntilConditionCount"
+            },
+            "assignTo": "p1Count"
+          },
+          {
+            "id": "rccw-remain-beats",
+            "type": "logic",
+            "logicType": "math",
+            "label": "remainBeats = stepsOff * beatsPerCycle",
+            "outputs": [],
+            "operator": "multiply",
+            "left": {
+              "source": "variable",
+              "name": "stepsOff"
+            },
+            "right": {
+              "source": "variable",
+              "name": "beatsPerCycle"
+            },
+            "assignTo": "remainBeats"
+          },
+          {
+            "id": "rccw-p3-count",
+            "type": "logic",
+            "logicType": "math",
+            "label": "p3Count = remainBeats + offset",
+            "outputs": [],
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "remainBeats"
+            },
+            "right": {
+              "source": "variable",
+              "name": "waitUntilConditionCount"
+            },
+            "assignTo": "p3Count"
+          },
+          {
+            "id": "rccw-group-layer",
+            "type": "logic",
+            "logicType": "math",
+            "label": "groupLayer = idx + layer",
+            "outputs": [],
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "idx"
+            },
+            "right": {
+              "source": "variable",
+              "name": "layer"
+            },
+            "assignTo": "groupLayer"
+          },
+          {
+            "id": "rccw-cond-skip-p1",
+            "type": "logic",
+            "logicType": "conditional",
+            "label": "stepsOn == 0 (skip phase1)",
+            "comparator": "==",
+            "left": {
+              "source": "variable",
+              "name": "stepsOn"
+            },
+            "right": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectListeners": [
+          {
+            "id": "rccw-listener",
+            "type": "effect-listener",
+            "label": "Rotation CCW Entry",
+            "outputs": []
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "rccw-listener",
+          "to": "rccw-num-lights"
+        },
+        {
+          "from": "rccw-num-lights",
+          "to": "rccw-num-groups"
+        },
+        {
+          "from": "rccw-num-groups",
+          "to": "rccw-phase2-count"
+        },
+        {
+          "from": "rccw-phase2-count",
+          "to": "rccw-foreach"
+        },
+        {
+          "from": "rccw-foreach",
+          "to": "rccw-raw1",
+          "fromPort": "each"
+        },
+        {
+          "from": "rccw-raw1",
+          "to": "rccw-raw2"
+        },
+        {
+          "from": "rccw-raw2",
+          "to": "rccw-steps-on"
+        },
+        {
+          "from": "rccw-steps-on",
+          "to": "rccw-num-minus"
+        },
+        {
+          "from": "rccw-num-minus",
+          "to": "rccw-steps-off"
+        },
+        {
+          "from": "rccw-steps-off",
+          "to": "rccw-wait-beats"
+        },
+        {
+          "from": "rccw-wait-beats",
+          "to": "rccw-p1-count"
+        },
+        {
+          "from": "rccw-p1-count",
+          "to": "rccw-remain-beats"
+        },
+        {
+          "from": "rccw-remain-beats",
+          "to": "rccw-p3-count"
+        },
+        {
+          "from": "rccw-p3-count",
+          "to": "rccw-group-layer"
+        },
+        {
+          "from": "rccw-group-layer",
+          "to": "rccw-cond-skip-p1"
+        },
+        {
+          "from": "rccw-phase1",
+          "to": "rccw-phase2"
+        },
+        {
+          "from": "rccw-phase2",
+          "to": "rccw-phase3"
+        },
+        {
+          "from": "rccw-cond-skip-p1",
+          "to": "rccw-phase2",
+          "fromPort": "true"
+        },
+        {
+          "from": "rccw-cond-skip-p1",
+          "to": "rccw-phase1",
+          "fromPort": "false"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rccw-phase1": {
+            "x": 694.920827566181,
+            "y": 655.6299047015357
+          },
+          "rccw-phase2": {
+            "x": 455.98154906742286,
+            "y": 860.8781655430794
+          },
+          "rccw-phase3": {
+            "x": 527.5856706742198,
+            "y": 1021.5539752580225
+          },
+          "rccw-num-lights": {
+            "x": 40.00873229838908,
+            "y": 46.35809352621436
+          },
+          "rccw-num-groups": {
+            "x": 24,
+            "y": 142
+          },
+          "rccw-phase2-count": {
+            "x": -7.79876465164125,
+            "y": 247.88150107860565
+          },
+          "rccw-foreach": {
+            "x": 36.41960263624787,
+            "y": 348.2959604561329
+          },
+          "rccw-raw1": {
+            "x": -10.539574367925525,
+            "y": 503.63947818800807
+          },
+          "rccw-raw2": {
+            "x": -6.460484191775322,
+            "y": 627.0009369179606
+          },
+          "rccw-steps-on": {
+            "x": 4.849567651748657,
+            "y": 747.4757648706436
+          },
+          "rccw-num-minus": {
+            "x": -3.4515810683369637,
+            "y": 881.2208103976311
+          },
+          "rccw-steps-off": {
+            "x": -10.644707925617695,
+            "y": 1006.3602116517723
+          },
+          "rccw-wait-beats": {
+            "x": -7.051072223111987,
+            "y": 1124.0460619330406
+          },
+          "rccw-p1-count": {
+            "x": -8.44458170235157,
+            "y": 1251.036474402994
+          },
+          "rccw-remain-beats": {
+            "x": 613.4197991508992,
+            "y": 122.59842788800597
+          },
+          "rccw-p3-count": {
+            "x": 628.2891986444594,
+            "y": 247.0918919891119
+          },
+          "rccw-group-layer": {
+            "x": 610.4941291697324,
+            "y": 379.72978864237666
+          },
+          "rccw-cond-skip-p1": {
+            "x": 627.7860247092323,
+            "y": 473.54141522571445
+          },
+          "rccw-listener": {
+            "x": 9.216093447059393,
+            "y": -38.85966309159994
+          }
+        },
+        "viewport": {
+          "x": 332.6553841274732,
+          "y": 26.79775075869759,
+          "zoom": 0.5803368725783962
+        }
+      }
+    }
+  ],
+  "bundled": true
+}

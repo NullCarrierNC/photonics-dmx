@@ -1,48 +1,38 @@
 import {
-  ActionNode,
   AudioEventNodeUnion,
   AudioEffectDefinition,
   BaseEventNode,
   BaseEffectDefinition,
-  Connection,
   EffectEventListenerNode,
-  EventDefinition,
-  EventRaiserNode,
-  EventListenerNode,
-  LogicNode,
   YargEventNode,
   YargEffectDefinition,
   VariableDefinition,
 } from '../../types/nodeCueTypes'
-import { createLogger } from '../../../../shared/logger'
-import { validateSharedActionNodePayload } from './sharedActionNodeValidation'
+import { AbstractGraphBuilder, CompiledGraphBase } from './AbstractGraphBuilder'
+import { CompilationError } from './CompilationError'
 
-const log = createLogger('EffectCompiler')
-
-export class EffectCompilationError extends Error {
+/**
+ * Error thrown by {@link EffectCompiler} when an effect graph is invalid. A
+ * {@link CompilationError} subclass so callers can distinguish effect-compile
+ * failures from cue-compile failures via `instanceof` / `error.name`.
+ */
+export class EffectCompilationError extends CompilationError {
   constructor(message: string) {
     super(message)
     this.name = 'EffectCompilationError'
   }
 }
 
-export interface CompiledEffect<TEvent extends BaseEventNode> {
+export interface CompiledEffect<TEvent extends BaseEventNode> extends CompiledGraphBase<TEvent> {
   definition: BaseEffectDefinition
-  eventMap: Map<string, TEvent>
-  actionMap: Map<string, ActionNode>
-  logicMap: Map<string, LogicNode>
   effectListenerMap: Map<string, EffectEventListenerNode>
-  eventRaiserMap: Map<string, EventRaiserNode> // Runtime events within effect
-  eventListenerMap: Map<string, EventListenerNode> // Runtime events within effect
-  eventDefinitions: EventDefinition[]
-  adjacency: Map<string, Connection[]>
   parameters: Map<string, VariableDefinition>
 }
 
 export type CompiledYargEffect = CompiledEffect<YargEventNode>
 export type CompiledAudioEffect = CompiledEffect<AudioEventNodeUnion>
 
-export class EffectCompiler {
+export class EffectCompiler extends AbstractGraphBuilder {
   public static compileYargEffect(definition: YargEffectDefinition): CompiledYargEffect {
     return this.buildCompiled(definition)
   }
@@ -74,14 +64,14 @@ export class EffectCompiler {
     // Derive parameters from variables with isParameter: true
     const parameters = definition.variables?.filter((v) => v.isParameter) ?? []
 
-    // Effects must have at least one effect listener (entry point)
+    // Effect-specific policy: at least one effect listener (entry point) is required.
     if (effectListeners.length === 0) {
       throw new EffectCompilationError(
         'At least one Effect Listener node is required (entry point).',
       )
     }
 
-    // Effects can't invoke other effects
+    // Effect-specific policy: effects can't invoke other effects.
     const effectRaisers = definition.nodes.effectRaisers ?? []
     if (effectRaisers.length > 0) {
       throw new EffectCompilationError(
@@ -89,7 +79,7 @@ export class EffectCompiler {
       )
     }
 
-    // Duplicate effect listener IDs are not allowed
+    // Effect-specific policy: duplicate effect listener IDs are not allowed.
     const effectListenerIds = effectListeners.map((l) => l.id)
     const duplicateIds = effectListenerIds.filter((id, i) => effectListenerIds.indexOf(id) !== i)
     if (duplicateIds.length > 0) {
@@ -99,141 +89,46 @@ export class EffectCompiler {
       )
     }
 
-    // Must have at least one action or runtime event mechanism
+    // Effect-specific policy: must have at least one action or runtime event mechanism.
     if (!actions.length && !eventRaisers.length && !eventListeners.length) {
       throw new EffectCompilationError(
         'Effect must contain at least one action or runtime event node.',
       )
     }
 
-    const eventMap = new Map(events.map((event) => [event.id, event]))
-    const actionMap = new Map(actions.map((action) => [action.id, action]))
-    const logicMap = new Map(logic.map((node) => [node.id, node]))
+    // Effect-specific extra maps: effect-listener entries and the parameter map.
     const effectListenerMap = new Map(effectListeners.map((listener) => [listener.id, listener]))
-    const eventRaiserMap = new Map(eventRaisers.map((raiser) => [raiser.id, raiser]))
-    const eventListenerMap = new Map(eventListeners.map((listener) => [listener.id, listener]))
     const parameterMap = new Map(parameters.map((variable) => [variable.name, variable]))
-    const eventNameSet = new Set(eventDefinitions.map((e) => e.name))
 
-    // Validate runtime event raiser/listener nodes reference valid registered events
-    for (const raiser of eventRaisers) {
-      if (!raiser.eventName) {
-        log.warn(`Event raiser '${raiser.label ?? raiser.id}' has no event selected.`)
-        continue
-      }
-      if (!eventNameSet.has(raiser.eventName)) {
-        throw new EffectCompilationError(
-          `Event raiser '${raiser.label ?? raiser.id}' references undefined event '${raiser.eventName}'.`,
-        )
-      }
-    }
-
-    for (const listener of eventListeners) {
-      if (!listener.eventName) {
-        log.warn(`Event listener '${listener.label ?? listener.id}' has no event selected.`)
-        continue
-      }
-      if (!eventNameSet.has(listener.eventName)) {
-        throw new EffectCompilationError(
-          `Event listener '${listener.label ?? listener.id}' references undefined event '${listener.eventName}'.`,
-        )
-      }
-    }
-
-    // Validate parameter mappings removed - parameters are now auto-mapped from variables with isParameter: true
-
-    // Ensure all connection endpoints exist
-    for (const conn of definition.connections) {
-      const fromExists =
-        eventMap.has(conn.from) ||
-        actionMap.has(conn.from) ||
-        logicMap.has(conn.from) ||
-        eventRaiserMap.has(conn.from) ||
-        eventListenerMap.has(conn.from) ||
-        effectListenerMap.has(conn.from)
-
-      if (!fromExists) {
-        throw new EffectCompilationError(`Connection 'from' id '${conn.from}' does not exist.`)
-      }
-
-      const toExists =
-        eventMap.has(conn.to) ||
-        actionMap.has(conn.to) ||
-        logicMap.has(conn.to) ||
-        eventRaiserMap.has(conn.to) ||
-        eventListenerMap.has(conn.to) ||
-        effectListenerMap.has(conn.to)
-
-      if (!toExists) {
-        throw new EffectCompilationError(`Connection 'to' id '${conn.to}' does not exist.`)
-      }
-    }
-
-    // Build adjacency for all nodes
-    const adjacency = new Map<string, Connection[]>()
-    for (const conn of definition.connections) {
-      const list = adjacency.get(conn.from) ?? []
-      list.push(conn)
-      adjacency.set(conn.from, list)
-    }
-
-    // Validate actions and reachability from effect listeners
-    const reachableActions = new Set<string>()
-    const visited = new Set<string>()
-
-    const traverseReachability = (nodeId: string): void => {
-      if (visited.has(nodeId)) return
-      visited.add(nodeId)
-      if (actionMap.has(nodeId)) {
-        reachableActions.add(nodeId)
-      }
-      const edges = adjacency.get(nodeId) ?? []
-      for (const edge of edges) {
-        traverseReachability(edge.to)
-      }
-    }
-
-    // Start from effect listener nodes (entry points)
-    for (const effectListener of effectListeners) {
-      traverseReachability(effectListener.id)
-    }
-
-    // Also start from system event nodes (if any)
-    for (const event of events) {
-      traverseReachability(event.id)
-    }
-
-    // Also start from runtime event listeners
-    for (const listener of eventListeners) {
-      traverseReachability(listener.id)
-    }
-
-    for (const action of actions) {
-      this.validateAction(action)
-    }
-
-    const unreachableActions = actions.filter((action) => !reachableActions.has(action.id))
-    if (unreachableActions.length > 0) {
-      throw new EffectCompilationError(
-        `Action node(s) ${unreachableActions.map((node) => `'${node.label ?? node.id}'`).join(', ')} are not reachable from any entry point.`,
-      )
-    }
+    const core = this.buildCompiledCore<TEvent>(
+      { events, actions, logic, eventRaisers, eventListeners },
+      definition.connections,
+      eventDefinitions,
+      {
+        createError: (message) => new EffectCompilationError(message),
+        extraEndpointMaps: [effectListenerMap],
+        // Reachability starts from the effect-listener entry points, then system
+        // events, then runtime event listeners.
+        reachabilityEntryIds: [
+          ...effectListeners.map((listener) => listener.id),
+          ...events.map((event) => event.id),
+          ...eventListeners.map((listener) => listener.id),
+        ],
+        unreachableSuffix: 'any entry point',
+      },
+    )
 
     return {
       definition,
-      eventMap,
-      actionMap,
-      logicMap,
+      eventMap: core.eventMap,
+      actionMap: core.actionMap,
+      logicMap: core.logicMap,
       effectListenerMap,
-      eventRaiserMap,
-      eventListenerMap,
+      eventRaiserMap: core.eventRaiserMap,
+      eventListenerMap: core.eventListenerMap,
       eventDefinitions,
-      adjacency,
+      adjacency: core.adjacency,
       parameters: parameterMap,
     }
-  }
-
-  private static validateAction(action: ActionNode): void {
-    validateSharedActionNodePayload(action, (message) => new EffectCompilationError(message))
   }
 }

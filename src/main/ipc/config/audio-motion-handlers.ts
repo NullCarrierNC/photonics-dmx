@@ -146,7 +146,7 @@ export function registerAudioMotionConfigHandlers(
 
   ipcMain.handle(CONFIG.GET_STAGE_KIT_PRIORITY, async () => {
     const prefs = controllerManager.getConfig().getAllPreferences()
-    return prefs.stageKitPrefs?.yargPriority || 'prefer-for-tracked'
+    return prefs.stageKitPrefs?.yargPriority || 'random'
   })
 
   ipcMain.handle(CONFIG.SET_STAGE_KIT_PRIORITY, async (_, priority: unknown) => {

@@ -12,6 +12,7 @@ import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggl
 import CuePreviewYarg from '@renderer/components/CuePreviewYarg'
 import CuePreviewAudio from '@renderer/components/CuePreviewAudio'
 import LightsDmxPreview from '@renderer/components/LightsDmxPreview'
+import StrobeChannelPreviewNotice from '@renderer/components/StrobeChannelPreviewNotice'
 import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPreview'
 import DmxRigSelector from '@renderer/components/DmxRigSelector'
 import { useTimeoutEffect } from '../utils/useTimeout'
@@ -580,6 +581,7 @@ const CueSimulation: React.FC = () => {
 
       {selectedRig !== null && rigConfig !== null && dmxValues !== null && (
         <>
+          <StrobeChannelPreviewNotice lightingConfig={rigConfig} className="mb-3" />
           <LightsDmxPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
         </>
       )}

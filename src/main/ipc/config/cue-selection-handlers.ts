@@ -32,7 +32,7 @@ export function registerCueSelectionConfigHandlers(
     }
 
     const currentPriority = registry.getStageKitPriority()
-    const configPriority = prefs.stageKitPrefs?.yargPriority || 'prefer-for-tracked'
+    const configPriority = prefs.stageKitPrefs?.yargPriority || 'random'
 
     if (currentPriority !== configPriority) {
       registry.setStageKitPriority(configPriority)
@@ -56,6 +56,9 @@ export function registerCueSelectionConfigHandlers(
       const registry = YargCueRegistry.getInstance()
 
       registry.setEnabledGroups(validatedIds)
+      // Selection reads the active set; setEnabledGroups only trims it and never adds. Activate the
+      // enabled groups so a group enabled at runtime is immediately selectable without a restart.
+      registry.setActiveGroups(registry.getEnabledGroups())
       const disabledYarg = controllerManager.getConfig().getPreference('cueDomains')
         .yarg.disabledCues
       registry.setDisabledCues(disabledYarg)

@@ -6,6 +6,7 @@ import type {
 import type { IAudioCue } from '../cues/interfaces/IAudioCue'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import type { AudioCueType } from '../cues/types/audioCueTypes'
+import { monotonicNowMs } from '../../shared/time'
 
 function randomInRange(minSec: number, maxSec: number): number {
   return minSec + Math.random() * (maxSec - minSec)
@@ -67,6 +68,28 @@ export class AudioGameModeManager {
     this.onCueSwitch?.(this.primaryCue)
   }
 
+  /**
+   * Re-validate the active primary cue against the current eligible pool WITHOUT restarting a
+   * still-valid run. Re-rolls and reschedules only when the active cue is empty or no longer
+   * eligible (e.g. after the user toggles cue groups); otherwise the running cue and its dwell
+   * timer are left untouched. Used by `refreshCueSelection` so incidental refreshes (settings
+   * edits, cue hot-reloads) don't yank the lights to a new cue and reset the schedule.
+   */
+  public ensureValidPrimary(): void {
+    let pool = filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes())
+    if (pool.length === 0) {
+      pool = filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes(true))
+    }
+    const eligible = pool.length > 0 ? pool : this.registry.getAvailableCueTypes()
+    if (this.primaryCue !== '' && eligible.includes(this.primaryCue)) {
+      // Active cue still valid: leave it and its dwell timer running; just re-broadcast state.
+      this.emitScheduleChange()
+      return
+    }
+    // Active cue is empty or not in the eligible pool: pick a fresh one and (re)schedule.
+    this.start()
+  }
+
   public setOnCueSwitch(cb: ((cueType: AudioCueType) => void) | null): void {
     this.onCueSwitch = cb
   }
@@ -84,7 +107,7 @@ export class AudioGameModeManager {
     const wasPending = this.pendingSwitch
     this.config = { ...config }
     if (!this.pendingSwitch && this.switchDeadlineMs > 0) {
-      const remaining = this.switchDeadlineMs - Date.now()
+      const remaining = this.switchDeadlineMs - monotonicNowMs()
       if (remaining < 0) {
         this.pendingSwitch = true
       }
@@ -102,7 +125,7 @@ export class AudioGameModeManager {
    * Run once per audio frame before cue execution.
    */
   public processFrame(audioData: AudioLightingData): void {
-    const now = Date.now()
+    const now = monotonicNowMs()
     if (!this.pendingSwitch && now >= this.switchDeadlineMs) {
       this.pendingSwitch = true
       this.emitScheduleChange()
@@ -126,7 +149,7 @@ export class AudioGameModeManager {
   private scheduleNextSwitch(): void {
     const { cueDurationMin, cueDurationMax } = this.config
     const durationSec = randomInRange(cueDurationMin, cueDurationMax)
-    this.switchDeadlineMs = Date.now() + Math.round(durationSec * 1000)
+    this.switchDeadlineMs = monotonicNowMs() + Math.round(durationSec * 1000)
   }
 
   private switchToNextCue(): void {

@@ -9,12 +9,15 @@ import {
 } from '../../processors/ProcessorManager'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
+import { ChainFanout } from '../../controllers/ChainFanout'
+import type { RigChain } from '../../controllers/RigChain'
 import { createMockLightingConfig } from '../helpers/testFixtures'
 
 describe('ProcessorManager', () => {
   let mockLightManager: DmxLightManager
   let mockSequencer: ILightingController
   let manager: ProcessorManager
+  let chainFanout: ChainFanout
 
   beforeEach(() => {
     jest.spyOn(console, 'log').mockImplementation(() => {})
@@ -53,7 +56,22 @@ describe('ProcessorManager', () => {
       shutdown: jest.fn(),
     } as unknown as ILightingController
 
-    manager = new ProcessorManager(mockLightManager, mockSequencer, { mode: 'direct' })
+    // Single-rig fanout for these tests — they exercise the manager's lifecycle, not the
+    // multi-rig render path (that's covered by Rb3StageKitDirectProcessor.multiRig.test).
+    chainFanout = new ChainFanout()
+    chainFanout.setChains([
+      {
+        rigId: 'primary',
+        isPrimary: true,
+        dmxLightManager: mockLightManager,
+        sequencer: mockSequencer,
+        yargCueHandler: null,
+        audioCueHandler: null,
+        rb3MenuCueHandler: null,
+      } as unknown as RigChain,
+    ])
+
+    manager = new ProcessorManager(chainFanout, { mode: 'direct' })
   })
 
   it('constructs with default config when mode is direct', () => {
@@ -96,7 +114,7 @@ describe('ProcessorManager', () => {
 
   it('throws on invalid mode in constructor', () => {
     expect(() => {
-      new ProcessorManager(mockLightManager, mockSequencer, { mode: 'invalid' as ProcessingMode })
+      new ProcessorManager(chainFanout, { mode: 'invalid' as ProcessingMode })
     }).toThrow(/Invalid mode/)
   })
 })

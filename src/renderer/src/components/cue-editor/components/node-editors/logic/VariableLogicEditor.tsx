@@ -65,6 +65,7 @@ const VariableLogicEditor: React.FC<VariableLogicEditorProps> = ({
                 | 'color'
                 | 'cue-type'
                 | 'light-array'
+                | 'color-array'
                 | 'event',
             })
           }>
@@ -74,6 +75,7 @@ const VariableLogicEditor: React.FC<VariableLogicEditorProps> = ({
           <option value="color">color</option>
           <option value="cue-type">cue-type</option>
           <option value="light-array">light-array</option>
+          <option value="color-array">color-array</option>
           <option value="event">event</option>
         </select>
       </label>
@@ -90,6 +92,7 @@ const VariableLogicEditor: React.FC<VariableLogicEditorProps> = ({
               | 'color'
               | 'cue-type'
               | 'light-array'
+              | 'color-array'
               | 'event'
           }
           validLiterals={validLiteralsFromVariable}

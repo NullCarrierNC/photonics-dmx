@@ -1,14 +1,24 @@
 import { EventEmitter } from 'events'
-import { CueData, CueType, DrumNoteType, InstrumentNoteType } from '../cues/types/cueTypes'
+import {
+  CueData,
+  CueType,
+  DrumNoteType,
+  InstrumentNoteType,
+  cueTypeToStrobeSlot,
+  isStrobeCueType,
+  isVocalActive,
+} from '../cues/types/cueTypes'
 import { YargMotionCueRef } from '../cues/types/audioCueTypes'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
+import { getStrobeStateManager } from '../controllers/StrobeStateManager'
 import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
 import { YargCueRegistry } from '../cues/registries/YargCueRegistry'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
 import { createLogger } from '../../shared/logger'
+import { monotonicNowMs } from '../../shared/time'
 const log = createLogger('YargCueHandler')
 
 /**
@@ -27,14 +37,6 @@ const log = createLogger('YargCueHandler')
  * Layer 0 will maintain its state though.
  * addEffect will not clear other effects unless it's on the same layer.
  */
-const STROBE_TYPES: CueType[] = [
-  CueType.Strobe_Fastest,
-  CueType.Strobe_Fast,
-  CueType.Strobe_Medium,
-  CueType.Strobe_Slow,
-  CueType.Strobe_Off,
-]
-
 export type YargCueHandlerOptions = {
   getMotionCueMinimumHoldMs?: () => number
   /** Probability (0-100) that an automatic motion cue pick will play on a new lighting cue. Defaults to 100 (always). */
@@ -65,6 +67,8 @@ class YargCueHandler extends EventEmitter {
   private cueStartTime = 0
   private lastCueChangeTime = 0
   private previousCueData?: Partial<CueData>
+  /** Tracks whether any vocal/harmony part was active on the previous frame, for note-on/off edge detection. */
+  private wasVocalActive = false
 
   public setManualMotionRef(ref: YargMotionCueRef | null): void {
     this.manualMotionRef = ref
@@ -143,10 +147,29 @@ class YargCueHandler extends EventEmitter {
     this.cueStartTime = 0
     this.lastCueChangeTime = 0
     this.previousCueData = undefined
+    this.wasVocalActive = false
   }
 
   private addHistoryToCueData(cueType: CueType, parameters: CueData): CueData {
-    const now = Date.now()
+    const now = monotonicNowMs()
+
+    // Strobe cues (including Strobe_Off) run in their own slot on top of the primary/secondary
+    // look. They must not disturb the primary-cue history/executionCount accounting: a held
+    // strobe is re-dispatched ~30x/s alongside the lighting cue, and mutating currentCue here
+    // would thrash cueHistory/executionCount and defeat the executionCount-gated motion pick.
+    // Report the current (unchanged) primary state instead of advancing it.
+    if (isStrobeCueType(cueType)) {
+      return {
+        ...parameters,
+        previousCue:
+          this.cueHistory.length > 0 ? this.cueHistory[this.cueHistory.length - 1] : undefined,
+        cueHistory: [...this.cueHistory],
+        executionCount: this.executionCount,
+        cueStartTime: this.cueStartTime,
+        timeSinceLastCue: now - this.lastCueChangeTime,
+        previousFrame: this.previousCueData,
+      }
+    }
 
     if (this.currentCue !== cueType) {
       if (this.currentCue && this.currentCue !== cueType) {
@@ -243,8 +266,24 @@ class YargCueHandler extends EventEmitter {
     this._sequencer.onKeysNote(noteType)
   }
 
+  /**
+   * Detect vocal note-on / note-off edges from the current frame's vocal and harmony
+   * values and forward them to the sequencer. "Singing" is any vocal or harmony part
+   * above zero; an edge fires only when that aggregate active state changes.
+   */
+  public handleVocalNote(data: CueData): void {
+    const isActive = isVocalActive(data)
+
+    if (isActive !== this.wasVocalActive) {
+      this._sequencer.onVocalNote(isActive)
+      this.wasVocalActive = isActive
+    }
+  }
+
   public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
-    // Update CueData with history and context information
+    const incomingIsStrobe = isStrobeCueType(cueType)
+    // Update CueData with history and context information. addHistoryToCueData no-ops the
+    // primary-cue accounting for strobe cues so a held strobe does not thrash it.
     const historicCueData = this.addHistoryToCueData(cueType, parameters)
 
     // Special cases that need to be handled differently
@@ -269,6 +308,7 @@ class YargCueHandler extends EventEmitter {
           this.currentStrobeCue.onStop?.()
           this.currentStrobeCue = null
         }
+        getStrobeStateManager().setActive(null)
         this.emit('cueHandled', historicCueData)
         return
       case CueType.Keyframe_First:
@@ -300,7 +340,6 @@ class YargCueHandler extends EventEmitter {
         : this.registry.getCueImplementation(cueType, trackMode)
 
     if (cue) {
-      const incomingIsStrobe = STROBE_TYPES.includes(cueType)
       const incomingIsSecondary = cue.style === CueStyle.Secondary
 
       if (incomingIsStrobe) {
@@ -310,6 +349,7 @@ class YargCueHandler extends EventEmitter {
           this.currentStrobeCue = null
         }
         this.currentStrobeCue = cue
+        getStrobeStateManager().setActive(cueTypeToStrobeSlot(cueType))
       } else if (incomingIsSecondary) {
         // Non-strobe overlays run concurrently with primary and strobes, but replace the existing secondary overlay.
         if (this.currentSecondaryCue && this.currentSecondaryCue !== cue) {
@@ -331,8 +371,13 @@ class YargCueHandler extends EventEmitter {
       log.error(`No implementation found for cue: ${cueType}`)
     }
 
-    if (trackMode !== 'simulated') {
-      if (!this.motionEnabled) {
+    // Strobe cues run in their own slot and must not drive motion selection (which is gated on
+    // the primary cue's executionCount); only non-strobe cues touch the motion pick.
+    if (trackMode !== 'simulated' && !incomingIsStrobe) {
+      // The Fallback is a self-contained idle look; never layer an automatic motion cue on top of
+      // it. Treat it like motion-disabled so any motion left over from the previous cue is stopped
+      // (and the heads homed) and no new pick is made.
+      if (!this.motionEnabled || cueType === CueType.Fallback) {
         if (this.currentMotionCue) {
           this.currentMotionCue.onStop?.()
           this.currentMotionCue = null
@@ -344,7 +389,7 @@ class YargCueHandler extends EventEmitter {
         const registry = YargCueRegistry.getInstance()
         const isNewCue = historicCueData.executionCount === 1
         const isManualChange = this.manualMotionRef !== this.lastManualMotionRefForMotion
-        const now = Date.now()
+        const now = monotonicNowMs()
         const minHold = this.getMotionCueMinimumHoldMs()
         const heldLongEnough =
           this.currentMotionCueStartTime == null || now - this.currentMotionCueStartTime >= minHold
@@ -440,6 +485,9 @@ class YargCueHandler extends EventEmitter {
       this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
     }
+    // Unconditional: clearing a primary/blackout must also drop any shared strobe slot even if
+    // this handler didn't think a strobe cue was active (defensive against state drift).
+    getStrobeStateManager().setActive(null)
     if (this.currentMotionCue) {
       this.currentMotionCue.onStop?.()
       this.currentMotionCue = null
@@ -490,6 +538,8 @@ class YargCueHandler extends EventEmitter {
       this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
     }
+    // Unconditional: a handler teardown must never leave the shared StrobeStateManager stuck.
+    getStrobeStateManager().setActive(null)
     if (this.currentMotionCue) {
       this.currentMotionCue.onStop?.()
       this.currentMotionCue = null

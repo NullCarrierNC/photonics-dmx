@@ -96,7 +96,7 @@ export class LayerManager implements ILayerManager {
     layerMap.set(lightId, effect)
 
     // Update layer last used timestamp
-    this.setLayerLastUsed(layer, Date.now())
+    this.setLayerLastUsed(layer, performance.now())
   }
 
   /**

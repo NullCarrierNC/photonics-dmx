@@ -491,6 +491,65 @@ describe('LightTransitionController', () => {
       expect(mockLightStateManager.setLightState).toHaveBeenCalledWith(lightId, expectedState)
     })
 
+    // 'mix' is an alpha crossfade: a higher layer blends with the composited lower layers
+    // by opacity (opacity 0 = underlying, 1 = this layer). Used so a yellow flash can
+    // crossfade over a blue base into pure yellow and back, rather than fading from black
+    // ('replace') or summing to white ('add').
+    describe('mix blend mode (alpha crossfade)', () => {
+      const blendBlueUnderYellow = (overlayOpacity: number): RGBIO => {
+        const mockLightStateManager = {
+          setLightState: jest.fn(),
+          getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
+          publishLightStates: jest.fn(),
+          getTrackedLightIds: jest.fn().mockReturnValue([]),
+        }
+        const ltc = new LightTransitionController(
+          mockLightStateManager as unknown as LightStateManager,
+        )
+        const blueBase = createMockRGBIP({
+          red: 0,
+          green: 0,
+          blue: 255,
+          intensity: 255,
+          opacity: 1.0,
+          blendMode: 'replace',
+        })
+        const yellowOverlay = createMockRGBIP({
+          red: 255,
+          green: 255,
+          blue: 0,
+          intensity: 255,
+          opacity: overlayOpacity,
+          blendMode: 'mix',
+        })
+        const layerStates = new Map<number, RGBIO>()
+        layerStates.set(0, blueBase)
+        layerStates.set(1, yellowOverlay)
+        ltcAccess(ltc)._currentLayerStates.set('mix-light', layerStates)
+        ltcAccess(ltc).calculateFinalColorForLight('mix-light')
+        return (mockLightStateManager.setLightState as jest.Mock).mock.calls.at(-1)![1] as RGBIO
+      }
+
+      it('opacity 0 shows the underlying blue', () => {
+        const out = blendBlueUnderYellow(0)
+        expect([out.red, out.green, out.blue]).toEqual([0, 0, 255])
+      })
+
+      it('opacity 1 shows pure yellow with the blue fully replaced', () => {
+        const out = blendBlueUnderYellow(1)
+        expect([out.red, out.green, out.blue]).toEqual([255, 255, 0])
+      })
+
+      it('opacity 0.5 crossfades — all channels present, not white, not black', () => {
+        const out = blendBlueUnderYellow(0.5)
+        expect(out.red).toBeGreaterThan(0)
+        expect(out.green).toBeGreaterThan(0)
+        expect(out.blue).toBeGreaterThan(0)
+        expect(out.blue).toBeLessThan(255) // blue is fading out
+        expect(out.red).toBeLessThan(255) // yellow is fading in
+      })
+    })
+
     it('should blend each RGB channel based on its individual opacity', () => {
       // Create a controller with known light states
       const mockLightStateManager = {
@@ -1062,8 +1121,8 @@ describe('LightTransitionController', () => {
       expect(capturedState?.tilt).toBe(33)
     })
 
-    it('multiply blend: pan/tilt carry forward from lower layer through colour-only multiply layer', () => {
-      const lightId = 'test-carry-mul'
+    it('mix blend: pan/tilt carry forward from lower layer through colour-only mix layer', () => {
+      const lightId = 'test-carry-mix'
       setLayerAndCompute(lightId, 10, {
         red: 200,
         green: 100,
@@ -1080,10 +1139,96 @@ describe('LightTransitionController', () => {
         blue: 128,
         intensity: 200,
         opacity: 1,
-        blendMode: 'multiply',
+        blendMode: 'mix',
       })
       expect(capturedState?.pan).toBe(20)
       expect(capturedState?.tilt).toBe(80)
+    })
+  })
+
+  describe('blend mode opacity composition (replace/add/mix)', () => {
+    let capturedState: RGBIO | undefined
+    let ltcTest: LightTransitionController
+
+    beforeEach(() => {
+      capturedState = undefined
+      const lsm = {
+        setLightState: jest.fn((_, s: RGBIO) => {
+          capturedState = s
+        }),
+        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
+        publishLightStates: jest.fn(),
+        getTrackedLightIds: jest.fn().mockReturnValue([]),
+      }
+      ltcTest = new LightTransitionController(lsm as unknown as LightStateManager)
+    })
+
+    function compose(lightId: string, lower: RGBIO, upper: RGBIO): void {
+      const acc = ltcAccess(ltcTest)
+      const states = new Map<number, RGBIO>()
+      states.set(10, lower)
+      states.set(20, upper)
+      acc._currentLayerStates.set(lightId, states)
+      acc.calculateFinalColorForLight(lightId)
+    }
+
+    // Lower (base) layer the upper layer composites onto: (100, 40, 20) @ intensity 200.
+    const base: RGBIO = {
+      red: 100,
+      green: 40,
+      blue: 20,
+      intensity: 200,
+      opacity: 1,
+      blendMode: 'replace',
+    }
+    const upperColor = { red: 200, green: 100, blue: 50, intensity: 100 }
+
+    for (const blendMode of ['replace', 'add', 'mix'] as const) {
+      it(`${blendMode}: opacity 0 is transparent (shows the lower layer unchanged)`, () => {
+        compose(`op0-${blendMode}`, base, { ...upperColor, opacity: 0, blendMode })
+        expect(capturedState?.red).toBe(100)
+        expect(capturedState?.green).toBe(40)
+        expect(capturedState?.blue).toBe(20)
+        expect(capturedState?.intensity).toBe(200)
+      })
+    }
+
+    it('replace: opacity 0.5 scales the replacement colour from black', () => {
+      compose('rep-half', base, { ...upperColor, opacity: 0.5, blendMode: 'replace' })
+      expect(capturedState?.red).toBe(100) // 200 * 0.5
+      expect(capturedState?.green).toBe(50) // 100 * 0.5
+      expect(capturedState?.blue).toBe(25) // 50 * 0.5
+      expect(capturedState?.intensity).toBe(50) // 100 * 0.5
+    })
+
+    it('add: opacity 0.5 adds the scaled colour onto the lower layer', () => {
+      compose('add-half', base, { ...upperColor, opacity: 0.5, blendMode: 'add' })
+      expect(capturedState?.red).toBe(200) // 100 + 100
+      expect(capturedState?.green).toBe(90) // 40 + 50
+      expect(capturedState?.blue).toBe(45) // 20 + 25
+      expect(capturedState?.intensity).toBe(250) // 200 + 50
+    })
+
+    it('mix: opacity 0.5 crossfades between the lower and upper colours', () => {
+      compose('mix-half', base, { ...upperColor, opacity: 0.5, blendMode: 'mix' })
+      expect(capturedState?.red).toBe(150) // (100 + 200) / 2
+      expect(capturedState?.green).toBe(70) // (40 + 100) / 2
+      expect(capturedState?.blue).toBe(35) // (20 + 50) / 2
+      expect(capturedState?.intensity).toBe(150) // (200 + 100) / 2
+    })
+
+    it('opacity 1.0: replace and mix fully take the upper colour; add saturates', () => {
+      compose('rep-full', base, { ...upperColor, opacity: 1, blendMode: 'replace' })
+      expect(capturedState?.red).toBe(200)
+      expect(capturedState?.intensity).toBe(100)
+
+      compose('mix-full', base, { ...upperColor, opacity: 1, blendMode: 'mix' })
+      expect(capturedState?.red).toBe(200)
+      expect(capturedState?.intensity).toBe(100)
+
+      compose('add-full', base, { ...upperColor, opacity: 1, blendMode: 'add' })
+      expect(capturedState?.red).toBe(255) // 100 + 200, clamped
+      expect(capturedState?.intensity).toBe(255) // 200 + 100, clamped
     })
   })
 })

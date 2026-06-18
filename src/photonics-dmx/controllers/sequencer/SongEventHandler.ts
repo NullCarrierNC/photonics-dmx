@@ -151,6 +151,14 @@ export class SongEventHandler implements ISongEventHandler {
   }
 
   /**
+   * Handle a vocal note edge.
+   * @param active true = note-on (singing started), false = note-off (singing stopped)
+   */
+  public onVocalNote(active: boolean): void {
+    this.handleEvent(active ? 'vocal-note' : 'vocal-note-off')
+  }
+
+  /**
    * Handle individual keys note events
    */
   public onKeysNote(noteType: InstrumentNoteType): void {
@@ -214,7 +222,9 @@ export class SongEventHandler implements ISongEventHandler {
       | 'keys-red'
       | 'keys-yellow'
       | 'keys-blue'
-      | 'keys-orange',
+      | 'keys-orange'
+      | 'vocal-note'
+      | 'vocal-note-off',
   ): void {
     const currentTime = performance.now()
 

@@ -114,23 +114,10 @@ export function createDefaultDmxRig(): DmxRig {
 }
 
 /**
- * If the same source light is saved in more than one role (e.g. front + strobe), reuses a single new id.
+ * Re-exported from the shared rig import/export core (its canonical home) so existing callers here
+ * keep importing it from `lightsLayoutHelpers`.
  */
-export function mapLightsToNewIdsForSave(
-  lights: DmxLight[],
-  idMap: Record<string, string>,
-): DmxLight[] {
-  return lights.map((light) => {
-    const originalId = light.id ?? crypto.randomUUID()
-    if (!idMap[originalId]) {
-      idMap[originalId] = crypto.randomUUID()
-    }
-    return {
-      ...light,
-      id: idMap[originalId],
-    }
-  })
-}
+export { mapLightsToNewIdsForSave } from '../../../../photonics-dmx/helpers/rigImportExport'
 
 export function lightingConfigsEqual(a: LightingConfiguration, b: LightingConfiguration): boolean {
   return equal(a, b)

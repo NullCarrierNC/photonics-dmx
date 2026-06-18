@@ -105,3 +105,26 @@ describe('EffectLoader.saveFile group id uniqueness', () => {
     })
   })
 })
+
+describe('EffectLoader compile errors surface on the summary', () => {
+  let tmpDir: string
+  let loader: EffectLoader
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-loader-compile-'))
+    loader = new EffectLoader({ baseDir: tmpDir })
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('flags an effect that passes schema validation but fails to compile', async () => {
+    // The minimal fixture validates but has no Effect Listener entry point, so compiling it
+    // produces an error that the loader records on the file summary.
+    await loader.saveFile('yarg', 'broken.json', minimalYargEffectFixture('grp-broken'))
+    const summary = loader.getSummary().yarg.find((s) => s.path.endsWith('broken.json'))
+    expect(summary?.errors?.length).toBeGreaterThan(0)
+    expect(summary?.errors?.join(' ')).toContain('Effect Listener')
+  })
+})

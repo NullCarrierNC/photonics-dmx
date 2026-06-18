@@ -1,10 +1,10 @@
 import * as path from 'path'
 
 /**
- * Report from ConfigFile when JSON parse, migration, or schema checks fail on disk;
+ * Report from ConfigFile when a read, JSON parse, migration, or schema check fails on disk;
  * the original file is preserved under a `.corrupt-*` name.
  */
-export type ConfigCorruptReason = 'parse' | 'schema'
+export type ConfigCorruptReason = 'read' | 'parse' | 'schema'
 
 export interface ConfigCorruptInfo {
   fileName: string

@@ -29,6 +29,12 @@ export const EFFECTS = {
   EXPORT: 'effects:export',
 } as const
 
+// ---- Rigs (import / export) ----
+export const RIGS = {
+  EXPORT: 'rigs:export',
+  IMPORT_PICK: 'rigs:import-pick',
+} as const
+
 // ---- Window ----
 export const WINDOW = {
   OPEN_CUE_EDITOR: 'open-cue-editor-window',
@@ -39,7 +45,6 @@ export const WINDOW = {
 export const SHELL = {
   SHOW_ITEM_IN_FOLDER: 'shell:showItemInFolder',
   OPEN_PATH: 'shell:openPath',
-  RUN_NODE_SCRIPT: 'shell:runNodeScript',
 } as const
 
 // ---- Lifecycle ----
@@ -90,6 +95,8 @@ export const LIGHT = {
   GET_CUE_CONSISTENCY_WINDOW: 'get-cue-consistency-window',
   GET_MOTION_CUE_MIN_HOLD_MS: 'get-motion-cue-min-hold-ms',
   SET_MOTION_CUE_MIN_HOLD_MS: 'set-motion-cue-min-hold-ms',
+  GET_YARG_FALLBACK_CUE_TIME_MS: 'get-yarg-fallback-cue-time-ms',
+  SET_YARG_FALLBACK_CUE_TIME_MS: 'set-yarg-fallback-cue-time-ms',
   GET_MOTION_CUE_PROBABILITY_PERCENT: 'get-motion-cue-probability-percent',
   SET_MOTION_CUE_PROBABILITY_PERCENT: 'set-motion-cue-probability-percent',
   GET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT: 'get-audio-motion-cue-probability-percent',
@@ -176,6 +183,7 @@ export const CONFIG = {
 export const CHANNELS = {
   ...NODE_CUES,
   ...EFFECTS,
+  ...RIGS,
   ...WINDOW,
   ...SHELL,
   ...LIFECYCLE,

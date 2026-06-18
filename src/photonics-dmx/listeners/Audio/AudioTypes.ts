@@ -1,8 +1,9 @@
 import type { Brightness, Color } from '../../types'
 
 /**
- * Audio analysis data structure for lighting control
- * Emitted by AudioInputListener as 'audio:data' events
+ * Audio analysis data structure for lighting control.
+ * Produced by `AudioCaptureManager` in the renderer (Web Audio API) and forwarded to the
+ * main process over IPC.
  */
 export interface AudioLightingData {
   /** Timestamp of the audio analysis */
@@ -119,7 +120,10 @@ export interface AudioConfig {
   beatDetection: {
     /** Minimum threshold for beat detection (0.0-1.0, default: 0.3) */
     threshold: number
-    /** Decay rate for beat detection (0.0-1.0, default: 0.95) */
+    /**
+     * Adaptive noise-floor decay (0.0-1.0), read by `BeatDetector` via `noiseFloorDecayFor`.
+     * Higher keeps the floor up longer (fewer onsets); lower lets it fall faster (more sensitive).
+     */
     decayRate: number
     /** Minimum time between beats in milliseconds (default: 100) */
     minInterval: number

@@ -56,4 +56,14 @@ export interface INetCue {
    * Called when the cue is paused
    */
   onPause?(): void
+
+  /**
+   * Called when a rig chain is being disposed. Implementations that cache per-sequencer
+   * runtime state (engines, sessions, per-rig variable stores, etc.) should drop the entry
+   * keyed by this sequencer so the chain can be garbage-collected and state doesn't
+   * accumulate across `restartControllers` cycles.
+   *
+   * Implementations that don't cache per-sequencer state may safely omit this method.
+   */
+  releaseSequencer?(sequencer: ILightingController): void
 }

@@ -1,7 +1,7 @@
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
-import { Sequencer } from '../../photonics-dmx/controllers/sequencer/Sequencer'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
+import { getStrobeStateManager } from '../../photonics-dmx/controllers/StrobeStateManager'
 import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
 import { LightingConfiguration, ConfigStrobeType, FixtureConfig } from '../../photonics-dmx/types'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
@@ -19,7 +19,9 @@ import * as path from 'path'
 import { EffectLoader } from '../../photonics-dmx/cues/node/loader/EffectLoader'
 
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
-import { LightStateManager } from '../../photonics-dmx/controllers/sequencer/LightStateManager'
+import { noopRuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
+import { RigChain } from './RigChain'
+import { ChainFanout } from './ChainFanout'
 import { TestEffectRunner } from './TestEffectRunner'
 import { ListenerLifecycleController } from './ListenerLifecycleController'
 import {
@@ -30,7 +32,6 @@ import { ConsoleModeController } from './ConsoleModeController'
 import { RegistryInitializer } from './RegistryInitializer'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { LifecyclePhase } from '../../shared/ipcTypes'
-import { LightTransitionController } from '../../photonics-dmx/controllers/sequencer/LightTransitionController'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import {
@@ -42,6 +43,7 @@ import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoade
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues'
 import { createLogger } from '../../shared/logger'
+import { DMX_OUTPUT_REFRESH_RATE_HZ_MAX } from '../../shared/dmxOutputRefresh'
 
 const log = createLogger('ControllerManager')
 
@@ -81,10 +83,31 @@ export class LifecycleAbortedError extends Error {
 
 export class ControllerManager {
   private config: ConfigurationManager
+  /**
+   * Per-rig sequencer chains. Order is significant: `rigChains[0]` is the primary chain,
+   * whose handlers own user-visible renderer broadcasts so the UI sees one event per
+   * logical cue rather than one per rig.
+   */
+  private rigChains: RigChain[] = []
+  /**
+   * Listener / processor surface that dispatches each incoming event to every chain's
+   * matching cue handler. Held here so listener controllers can read the up-to-date chain
+   * list without re-creating their listener wiring on every chain rebuild.
+   */
+  private chainFanout = new ChainFanout()
+  /**
+   * Shared tick source for every chain's `Sequencer`. Owned here (rather than inside a
+   * `Sequencer`) so chains can share one clock and tear down independently without
+   * stopping ticks for the others. Rebuilt on every `restartControllers`.
+   */
+  private clock: Clock | null = null
+  /**
+   * Shorthand accessors pointing at the same instances exposed by `rigChains[0]`. Provided
+   * for call sites (listener coordinators, audio controller, IPC handlers, test runner)
+   * that need a single light manager / effects controller reference without iterating
+   * chains.
+   */
   private dmxLightManager: DmxLightManager | null = null
-  private lightStateManager: LightStateManager | null = null
-  private lightTransitionController: LightTransitionController | null = null
-  private sequencer: Sequencer | null = null
   private effectsController: ILightingController | null = null
   private dmxPublisher: DmxPublisher | null = null
 
@@ -113,36 +136,16 @@ export class ControllerManager {
       hasReceivers: hasBrowserWindows,
     })
     this.testEffectRunner = new TestEffectRunner({
-      getConfig: () => ({
-        getPreference: (key: string) =>
-          key === 'effectDebounce' ? this.config.getPreference('effectDebounce') : 0,
-      }),
-      getCueHandler: () => (this.cueHandler instanceof YargCueHandler ? this.cueHandler : null),
-      getEffectsController: () => this.effectsController,
-      getDmxLightManager: () => this.dmxLightManager!,
+      getChainFanout: () => this.chainFanout,
+      ensureChainsHaveYargHandlers: () => this.ensureChainsHaveYargHandlersForSimulation(),
       ensureInitialized: () => this.init(),
-      createCueHandler: (dmx, eff) => {
-        const h = new YargCueHandler(dmx, eff, {
-          getMotionCueMinimumHoldMs: () =>
-            this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
-          getMotionCueProbabilityPercent: () =>
-            this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
-          runtimeBroadcaster: mainRuntimeBroadcaster,
-        })
-        h.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
-        h.setManualMotionRef(
-          this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
-        )
-        return h
-      },
-      setCueHandler: (h) => {
-        this.cueHandler = h
-      },
     })
     this.listenerLifecycle = new ListenerLifecycleController(
       {
         getDmxLightManager: () => this.dmxLightManager,
         getEffectsController: () => this.effectsController,
+        getRigChains: () => this.rigChains,
+        getChainFanout: () => this.chainFanout,
         getMotionEnabled: () => this.config.getPreference('motionEnabled') ?? true,
         getActiveYargMotionCueRef: () =>
           this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
@@ -150,6 +153,7 @@ export class ControllerManager {
           this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
         getMotionCueProbabilityPercent: () =>
           this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
+        getFallbackCueTimeMs: () => this.config.getPreference('yargFallbackCueTimeMs') ?? 20000,
         sendSenderError: (message: string) => {
           sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
         },
@@ -162,6 +166,8 @@ export class ControllerManager {
       {
         getDmxLightManager: () => this.dmxLightManager,
         getEffectsController: () => this.effectsController,
+        getRigChains: () => this.rigChains,
+        getChainFanout: () => this.chainFanout,
         config: this.config,
         sendToAllWindows,
         runtimeBroadcaster: mainRuntimeBroadcaster,
@@ -257,8 +263,7 @@ export class ControllerManager {
     this.assertPhase(['initializing', 'restarting', 'failed'], 'init')
 
     this.senderLifecycle.ensureSenderManager()
-    await this.initializeDmxManager()
-    await this.initializeSequencer()
+    await this.initializeRigChains()
     await this.registryInit.initializeCueRegistry()
     await this.registryInit.initializeAudioCueRegistry()
     await this.applyMotionPreferencesFromConfig()
@@ -277,18 +282,26 @@ export class ControllerManager {
   }
 
   /**
-   * Initialize the DMX Light Manager
-   * Creates a merged manager from all active rigs for backward compatibility
-   * Individual rig managers are handled by DmxPublisher
+   * Build one `RigChain` per active rig and wire up the DMX publisher. Each chain owns its
+   * own sequencer, light manager, and (later) cue handlers; the same listener event fans
+   * out to every chain so the cue resolves against each rig's own lights independently.
+   *
+   * If no rigs are active, a single empty chain is built so the rest of the system has a
+   * sequencer/light-state plumbing to reference (cue handlers never get installed; nothing
+   * makes it to the wire).
+   *
+   * `Clock` is rebuilt every time we initialise so a stale clock from a previous lifecycle
+   * never drives a fresh sequencer.
    */
-  private async initializeDmxManager(): Promise<void> {
-    // Load only active rigs
+  private async initializeRigChains(): Promise<void> {
     const activeRigs = this.config.getActiveRigs()
+
+    const clockRate = this.config.getPreference('clockRate')
+    this.clock = new Clock(clockRate)
 
     if (activeRigs.length === 0) {
       log.warn('No active DMX rigs found. DMX output will be disabled.')
-      // Create empty manager for backward compatibility
-      const emptyConfig = {
+      const emptyConfig: LightingConfiguration = {
         numLights: 0,
         lightLayout: { id: 'default-layout', label: 'Default Layout' },
         strobeType: ConfigStrobeType.None,
@@ -296,64 +309,57 @@ export class ControllerManager {
         backLights: [],
         strobeLights: [],
       }
-      this.dmxLightManager = new DmxLightManager(emptyConfig)
-      return
+      this.rigChains = [
+        new RigChain({
+          rigId: 'empty',
+          config: emptyConfig,
+          clock: this.clock,
+          isPrimary: true,
+        }),
+      ]
+    } else {
+      log.info(`Initializing ${activeRigs.length} active DMX rig(s)`)
+      // One chain per active rig. The first chain is marked primary so its handlers own
+      // user-visible renderer broadcasts; secondary chains run silently.
+      this.rigChains = activeRigs.map(
+        (rig, index) =>
+          new RigChain({
+            rigId: rig.id,
+            config: rig.config,
+            clock: this.clock!,
+            isPrimary: index === 0,
+            mirror: { horiz: rig.mirrorHoriz, vert: rig.mirrorVert },
+          }),
+      )
     }
 
-    log.info(`Initializing ${activeRigs.length} active DMX rig(s)`)
+    const primaryChain = this.rigChains[0]
+    this.dmxLightManager = primaryChain.dmxLightManager
+    this.effectsController = primaryChain.sequencer
 
-    // Create merged configuration from all active rigs for backward compatibility
-    // This allows processors and cue handlers to work with all lights
-    const mergedConfig: LightingConfiguration = {
-      numLights: 0,
-      lightLayout: { id: 'merged', label: 'Merged Rigs' },
-      strobeType: ConfigStrobeType.None,
-      frontLights: [],
-      backLights: [],
-      strobeLights: [],
-    }
-
-    // Merge all lights from all active rigs
-    for (const rig of activeRigs) {
-      mergedConfig.frontLights.push(...rig.config.frontLights)
-      mergedConfig.backLights.push(...rig.config.backLights)
-      mergedConfig.strobeLights.push(...rig.config.strobeLights)
-      mergedConfig.numLights += rig.config.numLights
-    }
-
-    this.dmxLightManager = new DmxLightManager(mergedConfig)
-  }
-
-  /**
-   * Initialize the lighting system
-   */
-  private async initializeSequencer(): Promise<void> {
-    // Get clock rate from configuration
-    const clockRate = this.config.getPreference('clockRate')
-
-    // Create the shared Clock instance
-    const clock = new Clock(clockRate)
-
-    // Create the sequencer components with the Clock
-    this.lightStateManager = new LightStateManager()
-    this.lightTransitionController = new LightTransitionController(this.lightStateManager)
-
-    // Create the sequencer with all components
-    this.sequencer = new Sequencer(this.lightTransitionController, clock)
-    this.effectsController = this.sequencer
+    this.chainFanout.setChains(this.rigChains)
 
     // Start the centralized timing system
-    clock.start()
+    this.clock.start()
 
-    // Set up DMX publisher (no longer takes DmxLightManager in constructor)
-    this.dmxPublisher = new DmxPublisher(
-      this.senderLifecycle.getSenderManager(),
-      this.lightStateManager,
+    // Set up DMX publisher. Govern wire output so the render tick rate (clockRate, up to
+    // 100 Hz) doesn't fire-hose cheap USB / low-end sACN adapters. The Global DMX Publishing
+    // Rate pref sits upstream of all enabled senders; per-sender refresh settings still pace
+    // individual slow links below this cap. Falls back to the absolute DMX ceiling when the
+    // pref is absent so the governor never throttles a sender below what it could output.
+    const globalDmxRateHz =
+      this.config.getPreference('globalDmxPublishingRateHz') ?? DMX_OUTPUT_REFRESH_RATE_HZ_MAX
+    this.dmxPublisher = new DmxPublisher(this.senderLifecycle.getSenderManager(), null, undefined, {
+      outputRateHz: globalDmxRateHz,
+    })
+    // Subscribe the publisher to every chain's LightStateManager. Each chain's emission
+    // writes its rig's lights into the publisher's aggregated map; a coalesced flush calls
+    // publishNow once per tick.
+    this.dmxPublisher.setRigChains(
+      this.rigChains.map((c) => ({ rigId: c.rigId, lightStateManager: c.lightStateManager })),
     )
 
-    // Load active rigs and set them up in the publisher
-    const activeRigs = this.config.getActiveRigs()
-    if (this.dmxPublisher && activeRigs.length > 0) {
+    if (activeRigs.length > 0) {
       this.dmxPublisher.updateActiveRigs(activeRigs)
     }
   }
@@ -662,14 +668,19 @@ export class ControllerManager {
         }
       }
 
-      if (this.effectsController) {
+      // Dispose every rig chain. The shared clock is stopped separately below so a chain
+      // tearing down can't take ticks away from any sibling chain.
+      for (const chain of this.rigChains) {
         try {
-          await this.effectsController.shutdown()
-          log.info('ControllerManager shutdown: effects controller stopped')
+          await chain.dispose()
         } catch (err) {
-          log.error('Error shutting down effects controller:', err)
+          log.error(`Error disposing rig chain ${chain.rigId}:`, err)
         }
       }
+      this.rigChains = []
+      this.dmxLightManager = null
+      this.effectsController = null
+      log.info('ControllerManager shutdown: rig chains disposed')
 
       if (this.dmxPublisher) {
         try {
@@ -678,6 +689,15 @@ export class ControllerManager {
         } catch (err) {
           log.error('Error shutting down DMX publisher:', err)
         }
+      }
+
+      if (this.clock) {
+        try {
+          this.clock.destroy()
+        } catch (err) {
+          log.error('Error stopping shared clock:', err)
+        }
+        this.clock = null
       }
 
       try {
@@ -735,6 +755,47 @@ export class ControllerManager {
 
   public getCueHandler(): YargCueHandler | null {
     return this.cueHandler
+  }
+
+  /**
+   * Returns the listener / processor fanout. Exposed so simulation IPC handlers and the
+   * test-effect runner can dispatch events to every active rig's handler without going
+   * through `getCueHandler()` (which only returns the primary chain's handler).
+   */
+  public getChainFanout(): ChainFanout {
+    return this.chainFanout
+  }
+
+  /**
+   * Idempotent: ensures every active rig chain has a `YargCueHandler` attached, creating
+   * one bound to the chain's own `(dmxLightManager, sequencer)` for any chain whose slot is
+   * still null. Used by the simulation IPC path and `TestEffectRunner` to bring secondary
+   * chains up to par with the primary so cues dispatched through `ChainFanout` reach every
+   * rig — even when no real network listener has run `enableYargInternal`.
+   *
+   * Handler construction mirrors `ListenerCoordinator.enableYargInternal`: same motion
+   * preferences, and only the primary chain's handler gets the main runtime broadcaster so
+   * renderer events stay deduped.
+   *
+   * Safe to call after `enableYargInternal` (no-op for chains that already have handlers)
+   * and after `disableYarg` (rebuilds the chain slots from scratch).
+   */
+  public ensureChainsHaveYargHandlersForSimulation(): void {
+    for (const chain of this.rigChains) {
+      if (chain.yargCueHandler) continue
+      const handler = new YargCueHandler(chain.dmxLightManager, chain.sequencer, {
+        getMotionCueMinimumHoldMs: () =>
+          this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
+        getMotionCueProbabilityPercent: () =>
+          this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
+        runtimeBroadcaster: chain.isPrimary ? mainRuntimeBroadcaster : noopRuntimeBroadcaster(),
+      })
+      handler.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
+      handler.setManualMotionRef(
+        this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
+      )
+      chain.yargCueHandler = handler
+    }
   }
 
   public getNodeCueLoader(): NodeCueLoader | null {
@@ -823,6 +884,7 @@ export class ControllerManager {
     const activeSendersBeforeRestart = this.senderLifecycle.getActiveOutputSenderSnapshotIfAny()
     const wasConsoleMode = this.consoleMode.getConsoleRestore() !== null
 
+    let teardownSucceeded = false
     try {
       if (wasYargEnabled) {
         await this.listenerLifecycle.yargRb3.disableYarg()
@@ -834,9 +896,10 @@ export class ControllerManager {
         await this.listenerLifecycle.audio.disableAudio()
       }
 
-      if (this.effectsController) {
-        await this.effectsController.shutdown()
+      for (const chain of this.rigChains) {
+        await chain.dispose()
       }
+      this.rigChains = []
 
       if (this.dmxPublisher) {
         await this.dmxPublisher.shutdown()
@@ -847,16 +910,27 @@ export class ControllerManager {
         this.cueHandler.shutdown()
       }
 
+      // Gguarantee the process-wide strobe state is cleared on every restart,
+      // even if no cue handler was active to clear it during its own shutdown.
+      // Prevents a stale strobe slot from driving hardware-strobe-channel
+      // lights after an input-platform switch.
+      getStrobeStateManager().setActive(null)
+
+      // Clear the shared tick source so `init()` builds a fresh one rather than reusing
+      // a clock whose tick callbacks have been unregistered.
+      if (this.clock) {
+        this.clock.destroy()
+        this.clock = null
+      }
+
       this.dmxLightManager = null
-      this.lightStateManager = null
-      this.lightTransitionController = null
-      this.sequencer = null
       this.effectsController = null
       this.dmxPublisher = null
       this.cueHandler = null
 
       this.isInitialized = false
 
+      teardownSucceeded = true
       log.info('Controllers shutdown completed, reinitializing')
     } catch (error) {
       log.error('Error shutting down controllers:', error)
@@ -873,6 +947,16 @@ export class ControllerManager {
       throw new LifecycleAbortedError(
         'restartControllers aborted: shutdown started before reinitialization',
       )
+    }
+
+    // A teardown failure (with no concurrent shutdown) leaves controllers partially torn down.
+    // Reinitializing on top of that risks dangling listeners/timers and double-published state,
+    // so fail the restart instead of building a fresh graph over a broken one.
+    if (!teardownSucceeded) {
+      log.error('Restart aborted: controller teardown did not complete; not reinitializing')
+      this.setLifecyclePhase('failed')
+      this.isInitialized = false
+      throw new Error('Controller teardown failed during restart; reinitialization aborted')
     }
 
     try {
@@ -1003,11 +1087,14 @@ export class ControllerManager {
   }
 
   /**
-   * Apply global motion master toggle to YARG and audio motion handlers.
+   * Apply the global motion master toggle to every active rig's YARG handler plus the audio
+   * processor (audio's fanout is hidden behind `AudioCueProcessor`). Without the chain loop
+   * only the primary chain would see the toggle and secondary rigs would keep producing
+   * motion output until the next listener restart.
    */
   public setMotionEnabledGlobal(enabled: boolean): void {
-    if (this.cueHandler instanceof YargCueHandler) {
-      this.cueHandler.setMotionEnabled(enabled)
+    for (const chain of this.rigChains) {
+      chain.yargCueHandler?.setMotionEnabled(enabled)
     }
     this.listenerLifecycle.audio.setMotionEnabled(enabled)
   }
@@ -1020,9 +1107,14 @@ export class ControllerManager {
     return this.listenerLifecycle.audio.isAudioGameModeActive()
   }
 
+  /**
+   * Update the manual YARG motion cue reference on every active rig's handler so all rigs
+   * pick up the new reference together. Only the primary chain emits the renderer
+   * broadcast for the change (see Phase 4 dedup); the secondary chains apply silently.
+   */
   public setActiveYargMotionCueRef(ref: YargMotionCueRef | null): void {
-    if (this.cueHandler instanceof YargCueHandler) {
-      this.cueHandler.setManualMotionRef(ref)
+    for (const chain of this.rigChains) {
+      chain.yargCueHandler?.setManualMotionRef(ref)
     }
   }
 
@@ -1042,7 +1134,7 @@ export class ControllerManager {
     }
     const r = await this.consoleMode.enableConsoleMode(rigId)
     if (r.success) {
-      this.lifecyclePhase = 'consoleMode'
+      this.setLifecyclePhase('consoleMode')
     }
     return r
   }
@@ -1052,7 +1144,7 @@ export class ControllerManager {
   > {
     const r = await this.consoleMode.disableConsoleMode()
     if (r.success && this.lifecyclePhase === 'consoleMode') {
-      this.lifecyclePhase = 'running'
+      this.setLifecyclePhase('running')
     }
     return r
   }

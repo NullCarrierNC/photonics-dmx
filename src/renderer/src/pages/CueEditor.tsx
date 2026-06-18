@@ -11,6 +11,7 @@ import NodeSidebar from '../components/cue-editor/components/NodeSidebar'
 import CueEditorToolbar from '../components/cue-editor/components/CueEditorToolbar'
 import CueEditorRegistryPanel from '../components/cue-editor/components/CueEditorRegistryPanel'
 import CueEditorValidationErrors from '../components/cue-editor/components/CueEditorValidationErrors'
+import CueEditorWarnings from '../components/cue-editor/components/CueEditorWarnings'
 import ActionNodeComponent from '../components/cue-editor/components/flow/ActionNode'
 import EventNodeComponent from '../components/cue-editor/components/flow/EventNode'
 import LogicNodeComponent from '../components/cue-editor/components/flow/LogicNode'
@@ -27,8 +28,10 @@ import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles'
 import { useCueFlow } from '../components/cue-editor/hooks/useCueFlow'
 import { useActiveNodes } from '../components/cue-editor/hooks/useActiveNodes'
 import { useErrorNodes } from '../components/cue-editor/hooks/useErrorNodes'
+import { useLevelModeWarnings } from '../components/cue-editor/hooks/useLevelModeWarnings'
 import { ActiveNodesContext } from '../components/cue-editor/context/ActiveNodesContext'
 import { ErrorNodesContext } from '../components/cue-editor/context/ErrorNodesContext'
+import { WarningNodesContext } from '../components/cue-editor/context/WarningNodesContext'
 import {
   updateDocumentFromFlow,
   updateEffectDocumentFromFlow,
@@ -213,6 +216,7 @@ const CueEditor: React.FC = () => {
     handleImport,
     handleExport,
     handleReload,
+    revertCurrentFileToDisk,
     pendingImport,
     clearPendingImport,
     commitPendingImport,
@@ -373,6 +377,7 @@ const CueEditor: React.FC = () => {
         : selectedCueId ?? null
   const activeNodeIds = useActiveNodes(currentGraphId)
   const errorNodeIds = useErrorNodes(currentGraphId)
+  const { warningNodeIds, warningMessages } = useLevelModeWarnings(nodes, edges)
 
   const usedCueTypes = useMemo((): Set<string> => {
     if (!editorDoc || editorDoc.mode !== 'cue' || cueKind !== 'lighting') return new Set()
@@ -590,17 +595,35 @@ const CueEditor: React.FC = () => {
               checkValueSource(logicNode.index, nodeType, nodeId, nodeLabel, 'index')
               checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
               break
+            case 'color-from-index':
+              checkValueSource(logicNode.colors, nodeType, nodeId, nodeLabel, 'colors')
+              checkValueSource(logicNode.index, nodeType, nodeId, nodeLabel, 'index')
+              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
+              break
             case 'array-length':
             case 'reverse-lights':
             case 'create-pairs':
+            case 'reverse-colors':
+            case 'shuffle-colors':
               checkVarName(logicNode.sourceVariable, nodeType, nodeId, nodeLabel, 'sourceVariable')
               checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
               break
             case 'concat-lights':
+            case 'concat-colors':
               for (const sourceVar of logicNode.sourceVariables ?? []) {
                 checkVarName(sourceVar, nodeType, nodeId, nodeLabel, 'sourceVariables')
               }
               checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
+              break
+            case 'build-ring':
+              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
+              checkVarName(
+                logicNode.assignGroupSize,
+                nodeType,
+                nodeId,
+                nodeLabel,
+                'assignGroupSize',
+              )
               break
             case 'delay':
               checkValueSource(logicNode.delayTime, nodeType, nodeId, nodeLabel, 'delayTime')
@@ -763,12 +786,15 @@ const CueEditor: React.FC = () => {
         cues: file.cues.map((c) => (c.id === selectedCueId ? updatedCue : c)),
       }
       setEditorDoc({ mode: 'cue', file: updatedFile, path: editorDoc.path })
+      // Collision resolution may have regenerated the cue's id; follow it so the editor
+      // keeps the same cue selected instead of falling back to another one.
+      setSelectedCueId(updatedCue.id)
       loadCueIntoFlow(updatedCue)
       setShowJsonEditor(false)
       setJsonEditorDirty(false)
       setIsDirty(true)
     },
-    [editorDoc, selectedCueId, loadCueIntoFlow, setEditorDoc, setIsDirty],
+    [editorDoc, selectedCueId, loadCueIntoFlow, setEditorDoc, setSelectedCueId, setIsDirty],
   )
 
   const handleJsonEffectSave = useCallback(
@@ -780,12 +806,13 @@ const CueEditor: React.FC = () => {
         effects: file.effects.map((e) => (e.id === selectedCueId ? updatedEffect : e)),
       }
       setEditorDoc({ mode: 'effect', file: updatedFile, path: editorDoc.path })
+      setSelectedCueId(updatedEffect.id)
       loadCueIntoFlow(updatedEffect)
       setShowJsonEditor(false)
       setJsonEditorDirty(false)
       setIsDirty(true)
     },
-    [editorDoc, selectedCueId, loadCueIntoFlow, setEditorDoc, setIsDirty],
+    [editorDoc, selectedCueId, loadCueIntoFlow, setEditorDoc, setSelectedCueId, setIsDirty],
   )
 
   const handleGraphPrettify = useCallback(() => {
@@ -833,15 +860,17 @@ const CueEditor: React.FC = () => {
     [showJsonEditor, jsonEditorDirty, isDirty],
   )
 
-  const handleDiscardNavigation = useCallback(() => {
-    if (pendingNavigation) {
-      pendingNavigation()
-      setPendingNavigation(null)
-      setShowJsonEditor(false)
-      setJsonEditorDirty(false)
-      setIsDirty(false)
-    }
-  }, [pendingNavigation, setIsDirty])
+  const handleDiscardNavigation = useCallback(async () => {
+    if (!pendingNavigation) return
+    // Edits live in the in-memory editorDoc (Add Cue / JSON Apply / metadata), so truly
+    // discarding them means reverting to the on-disk copy before performing the navigation.
+    await revertCurrentFileToDisk()
+    pendingNavigation()
+    setPendingNavigation(null)
+    setShowJsonEditor(false)
+    setJsonEditorDirty(false)
+    setIsDirty(false)
+  }, [pendingNavigation, revertCurrentFileToDisk, setIsDirty])
 
   const fileList = mode === 'yarg' ? groupedFiles.yarg : groupedFiles.audio
   const effectFiles = mode === 'yarg' ? groupedEffectFiles.yarg : groupedEffectFiles.audio
@@ -968,6 +997,7 @@ const CueEditor: React.FC = () => {
                 cueDefinition={currentCueDefinition}
                 editorDoc={editorDoc}
                 selectedCueId={selectedCueId}
+                availableCueTypes={availableCueTypes}
                 onSave={handleJsonEditorSave}
                 onCancel={() => {
                   setShowJsonEditor(false)
@@ -978,47 +1008,50 @@ const CueEditor: React.FC = () => {
             ) : (
               <ActiveNodesContext.Provider value={activeNodeIds}>
                 <ErrorNodesContext.Provider value={errorNodeIds}>
-                  <CueFlowCanvas
-                    nodes={nodes}
-                    edges={edges}
-                    nodeTypes={nodeTypes}
-                    selectedCueName={
-                      editorMode === 'effect'
-                        ? currentEffectDefinition?.name
-                        : currentCueDefinition?.name
-                    }
-                    contextMenu={contextMenu}
-                    paneContextMenu={paneContextMenu}
-                    flowWrapperRef={flowWrapperRef}
-                    onNodesChange={onNodesChange}
-                    onEdgesChange={onEdgesChange}
-                    onConnect={onConnect}
-                    onSelectionChange={handleNodeSelection}
-                    onNodeContextMenu={handleNodeContextMenu}
-                    onEdgeContextMenu={onEdgeContextMenu}
-                    onPaneClick={closeContextMenu}
-                    onPaneContextMenu={handlePaneContextMenu}
-                    onRemoveNode={handleRemoveNode}
-                    setReactFlowInstance={setReactFlowInstance}
-                    isValidConnection={isValidConnection}
-                    activeMode={activeMode}
-                    activeCueKind={editorMode === 'cue' ? cueKind : 'lighting'}
-                    editorMode={editorMode}
-                    addEventNode={addEventNode}
-                    addActionNode={addActionNode}
-                    addLogicNode={addLogicNode}
-                    addEventRaiserNode={addEventRaiserNode}
-                    addEventListenerNode={addEventListenerNode}
-                    addEffectRaiserNode={addEffectRaiserNode}
-                    addEffectListenerNode={addEffectListenerNode}
-                    addNotesNode={addNotesNode}
-                    onJsonToggle={() => setShowJsonEditor(true)}
-                    onGraphPrettify={handleGraphPrettify}
-                  />
+                  <WarningNodesContext.Provider value={warningNodeIds}>
+                    <CueFlowCanvas
+                      nodes={nodes}
+                      edges={edges}
+                      nodeTypes={nodeTypes}
+                      selectedCueName={
+                        editorMode === 'effect'
+                          ? currentEffectDefinition?.name
+                          : currentCueDefinition?.name
+                      }
+                      contextMenu={contextMenu}
+                      paneContextMenu={paneContextMenu}
+                      flowWrapperRef={flowWrapperRef}
+                      onNodesChange={onNodesChange}
+                      onEdgesChange={onEdgesChange}
+                      onConnect={onConnect}
+                      onSelectionChange={handleNodeSelection}
+                      onNodeContextMenu={handleNodeContextMenu}
+                      onEdgeContextMenu={onEdgeContextMenu}
+                      onPaneClick={closeContextMenu}
+                      onPaneContextMenu={handlePaneContextMenu}
+                      onRemoveNode={handleRemoveNode}
+                      setReactFlowInstance={setReactFlowInstance}
+                      isValidConnection={isValidConnection}
+                      activeMode={activeMode}
+                      activeCueKind={editorMode === 'cue' ? cueKind : 'lighting'}
+                      editorMode={editorMode}
+                      addEventNode={addEventNode}
+                      addActionNode={addActionNode}
+                      addLogicNode={addLogicNode}
+                      addEventRaiserNode={addEventRaiserNode}
+                      addEventListenerNode={addEventListenerNode}
+                      addEffectRaiserNode={addEffectRaiserNode}
+                      addEffectListenerNode={addEffectListenerNode}
+                      addNotesNode={addNotesNode}
+                      onJsonToggle={() => setShowJsonEditor(true)}
+                      onGraphPrettify={handleGraphPrettify}
+                    />
+                  </WarningNodesContext.Provider>
                 </ErrorNodesContext.Provider>
               </ActiveNodesContext.Provider>
             )}
             <CueEditorValidationErrors errors={validationErrors} />
+            <CueEditorWarnings warnings={warningMessages} />
           </section>
         </Panel>
         <Separator className="w-2 shrink-0 rounded bg-gray-200 dark:bg-gray-700 hover:bg-blue-400 transition-colors data-[resize-handle-active]:bg-blue-500 cursor-col-resize min-w-2" />

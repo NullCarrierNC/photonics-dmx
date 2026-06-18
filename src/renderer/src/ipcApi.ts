@@ -8,6 +8,7 @@
 import {
   NODE_CUES,
   EFFECTS,
+  RIGS,
   WINDOW,
   LIFECYCLE,
   LIGHT,
@@ -56,6 +57,12 @@ export const getMotionCueMinHoldMs = () =>
 
 export const setMotionCueMinHoldMs = (minHoldMs: number) =>
   window.api.invoke(LIGHT.SET_MOTION_CUE_MIN_HOLD_MS, minHoldMs)
+
+export const getYargFallbackCueTimeMs = () =>
+  window.api.invoke(LIGHT.GET_YARG_FALLBACK_CUE_TIME_MS, undefined)
+
+export const setYargFallbackCueTimeMs = (fallbackMs: number) =>
+  window.api.invoke(LIGHT.SET_YARG_FALLBACK_CUE_TIME_MS, fallbackMs)
 
 export const getMotionCueProbabilityPercent = () =>
   window.api.invoke(LIGHT.GET_MOTION_CUE_PROBABILITY_PERCENT, undefined)
@@ -176,6 +183,12 @@ export const getActiveRigs = () => window.api.invoke(CONFIG.GET_ACTIVE_RIGS, und
 export const saveDmxRig = (rig: DmxRig) => window.api.invoke(CONFIG.SAVE_DMX_RIG, rig)
 
 export const deleteDmxRig = (id: string) => window.api.invoke(CONFIG.DELETE_DMX_RIG, id)
+
+/** Build a self-contained rig export file (rig + referenced templates) and write it via a save dialog. */
+export const exportRig = (rigId: string) => window.api.invoke(RIGS.EXPORT, rigId)
+
+/** Open a rig export file via a file dialog; returns the parsed rig + templates without committing. */
+export const pickRigImportFile = () => window.api.invoke(RIGS.IMPORT_PICK, undefined)
 
 // ---------------------------------------------------------------------------
 // Audio configuration
@@ -453,9 +466,6 @@ export const showItemInFolder = (filePath: string) =>
   window.api.invoke(SHELL.SHOW_ITEM_IN_FOLDER, filePath)
 
 export const openPath = (filePath: string) => window.api.invoke(SHELL.OPEN_PATH, filePath)
-
-export const runNodeScript = (payload: { scriptName: string; args: string[] }) =>
-  window.api.invoke(SHELL.RUN_NODE_SCRIPT, payload)
 
 // ---------------------------------------------------------------------------
 // Node cue debug

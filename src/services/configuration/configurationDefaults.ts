@@ -1,5 +1,6 @@
 import {
   DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+  DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
   OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
 } from '../../shared/dmxOutputRefresh'
 import {
@@ -52,8 +53,20 @@ export interface AppPreferences {
   cueDomains: Record<CueDomain, CueDomainPrefs>
   /** Master switch: when false, YARG and audio automatic motion layers are off. */
   motionEnabled?: boolean
+  /**
+   * Milliseconds with no new YARG lighting cue (while a song plays) before the auto Fallback cue
+   * fires, then re-fires each window. 0 disables the feature. Default 20000.
+   */
+  yargFallbackCueTimeMs: number
   cueConsistencyWindow: number
   clockRate: number
+  /**
+   * Global publisher output rate cap (Hz). Sits upstream of all enabled senders and bounds how
+   * often the DmxPublisher hands frames to the SenderManager — protects cheap USB / low-end
+   * sACN adapters from being fed at the render tick rate. Per-sender refresh settings still
+   * pace individual wire links below this cap.
+   */
+  globalDmxPublishingRateHz?: number
 
   dmxOutputConfig?: {
     sacnEnabled: boolean
@@ -109,9 +122,11 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   effectDebounce: 0,
   complex: true,
   cueDomains: createDefaultCueDomains(),
-  cueConsistencyWindow: 60000,
+  cueConsistencyWindow: 10000,
   motionEnabled: true,
+  yargFallbackCueTimeMs: 20000,
   clockRate: 10,
+  globalDmxPublishingRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
   activeAudioCueType: '' as AudioCueType,
   audioGameMode: DEFAULT_AUDIO_GAME_MODE,
 
@@ -151,7 +166,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
     refreshRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
   },
   stageKitPrefs: {
-    yargPriority: 'prefer-for-tracked',
+    yargPriority: 'random',
   },
   dmxSettingsPrefs: {
     artNetExpanded: false,

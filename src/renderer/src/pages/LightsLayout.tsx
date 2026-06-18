@@ -41,7 +41,9 @@ import LightsLayoutRigSection from './LightsLayout/LightsLayoutRigSection'
 import LightsLayoutForm from './LightsLayout/LightsLayoutForm'
 import LightChannelAssignmentSection from './LightsLayout/LightChannelAssignmentSection'
 import LightsLayoutIntro from './LightsLayout/LightsLayoutIntro'
-import { saveDmxRig } from '../ipcApi'
+import ImportRigModal from './LightsLayout/components/ImportRigModal'
+import { useRigImportExport } from './LightsLayout/useRigImportExport'
+import { getDmxRigs, saveDmxRig } from '../ipcApi'
 import {
   LIGHT_LAYOUTS,
   isTwoRowPrimaryLayout,
@@ -62,6 +64,10 @@ import { useConfirm } from '../hooks/useConfirm'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('LightsLayout')
 
+/** Compact toolbar button, sized to match the Node/Cue editor's Import/Export buttons. */
+const rigToolbarButton =
+  'px-3 py-1 text-xs rounded border border-gray-400 dark:border-white bg-gray-200 dark:bg-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed'
+
 /**
  * Handles the light layout and channel configuration.
  * @returns React component
@@ -71,7 +77,7 @@ const LightsLayout = () => {
   const confirm = useConfirm()
   const [activeConfig, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom)
   const [myFixtures] = useAtom(myValidDmxLightsAtom)
-  const [myFixtureLibrary] = useAtom(myDmxLightsAtom)
+  const [myFixtureLibrary, setMyFixtureLibrary] = useAtom(myDmxLightsAtom)
   const [rigs, setRigs] = useAtom(dmxRigsAtom)
   const [activeRigId, setActiveRigId] = useAtom(activeRigIdAtom)
   const [prefs] = useAtom(lightingPrefsAtom)
@@ -371,6 +377,29 @@ const LightsLayout = () => {
     })
   }, [isDirty, confirm])
 
+  const {
+    pendingImport,
+    handleExport,
+    handleImport,
+    handleDuplicate,
+    handleDelete,
+    commitPendingImport,
+    clearPendingImport,
+  } = useRigImportExport({
+    rigs,
+    setRigs,
+    activeRigId,
+    setActiveRigId,
+    setRigName,
+    setActiveLightsConfig,
+    myFixtureLibrary,
+    setMyFixtureLibrary,
+    onBeforeDiscardingUnsaved: tryConfirmUnsaved,
+    isDirty,
+    showToast,
+    confirm,
+  })
+
   // Memo Check for Physical Strobe Fixtures in Source Lights
   const hasPhysicalStrobe = useMemo(() => {
     return true
@@ -507,8 +536,26 @@ const LightsLayout = () => {
         return
       }
 
-      setActiveLightsConfig(updatedConfig)
-      setRigs((prev) => prev.map((r) => (r.id === activeRigId ? updatedRig : r)))
+      // getDmxRigs() returns the backend-canonical rigs: migration + template-sync run on read
+      // and materialize defaults (e.g. strobeValues/config) and recomputed channels that the
+      // editor's raw config omits. Adopt that shape for both atoms so the editor baseline and the
+      // saved rig the dirty check compares stay identical; the unsaved indicator then reflects
+      // real edits only. Fall back to the local objects if the re-read fails or the rig is gone.
+      try {
+        const freshRigs = await getDmxRigs()
+        const freshRig = freshRigs.find((r) => r.id === activeRigId)
+        if (freshRig) {
+          setRigs(freshRigs)
+          setActiveLightsConfig(freshRig.config)
+        } else {
+          setActiveLightsConfig(updatedConfig)
+          setRigs((prev) => prev.map((r) => (r.id === activeRigId ? updatedRig : r)))
+        }
+      } catch (err) {
+        log.error('Failed to refresh rigs after save; using local config', err)
+        setActiveLightsConfig(updatedConfig)
+        setRigs((prev) => prev.map((r) => (r.id === activeRigId ? updatedRig : r)))
+      }
 
       setShowSuccessMessage(true)
       setTimeout(() => setShowSuccessMessage(false), 3000)
@@ -532,7 +579,44 @@ const LightsLayout = () => {
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
       <ToastContainer toasts={toasts} onDismiss={hideToast} />
-      <LightsLayoutIntro />
+      <ImportRigModal
+        isOpen={pendingImport !== null}
+        sourceBasename={pendingImport?.sourceBasename ?? ''}
+        defaultName={pendingImport?.defaultName ?? ''}
+        existingRigNamesLower={new Set(rigs.map((r) => r.name.trim().toLowerCase()))}
+        summary={
+          pendingImport?.summary ?? {
+            templatesToAddCount: 0,
+            templatesReusedCount: 0,
+            orphanCount: 0,
+          }
+        }
+        onCancel={clearPendingImport}
+        onSave={(name) => void commitPendingImport(name)}
+      />
+      <LightsLayoutIntro
+        headerRight={
+          advancedModeEnabled ? (
+            <>
+              <button
+                type="button"
+                onClick={handleImport}
+                title="Import a rig from a file"
+                className={rigToolbarButton}>
+                Import Layout
+              </button>
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={!activeRigId}
+                title="Export the selected rig to a file"
+                className={rigToolbarButton}>
+                Export Layout
+              </button>
+            </>
+          ) : undefined
+        }
+      />
 
       {/* Check if any lights are configured at all */}
       {myFixtureLibrary.length === 0 ? (
@@ -556,6 +640,8 @@ const LightsLayout = () => {
               setRigName={setRigName}
               onRigsChange={setRigs}
               onBeforeDiscardingUnsaved={tryConfirmUnsaved}
+              onDuplicate={handleDuplicate}
+              onDelete={handleDelete}
             />
           )}
 

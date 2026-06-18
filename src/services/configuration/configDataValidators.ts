@@ -27,7 +27,12 @@ const cueDomainEntrySchema = {
       type: 'object',
       additionalProperties: { type: 'array', items: { type: 'string' } },
     },
-    selectionMode: { type: 'string' },
+    // Constrained to the valid CueDomainSelectionMode values so a corrupt value fails validation
+    // and routes through corruption-recovery rather than being coerced to a default by the
+    // getters. Shared across all cue domains (lighting reads oncePerSong|withinSong; motion reads
+    // oncePerSong|perCueChange|none). Optional; additionalProperties stays true so newer config
+    // versions still validate.
+    selectionMode: { type: 'string', enum: ['oncePerSong', 'perCueChange', 'withinSong', 'none'] },
     activeCueRef: {
       anyOf: [
         { type: 'null' },
@@ -67,6 +72,9 @@ const appPreferencesDataSchema = {
     cueDomains: cueDomainsSchema,
     cueConsistencyWindow: { type: 'number' },
     clockRate: { type: 'number' },
+    // Optional (not required) so prefs.json from installs predating this field still validate;
+    // ConfigurationManager reads default to 20000 when absent.
+    yargFallbackCueTimeMs: { type: 'number' },
   },
   additionalProperties: true,
 }

@@ -18,14 +18,20 @@ import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
  * but no initial setEffect clear. Re-submitted `motion-pattern` actions with the same resolved config
  * are skipped so `cue-called` does not restart the waveform each tick.
  */
+interface YargMotionRunState {
+  /** Lazily (re)created on execute; cancelled and nulled in onStop so the next execute
+   *  starts a fresh engine but the session's accumulated state survives. */
+  engine: GraphExecutionEngine | null
+  session: CueSession
+}
+
 export class YargMotionNodeCue implements INetCue {
   private readonly groupId: string
   private readonly compiledCue: CompiledYargCue
   private readonly effectRegistry: EffectRegistry
-  private readonly session: CueSession
   private readonly runtimeCallbacks?: NodeRuntimeCallbacks
   private readonly runtimeBroadcaster: RuntimeBroadcaster
-  private engine: GraphExecutionEngine | null = null
+  private readonly states = new Map<ILightingController, YargMotionRunState>()
 
   constructor(
     groupId: string,
@@ -37,11 +43,40 @@ export class YargMotionNodeCue implements INetCue {
     this.groupId = groupId
     this.compiledCue = compiledCue
     this.effectRegistry = effectRegistry ?? new EffectRegistry()
-    this.session = new CueSession()
     this.runtimeCallbacks = runtimeCallbacks
     this.runtimeBroadcaster = runtimeBroadcaster ?? noopRuntimeBroadcaster()
-    const definition = compiledCue.definition as YargMotionNodeCueDefinition
-    this.session.initializeVariables(definition.variables ?? [], compiledCue.groupVariables ?? [])
+  }
+
+  private getOrCreateState(
+    sequencer: ILightingController,
+    lightManager: DmxLightManager,
+  ): YargMotionRunState {
+    let state = this.states.get(sequencer)
+    if (!state) {
+      const definition = this.compiledCue.definition as YargMotionNodeCueDefinition
+      const session = new CueSession()
+      session.initializeVariables(definition.variables ?? [], this.compiledCue.groupVariables ?? [])
+      state = { engine: null, session }
+      this.states.set(sequencer, state)
+    }
+    if (!state.engine) {
+      const definition = this.compiledCue.definition as YargMotionNodeCueDefinition
+      const cueId = this.id
+      const policy = motionCueGraphPolicy(this.groupId, cueId)
+      state.engine = GraphExecutionEngine.forCue(
+        this.compiledCue,
+        cueId,
+        policy,
+        state.session,
+        sequencer,
+        lightManager,
+        this.runtimeBroadcaster,
+        this.effectRegistry,
+        definition.variables ?? [],
+        this.runtimeCallbacks,
+      )
+    }
+    return state
   }
 
   get cueId(): string {
@@ -69,32 +104,29 @@ export class YargMotionNodeCue implements INetCue {
     sequencer: ILightingController,
     lightManager: DmxLightManager,
   ): void | Promise<void> {
-    if (!this.engine) {
-      const definition = this.compiledCue.definition as YargMotionNodeCueDefinition
-      const cueId = this.id
-      const policy = motionCueGraphPolicy(this.groupId, cueId)
-      this.engine = GraphExecutionEngine.forCue(
-        this.compiledCue,
-        cueId,
-        policy,
-        this.session,
-        sequencer,
-        lightManager,
-        this.runtimeBroadcaster,
-        this.effectRegistry,
-        definition.variables ?? [],
-        this.runtimeCallbacks,
-      )
-    }
-    this.engine.startCueRun(parameters, {
-      hasCueStartedFired: this.session.hasCueStartedFired(),
+    const state = this.getOrCreateState(sequencer, lightManager)
+    state.engine!.startCueRun(parameters, {
+      hasCueStartedFired: state.session.hasCueStartedFired(),
     })
   }
 
   onStop(): void {
-    this.engine?.cancelAll(false)
-    this.engine = null
-    this.session.resetForStop()
+    for (const state of this.states.values()) {
+      state.engine?.cancelAll(false)
+      state.engine = null
+      state.session.resetForStop()
+    }
+  }
+
+  /**
+   * Drops the per-sequencer state entry so a disposed chain's sequencer can be garbage
+   * collected. See {@link YargNodeCue.releaseSequencer} for the rationale.
+   */
+  releaseSequencer(sequencer: ILightingController): void {
+    const state = this.states.get(sequencer)
+    if (!state) return
+    state.engine?.cancelAll(false)
+    this.states.delete(sequencer)
   }
 
   onPause(): void {

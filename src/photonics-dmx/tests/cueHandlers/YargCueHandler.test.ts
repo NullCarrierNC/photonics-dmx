@@ -9,11 +9,16 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 import { YargCueHandler } from '../../cueHandlers/YargCueHandler'
+import { monotonicNowMs } from '../../../shared/time'
 import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
 import { CueStyle, INetCue } from '../../cues/interfaces/INetCue'
 import { CueData, CueType, defaultCueData } from '../../cues/types/cueTypes'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
+import {
+  getStrobeStateManager,
+  __resetStrobeStateManagerForTests,
+} from '../../controllers/StrobeStateManager'
 
 type CueLifecycleMocks = {
   execute: jest.Mock
@@ -45,6 +50,7 @@ function makeSequencer(): ILightingController {
     onGuitarNote: jest.fn(),
     onBassNote: jest.fn(),
     onKeysNote: jest.fn(),
+    onVocalNote: jest.fn(),
   } as unknown as ILightingController
 }
 
@@ -104,7 +110,7 @@ describe('YargCueHandler shutdown lifecycle', () => {
     internals.currentSecondaryCue = secondary
     internals.currentStrobeCue = strobe
     internals.currentMotionCue = motion
-    internals.currentMotionCueStartTime = Date.now()
+    internals.currentMotionCueStartTime = monotonicNowMs()
 
     handler.shutdown()
 
@@ -118,5 +124,146 @@ describe('YargCueHandler shutdown lifecycle', () => {
     expect(internals.currentStrobeCue).toBeNull()
     expect(internals.currentMotionCue).toBeNull()
     expect(internals.currentMotionCueStartTime).toBeNull()
+  })
+
+  it('shutdown clears shared strobe state even when no strobe cue was active (Fix 2)', () => {
+    __resetStrobeStateManagerForTests()
+    // Simulate a stale slot left by a prior interrupted strobe (no Strobe_Off received).
+    getStrobeStateManager().setActive('fast')
+    expect(getStrobeStateManager().getActive()).toBe('fast')
+
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    // No currentStrobeCue set — old code only cleared when one was present.
+    handler.shutdown()
+
+    expect(getStrobeStateManager().getActive()).toBeNull()
+  })
+})
+
+describe('YargCueHandler strobe history isolation', () => {
+  beforeEach(() => {
+    __resetStrobeStateManagerForTests()
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('a held strobe does not thrash the primary cue executionCount', async () => {
+    const registry = YargCueRegistry.getInstance()
+    const primary = makeFakeCue(CueStyle.Primary, 'frenzy')
+    const strobe = makeFakeCue(CueStyle.Primary, 'strobe')
+    jest
+      .spyOn(registry, 'getCueImplementation')
+      .mockImplementation((cueType) =>
+        cueType === CueType.Frenzy ? primary : cueType === CueType.Strobe_Fast ? strobe : null,
+      )
+
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    const execCounts: Array<number | undefined> = []
+    handler.addCueHandledListener((data) => execCounts.push(data.executionCount))
+
+    await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
+    await handler.handleCue(CueType.Strobe_Fast, gameplayCueData({ lightingCue: CueType.Frenzy }))
+    await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
+
+    // A strobe interleaved between two Frenzy dispatches must not touch the primary
+    // executionCount: it reports the current count (1), and the second Frenzy advances to 2.
+    expect(execCounts).toEqual([1, 1, 2])
+    handler.shutdown()
+  })
+})
+
+describe('YargCueHandler vocal note edge detection', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('fires note-on then note-off only on the active-state edges', () => {
+    const sequencer = makeSequencer()
+    const handler = new YargCueHandler(makeLightManager(), sequencer)
+    const onVocalNote = sequencer.onVocalNote as jest.Mock
+
+    // Silence -> no edge
+    handler.handleVocalNote(gameplayCueData({ vocalNote: 0 }))
+    expect(onVocalNote).not.toHaveBeenCalled()
+
+    // Singing starts -> note-on edge (true)
+    handler.handleVocalNote(gameplayCueData({ vocalNote: 0.7 }))
+    expect(onVocalNote).toHaveBeenNthCalledWith(1, true)
+
+    // Still singing (different pitch) -> no new edge
+    handler.handleVocalNote(gameplayCueData({ vocalNote: 0.4 }))
+    expect(onVocalNote).toHaveBeenCalledTimes(1)
+
+    // Goes silent -> note-off edge (false)
+    handler.handleVocalNote(gameplayCueData({ vocalNote: 0 }))
+    expect(onVocalNote).toHaveBeenNthCalledWith(2, false)
+    expect(onVocalNote).toHaveBeenCalledTimes(2)
+  })
+
+  it('treats any harmony part as singing', () => {
+    const sequencer = makeSequencer()
+    const handler = new YargCueHandler(makeLightManager(), sequencer)
+    const onVocalNote = sequencer.onVocalNote as jest.Mock
+
+    handler.handleVocalNote(gameplayCueData({ vocalNote: 0, harmony1Note: 0.9 }))
+    expect(onVocalNote).toHaveBeenNthCalledWith(1, true)
+
+    handler.handleVocalNote(
+      gameplayCueData({ vocalNote: 0, harmony0Note: 0, harmony1Note: 0, harmony2Note: 0 }),
+    )
+    expect(onVocalNote).toHaveBeenNthCalledWith(2, false)
+  })
+})
+
+describe('YargCueHandler Fallback motion suppression', () => {
+  let registry: YargCueRegistry
+
+  beforeEach(() => {
+    registry = YargCueRegistry.getInstance()
+    jest.restoreAllMocks()
+  })
+
+  it('does not pick a motion cue when the Fallback cue fires', async () => {
+    const primary = makeFakeCue(CueStyle.Primary, 'primary:Fallback')
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(primary)
+    const getRandomMotionCue = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
+
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+
+    await handler.handleCue(CueType.Fallback, gameplayCueData({ lightingCue: CueType.Fallback }))
+
+    // The Fallback look still runs, but no automatic motion cue is picked.
+    expect(primary.execute).toHaveBeenCalledTimes(1)
+    expect(getRandomMotionCue).not.toHaveBeenCalled()
+  })
+
+  it('clears a running motion cue when the Fallback fires', async () => {
+    const fallback = makeFakeCue(CueStyle.Primary, 'primary:Fallback')
+    const motion = makeFakeCue(CueStyle.Primary, 'motion')
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(fallback)
+    const getRandomMotionCue = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
+
+    const sequencer = makeSequencer()
+    const handler = new YargCueHandler(makeLightManager(), sequencer)
+
+    // Seed a freshly-started motion cue from a previous (real) cue. startTime = now keeps it inside
+    // the min-hold so the unpatched handler would re-execute it rather than clear it.
+    const internals = handler as unknown as {
+      currentMotionCue: INetCue | null
+      currentMotionCueStartTime: number | null
+    }
+    internals.currentMotionCue = motion
+    internals.currentMotionCueStartTime = monotonicNowMs()
+
+    await handler.handleCue(CueType.Fallback, gameplayCueData({ lightingCue: CueType.Fallback }))
+
+    // The leftover motion is stopped and the heads homed; nothing new is picked or executed.
+    expect(motion.onStop).toHaveBeenCalledTimes(1)
+    expect(sequencer.schedulePanTiltClear).toHaveBeenCalled()
+    expect(getRandomMotionCue).not.toHaveBeenCalled()
+    expect(motion.execute).not.toHaveBeenCalled()
+    expect(internals.currentMotionCue).toBeNull()
   })
 })

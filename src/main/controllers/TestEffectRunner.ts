@@ -1,23 +1,18 @@
 import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/types/cueTypes'
-import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { sendToAllWindows } from '../utils/windowUtils'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
-import type { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
-import type { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
+import type { ChainFanout } from '../../photonics-dmx/controllers/ChainFanout'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('TestEffectRunner')
 
 export interface TestEffectRunnerContext {
-  getConfig: () => { getPreference: (key: string) => number }
-  getCueHandler: () => YargCueHandler | null
-  getEffectsController: () => ILightingController | null
-  getDmxLightManager: () => DmxLightManager | null
+  getChainFanout: () => ChainFanout
+  /**
+   * Ensure every active rig chain has a `YargCueHandler` attached so test cues dispatched
+   * through the fanout reach every rig — not just the primary chain. Idempotent.
+   */
+  ensureChainsHaveYargHandlers: () => void
   ensureInitialized: () => Promise<void>
-  createCueHandler: (
-    dmxLightManager: DmxLightManager,
-    effectsController: ILightingController,
-  ) => YargCueHandler
-  setCueHandler: (handler: YargCueHandler | null) => void
 }
 
 /**
@@ -75,30 +70,24 @@ export class TestEffectRunner {
     this.effectId = null
     this.testCueGroup = undefined
 
-    const cueHandler = this.ctx.getCueHandler()
-    if (cueHandler instanceof YargCueHandler) {
-      cueHandler.stopActiveCue()
-    }
-
-    const effectsController = this.ctx.getEffectsController()
-    if (effectsController) {
-      await effectsController.blackout(0)
-    }
+    // Stop the active cue on every chain's handler and blackout every chain's sequencer
+    // (not just the primary). Without this, secondary rigs would stay lit at the last
+    // test-effect frame after stop.
+    const fanout = this.ctx.getChainFanout()
+    fanout.yargStopActiveCue()
+    await fanout.yargBlackout(0)
   }
 
   private startInternal(): void {
-    const effectsController = this.ctx.getEffectsController()
-    const dmxLightManager = this.ctx.getDmxLightManager()
-    if (!effectsController || !dmxLightManager) {
-      log.error('Cannot test effect: lighting system not initialized')
-      return
-    }
+    // Make sure every active rig chain has a YARG handler attached before we start
+    // dispatching test cues — without this, only chains whose listener has already
+    // enabled would see the cue.
+    this.ctx.ensureChainsHaveYargHandlers()
 
-    let cueHandler = this.ctx.getCueHandler()
-    if (!cueHandler) {
-      log.info('Creating temporary YARG cue handler for testing')
-      cueHandler = this.ctx.createCueHandler(dmxLightManager, effectsController)
-      this.ctx.setCueHandler(cueHandler)
+    const fanout = this.ctx.getChainFanout()
+    if (fanout.getChains().length === 0) {
+      log.error('Cannot test effect: no active rig chains')
+      return
     }
 
     const effectId = this.effectId
@@ -110,13 +99,12 @@ export class TestEffectRunner {
   }
 
   private testCue(cueId: string): void {
-    const cueHandler = this.ctx.getCueHandler()
-    if (!cueHandler) {
-      log.error('No cue handler available. Make sure YARG or RB3 is enabled.')
+    const cue = getCueTypeFromId(cueId)
+    if (cue === undefined) {
+      log.error('\n Test Cue Error: no cue for ID ', cueId)
       return
     }
 
-    const cue = getCueTypeFromId(cueId)
     let strobe: StrobeState = 'Strobe_Off' as StrobeState
     if (cueId.indexOf('Strobe') > -1) {
       strobe = cueId as StrobeState
@@ -151,15 +139,13 @@ export class TestEffectRunner {
       ledColor: '',
     }
 
-    if (cue !== undefined) {
-      try {
-        cueHandler.handleCue(cue, data)
-        sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, data)
-      } catch (error) {
-        log.error('Error handling cue:', error)
-      }
-    } else {
-      log.error('\n Test Cue Error: no cue for ID ', cueId)
+    try {
+      // Always dispatch through the fanout — `startInternal` guarantees handlers exist on
+      // every chain, so this reaches every rig in lockstep.
+      void this.ctx.getChainFanout().handleCue(cue, data)
+      sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, data)
+    } catch (error) {
+      log.error('Error handling cue:', error)
     }
   }
 }

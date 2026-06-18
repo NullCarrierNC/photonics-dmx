@@ -8,11 +8,26 @@ import {
   Beat,
   StrobeState,
   CueType,
+  isCueType,
+  isNonDrivingCueType,
   lightingCueMap,
   InstrumentNoteType,
   DrumNoteType,
 } from '../../cues/types/cueTypes'
 import { createLogger } from '../../../shared/logger'
+import { monotonicNowMs } from '../../../shared/time'
+import {
+  PlatformByte,
+  VenueSizeByte,
+  SceneIndexByte,
+  PauseStateByte,
+  SongSectionByte,
+  GuitarBassKeyboardNotesByte,
+  DrumNotesByte,
+  PostProcessingByte,
+  KeyFrameByte,
+  BeatByte,
+} from './yargTypes'
 
 const log = createLogger('YargNetworkListener')
 
@@ -29,109 +44,7 @@ export interface YargCueRuntime {
   handleGuitarNote(noteType: InstrumentNoteType, data: CueData): void
   handleBassNote(noteType: InstrumentNoteType, data: CueData): void
   handleKeysNote(noteType: InstrumentNoteType, data: CueData): void
-}
-
-enum PlatformByte {
-  Unknown = 0,
-  Windows = 1,
-  Linux = 2,
-  Mac = 3,
-}
-
-enum VenueSizeByte {
-  NoVenue = 0,
-  Small = 1,
-  Large = 2,
-}
-
-enum SceneIndexByte {
-  Unknown = 0,
-  Menu = 1,
-  Gameplay = 2,
-  Score = 3,
-  Calibration = 4,
-  Practice = 5,
-}
-
-enum PauseStateByte {
-  AtMenu = 0,
-  Unpaused = 1,
-  Paused = 2,
-}
-
-enum SongSectionByte {
-  None = 0,
-  Chorus = 2,
-  Verse = 5,
-}
-
-enum GuitarBassKeyboardNotesByte {
-  None = 0,
-  Open = 1 << 0,
-  Green = 1 << 1,
-  Red = 1 << 2,
-  Yellow = 1 << 3,
-  Blue = 1 << 4,
-  Orange = 1 << 5,
-}
-
-enum DrumNotesByte {
-  None = 0,
-  Kick = 1 << 0,
-  RedDrum = 1 << 1,
-  YellowDrum = 1 << 2,
-  BlueDrum = 1 << 3,
-  GreenDrum = 1 << 4,
-  YellowCymbal = 1 << 5,
-  BlueCymbal = 1 << 6,
-  GreenCymbal = 1 << 7,
-}
-
-enum PostProcessingByte {
-  Default = 0,
-  Bloom = 1,
-  Bright = 2,
-  Contrast = 3,
-  Posterize = 4,
-  PhotoNegative = 5,
-  Mirror = 6,
-  BlackAndWhite = 7,
-  SepiaTone = 8,
-  SilverTone = 9,
-  Choppy_BlackAndWhite = 10,
-  PhotoNegative_RedAndBlack = 11,
-  Polarized_BlackAndWhite = 12,
-  Polarized_RedAndBlue = 13,
-  Desaturated_Blue = 14,
-  Desaturated_Red = 15,
-  Contrast_Red = 16,
-  Contrast_Green = 17,
-  Contrast_Blue = 18,
-  Grainy_Film = 19,
-  Grainy_ChromaticAbberation = 20,
-  Scanlines = 21,
-  Scanlines_BlackAndWhite = 22,
-  Scanlines_Blue = 23,
-  Scanlines_Security = 24,
-  Trails = 25,
-  Trails_Long = 26,
-  Trails_Desaturated = 27,
-  Trails_Flickery = 28,
-  Trails_Spacey = 29,
-}
-
-enum KeyFrameByte {
-  Off = 0,
-  KeyframeFirst = 27,
-  KeyframeNext = 28,
-  KeyframePrevious = 29,
-}
-
-enum BeatByte {
-  Measure = 0,
-  Strong = 1,
-  Weak = 2,
-  Off = 3,
+  handleVocalNote(data: CueData): void
 }
 
 const PORT = 36107
@@ -139,6 +52,43 @@ const PACKET_HEADER = 0x59415247 // 'YARG' in hex
 const YARG_DATAGRAM_VERSION = 1
 /** Max rate for forwarding identical-state packets (30 updates per second). */
 const IDENTICAL_FRAME_THROTTLE_MS = 1000 / 30
+
+/** How often the fallback-cue condition is polled (ms). */
+const FALLBACK_POLL_MS = 500
+
+/** Maps post-processing byte values to their string literal names. */
+const POST_PROCESSING_MAP: Record<number, PostProcessing> = {
+  [PostProcessingByte.Default]: 'Default',
+  [PostProcessingByte.Bloom]: 'Bloom',
+  [PostProcessingByte.Bright]: 'Bright',
+  [PostProcessingByte.Contrast]: 'Contrast',
+  [PostProcessingByte.Posterize]: 'Posterize',
+  [PostProcessingByte.PhotoNegative]: 'PhotoNegative',
+  [PostProcessingByte.Mirror]: 'Mirror',
+  [PostProcessingByte.BlackAndWhite]: 'BlackAndWhite',
+  [PostProcessingByte.SepiaTone]: 'SepiaTone',
+  [PostProcessingByte.SilverTone]: 'SilverTone',
+  [PostProcessingByte.Choppy_BlackAndWhite]: 'Choppy_BlackAndWhite',
+  [PostProcessingByte.PhotoNegative_RedAndBlack]: 'PhotoNegative_RedAndBlack',
+  [PostProcessingByte.Polarized_BlackAndWhite]: 'Polarized_BlackAndWhite',
+  [PostProcessingByte.Polarized_RedAndBlue]: 'Polarized_RedAndBlue',
+  [PostProcessingByte.Desaturated_Blue]: 'Desaturated_Blue',
+  [PostProcessingByte.Desaturated_Red]: 'Desaturated_Red',
+  [PostProcessingByte.Contrast_Red]: 'Contrast_Red',
+  [PostProcessingByte.Contrast_Green]: 'Contrast_Green',
+  [PostProcessingByte.Contrast_Blue]: 'Contrast_Blue',
+  [PostProcessingByte.Grainy_Film]: 'Grainy_Film',
+  [PostProcessingByte.Grainy_ChromaticAbberation]: 'Grainy_ChromaticAbberation',
+  [PostProcessingByte.Scanlines]: 'Scanlines',
+  [PostProcessingByte.Scanlines_BlackAndWhite]: 'Scanlines_BlackAndWhite',
+  [PostProcessingByte.Scanlines_Blue]: 'Scanlines_Blue',
+  [PostProcessingByte.Scanlines_Security]: 'Scanlines_Security',
+  [PostProcessingByte.Trails]: 'Trails',
+  [PostProcessingByte.Trails_Long]: 'Trails_Long',
+  [PostProcessingByte.Trails_Desaturated]: 'Trails_Desaturated',
+  [PostProcessingByte.Trails_Flickery]: 'Trails_Flickery',
+  [PostProcessingByte.Trails_Spacey]: 'Trails_Spacey',
+}
 
 export class YargNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null
@@ -159,9 +109,6 @@ export class YargNetworkListener extends EventEmitter {
   /** Timestamp (ms) when we last forwarded an identical frame; used to throttle unchanged packets to 30 Hz. */
   private lastForwardedIdenticalAt = 0
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- log payload shape varies
-  private lastLogData: Record<string, any> | null = null
-
   // Track the last scene to detect transitions
   private lastScene: 'Unknown' | 'Menu' | 'Gameplay' | 'Score' | 'Calibration' | 'Practice' | null =
     null
@@ -169,9 +116,24 @@ export class YargNetworkListener extends EventEmitter {
   /** Bound while UDP bind() is pending; used to distinguish bind failures from runtime socket errors. */
   private startBindReject: ((reason: unknown) => void) | null = null
 
-  constructor(cueHandler: YargCueRuntime) {
+  // --- Fallback cue tracking ---
+  /** Reads the configured Fallback Time (ms). 0 disables the feature. */
+  private readonly getFallbackCueTimeMs: () => number
+  /** Monotonic time the fallback window last restarted: every real cue, and the first blackout / no-cue of a run, reset it; a continuing run of blackouts does not, so a song that only streams blackouts falls through to the Fallback. */
+  private lastCueReceivedAt = 0
+  /** True when the previous lighting cue was non-driving (blackout / no-cue). The first such cue after a real cue still resets the window; only a continuing run of them is treated as non-driving. */
+  private inNonDrivingRun = false
+  /** True while the auto Fallback cue is the current look; any received cue clears it. */
+  private fallbackActive = false
+  /** Monotonic time the Fallback cue last fired; gates the re-fire window. */
+  private lastFallbackFireAt = 0
+  /** Polls for the fallback condition independently of incoming packets (covers YARG going silent). */
+  private fallbackTimer: NodeJS.Timeout | null = null
+
+  constructor(cueHandler: YargCueRuntime, options?: { getFallbackCueTimeMs?: () => number }) {
     super() // Initialize EventEmitter
     this.cueHandler = cueHandler
+    this.getFallbackCueTimeMs = options?.getFallbackCueTimeMs ?? (() => 20000)
 
     log.info('YargNetworkListener initialized.')
 
@@ -217,6 +179,7 @@ export class YargNetworkListener extends EventEmitter {
       this.server!.bind(PORT, () => {
         this.startBindReject = null
         this.listening = true
+        this.startFallbackPolling()
         log.info(`YargNetworkListener started and listening on port ${PORT}`)
         resolve()
       })
@@ -231,6 +194,7 @@ export class YargNetworkListener extends EventEmitter {
     const sock = this.server
     this.server = null
     this.listening = false
+    this.stopFallbackPolling()
     if (!sock) {
       return Promise.resolve()
     }
@@ -252,6 +216,60 @@ export class YargNetworkListener extends EventEmitter {
 
   public shutdown(): Promise<void> {
     return this.stop()
+  }
+
+  /** Begin polling for the fallback condition. Idempotent. */
+  private startFallbackPolling(): void {
+    if (this.fallbackTimer) {
+      return
+    }
+    this.fallbackTimer = setInterval(() => this.checkFallback(), FALLBACK_POLL_MS)
+  }
+
+  /** Stop polling and reset the fallback state. */
+  private stopFallbackPolling(): void {
+    if (this.fallbackTimer) {
+      clearInterval(this.fallbackTimer)
+      this.fallbackTimer = null
+    }
+    this.fallbackActive = false
+    this.inNonDrivingRun = false
+  }
+
+  /**
+   * Fire the auto Fallback cue when a song is playing and no *driving* YARG lighting cue has been
+   * received within the configured window — i.e. YARG has gone silent, or is only streaming a
+   * continuing run of blackout / no-cue cues (the first blackout of a run still counts as driving;
+   * see isNonDrivingCueType). Re-fires every window so the registry can re-select a (possibly
+   * different) implementation. Runs independently of incoming packets so it still triggers when
+   * YARG stops sending entirely. Only fires during Gameplay and never while paused; a Fallback Time
+   * of 0 disables it.
+   */
+  private checkFallback(): void {
+    const fallbackMs = this.getFallbackCueTimeMs()
+    if (fallbackMs <= 0) {
+      return
+    }
+    if (this.lastScene !== 'Gameplay') {
+      return
+    }
+    const data = this.lastData
+    if (!data || data.pauseState === 'Paused') {
+      return
+    }
+    const now = monotonicNowMs()
+    const reference = this.fallbackActive ? this.lastFallbackFireAt : this.lastCueReceivedAt
+    if (now - reference < fallbackMs) {
+      return
+    }
+    this.fallbackActive = true
+    this.lastFallbackFireAt = now
+    log.info('YARG: Fallback cue triggered (no new lighting cue within fallback window)')
+    void this.cueHandler.handleCue(CueType.Fallback, {
+      ...data,
+      lightingCue: CueType.Fallback,
+      trackMode: 'tracked',
+    })
   }
 
   private setupServerEvents() {
@@ -467,7 +485,9 @@ export class YargNetworkListener extends EventEmitter {
         postProcessing: this.getPostProcessing(postProcessingByte),
         fogState,
         strobeState: this.getStrobeState(strobeStateValue),
-        performer: 0,
+        // Union of performers currently spotlighted or singing along (PerformerByte bitmask).
+        // TODO: verify the intended performer against live YARG data.
+        performer: spotlight | singalong,
         spotlight,
         singalong,
         ...(cameraCutConstraint !== undefined && {
@@ -494,32 +514,14 @@ export class YargNetworkListener extends EventEmitter {
    */
   public processCueData(YargCueData: CueData): void {
     const isIdentical = this.lastData !== null && this.isDataEqual(this.lastData, YargCueData)
-    if (isIdentical && Date.now() - this.lastForwardedIdenticalAt < IDENTICAL_FRAME_THROTTLE_MS) {
+    if (
+      isIdentical &&
+      monotonicNowMs() - this.lastForwardedIdenticalAt < IDENTICAL_FRAME_THROTTLE_MS
+    ) {
       return
     }
 
     this.handleSceneTransition(YargCueData.currentScene)
-
-    const logData = {
-      currentScene: YargCueData.currentScene,
-      songSection: YargCueData.songSection,
-      beatsPerMinute: YargCueData.beatsPerMinute,
-      lightingCue: YargCueData.lightingCue,
-      guitarNotes: YargCueData.guitarNotes,
-      bassNotes: YargCueData.bassNotes,
-      drumNotes: YargCueData.drumNotes,
-      keysNotes: YargCueData.keysNotes,
-      postProcessing: YargCueData.postProcessing,
-      fogState: YargCueData.fogState,
-      beat: YargCueData.beat,
-      keyframe: YargCueData.keyframe,
-      performer: YargCueData.performer,
-      strobeState: YargCueData.strobeState,
-    }
-    if (this.lastLogData && !this.isDataEqual(this.lastLogData, logData)) {
-      this.lastLogData = logData
-    }
-    this.lastLogData = logData
 
     switch (YargCueData.beat) {
       case 'Strong':
@@ -543,8 +545,27 @@ export class YargNetworkListener extends EventEmitter {
     }
 
     const cueType = YargCueData.lightingCue
-    if (cueType) {
-      this.cueHandler.handleCue(cueType as CueType, YargCueData)
+    if (cueType && isCueType(cueType)) {
+      // Fallback cue support: some songs contain a venue track that is just blackout cues, etc.
+      // YARG won't autogen for these, so we see if we keep getting non-driving cues, if so trigger the fallback.
+      const nonDriving = isNonDrivingCueType(cueType)
+      // A blackout/no-cue can be a legitimate look, so the *first* one after a real cue still resets
+      // the window like any cue. Only a continuing run of them is non-driving — that's what lets a
+      // song streaming blackouts fall through to the Fallback.
+      const continuingBlackoutRun = nonDriving && this.inNonDrivingRun
+      if (continuingBlackoutRun) {
+        // Non-driving: don't reset the window; suppress while the Fallback owns the look.
+        if (!this.fallbackActive) {
+          this.cueHandler.handleCue(cueType, YargCueData)
+        }
+      } else {
+        // Real cue, or the first blackout of a run: YARG is actively driving the lights. Reset the
+        // window and clear any active Fallback so this cue takes over immediately.
+        this.lastCueReceivedAt = monotonicNowMs()
+        this.fallbackActive = false
+        this.cueHandler.handleCue(cueType, YargCueData)
+      }
+      this.inNonDrivingRun = nonDriving
     } else {
       log.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
     }
@@ -608,9 +629,11 @@ export class YargNetworkListener extends EventEmitter {
       }
     })
 
+    this.cueHandler.handleVocalNote(YargCueData)
+
     this.lastData = YargCueData
     if (isIdentical) {
-      this.lastForwardedIdenticalAt = Date.now()
+      this.lastForwardedIdenticalAt = monotonicNowMs()
     }
   }
 
@@ -721,39 +744,7 @@ export class YargNetworkListener extends EventEmitter {
    * @private
    */
   private getPostProcessing(byteValue: number): PostProcessing {
-    const map: Record<number, PostProcessing> = {
-      [PostProcessingByte.Default]: 'Default',
-      [PostProcessingByte.Bloom]: 'Bloom',
-      [PostProcessingByte.Bright]: 'Bright',
-      [PostProcessingByte.Contrast]: 'Contrast',
-      [PostProcessingByte.Posterize]: 'Posterize',
-      [PostProcessingByte.PhotoNegative]: 'PhotoNegative',
-      [PostProcessingByte.Mirror]: 'Mirror',
-      [PostProcessingByte.BlackAndWhite]: 'BlackAndWhite',
-      [PostProcessingByte.SepiaTone]: 'SepiaTone',
-      [PostProcessingByte.SilverTone]: 'SilverTone',
-      [PostProcessingByte.Choppy_BlackAndWhite]: 'Choppy_BlackAndWhite',
-      [PostProcessingByte.PhotoNegative_RedAndBlack]: 'PhotoNegative_RedAndBlack',
-      [PostProcessingByte.Polarized_BlackAndWhite]: 'Polarized_BlackAndWhite',
-      [PostProcessingByte.Polarized_RedAndBlue]: 'Polarized_RedAndBlue',
-      [PostProcessingByte.Desaturated_Blue]: 'Desaturated_Blue',
-      [PostProcessingByte.Desaturated_Red]: 'Desaturated_Red',
-      [PostProcessingByte.Contrast_Red]: 'Contrast_Red',
-      [PostProcessingByte.Contrast_Green]: 'Contrast_Green',
-      [PostProcessingByte.Contrast_Blue]: 'Contrast_Blue',
-      [PostProcessingByte.Grainy_Film]: 'Grainy_Film',
-      [PostProcessingByte.Grainy_ChromaticAbberation]: 'Grainy_ChromaticAbberation',
-      [PostProcessingByte.Scanlines]: 'Scanlines',
-      [PostProcessingByte.Scanlines_BlackAndWhite]: 'Scanlines_BlackAndWhite',
-      [PostProcessingByte.Scanlines_Blue]: 'Scanlines_Blue',
-      [PostProcessingByte.Scanlines_Security]: 'Scanlines_Security',
-      [PostProcessingByte.Trails]: 'Trails',
-      [PostProcessingByte.Trails_Long]: 'Trails_Long',
-      [PostProcessingByte.Trails_Desaturated]: 'Trails_Desaturated',
-      [PostProcessingByte.Trails_Flickery]: 'Trails_Flickery',
-      [PostProcessingByte.Trails_Spacey]: 'Trails_Spacey',
-    }
-    return map[byteValue] ?? 'Unknown'
+    return POST_PROCESSING_MAP[byteValue] ?? 'Unknown'
   }
 
   /**
@@ -980,6 +971,10 @@ export class YargNetworkListener extends EventEmitter {
       // Handle Menu -> Gameplay transition (song start)
       if (this.lastScene === 'Menu' && currentScene === 'Gameplay') {
         log.info('YARG: Song starting - triggering blackout to clear menu lighting')
+        // Reset the fallback window so it starts fresh from song start.
+        this.lastCueReceivedAt = monotonicNowMs()
+        this.fallbackActive = false
+        this.inNonDrivingRun = false
         this.cueHandler.notifySongStart()
         // Trigger a fast blackout to clear any menu lighting
         this.cueHandler.handleCue(CueType.Blackout_Fast, {
@@ -1012,6 +1007,7 @@ export class YargNetworkListener extends EventEmitter {
 
       // Handle Gameplay -> other (song end)
       if (this.lastScene === 'Gameplay' && currentScene !== 'Gameplay') {
+        this.fallbackActive = false
         this.cueHandler.notifySongEnd()
       }
     }

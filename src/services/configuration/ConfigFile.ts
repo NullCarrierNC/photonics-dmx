@@ -46,6 +46,9 @@ export class ConfigFile<T> {
   private readonly validate: ConfigDataValidCheck<T> | undefined
   private readonly onCorruptRecovery: ((info: ConfigCorruptInfo) => void) | undefined
   private readonly coerceUnversioned: ((raw: unknown) => T) | undefined
+  // Serializes saves so only one writeFile+rename is in flight per file at a time,
+  // avoiding concurrent renames racing the same destination.
+  private saveChain: Promise<void> = Promise.resolve()
 
   constructor(
     filename: string,
@@ -160,7 +163,9 @@ export class ConfigFile<T> {
       fileContent = fs.readFileSync(this.filePath, 'utf-8')
     } catch (error) {
       log.error(`[Photonics Config] Failed to read ${this.filePath}:`, error)
-      return this.defaultData
+      // Treat an unreadable file like a parse/schema failure: back it up and surface a
+      // recovery event instead of silently masking the user's config with defaults.
+      return this.recoverToDefault('read', { parseOrMigrateError: error })
     }
 
     let parsed: unknown
@@ -258,8 +263,20 @@ export class ConfigFile<T> {
   /**
    * Saves data to file with version information.
    * Uses write-temp-then-rename for atomicity and async I/O to avoid blocking the event loop.
+   * Saves are serialized via `saveChain` so concurrent calls cannot race the same destination.
    */
-  private async save(data: T): Promise<void> {
+  private save(data: T): Promise<void> {
+    const run = this.saveChain.then(() => this.writeAtomic(data))
+    // Keep the chain alive even if this save rejects, so a single failure
+    // doesn't permanently break subsequent saves.
+    this.saveChain = run.catch(() => {})
+    return run
+  }
+
+  /**
+   * Performs the actual atomic write: write to a unique temp file, then rename over the target.
+   */
+  private async writeAtomic(data: T): Promise<void> {
     const versionedData: ConfigWithVersion<T> = {
       version: this.currentVersion,
       data: data,
@@ -272,7 +289,7 @@ export class ConfigFile<T> {
     const tempPath = path.join(dir, `.${basename}.tmp.${unique}`)
     try {
       await fsPromises.writeFile(tempPath, content, 'utf-8')
-      await fsPromises.rename(tempPath, this.filePath)
+      await this.renameWithRetry(tempPath, this.filePath)
     } catch (error) {
       try {
         await fsPromises.unlink(tempPath).catch(() => {})
@@ -281,6 +298,36 @@ export class ConfigFile<T> {
       }
       log.error(`Error saving configuration to ${this.filePath}:`, error)
       throw new Error(`Failed to save configuration: ${error}`)
+    }
+  }
+
+  /**
+   * Renames with retry-and-backoff for transient Windows file-lock errors.
+   *
+   * On Windows, rename() fails with EPERM/EACCES/EBUSY when the source temp file or
+   * the destination is momentarily held open by another process — antivirus real-time
+   * scanning, Controlled Folder Access, cloud-sync of AppData, or the search indexer.
+   * These locks clear within tens of milliseconds, so a short backoff almost always
+   * succeeds. Non-transient errors (e.g. ENOSPC, ENOENT) are re-thrown immediately.
+   */
+  private async renameWithRetry(from: string, to: string): Promise<void> {
+    const transientCodes = new Set(['EPERM', 'EACCES', 'EBUSY', 'ENOTEMPTY'])
+    const delaysMs = [10, 20, 40, 80, 160]
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await fsPromises.rename(from, to)
+        return
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException)?.code
+        if (!code || !transientCodes.has(code) || attempt >= delaysMs.length) {
+          throw error
+        }
+        const delay = delaysMs[attempt]
+        log.warn(
+          `Rename of ${to} hit ${code}; retrying in ${delay}ms (attempt ${attempt + 1}/${delaysMs.length})`,
+        )
+        await new Promise((resolve) => setTimeout(resolve, delay))
+      }
     }
   }
 

@@ -27,6 +27,8 @@ import {
 import {
   clampDmxOutputRefreshRateHz,
   DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+  DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
+  DMX_OUTPUT_REFRESH_RATE_HZ_MIN,
   OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
 } from '../../../shared/dmxOutputRefresh'
 import { createLogger } from '../../../shared/logger'
@@ -44,6 +46,8 @@ const DmxOutputSettings: React.FC = () => {
   const [openDmxComPort, setOpenDmxComPort] = useAtom(openDmxComPortAtom)
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
   const openDmxSpeed = prefs.openDmxConfig?.dmxSpeed ?? OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
+  const globalDmxPublishingRate = prefs.globalDmxPublishingRateHz ?? DMX_OUTPUT_REFRESH_RATE_HZ_MAX
+  const advancedModeEnabled = prefs.advancedModeEnabled ?? false
 
   const [artNetExpanded, setArtNetExpanded] = useState(false)
   const [sacnExpanded, setSacnExpanded] = useState(false)
@@ -389,6 +393,20 @@ const DmxOutputSettings: React.FC = () => {
     }
   }
 
+  const handleGlobalDmxRateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const parsed = parseInt(e.target.value, 10)
+    const sanitized = clampDmxOutputRefreshRateHz(
+      Number.isFinite(parsed) ? parsed : DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
+    )
+
+    try {
+      await savePrefs({ globalDmxPublishingRateHz: sanitized })
+      setPrefs((prev) => ({ ...prev, globalDmxPublishingRateHz: sanitized }))
+    } catch (error) {
+      log.error('Failed to save Global DMX Publishing Rate:', error)
+    }
+  }
+
   const handleSacnConfigChange = async (
     field: keyof typeof sacnConfig,
     value: string | number | boolean,
@@ -456,6 +474,48 @@ const DmxOutputSettings: React.FC = () => {
       <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
         DMX Output Configuration
       </h2>
+
+      {advancedModeEnabled && (
+        <div className="mb-6">
+          <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">
+            Global DMX Publishing Rate
+          </h3>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={globalDmxPublishingRate}
+              onChange={handleGlobalDmxRateChange}
+              className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              min={DMX_OUTPUT_REFRESH_RATE_HZ_MIN}
+              max={DMX_OUTPUT_REFRESH_RATE_HZ_MAX}
+            />
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Hz ({DMX_OUTPUT_REFRESH_RATE_HZ_MIN}–{DMX_OUTPUT_REFRESH_RATE_HZ_MAX})
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 leading-snug">
+            Caps how often the publisher hands frames to all enabled DMX outputs. This sits upstream
+            of the individual outputs - each enabled adapter can still be set lower by its own
+            refresh rate. Lower this if you see flicker, dropouts, or sluggishness on cheap USB or
+            low-end sACN/ArtNet adapters that can&apos;t keep up. The default (
+            {DMX_OUTPUT_REFRESH_RATE_HZ_MAX} Hz) is the DMX-512 ceiling.
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 leading-snug">
+            NOTE: This should always be the same or higher than the fastest refresh rate of the
+            individual DMX outputs.{' '}
+            <em>
+              Lower this only as a last resort after lowering the DMX Output you&apos;re
+              using&apos;s refresh rate
+            </em>
+            .
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 leading-snug">
+            CAUTION: When using regular PAR style DMX lights as strobes, the faster this value the
+            better the strobe will look. Lowering this value will limit how quickly the strobes can
+            flash.
+          </p>
+        </div>
+      )}
 
       <DmxOutputEnabledModes
         sacnEnabled={prefs.dmxOutputConfig?.sacnEnabled || false}

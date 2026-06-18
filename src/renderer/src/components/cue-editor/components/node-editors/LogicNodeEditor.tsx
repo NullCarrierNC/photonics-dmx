@@ -7,10 +7,15 @@ import type {
   CueDataLogicNode,
   ConfigDataLogicNode,
   LightsFromIndexLogicNode,
+  ColorFromIndexLogicNode,
+  ReverseColorsLogicNode,
+  ConcatColorsLogicNode,
+  ShuffleColorsLogicNode,
   ArrayLengthLogicNode,
   ReverseLightsLogicNode,
   CreatePairsLogicNode,
   ConcatLightsLogicNode,
+  BuildRingLogicNode,
   DebuggerLogicNode,
   DelayLogicNode,
   RandomLogicNode,
@@ -25,10 +30,15 @@ import CueDataLogicEditor from './logic/CueDataLogicEditor'
 import ConfigDataLogicEditor from './logic/ConfigDataLogicEditor'
 import ConditionalLogicEditor from './logic/ConditionalLogicEditor'
 import LightsFromIndexLogicEditor from './logic/LightsFromIndexLogicEditor'
+import ColorFromIndexLogicEditor from './logic/ColorFromIndexLogicEditor'
+import ReverseColorsLogicEditor from './logic/ReverseColorsLogicEditor'
+import ConcatColorsLogicEditor from './logic/ConcatColorsLogicEditor'
+import ShuffleColorsLogicEditor from './logic/ShuffleColorsLogicEditor'
 import ArrayLengthLogicEditor from './logic/ArrayLengthLogicEditor'
 import ReverseLightsLogicEditor from './logic/ReverseLightsLogicEditor'
 import CreatePairsLogicEditor from './logic/CreatePairsLogicEditor'
 import ConcatLightsLogicEditor from './logic/ConcatLightsLogicEditor'
+import BuildRingLogicEditor from './logic/BuildRingLogicEditor'
 import DelayLogicEditor from './logic/DelayLogicEditor'
 import RandomLogicEditor from './logic/RandomLogicEditor'
 import ShuffleLightsLogicEditor from './logic/ShuffleLightsLogicEditor'
@@ -112,6 +122,46 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     )
   }
 
+  if (node.logicType === 'color-from-index') {
+    return (
+      <ColorFromIndexLogicEditor
+        node={node as ColorFromIndexLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'reverse-colors') {
+    return (
+      <ReverseColorsLogicEditor
+        node={node as ReverseColorsLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'concat-colors') {
+    return (
+      <ConcatColorsLogicEditor
+        node={node as ConcatColorsLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'shuffle-colors') {
+    return (
+      <ShuffleColorsLogicEditor
+        node={node as ShuffleColorsLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
   if (node.logicType === 'conditional') {
     return (
       <ConditionalLogicEditor
@@ -156,6 +206,16 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     return (
       <ConcatLightsLogicEditor
         node={node as ConcatLightsLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'build-ring') {
+    return (
+      <BuildRingLogicEditor
+        node={node as BuildRingLogicNode}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />

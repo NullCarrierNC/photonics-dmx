@@ -47,6 +47,51 @@ describe('Sequencer blending and queueing (real harness)', () => {
     harness.cleanup()
   })
 
+  it('mix crossfades an overlay over a base (blue base + yellow mix overlay)', () => {
+    // Mirrors YARG Alt 1 > Score: steady blue base + yellow flash overlay using 'mix'.
+    const harness = createSequencerHarness({ frontCount: 1, backCount: 0 })
+    const lights = harness.lightManager.getLights(['front'], ['all'])
+    const blueBase = { ...getColor('blue', 'high', 'replace'), opacity: 1 }
+
+    harness.sequencer.addEffect('base', buildSingleLayerEffect(lights, 0, blueBase, 0, 'linear'))
+
+    // Mid-crossfade (opacity 0.5): blue and yellow both present — not pure white, not black.
+    harness.sequencer.addEffect(
+      'flash',
+      buildSingleLayerEffect(
+        lights,
+        1,
+        { ...getColor('yellow', 'high', 'mix'), opacity: 0.5 },
+        0,
+        'linear',
+      ),
+    )
+    harness.advanceBy(1)
+    const mid = harness.getLightState(lights[0].id)
+    expect(mid?.red ?? 0).toBeGreaterThan(0) // yellow fading in
+    expect(mid?.green ?? 0).toBeGreaterThan(0)
+    expect(mid?.blue ?? 0).toBeGreaterThan(0) // blue base still showing through
+
+    // Peak (opacity 1): pure yellow, blue fully replaced.
+    harness.sequencer.addEffect(
+      'flash',
+      buildSingleLayerEffect(
+        lights,
+        1,
+        { ...getColor('yellow', 'high', 'mix'), opacity: 1 },
+        0,
+        'linear',
+      ),
+    )
+    harness.advanceBy(1)
+    const peak = harness.getLightState(lights[0].id)
+    expect(peak?.red ?? 0).toBeGreaterThan(0)
+    expect(peak?.green ?? 0).toBeGreaterThan(0)
+    expect(peak?.blue ?? 0).toBe(0) // pure yellow, not white
+
+    harness.cleanup()
+  })
+
   it('produces different mid-transition values for easing', () => {
     const sampleMidValue = (
       easing: Effect['transitions'][number]['transform']['easing'],

@@ -221,15 +221,17 @@ describe('Sequencer', () => {
   })
 
   describe('shutdown', () => {
-    it('should stop the clock and perform cleanup', () => {
-      // Setup spy on Clock
-      const clockStopSpy = jest.spyOn((sequencer as any).clock, 'stop')
+    it('unregisters its tick callback without stopping the externally-owned clock', () => {
+      const clock = (sequencer as any).clock
+      const clockStopSpy = jest.spyOn(clock, 'stop')
+      const offTickSpy = jest.spyOn(clock, 'offTick')
 
-      // Call the method
       sequencer.shutdown()
 
-      // Verify clock was stopped
-      expect(clockStopSpy).toHaveBeenCalled()
+      // Clock is owned by whoever constructed it (so multiple sequencers can share one tick
+      // source); sequencer shutdown only removes its own subscription.
+      expect(clockStopSpy).not.toHaveBeenCalled()
+      expect(offTickSpy).toHaveBeenCalled()
     })
   })
 })

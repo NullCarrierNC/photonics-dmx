@@ -11,21 +11,23 @@ const ArrayLengthLogicEditor: React.FC<ArrayLengthLogicEditorProps> = ({
   availableVariables,
   updateNode,
 }) => {
-  const lightArrayVars = availableVariables.filter((v) => v.type === 'light-array')
+  const arrayVars = availableVariables.filter(
+    (v) => v.type === 'light-array' || v.type === 'color-array',
+  )
   const numberVars = availableVariables.filter((v) => v.type === 'number')
 
   return (
     <div className="space-y-2 text-xs">
       <label className="flex flex-col font-medium">
-        Source Variable (light-array)
+        Source Variable (light-array or color-array)
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={node.sourceVariable}
           onChange={(event) => updateNode({ sourceVariable: event.target.value })}>
-          <option value="">-- Select light-array --</option>
-          {lightArrayVars.map((v) => (
+          <option value="">-- Select array --</option>
+          {arrayVars.map((v) => (
             <option key={v.name} value={v.name}>
-              {v.name} ({v.scope})
+              {v.name} ({v.type}, {v.scope})
             </option>
           ))}
         </select>
@@ -47,7 +49,7 @@ const ArrayLengthLogicEditor: React.FC<ArrayLengthLogicEditorProps> = ({
       </label>
 
       <p className="text-[10px] text-gray-500 italic">
-        Gets the number of lights in the source array.
+        Gets the number of items in the source array (lights or colours).
       </p>
     </div>
   )

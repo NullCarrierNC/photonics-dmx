@@ -35,7 +35,9 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
         default port is 6454.
       </p>
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Host:</label>
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
+          Host:
+        </label>
         <input
           type="text"
           value={config.host}
@@ -46,7 +48,9 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Net:</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
+            Net:
+          </label>
           <input
             type="number"
             value={config.net}
@@ -57,7 +61,7 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
           />
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
             Subnet:
           </label>
           <input
@@ -70,7 +74,7 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
           />
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
             Universe:
           </label>
           <input
@@ -86,7 +90,7 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
             Sub Universe:
           </label>
           <input
@@ -100,7 +104,9 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">Port:</label>
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
+          Port:
+        </label>
         <input
           type="number"
           value={config.port}
@@ -112,8 +118,8 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
       </div>
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-28 shrink-0">
-            Refresh rate:
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
+            Refresh Rate:
           </label>
           <input
             type="number"
@@ -130,7 +136,7 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
           />
           <span className="text-xs text-gray-500 dark:text-gray-400">Hz (10–44)</span>
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 ml-[7.5rem] max-w-lg leading-snug">
+        <p className="text-xs text-gray-500 dark:text-gray-400 ml-[5.5rem] max-w-lg leading-snug">
           If you see flickering, try lowering this value to 20.
         </p>
       </div>

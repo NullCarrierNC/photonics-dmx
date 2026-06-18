@@ -74,6 +74,8 @@ function normalizeAudioEventForSave(
         Array.isArray(t.outputs) && t.outputs.length === 3
           ? (t.outputs as ['enter', 'during', 'exit'])
           : ([...AUDIO_TRIGGER_SAVE_DEFAULTS.outputs] as ['enter', 'during', 'exit']),
+      ...(t.attackMs != null && { attackMs: t.attackMs }),
+      ...(t.releaseMs != null && { releaseMs: t.releaseMs }),
       ...(t.spectralGates != null && { spectralGates: t.spectralGates }),
       ...(t.useOnsetGating != null && { useOnsetGating: t.useOnsetGating }),
       ...(t.onsetThreshold != null && { onsetThreshold: t.onsetThreshold }),

@@ -5,10 +5,12 @@ import { IAudioCue } from '../cues/interfaces/IAudioCue'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
+import { getStrobeStateManager } from '../controllers/StrobeStateManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
 import { createLogger } from '../../shared/logger'
+import { monotonicNowMs } from '../../shared/time'
 const log = createLogger('AudioCueHandler')
 
 export type AudioCueHandlerOptions = {
@@ -208,7 +210,7 @@ export class AudioCueHandler extends EventEmitter {
     const bypassMinHold = manualChanged || gameModeActive
     if (primaryChanged && !bypassMinHold) {
       const minHold = this.getMotionCueMinimumHoldMs()
-      const now = Date.now()
+      const now = monotonicNowMs()
       const heldLongEnough =
         this.currentMotionCueStartTime == null || now - this.currentMotionCueStartTime >= minHold
       if (!heldLongEnough) {
@@ -268,7 +270,7 @@ export class AudioCueHandler extends EventEmitter {
       source = 'auto'
     }
 
-    const nowMs = Date.now()
+    const nowMs = monotonicNowMs()
     if (motionCue && this.currentMotionCue !== motionCue) {
       const prev = this.currentMotionCue
       this.currentMotionCue?.onStop?.()
@@ -302,6 +304,12 @@ export class AudioCueHandler extends EventEmitter {
     const cue = this.registry.getCueImplementation(cueType)
     if (!cue) {
       log.warn(`Audio cue not found: ${cueType}`)
+      // Clear the existing overlay when the requested cue is unavailable, matching
+      // assignPrimarySlot — otherwise a stale secondary keeps running indefinitely.
+      if (this.currentSecondaryCue) {
+        this.currentSecondaryCue.onStop?.()
+        this.currentSecondaryCue = null
+      }
       return
     }
 
@@ -316,6 +324,7 @@ export class AudioCueHandler extends EventEmitter {
       if (this.currentStrobeCue) {
         this.currentStrobeCue.onStop?.()
         this.currentStrobeCue = null
+        getStrobeStateManager().setActive(null)
       }
       return
     }
@@ -330,6 +339,10 @@ export class AudioCueHandler extends EventEmitter {
       this.currentStrobeCue?.onStop?.()
       this.currentStrobeCue = cue
     }
+    // Audio strobe cues aren't bucketed into discrete slow/medium/fast/fastest speeds the way YARG
+    // cues are; map any active audio strobe to the medium slot. A future refinement could let each
+    // audio strobe cue declare its preferred slot.
+    getStrobeStateManager().setActive('medium')
   }
 
   /**
@@ -344,8 +357,13 @@ export class AudioCueHandler extends EventEmitter {
     this.currentPrimaryCue = null
     this.currentSecondaryCue?.onStop?.()
     this.currentSecondaryCue = null
-    this.currentStrobeCue?.onStop?.()
-    this.currentStrobeCue = null
+    if (this.currentStrobeCue) {
+      this.currentStrobeCue.onStop?.()
+      this.currentStrobeCue = null
+    }
+    // Unconditional: an interrupted audio strobe (processing stops with no explicit clear) must
+    // not leave the process-wide StrobeStateManager stuck on a slot.
+    getStrobeStateManager().setActive(null)
     this.currentMotionCue?.onStop?.()
     this.currentMotionCue = null
     this.currentMotionCueStartTime = null

@@ -30,4 +30,9 @@ module.exports = {
     },
   },
   setupFilesAfterEnv: ['<rootDir>/src/photonics-dmx/tests/jest.setup.ts'],
+  // Mirror the `@renderer/*` path alias from tsconfig.web.json so renderer component/unit tests
+  // can import modules that use it (ts-jest does not apply tsconfig `paths` at runtime).
+  moduleNameMapper: {
+    '^@renderer/(.*)$': '<rootDir>/src/renderer/src/$1',
+  },
 }

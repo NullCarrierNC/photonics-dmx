@@ -96,6 +96,19 @@ export function isInstrumentEventTriggered(
   return null
 }
 
+/**
+ * Whether any vocal or harmony part is sounding on the given frame. Used both for vocal note
+ * edge detection (the sequencer wait-condition path) and for triggering vocal event nodes.
+ */
+export function isVocalActive(frame: Partial<CueData>): boolean {
+  return (
+    (frame.vocalNote ?? 0) > 0 ||
+    (frame.harmony0Note ?? 0) > 0 ||
+    (frame.harmony1Note ?? 0) > 0 ||
+    (frame.harmony2Note ?? 0) > 0
+  )
+}
+
 // Import RB3E types
 import { Rb3Difficulty, Rb3TrackType } from '../../listeners/RB3/rb3eTypes'
 
@@ -319,6 +332,7 @@ export enum CueType {
   Cool_Automatic = 'Cool_Automatic',
   Default = 'Default',
   Dischord = 'Dischord',
+  Fallback = 'Fallback',
   Flare_Fast = 'Flare_Fast',
   Flare_Slow = 'Flare_Slow',
   Frenzy = 'Frenzy',
@@ -347,6 +361,69 @@ export enum CueType {
   Unknown = 'UnknownCue',
   Strobe = 'Strobe', // RB3 has a discreet strobe cue
   DisableAll = 'DisableAll', // RB3 has a discreet disable all cue
+}
+
+/** All valid {@link CueType} string values, for membership checks against wire data. */
+const CUE_TYPE_VALUES: ReadonlySet<string> = new Set<string>(Object.values(CueType))
+
+/** True if `value` is a known {@link CueType}. Used to drop unrecognised wire cue values. */
+export function isCueType(value: string): value is CueType {
+  return CUE_TYPE_VALUES.has(value)
+}
+
+/**
+ * Discrete strobe-speed slots used by hardware-strobe-channel fixtures. Maps each YARG/RB3 strobe
+ * cue to the per-fixture `strobeValues` entry written to the fixture's strobe DMX channel.
+ */
+export type StrobeSpeedSlot = 'slow' | 'medium' | 'fast' | 'fastest'
+
+/** Strobe cue types — all "active strobe" variants plus the off signal. */
+export const STROBE_CUE_TYPES: readonly CueType[] = [
+  CueType.Strobe_Fastest,
+  CueType.Strobe_Fast,
+  CueType.Strobe_Medium,
+  CueType.Strobe_Slow,
+  CueType.Strobe_Off,
+] as const
+
+/** True for any strobe cue including the off signal. */
+export function isStrobeCueType(cueType: CueType): boolean {
+  return STROBE_CUE_TYPES.includes(cueType)
+}
+
+/**
+ * Cues that signal "no real lighting" — YARG sends a fast blackout or an explicit no-cue when a
+ * song has no lighting to drive. The YARG Fallback treats a *continuing run* of these as
+ * non-driving (the first one after a real cue still resets the window), so it can take over when a
+ * song streams them past the window.
+ */
+export const NON_DRIVING_CUE_TYPES: readonly CueType[] = [
+  CueType.Blackout_Fast,
+  CueType.NoCue,
+] as const
+
+/** True for cues that signal "no real lighting" (see NON_DRIVING_CUE_TYPES). */
+export function isNonDrivingCueType(cueType: CueType): boolean {
+  return NON_DRIVING_CUE_TYPES.includes(cueType)
+}
+
+/**
+ * Maps a strobe CueType to its speed slot. Returns null for {@link CueType.Strobe_Off} and any
+ * non-strobe cue type.
+ */
+export function cueTypeToStrobeSlot(cueType: CueType): StrobeSpeedSlot | null {
+  switch (cueType) {
+    case CueType.Strobe_Slow:
+      return 'slow'
+    case CueType.Strobe_Medium:
+      return 'medium'
+    case CueType.Strobe_Fast:
+      return 'fast'
+    case CueType.Strobe_Fastest:
+      return 'fastest'
+    default:
+      return null
+  }
 }
 
 export const lightingCueMap: Record<number, CueType> = {
@@ -441,6 +518,13 @@ export const CueTypeDescriptions = [
     id: CueType.Dischord,
     yargDescription:
       'YARG: Front left/right halves alternate green/blue. Flashes bright red or yellow on the measure.',
+    rb3Description:
+      'RB3E: Does not currently use cues, lights are set directly from passed LED colour values.',
+  },
+  {
+    id: CueType.Fallback,
+    yargDescription:
+      'YARG: Auto-triggered look when no new YARG lighting cue has arrived for the configured Fallback Time while a song is playing. Persistent; re-selected each window. Not sent over the wire by YARG.',
     rb3Description:
       'RB3E: Does not currently use cues, lights are set directly from passed LED colour values.',
   },

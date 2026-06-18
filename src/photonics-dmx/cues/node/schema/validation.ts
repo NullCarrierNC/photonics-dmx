@@ -15,6 +15,7 @@ import {
 import type {
   AudioNodeCueFile,
   AudioEffectFile,
+  EffectDefinition,
   EffectFile,
   NodeCueFile,
   NodeCueMode,
@@ -112,7 +113,7 @@ export const validateYargNodeCueFile = (
 
     // Check conditional nodes: literal vs variable validValues
     const cueVarDefs: VariableDefinition[] = [...groupVariables, ...cueVariables]
-    checkConditionalValidValues(cue.name, cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
+    checkConditionalValidValues(cue.name, 'cue', cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
   }
 
   if (semanticErrors.length > 0) {
@@ -195,7 +196,7 @@ export const validateAudioNodeCueFile = (
 
     // Check conditional nodes: literal vs variable validValues
     const cueVarDefs: VariableDefinition[] = [...groupVariables, ...cueVariables]
-    checkConditionalValidValues(cue.name, cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
+    checkConditionalValidValues(cue.name, 'cue', cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
   }
 
   if (semanticErrors.length > 0) {
@@ -248,6 +249,32 @@ export interface EffectValidationResult<T = EffectFile> {
 }
 
 /**
+ * Runs the same graph-level semantic checks on a single effect definition that
+ * the YARG/Audio cue validators run per-cue: logic-only cycle detection and
+ * conditional literal-vs-variable validValues checks. Reuses the shared
+ * {@link detectCycles} and {@link checkConditionalValidValues} helpers so effect
+ * files reach parity with cue files (errors prefixed with the effect name via
+ * the helpers' `cueName` parameter).
+ */
+const checkEffectSemantics = (effect: EffectDefinition, semanticErrors: string[]): void => {
+  // `nodes`/`connections` are schema-nullable on effect definitions, so guard.
+  const logicNodes = effect.nodes?.logic ?? []
+  const actionNodes = effect.nodes?.actions ?? []
+  const connections = effect.connections ?? []
+
+  // Check for circular dependencies (only logic-only cycles are invalid)
+  const logicIds = new Set(logicNodes.map((node) => node.id))
+  const actionIds = new Set(actionNodes.map((a) => a.id))
+  const nonEventIds = new Set<string>([...logicIds, ...actionIds])
+  const cycleErrors = detectCycles(connections, nonEventIds, actionIds)
+  semanticErrors.push(...cycleErrors.map((e) => `effect '${effect.name}': ${e}`))
+
+  // Check conditional nodes: literal vs variable validValues
+  const effectVarDefs: VariableDefinition[] = effect.variables ?? []
+  checkConditionalValidValues(effect.name, 'effect', logicNodes, effectVarDefs, semanticErrors)
+}
+
+/**
  * Validate YARG Effect File (schema + semantic, parity with cue validation).
  */
 export const validateYargEffectFile = (value: unknown): EffectValidationResult<YargEffectFile> => {
@@ -276,6 +303,10 @@ export const validateYargEffectFile = (value: unknown): EffectValidationResult<Y
       semanticErrors.push(`Duplicate effect id: '${effect.id}'`)
     }
     effectIds.add(effect.id)
+  }
+
+  for (const effect of file.effects) {
+    checkEffectSemantics(effect, semanticErrors)
   }
 
   if (semanticErrors.length > 0) {
@@ -325,6 +356,10 @@ export const validateAudioEffectFile = (
       semanticErrors.push(`Duplicate effect id: '${effect.id}'`)
     }
     effectIds.add(effect.id)
+  }
+
+  for (const effect of file.effects) {
+    checkEffectSemantics(effect, semanticErrors)
   }
 
   if (semanticErrors.length > 0) {

@@ -3,7 +3,7 @@
  * and compare precision, recall, and BPM error to ground truth.
  */
 
-import { BeatDetector } from '../../listeners/Audio/BeatDetector'
+import { BeatDetector, noiseFloorDecayFor } from '../../listeners/Audio/BeatDetector'
 import {
   buildSyntheticFixture,
   buildQuietFixture,
@@ -133,6 +133,23 @@ describe('BeatDetector', () => {
       }
       const minInterval = intervals.length > 0 ? Math.min(...intervals) : 0
       expect(minInterval).toBeGreaterThanOrEqual(140)
+    })
+  })
+
+  describe('decayRate', () => {
+    it('default decayRate reproduces the historic noise-floor decay', () => {
+      expect(noiseFloorDecayFor(0.8)).toBeCloseTo(0.9995, 6)
+    })
+
+    it('is monotonic: a higher decayRate decays the noise floor more slowly', () => {
+      expect(noiseFloorDecayFor(0.2)).toBeLessThan(noiseFloorDecayFor(0.8))
+      expect(noiseFloorDecayFor(0.8)).toBeLessThan(noiseFloorDecayFor(1))
+      expect(noiseFloorDecayFor(1)).toBe(1)
+    })
+
+    it('clamps out-of-range values', () => {
+      expect(noiseFloorDecayFor(-5)).toBe(noiseFloorDecayFor(0))
+      expect(noiseFloorDecayFor(5)).toBe(noiseFloorDecayFor(1))
     })
   })
 })

@@ -5,7 +5,7 @@
 
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
-import { TrackedLight } from '../../../types'
+import { TrackedLight, Color } from '../../../types'
 import { randomBetween } from '../../../helpers/utils'
 import { LogicNode, ValueSource, VariableDefinition, VariableType } from '../../types/nodeCueTypes'
 import { ExecutionContext } from './ExecutionContext'
@@ -86,6 +86,8 @@ export function evaluateLogicNode(
         case 'multiply':
           result = left * right
           break
+        // Divide/modulus by zero intentionally clamp to 0 rather than throwing: math nodes absorb
+        // bad operands as a data condition instead of surfacing a runtime error.
         case 'divide':
           result = right === 0 ? 0 : left / right
           break
@@ -325,18 +327,104 @@ export function evaluateLogicNode(
       return edges.map((edge) => edge.to)
     }
 
+    case 'color-from-index': {
+      // Pick a colour from a palette by index, with wraparound. The colour analogue of
+      // lights-from-index. The palette is a ValueSource resolving to a color-array: an inline
+      // literal Color[] (enum-validated at load) or a color-array variable.
+      const colors = resolveValue(
+        'color-array',
+        logicNode.colors,
+        context,
+        variableDefinitions,
+      ) as Color[]
+      if (!colors || colors.length === 0) {
+        log.warn(`color-from-index node ${nodeId}: colors palette is empty`)
+        return edges.map((edge) => edge.to)
+      }
+
+      const rawIndex = Number(resolveValue('number', logicNode.index, context, variableDefinitions))
+      const idx = Math.floor(isNaN(rawIndex) ? 0 : rawIndex)
+      const wrapped = ((idx % colors.length) + colors.length) % colors.length
+
+      const targetVarStore = getVarStore(logicNode.assignTo)
+      targetVarStore.set(logicNode.assignTo, { type: 'color', value: colors[wrapped] })
+
+      return edges.map((edge) => edge.to)
+    }
+
+    case 'reverse-colors': {
+      const sourceVarStore = getVarStore(logicNode.sourceVariable)
+      const sourceVar = sourceVarStore.get(logicNode.sourceVariable)
+
+      if (!sourceVar || sourceVar.type !== 'color-array') {
+        log.warn(
+          `reverse-colors node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a color-array`,
+        )
+        return edges.map((edge) => edge.to)
+      }
+
+      const colorsArray = sourceVar.value as Color[]
+      const reversed = [...colorsArray].reverse()
+
+      const targetVarStore = getVarStore(logicNode.assignTo)
+      targetVarStore.set(logicNode.assignTo, { type: 'color-array', value: reversed })
+
+      return edges.map((edge) => edge.to)
+    }
+
+    case 'concat-colors': {
+      const concatResult: Color[] = []
+
+      for (const varName of logicNode.sourceVariables) {
+        const sourceVarStore = getVarStore(varName)
+        const sourceVar = sourceVarStore.get(varName)
+
+        if (sourceVar && sourceVar.type === 'color-array') {
+          concatResult.push(...(sourceVar.value as Color[]))
+        } else {
+          log.warn(
+            `concat-colors node ${nodeId}: variable "${varName}" is not a color-array, skipping`,
+          )
+        }
+      }
+
+      const targetVarStore = getVarStore(logicNode.assignTo)
+      targetVarStore.set(logicNode.assignTo, { type: 'color-array', value: concatResult })
+
+      return edges.map((edge) => edge.to)
+    }
+
+    case 'shuffle-colors': {
+      const sourceVarStore = getVarStore(logicNode.sourceVariable)
+      const sourceVar = sourceVarStore.get(logicNode.sourceVariable)
+
+      if (!sourceVar || sourceVar.type !== 'color-array') {
+        log.warn(
+          `shuffle-colors node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a color-array`,
+        )
+        return edges.map((edge) => edge.to)
+      }
+
+      const colorsArray = sourceVar.value as Color[]
+      const shuffled = [...colorsArray].sort(() => Math.random() - 0.5)
+
+      const targetVarStore = getVarStore(logicNode.assignTo)
+      targetVarStore.set(logicNode.assignTo, { type: 'color-array', value: shuffled })
+
+      return edges.map((edge) => edge.to)
+    }
+
     case 'array-length': {
-      // Get the source light array variable
+      // Get the source array variable (light-array or color-array)
       const sourceVarStore = getVarStore(logicNode.sourceVariable)
       const sourceVar = sourceVarStore.get(logicNode.sourceVariable)
 
       let length = 0
-      if (sourceVar && sourceVar.type === 'light-array') {
-        const lightsArray = sourceVar.value as TrackedLight[]
-        length = lightsArray.length
+      if (sourceVar && (sourceVar.type === 'light-array' || sourceVar.type === 'color-array')) {
+        length = (sourceVar.value as unknown[]).length
       } else {
         log.warn(
-          `array-length node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`,
+          `array-length node ${nodeId}: source variable "${logicNode.sourceVariable}" is not an array`,
         )
       }
 
@@ -419,6 +507,46 @@ export function evaluateLogicNode(
       // Assign the concatenated array to the target variable
       const targetVarStore = getVarStore(logicNode.assignTo)
       targetVarStore.set(logicNode.assignTo, { type: 'light-array', value: concatResult })
+
+      return edges.map((edge) => edge.to)
+    }
+
+    case 'build-ring': {
+      // Build a virtual RING_STEPS-step (8) LED ring from the whole rig so every chase keeps
+      // its authored 8-step shape and timing on any light count. Three rules keyed on
+      // divisibility against the ring size:
+      //   - n divides 8 (1,2,4,8): repeat the array 8/n times, group size 1.
+      //   - n is a multiple of 8 (16,24,...): k-way interleave (k = n/8), step i drives
+      //     lights[i], lights[i+8], ..., group size k.
+      //   - anything else (3,5,6,10,12,...): resample to 8 steps (step i -> lights[floor(i*n/8)]),
+      //     group size 1.
+      // 4/8/16 are byte-identical to the prior special-cased folds (doubled / as-is /
+      // front-back interleave); other counts intentionally change to hold the 8-step shape.
+      const allLights = extractConfigDataValue('all-lights-array', lightManager)
+      const lights = Array.isArray(allLights) ? allLights : []
+      const n = lights.length
+
+      let ring: TrackedLight[]
+      let groupSize = 1
+      if (n === 0) {
+        ring = []
+      } else if (RING_STEPS % n === 0) {
+        ring = repeatRing(lights, RING_STEPS / n)
+      } else if (n % RING_STEPS === 0) {
+        groupSize = n / RING_STEPS
+        ring = interleaveRingGroups(lights, groupSize)
+      } else {
+        ring = resampleRing(lights)
+      }
+
+      getVarStore(logicNode.assignTo).set(logicNode.assignTo, {
+        type: 'light-array',
+        value: ring,
+      })
+      getVarStore(logicNode.assignGroupSize).set(logicNode.assignGroupSize, {
+        type: 'number',
+        value: groupSize,
+      })
 
       return edges.map((edge) => edge.to)
     }
@@ -538,6 +666,47 @@ export function evaluateLogicNode(
   }
 
   return edges.map((edge) => edge.to)
+}
+
+/** Number of steps in the virtual LED ring the Stage Kit cues chase around (build-ring node). */
+const RING_STEPS = 8
+
+/** Repeat a light array `times` times (build-ring fold for counts that divide RING_STEPS). */
+function repeatRing(lights: TrackedLight[], times: number): TrackedLight[] {
+  const result: TrackedLight[] = []
+  for (let r = 0; r < times; r++) {
+    result.push(...lights)
+  }
+  return result
+}
+
+/**
+ * Interleave `k` equal slices of a light array into a RING_STEPS-step ring: step i drives
+ * lights[i], lights[i + 8], ..., lights[i + 8*(k-1)] (build-ring fold for multiples of 8).
+ * For 16 lights (k=2) this is the front/back interleave [0,8,1,9,...,7,15].
+ */
+function interleaveRingGroups(lights: TrackedLight[], k: number): TrackedLight[] {
+  const result: TrackedLight[] = []
+  for (let step = 0; step < RING_STEPS; step++) {
+    for (let g = 0; g < k; g++) {
+      result.push(lights[step + g * RING_STEPS])
+    }
+  }
+  return result
+}
+
+/**
+ * Resample a light array to RING_STEPS steps by nearest-floor mapping: step i -> lights[floor(i*n/8)]
+ * (build-ring fold for counts that neither divide nor are a multiple of 8). Some lights serve two
+ * adjacent steps or are skipped, but the chase keeps its 8-step shape and offset/gap geometry.
+ */
+function resampleRing(lights: TrackedLight[]): TrackedLight[] {
+  const n = lights.length
+  const result: TrackedLight[] = []
+  for (let step = 0; step < RING_STEPS; step++) {
+    result.push(lights[Math.floor((step * n) / RING_STEPS)])
+  }
+  return result
 }
 
 /**

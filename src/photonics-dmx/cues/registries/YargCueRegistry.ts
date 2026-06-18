@@ -5,6 +5,7 @@ import { INetCue, CueStyle } from '../interfaces/INetCue'
 import { YargMotionNodeCue } from '../node/runtime/YargMotionNodeCue'
 import { MotionSelectionState } from './MotionSelectionState'
 import { createLogger } from '../../../shared/logger'
+import { monotonicNowMs } from '../../../shared/time'
 const log = createLogger('YargCueRegistry')
 
 /**
@@ -249,6 +250,9 @@ export class YargCueRegistry {
     // Check if we should prefer stage kit group based on priority and trackMode
     // When trackMode='tracked' and stageKitPriority='prefer-for-tracked', prefer stage kit group
     // When trackMode='simulated', ignore stage kit priority to allow testing all groups
+    // This serves tracked cues from the stage kit group directly and does not engage the
+    // once-per-song group lock: with a single group serving the whole song there is no group
+    // switching to constrain.
     if (
       trackMode === 'tracked' &&
       this.stageKitPriority === 'prefer-for-tracked' &&
@@ -427,7 +431,7 @@ export class YargCueRegistry {
       }
     }
 
-    const now = Date.now()
+    const now = monotonicNowMs()
     const lastExecutionTime = this.lastCueExecutionTime.get(cueType)
     const lastSelection = this.lastCueGroupSelection.get(cueType)
 
@@ -514,7 +518,7 @@ export class YargCueRegistry {
     cueType: CueType,
     selection: { groupId: string; isFallback: boolean },
   ): void {
-    const now = Date.now()
+    const now = monotonicNowMs()
     this.lastCueExecutionTime.set(cueType, now)
     this.lastCueGroupSelection.set(cueType, selection)
     //  console.log(`[Consistency] Recorded execution of ${cueType} with group ${selection.groupId} at ${now}`);
@@ -980,6 +984,26 @@ export class YargCueRegistry {
   }
 
   /**
+   * Notifies every registered cue (lighting and motion) that the given sequencer is going
+   * away so the cue impl can drop its per-sequencer runtime state. Called by `RigChain.dispose`
+   * to keep cue instances from accumulating stale entries across `restartControllers` cycles.
+   */
+  public releaseSequencerFromAllCues(
+    sequencer: import('../../controllers/sequencer/interfaces').ILightingController,
+  ): void {
+    for (const group of this.groups.values()) {
+      for (const cue of group.cues.values()) {
+        cue.releaseSequencer?.(sequencer)
+      }
+      if (group.motionCues) {
+        for (const motionCue of group.motionCues.values()) {
+          motionCue.releaseSequencer?.(sequencer)
+        }
+      }
+    }
+  }
+
+  /**
    * Get the currently enabled group IDs.
    * @returns Array of enabled group IDs
    */
@@ -1200,7 +1224,7 @@ export class YargCueRegistry {
       isWithinWindow: boolean
     }>
   } {
-    const now = Date.now()
+    const now = monotonicNowMs()
     const trackedCues: Array<{
       cueType: CueType
       lastExecutionTime: number

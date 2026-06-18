@@ -193,6 +193,27 @@ export class AudioCueRegistry {
   }
 
   /**
+   * Notifies every registered audio cue (lighting and motion) that the given sequencer is
+   * going away so the cue impl can drop its per-sequencer runtime state. Called by
+   * `RigChain.dispose` to keep cue instances from accumulating stale entries across
+   * `restartControllers` cycles.
+   */
+  public releaseSequencerFromAllCues(
+    sequencer: import('../../controllers/sequencer/interfaces').ILightingController,
+  ): void {
+    for (const group of this.groups.values()) {
+      for (const cue of group.cues.values()) {
+        cue.releaseSequencer?.(sequencer)
+      }
+      if (group.motionCues) {
+        for (const motionCue of group.motionCues.values()) {
+          motionCue.releaseSequencer?.(sequencer)
+        }
+      }
+    }
+  }
+
+  /**
    * Get full group definitions.
    */
   public getGroups(): AudioCueGroup[] {

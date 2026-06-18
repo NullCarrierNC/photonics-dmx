@@ -4,12 +4,15 @@ import {
   validateCueGroupSelectionMode,
   validateCueRefPayload,
   validateCueType,
+  validateDmxRigPayload,
   validateHost,
   validateLightingConfiguration,
   validateMotionSelectionMode,
   validateNumberInRange,
   validatePathUnderAllowedRoots,
   validatePreferencesPayload,
+  validateRigMirrorFlag,
+  validateRigOutputs,
   validateSenderEnablePayload,
   validateSenderId,
   validateStageKitPriority,
@@ -58,6 +61,192 @@ describe('inputValidation', () => {
 
     it('rejects empty string', () => {
       expect(validateSenderId('').ok).toBe(false)
+    })
+  })
+
+  describe('validateRigOutputs', () => {
+    it('accepts undefined (legacy / publish-to-all default)', () => {
+      const result = validateRigOutputs(undefined)
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value).toBeUndefined()
+      }
+    })
+
+    it('accepts null as undefined (defensive — JSON round-trip)', () => {
+      const result = validateRigOutputs(null)
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value).toBeUndefined()
+      }
+    })
+
+    it('accepts an empty array (explicit "publish nowhere on wire")', () => {
+      const result = validateRigOutputs([])
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value).toEqual([])
+      }
+    })
+
+    it('accepts a valid wire-sender array', () => {
+      const result = validateRigOutputs(['sacn', 'opendmx'])
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value).toEqual(['sacn', 'opendmx'])
+      }
+    })
+
+    it('deduplicates repeated entries', () => {
+      const result = validateRigOutputs(['sacn', 'sacn', 'opendmx', 'sacn'])
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value).toEqual(['sacn', 'opendmx'])
+      }
+    })
+
+    it('rejects "ipc" (IPC is not a routable wire sender)', () => {
+      const result = validateRigOutputs(['ipc'])
+      expect(result.ok).toBe(false)
+    })
+
+    it('rejects unknown sender ids', () => {
+      const result = validateRigOutputs(['sacn', 'bogus'])
+      expect(result.ok).toBe(false)
+    })
+
+    it('rejects non-array values', () => {
+      expect(validateRigOutputs('sacn').ok).toBe(false)
+      expect(validateRigOutputs({}).ok).toBe(false)
+      expect(validateRigOutputs(42).ok).toBe(false)
+    })
+
+    it('rejects arrays containing non-string entries', () => {
+      const result = validateRigOutputs(['sacn', 123])
+      expect(result.ok).toBe(false)
+    })
+  })
+
+  describe('validateDmxRigPayload outputs handling', () => {
+    const baseRig = {
+      id: 'r1',
+      name: 'Rig 1',
+      active: true,
+      config: {
+        numLights: 1,
+        lightLayout: { id: 'two-rows', label: 'Two Rows' },
+        strobeType: 'None',
+        frontLights: [],
+        backLights: [],
+        strobeLights: [],
+      },
+    }
+
+    it('omits outputs when not supplied (legacy default preserved)', () => {
+      const result = validateDmxRigPayload(baseRig)
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect('outputs' in result.value).toBe(false)
+      }
+    })
+
+    it('passes through a valid outputs whitelist', () => {
+      const result = validateDmxRigPayload({ ...baseRig, outputs: ['sacn'] })
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value.outputs).toEqual(['sacn'])
+      }
+    })
+
+    it('rejects a rig whose outputs contain an invalid sender id', () => {
+      const result = validateDmxRigPayload({ ...baseRig, outputs: ['sacn', 'bogus'] })
+      expect(result.ok).toBe(false)
+    })
+
+    it('rejects a rig whose outputs is not an array', () => {
+      const result = validateDmxRigPayload({ ...baseRig, outputs: 'sacn' })
+      expect(result.ok).toBe(false)
+    })
+  })
+
+  describe('validateRigMirrorFlag', () => {
+    it('accepts undefined and null as undefined', () => {
+      expect(validateRigMirrorFlag(undefined, 'mirrorHoriz')).toEqual({
+        ok: true,
+        value: undefined,
+      })
+      expect(validateRigMirrorFlag(null, 'mirrorHoriz')).toEqual({ ok: true, value: undefined })
+    })
+
+    it('accepts true and passes it through', () => {
+      expect(validateRigMirrorFlag(true, 'mirrorVert')).toEqual({ ok: true, value: true })
+    })
+
+    it('normalizes false to undefined so the no-op default is never persisted', () => {
+      expect(validateRigMirrorFlag(false, 'mirrorHoriz')).toEqual({ ok: true, value: undefined })
+    })
+
+    it('rejects non-boolean values with a field-tagged error', () => {
+      expect(validateRigMirrorFlag('yes', 'mirrorHoriz').ok).toBe(false)
+      expect(validateRigMirrorFlag(1, 'mirrorVert').ok).toBe(false)
+      expect(validateRigMirrorFlag({}, 'mirrorHoriz').ok).toBe(false)
+    })
+  })
+
+  describe('validateDmxRigPayload mirror handling', () => {
+    const baseRig = {
+      id: 'r1',
+      name: 'Rig 1',
+      active: true,
+      config: {
+        numLights: 1,
+        lightLayout: { id: 'two-rows', label: 'Two Rows' },
+        strobeType: 'None',
+        frontLights: [],
+        backLights: [],
+        strobeLights: [],
+      },
+    }
+
+    it('omits mirror fields when not supplied', () => {
+      const result = validateDmxRigPayload(baseRig)
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect('mirrorHoriz' in result.value).toBe(false)
+        expect('mirrorVert' in result.value).toBe(false)
+      }
+    })
+
+    it('passes through mirrorHoriz: true', () => {
+      const result = validateDmxRigPayload({ ...baseRig, mirrorHoriz: true })
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value.mirrorHoriz).toBe(true)
+        expect('mirrorVert' in result.value).toBe(false)
+      }
+    })
+
+    it('passes through both mirrorHoriz and mirrorVert when true', () => {
+      const result = validateDmxRigPayload({ ...baseRig, mirrorHoriz: true, mirrorVert: true })
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.value.mirrorHoriz).toBe(true)
+        expect(result.value.mirrorVert).toBe(true)
+      }
+    })
+
+    it('strips mirror flags when set to false so the on-disk shape stays minimal', () => {
+      const result = validateDmxRigPayload({ ...baseRig, mirrorHoriz: false, mirrorVert: false })
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect('mirrorHoriz' in result.value).toBe(false)
+        expect('mirrorVert' in result.value).toBe(false)
+      }
+    })
+
+    it('rejects non-boolean mirror values', () => {
+      expect(validateDmxRigPayload({ ...baseRig, mirrorHoriz: 'yes' }).ok).toBe(false)
+      expect(validateDmxRigPayload({ ...baseRig, mirrorVert: 1 }).ok).toBe(false)
     })
   })
 

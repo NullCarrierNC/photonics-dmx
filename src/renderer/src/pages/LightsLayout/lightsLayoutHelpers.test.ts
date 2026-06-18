@@ -45,6 +45,26 @@ describe('lightingConfigsEqual', () => {
       false,
     )
   })
+
+  it('treats a light without strobeValues as unequal to one where it is materialized', () => {
+    // The editor builds lights without `strobeValues`; the backend materializes that key on read
+    // (template-sync). fast-deep-equal treats an absent key as different from a present one, so a
+    // raw config never equals its normalized form — which is why the saved baseline must be taken
+    // from the backend-canonical read rather than the editor's raw config.
+    const base: LightingConfiguration = {
+      numLights: 1,
+      lightLayout: LIGHT_LAYOUTS[0]!,
+      strobeType: ConfigStrobeType.AllCapable,
+      frontLights: [minimalStrobe],
+      backLights: [],
+      strobeLights: [],
+    }
+    const materialized: LightingConfiguration = {
+      ...base,
+      frontLights: [{ ...minimalStrobe, strobeValues: { value: 1 } } as unknown as DmxLight],
+    }
+    expect(lightingConfigsEqual(base, materialized)).toBe(false)
+  })
 })
 
 const minimalStrobe: DmxLight = {
@@ -55,7 +75,7 @@ const minimalStrobe: DmxLight = {
   name: 's',
   label: 's',
   isStrobeEnabled: true,
-  channels: { masterDimmer: 1, strobeSpeed: 1 },
+  channels: { masterDimmer: 1, strobeChannel: 1 },
   universe: 0,
 }
 

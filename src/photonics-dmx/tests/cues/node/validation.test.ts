@@ -590,6 +590,75 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(false)
   })
 
+  it('validates audio-trigger with attackMs and releaseMs set', () => {
+    const definition: AudioNodeCueDefinition = {
+      id: 'asym-trigger',
+      name: 'Asymmetric',
+      kind: 'lighting',
+      cueTypeId: 'custom-audio',
+      nodes: {
+        events: [
+          {
+            id: 'event-1',
+            type: 'event',
+            eventType: 'audio-trigger',
+            frequencyRange: { minHz: 100, maxHz: 500 },
+            threshold: 0.5,
+            attackMs: 30,
+            releaseMs: 300,
+            color: '#60a5fa',
+            nodeLabel: 'T',
+            outputs: ['enter', 'during', 'exit'],
+          },
+        ],
+        actions: [],
+      },
+      connections: [],
+      layout: { nodePositions: {} },
+    }
+    const result = validateAudioNodeCueFile({
+      version: 1,
+      mode: 'audio',
+      group: { id: 'g', name: 'G' },
+      cues: [definition],
+    })
+    expect(result.valid).toBe(true)
+  })
+
+  it('rejects audio-trigger when releaseMs is negative', () => {
+    const definition: AudioNodeCueDefinition = {
+      id: 'bad-release',
+      name: 'Bad Release',
+      kind: 'lighting',
+      cueTypeId: 'custom-audio',
+      nodes: {
+        events: [
+          {
+            id: 'event-1',
+            type: 'event',
+            eventType: 'audio-trigger',
+            frequencyRange: { minHz: 100, maxHz: 500 },
+            threshold: 0.5,
+            releaseMs: -1,
+            color: '#60a5fa',
+            nodeLabel: 'T',
+            outputs: ['enter', 'during', 'exit'],
+          },
+        ],
+        actions: [],
+      },
+      connections: [],
+      layout: { nodePositions: {} },
+    }
+    const result = validateAudioNodeCueFile({
+      version: 1,
+      mode: 'audio',
+      group: { id: 'g', name: 'G' },
+      cues: [definition],
+    })
+    expect(result.valid).toBe(false)
+  })
+
   it('rejects audio-trigger event missing required trigger fields', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'bad-trigger-cue',
@@ -800,6 +869,26 @@ describe('Node cue validation', () => {
         { from: 'event-1', to: 'logic-1' },
         { from: 'logic-1', to: 'action-1' },
       ]
+      const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
+      expect(result.valid).toBe(false)
+      expect(result.errors.length).toBeGreaterThan(0)
+    })
+
+    it('rejects build-ring node missing assignGroupSize', () => {
+      const cue = validCue()
+      cue.nodes.logic = [
+        {
+          id: 'logic-1',
+          type: 'logic',
+          logicType: 'build-ring',
+          assignTo: 'ring',
+        } as any,
+      ]
+      cue.connections = [
+        { from: 'event-1', to: 'logic-1' },
+        { from: 'logic-1', to: 'action-1' },
+      ]
+      cue.variables = [{ name: 'ring', type: 'light-array', scope: 'cue', initialValue: [] }]
       const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
       expect(result.valid).toBe(false)
       expect(result.errors.length).toBeGreaterThan(0)
@@ -1080,6 +1169,13 @@ describe('Node cue validation', () => {
               assignTo: 'shuf',
             },
             {
+              id: 'ring-1',
+              type: 'logic',
+              logicType: 'build-ring',
+              assignTo: 'ring',
+              assignGroupSize: 'ringGroupSize',
+            },
+            {
               id: 'rand-1',
               type: 'logic',
               logicType: 'random',
@@ -1116,6 +1212,8 @@ describe('Node cue validation', () => {
           { name: 'len', type: 'number', scope: 'cue', initialValue: 0 },
           { name: 'shuf', type: 'light-array', scope: 'cue', initialValue: [] },
           { name: 'r', type: 'number', scope: 'cue', initialValue: 0 },
+          { name: 'ring', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'ringGroupSize', type: 'number', scope: 'cue', initialValue: 1 },
         ],
         layout: { nodePositions: {} },
       }
@@ -1203,6 +1301,49 @@ describe('Node cue validation', () => {
       }
     }
   })
+
+  it('validates bundled yarg-stagekit.json', () => {
+    const filePath = path.join(
+      __dirname,
+      '../../../../../resources/defaults/node-data/cues/yarg/yarg-stagekit.json',
+    )
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const result = validateYargNodeCueFile(JSON.parse(raw))
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      expect(result.data.group.id).toBe('yarg-stagekit')
+      for (const cue of result.data.cues) {
+        expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+      }
+      // every cue must lay its nodes out (no stacking at the origin in the editor)
+      for (const cue of result.data.cues) {
+        const positions = cue.layout?.nodePositions ?? {}
+        expect(Object.keys(positions).length).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  for (const fileName of ['yarg-fade.json']) {
+    it(`validates bundled ${fileName} (compiles, caps brightness at high, no strobes)`, () => {
+      const filePath = path.join(
+        __dirname,
+        `../../../../../resources/defaults/node-data/cues/yarg/${fileName}`,
+      )
+      const raw = fs.readFileSync(filePath, 'utf8')
+      const result = validateYargNodeCueFile(JSON.parse(raw))
+      expect(result.valid).toBe(true)
+      if (result.valid) {
+        for (const cue of result.data.cues) {
+          expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+        }
+      }
+      // max/linear brightness is reserved for strobes; these libraries must not use it
+      expect(raw).not.toMatch(
+        /"brightness":\s*\{\s*"source":\s*"literal",\s*"value":\s*"(max|linear)"\s*\}/,
+      )
+      expect(raw).not.toContain('Strobe')
+    })
+  }
 
   it('audio stagekit rotation effect raisers are persistent (seamless loop at wrap)', () => {
     const filePath = path.join(
@@ -1440,6 +1581,17 @@ describe('Node cue validation', () => {
       const result = validateEffectFile(JSON.parse(raw))
       expect(result.valid).toBe(true)
       expect(result.mode).toBe('audio')
+    })
+
+    it('validates bundled yarg-fade-effects.json', () => {
+      const filePath = path.join(
+        __dirname,
+        '../../../../../resources/defaults/node-data/effects/yarg/yarg-fade-effects.json',
+      )
+      const raw = fs.readFileSync(filePath, 'utf8')
+      const result = validateEffectFile(JSON.parse(raw))
+      expect(result.valid).toBe(true)
+      expect(result.mode).toBe('yarg')
     })
   })
 })

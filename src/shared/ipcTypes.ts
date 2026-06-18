@@ -15,6 +15,7 @@
 import {
   NODE_CUES,
   EFFECTS,
+  RIGS,
   WINDOW,
   SHELL,
   LIFECYCLE,
@@ -76,6 +77,23 @@ export type LifecyclePhase =
   | 'failed'
   | 'shuttingDown'
   | 'stopped'
+
+/**
+ * Payload sent from the publisher to the renderer over `RENDERER_RECEIVE.DMX_VALUES`.
+ *
+ * Tagged union mirroring the publisher's two modes:
+ *  - `kind: 'rigs'` — normal cue-driven output. One channel buffer per currently-active rig,
+ *    keyed by rig id. Each rig's buffer is independent (matches what would go on its routed
+ *    wire sender), so previewing a single rig is always correct even when rigs share channel
+ *    numbers across separate physical universes.
+ *  - `kind: 'manual'` — DMX Console manual takeover (or shutdown blackout). A flat universe
+ *    buffer; the renderer treats it as a loopback of what was just sent on every wire slot.
+ *
+ * Consumers select between modes via discriminated narrowing on `kind`.
+ */
+export type DmxValuesPayload =
+  | { kind: 'rigs'; rigBuffers: Record<string, Record<number, number>> }
+  | { kind: 'manual'; buffer: Record<number, number> }
 
 import type {
   NodeCueFile,
@@ -218,6 +236,18 @@ export interface IpcInvokeMap {
     response: { success: true; path: string } | IpcErrorResult
   }
 
+  // ---- Rigs (import / export) ----
+  [RIGS.EXPORT]: {
+    request: string // rigId
+    response: { success: true; path: string } | IpcErrorResult
+  }
+  [RIGS.IMPORT_PICK]: {
+    request: void
+    response:
+      | { success: true; sourceBasename: string; rig: DmxRig; templates: DmxFixture[] }
+      | IpcErrorResult
+  }
+
   // ---- Lifecycle ----
   [LIFECYCLE.GET_PHASE]: {
     request: void
@@ -242,10 +272,6 @@ export interface IpcInvokeMap {
   [SHELL.OPEN_PATH]: {
     request: string
     response: IpcErrorResult | { success: true; result: string }
-  }
-  [SHELL.RUN_NODE_SCRIPT]: {
-    request: { scriptName: string; args: string[] }
-    response: { success: true; stdout: string; stderr: string } | IpcErrorResult
   }
 
   // ---- Cue / listeners ----
@@ -411,6 +437,14 @@ export interface IpcInvokeMap {
   [LIGHT.SET_MOTION_CUE_MIN_HOLD_MS]: {
     request: number
     response: { success: true; minHoldMs: number } | IpcErrorResult
+  }
+  [LIGHT.GET_YARG_FALLBACK_CUE_TIME_MS]: {
+    request: void
+    response: { success: true; fallbackMs: number } | IpcErrorResult
+  }
+  [LIGHT.SET_YARG_FALLBACK_CUE_TIME_MS]: {
+    request: number
+    response: { success: true; fallbackMs: number } | IpcErrorResult
   }
   [LIGHT.GET_MOTION_CUE_PROBABILITY_PERCENT]: {
     request: void
@@ -845,7 +879,7 @@ export interface IpcEventMap {
   }
   [RENDERER_RECEIVE.AUDIO_DATA_MIRROR]: AudioLightingData
   [RENDERER_RECEIVE.CUE_STATE_UPDATE]: CueStateUpdatePayload
-  [RENDERER_RECEIVE.DMX_VALUES]: { universeBuffer: Record<number, number> }
+  [RENDERER_RECEIVE.DMX_VALUES]: DmxValuesPayload
   [RENDERER_RECEIVE.CONFIG_CORRUPT_RECOVERED]: { files: ConfigCorruptInfo[] }
   [RENDERER_RECEIVE.CUE_HANDLED]: CueData
   [RENDERER_RECEIVE.NODE_CUES_CHANGED]: NodeCueListSummary

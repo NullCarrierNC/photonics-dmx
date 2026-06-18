@@ -24,13 +24,20 @@ let activeSimulatedYargMotionCue: INetCue | null = null
 let activeSimulatedAudioMotionCue: IAudioCue | null = null
 let simulatedAudioMotionExecutionCount = 0
 
+/**
+ * Each motion cue is executed once per active rig chain so secondary rigs see the same
+ * motion at the same time. The cue instance itself is a registry singleton; the per-rig
+ * state lives inside it keyed by sequencer (see the cue runtime per-sequencer state work).
+ */
 function stopActiveSimulatedMotionCue(controllerManager: ControllerManager): void {
   activeSimulatedYargMotionCue?.onStop?.()
   activeSimulatedYargMotionCue = null
   activeSimulatedAudioMotionCue?.onStop?.()
   activeSimulatedAudioMotionCue = null
   simulatedAudioMotionExecutionCount = 0
-  controllerManager.getLightingController()?.schedulePanTiltClear()
+  // Schedule pan/tilt clear on every chain — secondary rigs would otherwise leave their
+  // moving heads pointed at the last motion target after a stop.
+  controllerManager.getChainFanout().yargSchedulePanTiltClear()
 }
 
 async function runActiveSimulatedMotionCue(
@@ -38,12 +45,16 @@ async function runActiveSimulatedMotionCue(
   mockCueData: CueData,
 ): Promise<void> {
   if (!activeSimulatedYargMotionCue) return
-  const sequencer = controllerManager.getLightingController()
-  const lightManager = controllerManager.getDmxLightManager()
-  if (!sequencer || !lightManager) return
-  const maybePromise = activeSimulatedYargMotionCue.execute(mockCueData, sequencer, lightManager)
-  if (maybePromise instanceof Promise) {
-    await maybePromise
+  const fanout = controllerManager.getChainFanout()
+  for (const chain of fanout.getChains()) {
+    const maybePromise = activeSimulatedYargMotionCue.execute(
+      mockCueData,
+      chain.sequencer,
+      chain.dmxLightManager,
+    )
+    if (maybePromise instanceof Promise) {
+      await maybePromise
+    }
   }
 }
 
@@ -51,14 +62,18 @@ async function runActiveSimulatedAudioMotionCue(
   controllerManager: ControllerManager,
 ): Promise<void> {
   if (!activeSimulatedAudioMotionCue) return
-  const sequencer = controllerManager.getLightingController()
-  const lightManager = controllerManager.getDmxLightManager()
-  if (!sequencer || !lightManager) return
   simulatedAudioMotionExecutionCount++
   const mockAudio = createMockAudioCueData(simulatedAudioMotionExecutionCount)
-  const maybePromise = activeSimulatedAudioMotionCue.execute(mockAudio, sequencer, lightManager)
-  if (maybePromise instanceof Promise) {
-    await maybePromise
+  const fanout = controllerManager.getChainFanout()
+  for (const chain of fanout.getChains()) {
+    const maybePromise = activeSimulatedAudioMotionCue.execute(
+      mockAudio,
+      chain.sequencer,
+      chain.dmxLightManager,
+    )
+    if (maybePromise instanceof Promise) {
+      await maybePromise
+    }
   }
 }
 
@@ -189,8 +204,11 @@ export function setupSimulationHandlers(
         effectId?: string | null
       },
     ) => {
-      const lighting = controllerManager.getLightingController()
-      if (!lighting) return false
+      if (!controllerManager.getIsInitialized()) return false
+      // Make sure every chain has a YARG handler so the fanout `handleCue` actually
+      // reaches secondary rigs even when no real network listener has run.
+      controllerManager.ensureChainsHaveYargHandlersForSimulation()
+      const fanout = controllerManager.getChainFanout()
 
       const mockCueData = data
         ? createMockCueData({
@@ -208,12 +226,11 @@ export function setupSimulationHandlers(
 
       if (data) {
         const { effectId } = data
-        const cueHandler = controllerManager.getCueHandler()
-        if (cueHandler && effectId) {
+        if (effectId) {
           const cueType = getCueTypeFromId(effectId)
           if (cueType) {
             try {
-              await cueHandler.handleCue(cueType, mockCueData)
+              await fanout.handleCue(cueType, mockCueData)
             } catch (error) {
               log.error('Error handling cue in simulate beat:', error)
             }
@@ -223,7 +240,7 @@ export function setupSimulationHandlers(
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
       await runActiveSimulatedMotionCue(controllerManager, mockCueData)
       await runActiveSimulatedAudioMotionCue(controllerManager)
-      lighting.onBeat()
+      fanout.yargOnBeat()
       return true
     },
   )
@@ -239,8 +256,9 @@ export function setupSimulationHandlers(
         effectId?: string | null
       },
     ) => {
-      const lighting = controllerManager.getLightingController()
-      if (!lighting) return false
+      if (!controllerManager.getIsInitialized()) return false
+      controllerManager.ensureChainsHaveYargHandlersForSimulation()
+      const fanout = controllerManager.getChainFanout()
 
       const mockCueData = data
         ? createMockCueData({
@@ -258,12 +276,11 @@ export function setupSimulationHandlers(
 
       if (data) {
         const { effectId } = data
-        const cueHandler = controllerManager.getCueHandler()
-        if (cueHandler && effectId) {
+        if (effectId) {
           const cueType = getCueTypeFromId(effectId)
           if (cueType) {
             try {
-              await cueHandler.handleCue(cueType, mockCueData)
+              await fanout.handleCue(cueType, mockCueData)
             } catch (error) {
               log.error('Error handling cue in simulate keyframe:', error)
             }
@@ -273,7 +290,7 @@ export function setupSimulationHandlers(
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
       await runActiveSimulatedMotionCue(controllerManager, mockCueData)
       await runActiveSimulatedAudioMotionCue(controllerManager)
-      lighting.onKeyframe()
+      fanout.yargOnKeyframe()
       return true
     },
   )
@@ -289,8 +306,9 @@ export function setupSimulationHandlers(
         effectId?: string | null
       },
     ) => {
-      const lighting = controllerManager.getLightingController()
-      if (!lighting) return false
+      if (!controllerManager.getIsInitialized()) return false
+      controllerManager.ensureChainsHaveYargHandlersForSimulation()
+      const fanout = controllerManager.getChainFanout()
 
       const mockCueData = data
         ? createMockCueData({
@@ -308,12 +326,11 @@ export function setupSimulationHandlers(
 
       if (data) {
         const { effectId } = data
-        const cueHandler = controllerManager.getCueHandler()
-        if (cueHandler && effectId) {
+        if (effectId) {
           const cueType = getCueTypeFromId(effectId)
           if (cueType) {
             try {
-              await cueHandler.handleCue(cueType, mockCueData)
+              await fanout.handleCue(cueType, mockCueData)
             } catch (error) {
               log.error('Error handling cue in simulate measure:', error)
             }
@@ -323,7 +340,7 @@ export function setupSimulationHandlers(
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
       await runActiveSimulatedMotionCue(controllerManager, mockCueData)
       await runActiveSimulatedAudioMotionCue(controllerManager)
-      lighting.onMeasure()
+      fanout.yargOnMeasure()
       return true
     },
   )
@@ -343,79 +360,61 @@ export function setupSimulationHandlers(
     ) => {
       try {
         const { instrument, noteType, venueSize = 'Small', bpm = 120, cueGroup, effectId } = data
-        const cueHandler = controllerManager.getCueHandler()
-        if (cueHandler) {
-          const mockCueData = createMockCueData({
-            venueSize,
-            bpm,
-            effectId: effectId ?? undefined,
-            beat: 'Unknown',
-            keyframe: 'Unknown',
-            simulationCueGroup: cueGroup,
-          })
-          switch (instrument) {
-            case 'guitar': {
-              const normalizedNote = String(noteType) as InstrumentNoteType
-              mockCueData.guitarNotes = [normalizedNote]
-              if (
-                'handleGuitarNote' in cueHandler &&
-                typeof cueHandler.handleGuitarNote === 'function'
-              ) {
-                cueHandler.handleGuitarNote(normalizedNote, mockCueData)
-              }
-              break
-            }
-            case 'bass': {
-              const normalizedNote = String(noteType) as InstrumentNoteType
-              mockCueData.bassNotes = [normalizedNote]
-              if (
-                'handleBassNote' in cueHandler &&
-                typeof cueHandler.handleBassNote === 'function'
-              ) {
-                cueHandler.handleBassNote(normalizedNote, mockCueData)
-              }
-              break
-            }
-            case 'keys': {
-              const normalizedNote = String(noteType) as InstrumentNoteType
-              mockCueData.keysNotes = [normalizedNote]
-              if (
-                'handleKeysNote' in cueHandler &&
-                typeof cueHandler.handleKeysNote === 'function'
-              ) {
-                cueHandler.handleKeysNote(normalizedNote, mockCueData)
-              }
-              break
-            }
-            case 'drums': {
-              const normalizedNote = String(noteType) as DrumNoteType
-              mockCueData.drumNotes = [normalizedNote]
-              if (
-                'handleDrumNote' in cueHandler &&
-                typeof cueHandler.handleDrumNote === 'function'
-              ) {
-                cueHandler.handleDrumNote(normalizedNote, mockCueData)
-              }
-              break
-            }
-            default:
-              log.warn(`Unknown instrument: ${instrument}`)
-              return { success: false, error: `Unknown instrument: ${instrument}` }
-          }
-
-          // Run the current test cue with CueData that includes the note so the node graph
-          // runs the instrument-event branch (e.g. drum-red).
-          if (effectId && cueGroup) {
-            const cueType = getCueTypeFromId(effectId)
-            if (cueType) {
-              await cueHandler.handleCue(cueType, mockCueData)
-            }
-          }
-
-          sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
-          return { success: true }
+        if (!controllerManager.getIsInitialized()) {
+          return { success: false, error: 'Lighting system not initialized' }
         }
-        return { success: false, error: 'No cue handler available' }
+        controllerManager.ensureChainsHaveYargHandlersForSimulation()
+        const fanout = controllerManager.getChainFanout()
+
+        const mockCueData = createMockCueData({
+          venueSize,
+          bpm,
+          effectId: effectId ?? undefined,
+          beat: 'Unknown',
+          keyframe: 'Unknown',
+          simulationCueGroup: cueGroup,
+        })
+        switch (instrument) {
+          case 'guitar': {
+            const normalizedNote = String(noteType) as InstrumentNoteType
+            mockCueData.guitarNotes = [normalizedNote]
+            fanout.handleGuitarNote(normalizedNote, mockCueData)
+            break
+          }
+          case 'bass': {
+            const normalizedNote = String(noteType) as InstrumentNoteType
+            mockCueData.bassNotes = [normalizedNote]
+            fanout.handleBassNote(normalizedNote, mockCueData)
+            break
+          }
+          case 'keys': {
+            const normalizedNote = String(noteType) as InstrumentNoteType
+            mockCueData.keysNotes = [normalizedNote]
+            fanout.handleKeysNote(normalizedNote, mockCueData)
+            break
+          }
+          case 'drums': {
+            const normalizedNote = String(noteType) as DrumNoteType
+            mockCueData.drumNotes = [normalizedNote]
+            fanout.handleDrumNote(normalizedNote, mockCueData)
+            break
+          }
+          default:
+            log.warn(`Unknown instrument: ${instrument}`)
+            return { success: false, error: `Unknown instrument: ${instrument}` }
+        }
+
+        // Run the current test cue with CueData that includes the note so the node graph
+        // runs the instrument-event branch (e.g. drum-red).
+        if (effectId && cueGroup) {
+          const cueType = getCueTypeFromId(effectId)
+          if (cueType) {
+            await fanout.handleCue(cueType, mockCueData)
+          }
+        }
+
+        sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
+        return { success: true }
       } catch (error) {
         log.error('Error simulating instrument note:', error)
         return ipcError(error)
@@ -436,9 +435,8 @@ export function setupSimulationHandlers(
       if (!controllerManager.getIsInitialized()) {
         await controllerManager.init()
       }
-      const lightManager = controllerManager.getDmxLightManager()
-      const sequencer = controllerManager.getLightingController()
-      if (!lightManager || !sequencer) {
+      const fanout = controllerManager.getChainFanout()
+      if (fanout.getChains().length === 0) {
         return ipcError(new Error('Lighting system not available'))
       }
       const group = YargCueRegistry.getInstance().getGroup(groupId)
@@ -454,15 +452,21 @@ export function setupSimulationHandlers(
       activeSimulatedAudioMotionCue?.onStop?.()
       activeSimulatedAudioMotionCue = null
       simulatedAudioMotionExecutionCount = 0
-      sequencer.cancelPanTiltClear()
+      // Cancel pending pan/tilt clears on every chain — without this, secondary rigs
+      // would clear pan/tilt mid-motion after the previous simulation stopped.
+      fanout.yargCancelPanTiltClear()
       const mockCueData = createMockCueData({
         venueSize: 'Small',
         bpm: 120,
         simulationCueGroup: groupId,
       })
-      const maybePromise = cue.execute(mockCueData, sequencer, lightManager)
-      if (maybePromise instanceof Promise) {
-        await maybePromise
+      // Execute the motion cue once per active rig chain. The cue instance is shared
+      // (registry singleton) but each chain's call binds a per-sequencer engine internally.
+      for (const chain of fanout.getChains()) {
+        const maybePromise = cue.execute(mockCueData, chain.sequencer, chain.dmxLightManager)
+        if (maybePromise instanceof Promise) {
+          await maybePromise
+        }
       }
       activeSimulatedYargMotionCue = cue
       sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
@@ -490,9 +494,8 @@ export function setupSimulationHandlers(
       if (!controllerManager.getIsInitialized()) {
         await controllerManager.init()
       }
-      const lightManager = controllerManager.getDmxLightManager()
-      const sequencer = controllerManager.getLightingController()
-      if (!lightManager || !sequencer) {
+      const fanout = controllerManager.getChainFanout()
+      if (fanout.getChains().length === 0) {
         return ipcError(new Error('Lighting system not available'))
       }
       const group = AudioCueRegistry.getInstance().getGroup(groupId)
@@ -508,11 +511,13 @@ export function setupSimulationHandlers(
       activeSimulatedAudioMotionCue?.onStop?.()
       activeSimulatedAudioMotionCue = null
       simulatedAudioMotionExecutionCount = 0
-      sequencer.cancelPanTiltClear()
+      fanout.yargCancelPanTiltClear()
       const mockAudio = createMockAudioCueData(1)
-      const maybePromise = cue.execute(mockAudio, sequencer, lightManager)
-      if (maybePromise instanceof Promise) {
-        await maybePromise
+      for (const chain of fanout.getChains()) {
+        const maybePromise = cue.execute(mockAudio, chain.sequencer, chain.dmxLightManager)
+        if (maybePromise instanceof Promise) {
+          await maybePromise
+        }
       }
       activeSimulatedAudioMotionCue = cue
       return { success: true as const }

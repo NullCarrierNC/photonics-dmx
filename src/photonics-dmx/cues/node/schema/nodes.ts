@@ -86,6 +86,7 @@ export const effectRaiserNodeSchema = {
       items: { type: 'string' },
     },
     isPersistent: { type: 'boolean', nullable: true },
+    interruptible: { type: 'boolean', nullable: true },
     parameterValues: {
       type: 'object',
       nullable: true,
@@ -298,6 +299,8 @@ export const audioTriggerSchema = {
     hysteresis: { type: 'number', minimum: 0, maximum: 1, nullable: true },
     holdMs: { type: 'number', minimum: 0, nullable: true },
     smoothing: { type: 'number', minimum: 0, maximum: 1, nullable: true },
+    attackMs: { type: 'number', minimum: 0, nullable: true },
+    releaseMs: { type: 'number', minimum: 0, nullable: true },
     spectralGates: audioTriggerSpectralGatesSchema,
     useOnsetGating: { type: 'boolean', nullable: true },
     onsetThreshold: { type: 'number', nullable: true, minimum: 0, maximum: 1 },

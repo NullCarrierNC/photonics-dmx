@@ -14,6 +14,10 @@ interface LightsLayoutRigSectionProps {
   onRigsChange: (rigs: DmxRig[]) => void
   /** Return false to cancel a rig change or new rig when there are unsaved edits. */
   onBeforeDiscardingUnsaved: () => Promise<boolean>
+  /** Clone the selected rig (handles its own unsaved-changes guard). */
+  onDuplicate: () => void
+  /** Delete the selected rig (shows its own confirmation). */
+  onDelete: () => void
 }
 
 const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
@@ -24,6 +28,8 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
   setRigName,
   onRigsChange,
   onBeforeDiscardingUnsaved,
+  onDuplicate,
+  onDelete,
 }) => (
   <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
     <div className="flex items-center gap-4 flex-wrap">
@@ -72,6 +78,22 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
         }}
         className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm">
         New Rig
+      </button>
+
+      <button
+        onClick={onDuplicate}
+        disabled={!activeRigId}
+        title="Create a copy of the selected rig"
+        className="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+        Duplicate
+      </button>
+
+      <button
+        onClick={onDelete}
+        disabled={rigs.length <= 1}
+        title={rigs.length <= 1 ? 'You need at least one rig' : 'Delete the selected rig'}
+        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+        Delete
       </button>
 
       <div className="flex items-center gap-2">

@@ -1,0 +1,5144 @@
+{
+  "version": 1,
+  "cueVersion": 3,
+  "mode": "yarg",
+  "group": {
+    "id": "yarg-fade",
+    "name": "Fade Based",
+    "description": "Fading and crossfades as the main animation, with breathing washes, soft beams and colour dissolves instead of hard on and off",
+    "isStageKit": false
+  },
+  "cues": [
+    {
+      "id": "cue-fade-intro",
+      "name": "Intro",
+      "description": "Green wash that breathes gently up and down",
+      "cueType": "Intro",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-intro-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [
+          {
+            "id": "fade-intro-a",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 1400
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "sinInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "fade-intro-b",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 1400
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "sinInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-intro-called",
+          "to": "fade-intro-a"
+        },
+        {
+          "from": "fade-intro-a",
+          "to": "fade-intro-b"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-intro-called": {
+            "x": 2.9071410298347473,
+            "y": 3.159154463559389
+          },
+          "fade-intro-a": {
+            "x": 5.278085421770811,
+            "y": 96.7748891711235
+          },
+          "fade-intro-b": {
+            "x": 2.287458697333932,
+            "y": 250.65991551056504
+          }
+        },
+        "viewport": {
+          "x": 597.1629209553357,
+          "y": 104.81784875970334,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-fade-menu",
+      "name": "Menu",
+      "description": "Calm wash that drifts between blue and teal and settles",
+      "cueType": "Menu",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-menu-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "fade-menu-s0",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 1800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "sinInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "fade-menu-s1",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "teal"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 1800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "sinInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "fade-menu-s2",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 1800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "sinInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "fade-menu-s3",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "teal"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 1800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "sinInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "fade-menu-s4",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "teal"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 1800
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "sinInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-menu-start",
+          "to": "fade-menu-s0"
+        },
+        {
+          "from": "fade-menu-s0",
+          "to": "fade-menu-s1"
+        },
+        {
+          "from": "fade-menu-s1",
+          "to": "fade-menu-s2"
+        },
+        {
+          "from": "fade-menu-s2",
+          "to": "fade-menu-s3"
+        },
+        {
+          "from": "fade-menu-s3",
+          "to": "fade-menu-s4"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-menu-start": {
+            "x": 17.212268063798547,
+            "y": 10.376312248408794
+          },
+          "fade-menu-s0": {
+            "x": 0.7169933170080185,
+            "y": 104.46673906594515
+          },
+          "fade-menu-s1": {
+            "x": 10.405038088560104,
+            "y": 243.8937582038343
+          },
+          "fade-menu-s2": {
+            "x": 3.9915034230798483,
+            "y": 393.9091975055635
+          },
+          "fade-menu-s3": {
+            "x": 6.574439579620957,
+            "y": 540.2438408359885
+          },
+          "fade-menu-s4": {
+            "x": 2.1275356393307447,
+            "y": 698.4002794250846
+          }
+        },
+        "viewport": {
+          "x": 477.6435101928655,
+          "y": 99.20877812243998,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-fade-sil",
+      "name": "Silhouettes",
+      "description": "Front stays dark while the back glows and breathes green",
+      "cueType": "Silhouettes",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-sil-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [
+          {
+            "id": "fade-sil-front",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 10
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "fade-sil-a",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 1200
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "sinInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "fade-sil-b",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 1200
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "sinInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-sil-called",
+          "to": "fade-sil-front"
+        },
+        {
+          "from": "fade-sil-front",
+          "to": "fade-sil-a"
+        },
+        {
+          "from": "fade-sil-a",
+          "to": "fade-sil-b"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-sil-called": {
+            "x": -7.9175300393253565,
+            "y": -3.456059791147709
+          },
+          "fade-sil-front": {
+            "x": 5.242475291714072,
+            "y": 105.07612666487694
+          },
+          "fade-sil-a": {
+            "x": 6.816255658864975,
+            "y": 252.57823166251183
+          },
+          "fade-sil-b": {
+            "x": 0.4238902051001787,
+            "y": 392.91709968075156
+          }
+        },
+        "viewport": {
+          "x": 486.41297789267264,
+          "y": 97.95211004139856,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-fade-silsp",
+      "name": "Silhouettes Spotlight",
+      "description": "Dim green stage with a soft white bloom on the red drum",
+      "cueType": "Silhouettes_Spotlight",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-silsp-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "fade-silsp-drum",
+            "type": "event",
+            "eventType": "drum-red"
+          }
+        ],
+        "actions": [
+          {
+            "id": "fade-silsp-field",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "fade-silsp-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-silsp-bloom",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 80
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 120
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 380
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "endWait": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-silsp-start",
+          "to": "fade-silsp-all"
+        },
+        {
+          "from": "fade-silsp-drum",
+          "to": "fade-silsp-bloom"
+        },
+        {
+          "from": "fade-silsp-all",
+          "to": "fade-silsp-field"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-silsp-start": {
+            "x": 338.97334216473007,
+            "y": 12
+          },
+          "fade-silsp-drum": {
+            "x": 14.666666666666629,
+            "y": 33.33333333333326
+          },
+          "fade-silsp-field": {
+            "x": 320,
+            "y": 248.95729708671558
+          },
+          "fade-silsp-all": {
+            "x": 334.97334216472996,
+            "y": 104.9572970867157
+          },
+          "fade-silsp-bloom": {
+            "x": -1.6933245019366723,
+            "y": 140.9572970867158
+          }
+        },
+        "viewport": {
+          "x": 431.88499668822624,
+          "y": 138.1410135924816,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-verse",
+      "name": "Verse",
+      "description": "Blue and yellow dissolve across the stage on each measure while a light fades dark and steps around the ring on the beat",
+      "cueType": "Verse",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-verse-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "fade-verse-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "fade-verse-front",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "front-lights-array",
+            "assignTo": "frontLights"
+          },
+          {
+            "id": "fade-verse-back",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "back-lights-array",
+            "assignTo": "backLights"
+          },
+          {
+            "id": "fade-verse-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-verse-cf-front",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "frontLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 500
+              },
+              "crossFadeTrigger": {
+                "source": "literal",
+                "value": "measure"
+              }
+            }
+          },
+          {
+            "id": "fade-verse-cf-back",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "backLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 500
+              },
+              "crossFadeTrigger": {
+                "source": "literal",
+                "value": "measure"
+              }
+            }
+          },
+          {
+            "id": "fade-verse-gap",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-fade-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 60
+              },
+              "color": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-verse-start",
+          "to": "fade-verse-front"
+        },
+        {
+          "from": "fade-verse-front",
+          "to": "fade-verse-back"
+        },
+        {
+          "from": "fade-verse-back",
+          "to": "fade-verse-all"
+        },
+        {
+          "from": "fade-verse-all",
+          "to": "fade-verse-cf-front"
+        },
+        {
+          "from": "fade-verse-all",
+          "to": "fade-verse-cf-back"
+        },
+        {
+          "from": "fade-verse-called",
+          "to": "fade-verse-gap"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-verse-start": {
+            "x": 251.2462838590145,
+            "y": 0
+          },
+          "fade-verse-called": {
+            "x": 0,
+            "y": 0
+          },
+          "fade-verse-front": {
+            "x": 237.06587762013078,
+            "y": 84.35847298925125
+          },
+          "fade-verse-back": {
+            "x": 244.9200827485572,
+            "y": 188.876228303959
+          },
+          "fade-verse-all": {
+            "x": 243.19960547673213,
+            "y": 298.15483086928725
+          },
+          "fade-verse-cf-front": {
+            "x": 376.5329388100654,
+            "y": 452.821497535954
+          },
+          "fade-verse-cf-back": {
+            "x": 97.33333333333337,
+            "y": 455.4881642026205
+          },
+          "fade-verse-gap": {
+            "x": -28.77526442458236,
+            "y": 101.73831885680556
+          }
+        },
+        "viewport": {
+          "x": 432.60029589245096,
+          "y": 87.69193842401728,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "frontLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-cross-fade-colors",
+          "effectFileId": "yarg-core-effects",
+          "name": "Cross-Fade Colours"
+        },
+        {
+          "effectId": "effect-rotation-fade-ccw",
+          "effectFileId": "yarg-fade-effects",
+          "name": "Rotation CCW (fade)"
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-chorus",
+      "name": "Chorus",
+      "description": "Yellow and red dissolve across the stage on each measure while two lights fade dark at opposite poles and step around on the beat",
+      "cueType": "Chorus",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-chorus-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "fade-chorus-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "fade-chorus-front",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "front-lights-array",
+            "assignTo": "frontLights"
+          },
+          {
+            "id": "fade-chorus-back",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "back-lights-array",
+            "assignTo": "backLights"
+          },
+          {
+            "id": "fade-chorus-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          },
+          {
+            "id": "fade-chorus-pairs",
+            "type": "logic",
+            "logicType": "create-pairs",
+            "pairType": "opposite",
+            "sourceVariable": "allLights",
+            "assignTo": "pairedLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-chorus-cf-front",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "frontLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "red"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 450
+              },
+              "crossFadeTrigger": {
+                "source": "literal",
+                "value": "measure"
+              }
+            }
+          },
+          {
+            "id": "fade-chorus-cf-back",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "backLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "red"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 450
+              },
+              "crossFadeTrigger": {
+                "source": "literal",
+                "value": "measure"
+              }
+            }
+          },
+          {
+            "id": "fade-chorus-gap",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-fade-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "pairedLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 60
+              },
+              "color": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 2
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-chorus-start",
+          "to": "fade-chorus-front"
+        },
+        {
+          "from": "fade-chorus-front",
+          "to": "fade-chorus-back"
+        },
+        {
+          "from": "fade-chorus-back",
+          "to": "fade-chorus-all"
+        },
+        {
+          "from": "fade-chorus-all",
+          "to": "fade-chorus-cf-front"
+        },
+        {
+          "from": "fade-chorus-all",
+          "to": "fade-chorus-cf-back"
+        },
+        {
+          "from": "fade-chorus-called",
+          "to": "fade-chorus-gap"
+        },
+        {
+          "from": "fade-chorus-all",
+          "to": "fade-chorus-pairs"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-chorus-start": {
+            "x": 4.611056188121438,
+            "y": 0
+          },
+          "fade-chorus-called": {
+            "x": 246.82936890423298,
+            "y": 0
+          },
+          "fade-chorus-front": {
+            "x": 0,
+            "y": 100.17208781465888
+          },
+          "fade-chorus-back": {
+            "x": 9.764225888997316,
+            "y": 215.62769640237093
+          },
+          "fade-chorus-all": {
+            "x": 14.829368904232979,
+            "y": 337.91141686588526
+          },
+          "fade-chorus-pairs": {
+            "x": -176,
+            "y": 499.24475019921874
+          },
+          "fade-chorus-cf-front": {
+            "x": 246.82936890423298,
+            "y": 465.91141686588526
+          },
+          "fade-chorus-cf-back": {
+            "x": 10.992071141799329,
+            "y": 502.9333333333333
+          },
+          "fade-chorus-gap": {
+            "x": 235.26375755916035,
+            "y": 76.36444992447889
+          }
+        },
+        "viewport": {
+          "x": 255.87797332182527,
+          "y": 140.0832186752931,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "frontLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "pairedLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-cross-fade-colors",
+          "effectFileId": "yarg-core-effects",
+          "name": "Cross-Fade Colours"
+        },
+        {
+          "effectId": "effect-rotation-fade-ccw",
+          "effectFileId": "yarg-fade-effects",
+          "name": "Rotation CCW (fade)"
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-default",
+      "name": "Default",
+      "description": "Red and blue trade places across front and back on each keyframe while a light fades dark and steps counter-clockwise on the beat",
+      "cueType": "Default",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-default-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "fade-default-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "fade-default-front",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "front-lights-array",
+            "assignTo": "frontLights"
+          },
+          {
+            "id": "fade-default-back",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "back-lights-array",
+            "assignTo": "backLights"
+          },
+          {
+            "id": "fade-default-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-default-cf-front",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "frontLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "red"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 400
+              },
+              "crossFadeTrigger": {
+                "source": "literal",
+                "value": "keyframe"
+              }
+            }
+          },
+          {
+            "id": "fade-default-cf-back",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "backLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "red"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 400
+              },
+              "crossFadeTrigger": {
+                "source": "literal",
+                "value": "keyframe"
+              }
+            }
+          },
+          {
+            "id": "fade-default-gap",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-fade-ccw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 60
+              },
+              "color": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-default-start",
+          "to": "fade-default-front"
+        },
+        {
+          "from": "fade-default-front",
+          "to": "fade-default-back"
+        },
+        {
+          "from": "fade-default-back",
+          "to": "fade-default-all"
+        },
+        {
+          "from": "fade-default-all",
+          "to": "fade-default-cf-front"
+        },
+        {
+          "from": "fade-default-all",
+          "to": "fade-default-cf-back"
+        },
+        {
+          "from": "fade-default-called",
+          "to": "fade-default-gap"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-default-start": {
+            "x": 7.890774032101035,
+            "y": 0
+          },
+          "fade-default-called": {
+            "x": 251.4013907828679,
+            "y": 8
+          },
+          "fade-default-front": {
+            "x": -4,
+            "y": 88.48540046190215
+          },
+          "fade-default-back": {
+            "x": -7.532934473827481,
+            "y": 200.8334041684866
+          },
+          "fade-default-all": {
+            "x": -11.8964775018394,
+            "y": 324.79851910720265
+          },
+          "fade-default-cf-front": {
+            "x": -149.33333333333337,
+            "y": 464.79851910720276
+          },
+          "fade-default-cf-back": {
+            "x": 97.80039885950589,
+            "y": 468.79851910720254
+          },
+          "fade-default-gap": {
+            "x": 240.46706552617252,
+            "y": 95.46785808727145
+          }
+        },
+        "viewport": {
+          "x": 459.22447845642455,
+          "y": 97.20055533479899,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "frontLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-cross-fade-colors",
+          "effectFileId": "yarg-core-effects",
+          "name": "Cross-Fade Colours"
+        },
+        {
+          "effectId": "effect-rotation-fade-ccw",
+          "effectFileId": "yarg-fade-effects",
+          "name": "Rotation CCW (fade)"
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-cool-auto",
+      "name": "Cool Automatic",
+      "description": "Blue and green dissolve gently across the stage on each measure",
+      "cueType": "Cool_Automatic",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-cool-auto-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "fade-cool-auto-front",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "front-lights-array",
+            "assignTo": "frontLights"
+          },
+          {
+            "id": "fade-cool-auto-back",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "back-lights-array",
+            "assignTo": "backLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-cool-auto-cf-front",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "frontLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "green"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 500
+              },
+              "crossFadeTrigger": {
+                "source": "literal",
+                "value": "measure"
+              }
+            }
+          },
+          {
+            "id": "fade-cool-auto-cf-back",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "backLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "green"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 500
+              },
+              "crossFadeTrigger": {
+                "source": "literal",
+                "value": "measure"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-cool-auto-start",
+          "to": "fade-cool-auto-front"
+        },
+        {
+          "from": "fade-cool-auto-front",
+          "to": "fade-cool-auto-back"
+        },
+        {
+          "from": "fade-cool-auto-back",
+          "to": "fade-cool-auto-cf-front"
+        },
+        {
+          "from": "fade-cool-auto-back",
+          "to": "fade-cool-auto-cf-back"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-cool-auto-start": {
+            "x": 3.46897822804749,
+            "y": 0
+          },
+          "fade-cool-auto-front": {
+            "x": 0,
+            "y": 98.32455821707845
+          },
+          "fade-cool-auto-back": {
+            "x": 6.847603261470795,
+            "y": 213.95662945136428
+          },
+          "fade-cool-auto-cf-front": {
+            "x": -134.66666666666669,
+            "y": 364.6232961180308
+          },
+          "fade-cool-auto-cf-back": {
+            "x": 129.5142699281373,
+            "y": 360
+          }
+        },
+        "viewport": {
+          "x": 510.43214877694845,
+          "y": 71.7662639557384,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "frontLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-cross-fade-colors",
+          "effectFileId": "yarg-core-effects",
+          "name": "Cross-Fade Colours"
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-warm-auto",
+      "name": "Warm Automatic",
+      "description": "Red and yellow dissolve gently across the stage on each measure",
+      "cueType": "Warm_Automatic",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-warm-auto-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "fade-warm-auto-front",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "front-lights-array",
+            "assignTo": "frontLights"
+          },
+          {
+            "id": "fade-warm-auto-back",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "back-lights-array",
+            "assignTo": "backLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-warm-auto-cf-front",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "frontLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "red"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 500
+              },
+              "crossFadeTrigger": {
+                "source": "literal",
+                "value": "measure"
+              }
+            }
+          },
+          {
+            "id": "fade-warm-auto-cf-back",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "backLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "red"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 500
+              },
+              "crossFadeTrigger": {
+                "source": "literal",
+                "value": "measure"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-warm-auto-start",
+          "to": "fade-warm-auto-front"
+        },
+        {
+          "from": "fade-warm-auto-front",
+          "to": "fade-warm-auto-back"
+        },
+        {
+          "from": "fade-warm-auto-back",
+          "to": "fade-warm-auto-cf-front"
+        },
+        {
+          "from": "fade-warm-auto-back",
+          "to": "fade-warm-auto-cf-back"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-warm-auto-start": {
+            "x": 16.954454893246293,
+            "y": 0
+          },
+          "fade-warm-auto-front": {
+            "x": 0.33048889227211475,
+            "y": 85.06411952152848
+          },
+          "fade-warm-auto-back": {
+            "x": 0,
+            "y": 202.1310079023242
+          },
+          "fade-warm-auto-cf-front": {
+            "x": -113.33333333333331,
+            "y": 364.79767456899083
+          },
+          "fade-warm-auto-cf-back": {
+            "x": 152.33048889227211,
+            "y": 358.66666666666674
+          }
+        },
+        "viewport": {
+          "x": 512.876066665398,
+          "y": 76.20087203662843,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "frontLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-cross-fade-colors",
+          "effectFileId": "yarg-core-effects",
+          "name": "Cross-Fade Colours"
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-harmony",
+      "name": "Harmony",
+      "description": "Cool blues at the front and warm reds at the back, with a white bloom on the red drum",
+      "cueType": "Harmony",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-harmony-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "fade-harmony-drum",
+            "type": "event",
+            "eventType": "drum-red"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "fade-harmony-front",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "front-lights-array",
+            "assignTo": "frontLights"
+          },
+          {
+            "id": "fade-harmony-back",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "back-lights-array",
+            "assignTo": "backLights"
+          },
+          {
+            "id": "fade-harmony-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-harmony-cf-front",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "frontLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "green"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 400
+              },
+              "crossFadeTrigger": {
+                "source": "literal",
+                "value": "beat"
+              }
+            }
+          },
+          {
+            "id": "fade-harmony-cf-back",
+            "type": "effect-raiser",
+            "effectId": "effect-cross-fade-colors",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "backLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "startColor": {
+                "source": "literal",
+                "value": "red"
+              },
+              "startBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "endColor": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "endBrightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 400
+              },
+              "crossFadeTrigger": {
+                "source": "literal",
+                "value": "beat"
+              }
+            }
+          },
+          {
+            "id": "fade-harmony-bloom",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 60
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 120
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 320
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "endWait": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-harmony-start",
+          "to": "fade-harmony-front"
+        },
+        {
+          "from": "fade-harmony-front",
+          "to": "fade-harmony-back"
+        },
+        {
+          "from": "fade-harmony-back",
+          "to": "fade-harmony-all"
+        },
+        {
+          "from": "fade-harmony-all",
+          "to": "fade-harmony-cf-front"
+        },
+        {
+          "from": "fade-harmony-all",
+          "to": "fade-harmony-cf-back"
+        },
+        {
+          "from": "fade-harmony-drum",
+          "to": "fade-harmony-bloom"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-harmony-start": {
+            "x": 244.6053540892899,
+            "y": 0
+          },
+          "fade-harmony-drum": {
+            "x": 3.61184349283576,
+            "y": 0
+          },
+          "fade-harmony-front": {
+            "x": 241.30948895588517,
+            "y": 85.41460118442774
+          },
+          "fade-harmony-back": {
+            "x": 240.0813868585974,
+            "y": 211.61621914431453
+          },
+          "fade-harmony-all": {
+            "x": 236.6547444779426,
+            "y": 322.43517626449466
+          },
+          "fade-harmony-cf-front": {
+            "x": 357.98807781127596,
+            "y": 439.7685095978279
+          },
+          "fade-harmony-cf-back": {
+            "x": 101.33333333333326,
+            "y": 446.43517626449466
+          },
+          "fade-harmony-bloom": {
+            "x": -31.999999999999943,
+            "y": 95.47491714979208
+          }
+        },
+        "viewport": {
+          "x": 412.2729922165163,
+          "y": 148.0868089008145,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "frontLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-cross-fade-colors",
+          "effectFileId": "yarg-core-effects",
+          "name": "Cross-Fade Colours"
+        },
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-stomp",
+      "name": "Stomp",
+      "description": "Blue stage with a white bloom swelling on every keyframe",
+      "cueType": "Stomp",
+      "style": "secondary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-stomp-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "fade-stomp-trig",
+            "type": "event",
+            "eventType": "keyframe"
+          }
+        ],
+        "actions": [
+          {
+            "id": "fade-stomp-field",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "fade-stomp-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-stomp-bloom",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 40
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 90
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 320
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "endWait": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-stomp-start",
+          "to": "fade-stomp-all"
+        },
+        {
+          "from": "fade-stomp-trig",
+          "to": "fade-stomp-bloom"
+        },
+        {
+          "from": "fade-stomp-all",
+          "to": "fade-stomp-field"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-stomp-start": {
+            "x": 0,
+            "y": 0
+          },
+          "fade-stomp-trig": {
+            "x": 434.2947468049824,
+            "y": 0
+          },
+          "fade-stomp-field": {
+            "x": -21.33333333333337,
+            "y": 223.9206180870533
+          },
+          "fade-stomp-all": {
+            "x": 3.628080138315795,
+            "y": 89.25395142038667
+          },
+          "fade-stomp-bloom": {
+            "x": 422.58949360996496,
+            "y": 87.9206180870533
+          }
+        },
+        "viewport": {
+          "x": 343.5289398962632,
+          "y": 133.029768217355,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-score",
+      "name": "Score",
+      "description": "Blue stage that swells brighter and dims again in a slow continuous pulse",
+      "cueType": "Score",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-score-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [
+          {
+            "id": "fade-score-a",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 900
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "sinInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "fade-score-b",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 900
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "sinInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-score-called",
+          "to": "fade-score-a"
+        },
+        {
+          "from": "fade-score-a",
+          "to": "fade-score-b"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-score-called": {
+            "x": -10.698979329317808,
+            "y": 1.9298472329974174
+          },
+          "fade-score-a": {
+            "x": -2.420980744063854,
+            "y": 95.70727859064937
+          },
+          "fade-score-b": {
+            "x": -2.1402274891734123,
+            "y": 247.79845179617405
+          }
+        },
+        "viewport": {
+          "x": 499.8147025569342,
+          "y": 121.3518878640607,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "cue-fade-frenzy",
+      "name": "Frenzy",
+      "description": "Each light glows a colour from green, red, yellow, blue, orange and steps to the next colour on every beat, scrolling a rainbow across both rows",
+      "cueType": "Frenzy",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-frenzy-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "fade-frenzy-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [
+          {
+            "id": "fade-frenzy-set",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "pair"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "curColor"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 80
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "fade-frenzy-gate",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "transparent"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "low"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 0
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 200
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "fade-frenzy-init",
+            "type": "logic",
+            "logicType": "variable",
+            "mode": "set",
+            "varName": "step",
+            "valueType": "number",
+            "value": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "fade-frenzy-cfg-f",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "front-lights-array",
+            "assignTo": "frontLights"
+          },
+          {
+            "id": "fade-frenzy-cfg-b",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "back-lights-array",
+            "assignTo": "backLights"
+          },
+          {
+            "id": "fade-frenzy-each",
+            "type": "logic",
+            "logicType": "for-each-light",
+            "sourceVariable": "frontLights",
+            "currentLightVariable": "curF",
+            "currentIndexVariable": "idxF"
+          },
+          {
+            "id": "fade-frenzy-bpick",
+            "type": "logic",
+            "logicType": "lights-from-index",
+            "sourceVariable": "backLights",
+            "index": {
+              "source": "variable",
+              "name": "idxF"
+            },
+            "assignTo": "curBpick"
+          },
+          {
+            "id": "fade-frenzy-pair",
+            "type": "logic",
+            "logicType": "concat-lights",
+            "sourceVariables": ["curF", "curBpick"],
+            "assignTo": "pair"
+          },
+          {
+            "id": "fade-frenzy-sum",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "idxF"
+            },
+            "right": {
+              "source": "variable",
+              "name": "step"
+            },
+            "assignTo": "sum"
+          },
+          {
+            "id": "fade-frenzy-pick",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "variable",
+              "name": "palette"
+            },
+            "index": {
+              "source": "variable",
+              "name": "sum"
+            },
+            "assignTo": "curColor"
+          },
+          {
+            "id": "fade-frenzy-inc-add",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "step"
+            },
+            "right": {
+              "source": "literal",
+              "value": 1
+            },
+            "assignTo": "stepTmp"
+          },
+          {
+            "id": "fade-frenzy-inc-mod",
+            "type": "logic",
+            "logicType": "math",
+            "operator": "modulus",
+            "left": {
+              "source": "variable",
+              "name": "stepTmp"
+            },
+            "right": {
+              "source": "literal",
+              "value": 5
+            },
+            "assignTo": "step"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-frenzy-start",
+          "to": "fade-frenzy-init"
+        },
+        {
+          "from": "fade-frenzy-init",
+          "to": "fade-frenzy-cfg-f"
+        },
+        {
+          "from": "fade-frenzy-cfg-f",
+          "to": "fade-frenzy-cfg-b"
+        },
+        {
+          "from": "fade-frenzy-called",
+          "to": "fade-frenzy-each"
+        },
+        {
+          "from": "fade-frenzy-each",
+          "to": "fade-frenzy-bpick",
+          "fromPort": "each"
+        },
+        {
+          "from": "fade-frenzy-bpick",
+          "to": "fade-frenzy-pair"
+        },
+        {
+          "from": "fade-frenzy-pair",
+          "to": "fade-frenzy-sum"
+        },
+        {
+          "from": "fade-frenzy-sum",
+          "to": "fade-frenzy-pick"
+        },
+        {
+          "from": "fade-frenzy-pick",
+          "to": "fade-frenzy-set"
+        },
+        {
+          "from": "fade-frenzy-each",
+          "to": "fade-frenzy-inc-add",
+          "fromPort": "done"
+        },
+        {
+          "from": "fade-frenzy-inc-add",
+          "to": "fade-frenzy-inc-mod"
+        },
+        {
+          "from": "fade-frenzy-inc-mod",
+          "to": "fade-frenzy-gate"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-frenzy-start": {
+            "x": 480,
+            "y": 0
+          },
+          "fade-frenzy-called": {
+            "x": -140,
+            "y": 16
+          },
+          "fade-frenzy-init": {
+            "x": 480,
+            "y": 110
+          },
+          "fade-frenzy-cfg-f": {
+            "x": 480,
+            "y": 230
+          },
+          "fade-frenzy-cfg-b": {
+            "x": 480,
+            "y": 350
+          },
+          "fade-frenzy-each": {
+            "x": -140,
+            "y": 130
+          },
+          "fade-frenzy-bpick": {
+            "x": -360,
+            "y": 270
+          },
+          "fade-frenzy-pair": {
+            "x": -360,
+            "y": 390
+          },
+          "fade-frenzy-sum": {
+            "x": -360,
+            "y": 510
+          },
+          "fade-frenzy-pick": {
+            "x": -360,
+            "y": 630
+          },
+          "fade-frenzy-set": {
+            "x": -360,
+            "y": 760
+          },
+          "fade-frenzy-inc-add": {
+            "x": 240,
+            "y": 470
+          },
+          "fade-frenzy-inc-mod": {
+            "x": 240,
+            "y": 590
+          },
+          "fade-frenzy-gate": {
+            "x": 240,
+            "y": 720
+          }
+        },
+        "viewport": {
+          "x": 300,
+          "y": -50,
+          "zoom": 0.7
+        }
+      },
+      "variables": [
+        {
+          "name": "step",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "stepTmp",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "frontLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "curF",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "curBpick",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "pair",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "idxF",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "sum",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "curColor",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "green",
+          "isParameter": false
+        },
+        {
+          "name": "palette",
+          "type": "color-array",
+          "scope": "cue",
+          "initialValue": ["green", "red", "yellow", "blue", "orange"],
+          "isParameter": false
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-search",
+      "name": "Searchlights",
+      "description": "A yellow beam steps around a dark stage on the beat, with a bright red pulse on every measure",
+      "cueType": "Searchlights",
+      "style": "secondary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-search-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "fade-search-called",
+            "type": "event",
+            "eventType": "cue-called"
+          },
+          {
+            "id": "fade-search-measure",
+            "type": "event",
+            "eventType": "measure"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "fade-search-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-search-cw",
+            "type": "effect-raiser",
+            "effectId": "effect-rotation-cw",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 1
+              },
+              "color": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "startOffset": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "beat"
+              },
+              "waitUntilConditionCount": {
+                "source": "literal",
+                "value": 0
+              },
+              "beatsPerCycle": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "groupSize": {
+                "source": "literal",
+                "value": 1
+              }
+            }
+          },
+          {
+            "id": "fade-search-pulse",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 20
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 80
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 40
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 300
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "endWait": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-search-start",
+          "to": "fade-search-all"
+        },
+        {
+          "from": "fade-search-called",
+          "to": "fade-search-cw"
+        },
+        {
+          "from": "fade-search-measure",
+          "to": "fade-search-pulse"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-search-start": {
+            "x": 16.933152643963695,
+            "y": 0
+          },
+          "fade-search-called": {
+            "x": 204.22989562029636,
+            "y": 12.995905586828826
+          },
+          "fade-search-measure": {
+            "x": 445.33333333333337,
+            "y": 14.666666666666629
+          },
+          "fade-search-all": {
+            "x": 0,
+            "y": 103.66257225349545
+          },
+          "fade-search-cw": {
+            "x": 202.66666666666663,
+            "y": 118.87238441159332
+          },
+          "fade-search-pulse": {
+            "x": 447.3879213140657,
+            "y": 115.2252812410394
+          }
+        },
+        "viewport": {
+          "x": 319.2295295072254,
+          "y": 104.42285584565252,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-rotation-cw",
+          "effectFileId": "yarg-core-effects",
+          "name": "Rotation CW"
+        },
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-sweep",
+      "name": "Sweep",
+      "description": "A soft red beam sweeps across a yellow stage",
+      "cueType": "Sweep",
+      "style": "secondary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-sweep-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "fade-sweep-field",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "fade-sweep-front",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "front-lights-array",
+            "assignTo": "frontLights"
+          },
+          {
+            "id": "fade-sweep-back",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "back-lights-array",
+            "assignTo": "backLights"
+          },
+          {
+            "id": "fade-sweep-rev",
+            "type": "logic",
+            "logicType": "reverse-lights",
+            "sourceVariable": "backLights",
+            "assignTo": "backRev"
+          },
+          {
+            "id": "fade-sweep-ord",
+            "type": "logic",
+            "logicType": "concat-lights",
+            "sourceVariables": ["frontLights", "backRev"],
+            "assignTo": "ordered"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-sweep-comet",
+            "type": "effect-raiser",
+            "effectId": "effect-sweep-color",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "ordered"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "sweepTime": {
+                "source": "literal",
+                "value": 1600
+              },
+              "fadeInDuration": {
+                "source": "literal",
+                "value": 150
+              },
+              "fadeOutDuration": {
+                "source": "literal",
+                "value": 250
+              },
+              "lightOverlap": {
+                "source": "literal",
+                "value": 40
+              },
+              "betweenDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "lowBrightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "yellow"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-sweep-start",
+          "to": "fade-sweep-front"
+        },
+        {
+          "from": "fade-sweep-front",
+          "to": "fade-sweep-back"
+        },
+        {
+          "from": "fade-sweep-back",
+          "to": "fade-sweep-rev"
+        },
+        {
+          "from": "fade-sweep-rev",
+          "to": "fade-sweep-ord"
+        },
+        {
+          "from": "fade-sweep-ord",
+          "to": "fade-sweep-field"
+        },
+        {
+          "from": "fade-sweep-field",
+          "to": "fade-sweep-comet"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-sweep-start": {
+            "x": 236,
+            "y": -31.999999999999943
+          },
+          "fade-sweep-field": {
+            "x": 224,
+            "y": 484.05403350790334
+          },
+          "fade-sweep-front": {
+            "x": 245.56316137562203,
+            "y": 41.33333333333337
+          },
+          "fade-sweep-back": {
+            "x": 250.51080936193466,
+            "y": 142.09303576499224
+          },
+          "fade-sweep-rev": {
+            "x": 243.44824735447764,
+            "y": 259.681494679302
+          },
+          "fade-sweep-ord": {
+            "x": 250.29143039137125,
+            "y": 368.269161503762
+          },
+          "fade-sweep-comet": {
+            "x": 242.02046125133836,
+            "y": 605.3873668412366
+          }
+        },
+        "viewport": {
+          "x": 446.41381448414177,
+          "y": 89.97973743453622,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "frontLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backRev",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "ordered",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-sweep-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Sweep Colour"
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-flare-fast",
+      "name": "Flare Fast",
+      "description": "A bright white beam races across a blue stage",
+      "cueType": "Flare_Fast",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-flare-fast-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "fade-flare-fast-field",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "fade-flare-fast-front",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "front-lights-array",
+            "assignTo": "frontLights"
+          },
+          {
+            "id": "fade-flare-fast-back",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "back-lights-array",
+            "assignTo": "backLights"
+          },
+          {
+            "id": "fade-flare-fast-rev",
+            "type": "logic",
+            "logicType": "reverse-lights",
+            "sourceVariable": "backLights",
+            "assignTo": "backRev"
+          },
+          {
+            "id": "fade-flare-fast-ord",
+            "type": "logic",
+            "logicType": "concat-lights",
+            "sourceVariables": ["frontLights", "backRev"],
+            "assignTo": "ordered"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-flare-fast-comet",
+            "type": "effect-raiser",
+            "effectId": "effect-sweep-color",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "ordered"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "sweepTime": {
+                "source": "literal",
+                "value": 800
+              },
+              "fadeInDuration": {
+                "source": "literal",
+                "value": 150
+              },
+              "fadeOutDuration": {
+                "source": "literal",
+                "value": 250
+              },
+              "lightOverlap": {
+                "source": "literal",
+                "value": 40
+              },
+              "betweenDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "lowBrightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "blue"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-flare-fast-start",
+          "to": "fade-flare-fast-front"
+        },
+        {
+          "from": "fade-flare-fast-front",
+          "to": "fade-flare-fast-back"
+        },
+        {
+          "from": "fade-flare-fast-back",
+          "to": "fade-flare-fast-rev"
+        },
+        {
+          "from": "fade-flare-fast-rev",
+          "to": "fade-flare-fast-ord"
+        },
+        {
+          "from": "fade-flare-fast-ord",
+          "to": "fade-flare-fast-field"
+        },
+        {
+          "from": "fade-flare-fast-field",
+          "to": "fade-flare-fast-comet"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-flare-fast-start": {
+            "x": -88.4973258291592,
+            "y": 23.086258911954587
+          },
+          "fade-flare-fast-field": {
+            "x": -152.90961036194756,
+            "y": 552.0276231658399
+          },
+          "fade-flare-fast-front": {
+            "x": -123.11939552240074,
+            "y": 99.62401872128248
+          },
+          "fade-flare-fast-back": {
+            "x": -126.20805176720023,
+            "y": 212.25660936313022
+          },
+          "fade-flare-fast-rev": {
+            "x": -116.00989547196139,
+            "y": 330.19244657804825
+          },
+          "fade-flare-fast-ord": {
+            "x": -121.04657913480878,
+            "y": 432.69767429303624
+          },
+          "fade-flare-fast-comet": {
+            "x": -132.02139549979665,
+            "y": 679.497404360139
+          }
+        },
+        "viewport": {
+          "x": 474.66545698728186,
+          "y": 58.12849372087237,
+          "zoom": 0.5197897175876395
+        }
+      },
+      "variables": [
+        {
+          "name": "frontLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backRev",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "ordered",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-sweep-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Sweep Colour"
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-flare-slow",
+      "name": "Flare Slow",
+      "description": "A dark gap drifts slowly counter-clockwise across a white stage",
+      "cueType": "Flare_Slow",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-flare-slow-start",
+            "type": "event",
+            "eventType": "cue-started"
+          }
+        ],
+        "actions": [
+          {
+            "id": "fade-flare-slow-field",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "fade-flare-slow-front",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "front-lights-array",
+            "assignTo": "frontLights"
+          },
+          {
+            "id": "fade-flare-slow-back",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "back-lights-array",
+            "assignTo": "backLights"
+          },
+          {
+            "id": "fade-flare-slow-rev",
+            "type": "logic",
+            "logicType": "reverse-lights",
+            "sourceVariable": "backLights",
+            "assignTo": "backRev"
+          },
+          {
+            "id": "fade-flare-slow-ord",
+            "type": "logic",
+            "logicType": "concat-lights",
+            "sourceVariables": ["frontLights", "backRev"],
+            "assignTo": "ordered"
+          },
+          {
+            "id": "fade-flare-slow-ccw",
+            "type": "logic",
+            "logicType": "reverse-lights",
+            "sourceVariable": "ordered",
+            "assignTo": "orderedCcw"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-flare-slow-comet",
+            "type": "effect-raiser",
+            "effectId": "effect-sweep-color",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "orderedCcw"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "sweepTime": {
+                "source": "literal",
+                "value": 2600
+              },
+              "fadeInDuration": {
+                "source": "literal",
+                "value": 150
+              },
+              "fadeOutDuration": {
+                "source": "literal",
+                "value": 250
+              },
+              "lightOverlap": {
+                "source": "literal",
+                "value": 40
+              },
+              "betweenDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "lowBrightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "lowColor": {
+                "source": "literal",
+                "value": "white"
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-flare-slow-start",
+          "to": "fade-flare-slow-front"
+        },
+        {
+          "from": "fade-flare-slow-front",
+          "to": "fade-flare-slow-back"
+        },
+        {
+          "from": "fade-flare-slow-back",
+          "to": "fade-flare-slow-rev"
+        },
+        {
+          "from": "fade-flare-slow-rev",
+          "to": "fade-flare-slow-ord"
+        },
+        {
+          "from": "fade-flare-slow-ord",
+          "to": "fade-flare-slow-ccw"
+        },
+        {
+          "from": "fade-flare-slow-ccw",
+          "to": "fade-flare-slow-field"
+        },
+        {
+          "from": "fade-flare-slow-field",
+          "to": "fade-flare-slow-comet"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-flare-slow-start": {
+            "x": 0,
+            "y": 0
+          },
+          "fade-flare-slow-field": {
+            "x": -50.08961848904755,
+            "y": 671.0721006835379
+          },
+          "fade-flare-slow-front": {
+            "x": -4.014913200092792,
+            "y": 104.03228455417616
+          },
+          "fade-flare-slow-back": {
+            "x": -0.4022614738618131,
+            "y": 245.8647999987827
+          },
+          "fade-flare-slow-rev": {
+            "x": 6.604734564982778,
+            "y": 365.1351048021677
+          },
+          "fade-flare-slow-ord": {
+            "x": -12.157952381921291,
+            "y": 470.9956864119397
+          },
+          "fade-flare-slow-ccw": {
+            "x": -16.05796918149042,
+            "y": 577.4881528765784
+          },
+          "fade-flare-slow-comet": {
+            "x": -26.76389105191288,
+            "y": 794.1080028244542
+          }
+        },
+        "viewport": {
+          "x": 446.2280423209535,
+          "y": 63.73501177738808,
+          "zoom": 0.6087830093314934
+        }
+      },
+      "variables": [
+        {
+          "name": "frontLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backRev",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "ordered",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "orderedCcw",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-sweep-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Sweep Colour"
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-dischord",
+      "name": "Dischord",
+      "description": "The stage breathes between clashing green and red, with red stabs on the beat",
+      "cueType": "Dischord",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-dischord-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "fade-dischord-called",
+            "type": "event",
+            "eventType": "cue-called"
+          },
+          {
+            "id": "fade-dischord-beat",
+            "type": "event",
+            "eventType": "beat"
+          }
+        ],
+        "actions": [
+          {
+            "id": "fade-dischord-a",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 700
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "sinInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "fade-dischord-b",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 700
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "sinInOut"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "fade-dischord-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-dischord-bloom",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 30
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 70
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 260
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "endWait": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-dischord-start",
+          "to": "fade-dischord-all"
+        },
+        {
+          "from": "fade-dischord-called",
+          "to": "fade-dischord-a"
+        },
+        {
+          "from": "fade-dischord-a",
+          "to": "fade-dischord-b"
+        },
+        {
+          "from": "fade-dischord-beat",
+          "to": "fade-dischord-bloom"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-dischord-start": {
+            "x": -194.62317011194926,
+            "y": 10.666666666666629
+          },
+          "fade-dischord-called": {
+            "x": 236.0000000000001,
+            "y": 7.119109497716067
+          },
+          "fade-dischord-beat": {
+            "x": 0,
+            "y": 0
+          },
+          "fade-dischord-a": {
+            "x": 233.68729699775588,
+            "y": 81.6936692198118
+          },
+          "fade-dischord-b": {
+            "x": 230.37923071905982,
+            "y": 228.90488566209876
+          },
+          "fade-dischord-all": {
+            "x": -216,
+            "y": 95.34989076231909
+          },
+          "fade-dischord-bloom": {
+            "x": -11.70882254652679,
+            "y": 110.5448214225471
+          }
+        },
+        "viewport": {
+          "x": 463.98368879198097,
+          "y": 80.66066787671298,
+          "zoom": 0.75
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
+        }
+      ]
+    },
+    {
+      "id": "cue-fade-bre",
+      "name": "Big Rock Ending",
+      "description": "The whole stage races through white, yellow, red and blue with white hits on the kick",
+      "cueType": "BigRockEnding",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "fade-bre-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "fade-bre-kick",
+            "type": "event",
+            "eventType": "drum-kick"
+          }
+        ],
+        "actions": [],
+        "logic": [
+          {
+            "id": "fade-bre-all",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "all-lights-array",
+            "assignTo": "allLights"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [
+          {
+            "id": "fade-bre-cycle",
+            "type": "effect-raiser",
+            "effectId": "effect-color-cycle",
+            "isPersistent": true,
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 0
+              },
+              "color1": {
+                "source": "literal",
+                "value": "white"
+              },
+              "color2": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "color3": {
+                "source": "literal",
+                "value": "red"
+              },
+              "color4": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "duration": {
+                "source": "literal",
+                "value": 120
+              },
+              "crossFadeTrigger": {
+                "source": "literal",
+                "value": "beat"
+              }
+            }
+          },
+          {
+            "id": "fade-bre-bloom",
+            "type": "effect-raiser",
+            "effectId": "effect-flash-color",
+            "parameterValues": {
+              "lights": {
+                "source": "variable",
+                "name": "allLights"
+              },
+              "layer": {
+                "source": "literal",
+                "value": 5
+              },
+              "color": {
+                "source": "literal",
+                "value": "white"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "high"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "mix"
+              },
+              "startCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "startDelay": {
+                "source": "literal",
+                "value": 0
+              },
+              "holdTime": {
+                "source": "literal",
+                "value": 40
+              },
+              "durationIn": {
+                "source": "literal",
+                "value": 60
+              },
+              "durationOut": {
+                "source": "literal",
+                "value": 260
+              },
+              "endWaitCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "endWait": {
+                "source": "literal",
+                "value": 0
+              }
+            }
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "fade-bre-start",
+          "to": "fade-bre-all"
+        },
+        {
+          "from": "fade-bre-all",
+          "to": "fade-bre-cycle"
+        },
+        {
+          "from": "fade-bre-kick",
+          "to": "fade-bre-bloom"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "fade-bre-start": {
+            "x": 238.70000000000005,
+            "y": -14.300000000000068
+          },
+          "fade-bre-kick": {
+            "x": 468.70000000000005,
+            "y": -14.300000000000068
+          },
+          "fade-bre-all": {
+            "x": 232.29999999999995,
+            "y": 49.499999999999886
+          },
+          "fade-bre-cycle": {
+            "x": 219.19999999999982,
+            "y": 184.79999999999995
+          },
+          "fade-bre-bloom": {
+            "x": 455.79999999999995,
+            "y": 102.29999999999995
+          }
+        },
+        "viewport": {
+          "x": 334.47576688469206,
+          "y": 34.409090909090935,
+          "zoom": 1.3406127858275805
+        }
+      },
+      "variables": [
+        {
+          "name": "allLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        }
+      ],
+      "effects": [
+        {
+          "effectId": "effect-color-cycle",
+          "effectFileId": "yarg-fade-effects",
+          "name": "Colour Cycle"
+        },
+        {
+          "effectId": "effect-flash-color",
+          "effectFileId": "yarg-core-effects",
+          "name": "Flash Colour"
+        }
+      ]
+    }
+  ],
+  "bundled": true
+}

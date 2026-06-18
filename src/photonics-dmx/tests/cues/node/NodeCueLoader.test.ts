@@ -154,6 +154,39 @@ describe('NodeCueLoader', () => {
     expect(loader.getAvailableCueTypes('yarg', 'motion')).toEqual([])
   })
 
+  it('surfaces a per-cue compile failure on the file summary', async () => {
+    const file = yargMotionOnlyFile()
+    // Second motion cue whose action has no incoming connection: schema-valid but fails
+    // compilation (unreachable action). Reachability is a compile-time, not schema, check.
+    const goodAction = (file.cues[0] as YargMotionNodeCueDefinition).nodes.actions[0]
+    const brokenCue: YargMotionNodeCueDefinition = {
+      kind: 'motion',
+      id: 'm-broken',
+      name: 'Broken',
+      nodes: {
+        events: [{ id: 'ev-broken', type: 'event', eventType: 'cue-called' }],
+        actions: [{ ...goodAction, id: 'mp-broken' }],
+        logic: [],
+      },
+      connections: [],
+    }
+    file.cues.push(brokenCue)
+    expect(validateYargNodeCueFile(file).valid).toBe(true)
+
+    const yargDir = path.join(tmpDir, 'node-data', 'cues', 'yarg')
+    fs.mkdirSync(yargDir, { recursive: true })
+    fs.writeFileSync(path.join(yargDir, 'partial.json'), JSON.stringify(file), 'utf-8')
+
+    await loader.loadAll()
+
+    // The good cue still registers.
+    const group = yargRegistry.getGroup('loader-test-yarg-motion')
+    expect(group!.motionCues?.get('m1')).toBeDefined()
+    // The failed cue is reported on the summary rather than silently dropped.
+    const summary = loader.getSummary().yarg.find((s) => s.path.endsWith('partial.json'))
+    expect(summary?.errors?.some((e) => e.includes('m-broken'))).toBe(true)
+  })
+
   it('registers Audio kind motion into the group motion map', async () => {
     const file = audioMotionOnlyFile()
     const v = validateAudioNodeCueFile(file)

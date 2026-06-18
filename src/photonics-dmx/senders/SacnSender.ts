@@ -27,6 +27,9 @@ export class SacnSender extends BaseSender {
   private config: SacnConfig
   private lastSendTimeMs: number = 0
   private minIntervalMs: number = 0
+  /** Latest frame withheld by the rate limiter, flushed on the trailing edge so the last frame of a burst is not dropped. */
+  private pendingBuffer: Record<number, number> | null = null
+  private flushTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(config: SacnConfig = {}) {
     super()
@@ -122,6 +125,13 @@ export class SacnSender extends BaseSender {
       return
     }
 
+    // Cancel any queued trailing flush so it cannot fire after the sender closes.
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer)
+      this.flushTimer = null
+    }
+    this.pendingBuffer = null
+
     try {
       this.lastSendTimeMs = 0
       const zeroBuffer: Record<number, number> = {}
@@ -145,10 +155,29 @@ export class SacnSender extends BaseSender {
         const now = performance.now()
         const elapsed = now - this.lastSendTimeMs
         if (elapsed < this.minIntervalMs && this.lastSendTimeMs !== 0) {
+          // Throttled: keep the latest frame and schedule a trailing-edge flush so the
+          // final frame of a burst still reaches the wire instead of being dropped. Snapshot
+          // the frame: the publisher reuses and mutates its slot buffer in place each frame, so
+          // holding it by reference would let the trailing flush send a newer frame than the one
+          // withheld. The buffer is a flat channel->value record, so a shallow copy suffices.
+          this.pendingBuffer = { ...universeBuffer }
+          if (!this.flushTimer) {
+            this.flushTimer = setTimeout(() => {
+              this.flushTimer = null
+              const buffer = this.pendingBuffer
+              this.pendingBuffer = null
+              if (buffer) {
+                void this.send(buffer)
+              }
+            }, this.minIntervalMs - elapsed)
+          }
           return
         }
         this.lastSendTimeMs = now
       }
+
+      // A frame that goes out now supersedes any queued trailing frame.
+      this.pendingBuffer = null
 
       await this.sender!.send({ payload: universeBuffer })
     } catch (err: unknown) {

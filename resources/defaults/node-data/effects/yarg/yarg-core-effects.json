@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 1,
+  "cueVersion": 7,
   "mode": "yarg",
   "group": {
     "id": "yarg-core-effects",
@@ -1482,6 +1482,14 @@
           "isParameter": true
         },
         {
+          "name": "gapSteps",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Extra dark steps appended to each rotation cycle (0 = none). Lights stay off for this many steps after the chase completes before it repeats.",
+          "isParameter": true
+        },
+        {
           "name": "numLights",
           "type": "number",
           "scope": "cue",
@@ -1490,6 +1498,13 @@
         },
         {
           "name": "numGroups",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "cycleSteps",
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
@@ -1832,6 +1847,23 @@
             "assignTo": "numGroups"
           },
           {
+            "id": "rcw-cycle-steps",
+            "type": "logic",
+            "logicType": "math",
+            "label": "cycleSteps = numGroups + gapSteps",
+            "outputs": [],
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "numGroups"
+            },
+            "right": {
+              "source": "variable",
+              "name": "gapSteps"
+            },
+            "assignTo": "cycleSteps"
+          },
+          {
             "id": "rcw-phase2-count",
             "type": "logic",
             "logicType": "math",
@@ -1917,12 +1949,12 @@
             "id": "rcw-num-minus",
             "type": "logic",
             "logicType": "math",
-            "label": "numMinus = numGroups - stepsOn",
+            "label": "numMinus = cycleSteps - stepsOn",
             "outputs": [],
             "operator": "subtract",
             "left": {
               "source": "variable",
-              "name": "numGroups"
+              "name": "cycleSteps"
             },
             "right": {
               "source": "variable",
@@ -2080,6 +2112,10 @@
         },
         {
           "from": "rcw-num-groups",
+          "to": "rcw-cycle-steps"
+        },
+        {
+          "from": "rcw-cycle-steps",
           "to": "rcw-phase2-count"
         },
         {
@@ -2172,37 +2208,41 @@
             "x": 51.56838946372727,
             "y": 135.51311212236578
           },
+          "rcw-cycle-steps": {
+            "x": 26,
+            "y": 282
+          },
           "rcw-phase2-count": {
-            "x": -3.0710418429225683,
-            "y": 242.5238067880273
+            "x": -21.07104184292257,
+            "y": 438.5238067880273
           },
           "rcw-foreach": {
-            "x": 57.606060981399196,
-            "y": 344.8109013219878
+            "x": 39.606060981399196,
+            "y": 540.8109013219878
           },
           "rcw-raw1": {
-            "x": 5.957706185057759,
-            "y": 493.7191869430244
+            "x": -12.04229381494224,
+            "y": 689.7191869430244
           },
           "rcw-raw2": {
-            "x": -8.61822547763586,
-            "y": 627.1159091852605
+            "x": -26.61822547763586,
+            "y": 823.1159091852605
           },
           "rcw-steps-on": {
-            "x": 7.073440158739686,
-            "y": 740.4274326591853
+            "x": -10.926559841260314,
+            "y": 936.4274326591853
           },
           "rcw-num-minus": {
-            "x": -7.229431226849556,
-            "y": 876.2184264026582
+            "x": -25.229431226849556,
+            "y": 1072.2184264026582
           },
           "rcw-steps-off": {
-            "x": -7.443002516403794,
-            "y": 995.986811876297
+            "x": -25.443002516403794,
+            "y": 1191.986811876297
           },
           "rcw-wait-beats": {
-            "x": 4.694199252873659,
-            "y": 1128.4931761659682
+            "x": -13.30580074712634,
+            "y": 1324.4931761659682
           },
           "rcw-p1-count": {
             "x": 433.816974459216,
@@ -2229,14 +2269,14 @@
             "y": -91.09577898681164
           },
           "notes-602af270-549c-43e5-939b-b9dae67901ed": {
-            "x": -344.7859663395264,
-            "y": 292.680286774842
+            "x": -362.78596633952634,
+            "y": 488.680286774842
           }
         },
         "viewport": {
-          "x": 277.7802475781683,
-          "y": 53.779012687154136,
-          "zoom": 0.6020686906157078
+          "x": 553.125609500748,
+          "y": 72.55287368800703,
+          "zoom": 0.5
         }
       }
     },
@@ -2336,6 +2376,14 @@
           "isParameter": true
         },
         {
+          "name": "gapSteps",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "Extra dark steps appended to each rotation cycle (0 = none). Lights stay off for this many steps after the chase completes before it repeats.",
+          "isParameter": true
+        },
+        {
           "name": "numLights",
           "type": "number",
           "scope": "cue",
@@ -2344,6 +2392,13 @@
         },
         {
           "name": "numGroups",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "cycleSteps",
           "type": "number",
           "scope": "cue",
           "initialValue": 1,
@@ -2686,6 +2741,23 @@
             "assignTo": "numGroups"
           },
           {
+            "id": "rccw-cycle-steps",
+            "type": "logic",
+            "logicType": "math",
+            "label": "cycleSteps = numGroups + gapSteps",
+            "outputs": [],
+            "operator": "add",
+            "left": {
+              "source": "variable",
+              "name": "numGroups"
+            },
+            "right": {
+              "source": "variable",
+              "name": "gapSteps"
+            },
+            "assignTo": "cycleSteps"
+          },
+          {
             "id": "rccw-phase2-count",
             "type": "logic",
             "logicType": "math",
@@ -2771,12 +2843,12 @@
             "id": "rccw-num-minus",
             "type": "logic",
             "logicType": "math",
-            "label": "numMinus = numGroups - stepsOn",
+            "label": "numMinus = cycleSteps - stepsOn",
             "outputs": [],
             "operator": "subtract",
             "left": {
               "source": "variable",
-              "name": "numGroups"
+              "name": "cycleSteps"
             },
             "right": {
               "source": "variable",
@@ -2925,6 +2997,10 @@
         },
         {
           "from": "rccw-num-groups",
+          "to": "rccw-cycle-steps"
+        },
+        {
+          "from": "rccw-cycle-steps",
           "to": "rccw-phase2-count"
         },
         {
@@ -3010,12 +3086,16 @@
             "y": 1021.5539752580225
           },
           "rccw-num-lights": {
-            "x": 40.00873229838908,
-            "y": 46.35809352621436
+            "x": 50.00873229838908,
+            "y": -85.64190647378564
           },
           "rccw-num-groups": {
-            "x": 24,
-            "y": 142
+            "x": 34,
+            "y": 10
+          },
+          "rccw-cycle-steps": {
+            "x": 44,
+            "y": 132
           },
           "rccw-phase2-count": {
             "x": -7.79876465164125,
@@ -3070,14 +3150,14 @@
             "y": 473.54141522571445
           },
           "rccw-listener": {
-            "x": 9.216093447059393,
-            "y": -38.85966309159994
+            "x": 19.216093447059393,
+            "y": -170.85966309159994
           }
         },
         "viewport": {
-          "x": 189.78024757816831,
-          "y": 41.779012687154136,
-          "zoom": 0.6020686906157078
+          "x": 493.12560950074806,
+          "y": 135.55287368800703,
+          "zoom": 0.5
         }
       }
     },
@@ -4017,9 +4097,9 @@
       "variables": [
         {
           "name": "lights",
-          "type": "light-array",
+          "type": "string",
           "scope": "cue",
-          "initialValue": [],
+          "initialValue": "front,back",
           "description": "Pattern A lights",
           "isParameter": true
         },
@@ -4479,6 +4559,411 @@
           "alt-listener": {
             "x": 68.81425971375893,
             "y": 6.213695171584504
+          }
+        },
+        "viewport": {
+          "x": 143.50285877945,
+          "y": 181.0640065485314,
+          "zoom": 0.557096825409666
+        }
+      }
+    },
+    {
+      "id": "effect-alternating-keyframe",
+      "mode": "yarg",
+      "name": "Alternating Pattern (Keyframe)",
+      "description": "Alternates a colour between two light groups, swapping on every keyframe. Pattern A on / B off held for a keyframe, then A off / B on held for a keyframe.",
+      "parameters": [],
+      "variables": [
+        {
+          "name": "lights",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "front,back",
+          "description": "Pattern A lights",
+          "isParameter": true
+        },
+        {
+          "name": "lightFilter",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "all",
+          "description": "Filter for pattern A lights",
+          "isParameter": true
+        },
+        {
+          "name": "patternBGroups",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "front,back",
+          "description": "Pattern B light group name(s)",
+          "isParameter": true
+        },
+        {
+          "name": "patternBFilter",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "even",
+          "description": "Pattern B light filter",
+          "isParameter": true
+        },
+        {
+          "name": "layer",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "description": "DMX layer",
+          "isParameter": true
+        },
+        {
+          "name": "color",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "white",
+          "description": "Colour name",
+          "isParameter": true
+        },
+        {
+          "name": "brightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "medium",
+          "description": "Brightness level",
+          "isParameter": true
+        },
+        {
+          "name": "blendMode",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "replace",
+          "description": "Blend mode",
+          "isParameter": true
+        }
+      ],
+      "nodes": {
+        "events": [],
+        "actions": [
+          {
+            "id": "akf-a-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "lights"
+              },
+              "filter": {
+                "source": "variable",
+                "name": "lightFilter"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "keyframe"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          },
+          {
+            "id": "akf-b-off",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "patternBGroups"
+              },
+              "filter": {
+                "source": "variable",
+                "name": "patternBFilter"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 0
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "keyframe"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          },
+          {
+            "id": "akf-a-off",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "lights"
+              },
+              "filter": {
+                "source": "variable",
+                "name": "lightFilter"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 0
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "keyframe"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          },
+          {
+            "id": "akf-b-on",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "patternBGroups"
+              },
+              "filter": {
+                "source": "variable",
+                "name": "patternBFilter"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "color"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "keyframe"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectListeners": [
+          {
+            "id": "akf-listener",
+            "type": "effect-listener",
+            "label": "Alternating Keyframe Entry",
+            "outputs": []
+          }
+        ],
+        "notes": []
+      },
+      "connections": [
+        {
+          "from": "akf-listener",
+          "to": "akf-a-on"
+        },
+        {
+          "from": "akf-a-on",
+          "to": "akf-b-off"
+        },
+        {
+          "from": "akf-b-off",
+          "to": "akf-a-off"
+        },
+        {
+          "from": "akf-a-off",
+          "to": "akf-b-on"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "akf-listener": {
+            "x": 0,
+            "y": 0
+          },
+          "akf-a-on": {
+            "x": 0,
+            "y": 150
+          },
+          "akf-b-off": {
+            "x": 0,
+            "y": 300
+          },
+          "akf-a-off": {
+            "x": 0,
+            "y": 450
+          },
+          "akf-b-on": {
+            "x": 0,
+            "y": 600
           }
         },
         "viewport": {
@@ -5498,6 +5983,470 @@
         "viewport": {
           "x": 600.6057406417094,
           "y": 109.50687814271078,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "effect-cross-fade-colors-timed",
+      "mode": "yarg",
+      "name": "Cross-Fade Colours (Timed)",
+      "description": "Alternates between two colours on target lights, advancing on a wall-clock timer (independent of beats/measures). Used by self-driven looks like the Fallback cue.",
+      "parameters": [],
+      "variables": [
+        {
+          "name": "lights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "description": "Target lights",
+          "isParameter": true
+        },
+        {
+          "name": "layer",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "DMX layer",
+          "isParameter": true
+        },
+        {
+          "name": "startColor",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "blue",
+          "description": "First colour in the alternation",
+          "isParameter": true
+        },
+        {
+          "name": "startBrightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "medium",
+          "description": "Brightness for the first colour",
+          "isParameter": true
+        },
+        {
+          "name": "endColor",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "green",
+          "description": "Second colour in the alternation",
+          "isParameter": true
+        },
+        {
+          "name": "endBrightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "medium",
+          "description": "Brightness for the second colour",
+          "isParameter": true
+        },
+        {
+          "name": "blendMode",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "replace",
+          "description": "Blend mode",
+          "isParameter": true
+        },
+        {
+          "name": "duration",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 200,
+          "description": "Fade transition duration (ms)",
+          "isParameter": true
+        },
+        {
+          "name": "holdTime",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 600,
+          "description": "Dwell at each colour after the fade before advancing (ms)",
+          "isParameter": true
+        }
+      ],
+      "nodes": {
+        "events": [],
+        "actions": [
+          {
+            "id": "crossfade-start",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "lights"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "startColor"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "startBrightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "duration"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "holdTime"
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          },
+          {
+            "id": "crossfade-end",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "lights"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "endColor"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "endBrightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "duration"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "holdTime"
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          }
+        ],
+        "logic": [],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectListeners": [
+          {
+            "id": "crossfade-listener",
+            "type": "effect-listener",
+            "label": "Cross-Fade Entry",
+            "outputs": []
+          }
+        ]
+      },
+      "connections": [
+        {
+          "from": "crossfade-listener",
+          "to": "crossfade-start"
+        },
+        {
+          "from": "crossfade-start",
+          "to": "crossfade-end"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "crossfade-start": {
+            "x": -10.413719438016415,
+            "y": 122.38872547075152
+          },
+          "crossfade-end": {
+            "x": 8.798411060124636,
+            "y": 242.30974163860083
+          },
+          "crossfade-listener": {
+            "x": 8.470411906018853,
+            "y": -0.9947500191628933
+          }
+        },
+        "viewport": {
+          "x": 600.6057406417094,
+          "y": 109.50687814271078,
+          "zoom": 0.75
+        }
+      }
+    },
+    {
+      "id": "effect-cross-fade-random-timed",
+      "mode": "yarg",
+      "name": "Cross-Fade to Random Colour (Timed)",
+      "description": "Continuously fades target lights to a new random colour on a wall-clock timer (independent of beats/measures): pick a random colour, fade over `duration`, dwell `holdTime`, then repeat with a fresh colour. Used by self-driven looks like the Fallback cue.",
+      "parameters": [],
+      "variables": [
+        {
+          "name": "lights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "description": "Target lights",
+          "isParameter": true
+        },
+        {
+          "name": "layer",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "description": "DMX layer",
+          "isParameter": true
+        },
+        {
+          "name": "brightness",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "medium",
+          "description": "Brightness for the colour",
+          "isParameter": true
+        },
+        {
+          "name": "blendMode",
+          "type": "string",
+          "scope": "cue",
+          "initialValue": "replace",
+          "description": "Blend mode",
+          "isParameter": true
+        },
+        {
+          "name": "duration",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1000,
+          "description": "Fade transition duration (ms)",
+          "isParameter": true
+        },
+        {
+          "name": "holdTime",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 6000,
+          "description": "Dwell at the colour after the fade before advancing (ms)",
+          "isParameter": true
+        },
+        {
+          "name": "randomColor",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "blue",
+          "description": "Internal: the randomly chosen colour to fade to this cycle",
+          "isParameter": false
+        }
+      ],
+      "nodes": {
+        "events": [],
+        "actions": [
+          {
+            "id": "crossfade-random-set",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "lights"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "randomColor"
+              },
+              "brightness": {
+                "source": "variable",
+                "name": "brightness"
+              },
+              "blendMode": {
+                "source": "variable",
+                "name": "blendMode"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "variable",
+                "name": "duration"
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "delay"
+              },
+              "waitUntilTime": {
+                "source": "variable",
+                "name": "holdTime"
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layer"
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "crossfade-random-pick",
+            "type": "logic",
+            "logicType": "random",
+            "mode": "random-choice",
+            "choices": [
+              "red",
+              "blue",
+              "yellow",
+              "green",
+              "cyan",
+              "orange",
+              "purple",
+              "chartreuse",
+              "teal",
+              "violet",
+              "magenta",
+              "vermilion",
+              "amber"
+            ],
+            "assignTo": "randomColor"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectListeners": [
+          {
+            "id": "crossfade-random-listener",
+            "type": "effect-listener",
+            "label": "Cross-Fade Entry",
+            "outputs": []
+          }
+        ]
+      },
+      "connections": [
+        {
+          "from": "crossfade-random-listener",
+          "to": "crossfade-random-pick"
+        },
+        {
+          "from": "crossfade-random-pick",
+          "to": "crossfade-random-set"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "crossfade-random-listener": {
+            "x": 8,
+            "y": 0
+          },
+          "crossfade-random-pick": {
+            "x": 8,
+            "y": 120
+          },
+          "crossfade-random-set": {
+            "x": 8,
+            "y": 240
+          }
+        },
+        "viewport": {
+          "x": 600,
+          "y": 110,
           "zoom": 0.75
         }
       }

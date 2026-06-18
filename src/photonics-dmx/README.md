@@ -77,21 +77,34 @@ The sequencing system contains several other components, though these are mainly
 - `TransitionEngine`: Handles the animation and timing of transitions between light states using the shared frame context captured by the Sequencer.
 - `SongEventHandler`: Processes beat, measure, and other musical events.
 - `SystemEffectsController`: Manages system-level effects blackout, which don't act like normal cue/effects.
-- `EventScheduler`: Handles scheduling and management of timed events within the system using the centralized clock.
-- `Clock`: Provides centralized timing control with configurable precision (default 5ms) for all system components. Each tick yields a `FrameContext` that is passed to TransitionEngine and LightTransitionController.
+- `Clock`: Provides centralized timing control with configurable precision (default 10 ms) for all system components. Each tick yields a `FrameContext` that is passed to TransitionEngine and LightTransitionController.
 - `EffectTransformer`: Transforms generic effect definitions into concrete transition specifications.
 - `LightStateManager`: Manages the final merged RGBIO state for each light and publishes the output of each atomic frame calculation to external listeners.
 - `DebugMonitor`: Provides real-time monitoring and debugging capabilities (when enabled).
 
 #### Centralized Timing
 
-The `Clock` provides a single source of truth for all timing operations in the sequencer. On each tick the Sequencer captures a `FrameContext` containing the shared timestamp, delta, and frame index. TransitionEngine advances every effect state machine using that context, LightTransitionController interpolates/blends all lights using the same timestamp, and LightStateManager publishes the merged results immediately. The default interval is 5 ms, providing smooth interpolation while keeping every light in phase.
+The `Clock` provides a single source of truth for all timing operations in the sequencer. On each tick the Sequencer captures a `FrameContext` containing the shared timestamp, delta, and frame index. TransitionEngine advances every effect state machine using that context, LightTransitionController interpolates/blends all lights using the same timestamp, and LightStateManager publishes the merged results immediately. The default interval is 10 ms, providing smooth interpolation while keeping every light in phase.
 
 ### Processing Components
 
 - `ProcessorManager`: Manages direct StageKit processing for RB3E.
 - `Rb3StageKitDirectProcessor`: Provides direct StageKit-to-DMX mapping for real-time lighting control.
 - `StageKitLightMapper`: Maps StageKit light positions to DMX light configurations.
+
+## Multi-Rig Output
+
+Photonics drives multiple independent rigs at once. A single `ChainFanout` dispatches every listener and cue event to each active rig's `RigChain`, and each `RigChain` owns its own `Sequencer`, `LightTransitionController`, and `LightStateManager`, so rigs render the same cues independently. The shared `Clock` ticks all chains in lockstep to keep them phase-aligned.
+
+This results in each rig running the same cue, but interpreted to the limitations of that specific rig. E.g. if you have two rigs, one with 8 light and one with 4 lights, then when light 5-8 are active on the 8 light rig the colours of rig's 2 lights 1-4 will be a blend of 1-4's regular colours + 5-8's intended colours.
+
+This design is intentional differs from traditional multi-universe designs that expect you to run different effects per universe.
+
+**Flow:** listener → `ChainFanout` → per-rig `RigChain` (`Sequencer` → `LightTransitionController` → `LightStateManager`) → `DmxPublisher` (per-rig buffers) → `SenderManager` → rig-routed senders
+
+`DmxPublisher` builds a separate DMX buffer per rig and routes it to that rig's configured senders/universes. A leading and trailing-edge rate limiter and per-light state de-duplication sit ahead of the senders, so unchanged frames are skipped rather than re-sent.
+
+Rig mirroring (`helpers/mirrorRig.ts`, applied per `RigChain`) flips a rig's layout: horizontal mirroring reverses light order within each row and mirrors moving-head pan around home; vertical mirroring swaps the front and back rows. One physical layout can mirror another without re-authoring cues.
 
 ## Cues and Effects
 
@@ -166,9 +179,9 @@ precedence over lower layers.
 - **Layer 0**: Base layer (preserved by design)
 - **Layers 1-99**: Standard effect layers
 - **Layers 100+**: High priority "flash" layers
-- **Layer 200**: Blackout layers
+- **Layer 200**: Strobe effects
 - **Layers 201-254**: Reserved for future use
-- **Layer 255**: Strobe effects
+- **Layer 255**: Blackout layer
 
 `Layer 0` is a special layer: this is the main layer and all primary effects should use at least layer 0.
 When an effect on Layer 0 ends, _its final state is not cleared_ (unlike higher layers which are cleaned up).
@@ -176,8 +189,8 @@ This allows effects to transition smoothly into another and prevents the lights 
 if there is a gap between effects. Layers above 0 are cleaned up when their effects complete with no
 queued effects to maintain a clean state.
 
-`EffectManager.setEffect`: Set effect will clear all states above layer 0 before adding the effect.
-Layer 0 will transition into the new effect.
+`EffectManager.setEffect`: Clears all running effects on every layer (via `removeAllEffects`) before
+adding the new effect, so it becomes the only thing playing.
 `EffectManager.addEffect`: Adds the effect without clearing other layers. This lets us add effects on
 top of running ones without clearing them inadvertently.
 `EffectManager.addEffectUnblockedName`: Adds an effect only if no effect with the same name is already running. Prevents queue breaking timing issues.
@@ -223,14 +236,15 @@ With `'add'` blend mode and 0.5 opacity:
 ```
 Layer 10: R:255, G:255, B:255, I:255, Opacity: 0.5, BlendMode: 'replace'
 Layer 0:  R:255, G:0,   B:0,   I:255, Opacity: 1.0, BlendMode: 'replace'
-Result: R:255, G:127, B:127 (50% White over Red)
+Result: R:127, G:127, B:127 (white scaled to 50% intensity; Layer 0 is replaced)
 ```
 
-With `'replace'` blend mode and 0.5 opacity:
+With `'replace'` blend mode and 0.5 opacity every channel of the replacing layer is scaled by opacity. The underlying layer is discarded, not blended, so Layer 0's red does not show through:
 
-- Red: `255` (unchanged, fully opaque)
+- Red: `255 * 0.5 = 127.5` → 127
 - Green: `255 * 0.5 = 127.5` → 127
 - Blue: `255 * 0.5 = 127.5` → 127
+- Intensity: `255 * 0.5 = 127.5` → 127
 
 ### Example 4: Mixed Blend Modes
 
@@ -246,12 +260,29 @@ When mixing blend modes, the system applies the blend mode first, then the opaci
 - Green: `0 + (255 * 0.5) = 127.5` → 127 (Layer 10 adds 50% white)
 - Blue: `0 + (255 * 0.5) = 127.5` → 127 (Layer 10 adds 50% white)
 
+### Example 5: Mix Mode (Alpha Crossfade)
+
+```
+Layer 10: R:255, G:255, B:0,   I:255, Opacity: 0.5, BlendMode: 'mix'
+Layer 0:  R:0,   G:0,   B:255, I:255, Opacity: 1.0, BlendMode: 'replace'
+Result: R:127, G:127, B:127 (50% crossfade from blue toward yellow)
+```
+
+With `'mix'` blend mode each channel is interpolated between the lower layers and this layer by opacity (`lower * (1 - opacity) + layer * opacity`):
+
+- Red: `0 * 0.5 + 255 * 0.5 = 127`
+- Green: `0 * 0.5 + 255 * 0.5 = 127`
+- Blue: `255 * 0.5 + 0 * 0.5 = 127`
+
+Unlike `replace`, the lower layer is blended in rather than discarded, so the colour crossfades between the two rather than fading up from black.
+
 ## Available Blend Modes
 
 - **`replace`**: Overwrites lower layer colors (default behavior)
 - **`add`**: Adds to lower layer colors (good for additive blending)
 - **`multiply`**: Multiplies with lower layer colors (good for darkening)
 - **`overlay`**: Combines multiply and screen blending (good for contrast)
+- **`mix`**: Alpha-crossfades between the lower layers and this layer by `opacity` (0.0 = lower layers, 1.0 = this layer). Unlike `replace`, partial opacity blends the two colours rather than scaling this layer down from black, so a colour can be flashed over another without fading through black.
 
 The system uses `opacity` and `blendMode` for color blending:
 
@@ -262,7 +293,7 @@ export type RGBIO = {
   blue: number; // 0-255
   intensity: number; // 0-255
   opacity: number; // 0.0-1.0, required
-  blendMode: BlendMode; // required, enum: 'replace', 'add', 'multiply', 'overlay'
+  blendMode: BlendMode; // required, enum: 'replace', 'add', 'multiply', 'overlay', 'mix'
 
   pan?: number;
   tilt?: number;

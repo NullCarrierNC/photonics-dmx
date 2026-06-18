@@ -32,9 +32,13 @@ const getLogicNodeButtonClasses = (logicType: LogicNode['logicType']): string =>
     logicType === 'array-length' ||
     logicType === 'reverse-lights' ||
     logicType === 'create-pairs' ||
+    logicType === 'build-ring' ||
     logicType === 'concat-lights' ||
     logicType === 'shuffle-lights' ||
-    logicType === 'for-each-light'
+    logicType === 'for-each-light' ||
+    logicType === 'reverse-colors' ||
+    logicType === 'concat-colors' ||
+    logicType === 'shuffle-colors'
   const isDataNode = logicType === 'cue-data' || logicType === 'config-data'
   const isDebugNode = logicType === 'debugger'
 
@@ -175,6 +179,12 @@ const LogicNodesSection: React.FC<{
         Lights From Index
       </button>
       <button
+        className={getLogicNodeButtonClasses('color-from-index')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'color-from-index' })}
+        onClick={() => addLogicNode('color-from-index')}>
+        Color From Index
+      </button>
+      <button
         className={getLogicNodeButtonClasses('math')}
         {...makeDragHandlers({ kind: 'logic', logicType: 'math' })}
         onClick={() => addLogicNode('math')}>
@@ -212,6 +222,12 @@ const LogicNodesSection: React.FC<{
         Create Pairs
       </button>
       <button
+        className={getLogicNodeButtonClasses('build-ring')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'build-ring' })}
+        onClick={() => addLogicNode('build-ring')}>
+        Build Ring
+      </button>
+      <button
         className={getLogicNodeButtonClasses('reverse-lights')}
         {...makeDragHandlers({ kind: 'logic', logicType: 'reverse-lights' })}
         onClick={() => addLogicNode('reverse-lights')}>
@@ -228,6 +244,25 @@ const LogicNodesSection: React.FC<{
         {...makeDragHandlers({ kind: 'logic', logicType: 'for-each-light' })}
         onClick={() => addLogicNode('for-each-light')}>
         For Each Light
+      </button>
+      {/* color operations */}
+      <button
+        className={getLogicNodeButtonClasses('reverse-colors')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'reverse-colors' })}
+        onClick={() => addLogicNode('reverse-colors')}>
+        Reverse Colors
+      </button>
+      <button
+        className={getLogicNodeButtonClasses('concat-colors')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'concat-colors' })}
+        onClick={() => addLogicNode('concat-colors')}>
+        Concat Colors
+      </button>
+      <button
+        className={getLogicNodeButtonClasses('shuffle-colors')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'shuffle-colors' })}
+        onClick={() => addLogicNode('shuffle-colors')}>
+        Shuffle Colors
       </button>
       {/* Debug node (red) */}
       <button

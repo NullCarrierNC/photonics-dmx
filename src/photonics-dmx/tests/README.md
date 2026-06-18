@@ -121,7 +121,7 @@ The system uses an opacity-based blending approach:
 ### Opacity-Based System
 
 - **opacity**: 0.0 to 1.0, controls contribution strength
-- **blendMode**: How colors interact ('replace', 'add', 'multiply', 'overlay')
+- **blendMode**: How colors interact ('replace', 'add', 'multiply', 'overlay', 'mix' = alpha crossfade)
 - **Intuitive**: 0.5 opacity = 50% contribution
 - **Predictable**: Colors blend naturally based on blend mode
 
@@ -131,6 +131,7 @@ The system uses an opacity-based blending approach:
 - **add**: Adds to lower layer colors (good for additive blending)
 - **multiply**: Multiplies with lower layer colors (good for darkening)
 - **overlay**: Combines multiply and screen blending (good for contrast)
+- **mix**: Alpha-crossfades between the lower layers and this layer by opacity
 
 ## For Proper Additive Blending (Blue + Green = Cyan)
 

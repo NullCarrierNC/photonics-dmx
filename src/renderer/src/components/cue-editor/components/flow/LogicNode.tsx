@@ -122,6 +122,70 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
         </>
       )
     }
+    if (logicType === 'color-from-index') {
+      const indexText = formatValueSource(logic.index)
+      const palette = formatValueSource(logic.colors)
+      return (
+        <>
+          <div>
+            [<Mono>{palette || '?'}</Mono>][<Mono>{indexText}</Mono>]
+          </div>
+          {logic.assignTo && (
+            <div>
+              To Var: <Mono>{logic.assignTo}</Mono>
+            </div>
+          )}
+        </>
+      )
+    }
+    if (logicType === 'reverse-colors') {
+      return (
+        <>
+          <div>
+            REVERSE <Mono>{logic.sourceVariable || '?'}</Mono>
+          </div>
+          {logic.assignTo && (
+            <div>
+              To Var: <Mono>{logic.assignTo}</Mono>
+            </div>
+          )}
+        </>
+      )
+    }
+    if (logicType === 'concat-colors') {
+      const vars = logic.sourceVariables || []
+      return (
+        <>
+          <div>
+            CONCAT <Mono>{vars.length}</Mono> PALETTES
+          </div>
+          {vars.length > 0 && (
+            <div>
+              <Mono>{vars.join(' + ')}</Mono>
+            </div>
+          )}
+          {logic.assignTo && (
+            <div>
+              To Var: <Mono>{logic.assignTo}</Mono>
+            </div>
+          )}
+        </>
+      )
+    }
+    if (logicType === 'shuffle-colors') {
+      return (
+        <>
+          <div>
+            SHUFFLE <Mono>{logic.sourceVariable || '?'}</Mono>
+          </div>
+          {logic.assignTo && (
+            <div>
+              To Var: <Mono>{logic.assignTo}</Mono>
+            </div>
+          )}
+        </>
+      )
+    }
     if (logicType === 'array-length') {
       return (
         <>
@@ -162,6 +226,18 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
               To Var: <Mono>{logic.assignTo}</Mono>
             </div>
           )}
+        </>
+      )
+    }
+    if (logicType === 'build-ring') {
+      return (
+        <>
+          <div>
+            Ring → <Mono>{logic.assignTo || '?'}</Mono>
+          </div>
+          <div>
+            Size → <Mono>{logic.assignGroupSize || '?'}</Mono>
+          </div>
         </>
       )
     }
@@ -286,9 +362,13 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
     logicType === 'array-length' ||
     logicType === 'reverse-lights' ||
     logicType === 'create-pairs' ||
+    logicType === 'build-ring' ||
     logicType === 'concat-lights' ||
     logicType === 'shuffle-lights' ||
-    logicType === 'for-each-light'
+    logicType === 'for-each-light' ||
+    logicType === 'reverse-colors' ||
+    logicType === 'concat-colors' ||
+    logicType === 'shuffle-colors'
   const isDebugNode = logicType === 'debugger'
 
   const nodeStyles = isDebugNode

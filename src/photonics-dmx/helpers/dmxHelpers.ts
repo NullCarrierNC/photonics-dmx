@@ -6,10 +6,8 @@ import {
   RgbDmxChannels,
   RGBIO,
   RgbMovingHeadDmxChannels,
-  RgbStrobeDmxChannels,
   RgbwDmxChannels,
   RgbwMovingHeadDmxChannels,
-  RgbwStrobeDmxCannels,
   StrobeDmxChannels,
 } from '../types'
 
@@ -283,61 +281,51 @@ export const castToChannelType = (
   channels: { [key: string]: number },
 ):
   | RgbDmxChannels
-  | RgbStrobeDmxChannels
   | RgbwDmxChannels
-  | RgbwStrobeDmxCannels
   | StrobeDmxChannels
   | RgbMovingHeadDmxChannels
   | RgbwMovingHeadDmxChannels => {
   switch (fixtureType) {
-    case FixtureTypes.RGB:
-      return {
+    case FixtureTypes.RGB: {
+      const out: RgbDmxChannels = {
         red: channels.red || 0,
         green: channels.green || 0,
         blue: channels.blue || 0,
         masterDimmer: channels.masterDimmer || 0,
-      } as RgbDmxChannels
-    case FixtureTypes.RGBS:
-      return {
-        red: channels.red || 0,
-        green: channels.green || 0,
-        blue: channels.blue || 0,
-        masterDimmer: channels.masterDimmer || 0,
-        strobeSpeed: channels.strobeSpeed || 0,
-      } as RgbStrobeDmxChannels
-    case FixtureTypes.RGBW:
-      return {
+      }
+      if (channels.strobeChannel != null) out.strobeChannel = channels.strobeChannel
+      return out
+    }
+    case FixtureTypes.RGBW: {
+      const out: RgbwDmxChannels = {
         red: channels.red || 0,
         green: channels.green || 0,
         blue: channels.blue || 0,
         white: channels.white || 0,
         masterDimmer: channels.masterDimmer || 0,
-      } as RgbwDmxChannels
-    case FixtureTypes.RGBWS:
-      return {
-        red: channels.red || 0,
-        green: channels.green || 0,
-        blue: channels.blue || 0,
-        white: channels.white || 0,
-        masterDimmer: channels.masterDimmer || 0,
-        strobeSpeed: channels.strobeSpeed || 0,
-      } as RgbwStrobeDmxCannels
+      }
+      if (channels.strobeChannel != null) out.strobeChannel = channels.strobeChannel
+      return out
+    }
     case FixtureTypes.STROBE:
       return {
         masterDimmer: channels.masterDimmer || 0,
-        strobeSpeed: channels.strobeSpeed || 0,
+        strobeChannel: channels.strobeChannel || 0,
       } as StrobeDmxChannels
-    case FixtureTypes.RGBMH:
-      return {
+    case FixtureTypes.RGBMH: {
+      const out: RgbMovingHeadDmxChannels = {
         red: channels.red || 0,
         green: channels.green || 0,
         blue: channels.blue || 0,
         masterDimmer: channels.masterDimmer || 0,
         pan: channels.pan || 0,
         tilt: channels.tilt || 0,
-      } as RgbMovingHeadDmxChannels
-    case FixtureTypes.RGBWMH:
-      return {
+      }
+      if (channels.strobeChannel != null) out.strobeChannel = channels.strobeChannel
+      return out
+    }
+    case FixtureTypes.RGBWMH: {
+      const out: RgbwMovingHeadDmxChannels = {
         red: channels.red || 0,
         green: channels.green || 0,
         blue: channels.blue || 0,
@@ -345,7 +333,10 @@ export const castToChannelType = (
         masterDimmer: channels.masterDimmer || 0,
         pan: channels.pan || 0,
         tilt: channels.tilt || 0,
-      } as RgbwMovingHeadDmxChannels
+      }
+      if (channels.strobeChannel != null) out.strobeChannel = channels.strobeChannel
+      return out
+    }
     default:
       throw new Error(`Unknown fixture type: ${fixtureType}`)
   }

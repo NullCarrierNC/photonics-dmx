@@ -31,7 +31,14 @@ function finalizePreviewRgb(
   use3dOffGrey: boolean,
 ): { r: number; g: number; b: number } {
   if (!use3dOffGrey) {
-    return rgb
+    // 2D CSS preview clamps each channel to the 0–255 sRGB range. RGBW fixtures sum red+white
+    // (up to 510) before scaling, which can exceed 255. The 3D path keeps raw values so THREE
+    // bloom can drive HDR highlights.
+    return {
+      r: Math.min(255, rgb.r),
+      g: Math.min(255, rgb.g),
+      b: Math.min(255, rgb.b),
+    }
   }
   return blackToOffStateGrey3d(rgb, masterDimmerIsZero)
 }
@@ -53,11 +60,7 @@ export function getDmxPreviewLightColor(
     return finalizePreviewRgb({ r: v, g: v, b: v }, dimmer === 0, use3dOffGrey)
   }
 
-  if (
-    fixture === FixtureTypes.RGB ||
-    fixture === FixtureTypes.RGBS ||
-    fixture === FixtureTypes.RGBMH
-  ) {
+  if (fixture === FixtureTypes.RGB || fixture === FixtureTypes.RGBMH) {
     const rgbChannels = channels as RgbDmxChannels
     const red = dmxValues[rgbChannels.red] || 0
     const green = dmxValues[rgbChannels.green] || 0
@@ -75,11 +78,7 @@ export function getDmxPreviewLightColor(
     )
   }
 
-  if (
-    fixture === FixtureTypes.RGBW ||
-    fixture === FixtureTypes.RGBWS ||
-    fixture === FixtureTypes.RGBWMH
-  ) {
+  if (fixture === FixtureTypes.RGBW || fixture === FixtureTypes.RGBWMH) {
     const rgbwChannels = channels as RgbwDmxChannels
     const red = dmxValues[rgbwChannels.red] || 0
     const green = dmxValues[rgbwChannels.green] || 0

@@ -18,6 +18,7 @@ import {
   InstrumentNoteType,
 } from '../../../../cues'
 import { getColor } from '../../../../helpers/dmxHelpers'
+import type { Color } from '../../../../types'
 import * as utils from '../../../../helpers/utils'
 import { createSequencerHarness } from '../../../helpers/sequencerHarness'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
@@ -378,6 +379,351 @@ describe('Node runtime with real Sequencer', () => {
         expect(state?.intensity ?? 0).toBe(0)
       }
     }
+  })
+
+  it('selects palette colours by index with color-from-index (wraps around)', () => {
+    const eventNode: YargEventNode = {
+      id: 'event-1',
+      type: 'event',
+      eventType: 'beat',
+    }
+
+    const configNode: LogicNode = {
+      id: 'config-1',
+      type: 'logic',
+      logicType: 'config-data',
+      dataProperty: 'front-lights-array',
+      assignTo: 'frontLights',
+    }
+
+    const eachNode: LogicNode = {
+      id: 'each-1',
+      type: 'logic',
+      logicType: 'for-each-light',
+      sourceVariable: 'frontLights',
+      currentLightVariable: 'curLight',
+      currentIndexVariable: 'idx',
+    }
+
+    const pickNode: LogicNode = {
+      id: 'pick-1',
+      type: 'logic',
+      logicType: 'color-from-index',
+      colors: { source: 'literal', value: ['red', 'green', 'blue'] as Color[] },
+      index: { source: 'variable', name: 'idx' },
+      assignTo: 'curColor',
+    }
+
+    const actionNode: ActionNode = {
+      id: 'action-1',
+      type: 'action',
+      effectType: 'set-color',
+      target: {
+        groups: { source: 'variable', name: 'curLight' },
+        filter: { source: 'literal', value: 'all' },
+      },
+      color: {
+        name: { source: 'variable', name: 'curColor' },
+        brightness: { source: 'literal', value: 'high' },
+        blendMode: { source: 'literal', value: 'replace' },
+      },
+      timing: {
+        waitForCondition: { source: 'literal', value: 'none' },
+        waitForTime: { source: 'literal', value: 0 },
+        duration: { source: 'literal', value: 0 },
+        waitUntilCondition: { source: 'literal', value: 'none' },
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
+
+    const palette = ['red', 'green', 'blue'] as const
+
+    const definition: YargNodeCueDefinition = {
+      id: 'color-index',
+      name: 'Color Index',
+      kind: 'lighting',
+      cueType: CueType.Default,
+      style: 'primary',
+      nodes: {
+        events: [eventNode],
+        actions: [actionNode],
+        logic: [configNode, eachNode, pickNode],
+        eventRaisers: [],
+        eventListeners: [],
+        effectRaisers: [],
+      },
+      connections: [
+        { from: 'event-1', to: 'config-1' },
+        { from: 'config-1', to: 'each-1' },
+        { from: 'each-1', to: 'pick-1', fromPort: 'each' },
+        { from: 'pick-1', to: 'action-1' },
+      ],
+      variables: [
+        { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
+        { name: 'curLight', type: 'light-array', scope: 'cue', initialValue: [] },
+        { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+        { name: 'curColor', type: 'color', scope: 'cue', initialValue: 'red' },
+      ],
+    }
+
+    const engine = new NodeExecutionEngine(
+      compileCue(definition),
+      'test-group:color-index',
+      harness.sequencer,
+      harness.lightManager,
+      noopRuntimeBroadcaster(),
+      cueLevelVarStore,
+      groupLevelVarStore,
+      new EffectRegistry(),
+      definition.variables,
+    )
+
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
+
+    // 4 front lights, 3-colour palette: light 3 wraps to palette[0], proving modulo wraparound.
+    harness.frontLightIds.forEach((lightId, i) => {
+      const expected = getColor(palette[i % palette.length], 'high')
+      const state = harness.getLightState(lightId)
+      expect(state).toMatchObject({
+        red: expected.red,
+        green: expected.green,
+        blue: expected.blue,
+        blendMode: expected.blendMode,
+      })
+    })
+  })
+
+  it('reads a palette from a color-array variable set via the variable node', () => {
+    const eventNode: YargEventNode = {
+      id: 'event-1',
+      type: 'event',
+      eventType: 'beat',
+    }
+
+    const setPalette: LogicNode = {
+      id: 'set-pal',
+      type: 'logic',
+      logicType: 'variable',
+      mode: 'set',
+      varName: 'palette',
+      valueType: 'color-array',
+      value: { source: 'literal', value: ['red', 'green', 'blue'] as Color[] },
+    }
+
+    const configNode: LogicNode = {
+      id: 'config-1',
+      type: 'logic',
+      logicType: 'config-data',
+      dataProperty: 'front-lights-array',
+      assignTo: 'frontLights',
+    }
+
+    const eachNode: LogicNode = {
+      id: 'each-1',
+      type: 'logic',
+      logicType: 'for-each-light',
+      sourceVariable: 'frontLights',
+      currentLightVariable: 'curLight',
+      currentIndexVariable: 'idx',
+    }
+
+    const pickNode: LogicNode = {
+      id: 'pick-1',
+      type: 'logic',
+      logicType: 'color-from-index',
+      colors: { source: 'variable', name: 'palette' },
+      index: { source: 'variable', name: 'idx' },
+      assignTo: 'curColor',
+    }
+
+    const actionNode: ActionNode = {
+      id: 'action-1',
+      type: 'action',
+      effectType: 'set-color',
+      target: {
+        groups: { source: 'variable', name: 'curLight' },
+        filter: { source: 'literal', value: 'all' },
+      },
+      color: {
+        name: { source: 'variable', name: 'curColor' },
+        brightness: { source: 'literal', value: 'high' },
+        blendMode: { source: 'literal', value: 'replace' },
+      },
+      timing: {
+        waitForCondition: { source: 'literal', value: 'none' },
+        waitForTime: { source: 'literal', value: 0 },
+        duration: { source: 'literal', value: 0 },
+        waitUntilCondition: { source: 'literal', value: 'none' },
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+    }
+
+    const palette = ['red', 'green', 'blue'] as const
+
+    const definition: YargNodeCueDefinition = {
+      id: 'color-var-index',
+      name: 'Color Var Index',
+      kind: 'lighting',
+      cueType: CueType.Default,
+      style: 'primary',
+      nodes: {
+        events: [eventNode],
+        actions: [actionNode],
+        logic: [setPalette, configNode, eachNode, pickNode],
+        eventRaisers: [],
+        eventListeners: [],
+        effectRaisers: [],
+      },
+      connections: [
+        { from: 'event-1', to: 'set-pal' },
+        { from: 'set-pal', to: 'config-1' },
+        { from: 'config-1', to: 'each-1' },
+        { from: 'each-1', to: 'pick-1', fromPort: 'each' },
+        { from: 'pick-1', to: 'action-1' },
+      ],
+      variables: [
+        { name: 'palette', type: 'color-array', scope: 'cue', initialValue: [] },
+        { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
+        { name: 'curLight', type: 'light-array', scope: 'cue', initialValue: [] },
+        { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+        { name: 'curColor', type: 'color', scope: 'cue', initialValue: 'red' },
+      ],
+    }
+
+    const engine = new NodeExecutionEngine(
+      compileCue(definition),
+      'test-group:color-var-index',
+      harness.sequencer,
+      harness.lightManager,
+      noopRuntimeBroadcaster(),
+      cueLevelVarStore,
+      groupLevelVarStore,
+      new EffectRegistry(),
+      definition.variables,
+    )
+
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
+
+    harness.frontLightIds.forEach((lightId, i) => {
+      const expected = getColor(palette[i % palette.length], 'high')
+      const state = harness.getLightState(lightId)
+      expect(state).toMatchObject({
+        red: expected.red,
+        green: expected.green,
+        blue: expected.blue,
+        blendMode: expected.blendMode,
+      })
+    })
+  })
+
+  it('transforms color-array variables with reverse, concat, and shuffle', () => {
+    const eventNode: YargEventNode = {
+      id: 'event-1',
+      type: 'event',
+      eventType: 'beat',
+    }
+
+    const setA: LogicNode = {
+      id: 'set-a',
+      type: 'logic',
+      logicType: 'variable',
+      mode: 'set',
+      varName: 'a',
+      valueType: 'color-array',
+      value: { source: 'literal', value: ['red', 'green', 'blue'] as Color[] },
+    }
+
+    const setB: LogicNode = {
+      id: 'set-b',
+      type: 'logic',
+      logicType: 'variable',
+      mode: 'set',
+      varName: 'b',
+      valueType: 'color-array',
+      value: { source: 'literal', value: ['yellow', 'orange'] as Color[] },
+    }
+
+    const reverseNode: LogicNode = {
+      id: 'rev',
+      type: 'logic',
+      logicType: 'reverse-colors',
+      sourceVariable: 'a',
+      assignTo: 'reversed',
+    }
+
+    const concatNode: LogicNode = {
+      id: 'cat',
+      type: 'logic',
+      logicType: 'concat-colors',
+      sourceVariables: ['a', 'b'],
+      assignTo: 'combined',
+    }
+
+    const shuffleNode: LogicNode = {
+      id: 'shuf',
+      type: 'logic',
+      logicType: 'shuffle-colors',
+      sourceVariable: 'a',
+      assignTo: 'shuffled',
+    }
+
+    const definition: YargNodeCueDefinition = {
+      id: 'color-transforms',
+      name: 'Color Transforms',
+      kind: 'lighting',
+      cueType: CueType.Default,
+      style: 'primary',
+      nodes: {
+        events: [eventNode],
+        actions: [],
+        logic: [setA, setB, reverseNode, concatNode, shuffleNode],
+        eventRaisers: [],
+        eventListeners: [],
+        effectRaisers: [],
+      },
+      connections: [
+        { from: 'event-1', to: 'set-a' },
+        { from: 'set-a', to: 'set-b' },
+        { from: 'set-b', to: 'rev' },
+        { from: 'rev', to: 'cat' },
+        { from: 'cat', to: 'shuf' },
+      ],
+      variables: [
+        { name: 'a', type: 'color-array', scope: 'cue', initialValue: [] },
+        { name: 'b', type: 'color-array', scope: 'cue', initialValue: [] },
+        { name: 'reversed', type: 'color-array', scope: 'cue', initialValue: [] },
+        { name: 'combined', type: 'color-array', scope: 'cue', initialValue: [] },
+        { name: 'shuffled', type: 'color-array', scope: 'cue', initialValue: [] },
+      ],
+    }
+
+    const engine = new NodeExecutionEngine(
+      compileCue(definition),
+      'test-group:color-transforms',
+      harness.sequencer,
+      harness.lightManager,
+      noopRuntimeBroadcaster(),
+      cueLevelVarStore,
+      groupLevelVarStore,
+      new EffectRegistry(),
+      definition.variables,
+    )
+
+    engine.startExecution(eventNode, createCueData())
+    harness.advanceBy(1)
+
+    expect(cueLevelVarStore.get('reversed')?.value).toEqual(['blue', 'green', 'red'])
+    expect(cueLevelVarStore.get('combined')?.value).toEqual([
+      'red',
+      'green',
+      'blue',
+      'yellow',
+      'orange',
+    ])
+    const shuffled = (cueLevelVarStore.get('shuffled')?.value ?? []) as string[]
+    expect([...shuffled].sort()).toEqual(['blue', 'green', 'red'])
   })
 
   it('branches on cue data string comparisons', () => {

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 1,
+  "cueVersion": 2,
   "mode": "audio",
   "group": {
     "id": "audio-70s-light-organs",
@@ -50,6 +50,8 @@
             "threshold": 0.1,
             "hysteresis": 0.04,
             "holdMs": 150,
+            "attackMs": 30,
+            "releaseMs": 300,
             "color": "#ff0000",
             "nodeLabel": "Bass",
             "outputs": ["enter", "during", "exit"],
@@ -66,6 +68,8 @@
             "threshold": 0.09,
             "hysteresis": 0.05,
             "holdMs": 150,
+            "attackMs": 30,
+            "releaseMs": 300,
             "color": "#00ff00",
             "nodeLabel": "Mid",
             "outputs": ["enter", "during", "exit"],
@@ -82,6 +86,8 @@
             "threshold": 0.07,
             "hysteresis": 0.05,
             "holdMs": 150,
+            "attackMs": 30,
+            "releaseMs": 300,
             "color": "#0000ff",
             "nodeLabel": "Treble",
             "outputs": ["enter", "during", "exit"],
@@ -683,13 +689,17 @@
               },
               "waitUntilTime": {
                 "source": "literal",
-                "value": 0
+                "value": 2000
               },
               "easing": {
                 "source": "literal",
                 "value": "linear"
               },
               "level": {
+                "source": "literal",
+                "value": 1
+              },
+              "waitUntilConditionCount": {
                 "source": "literal",
                 "value": 1
               }
@@ -822,9 +832,9 @@
           }
         },
         "viewport": {
-          "x": 120.9162021542005,
-          "y": 140.5439202628806,
-          "zoom": 1.0837259668447805
+          "x": 72.94771981115252,
+          "y": 85.96179717703154,
+          "zoom": 1.5104232254438539
         }
       },
       "kind": "lighting"
@@ -1999,7 +2009,8 @@
             "threshold": 0.1,
             "hysteresis": 0.04,
             "holdMs": 200,
-            "smoothing": 0.85,
+            "attackMs": 30,
+            "releaseMs": 350,
             "color": "#ff0000",
             "nodeLabel": "Sub",
             "outputs": ["enter", "during", "exit"],
@@ -2017,7 +2028,8 @@
             "threshold": 0.18,
             "hysteresis": 0.04,
             "holdMs": 180,
-            "smoothing": 0.85,
+            "attackMs": 30,
+            "releaseMs": 350,
             "color": "#ff7f00",
             "nodeLabel": "Kick",
             "outputs": ["enter", "during", "exit"],
@@ -2034,7 +2046,8 @@
             "threshold": 0.14,
             "hysteresis": 0.04,
             "holdMs": 160,
-            "smoothing": 0.82,
+            "attackMs": 30,
+            "releaseMs": 320,
             "color": "#ffff00",
             "nodeLabel": "Bass",
             "outputs": ["enter", "during", "exit"],
@@ -2051,7 +2064,8 @@
             "threshold": 0.1,
             "hysteresis": 0.05,
             "holdMs": 150,
-            "smoothing": 0.78,
+            "attackMs": 30,
+            "releaseMs": 300,
             "color": "#00ff00",
             "nodeLabel": "Low Mid",
             "outputs": ["enter", "during", "exit"],
@@ -2068,7 +2082,8 @@
             "threshold": 0.08,
             "hysteresis": 0.05,
             "holdMs": 150,
-            "smoothing": 0.75,
+            "attackMs": 25,
+            "releaseMs": 280,
             "color": "#00ffff",
             "nodeLabel": "Mid",
             "outputs": ["enter", "during", "exit"],
@@ -2085,7 +2100,8 @@
             "threshold": 0.06,
             "hysteresis": 0.05,
             "holdMs": 150,
-            "smoothing": 0.7,
+            "attackMs": 25,
+            "releaseMs": 260,
             "color": "#0000ff",
             "nodeLabel": "Presence",
             "outputs": ["enter", "during", "exit"],
@@ -2102,7 +2118,8 @@
             "threshold": 0.05,
             "hysteresis": 0.05,
             "holdMs": 150,
-            "smoothing": 0.65,
+            "attackMs": 25,
+            "releaseMs": 240,
             "color": "#800080",
             "nodeLabel": "High",
             "outputs": ["enter", "during", "exit"],
@@ -2119,7 +2136,8 @@
             "threshold": 0,
             "hysteresis": 0.01,
             "holdMs": 500,
-            "smoothing": 0.65,
+            "attackMs": 25,
+            "releaseMs": 240,
             "color": "#ff00ff",
             "nodeLabel": "Air",
             "outputs": ["enter", "during", "exit"],

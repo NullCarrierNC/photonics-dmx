@@ -2,10 +2,13 @@
  * AudioCueProcessor: strobe slot independent from secondary; getEffective* accessors.
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { performance } from 'perf_hooks'
 import { AudioCueProcessor } from '../../processors/AudioCueProcessor'
 import { AudioCueHandler } from '../../cueHandlers/AudioCueHandler'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
+import { ChainFanout } from '../../controllers/ChainFanout'
+import type { RigChain } from '../../controllers/RigChain'
 import { AudioCueRegistry } from '../../cues/registries/AudioCueRegistry'
 import { IAudioCue } from '../../cues/interfaces/IAudioCue'
 import { AudioCueType } from '../../cues/types/audioCueTypes'
@@ -103,9 +106,22 @@ describe('AudioCueProcessor', () => {
       },
     }
 
-    processor = new AudioCueProcessor(
-      lightManager,
+    // Wrap the stub light manager + sequencer in a fake chain so the processor's
+    // ChainFanout-based fanout has somewhere to dispatch.
+    const fakeChain = {
+      rigId: 'stub',
+      isPrimary: true,
+      dmxLightManager: lightManager,
       sequencer,
+      yargCueHandler: null,
+      audioCueHandler: null,
+      rb3MenuCueHandler: null,
+    } as unknown as RigChain
+    const chainFanout = new ChainFanout()
+    chainFanout.setChains([fakeChain])
+
+    processor = new AudioCueProcessor(
+      chainFanout,
       noopRuntimeBroadcaster(),
       audioConfig,
       'proc-primary',
@@ -140,7 +156,7 @@ describe('AudioCueProcessor', () => {
 
   it('applies idle look and skips cue execution when game mode idle threshold sustained', () => {
     let t = 0
-    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => {
+    const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => {
       t += 500
       return t
     })
@@ -173,7 +189,7 @@ describe('AudioCueProcessor', () => {
     const setMotionSpy = jest.spyOn(AudioCueHandler.prototype, 'setMotionEnabled')
     const handleDataSpy = jest.spyOn(AudioCueHandler.prototype, 'handleAudioData')
     let t = 0
-    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => {
+    const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => {
       t += 500
       return t
     })

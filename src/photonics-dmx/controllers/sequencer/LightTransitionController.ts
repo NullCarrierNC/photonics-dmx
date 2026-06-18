@@ -1,4 +1,5 @@
-import { RGBIO, Transition } from '../../types'
+import { RGBIO, Transition, BlendMode } from '../../types'
+import { BLEND_MODE_OPTIONS } from '../../constants/options'
 
 import { getEasingFunction } from '../../easing'
 
@@ -619,27 +620,6 @@ export class LightTransitionController {
 
     // Apply blend mode per channel
     switch (blendMode) {
-      case 'replace':
-        // For replace mode: opacity controls the intensity of the replacement color
-        // When opacity = 0.0: layer is transparent, show underlying color
-        // When opacity = 1.0: layer completely replaces underlying color at full intensity
-        // When opacity = 0.5: layer completely replaces underlying color at 50% intensity
-        if (opacity <= 0.0) {
-          // Transparent layer - show underlying color
-          out.red = current.red
-          out.green = current.green
-          out.blue = current.blue
-          out.intensity = current.intensity
-        } else {
-          // Any opacity > 0 means the layer replaces the underlying color
-          // The opacity controls the intensity of the replacement
-          out.red = Math.round(newState.red * opacity)
-          out.green = Math.round(newState.green * opacity)
-          out.blue = Math.round(newState.blue * opacity)
-          out.intensity = Math.round(newState.intensity * opacity)
-        }
-        break
-
       case 'add':
         if (opacity <= 0.0) {
           // Transparent layer - show underlying color
@@ -665,18 +645,34 @@ export class LightTransitionController {
         }
         break
 
-      case 'multiply':
-        out.red = Math.round((current.red * newState.red * opacity) / 255)
-        out.green = Math.round((current.green * newState.green * opacity) / 255)
-        out.blue = Math.round((current.blue * newState.blue * opacity) / 255)
-        out.intensity = Math.round((current.intensity * newState.intensity * opacity) / 255)
+      case 'mix': {
+        // Alpha crossfade: interpolate between the underlying composited colour and this
+        // layer's colour by opacity. opacity 0 → underlying, 1 → this layer, between →
+        // a smooth blend of the two (a true colour crossfade, not a fade up from black).
+        const a = Math.max(0, Math.min(1, opacity))
+        out.red = Math.round(current.red * (1 - a) + newState.red * a)
+        out.green = Math.round(current.green * (1 - a) + newState.green * a)
+        out.blue = Math.round(current.blue * (1 - a) + newState.blue * a)
+        out.intensity = Math.round(current.intensity * (1 - a) + newState.intensity * a)
         break
+      }
 
-      case 'overlay':
-        out.red = this.blendOverlay(current.red, newState.red, opacity)
-        out.green = this.blendOverlay(current.green, newState.green, opacity)
-        out.blue = this.blendOverlay(current.blue, newState.blue, opacity)
-        out.intensity = this.blendOverlay(current.intensity, newState.intensity, opacity)
+      case 'replace':
+      default:
+        // Replace (and the fallback for any unrecognised mode): opacity controls the
+        // intensity of the replacement colour.
+        // 0.0 = transparent (show underlying); 1.0 = full replacement; 0.5 = half intensity.
+        if (opacity <= 0.0) {
+          out.red = current.red
+          out.green = current.green
+          out.blue = current.blue
+          out.intensity = current.intensity
+        } else {
+          out.red = Math.round(newState.red * opacity)
+          out.green = Math.round(newState.green * opacity)
+          out.blue = Math.round(newState.blue * opacity)
+          out.intensity = Math.round(newState.intensity * opacity)
+        }
         break
     }
 
@@ -685,26 +681,6 @@ export class LightTransitionController {
     out.tilt = newState.tilt !== undefined ? newState.tilt : current.tilt
 
     return out
-  }
-
-  /**
-   * Overlay blend mode - combines multiply and screen blending
-   */
-  private blendOverlay(base: number, blend: number, opacity: number): number {
-    const normalizedBlend = blend / 255
-    const normalizedBase = base / 255
-
-    let result: number
-    if (normalizedBase < 0.5) {
-      // Multiply blend for dark areas
-      result = 2 * normalizedBase * normalizedBlend
-    } else {
-      // Screen blend for light areas
-      result = 1 - 2 * (1 - normalizedBase) * (1 - normalizedBlend)
-    }
-
-    // Apply opacity and convert back to 0-255 range
-    return Math.round(result * 255 * opacity)
   }
 
   /**
@@ -849,7 +825,7 @@ export class LightTransitionController {
     corrected.opacity = Math.max(0, Math.min(1, corrected.opacity ?? 1))
 
     // Ensure blend mode is valid
-    if (!['replace', 'add', 'multiply', 'overlay'].includes(corrected.blendMode ?? '')) {
+    if (!BLEND_MODE_OPTIONS.includes(corrected.blendMode as BlendMode)) {
       corrected.blendMode = 'replace'
     }
 

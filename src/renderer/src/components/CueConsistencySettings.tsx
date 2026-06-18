@@ -32,15 +32,15 @@ export interface CueConsistencySettingsProps {
 const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
   motionGloballyEnabled = true,
 }) => {
-  const [consistencyWindow, setConsistencyWindow] = useState(60000)
+  const [consistencyWindow, setConsistencyWindow] = useState(10000)
   const [selectionMode, setSelectionMode] = useState<CueGroupSelectionMode>('withinSong')
   const [yargMotionSelectionMode, setYargMotionSelectionModeState] =
     useState<MotionGroupSelectionMode>('perCueChange')
   const [audioMotionSelectionMode, setAudioMotionSelectionModeState] =
     useState<MotionGroupSelectionMode>('perCueChange')
   const [motionMinHoldMs, setMotionMinHoldMsState] = useState(5000)
-  const [yargMotionProbability, setYargMotionProbability] = useState(100)
-  const [audioMotionProbability, setAudioMotionProbability] = useState(100)
+  const [yargMotionProbability, setYargMotionProbability] = useState(50)
+  const [audioMotionProbability, setAudioMotionProbability] = useState(50)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -396,13 +396,13 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
               onBlur={handleInputBlur}
               className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading || isSaving}
-              placeholder="60000"
+              placeholder="10000"
             />
             <span className="text-sm text-gray-600 dark:text-gray-400">milliseconds</span>
           </div>
 
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Set to 0 to disable consistency throttling. Default is 60000ms (60 seconds). Maximum is
+            Set to 0 to disable consistency throttling. Default is 10000ms (10 seconds). Maximum is
             300000ms (5 minutes).
           </p>
         </div>

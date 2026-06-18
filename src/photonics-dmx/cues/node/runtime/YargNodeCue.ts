@@ -4,7 +4,7 @@ import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CompiledYargCue } from '../compiler/NodeCueCompiler'
 import { EffectRegistry } from './EffectRegistry'
-import type { NodeRuntimeCallbacks } from './executionTypes'
+import type { NodeRuntimeCallbacks, VariableValue } from './executionTypes'
 import { CueSession } from './CueSession'
 import { GraphExecutionEngine } from './GraphExecutionEngine'
 import { cueGraphPolicy } from './GraphExecutionPolicy'
@@ -16,15 +16,54 @@ import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
  * YARG node cue: uses CueSession and GraphExecutionEngine.
  * Optional host callbacks can be injected for debug/error emission; when provided,
  * the engine uses them in preference to main-process emission.
+ *
+ * When multiple rigs run the same cue in parallel, each rig's call to {@link execute}
+ * carries its own sequencer reference; engine + session are keyed by that reference so
+ * every rig gets its own runtime state without sharing it across rigs.
  */
+interface YargCueRunState {
+  /** Lazily (re)created after construction or onStop; cancelled and nulled on stop so the next
+   *  execute starts with a fresh engine but the session's accumulated state survives. */
+  engine: GraphExecutionEngine | null
+  session: CueSession
+}
+
 export class YargNodeCue implements INetCue {
+  /**
+   * Group-level variable stores shared across every cue in a group, per sequencer:
+   * sequencer -> groupId -> store. Cues in the same group (running on the same rig) read and
+   * write the same cue-group-scoped variables, so one cue can hand state to another (e.g. Stomp
+   * recording its on/off state for Silhouettes_Spotlight). Keyed per sequencer so rigs running
+   * the same group in parallel keep isolated state.
+   */
+  private static groupLevelVarStores = new Map<
+    ILightingController,
+    Map<string, Map<string, VariableValue>>
+  >()
+
+  private static getSharedGroupStore(
+    sequencer: ILightingController,
+    groupId: string,
+  ): Map<string, VariableValue> {
+    let perSeq = YargNodeCue.groupLevelVarStores.get(sequencer)
+    if (!perSeq) {
+      perSeq = new Map()
+      YargNodeCue.groupLevelVarStores.set(sequencer, perSeq)
+    }
+    let store = perSeq.get(groupId)
+    if (!store) {
+      store = new Map()
+      perSeq.set(groupId, store)
+    }
+    return store
+  }
+
   private readonly groupId: string
   private readonly compiledCue: CompiledYargCue
   private readonly effectRegistry: EffectRegistry
-  private readonly session: CueSession
   private readonly runtimeCallbacks?: NodeRuntimeCallbacks
   private readonly runtimeBroadcaster: RuntimeBroadcaster
-  private engine: GraphExecutionEngine | null = null
+  private readonly states = new Map<ILightingController, YargCueRunState>()
 
   constructor(
     groupId: string,
@@ -36,11 +75,40 @@ export class YargNodeCue implements INetCue {
     this.groupId = groupId
     this.compiledCue = compiledCue
     this.effectRegistry = effectRegistry ?? new EffectRegistry()
-    this.session = new CueSession()
     this.runtimeCallbacks = runtimeCallbacks
     this.runtimeBroadcaster = runtimeBroadcaster ?? noopRuntimeBroadcaster()
-    const definition = compiledCue.definition as YargLightingNodeCueDefinition
-    this.session.initializeVariables(definition.variables ?? [], compiledCue.groupVariables ?? [])
+  }
+
+  private getOrCreateState(
+    sequencer: ILightingController,
+    lightManager: DmxLightManager,
+  ): YargCueRunState {
+    let state = this.states.get(sequencer)
+    if (!state) {
+      const definition = this.compiledCue.definition as YargLightingNodeCueDefinition
+      const session = new CueSession(YargNodeCue.getSharedGroupStore(sequencer, this.groupId))
+      session.initializeVariables(definition.variables ?? [], this.compiledCue.groupVariables ?? [])
+      state = { engine: null, session }
+      this.states.set(sequencer, state)
+    }
+    if (!state.engine) {
+      const definition = this.compiledCue.definition as YargLightingNodeCueDefinition
+      const cueId = this.id
+      const policy = cueGraphPolicy(this.groupId, cueId)
+      state.engine = GraphExecutionEngine.forCue(
+        this.compiledCue,
+        cueId,
+        policy,
+        state.session,
+        sequencer,
+        lightManager,
+        this.runtimeBroadcaster,
+        this.effectRegistry,
+        definition.variables ?? [],
+        this.runtimeCallbacks,
+      )
+    }
+    return state
   }
 
   get cueId(): string {
@@ -65,33 +133,35 @@ export class YargNodeCue implements INetCue {
     sequencer: ILightingController,
     lightManager: DmxLightManager,
   ): void | Promise<void> {
-    if (!this.engine) {
-      const definition = this.compiledCue.definition as YargLightingNodeCueDefinition
-      const cueId = this.id
-      const policy = cueGraphPolicy(this.groupId, cueId)
-      this.engine = GraphExecutionEngine.forCue(
-        this.compiledCue,
-        cueId,
-        policy,
-        this.session,
-        sequencer,
-        lightManager,
-        this.runtimeBroadcaster,
-        this.effectRegistry,
-        definition.variables ?? [],
-        this.runtimeCallbacks,
-      )
-    }
-    this.engine.startCueRun(parameters, {
-      hasCueStartedFired: this.session.hasCueStartedFired(),
+    const state = this.getOrCreateState(sequencer, lightManager)
+    state.engine!.startCueRun(parameters, {
+      hasCueStartedFired: state.session.hasCueStartedFired(),
     })
   }
 
   onStop(): void {
     const skipEffectRemoval = this.style === CueStyle.Primary
-    this.engine?.cancelAll(skipEffectRemoval)
-    this.engine = null
-    this.session.resetForStop()
+    for (const state of this.states.values()) {
+      state.engine?.cancelAll(skipEffectRemoval)
+      state.engine = null
+      state.session.resetForStop()
+    }
+  }
+
+  /**
+   * Drops the per-sequencer state entry so a disposed chain's sequencer reference can be
+   * garbage collected. Without this hook the cue instance (a registry singleton) would
+   * accumulate one stale entry per `restartControllers` cycle.
+   */
+  releaseSequencer(sequencer: ILightingController): void {
+    const state = this.states.get(sequencer)
+    if (!state) return
+    state.engine?.cancelAll(this.style === CueStyle.Primary)
+    this.states.delete(sequencer)
+    // The disposed sequencer's shared group stores can be dropped wholesale; other cues that
+    // shared them are releasing the same sequencer in the same teardown. Idempotent: a later
+    // release for the same sequencer finds no entry and no-ops.
+    YargNodeCue.groupLevelVarStores.delete(sequencer)
   }
 
   onPause(): void {

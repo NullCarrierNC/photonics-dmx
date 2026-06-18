@@ -37,7 +37,7 @@ export type Color =
 /**
  * Represents how a color should blend with colors on lower layers
  */
-export type BlendMode = 'replace' | 'add' | 'multiply' | 'overlay'
+export type BlendMode = 'replace' | 'add' | 'mix'
 
 /**
  * Represents brightness levels for lights
@@ -165,6 +165,9 @@ export const WAIT_CONDITIONS = [
   'drum-yellow-cymbal',
   'drum-blue-cymbal',
   'drum-green-cymbal',
+  // Vocal events (note-on/note-off edges from any vocal or harmony part)
+  'vocal-note',
+  'vocal-note-off',
 ] as const
 
 /**
@@ -214,12 +217,14 @@ export interface EffectTransition {
 export enum FixtureTypes {
   RGB = 'rgb',
   RGBW = 'rgbw',
-  RGBS = 'rgb/s',
-  RGBWS = 'rgbw/s',
   STROBE = 'strobe',
   RGBMH = 'rgb/mh',
   RGBWMH = 'rgbw/mh',
 }
+
+/** Legacy fixture identifiers replaced by the hasStrobeChannel model; retained for migration only. */
+export const LEGACY_FIXTURE_RGB_STROBE = 'rgb/s'
+export const LEGACY_FIXTURE_RGBW_STROBE = 'rgbw/s'
 
 /**
  * DMX-related types
@@ -238,18 +243,22 @@ export interface RgbDmxChannels extends BaseDmxFixture {
   red: number
   green: number
   blue: number
-}
-
-export interface RgbStrobeDmxChannels extends RgbDmxChannels {
-  strobeSpeed: number
+  /**
+   * Optional hardware strobe-speed DMX channel on an RGB-family fixture (RGB / RGBW / RGBMH /
+   * RGBWMH). Present when the fixture template has "Strobe Channel?" enabled — i.e. the user has
+   * declared that this colour fixture also exposes a strobe-speed channel. Stored alongside the
+   * other channel offsets so master-dimmer shifts propagate the same way they do for r/g/b.
+   *
+   * This is **not** the same concept as {@link StrobeDmxChannels.strobeChannel}: that one belongs
+   * to a dedicated (colour-less) hardware strobe fixture. The runtime treats the two channels
+   * differently — only the RGB-family flavour participates in the latch-and-write behaviour added
+   * for the "Strobe Channel?" feature.
+   */
+  strobeChannel?: number
 }
 
 export interface RgbwDmxChannels extends RgbDmxChannels {
   white: number
-}
-
-export interface RgbwStrobeDmxCannels extends RgbwDmxChannels {
-  strobeSpeed: number
 }
 
 export interface MovingHeadDmxChannels {
@@ -425,8 +434,35 @@ export interface RgbMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbDmxC
 
 export interface RgbwMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbwDmxChannels {}
 
+/**
+ * Channel record for a **dedicated** hardware strobe fixture — a colour-less light whose only
+ * outputs are master dimmer + strobe speed. Distinct from {@link RgbDmxChannels.strobeChannel},
+ * which is the optional strobe-speed channel exposed by some RGB-family fixtures.
+ */
 export interface StrobeDmxChannels extends BaseDmxFixture {
-  strobeSpeed: number
+  strobeChannel: number
+}
+
+/**
+ * Per-fixture DMX values written to {@link RgbDmxChannels.strobeChannel} when each strobe cue is
+ * active. Values are DMX 0–255 (not channel numbers).
+ *
+ * Only used by RGB-family fixtures with the "Strobe Channel?" template option enabled. Dedicated
+ * {@link FixtureTypes.STROBE} fixtures do not consume this — they are a separate device class.
+ */
+export interface StrobeChannelValues {
+  slow: number
+  medium: number
+  fast: number
+  fastest: number
+}
+
+/** Defaults used when a strobe-channel fixture has no explicit per-cue speed values yet. */
+export const DEFAULT_STROBE_CHANNEL_VALUES: Readonly<StrobeChannelValues> = {
+  slow: 64,
+  medium: 128,
+  fast: 192,
+  fastest: 255,
 }
 
 export type TrackedLight = {
@@ -448,9 +484,7 @@ export interface DmxFixture {
   group?: string
   channels:
     | RgbDmxChannels
-    | RgbStrobeDmxChannels
     | RgbwDmxChannels
-    | RgbwStrobeDmxCannels
     | StrobeDmxChannels
     | RgbMovingHeadDmxChannels
     | RgbwMovingHeadDmxChannels
@@ -458,6 +492,12 @@ export interface DmxFixture {
   universe?: number
   /** Floor vs ceiling/truss placement for preview and static wash; default floor when omitted before migration. */
   mount?: 'floor' | 'ceiling'
+  /**
+   * DMX values (0–255) written to {@link RgbDmxChannels.strobeChannel} based on the active strobe
+   * cue. Only meaningful when this is an RGB-family fixture whose `channels.strobeChannel` is set;
+   * dedicated {@link FixtureTypes.STROBE} fixtures don't use this field.
+   */
+  strobeValues?: StrobeChannelValues
 }
 
 export interface DmxLight extends DmxFixture {
@@ -554,7 +594,7 @@ export const LightTypes: DmxFixture[] = [
     group: '',
     channels: {
       masterDimmer: 0,
-      strobeSpeed: 0,
+      strobeChannel: 0,
     },
     universe: 1,
   },
@@ -585,6 +625,23 @@ export interface LightingConfiguration {
 }
 
 /**
+ * Sender ids whose DMX output goes on a wire (vs the in-app IPC preview).
+ * Per-rig `outputs` lists target only wire senders; IPC always receives every active rig
+ * and is filtered for display by the renderer's existing preview rig-selector.
+ */
+export type WireSenderId = 'sacn' | 'artnet' | 'enttecpro' | 'opendmx'
+
+export const WIRE_SENDER_IDS: readonly WireSenderId[] = [
+  'sacn',
+  'artnet',
+  'enttecpro',
+  'opendmx',
+] as const
+
+/** A sender slot id used by the publisher: wire senders plus the IPC preview channel. */
+export type SenderSlotId = WireSenderId | 'ipc'
+
+/**
  * DMX Rig Interface
  * Represents a complete DMX configuration with its own active state.
  * Universe is configured at the sender/adapter level.
@@ -594,6 +651,27 @@ export interface DmxRig {
   name: string
   active: boolean // Default true
   config: LightingConfiguration
+  /**
+   * Wire senders this rig publishes to.
+   *  - `undefined` → publish to every currently enabled wire sender (legacy/default).
+   *  - explicit array → publish only to listed wire senders that are currently enabled.
+   *    Empty array means "publish nowhere on the wire" (the rig still feeds the IPC preview).
+   * IPC is always populated for every active rig regardless of this field.
+   */
+  outputs?: WireSenderId[]
+  /**
+   * Mirror this rig horizontally (left/right) at runtime: positions within `frontLights`,
+   * `backLights`, and `strobeLights` are independently reversed, so cues using `'linear'`
+   * walk in the opposite direction and `'even'`/`'odd'` swap. Absence = false. See
+   * `helpers/mirrorRig.ts` for the transform.
+   */
+  mirrorHoriz?: boolean
+  /**
+   * Mirror this rig vertically (front/back) at runtime: `frontLights` and `backLights` arrays
+   * are swapped. `strobeLights` is not affected. Combine with `mirrorHoriz` for 180° rotation.
+   * Absence = false.
+   */
+  mirrorVert?: boolean
 }
 
 /**
@@ -601,7 +679,7 @@ export interface DmxRig {
  */
 export interface DmxRigsConfig {
   rigs: DmxRig[]
-  /** Bumped once the legacy `front-back` → `two-rows` rename and initial mount backfill have run. */
+  /** Schema version driving the on-read rig migrations; see `CURRENT_RIGS_SCHEMA_VERSION` and `migrateDmxRigsConfig`. */
   schemaVersion?: number
 }
 

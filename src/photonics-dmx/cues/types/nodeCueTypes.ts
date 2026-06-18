@@ -1,6 +1,6 @@
 import { CueType } from './cueTypes'
 
-import type { YargEventType, TrackedLight } from '../../types'
+import type { YargEventType, TrackedLight, Color } from '../../types'
 import {
   ALL_CONFIG_DATA_PROPERTIES,
   YARG_CUE_DATA_PROPERTIES,
@@ -47,18 +47,19 @@ export type VariableType =
   | 'string'
   | 'color'
   | 'light-array'
+  | 'color-array'
   | 'cue-type'
   | 'event'
 
 export type ValueSource =
-  | { source: 'literal'; value: number | boolean | string | TrackedLight[] }
+  | { source: 'literal'; value: number | boolean | string | TrackedLight[] | Color[] }
   | { source: 'variable'; name: string }
 
 export interface VariableDefinition {
   name: string
   type: VariableType
   scope: 'cue' | 'cue-group'
-  initialValue: number | boolean | string | TrackedLight[]
+  initialValue: number | boolean | string | TrackedLight[] | Color[]
   description?: string
   isParameter?: boolean
   /** Constrained set of allowed literal values; drives a selector in the effect-raiser parameter UI */
@@ -133,6 +134,31 @@ export interface LightsFromIndexLogicNode extends BaseLogicNode {
   assignTo: string // Variable to assign the single light to
 }
 
+export interface ColorFromIndexLogicNode extends BaseLogicNode {
+  logicType: 'color-from-index'
+  colors: ValueSource // Palette: inline literal Color[] (enum-validated) or a color-array variable
+  index: ValueSource // Index into the palette (with wraparound modulo palette length)
+  assignTo: string // Variable written with type 'color'
+}
+
+export interface ReverseColorsLogicNode extends BaseLogicNode {
+  logicType: 'reverse-colors'
+  sourceVariable: string // Name of color-array variable
+  assignTo: string // Variable to store reversed color-array
+}
+
+export interface ConcatColorsLogicNode extends BaseLogicNode {
+  logicType: 'concat-colors'
+  sourceVariables: string[] // Names of color-array variables to concatenate
+  assignTo: string // Variable to store concatenated color-array
+}
+
+export interface ShuffleColorsLogicNode extends BaseLogicNode {
+  logicType: 'shuffle-colors'
+  sourceVariable: string // color-array to shuffle
+  assignTo: string // shuffled copy
+}
+
 export interface ArrayLengthLogicNode extends BaseLogicNode {
   logicType: 'array-length'
   sourceVariable: string // Name of light-array variable
@@ -158,6 +184,12 @@ export interface ConcatLightsLogicNode extends BaseLogicNode {
   logicType: 'concat-lights'
   sourceVariables: string[] // Names of light-array variables to concatenate
   assignTo: string // Variable to store concatenated array
+}
+
+export interface BuildRingLogicNode extends BaseLogicNode {
+  logicType: 'build-ring'
+  assignTo: string // Variable to store the virtual ring (light-array)
+  assignGroupSize: string // Variable to store the ring group size (number)
 }
 
 export interface DelayLogicNode extends BaseLogicNode {
@@ -206,10 +238,15 @@ export type LogicNode =
   | CueDataLogicNode
   | ConfigDataLogicNode
   | LightsFromIndexLogicNode
+  | ColorFromIndexLogicNode
+  | ReverseColorsLogicNode
+  | ConcatColorsLogicNode
+  | ShuffleColorsLogicNode
   | ArrayLengthLogicNode
   | ReverseLightsLogicNode
   | CreatePairsLogicNode
   | ConcatLightsLogicNode
+  | BuildRingLogicNode
   | DelayLogicNode
   | DebuggerLogicNode
   | RandomLogicNode
@@ -254,6 +291,11 @@ export interface EffectRaiserNode {
   /** When true, the effect automatically re-triggers when it completes, creating a continuous loop.
    *  Used for effects like sweeps or cross-fades that should run indefinitely until the cue stops. */
   isPersistent?: boolean
+  /** When true, re-triggering this raiser while its effect is still running cancels the in-flight
+   *  effect and restarts it from the top, instead of dropping the trigger. Used for event-driven
+   *  flashes (e.g. a drum-red blink) that must fire on every event even when they arrive faster than
+   *  the flash duration. Default false keeps the drop-while-busy behaviour. */
+  interruptible?: boolean
 }
 
 export type NotesStyle = 'notes' | 'info' | 'important'
@@ -434,6 +476,10 @@ export interface AudioTriggerNode extends BaseEventNode {
   holdMs?: number
   /** Energy smoothing (0–1). 0 = raw/immediate, 1 = maximum smoothing (slow response). Default 0.45. */
   smoothing?: number
+  /** Rising-edge time constant (ms) for the band envelope. Smaller = snappier fade-up. Set with releaseMs to opt into asymmetric (fast-up/slow-down) smoothing instead of the symmetric `smoothing` path. */
+  attackMs?: number
+  /** Falling-edge time constant (ms) for the band envelope. Larger = slower fade-down (eg. 1970s light-organ feel). Set with attackMs to opt into asymmetric smoothing. */
+  releaseMs?: number
   /** Optional spectral conditions (flatness, ZCR, HFC, crest). AND with band energy. */
   spectralGates?: AudioTriggerSpectralGates
   /** When true, also require per-band onset strength above onsetThreshold for the matched band */

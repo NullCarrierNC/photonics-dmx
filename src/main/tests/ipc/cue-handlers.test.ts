@@ -12,6 +12,18 @@ const mockIpcMain = {
   on: jest.fn(),
 }
 
+// Default stubs for the chain fanout surface used by SIMULATE_* handlers. Tests can
+// override these by replacing the mock function after import.
+const stubChainFanout = {
+  handleCue: jest.fn(),
+  yargOnBeat: jest.fn(),
+  yargOnMeasure: jest.fn(),
+  yargOnKeyframe: jest.fn(),
+  yargSchedulePanTiltClear: jest.fn(),
+  yargCancelPanTiltClear: jest.fn(),
+  getChains: jest.fn().mockReturnValue([]),
+}
+
 const mockControllerManager = {
   getSenderManager: jest.fn().mockReturnValue({
     enableSender: jest.fn(),
@@ -19,6 +31,8 @@ const mockControllerManager = {
   }),
   getCueHandler: jest.fn(),
   getLightingController: jest.fn(),
+  getChainFanout: jest.fn(() => stubChainFanout),
+  ensureChainsHaveYargHandlersForSimulation: jest.fn(),
   getIsInitialized: jest.fn().mockReturnValue(true),
   getIsYargEnabled: jest.fn().mockReturnValue(true),
   getIsRb3Enabled: jest.fn().mockReturnValue(false),

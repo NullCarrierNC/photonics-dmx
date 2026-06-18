@@ -9,8 +9,9 @@ import type {
   SacnSenderConfig,
   SenderConfig,
   SerialSenderConfig,
+  WireSenderId,
 } from '../../photonics-dmx/types'
-import { ConfigStrobeType } from '../../photonics-dmx/types'
+import { ConfigStrobeType, WIRE_SENDER_IDS } from '../../photonics-dmx/types'
 import type { AppPreferences } from '../../services/configuration/ConfigurationManager'
 import {
   CUE_DOMAINS,
@@ -42,6 +43,7 @@ import {
 export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
 const SENDER_IDS = new Set(['sacn', 'ipc', 'enttecpro', 'artnet', 'opendmx'])
+const WIRE_SENDER_ID_SET: ReadonlySet<string> = new Set<string>(WIRE_SENDER_IDS)
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -59,6 +61,50 @@ export function validateSenderId(value: unknown): ValidationResult<string> {
     return { ok: false, error: `Invalid sender: ${value}` }
   }
   return { ok: true, value }
+}
+
+/**
+ * Validates a per-rig mirror flag (`mirrorHoriz` / `mirrorVert`). The field is optional on the
+ * wire payload — undefined, missing, or explicit `false` all normalize to `undefined`, which
+ * the caller drops from the saved rig so we don't persist the no-op default. Anything other
+ * than a boolean is rejected.
+ */
+export function validateRigMirrorFlag(
+  value: unknown,
+  field: 'mirrorHoriz' | 'mirrorVert',
+): ValidationResult<boolean | undefined> {
+  if (value === undefined || value === null) {
+    return { ok: true, value: undefined }
+  }
+  if (typeof value !== 'boolean') {
+    return { ok: false, error: `DmxRig.${field} must be a boolean` }
+  }
+  return { ok: true, value: value === true ? true : undefined }
+}
+
+/**
+ * Validates a per-rig `outputs` field. The field is optional on the wire payload — undefined or
+ * missing means "publish to every enabled wire sender" (legacy default). When present it must be
+ * an array of {@link WireSenderId} strings; duplicates are collapsed.
+ */
+export function validateRigOutputs(value: unknown): ValidationResult<WireSenderId[] | undefined> {
+  if (value === undefined || value === null) {
+    return { ok: true, value: undefined }
+  }
+  if (!Array.isArray(value)) {
+    return { ok: false, error: 'DmxRig.outputs must be an array of wire sender ids' }
+  }
+  const seen = new Set<WireSenderId>()
+  for (const entry of value) {
+    if (typeof entry !== 'string' || !WIRE_SENDER_ID_SET.has(entry)) {
+      return {
+        ok: false,
+        error: `DmxRig.outputs contains invalid wire sender id: ${String(entry)}`,
+      }
+    }
+    seen.add(entry as WireSenderId)
+  }
+  return { ok: true, value: Array.from(seen) }
 }
 
 export function validateNumberInRange(
@@ -455,17 +501,43 @@ export function validateDmxRigPayload(data: unknown): ValidationResult<DmxRig> {
   if (!cfg.ok) {
     return { ok: false, error: `DmxRig.config: ${cfg.error}` }
   }
-  return {
-    ok: true,
-    value: {
-      id: data.id.trim(),
-      name: data.name.trim(),
-      active: data.active,
-      config: cfg.value,
-    },
+  const outputs = validateRigOutputs(data.outputs)
+  if (!outputs.ok) {
+    return { ok: false, error: outputs.error }
   }
+  const mirrorHoriz = validateRigMirrorFlag(data.mirrorHoriz, 'mirrorHoriz')
+  if (!mirrorHoriz.ok) {
+    return { ok: false, error: mirrorHoriz.error }
+  }
+  const mirrorVert = validateRigMirrorFlag(data.mirrorVert, 'mirrorVert')
+  if (!mirrorVert.ok) {
+    return { ok: false, error: mirrorVert.error }
+  }
+  const rig: DmxRig = {
+    id: data.id.trim(),
+    name: data.name.trim(),
+    active: data.active,
+    config: cfg.value,
+  }
+  if (outputs.value !== undefined) {
+    rig.outputs = outputs.value
+  }
+  if (mirrorHoriz.value !== undefined) {
+    rig.mirrorHoriz = mirrorHoriz.value
+  }
+  if (mirrorVert.value !== undefined) {
+    rig.mirrorVert = mirrorVert.value
+  }
+  return { ok: true, value: rig }
 }
 
+/**
+ * Resolves `targetPath` and confirms it sits under one of `allowedRoots` after normalization,
+ * rejecting empty input, null bytes, and paths that escape the roots. The default roots include the
+ * user's home directory by design: users import/export cue and effect libraries to arbitrary
+ * locations they choose, so shell open/show operations are scoped to the home tree rather than a
+ * single app directory.
+ */
 export function validatePathUnderAllowedRoots(
   targetPath: unknown,
   allowedRoots: string[] = [process.cwd(), os.homedir(), os.tmpdir()],
@@ -491,41 +563,6 @@ export function validatePathUnderAllowedRoots(
   }
 
   return { ok: true, value: resolvedTarget }
-}
-
-/**
- * Resolves a script name to an absolute path under `appPath/scripts`.
- * `scriptName` must be a single file segment (no path separators, `..`, or NUL).
- */
-export function validateNodeScriptPath(
-  appPath: string,
-  scriptName: string,
-): ValidationResult<string> {
-  if (typeof scriptName !== 'string' || scriptName.length === 0) {
-    return { ok: false, error: 'Script name is required' }
-  }
-  if (scriptName.includes('\0')) {
-    return { ok: false, error: 'Script name must not contain null bytes' }
-  }
-  if (scriptName === '.' || scriptName === '..') {
-    return { ok: false, error: 'Script name must be a base filename' }
-  }
-  if (scriptName.includes('/') || scriptName.includes('\\')) {
-    return { ok: false, error: 'Script name must not contain path separators' }
-  }
-  if (scriptName !== path.basename(scriptName)) {
-    return { ok: false, error: 'Script name must not include path segments' }
-  }
-
-  const scriptsRoot = path.resolve(path.join(appPath, 'scripts'))
-  const scriptPath = path.join(scriptsRoot, scriptName)
-  const resolved = path.resolve(scriptPath)
-  const rel = path.relative(scriptsRoot, resolved)
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
-    return { ok: false, error: 'Script must resolve under the app scripts directory' }
-  }
-
-  return { ok: true, value: resolved }
 }
 
 function isStringArray(x: unknown): x is string[] {
@@ -644,6 +681,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'cueDomains',
   'cueConsistencyWindow',
   'clockRate',
+  'globalDmxPublishingRateHz',
   'dmxOutputConfig',
   'stageKitPrefs',
   'dmxSettingsPrefs',
@@ -698,6 +736,14 @@ export function validatePreferencesPayload(
 
   if ('advancedModeEnabled' in cleaned && typeof cleaned.advancedModeEnabled !== 'boolean') {
     return { ok: false, error: 'advancedModeEnabled must be a boolean' }
+  }
+
+  if ('globalDmxPublishingRateHz' in cleaned) {
+    const hz = cleaned.globalDmxPublishingRateHz
+    if (typeof hz !== 'number' || !Number.isFinite(hz)) {
+      return { ok: false, error: 'globalDmxPublishingRateHz must be a finite number' }
+    }
+    cleaned.globalDmxPublishingRateHz = clampDmxOutputRefreshRateHz(hz)
   }
 
   if ('sacnConfig' in cleaned) {
@@ -1034,6 +1080,34 @@ export function validateDmxFixturesArray(
     if (!isPlainObject(el.channels)) {
       return { ok: false, error: `${fieldName}[${i}].channels must be an object` }
     }
+    if (el.strobeValues != null) {
+      const strobeValuesError = validateStrobeChannelValues(
+        el.strobeValues,
+        `${fieldName}[${i}].strobeValues`,
+      )
+      if (strobeValuesError) {
+        return { ok: false, error: strobeValuesError }
+      }
+    }
   }
   return { ok: true, value: value as DmxFixture[] }
+}
+
+const STROBE_VALUE_KEYS = ['slow', 'medium', 'fast', 'fastest'] as const
+
+/**
+ * Validates a {@link StrobeChannelValues} record (each slot must be a DMX 0–255 integer).
+ * Returns null when valid, or an error message string when not.
+ */
+function validateStrobeChannelValues(value: unknown, fieldName: string): string | null {
+  if (!isPlainObject(value)) {
+    return `${fieldName} must be a plain object`
+  }
+  for (const key of STROBE_VALUE_KEYS) {
+    const v = (value as Record<string, unknown>)[key]
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 255) {
+      return `${fieldName}.${key} must be an integer between 0 and 255`
+    }
+  }
+  return null
 }

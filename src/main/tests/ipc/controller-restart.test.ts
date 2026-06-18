@@ -75,6 +75,8 @@ describe('ControllerManager lifecycle and sender restore', () => {
       effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
       dmxPublisher: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
       cueHandler: { shutdown: jest.fn() },
+      rigChains: [],
+      clock: { destroy: jest.fn() },
       dmxLightManager: {},
       lightStateManager: {},
       lightTransitionController: {},
@@ -116,6 +118,8 @@ describe('ControllerManager lifecycle and sender restore', () => {
       effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
       dmxPublisher: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
       cueHandler: { shutdown: jest.fn() },
+      rigChains: [],
+      clock: { destroy: jest.fn() },
       dmxLightManager: {},
       lightStateManager: {},
       lightTransitionController: {},
@@ -285,6 +289,8 @@ describe('ControllerManager lifecycle and sender restore', () => {
         setManualBuffer,
       },
       cueHandler: { shutdown: jest.fn() },
+      rigChains: [],
+      clock: { destroy: jest.fn() },
       dmxLightManager: {},
       lightStateManager: {},
       lightTransitionController: {},
@@ -346,6 +352,8 @@ describe('ControllerManager lifecycle and sender restore', () => {
         setManualBuffer: jest.fn(),
       },
       cueHandler: { shutdown: jest.fn() },
+      rigChains: [],
+      clock: { destroy: jest.fn() },
       dmxLightManager: {},
       lightStateManager: {},
       lightTransitionController: {},
@@ -403,6 +411,8 @@ describe('ControllerManager lifecycle and sender restore', () => {
         setManualBuffer: jest.fn(),
       },
       cueHandler: { shutdown: jest.fn() },
+      rigChains: [],
+      clock: { destroy: jest.fn() },
       dmxLightManager: {},
       lightStateManager: {},
       lightTransitionController: {},
@@ -449,6 +459,8 @@ describe('ControllerManager lifecycle and sender restore', () => {
         setManualBuffer: jest.fn(),
       },
       cueHandler: { shutdown: jest.fn() },
+      rigChains: [],
+      clock: { destroy: jest.fn() },
       dmxLightManager: {},
       lightStateManager: {},
       lightTransitionController: {},
@@ -491,6 +503,8 @@ describe('ControllerManager lifecycle and sender restore', () => {
         setManualBuffer,
       },
       cueHandler: { shutdown: jest.fn() },
+      rigChains: [],
+      clock: { destroy: jest.fn() },
       dmxLightManager: {},
       lightStateManager: {},
       lightTransitionController: {},
@@ -626,6 +640,8 @@ describe('ControllerManager lifecycle and sender restore', () => {
       effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
       dmxPublisher: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
       cueHandler: { shutdown: jest.fn() },
+      rigChains: [],
+      clock: { destroy: jest.fn() },
       dmxLightManager: {},
       lightStateManager: {},
       lightTransitionController: {},
@@ -707,7 +723,10 @@ describe('ControllerManager lifecycle and sender restore', () => {
       nodeCueLoader: null
       effectLoader: null
       cueHandler: null
-      effectsController: { shutdown: jest.Mock }
+      rigChains: Array<{ rigId: string; dispose: jest.Mock }>
+      clock: { destroy: jest.Mock } | null
+      dmxLightManager: null
+      effectsController: null
       dmxPublisher: { shutdown: jest.Mock }
       senderLifecycle: { shutdownSenderOnAppExit: jest.Mock }
     }
@@ -723,7 +742,12 @@ describe('ControllerManager lifecycle and sender restore', () => {
     stub.nodeCueLoader = null
     stub.effectLoader = null
     stub.cueHandler = null
-    stub.effectsController = { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) }
+    stub.rigChains = [
+      { rigId: 'merged', dispose: jest.fn().mockImplementation(() => Promise.resolve()) },
+    ]
+    stub.clock = { destroy: jest.fn() }
+    stub.dmxLightManager = null
+    stub.effectsController = null
     stub.dmxPublisher = { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) }
     stub.senderLifecycle = { shutdownSenderOnAppExit: senderShutdown }
 

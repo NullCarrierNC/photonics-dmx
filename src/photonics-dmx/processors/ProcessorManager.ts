@@ -5,11 +5,10 @@
  */
 import { EventEmitter } from 'events'
 import { Rb3StageKitDirectProcessor } from './Rb3StageKitDirectProcessor'
-import { DmxLightManager } from '../controllers/DmxLightManager'
-import { ILightingController } from '../controllers/sequencer/interfaces'
+import { ChainFanout } from '../controllers/ChainFanout'
 import { StageKitConfig } from '../listeners/RB3/StageKitTypes'
 import { CueData } from '../cues/types/cueTypes'
-import { Rb3MenuCueHandler } from '../cueHandlers/Rb3MenuCueHandler'
+import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('ProcessorManager')
 
@@ -42,20 +41,14 @@ export class ProcessorManager extends EventEmitter {
 
   private stageKitDirectProcessor: Rb3StageKitDirectProcessor | null = null
 
-  private lightManager: DmxLightManager
-  private photonicsSequencer: ILightingController
-  private cueHandler: Rb3MenuCueHandler | null = null
+  private readonly chainFanout: ChainFanout
+  private cueHandler: Rb3MenuCueDispatch | null = null
 
   private config: ProcessorManagerConfig
 
-  constructor(
-    lightManager: DmxLightManager,
-    photonicsSequencer: ILightingController,
-    config: Partial<ProcessorManagerConfig> = {},
-  ) {
+  constructor(chainFanout: ChainFanout, config: Partial<ProcessorManagerConfig> = {}) {
     super()
-    this.lightManager = lightManager
-    this.photonicsSequencer = photonicsSequencer
+    this.chainFanout = chainFanout
     this.config = { ...DEFAULT_PROCESSOR_CONFIG, ...config }
 
     if (config.mode && config.mode !== 'direct') {
@@ -91,7 +84,7 @@ export class ProcessorManager extends EventEmitter {
   /**
    * Set the cue handler used for RB3 menu animation.
    */
-  public setCueHandler(cueHandler: Rb3MenuCueHandler): void {
+  public setCueHandler(cueHandler: Rb3MenuCueDispatch): void {
     this.cueHandler = cueHandler
     if (this.stageKitDirectProcessor) {
       this.stageKitDirectProcessor.setCueHandler(cueHandler)
@@ -152,8 +145,7 @@ export class ProcessorManager extends EventEmitter {
     if (!this.stageKitDirectProcessor) {
       log.info('ProcessorManager: Creating new StageKitDirectProcessor...')
       this.stageKitDirectProcessor = new Rb3StageKitDirectProcessor(
-        this.lightManager,
-        this.photonicsSequencer,
+        this.chainFanout,
         this.config.stageKitConfig,
         this.cueHandler, // Pass cue handler for menu state handling
       )

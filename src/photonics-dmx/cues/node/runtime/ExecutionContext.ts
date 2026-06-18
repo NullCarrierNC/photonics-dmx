@@ -7,6 +7,7 @@ import { ActionNode, BaseEventNode } from '../../types/nodeCueTypes'
 import { CueData } from '../../types/cueTypes'
 import { AudioCueData } from '../../types/audioCueTypes'
 import { VariableValue, NodeCompletionCallback, ContextCompletionCallback } from './executionTypes'
+import { monotonicNowMs } from '../../../../shared/time'
 
 export class ExecutionContext {
   public readonly id: string
@@ -48,7 +49,7 @@ export class ExecutionContext {
   ) {
     this.id = `${eventNode.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     this.eventNode = eventNode
-    this.startTime = Date.now()
+    this.startTime = monotonicNowMs()
     this.cueData = cueData
     this.cueLevelVarStore = cueLevelVarStore
     this.groupLevelVarStore = groupLevelVarStore

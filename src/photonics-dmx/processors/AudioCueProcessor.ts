@@ -7,18 +7,18 @@ import {
 import { DEFAULT_AUDIO_CONFIG, DEFAULT_AUDIO_IDLE_DETECTION } from '../listeners/Audio'
 
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
+import type { ChainFanout } from '../controllers/ChainFanout'
 import { pickStrobeCueType } from './audioStrobeHelpers'
 import { AudioGameModeManager } from './AudioGameModeManager'
 import { AudioIdleController } from './AudioIdleController'
 import { AUDIO_IDLE_EFFECT_NAME, AUDIO_IDLE_LAYER } from './audioIdleConstants'
-import { DmxLightManager } from '../controllers/DmxLightManager'
-import { ILightingController } from '../controllers/sequencer/interfaces'
 import { AudioCueType, AudioMotionCueRef } from '../cues/types/audioCueTypes'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import { getIntensityScale } from '../cues/audio/utils/bandUtils'
 import { getColor } from '../helpers/dmxHelpers'
 import { getEffectSingleColor } from '../effects/effectSingleColor'
 import { createLogger } from '../../shared/logger'
+import { monotonicNowMs } from '../../shared/time'
 import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 const log = createLogger('AudioCueProcessor')
 
@@ -31,7 +31,12 @@ const log = createLogger('AudioCueProcessor')
 export class AudioCueProcessor {
   private config: AudioConfig
   private isActive = false
-  private cueHandler: AudioCueHandler
+  /**
+   * Chain fanout that owns the per-rig {@link AudioCueHandler} instances. Cue assignment
+   * is decided once per audio frame here, then dispatched to every rig's handler so each
+   * rig renders the same cue against its own light layout.
+   */
+  private readonly chainFanout: ChainFanout
   private currentPrimaryCueType: AudioCueType
   private currentSecondaryCueType: AudioCueType | null
   private registry: AudioCueRegistry
@@ -41,14 +46,12 @@ export class AudioCueProcessor {
   private onStrobeStateChange: ((active: boolean) => void) | null = null
   private onGameModeCueChange: ((cueType: AudioCueType) => void) | null = null
   private onGameModeScheduleChange: ((info: AudioGameModeSchedulePayload) => void) | null = null
-  private readonly lightManager: DmxLightManager
   private readonly idleController = new AudioIdleController()
   private idleLookActive = false
   private idleSuppressedMotion = false
 
   constructor(
-    lightManager: DmxLightManager,
-    private sequencer: ILightingController,
+    chainFanout: ChainFanout,
     runtimeBroadcaster: RuntimeBroadcaster,
     audioConfig: AudioConfig,
     preferredCueType?: AudioCueType,
@@ -56,17 +59,31 @@ export class AudioCueProcessor {
     getMotionCueMinimumHoldMs?: () => number,
     getMotionCueProbabilityPercent?: () => number,
   ) {
-    this.lightManager = lightManager
+    this.chainFanout = chainFanout
     this.config = this.mergeAudioConfig(audioConfig)
     this.registry = AudioCueRegistry.getInstance()
     this.currentPrimaryCueType = this.selectActiveCueType(preferredCueType)
     this.currentSecondaryCueType = preferredSecondaryCueType ?? null
-    this.cueHandler = new AudioCueHandler(lightManager, sequencer, {
-      getMotionCueMinimumHoldMs,
-      getMotionCueProbabilityPercent,
-      runtimeBroadcaster,
-    })
-    this.cueHandler.syncSlots(this.currentPrimaryCueType, this.currentSecondaryCueType, null, false)
+    // Create one AudioCueHandler per chain, bound to that chain's sequencer and light
+    // manager. Only the primary chain emits renderer broadcasts to keep the UI from
+    // receiving duplicate motion-cue change events.
+    const chains = this.chainFanout.getChains()
+    for (const chain of chains) {
+      if (chain.audioCueHandler) {
+        chain.audioCueHandler.destroy()
+      }
+      chain.audioCueHandler = new AudioCueHandler(chain.dmxLightManager, chain.sequencer, {
+        getMotionCueMinimumHoldMs,
+        getMotionCueProbabilityPercent,
+        runtimeBroadcaster: chain.isPrimary ? runtimeBroadcaster : undefined,
+      })
+    }
+    this.chainFanout.audioSyncSlots(
+      this.currentPrimaryCueType,
+      this.currentSecondaryCueType,
+      null,
+      false,
+    )
   }
 
   private mergeAudioConfig(patch: AudioConfig): AudioConfig {
@@ -81,11 +98,11 @@ export class AudioCueProcessor {
   }
 
   public setMotionEnabled(enabled: boolean): void {
-    this.cueHandler.setMotionEnabled(enabled)
+    this.chainFanout.audioSetMotionEnabled(enabled)
   }
 
   public setManualMotionRef(ref: AudioMotionCueRef | null): void {
-    this.cueHandler.setManualMotionRef(ref)
+    this.chainFanout.audioSetManualMotionRef(ref)
   }
 
   /**
@@ -121,13 +138,13 @@ export class AudioCueProcessor {
     } else {
       this.strobeCueType = null
     }
-    this.cueHandler.stop()
+    this.chainFanout.audioStop()
     this.registry.onMotionSongEnd()
 
     // Clear all audio-related effects
     // Remove effects from layers 0-7 (frequency band layers)
     for (let layer = 0; layer < 8; layer++) {
-      this.sequencer.removeEffectByLayer(layer, true)
+      this.chainFanout.audioRemoveEffectByLayer(layer, true)
     }
 
     log.info('AudioCueProcessor: Stopped')
@@ -150,10 +167,10 @@ export class AudioCueProcessor {
   public processAudioData(data: AudioLightingData): void {
     if (!this.isActive) return
 
-    const now = Date.now()
+    const now = monotonicNowMs()
     if (data.beatDetected && now - this.lastBeatTimestamp >= 100) {
       this.lastBeatTimestamp = now
-      this.sequencer.onBeat()
+      this.chainFanout.audioOnBeat()
     }
 
     const processedData =
@@ -189,8 +206,8 @@ export class AudioCueProcessor {
     this.evaluateStrobe(processedData)
     const strobe = this.strobeActive && this.strobeCueType ? this.strobeCueType : null
 
-    void this.cueHandler
-      .handleAudioData(
+    void this.chainFanout
+      .audioHandleData(
         processedData,
         this.config,
         primary,
@@ -215,7 +232,7 @@ export class AudioCueProcessor {
   public shutdown(): void {
     this.disableGameMode()
     this.stop()
-    this.cueHandler.destroy()
+    this.chainFanout.audioDestroy()
     log.info('AudioCueProcessor: Shutdown complete')
   }
 
@@ -233,7 +250,7 @@ export class AudioCueProcessor {
       this.onGameModeScheduleChange?.(info)
     })
     this.gameModeManager.start()
-    this.cueHandler.syncSlots(this.gameModeManager.getActivePrimaryCue(), null, null, true)
+    this.chainFanout.audioSyncSlots(this.gameModeManager.getActivePrimaryCue(), null, null, true)
     log.info('AudioCueProcessor: Game Mode enabled')
   }
 
@@ -249,7 +266,7 @@ export class AudioCueProcessor {
     this.gameModeManager.setOnCueSwitch(null)
     this.gameModeManager.setOnScheduleChange(null)
     this.gameModeManager = null
-    this.cueHandler.syncSlots(
+    this.chainFanout.audioSyncSlots(
       this.currentPrimaryCueType,
       this.currentSecondaryCueType,
       this.getStrobeSlotSyncType(),
@@ -278,8 +295,10 @@ export class AudioCueProcessor {
    */
   public refreshCueSelection(): void {
     if (this.gameModeManager) {
-      this.gameModeManager.start()
-      this.cueHandler.syncSlots(this.gameModeManager.getActivePrimaryCue(), null, null, true)
+      // Re-validate the running Game Mode cue rather than restarting it: an incidental refresh
+      // (cue-group toggle, cue hot-reload) must not re-roll the cue and reset its dwell timer.
+      this.gameModeManager.ensureValidPrimary()
+      this.chainFanout.audioSyncSlots(this.gameModeManager.getActivePrimaryCue(), null, null, true)
       return
     }
 
@@ -297,7 +316,7 @@ export class AudioCueProcessor {
       log.info(`AudioCueProcessor: Clearing unavailable secondary ${this.currentSecondaryCueType}`)
       this.currentSecondaryCueType = null
     }
-    this.cueHandler.syncSlots(
+    this.chainFanout.audioSyncSlots(
       this.currentPrimaryCueType,
       this.currentSecondaryCueType,
       this.getStrobeSlotSyncType(),
@@ -318,7 +337,7 @@ export class AudioCueProcessor {
     if (this.currentPrimaryCueType !== cueType) {
       this.currentPrimaryCueType = cueType
       if (!this.gameModeManager) {
-        this.cueHandler.syncSlots(
+        this.chainFanout.audioSyncSlots(
           this.currentPrimaryCueType,
           this.currentSecondaryCueType,
           this.getStrobeSlotSyncType(),
@@ -341,7 +360,7 @@ export class AudioCueProcessor {
     if (cueType == null || cueType === '') {
       if (this.currentSecondaryCueType != null) {
         this.currentSecondaryCueType = null
-        this.cueHandler.syncSlots(
+        this.chainFanout.audioSyncSlots(
           this.currentPrimaryCueType,
           null,
           this.getStrobeSlotSyncType(),
@@ -359,7 +378,7 @@ export class AudioCueProcessor {
     }
     if (this.currentSecondaryCueType !== cueType) {
       this.currentSecondaryCueType = cueType
-      this.cueHandler.syncSlots(
+      this.chainFanout.audioSyncSlots(
         this.currentPrimaryCueType,
         this.currentSecondaryCueType,
         this.getStrobeSlotSyncType(),
@@ -468,35 +487,42 @@ export class AudioCueProcessor {
     if (this.idleLookActive) {
       return
     }
-    this.idleSuppressedMotion = this.cueHandler.isMotionLayerEnabled()
+    this.idleSuppressedMotion = this.chainFanout.audioIsMotionLayerEnabled()
     if (this.idleSuppressedMotion) {
-      this.cueHandler.setMotionEnabled(false)
+      this.chainFanout.audioSetMotionEnabled(false)
     }
-    const lights = this.lightManager.getLights(['front', 'back'], ['all'])
     const { idleColor, idleBrightness } = this.config.idleDetection
     const color = getColor(idleColor, idleBrightness)
-    const effect = getEffectSingleColor({
-      color,
-      duration: 400,
-      lights,
-      layer: AUDIO_IDLE_LAYER,
-    })
-    void this.sequencer.setEffect(AUDIO_IDLE_EFFECT_NAME, effect, true)
+    // Build the idle effect per chain against that chain's own light layout so each rig
+    // sees the same look scaled to its own lights.
+    for (const chain of this.chainFanout.getChains()) {
+      const lights = chain.dmxLightManager.getLights(['front', 'back'], ['all'])
+      if (!lights.length) continue
+      const effect = getEffectSingleColor({
+        color,
+        duration: 400,
+        lights,
+        layer: AUDIO_IDLE_LAYER,
+      })
+      void chain.sequencer.setEffect(AUDIO_IDLE_EFFECT_NAME, effect, true)
+    }
     this.idleLookActive = true
   }
 
   private clearIdleLook(): void {
     const hadIdle = this.idleLookActive || this.idleSuppressedMotion
     if (this.idleLookActive) {
-      this.sequencer.removeEffect(AUDIO_IDLE_EFFECT_NAME, AUDIO_IDLE_LAYER)
+      for (const chain of this.chainFanout.getChains()) {
+        chain.sequencer.removeEffect(AUDIO_IDLE_EFFECT_NAME, AUDIO_IDLE_LAYER)
+      }
       this.idleLookActive = false
     }
     if (this.idleSuppressedMotion) {
-      this.cueHandler.setMotionEnabled(true)
+      this.chainFanout.audioSetMotionEnabled(true)
       this.idleSuppressedMotion = false
     }
     if (hadIdle) {
-      this.cueHandler.resetMotionTracking()
+      this.chainFanout.audioResetMotionTracking()
     }
   }
 

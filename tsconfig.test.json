@@ -6,6 +6,7 @@
     "types": ["node", "jest", "electron-vite/node"]
   },
   "include": [
+    "src/renderer/src/env.d.ts",
     "src/photonics-dmx/tests/window-globals.d.ts",
     "src/shared/**/*.ts",
     "src/main/logging/**/*.ts",
