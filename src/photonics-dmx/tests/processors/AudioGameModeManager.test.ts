@@ -39,6 +39,14 @@ describe('AudioGameModeManager.ensureValidPrimary', () => {
     const running = mgr.getActivePrimaryCue()
     const deadlineAfterStart = lastDeadline
     expect(['audio-a', 'audio-b']).toContain(running)
+
+    // Deadline is broadcast to the renderer as a wall-clock timestamp (Date.now() frame),
+    // so it lands a positive duration in the future, within the configured 5-10s window.
+    expect(deadlineAfterStart).not.toBeNull()
+    const remainingMs = (deadlineAfterStart ?? 0) - Date.now()
+    expect(remainingMs).toBeGreaterThan(0)
+    expect(remainingMs).toBeLessThanOrEqual(10_000 + 100)
+
     onSwitch.mockClear()
 
     mgr.ensureValidPrimary()
