@@ -30,7 +30,6 @@ When used with the [FatsCo Light Show and Strobe Light](https://fatsco.tech/), y
 
 If you're ready to move up to larger, theatre style stage lighting, then read on!
 
-
 ## YARG vs. Rock Band 3 (Enhanced)
 
 How Photonics works is a bit different between the games:
@@ -39,7 +38,7 @@ How Photonics works is a bit different between the games:
 
 Uses the same YARG UDP data stream and cue triggers as YALCY. You will need to enable the `UDP Data Stream` in `Settings > All Settings > Experimental`. See the [Playing YARG](https://photonics.rocks/docs/playing-yarg/) for more on setting up YARG.
 
-YARG supports multiple banks of cues (the visual effects): the `Stage Kit` group mimmics the original Stage Kit effects. Additional cue banks provide alternative interpretations of these cues - they're inspired by, but do not match, the original Stage Kit. This provides greater variation in 
+YARG supports multiple banks of cues (the visual effects): the `Stage Kit` group mimmics the original Stage Kit effects. Additional cue banks provide alternative interpretations of these cues - they're inspired by, but do not match, the original Stage Kit. This provides greater variation in
 your light shows as you play. If you're a purist, you can enable `Stage Kit Mode` to restrict Photonics to the SK style lighting cues instead.
 
 As the project evolves more cue groups will be added, creating a growing library of visual effects to keep your lightshows interesting!
@@ -58,13 +57,11 @@ Unlike YARG, RB3E specifies the specific colours of each of the LEDs found on th
 
 Please see [Playing RB3](/docs/playing-rock-band-3-enhanced/) for more information.
 
-
 ## Music Visualization
 
 Photonics includes audio-reactive cues, acting as a visualizer for music coming from any audio source. This feature is aimed towards visualizing for rhythm games not directly supported (eg. Clone Hero, Frets on Fire, etc), but can also be used as a general purpose music visualizer.
 
 There are two primary audio modes: `Manual` and `Game Mode`. Manual will only run the specific lighting cue you select, good if you just want a specific cue running while listening to music. Game will automatically select different cues and change them on the beat. No two play throughs are exactly the same!
-
 
 ## DMX Fixture Support
 
@@ -82,14 +79,10 @@ There is an almost inifinte number of variations and unusual DMX lights. While P
 
 Moving Heads that spin in circles will be the most challenging to implement. You can either use them without motion as regular lights, or try setting up their motion capabilities. Photonics assumes discreet pan and tilt, so the results may be somewhat unpredictable, but may be worth trying.
 
-
 ## Cue Editor
 
 Create your own cues for YARG or Music Visualization. Photonics includes a powerful node-based cue editor.
 Please see or [Discord Server](https://discord.gg/2Vyqc2hYcK) or [Photonics.rocks](https://photonics.rocks/docs/table-of-contents/#The-Cue-Editor) for more information on how to use this feature.
-
-
-
 
 ## Downloading and Playing
 
@@ -114,8 +107,6 @@ If the first time you run Photonics your Mac shows you an error:
 This is Gatekeeper blocking the app because it’s not currently signed. To bypass this warning you need to open your terminal and run:
 `xattr -r -d com.apple.quarantine /Applications/Photonics.app`
 
-
-
 ## Upgrading from Previous Versions
 
 Alpha 5 introduces a new light layout, `stacked`. This is for lights mounted on a truss or T-bar where some may be up-firing while others are down-firing.
@@ -125,7 +116,6 @@ On your first run double-check your light layout, and if necessary, update it to
 The only time a mismatch between the light layout and your real lights can become an issue is with moving heads: inverted (down-firing) lights need to interpret the motion data differently than up-firing. If this is not accounted for, your lights may aim right when you expect them to aim left, etc.
 
 If you have regular, non-moving PAR or spot style lights, these will only look incorrect in the 3D preview if not setup correctly.
-
 
 ## Status
 

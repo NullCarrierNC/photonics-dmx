@@ -1,7 +1,7 @@
 {
   "name": "photonics-dmx",
-  "version": "0.1.1-DEV",
-  "description": "A DMX sequencer for YARG and RB3E",
+  "version": "0.6.1-alpha.6",
+  "description": "A DMX sequencer for YARG, RB3E, and music visualization.",
   "main": "./out/main/index.js",
   "author": "Null Carrier",
   "homepage": "https://photonics.rocks",
