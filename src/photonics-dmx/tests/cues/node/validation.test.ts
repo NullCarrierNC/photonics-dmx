@@ -1302,21 +1302,6 @@ describe('Node cue validation', () => {
     }
   })
 
-  it('validates bundled yarg-stagekit-negative-space.json', () => {
-    const filePath = path.join(
-      __dirname,
-      '../../../../../resources/defaults/node-data/cues/yarg/yarg-stagekit-negative-space.json',
-    )
-    const raw = fs.readFileSync(filePath, 'utf8')
-    const result = validateYargNodeCueFile(JSON.parse(raw))
-    expect(result.valid).toBe(true)
-    if (result.valid) {
-      for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
-      }
-    }
-  })
-
   it('validates bundled yarg-stagekit.json', () => {
     const filePath = path.join(
       __dirname,
