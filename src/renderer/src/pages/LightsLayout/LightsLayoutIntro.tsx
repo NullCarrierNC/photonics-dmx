@@ -1,11 +1,19 @@
 import React from 'react'
 
+interface LightsLayoutIntroProps {
+  /** Optional controls rendered on the same row as the title, aligned to the right (e.g. import/export). */
+  headerRight?: React.ReactNode
+}
+
 /**
  * Intro copy and usage notes for the Lights Layout page.
  */
-const LightsLayoutIntro: React.FC = () => (
+const LightsLayoutIntro: React.FC<LightsLayoutIntroProps> = ({ headerRight }) => (
   <>
-    <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Lights Layout</h1>
+    <div className="flex items-center justify-between gap-4 mb-4">
+      <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Lights Layout</h1>
+      {headerRight ? <div className="flex items-center gap-2 shrink-0">{headerRight}</div> : null}
+    </div>
     <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
       The Lights Layout allows you to assign the lights you created in My Lights to specific
       lighting fixture positions and to configure their DMX channels.

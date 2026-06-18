@@ -8,6 +8,7 @@
 import {
   NODE_CUES,
   EFFECTS,
+  RIGS,
   WINDOW,
   LIFECYCLE,
   LIGHT,
@@ -182,6 +183,12 @@ export const getActiveRigs = () => window.api.invoke(CONFIG.GET_ACTIVE_RIGS, und
 export const saveDmxRig = (rig: DmxRig) => window.api.invoke(CONFIG.SAVE_DMX_RIG, rig)
 
 export const deleteDmxRig = (id: string) => window.api.invoke(CONFIG.DELETE_DMX_RIG, id)
+
+/** Build a self-contained rig export file (rig + referenced templates) and write it via a save dialog. */
+export const exportRig = (rigId: string) => window.api.invoke(RIGS.EXPORT, rigId)
+
+/** Open a rig export file via a file dialog; returns the parsed rig + templates without committing. */
+export const pickRigImportFile = () => window.api.invoke(RIGS.IMPORT_PICK, undefined)
 
 // ---------------------------------------------------------------------------
 // Audio configuration
