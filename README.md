@@ -2,7 +2,6 @@
 
 <video src="https://photonics.rocks/wp-content/uploads/2026/05/photonics-dmx-preview.mp4" width="100%" autoplay loop muted></video>
 
-
 Photonics is a purpose built DMX light sequencer / controller for use with YARG, Rock Band 3 Enhanced, or as a music visualizer.
 It uses in-game lighting data, or audio analysis, to drive DMX lights in time to the music.
 
