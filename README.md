@@ -1,6 +1,9 @@
 # Photonics - DMX Sequencer for YARG, Rock Band 3 (Enhanced), and Music Visualization
 
-<video src="https://photonics.rocks/wp-content/uploads/2026/05/photonics-dmx-preview.mp4" width="600" autoplay loop muted></video>
+
+
+https://github.com/user-attachments/assets/f05fe5a7-16ca-4fe5-8ea9-a44b3a4c7d22
+
 
 
 Photonics is a purpose built DMX light sequencer / controller for use with YARG, Rock Band 3 Enhanced, or as a music visualizer.
@@ -56,7 +59,7 @@ Unlike YARG, RB3E specifies the specific colours of each of the LEDs found on th
 
 ** If you are running RB3E you will need either 4 or 8 DMX lights ** - other combinations are unsupported.
 
-Please see [Playing RB3](/docs/playing-rock-band-3-enhanced/) for more information.
+Please see [Playing RB3](https://photonics.rocks/docs/playing-rock-band-3-enhanced/) for more information.
 
 ## Music Visualization
 
@@ -64,7 +67,7 @@ Photonics includes audio-reactive cues, acting as a visualizer for music coming 
 
 There are two primary audio modes: `Manual` and `Game Mode`. Manual will only run the specific lighting cue you select, good if you just want a specific cue running while listening to music. Game will automatically select different cues and change them on the beat. No two play throughs are exactly the same!
 
-## DMX Fixture Support
+## DMX Lighting Fixture Support
 
 Photonics supports all DMX lights that use discreet colour channels, such as common RGB PAR lights. Lights with additional colour channels, such as Orange, Yellow, etc, can be used - but those specific channels won't be used today.
 
