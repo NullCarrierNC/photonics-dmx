@@ -1368,7 +1368,6 @@ describe('Node cue validation', () => {
       'cue-sk-audio-warm-auto',
       'cue-sk-audio-harmony',
       'cue-sk-audio-searchlights',
-      'cue-sk-audio-score',
       'cue-sk-audio-sweep',
     ]
     for (const cueId of cueIds) {

@@ -1,6 +1,6 @@
 # Photonics - DMX Sequencer for YARG, Rock Band 3 (Enhanced), and Music Visualization
 
-[![Photonics DMX demo](https://img.youtube.com/vi/RNMgnqftDfw/maxresdefault.jpg)](https://www.youtube.com/@PhotonicsDMX)
+https://github.com/user-attachments/assets/f05fe5a7-16ca-4fe5-8ea9-a44b3a4c7d22
 
 Photonics is a purpose built DMX light sequencer / controller for use with YARG, Rock Band 3 Enhanced, or as a music visualizer.
 It uses in-game lighting data, or audio analysis, to drive DMX lights in time to the music.
@@ -30,7 +30,6 @@ When used with the [FatsCo Light Show and Strobe Light](https://fatsco.tech/), y
 
 If you're ready to move up to larger, theatre style stage lighting, then read on!
 
-
 ## YARG vs. Rock Band 3 (Enhanced)
 
 How Photonics works is a bit different between the games:
@@ -39,7 +38,7 @@ How Photonics works is a bit different between the games:
 
 Uses the same YARG UDP data stream and cue triggers as YALCY. You will need to enable the `UDP Data Stream` in `Settings > All Settings > Experimental`. See the [Playing YARG](https://photonics.rocks/docs/playing-yarg/) for more on setting up YARG.
 
-YARG supports multiple banks of cues (the visual effects): the `Stage Kit` group mimmics the original Stage Kit effects. Additional cue banks provide alternative interpretations of these cues - they're inspired by, but do not match, the original Stage Kit. This provides greater variation in 
+YARG supports multiple banks of cues (the visual effects): the `Stage Kit` group mimmics the original Stage Kit effects. Additional cue banks provide alternative interpretations of these cues - they're inspired by, but do not match, the original Stage Kit. This provides greater variation in
 your light shows as you play. If you're a purist, you can enable `Stage Kit Mode` to restrict Photonics to the SK style lighting cues instead.
 
 As the project evolves more cue groups will be added, creating a growing library of visual effects to keep your lightshows interesting!
@@ -56,8 +55,7 @@ Unlike YARG, RB3E specifies the specific colours of each of the LEDs found on th
 
 ** If you are running RB3E you will need either 4 or 8 DMX lights ** - other combinations are unsupported.
 
-Please see [Playing RB3](/docs/playing-rock-band-3-enhanced/) for more information.
-
+Please see [Playing RB3](https://photonics.rocks/docs/playing-rock-band-3-enhanced/) for more information.
 
 ## Music Visualization
 
@@ -65,8 +63,7 @@ Photonics includes audio-reactive cues, acting as a visualizer for music coming 
 
 There are two primary audio modes: `Manual` and `Game Mode`. Manual will only run the specific lighting cue you select, good if you just want a specific cue running while listening to music. Game will automatically select different cues and change them on the beat. No two play throughs are exactly the same!
 
-
-## DMX Fixture Support
+## DMX Lighting Fixture Support
 
 Photonics supports all DMX lights that use discreet colour channels, such as common RGB PAR lights. Lights with additional colour channels, such as Orange, Yellow, etc, can be used - but those specific channels won't be used today.
 
@@ -76,20 +73,16 @@ Photonics supports all DMX lights that use discreet colour channels, such as com
 
 Photonics also support moving head lights, specifically those that provide pan and tilt capabilities. These add an extra dimension to the light show!
 
-## Got a Funky DMX Fixture?
+### Got a Funky DMX Fixture?
 
 There is an almost inifinte number of variations and unusual DMX lights. While Photonics won't support all of their possible features directly, they are almost always still usable with Photonics. They may look a little different, but still create an enjoyable light show.
 
 Moving Heads that spin in circles will be the most challenging to implement. You can either use them without motion as regular lights, or try setting up their motion capabilities. Photonics assumes discreet pan and tilt, so the results may be somewhat unpredictable, but may be worth trying.
 
-
 ## Cue Editor
 
 Create your own cues for YARG or Music Visualization. Photonics includes a powerful node-based cue editor.
 Please see or [Discord Server](https://discord.gg/2Vyqc2hYcK) or [Photonics.rocks](https://photonics.rocks/docs/table-of-contents/#The-Cue-Editor) for more information on how to use this feature.
-
-
-
 
 ## Downloading and Playing
 
@@ -114,8 +107,6 @@ If the first time you run Photonics your Mac shows you an error:
 This is Gatekeeper blocking the app because it’s not currently signed. To bypass this warning you need to open your terminal and run:
 `xattr -r -d com.apple.quarantine /Applications/Photonics.app`
 
-
-
 ## Upgrading from Previous Versions
 
 Alpha 5 introduces a new light layout, `stacked`. This is for lights mounted on a truss or T-bar where some may be up-firing while others are down-firing.
@@ -125,7 +116,6 @@ On your first run double-check your light layout, and if necessary, update it to
 The only time a mismatch between the light layout and your real lights can become an issue is with moving heads: inverted (down-firing) lights need to interpret the motion data differently than up-firing. If this is not accounted for, your lights may aim right when you expect them to aim left, etc.
 
 If you have regular, non-moving PAR or spot style lights, these will only look incorrect in the 3D preview if not setup correctly.
-
 
 ## Status
 
