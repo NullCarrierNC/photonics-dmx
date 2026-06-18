@@ -42,7 +42,8 @@ export class AudioGameModeManager {
   private registry = AudioCueRegistry.getInstance()
   private primaryCue: AudioCueType = ''
   private pendingSwitch = false
-  private switchDeadlineMs = 0
+  private switchDeadlineMs = 0 // monotonic deadline; drives the actual switch (immune to clock changes)
+  private switchDeadlineWallMs = 0 // wall-clock mirror; sent to the renderer for the countdown display
   private onCueSwitch: ((cueType: AudioCueType) => void) | null = null
   private onScheduleChange: ((info: AudioGameModeSchedulePayload) => void) | null = null
 
@@ -141,7 +142,7 @@ export class AudioGameModeManager {
 
   private emitScheduleChange(): void {
     this.onScheduleChange?.({
-      deadlineMs: this.switchDeadlineMs > 0 ? this.switchDeadlineMs : null,
+      deadlineMs: this.switchDeadlineMs > 0 ? this.switchDeadlineWallMs : null,
       pending: this.pendingSwitch,
     })
   }
@@ -149,7 +150,9 @@ export class AudioGameModeManager {
   private scheduleNextSwitch(): void {
     const { cueDurationMin, cueDurationMax } = this.config
     const durationSec = randomInRange(cueDurationMin, cueDurationMax)
-    this.switchDeadlineMs = monotonicNowMs() + Math.round(durationSec * 1000)
+    const durationMs = Math.round(durationSec * 1000)
+    this.switchDeadlineMs = monotonicNowMs() + durationMs
+    this.switchDeadlineWallMs = Date.now() + durationMs
   }
 
   private switchToNextCue(): void {
