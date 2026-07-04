@@ -179,8 +179,8 @@ export function effectGraphPolicy(effectId: string, instanceId?: number): GraphE
     getLogPrefix: () => prefix,
     getEntryNodes(compiled, _parameters, _entryContext): BaseEventNode[] {
       const effect = compiled as CompiledEffect<BaseEventNode>
-      const listener = Array.from(effect.effectListenerMap.values())[0]
-      return listener ? [listener as unknown as BaseEventNode] : []
+      // Every effect-listener is an entry point (an effect may declare more than one).
+      return Array.from(effect.effectListenerMap.values()) as unknown as BaseEventNode[]
     },
   }
 }

@@ -1346,4 +1346,80 @@ describe('EffectExecutionEngine', () => {
       expect(mockSequencer.removeEffect).toHaveBeenCalledTimes(removeEffectBefore)
     })
   })
+
+  describe('multiple effect-listeners (C-30)', () => {
+    const setColorAction = (id: string) => ({
+      id,
+      type: 'action' as const,
+      effectType: 'set-color' as const,
+      target: {
+        groups: { source: 'literal' as const, value: 'front' },
+        filter: { source: 'literal' as const, value: 'all' },
+      },
+      color: {
+        name: { source: 'literal' as const, value: 'white' },
+        brightness: { source: 'literal' as const, value: 'medium' },
+        blendMode: { source: 'literal' as const, value: 'replace' },
+      },
+      timing: {
+        waitForCondition: { source: 'literal' as const, value: 'none' },
+        waitForTime: { source: 'literal' as const, value: 0 },
+        duration: { source: 'literal' as const, value: 100 },
+        waitUntilCondition: { source: 'literal' as const, value: 'none' },
+        waitUntilTime: { source: 'literal' as const, value: 0 },
+        easing: { source: 'literal' as const, value: 'linear' },
+        level: { source: 'literal' as const, value: 1 },
+      },
+      layer: { source: 'literal' as const, value: 0 },
+    })
+
+    it('triggers every effect-listener, not just the first', async () => {
+      const effect: YargEffectDefinition = {
+        id: 'multi-listener',
+        mode: 'yarg',
+        name: 'Multi Listener',
+        description: '',
+        variables: [],
+        nodes: {
+          events: [],
+          actions: [setColorAction('action-a'), setColorAction('action-b')],
+          logic: [],
+          eventRaisers: [],
+          eventListeners: [],
+          effectListeners: [
+            { id: 'listener-a', type: 'effect-listener', label: 'A', outputs: ['action-a'] },
+            { id: 'listener-b', type: 'effect-listener', label: 'B', outputs: ['action-b'] },
+          ],
+        },
+        connections: [
+          { from: 'listener-a', to: 'action-a' },
+          { from: 'listener-b', to: 'action-b' },
+        ],
+        layout: { nodePositions: {} },
+      }
+
+      const activated: string[] = []
+      const broadcaster = {
+        emit: (channel: string, payload: unknown): void => {
+          if (channel.includes('node-execution')) {
+            const p = payload as { type: string; nodeId: string }
+            if (p.type === 'activated') activated.push(p.nodeId)
+          }
+        },
+      }
+      const engine = new EffectExecutionEngine(
+        EffectCompiler.compile(effect),
+        mockSequencer,
+        mockLightManager,
+        broadcaster,
+        {},
+        createCueData(),
+      )
+
+      await engine.triggerEffect(createCueData())
+
+      // Both listeners' downstream actions ran (the old code only ran the first listener).
+      expect(activated).toEqual(expect.arrayContaining(['action-a', 'action-b']))
+    })
+  })
 })

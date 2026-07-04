@@ -194,46 +194,49 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
    * Trigger the effect by starting execution from the effect listener.
    */
   public triggerEffect(cueData: CueData | AudioCueData): void {
-    // Get the effect listener (entry point)
-    const effectListener = Array.from(this.compiledEffect.effectListenerMap.values())[0]
-    if (!effectListener) {
+    // An effect may declare more than one effect-listener (the compiler allows it); trigger every
+    // one, each from its own execution context, so all authored entry points run.
+    const effectListeners = Array.from(this.compiledEffect.effectListenerMap.values())
+    if (effectListeners.length === 0) {
       log.warn('No effect listener found in effect')
       return
     }
 
-    // Apply parameter values to effect variables
-    this.applyParameterValues(effectListener)
+    for (const effectListener of effectListeners) {
+      // Apply parameter values to effect variables
+      this.applyParameterValues(effectListener)
 
-    // Create execution context with caller's cue data. cueLevelVarStore is the effect's
-    // var store so resolveActionTiming() reads waitUntilCondition/waitUntilTime from it.
-    const context = new ExecutionContext(
-      { id: effectListener.id, type: 'event', outputs: effectListener.outputs } as any,
-      cueData, // Pass caller's cue data
-      this.effectVarStore, // Use effect-local variables as "cue-level"
-      new Map(), // No group-level variables for effects
-    )
+      // Create execution context with caller's cue data. cueLevelVarStore is the effect's
+      // var store so resolveActionTiming() reads waitUntilCondition/waitUntilTime from it.
+      const context = new ExecutionContext(
+        { id: effectListener.id, type: 'event', outputs: effectListener.outputs } as any,
+        cueData, // Pass caller's cue data
+        this.effectVarStore, // Use effect-local variables as "cue-level"
+        new Map(), // No group-level variables for effects
+      )
 
-    context.setOnContextComplete(() => {
-      this.activeContexts.delete(context.id)
-      this.maybeFireIdle()
-    })
+      context.setOnContextComplete(() => {
+        this.activeContexts.delete(context.id)
+        this.maybeFireIdle()
+      })
 
-    this.activeContexts.set(context.id, context)
+      this.activeContexts.set(context.id, context)
 
-    this.emitNodeExecution('activated', effectListener.id)
-    this.emitNodeExecution('deactivated', effectListener.id)
+      this.emitNodeExecution('activated', effectListener.id)
+      this.emitNodeExecution('deactivated', effectListener.id)
 
-    // Get outgoing edges from effect listener and start execution
-    const { adjacency } = this.compiledEffect
-    const outgoing = adjacency.get(effectListener.id) ?? []
-    const nextNodes = outgoing.map((conn) => conn.to)
+      // Get outgoing edges from effect listener and start execution
+      const { adjacency } = this.compiledEffect
+      const outgoing = adjacency.get(effectListener.id) ?? []
+      const nextNodes = outgoing.map((conn) => conn.to)
 
-    if (nextNodes.length > 0) {
-      this.continueExecution(nextNodes, context)
-    } else {
-      // No children - context completes immediately
-      this.activeContexts.delete(context.id)
-      this.maybeFireIdle()
+      if (nextNodes.length > 0) {
+        this.continueExecution(nextNodes, context)
+      } else {
+        // No children - context completes immediately
+        this.activeContexts.delete(context.id)
+        this.maybeFireIdle()
+      }
     }
   }
 

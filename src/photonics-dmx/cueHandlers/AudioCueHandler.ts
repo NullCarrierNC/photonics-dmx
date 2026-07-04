@@ -332,6 +332,13 @@ export class AudioCueHandler extends EventEmitter {
     const cue = this.registry.getCueImplementation(cueType)
     if (!cue) {
       log.warn(`Audio cue not found: ${cueType}`)
+      // Clear the running strobe when the requested cue is unavailable (mirror the null branch and
+      // assignSecondarySlot) — otherwise a stale strobe keeps running with the strobe manager active.
+      if (this.currentStrobeCue) {
+        this.currentStrobeCue.onStop?.()
+        this.currentStrobeCue = null
+        getStrobeStateManager().setActive(null)
+      }
       return
     }
 

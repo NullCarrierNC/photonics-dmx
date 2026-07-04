@@ -733,6 +733,12 @@ export class Rb3eNetworkListener extends EventEmitter {
       case 0: // No color
         color = 'off'
         break
+      case 255: // DisableAll (0xFF): StageKit reset — clear strobe + fog and turn everything off.
+        strobeEffect = 'off'
+        this._currentStrobeState = 'Strobe_Off'
+        this._currentFogState = false
+        color = 'off'
+        break
       default:
         color = 'off'
         break
