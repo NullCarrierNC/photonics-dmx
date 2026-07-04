@@ -98,10 +98,7 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
           Leaving this here so when I revisit RB3 Cue handling I can switch between LED or cue based effects.
 
           <div className="flex flex-row gap-8 items-start mt-6">
-            <CueStyleToggle /> 
-          </div>
-          <div className="flex flex-row gap-8 items-start mt-6">
-            <DebounceSetting />
+            <CueStyleToggle />
           </div>
             */}
         </div>

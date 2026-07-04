@@ -67,8 +67,6 @@ export const CUE = {
   RB3E_LISTENER_DISABLED: 'rb3e-listener-disabled',
   SET_LISTEN_CUE_DATA: 'set-listen-cue-data',
   CUE_STYLE: 'cue-style',
-  UPDATE_EFFECT_DEBOUNCE: 'update-effect-debounce',
-  GET_EFFECT_DEBOUNCE: 'get-effect-debounce',
 } as const
 
 // ---- Light / senders / simulation ----

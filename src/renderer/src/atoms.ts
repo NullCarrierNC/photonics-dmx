@@ -169,8 +169,6 @@ export const isSenderErrorAtom = atom<boolean>(false)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error message or serialized error
 export const senderErrorAtom = atom<any>('')
 
-export const effectDebounceTimeAtom = atom<number>(1600)
-
 export const senderEnttecProEnabledAtom = atom<boolean>(false)
 export const enttecProComPortAtom = atom<string>('')
 export const senderOpenDmxEnabledAtom = atom<boolean>(false)

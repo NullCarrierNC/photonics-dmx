@@ -95,21 +95,6 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
     }
   })
 
-  // Persist effect debounce preference (stored for compatibility; cue debouncing has been removed, so setEffectDebouncePeriod is a no-op).
-  ipcMain.on(CUE.UPDATE_EFFECT_DEBOUNCE, (_, debounceTime: number) => {
-    void (async () => {
-      try {
-        await controllerManager.getConfig().setPreference('effectDebounce', debounceTime)
-        const cueHandler = controllerManager.getCueHandler()
-        if (cueHandler && 'setEffectDebouncePeriod' in cueHandler) {
-          cueHandler.setEffectDebouncePeriod(debounceTime)
-        }
-      } catch (err) {
-        log.error('Failed to save effect debounce preference:', err)
-      }
-    })()
-  })
-
   // Set cue style
   ipcMain.on(CUE.CUE_STYLE, (_, style: 'simple' | 'complex') => {
     void controllerManager

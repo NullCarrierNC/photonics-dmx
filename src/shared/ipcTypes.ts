@@ -299,11 +299,6 @@ export interface IpcInvokeMap {
     request: void
     response: boolean
   }
-  [CUE.GET_EFFECT_DEBOUNCE]: {
-    request: void
-    response: number
-  }
-
   // ---- Light / senders / simulation ----
   [LIGHT.GET_SYSTEM_STATUS]: {
     request: void
@@ -819,7 +814,6 @@ export interface IpcSendMap {
   [CUE.RB3E_LISTENER_DISABLED]: void
   [CUE.SET_LISTEN_CUE_DATA]: boolean
   [CUE.CUE_STYLE]: 'simple' | 'complex'
-  [CUE.UPDATE_EFFECT_DEBOUNCE]: number
   [LIGHT.CONSOLE_SEND_DMX]: Record<number, number>
 }
 

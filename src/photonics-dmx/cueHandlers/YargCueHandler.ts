@@ -219,10 +219,6 @@ class YargCueHandler extends EventEmitter {
     this.off('cueHandled', listener)
   }
 
-  public setEffectDebouncePeriod(_time: number): void {
-    // Stored preference compatibility; node cue dispatch does not debounce cue events.
-  }
-
   /**
    * Handle a beat event from YARG
    */

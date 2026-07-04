@@ -407,15 +407,6 @@ export const setListenCueData = (shouldListen: boolean) =>
 export const setCueStyle = (style: 'simple' | 'complex') => window.api.send(CUE.CUE_STYLE, style)
 
 // ---------------------------------------------------------------------------
-// Effect debounce
-// ---------------------------------------------------------------------------
-
-export const getEffectDebounce = () => window.api.invoke(CUE.GET_EFFECT_DEBOUNCE, undefined)
-
-export const updateEffectDebounce = (value: number) =>
-  window.api.send(CUE.UPDATE_EFFECT_DEBOUNCE, value)
-
-// ---------------------------------------------------------------------------
 // Test effects and simulation
 // ---------------------------------------------------------------------------
 

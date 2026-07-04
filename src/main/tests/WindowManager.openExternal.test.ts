@@ -16,7 +16,9 @@ function openExternalSafely(url: string): void {
 }
 
 describe('WindowManager.openExternalSafely', () => {
-  beforeEach(() => jest.clearAllMocks())
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
 
   it('opens http and https URLs', () => {
     openExternalSafely('https://example.com/docs')
