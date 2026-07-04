@@ -95,6 +95,59 @@ describe('OpenDmxSender', () => {
     expect((listener.mock.calls[0][0] as SenderError).senderId).toBe('opendmx')
   })
 
+  it('a single transient write failure reports a non-disabling error', async () => {
+    const listener = jest.fn()
+    sender.onSendError(listener)
+    await sender.start()
+    mockWriteChannels.mockImplementationOnce(() => {
+      throw new Error('Device write failed')
+    })
+    await sender.send({ 1: 0 })
+    await sender.send({ 1: 1 }) // recovers
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect((listener.mock.calls[0][0] as SenderError).shouldDisable).toBe(false)
+  })
+
+  it('three consecutive write failures escalate to a disabling error', async () => {
+    const listener = jest.fn()
+    sender.onSendError(listener)
+    await sender.start()
+    mockWriteChannels.mockImplementation(() => {
+      throw new Error('Device write failed')
+    })
+    await sender.send({ 1: 0 })
+    await sender.send({ 1: 0 })
+    await sender.send({ 1: 0 })
+
+    const flags = listener.mock.calls.map((c) => (c[0] as SenderError).shouldDisable)
+    expect(flags).toEqual([false, false, true])
+  })
+
+  it('a successful write resets the failure streak', async () => {
+    const listener = jest.fn()
+    sender.onSendError(listener)
+    await sender.start()
+    mockWriteChannels
+      .mockImplementationOnce(() => {
+        throw new Error('Device write failed')
+      })
+      .mockImplementationOnce(() => {
+        throw new Error('Device write failed')
+      })
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new Error('Device write failed')
+      })
+    await sender.send({ 1: 0 })
+    await sender.send({ 1: 0 })
+    await sender.send({ 1: 0 }) // success clears the streak
+    await sender.send({ 1: 0 })
+
+    const flags = listener.mock.calls.map((c) => (c[0] as SenderError).shouldDisable)
+    expect(flags).toEqual([false, false, false])
+  })
+
   it('passes a usleep function to the device adapter for precise DMX framing', async () => {
     let capturedUsleep: unknown
     const capturingFactory = (

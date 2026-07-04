@@ -138,9 +138,14 @@ class OpenDmxDeviceAdapter implements IOpenDmxDeviceAdapter {
 }
 
 export class OpenDmxSender extends BaseSender {
+  /** Consecutive send() failures before the sender reports itself unusable (transient USB write
+   *  errors are normal at per-frame rates; a streak means the device is gone). */
+  private static readonly MAX_SEND_FAILURES = 3
+
   private device: IOpenDmxDeviceAdapter | undefined
   private eventEmitter: EventEmitter
   private dmxUniverse: number
+  private consecutiveSendFailures = 0
   private readonly deviceFactory?: (
     path: string,
     options: OpenDmxDeviceOptions,
@@ -212,9 +217,15 @@ export class OpenDmxSender extends BaseSender {
     try {
       this.verifySenderStarted()
       this.device!.writeChannels(universeBuffer)
+      this.consecutiveSendFailures = 0
     } catch (err) {
       log.error('OpenDmxSender error:', err)
-      const errorEvent = new SenderError(err, { senderId: 'opendmx' })
+      // Per-frame USB writes can fail transiently, so a single failure only reports; a sustained
+      // streak means the device is gone (unplug) and the sender must auto-disable like the
+      // start-path failures do — otherwise frames error forever with the toggle still on.
+      this.consecutiveSendFailures++
+      const shouldDisable = this.consecutiveSendFailures >= OpenDmxSender.MAX_SEND_FAILURES
+      const errorEvent = new SenderError(err, { senderId: 'opendmx', shouldDisable })
       this.eventEmitter.emit('SenderError', errorEvent)
     }
   }
