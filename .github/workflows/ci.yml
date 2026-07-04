@@ -67,7 +67,7 @@ jobs:
         run: npm ci
 
       - name: Test
-        run: npm test
+        run: npm run test:coverage
 
   all-checks-passed:
     name: all checks passed

@@ -48,22 +48,29 @@ describe('SacnSender', () => {
   })
 
   it('flushes the last throttled frame on the trailing edge', async () => {
-    // 50 Hz => 20 ms minimum interval between sends.
-    const throttled = new SacnSender({ universe: 7, maxOutputRate: 50 })
-    await throttled.start()
-    mockSend.mockClear()
+    jest.useFakeTimers()
+    try {
+      // 50 Hz => 20 ms minimum interval between sends.
+      const throttled = new SacnSender({ universe: 7, maxOutputRate: 50 })
+      await throttled.start()
+      mockSend.mockClear()
+      jest.advanceTimersByTime(1000) // move the mocked clock off 0 (0 doubles as "never sent")
 
-    await throttled.send({ 1: 10 }) // leading frame goes out immediately
-    await throttled.send({ 1: 20 }) // within the interval: withheld, not dropped
+      await throttled.send({ 1: 10 }) // leading frame goes out immediately
+      await throttled.send({ 1: 20 }) // within the interval: withheld, not dropped
 
-    expect(mockSend).toHaveBeenCalledTimes(1)
-    expect(mockSend).not.toHaveBeenCalledWith({ payload: { 1: 20 } })
+      expect(mockSend).toHaveBeenCalledTimes(1)
+      expect(mockSend).not.toHaveBeenCalledWith({ payload: { 1: 20 } })
 
-    // Wait past the interval for the trailing-edge flush.
-    await new Promise((resolve) => setTimeout(resolve, 40))
+      // Advance past the interval so the trailing-edge flush timer fires (deterministic, no real wait).
+      jest.advanceTimersByTime(30)
+      await Promise.resolve()
 
-    expect(mockSend).toHaveBeenCalledWith({ payload: { 1: 20 } })
-    await throttled.stop().catch(() => {})
+      expect(mockSend).toHaveBeenCalledWith({ payload: { 1: 20 } })
+      await throttled.stop().catch(() => {})
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   it('stop closes sender', async () => {

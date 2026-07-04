@@ -20,13 +20,24 @@ module.exports = {
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
   coveragePathIgnorePatterns: ['/node_modules/', '/dist/'],
-  // Ratcheted from a Jest --coverage run (global totals); floor(percent) - 1
+  // Count EVERY source file, not just those a test happens to import — otherwise the headline
+  // percentage only reflects tested files and hides untested ones entirely.
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/tests/**',
+    '!src/**/*.test.{ts,tsx}',
+    '!src/**/*.spec.{ts,tsx}',
+    '!src/**/*.d.ts',
+  ],
+  // Ratcheted from a Jest --coverage run over ALL source (global totals); floor(percent) - 1.
+  // These are the TRUE numbers now that every file counts (previously the config only measured
+  // tested files, inflating the headline to ~68%). Ratchet upward as coverage improves.
   coverageThreshold: {
     global: {
-      statements: 68,
-      branches: 66,
-      functions: 54,
-      lines: 68,
+      statements: 45,
+      branches: 71,
+      functions: 61,
+      lines: 45,
     },
   },
   setupFilesAfterEnv: ['<rootDir>/src/photonics-dmx/tests/jest.setup.ts'],
