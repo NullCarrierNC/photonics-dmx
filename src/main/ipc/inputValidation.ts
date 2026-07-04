@@ -854,6 +854,73 @@ export function validatePreferencesPayload(
     cleaned.artNetConfig = next
   }
 
+  if ('brightness' in cleaned) {
+    const b = cleaned.brightness
+    if (!isPlainObject(b)) {
+      return { ok: false, error: 'brightness must be an object' }
+    }
+    for (const level of ['low', 'medium', 'high', 'max'] as const) {
+      const v = b[level]
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 255) {
+        return { ok: false, error: `brightness.${level} must be an integer 0-255` }
+      }
+    }
+  }
+
+  if ('stageKitPrefs' in cleaned) {
+    const s = cleaned.stageKitPrefs
+    if (!isPlainObject(s)) {
+      return { ok: false, error: 'stageKitPrefs must be an object' }
+    }
+    const priority = validateStageKitPriority(s.yargPriority)
+    if (!priority.ok) {
+      return { ok: false, error: `stageKitPrefs.yargPriority: ${priority.error}` }
+    }
+  }
+
+  if ('dmxSettingsPrefs' in cleaned) {
+    const d = cleaned.dmxSettingsPrefs
+    if (!isPlainObject(d)) {
+      return { ok: false, error: 'dmxSettingsPrefs must be an object' }
+    }
+    for (const key of [
+      'artNetExpanded',
+      'enttecProExpanded',
+      'sacnExpanded',
+      'openDmxExpanded',
+    ] as const) {
+      if (key in d && typeof d[key] !== 'boolean') {
+        return { ok: false, error: `dmxSettingsPrefs.${key} must be a boolean` }
+      }
+    }
+  }
+
+  if ('simulationSettings' in cleaned) {
+    const s = cleaned.simulationSettings
+    if (!isPlainObject(s)) {
+      return { ok: false, error: 'simulationSettings must be an object' }
+    }
+    if (s.registryType !== 'YARG' && s.registryType !== 'RB3E') {
+      return { ok: false, error: 'simulationSettings.registryType must be YARG or RB3E' }
+    }
+    if (typeof s.groupId !== 'string') {
+      return { ok: false, error: 'simulationSettings.groupId must be a string' }
+    }
+    if (s.effectId !== null && typeof s.effectId !== 'string') {
+      return { ok: false, error: 'simulationSettings.effectId must be a string or null' }
+    }
+    if (s.venueSize !== 'NoVenue' && s.venueSize !== 'Small' && s.venueSize !== 'Large') {
+      return { ok: false, error: 'simulationSettings.venueSize must be NoVenue, Small, or Large' }
+    }
+    if (typeof s.bpm !== 'number' || !Number.isFinite(s.bpm)) {
+      return { ok: false, error: 'simulationSettings.bpm must be a finite number' }
+    }
+    const instruments = ['guitar', 'bass', 'keys', 'drums']
+    if (typeof s.instrument !== 'string' || !instruments.includes(s.instrument)) {
+      return { ok: false, error: 'simulationSettings.instrument must be guitar/bass/keys/drums' }
+    }
+  }
+
   return { ok: true, value: cleaned as Partial<AppPreferences> }
 }
 

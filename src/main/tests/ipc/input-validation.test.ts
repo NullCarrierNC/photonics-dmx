@@ -691,5 +691,62 @@ describe('inputValidation', () => {
       const r = validatePreferencesPayload(payload)
       expect(r.ok).toBe(false)
     })
+
+    describe('shape validation for pass-through prefs (M-7)', () => {
+      it('accepts a well-formed brightness object', () => {
+        const r = validatePreferencesPayload({
+          brightness: { low: 10, medium: 80, high: 180, max: 255 },
+        })
+        expect(r.ok).toBe(true)
+      })
+
+      it.each([
+        ['out-of-range level', { low: 10, medium: 80, high: 300, max: 255 }],
+        ['non-integer level', { low: 10.5, medium: 80, high: 180, max: 255 }],
+        ['missing level', { low: 10, medium: 80, high: 180 }],
+        ['negative level', { low: -1, medium: 80, high: 180, max: 255 }],
+      ])('rejects a malformed brightness: %s', (_label, brightness) => {
+        expect(validatePreferencesPayload({ brightness }).ok).toBe(false)
+      })
+
+      it('validates stageKitPrefs.yargPriority against the allowed set', () => {
+        expect(validatePreferencesPayload({ stageKitPrefs: { yargPriority: 'random' } }).ok).toBe(
+          true,
+        )
+        expect(validatePreferencesPayload({ stageKitPrefs: { yargPriority: 'bogus' } }).ok).toBe(
+          false,
+        )
+      })
+
+      it('requires dmxSettingsPrefs expansion flags to be booleans', () => {
+        expect(validatePreferencesPayload({ dmxSettingsPrefs: { artNetExpanded: true } }).ok).toBe(
+          true,
+        )
+        expect(validatePreferencesPayload({ dmxSettingsPrefs: { artNetExpanded: 'yes' } }).ok).toBe(
+          false,
+        )
+      })
+
+      it('validates the simulationSettings shape', () => {
+        const good = {
+          registryType: 'YARG',
+          groupId: 'default',
+          effectId: null,
+          venueSize: 'Small',
+          bpm: 120,
+          instrument: 'drums',
+        }
+        expect(validatePreferencesPayload({ simulationSettings: good }).ok).toBe(true)
+        expect(
+          validatePreferencesPayload({ simulationSettings: { ...good, registryType: 'X' } }).ok,
+        ).toBe(false)
+        expect(
+          validatePreferencesPayload({ simulationSettings: { ...good, bpm: 'fast' } }).ok,
+        ).toBe(false)
+        expect(
+          validatePreferencesPayload({ simulationSettings: { ...good, instrument: 'kazoo' } }).ok,
+        ).toBe(false)
+      })
+    })
   })
 })
