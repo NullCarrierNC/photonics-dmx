@@ -280,44 +280,29 @@ export class SenderManager {
   }
 
   /**
-   * Disables all senders.
+   * Disables all senders: detach EVERY sender first (error handler off, removed from
+   * `enabledSenders` so `send()` drops frames for all of them), then stop them concurrently.
+   * Detaching before any `stop()` runs means a frame published at any point during the bulk
+   * disable cannot land after a sender's blackout and hold the last state on the wire.
    */
   public async disableAllSenders(): Promise<void> {
     log.info('SenderManager: disabling all senders')
-
-    const senderPromises: Promise<void>[] = []
-
-    for (const [id, sender] of this.enabledSenders) {
-      log.info(`SenderManager: disabling sender "${id}"`)
-      try {
-        // Add each sender's stop promise to our array
-        senderPromises.push(
-          sender.stop().catch((err) => {
-            log.error(`Error stopping sender with ID "${id}":`, err)
-            // Don't rethrow, we want to continue with other senders
-          }),
-        )
-
-        // Also remove error handlers while we're here
-        sender.removeSendError(this.handleSenderError)
-      } catch (err) {
-        log.error(`Error preparing sender "${id}" for shutdown:`, err)
-      }
+    const detached = [...this.enabledSenders.entries()]
+    for (const [, sender] of detached) {
+      sender.removeSendError(this.handleSenderError)
     }
-
-    // Wait for all senders to finish their shutdown process
-    if (senderPromises.length > 0) {
-      try {
-        await Promise.all(senderPromises)
-        log.info('All senders have completed shutdown')
-      } catch (err) {
-        log.error('Error waiting for senders to shut down:', err)
-      }
-    }
-
-    // Clear the lists regardless of any errors
     this.enabledSenders.clear()
     this.initializingSenders.clear()
+    await Promise.all(
+      detached.map(async ([id, sender]) => {
+        try {
+          await sender.stop()
+        } catch (err) {
+          log.error(`Error stopping sender with ID "${id}":`, err)
+        }
+        log.info(`Sender with ID "${id}" disabled.`)
+      }),
+    )
     log.info('All senders disabled and removed from manager')
   }
 
