@@ -161,7 +161,17 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
    * Effect contexts have no onNodeComplete callback, so completing a blocking action must
    * advance the phase, continue downstream, and fire the idle check inline.
    */
-  protected override onBlockingActionComplete(nodeId: string, context: ExecutionContext): void {
+  protected override onBlockingActionComplete(
+    nodeId: string,
+    context: ExecutionContext,
+    cancelled = false,
+  ): void {
+    if (cancelled) {
+      // Effect force-cleared: release the action so the context can settle, without advancing.
+      context.completeActionSilent(nodeId)
+      this.maybeFireIdle()
+      return
+    }
     context.advancePhase()
     context.completeAction(nodeId)
     this.continueToNextNodes(nodeId, context)

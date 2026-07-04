@@ -124,7 +124,7 @@ export class Sequencer implements ILightingController {
   public addEffectWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
   ): void {
     this.effectManager.addEffectWithCallback(name, effect, onComplete, isPersistent)
@@ -133,7 +133,7 @@ export class Sequencer implements ILightingController {
   public setEffectWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
   ): void {
     this.effectManager.setEffectWithCallback(name, effect, onComplete, isPersistent)
@@ -208,7 +208,7 @@ export class Sequencer implements ILightingController {
   public addEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
   ): void {
     this.effectManager.addEffectUnblockedNameWithCallback(name, effect, onComplete, isPersistent)
@@ -221,7 +221,7 @@ export class Sequencer implements ILightingController {
   public setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
   ): void {
     this.effectManager.setEffectUnblockedNameWithCallback(name, effect, onComplete, isPersistent)

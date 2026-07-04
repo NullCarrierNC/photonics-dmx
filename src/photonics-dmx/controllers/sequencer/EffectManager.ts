@@ -59,7 +59,7 @@ export class EffectManager implements IEffectManager {
   /** Active effect-level persistence runs keyed by run id */
   private persistentRuns: Map<string, PersistentEffectRun> = new Map()
   /** Callbacks for effect completion, keyed by effect name */
-  private effectCallbacks: Map<string, () => void> = new Map()
+  private effectCallbacks: Map<string, (cancelled: boolean) => void> = new Map()
 
   // Reusable default state template
   private defaultStateTemplate: RGBIO = {
@@ -115,7 +115,7 @@ export class EffectManager implements IEffectManager {
   public addEffectWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
   ): void {
     // Register the callback
@@ -139,7 +139,7 @@ export class EffectManager implements IEffectManager {
   public setEffectWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
   ): void {
     // setEffect clears all effects (and their callbacks) first, so register AFTER it — registering
@@ -163,11 +163,28 @@ export class EffectManager implements IEffectManager {
    *
    * @param effectName The name of the effect that completed
    */
-  private fireEffectCallback(effectName: string): void {
+  private fireEffectCallback(effectName: string, cancelled = false): void {
     const callback = this.effectCallbacks.get(effectName)
     if (callback) {
       this.effectCallbacks.delete(effectName)
-      callback()
+      callback(cancelled)
+    }
+  }
+
+  /**
+   * Fire every pending completion callback with `cancelled = true`, then drop them. Used when
+   * effects are force-cleared (cue switch / removeAllEffects): a blocking graph node waiting on one
+   * of these effects would otherwise never be told its action ended and would strand its context.
+   */
+  private cancelPendingCallbacks(): void {
+    const pending = [...this.effectCallbacks.values()]
+    this.effectCallbacks.clear()
+    for (const callback of pending) {
+      try {
+        callback(true)
+      } catch (err) {
+        log.error('Error in cancelled effect completion callback:', err)
+      }
     }
   }
 
@@ -397,14 +414,14 @@ export class EffectManager implements IEffectManager {
   public addEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
   ): void {
     const added = this.addEffectUnblockedName(name, effect, isPersistent)
     if (added) {
       this.effectCallbacks.set(name, onComplete)
     } else {
-      onComplete()
+      onComplete(false)
     }
   }
 
@@ -416,14 +433,14 @@ export class EffectManager implements IEffectManager {
   public setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
   ): void {
     const set = this.setEffectUnblockedName(name, effect, isPersistent)
     if (set) {
       this.effectCallbacks.set(name, onComplete)
     } else {
-      onComplete()
+      onComplete(false)
     }
   }
 
@@ -597,10 +614,11 @@ export class EffectManager implements IEffectManager {
       // 3. Use clearAllTransitions() which clears maps and publishes black states
       this.lightTransitionController.clearAllTransitions()
 
-      // 4. Reset effect tracking state and clear callbacks to avoid orphaned references
+      // 4. Reset effect tracking state; cancel (not just drop) pending callbacks so blocking graph
+      //    nodes waiting on these effects are told their action ended instead of stranding.
       this._lastCalled0LayerEffect = ''
       this.persistentRuns.clear()
-      this.effectCallbacks.clear()
+      this.cancelPendingCallbacks()
     } finally {
       // Always release the clearing lock, even if an error occurs
       this.lightTransitionController.endClearingSequence()

@@ -2318,8 +2318,10 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('targets random filters deterministically', () => {
+    // random-3 samples without replacement: each draw indexes the SHRINKING remaining pool, so
+    // returning 0 each time picks the first three front lights in order (distinct, no repeats).
     const randomSpy = jest.spyOn(utils, 'randomBetween')
-    randomSpy.mockReturnValueOnce(0).mockReturnValueOnce(1).mockReturnValueOnce(3)
+    randomSpy.mockReturnValue(0)
 
     const eventNode: YargEventNode = {
       id: 'event-1',
@@ -2400,9 +2402,10 @@ describe('Node runtime with real Sequencer', () => {
     const expectedIds = new Set([
       harness.frontLightIds[0],
       harness.frontLightIds[1],
-      harness.frontLightIds[3],
+      harness.frontLightIds[2],
     ])
     expect(uniqueLit).toEqual(expectedIds)
+    expect(uniqueLit.size).toBe(3) // distinct picks, no duplicates
 
     randomSpy.mockRestore()
   })

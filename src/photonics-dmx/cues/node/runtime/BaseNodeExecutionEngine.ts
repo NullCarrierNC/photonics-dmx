@@ -344,7 +344,17 @@ export abstract class BaseNodeExecutionEngine {
    * onNodeComplete callback advance the phase and continue. Effect overrides to advance
    * and continue inline (its contexts have no onNodeComplete callback).
    */
-  protected onBlockingActionComplete(nodeId: string, context: ExecutionContext): void {
+  protected onBlockingActionComplete(
+    nodeId: string,
+    context: ExecutionContext,
+    cancelled = false,
+  ): void {
+    if (cancelled) {
+      // The effect was force-cleared (cue switch): release the active action so the context can
+      // complete, but do NOT advance the graph — the cue is being replaced, not stepped forward.
+      context.completeActionSilent(nodeId)
+      return
+    }
     context.completeAction(nodeId)
   }
 
@@ -811,11 +821,11 @@ export abstract class BaseNodeExecutionEngine {
         if (shouldBlock) {
           context.registerActiveAction(actionNode.id, actionNode)
           this.markPendingCallbackEffect(effectName)
-          const callback = (): void => {
+          const callback = (cancelled = false): void => {
             this.clearPendingCallbackEffect(effectName)
             this.submittedEffects.delete(effectName)
             this.emitNodeExecution('deactivated', actionNode.id)
-            this.onBlockingActionComplete(actionNode.id, context)
+            this.onBlockingActionComplete(actionNode.id, context, cancelled)
           }
           this.submittedEffects.set(effectName, resolvedLayer)
           if (useSetEffect) {
@@ -898,13 +908,13 @@ export abstract class BaseNodeExecutionEngine {
       if (chainHasBlockingStep) {
         context.registerActiveAction(lastChainNode.id, lastChainNode)
         this.markPendingCallbackEffect(chainEffectName)
-        const callback = (): void => {
+        const callback = (cancelled = false): void => {
           this.clearPendingCallbackEffect(chainEffectName)
           this.submittedEffects.delete(chainEffectName)
           for (const a of actionChain) {
             this.emitNodeExecution('deactivated', a.id)
           }
-          this.onBlockingActionComplete(lastChainNode.id, context)
+          this.onBlockingActionComplete(lastChainNode.id, context, cancelled)
         }
         this.submittedEffects.set(chainEffectName, chainData.baseLayer)
         if (useSetEffectChain) {
@@ -1023,12 +1033,12 @@ export abstract class BaseNodeExecutionEngine {
     if (shouldBlock) {
       context.registerActiveAction(actionNode.id, actionNode)
       this.markPendingCallbackEffect(effectName)
-      const callback = (): void => {
+      const callback = (cancelled = false): void => {
         this.clearPendingCallbackEffect(effectName)
         this.submittedEffects.delete(effectName)
         this.setPositionSubmissionFingerprint.set(effectName, positionFp)
         this.emitNodeExecution('deactivated', actionNode.id)
-        this.onBlockingActionComplete(actionNode.id, context)
+        this.onBlockingActionComplete(actionNode.id, context, cancelled)
       }
       this.submittedEffects.set(effectName, resolvedLayer)
       if (useSetEffect) {

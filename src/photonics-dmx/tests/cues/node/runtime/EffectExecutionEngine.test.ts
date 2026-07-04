@@ -1243,7 +1243,7 @@ describe('EffectExecutionEngine', () => {
     })
 
     it('does not fire idle until all pending callback-backed submissions complete', () => {
-      const callbacks: Array<() => void> = []
+      const callbacks: Array<(cancelled: boolean) => void> = []
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, _effect, callback) => {
           callbacks.push(callback)
@@ -1267,15 +1267,15 @@ describe('EffectExecutionEngine', () => {
       expect(callbacks).toHaveLength(2)
       expect(onIdle).not.toHaveBeenCalled()
 
-      callbacks[0]()
+      callbacks[0](false)
       expect(onIdle).not.toHaveBeenCalled()
 
-      callbacks[1]()
+      callbacks[1](false)
       expect(onIdle).toHaveBeenCalledTimes(1)
     })
 
     it('cancelAll clears submitted callback-backed effects and prevents idle retrigger', () => {
-      const callbacks: Array<() => void> = []
+      const callbacks: Array<(cancelled: boolean) => void> = []
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, _effect, callback) => {
           callbacks.push(callback)
@@ -1310,13 +1310,13 @@ describe('EffectExecutionEngine', () => {
       }
 
       // Simulate stale callback invocations after cancel: idle callback should already be detached.
-      callbacks[0]()
-      callbacks[1]()
+      callbacks[0](false)
+      callbacks[1](false)
       expect(onIdle).not.toHaveBeenCalled()
     })
 
     it('cancelAll(true) leaves effects on sequencer so lights stay lit during cue transition', () => {
-      const callbacks: Array<() => void> = []
+      const callbacks: Array<(cancelled: boolean) => void> = []
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, _effect, callback) => {
           callbacks.push(callback)

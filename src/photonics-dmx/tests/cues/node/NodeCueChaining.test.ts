@@ -96,13 +96,21 @@ describe('Node cue chaining', () => {
         callOrder.push(name)
       },
       setEffect: () => Promise.resolve(),
-      addEffectWithCallback: (name: string, _effect: Effect, callback: () => void) => {
+      addEffectWithCallback: (
+        name: string,
+        _effect: Effect,
+        callback: (cancelled: boolean) => void,
+      ) => {
         callOrder.push(name)
-        callback()
+        callback(false)
       },
-      setEffectWithCallback: (name: string, _effect: Effect, callback: () => void) => {
+      setEffectWithCallback: (
+        name: string,
+        _effect: Effect,
+        callback: (cancelled: boolean) => void,
+      ) => {
         callOrder.push(name)
-        callback()
+        callback(false)
       },
       addEffectUnblockedName: (name: string) => {
         callOrder.push(name)
@@ -112,13 +120,21 @@ describe('Node cue chaining', () => {
         callOrder.push(name)
         return true
       },
-      addEffectUnblockedNameWithCallback: (name: string, _effect: Effect, callback: () => void) => {
+      addEffectUnblockedNameWithCallback: (
+        name: string,
+        _effect: Effect,
+        callback: (cancelled: boolean) => void,
+      ) => {
         callOrder.push(name)
-        callback()
+        callback(false)
       },
-      setEffectUnblockedNameWithCallback: (name: string, _effect: Effect, callback: () => void) => {
+      setEffectUnblockedNameWithCallback: (
+        name: string,
+        _effect: Effect,
+        callback: (cancelled: boolean) => void,
+      ) => {
         callOrder.push(name)
-        callback()
+        callback(false)
       },
       removeEffectCallback: () => {},
       removeEffectByLayer: () => {},

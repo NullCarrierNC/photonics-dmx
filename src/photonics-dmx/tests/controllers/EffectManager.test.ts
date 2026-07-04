@@ -896,6 +896,27 @@ describe('EffectManager', () => {
       expect(callbacks.size).toBe(0)
     })
 
+    it('removeAllEffects fires pending callbacks with cancelled=true instead of dropping them', () => {
+      const effectManagerWithCallbacks = new EffectManager(
+        layerManager as unknown as ILayerManager,
+        transitionEngine as unknown as ITransitionEngine,
+        effectTransformer as unknown as IEffectTransformer,
+        systemEffects as unknown as ISystemEffectsController,
+      )
+      const callbacks = (effectManagerWithCallbacks as any).effectCallbacks as Map<
+        string,
+        (cancelled: boolean) => void
+      >
+      const cb = jest.fn()
+      callbacks.set('pending', cb)
+
+      effectManagerWithCallbacks.removeAllEffects()
+
+      // The waiting graph node must be told its action ended (cancelled) rather than stranded.
+      expect(cb).toHaveBeenCalledWith(true)
+      expect(callbacks.size).toBe(0)
+    })
+
     it('setEffectWithCallback keeps the callback registered after the internal clear', () => {
       const effect: Effect = {
         id: 'cb-effect',

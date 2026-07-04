@@ -168,13 +168,13 @@ export interface IEffectManager {
   addEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
   ): void
   setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
   ): void
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void
@@ -294,13 +294,13 @@ export interface ILightingController {
   addEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
   ): void
   setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
   ): void
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void
@@ -351,7 +351,7 @@ export interface ILightingController {
   addEffectWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
   ): void
 
@@ -362,7 +362,7 @@ export interface ILightingController {
   setEffectWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
   ): void
 
