@@ -96,7 +96,11 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   })
 
   // Set cue style
-  ipcMain.on(CUE.CUE_STYLE, (_, style: 'simple' | 'complex') => {
+  ipcMain.on(CUE.CUE_STYLE, (_, style: unknown) => {
+    if (style !== 'simple' && style !== 'complex') {
+      log.warn(`Ignoring invalid cue style payload: ${String(style)}`)
+      return
+    }
     void controllerManager
       .getConfig()
       .setPreference('complex', style === 'complex')

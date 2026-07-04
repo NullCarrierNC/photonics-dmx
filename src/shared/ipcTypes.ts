@@ -599,7 +599,7 @@ export interface IpcInvokeMap {
     response: IpcSuccessResult | IpcErrorResult
   }
   [CONFIG.GET_LIGHT_LAYOUT]: {
-    request: string
+    request: void
     response: LightingConfiguration
   }
   [CONFIG.SAVE_LIGHT_LAYOUT]: {

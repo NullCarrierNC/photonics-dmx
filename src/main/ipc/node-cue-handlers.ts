@@ -142,7 +142,12 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
 
     const sourcePath = result.filePaths[0]
     const raw = await fs.readFile(sourcePath, 'utf-8')
-    const parsed = JSON.parse(raw)
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      return { success: false, error: 'That file is not valid JSON.' }
+    }
     const validation = validateNodeCueFile(parsed)
     if (!validation.valid) {
       return { success: false, error: validation.errors.join(', ') }

@@ -63,11 +63,11 @@ export function registerLightsRigsConfigHandlers(
     }
   })
 
-  ipcMain.handle(CONFIG.GET_LIGHT_LAYOUT, async (_, filename: string) => {
+  ipcMain.handle(CONFIG.GET_LIGHT_LAYOUT, async () => {
     try {
       return controllerManager.getConfig().getLightingLayout()
     } catch (error) {
-      log.error(`Error fetching light layout for ${filename}:`, error)
+      log.error('Error fetching light layout:', error)
       throw error
     }
   })

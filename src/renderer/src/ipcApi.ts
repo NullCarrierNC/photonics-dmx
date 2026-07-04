@@ -155,8 +155,7 @@ export const getMyLights = () => window.api.invoke(CONFIG.GET_MY_LIGHTS, undefin
 
 export const saveMyLights = (data: DmxFixture[]) => window.api.invoke(CONFIG.SAVE_MY_LIGHTS, data)
 
-export const getLightLayout = (filename: string) =>
-  window.api.invoke(CONFIG.GET_LIGHT_LAYOUT, filename)
+export const getLightLayout = () => window.api.invoke(CONFIG.GET_LIGHT_LAYOUT, undefined)
 
 export const saveLightLayout = (data: LightingConfiguration) =>
   window.api.invoke(CONFIG.SAVE_LIGHT_LAYOUT, data)

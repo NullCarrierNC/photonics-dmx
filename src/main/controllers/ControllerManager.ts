@@ -552,9 +552,11 @@ export class ControllerManager {
    * Awaits any in-flight restart so enable/disable cannot interleave with teardown/reinit.
    */
   public enableYarg(): void {
-    void this.awaitInFlightLifecycleWork().then(() => {
-      this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
-    })
+    void this.awaitInFlightLifecycleWork()
+      .then(() => {
+        this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
+      })
+      .catch((err) => log.error('Error enabling YARG after in-flight lifecycle work:', err))
   }
 
   /**

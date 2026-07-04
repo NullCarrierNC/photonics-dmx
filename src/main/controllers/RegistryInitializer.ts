@@ -69,7 +69,9 @@ export class RegistryInitializer {
       const allGroups = registry.getRegisteredGroups()
       registry.setEnabledGroups(allGroups)
       if (allGroups.length > 0) {
-        void config.updateCueDomain('audio', { enabledGroups: allGroups })
+        void config
+          .updateCueDomain('audio', { enabledGroups: allGroups })
+          .catch((err) => log.error('Failed to persist default audio enabled groups:', err))
       }
       log.info('AudioCueRegistry initialized with all groups (no preference set):', allGroups)
     }

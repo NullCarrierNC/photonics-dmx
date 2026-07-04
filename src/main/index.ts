@@ -56,8 +56,10 @@ process.on('SIGINT', async () => {
     clearTimeout(forceExitTimeout)
     app.quit()
   } catch (error) {
-    await closeFileLogWithTimeout()
+    // Log BEFORE closing the file log, or the one message explaining the failed shutdown never
+    // reaches the log file.
     log.error('Error during SIGINT shutdown:', error)
+    await closeFileLogWithTimeout()
     clearTimeout(forceExitTimeout)
     process.exit(1)
   }
@@ -78,8 +80,9 @@ process.on('SIGTERM', async () => {
     clearTimeout(forceExitTimeout)
     app.quit()
   } catch (error) {
-    await closeFileLogWithTimeout()
+    // Log BEFORE closing the file log so the shutdown-failure message is actually written.
     log.error('Error during SIGTERM shutdown:', error)
+    await closeFileLogWithTimeout()
     clearTimeout(forceExitTimeout)
     process.exit(1)
   }
@@ -139,13 +142,15 @@ app.on('before-quit', async (event) => {
   log.info('Application is shutting down, cleaning up resources...')
   try {
     await application.shutdown()
-    await closeFileLogWithTimeout()
+    // Log the outcome BEFORE closing the file log, so both the success and failure messages are
+    // actually written rather than logged into an already-closed sink.
     log.info('Graceful shutdown completed.')
+    await closeFileLogWithTimeout()
     // Now we can actually quit
     app.exit(0)
   } catch (error) {
-    await closeFileLogWithTimeout()
     log.error('Error during shutdown:', error)
+    await closeFileLogWithTimeout()
     app.exit(1)
   }
 })

@@ -411,7 +411,7 @@ export const App = (): JSX.Element => {
   useEffect(() => {
     const loadLightLayout = async (): Promise<void> => {
       try {
-        const data = await getLightLayout('myLayout.json')
+        const data = await getLightLayout()
         setActiveLightsConfig(data || null)
       } catch (error) {
         log.error('Failed to load light layout:', error)
