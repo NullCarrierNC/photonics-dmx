@@ -400,11 +400,6 @@ const LightsLayout = () => {
     confirm,
   })
 
-  // Memo Check for Physical Strobe Fixtures in Source Lights
-  const hasPhysicalStrobe = useMemo(() => {
-    return true
-  }, [])
-
   //  Handlers for Updating Lights
   const handleLightChange = (updatedLight: DmxLight) => {
     setAllPrimaryLights((prev) =>
@@ -659,7 +654,6 @@ const LightsLayout = () => {
             setSelectedStrobe={setSelectedStrobe}
             dedicatedStrobeCount={dedicatedStrobeCount}
             setDedicatedStrobeCount={setDedicatedStrobeCount}
-            hasPhysicalStrobe={hasPhysicalStrobe}
           />
 
           {/* Light Layout Preview */}

@@ -25,8 +25,11 @@ export function registerCueSelectionConfigHandlers(
       const newGroups = allGroups.filter((id) => !knownYargCueGroups.includes(id))
       if (newGroups.length > 0) {
         enabled = [...enabled, ...newGroups]
-        await config.updateCueDomain('yarg', { enabledGroups: enabled })
       }
+      // Drop any enabled group that is no longer registered (e.g. its cue file was deleted), so we
+      // never return or register a stale group id — matching the registry-init path.
+      enabled = enabled.filter((id) => allGroups.includes(id))
+      await config.updateCueDomain('yarg', { enabledGroups: enabled })
       await config.updateCueDomain('yarg', { knownGroups: allGroups })
       registry.setEnabledGroups(enabled)
     }

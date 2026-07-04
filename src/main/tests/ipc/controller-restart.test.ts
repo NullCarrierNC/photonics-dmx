@@ -9,6 +9,8 @@ jest.mock('../../utils/windowUtils', () => ({
 
 import { ControllerManager, LifecycleAbortedError } from '../../controllers/ControllerManager'
 import { SenderLifecycleController } from '../../controllers/SenderLifecycleController'
+import { sendToAllWindows } from '../../utils/windowUtils'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
 type SenderManagerLike = {
   enableSender: jest.Mock
@@ -340,6 +342,11 @@ describe('ControllerManager lifecycle and sender restore', () => {
     })
     expect(setManualBuffer).not.toHaveBeenCalled()
     expect(fake.lifecyclePhase).toBe('running')
+    // Centralized restart broadcast (C-15): fired once here rather than by each IPC caller.
+    expect(jest.mocked(sendToAllWindows)).toHaveBeenCalledWith(
+      RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
+      undefined,
+    )
   })
 
   it('restartControllers passes ipc flag through snapshot so preview sender can be restored', async () => {

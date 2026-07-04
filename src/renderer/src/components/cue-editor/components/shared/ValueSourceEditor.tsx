@@ -194,10 +194,12 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
 
   const handleToggleVar = (checked: boolean) => {
     if (checked) {
-      // Switch to variable mode
+      // Switch to variable mode. Default to an empty (unselected) name rather than a phantom "var1"
+      // that references a variable which usually doesn't exist — the empty state is shown as invalid
+      // so the author must pick a real variable before saving.
       onChange({
         source: 'variable',
-        name: isVariableSource(source) ? source.name ?? 'var1' : 'var1',
+        name: isVariableSource(source) ? source.name ?? '' : '',
       })
     } else {
       // Switch to literal mode
@@ -286,7 +288,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
               onChange={(event) =>
                 onChange({
                   source: 'variable',
-                  name: event.target.value || 'var1',
+                  name: event.target.value,
                 })
               }>
               <option value="">-- Select --</option>
@@ -296,6 +298,9 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
                 </option>
               ))}
             </select>
+            {!(isVariableSource(source) && source.name) && (
+              <span className="text-[10px] text-red-500">Select a variable</span>
+            )}
           </label>
         </div>
       )}

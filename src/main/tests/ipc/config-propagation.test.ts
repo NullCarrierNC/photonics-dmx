@@ -8,7 +8,7 @@
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { ConfigStrobeType } from '../../../photonics-dmx/types'
-import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { CONFIG } from '../../../shared/ipcChannels'
 import { LIGHT } from '../../../shared/ipcChannels'
 
 // --- Mocks set up before any imports that use them ---
@@ -121,10 +121,6 @@ describe('SAVE_DMX_RIG config propagation', () => {
     const rig = makeRig('rig-1', true)
     await handler({}, rig)
     expect(mockControllerManager.restartControllers).toHaveBeenCalledTimes(1)
-    expect(mockSendToAllWindows).toHaveBeenCalledWith(
-      RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
-      undefined,
-    )
   })
 
   it('calls restartControllers when deactivating a previously active rig', async () => {
@@ -185,10 +181,6 @@ describe('setConsoleFixtureConfig propagation', () => {
       config: { invertPan: true },
     })
     expect(result).toEqual({ success: true })
-    expect(mockSendToAllWindows).toHaveBeenCalledWith(
-      RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
-      undefined,
-    )
   })
 
   it('returns { success: false } for invalid payload', async () => {
@@ -214,10 +206,6 @@ describe('DELETE_DMX_RIG propagation', () => {
     const handler = handlers.get(CONFIG.DELETE_DMX_RIG)!
     await handler({}, 'rig-1')
     expect(mockControllerManager.restartControllers).toHaveBeenCalledTimes(1)
-    expect(mockSendToAllWindows).toHaveBeenCalledWith(
-      RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
-      undefined,
-    )
   })
 
   it('does not call restartControllers or refreshActiveRigs when deleting an inactive rig', async () => {

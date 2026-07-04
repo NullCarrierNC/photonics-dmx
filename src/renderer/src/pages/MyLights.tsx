@@ -47,9 +47,13 @@ const MyLights = () => {
           })()
         : [...myLights, lightToSave]
 
+    // Optimistic update with rollback: if the persist fails, restore the previous library so the UI
+    // doesn't keep showing an unsaved state that isn't on disk.
+    const previousLibrary = myLights
     setMyLights(nextLibrary)
     const result = await saveMyLights(nextLibrary)
     if (!result.success) {
+      setMyLights(previousLibrary)
       showToast(result.error, 'error', 5000)
       return
     }
@@ -58,10 +62,12 @@ const MyLights = () => {
 
   const handleDelete = async () => {
     if (currentLight && currentLight.id) {
+      const previousLibrary = myLights
       const updatedMyLights = myLights.filter((light) => light.id !== currentLight.id)
       setMyLights(updatedMyLights)
       const result = await saveMyLights(updatedMyLights)
       if (!result.success) {
+        setMyLights(previousLibrary)
         showToast(result.error, 'error', 5000)
         return
       }
