@@ -20,6 +20,7 @@ import {
   openDmxComPortAtom,
   syncOutputSenderAtoms,
   yargListenerEnabledAtom,
+  rb3eListenerEnabledAtom,
 } from './atoms'
 import squareLogo from './assets/images/photonics-icon.png'
 import LeftMenu from './components/LeftMenu'
@@ -79,6 +80,7 @@ export const App = (): JSX.Element => {
   const setOpenDmxEnabled = useSetAtom(senderOpenDmxEnabledAtom)
   const setIpcEnabled = useSetAtom(senderIpcEnabledAtom)
   const setYargEnabled = useSetAtom(yargListenerEnabledAtom)
+  const setRb3Enabled = useSetAtom(rb3eListenerEnabledAtom)
   const [appVer, setAppVer] = useState('')
   const { toasts, showToast, hideToast } = useToast()
 
@@ -111,6 +113,17 @@ export const App = (): JSX.Element => {
       showToast(`YARG: ${payload.message}`, 'error', 5000)
     },
     [showToast, setYargEnabled],
+  )
+
+  const handleRb3Error = useCallback(
+    (payload: { type: string; message: string; autoDisabled?: boolean }): void => {
+      log.error('RB3E error:', payload)
+      if (payload.autoDisabled) {
+        setRb3Enabled(false)
+      }
+      showToast(`RB3E: ${payload.message}`, 'error', 5000)
+    },
+    [showToast, setRb3Enabled],
   )
 
   const handleNodeCueRuntimeError = useCallback(
@@ -432,6 +445,7 @@ export const App = (): JSX.Element => {
     setIsLeftMenuCollapsed,
     handleSenderError,
     handleYargError,
+    handleRb3Error,
     handleNodeCueRuntimeError,
     handleSenderNetworkError,
     handleCueStateUpdate,

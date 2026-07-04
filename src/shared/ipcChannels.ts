@@ -200,6 +200,7 @@ export const RENDERER_RECEIVE = {
   SENDER_ERROR: 'sender-error',
   SENDER_NETWORK_ERROR: 'sender-network-error',
   YARG_ERROR: 'yarg-error',
+  RB3_ERROR: 'rb3-error',
   CONTROLLERS_RESTARTED: 'controllers-restarted',
   AUDIO_ENABLE: 'audio:enable',
   AUDIO_DISABLE: 'audio:disable',

@@ -207,9 +207,38 @@ export class ListenerCoordinator {
     this.processorManager.setCueHandler(this.deps.getChainFanout())
     this.rb3eListener = new Rb3eNetworkListener()
     this.processorManager.setNetworkListener(this.rb3eListener)
-    this.rb3eListener.start()
-    this.isRb3Enabled = true
-    log.info('RB3 listener enabled in direct StageKit mode')
+    // Enable only once the socket is actually listening. On a bind failure (e.g. port in use) the
+    // RB3 surface is torn back down and the renderer is told to un-toggle — otherwise the UI shows
+    // an enabled listener that receives nothing.
+    try {
+      await this.rb3eListener.start()
+      this.isRb3Enabled = true
+      log.info('RB3 listener enabled in direct StageKit mode')
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code
+      const isPortInUse = code === 'EADDRINUSE'
+      const message = isPortInUse
+        ? 'RB3E network port is already in use. Is another lighting app or instance running? If so, you must quit it first.'
+        : err instanceof Error
+          ? err.message
+          : String(err)
+      log.error('Failed to start RB3E listener:', err)
+      this.rb3eListener = null
+      this.isRb3Enabled = false
+      this.processorManager.destroy()
+      this.processorManager = null
+      for (const chain of chains) {
+        if (chain.rb3MenuCueHandler) {
+          chain.rb3MenuCueHandler.shutdown()
+          chain.rb3MenuCueHandler = null
+        }
+      }
+      this.deps.sendToAllWindows(RENDERER_RECEIVE.RB3_ERROR, {
+        type: isPortInUse ? 'port-in-use' : 'start-failed',
+        message,
+        autoDisabled: true,
+      })
+    }
   }
 
   public async disableRb3(): Promise<void> {

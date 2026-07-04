@@ -107,22 +107,36 @@ export class Rb3eNetworkListener extends EventEmitter {
     log.info('Rb3eNetworkListener initialized as event emitter.')
   }
 
-  public start() {
+  /**
+   * Binds the UDP socket. Resolves once the socket is listening; rejects if the bind fails
+   * (e.g. EADDRINUSE), so callers can surface the failure instead of assuming the listener is up.
+   * Post-bind runtime errors are handled by the listener registered in `setupServerEvents`.
+   */
+  public start(): Promise<void> {
     if (this.listening) {
       log.warn('RB3ENetworkListener is already running.')
-      return
+      return Promise.resolve()
     }
     log.info(`RB3ENetworkListener: Starting UDP server on port ${PORT}...`)
     this.server = dgram.createSocket('udp4')
     this.setupServerEvents()
-    this.server.bind(PORT, () => {
-      this.listening = true
-      log.info(`RB3ENetworkListener started and listening on port ${PORT}`)
-    })
-
-    // Add error handling for bind failures
-    this.server.on('error', (err) => {
-      log.error(`RB3ENetworkListener: Bind error:`, err)
+    return new Promise((resolve, reject) => {
+      const sock = this.server!
+      const onListening = (): void => {
+        sock.off('error', onBindError)
+        this.listening = true
+        log.info(`RB3ENetworkListener started and listening on port ${PORT}`)
+        resolve()
+      }
+      const onBindError = (err: Error): void => {
+        sock.off('listening', onListening)
+        this.server = null
+        this.listening = false
+        reject(err)
+      }
+      sock.once('listening', onListening)
+      sock.once('error', onBindError)
+      sock.bind(PORT)
     })
   }
 

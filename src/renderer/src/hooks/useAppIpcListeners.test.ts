@@ -31,6 +31,7 @@ function minimalParams(over: Partial<UseAppIpcListenersParams> = {}): UseAppIpcL
     setIsLeftMenuCollapsed: jest.fn(),
     handleSenderError: jest.fn(),
     handleYargError: jest.fn(),
+    handleRb3Error: jest.fn(),
     handleNodeCueRuntimeError: jest.fn(),
     handleSenderNetworkError: jest.fn(),
     handleCueStateUpdate: jest.fn(),

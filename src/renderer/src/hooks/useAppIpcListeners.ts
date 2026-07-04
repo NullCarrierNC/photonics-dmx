@@ -18,6 +18,7 @@ export interface UseAppIpcListenersParams {
   setIsLeftMenuCollapsed: (collapsed: boolean) => void
   handleSenderError: (msg: string) => void
   handleYargError: (payload: { type: string; message: string; autoDisabled?: boolean }) => void
+  handleRb3Error: (payload: { type: string; message: string; autoDisabled?: boolean }) => void
   handleNodeCueRuntimeError: (msg: string) => void
   handleSenderNetworkError: (data: { sender: string; error: string; autoDisabled: boolean }) => void
   handleCueStateUpdate: (cueState: CueStateUpdatePayload) => void
@@ -179,6 +180,8 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     const onSenderError = (msg: string) => p().handleSenderError(msg)
     const onYargError = (payload: { type: string; message: string; autoDisabled?: boolean }) =>
       p().handleYargError(payload)
+    const onRb3Error = (payload: { type: string; message: string; autoDisabled?: boolean }) =>
+      p().handleRb3Error(payload)
     const onNodeCueRuntimeError = (msg: string) => p().handleNodeCueRuntimeError(msg)
     const onSenderNetworkError = (data: { sender: string; error: string; autoDisabled: boolean }) =>
       p().handleSenderNetworkError(data)
@@ -193,6 +196,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
 
     addIpcListener(RENDERER_RECEIVE.SENDER_ERROR, onSenderError)
     addIpcListener(RENDERER_RECEIVE.YARG_ERROR, onYargError)
+    addIpcListener(RENDERER_RECEIVE.RB3_ERROR, onRb3Error)
     addIpcListener(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, onNodeCueRuntimeError)
     addIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, onSenderNetworkError)
     addIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, onCueStateUpdate)
@@ -205,6 +209,7 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     return () => {
       removeIpcListener(RENDERER_RECEIVE.SENDER_ERROR, onSenderError)
       removeIpcListener(RENDERER_RECEIVE.YARG_ERROR, onYargError)
+      removeIpcListener(RENDERER_RECEIVE.RB3_ERROR, onRb3Error)
       removeIpcListener(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, onNodeCueRuntimeError)
       removeIpcListener(RENDERER_RECEIVE.SENDER_NETWORK_ERROR, onSenderNetworkError)
       removeIpcListener(RENDERER_RECEIVE.CUE_STATE_UPDATE, onCueStateUpdate)
