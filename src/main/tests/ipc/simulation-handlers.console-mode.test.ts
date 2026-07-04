@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals'
 import { setupSimulationHandlers } from '../../ipc/simulation-handlers'
+import { MotionCueSimulator } from '../../controllers/MotionCueSimulator'
 
 describe('simulation handlers console integration', () => {
   it('registers a console-enter callback that stops simulated motion state', () => {
@@ -7,12 +8,17 @@ describe('simulation handlers console integration', () => {
       handle: jest.fn(),
       on: jest.fn(),
     } as any
-    // The console-enter callback now drives the chain fanout so secondary rigs also get
-    // their pan/tilt cleared. Stub the fanout's `yargSchedulePanTiltClear` to verify it.
+    // The console-enter callback stops the motion simulator, which drives the chain fanout so
+    // secondary rigs also get their pan/tilt cleared. Stub `yargSchedulePanTiltClear` to verify it.
     const yargSchedulePanTiltClear = jest.fn()
+    const getChainFanout = jest.fn(() => ({ yargSchedulePanTiltClear }))
+    const motionCueSimulator = new MotionCueSimulator({
+      getChainFanout: getChainFanout as never,
+    })
     const controllerManager = {
       setOnConsoleEnter: jest.fn(),
-      getChainFanout: jest.fn(() => ({ yargSchedulePanTiltClear })),
+      getChainFanout,
+      getMotionCueSimulator: () => motionCueSimulator,
     } as any
 
     setupSimulationHandlers(ipcMain, controllerManager)

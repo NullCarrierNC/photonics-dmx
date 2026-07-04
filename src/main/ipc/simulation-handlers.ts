@@ -11,71 +11,15 @@ import { sendToAllWindows } from '../utils/windowUtils'
 import { ipcError } from './ipcResult'
 import { createMockAudioCueData, createMockCueData } from './mockCueData'
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
-import { INetCue } from '../../photonics-dmx/cues/interfaces/INetCue'
-import { IAudioCue } from '../../photonics-dmx/cues/interfaces/IAudioCue'
-import type { CueData } from '../../photonics-dmx/cues/types/cueTypes'
 import { createLogger } from '../../shared/logger'
 import { isNonEmptyString, isPlainObject } from './inputValidation'
 const log = createLogger('simulation-handlers')
 
-/** YARG motion cue started from Cue Simulation; stopped explicitly or replaced by another start. */
-let activeSimulatedYargMotionCue: INetCue | null = null
-/** Audio motion cue started from Cue Simulation. */
-let activeSimulatedAudioMotionCue: IAudioCue | null = null
-let simulatedAudioMotionExecutionCount = 0
-
 /**
- * Each motion cue is executed once per active rig chain so secondary rigs see the same
- * motion at the same time. The cue instance itself is a registry singleton; the per-rig
- * state lives inside it keyed by sequencer (see the cue runtime per-sequencer state work).
+ * The motion-cue simulation state now lives in a ControllerManager-owned {@link MotionCueSimulator}
+ * so it is reset when the controller graph is rebuilt (each cue is still executed once per active rig
+ * chain so secondary rigs see the same motion at the same time).
  */
-function stopActiveSimulatedMotionCue(controllerManager: ControllerManager): void {
-  activeSimulatedYargMotionCue?.onStop?.()
-  activeSimulatedYargMotionCue = null
-  activeSimulatedAudioMotionCue?.onStop?.()
-  activeSimulatedAudioMotionCue = null
-  simulatedAudioMotionExecutionCount = 0
-  // Schedule pan/tilt clear on every chain — secondary rigs would otherwise leave their
-  // moving heads pointed at the last motion target after a stop.
-  controllerManager.getChainFanout().yargSchedulePanTiltClear()
-}
-
-async function runActiveSimulatedMotionCue(
-  controllerManager: ControllerManager,
-  mockCueData: CueData,
-): Promise<void> {
-  if (!activeSimulatedYargMotionCue) return
-  const fanout = controllerManager.getChainFanout()
-  for (const chain of fanout.getChains()) {
-    const maybePromise = activeSimulatedYargMotionCue.execute(
-      mockCueData,
-      chain.sequencer,
-      chain.dmxLightManager,
-    )
-    if (maybePromise instanceof Promise) {
-      await maybePromise
-    }
-  }
-}
-
-async function runActiveSimulatedAudioMotionCue(
-  controllerManager: ControllerManager,
-): Promise<void> {
-  if (!activeSimulatedAudioMotionCue) return
-  simulatedAudioMotionExecutionCount++
-  const mockAudio = createMockAudioCueData(simulatedAudioMotionExecutionCount)
-  const fanout = controllerManager.getChainFanout()
-  for (const chain of fanout.getChains()) {
-    const maybePromise = activeSimulatedAudioMotionCue.execute(
-      mockAudio,
-      chain.sequencer,
-      chain.dmxLightManager,
-    )
-    if (maybePromise instanceof Promise) {
-      await maybePromise
-    }
-  }
-}
 
 /**
  * Set up simulation and test-effect IPC handlers (beat/keyframe/measure/instrument, test effects, system status, available cues).
@@ -84,9 +28,11 @@ export function setupSimulationHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
 ): void {
+  const sim = controllerManager.getMotionCueSimulator()
+
   controllerManager.setOnConsoleEnter(() => {
-    const hadYargSim = activeSimulatedYargMotionCue !== null
-    stopActiveSimulatedMotionCue(controllerManager)
+    const hadYargSim = sim.hasYargActive()
+    sim.stop()
     if (hadYargSim) {
       sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
         ref: null,
@@ -238,8 +184,8 @@ export function setupSimulationHandlers(
         }
       }
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
-      await runActiveSimulatedMotionCue(controllerManager, mockCueData)
-      await runActiveSimulatedAudioMotionCue(controllerManager)
+      await sim.runYarg(mockCueData)
+      await sim.runAudio()
       fanout.yargOnBeat()
       return true
     },
@@ -288,8 +234,8 @@ export function setupSimulationHandlers(
         }
       }
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
-      await runActiveSimulatedMotionCue(controllerManager, mockCueData)
-      await runActiveSimulatedAudioMotionCue(controllerManager)
+      await sim.runYarg(mockCueData)
+      await sim.runAudio()
       fanout.yargOnKeyframe()
       return true
     },
@@ -338,8 +284,8 @@ export function setupSimulationHandlers(
         }
       }
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
-      await runActiveSimulatedMotionCue(controllerManager, mockCueData)
-      await runActiveSimulatedAudioMotionCue(controllerManager)
+      await sim.runYarg(mockCueData)
+      await sim.runAudio()
       fanout.yargOnMeasure()
       return true
     },
@@ -447,11 +393,7 @@ export function setupSimulationHandlers(
       if (!cue) {
         return ipcError(new Error(`YARG motion cue not found: ${groupId}/${cueId}`))
       }
-      activeSimulatedYargMotionCue?.onStop?.()
-      activeSimulatedYargMotionCue = null
-      activeSimulatedAudioMotionCue?.onStop?.()
-      activeSimulatedAudioMotionCue = null
-      simulatedAudioMotionExecutionCount = 0
+      sim.clearActive()
       // Cancel pending pan/tilt clears on every chain — without this, secondary rigs
       // would clear pan/tilt mid-motion after the previous simulation stopped.
       fanout.yargCancelPanTiltClear()
@@ -468,7 +410,7 @@ export function setupSimulationHandlers(
           await maybePromise
         }
       }
-      activeSimulatedYargMotionCue = cue
+      sim.setYargCue(cue)
       sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
         ref: { groupId, cueId },
         source: 'auto',
@@ -506,11 +448,7 @@ export function setupSimulationHandlers(
       if (!cue) {
         return ipcError(new Error(`Audio motion cue not found: ${groupId}/${cueId}`))
       }
-      activeSimulatedYargMotionCue?.onStop?.()
-      activeSimulatedYargMotionCue = null
-      activeSimulatedAudioMotionCue?.onStop?.()
-      activeSimulatedAudioMotionCue = null
-      simulatedAudioMotionExecutionCount = 0
+      sim.clearActive()
       fanout.yargCancelPanTiltClear()
       const mockAudio = createMockAudioCueData(1)
       for (const chain of fanout.getChains()) {
@@ -519,7 +457,7 @@ export function setupSimulationHandlers(
           await maybePromise
         }
       }
-      activeSimulatedAudioMotionCue = cue
+      sim.setAudioCue(cue)
       return { success: true as const }
     } catch (error) {
       log.error('Error starting audio motion cue simulation:', error)
@@ -529,8 +467,8 @@ export function setupSimulationHandlers(
 
   ipcMain.handle(LIGHT.STOP_MOTION_CUE_SIMULATION, async () => {
     try {
-      const hadYargSim = activeSimulatedYargMotionCue !== null
-      stopActiveSimulatedMotionCue(controllerManager)
+      const hadYargSim = sim.hasYargActive()
+      sim.stop()
       if (hadYargSim) {
         sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
           ref: null,

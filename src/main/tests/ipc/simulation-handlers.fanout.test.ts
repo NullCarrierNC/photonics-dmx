@@ -17,6 +17,7 @@ jest.mock('../../utils/windowUtils', () => ({
 import { setupSimulationHandlers } from '../../ipc/simulation-handlers'
 import { LIGHT } from '../../../shared/ipcChannels'
 import { ChainFanout } from '../../../photonics-dmx/controllers/ChainFanout'
+import { MotionCueSimulator } from '../../controllers/MotionCueSimulator'
 import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../../photonics-dmx/cues/registries/AudioCueRegistry'
 import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
@@ -76,6 +77,7 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
     setOnConsoleEnter: jest.Mock
     ensureChainsHaveYargHandlersForSimulation: jest.Mock
     getChainFanout: () => ChainFanout
+    getMotionCueSimulator: () => MotionCueSimulator
     getIsInitialized: () => boolean
     init: jest.Mock
   }
@@ -95,10 +97,12 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
     fanout = new ChainFanout()
     fanout.setChains(chains)
     ipc = makeIpcMain()
+    const motionCueSimulator = new MotionCueSimulator({ getChainFanout: () => fanout })
     controllerManager = {
       setOnConsoleEnter: jest.fn(),
       ensureChainsHaveYargHandlersForSimulation: jest.fn(),
       getChainFanout: () => fanout,
+      getMotionCueSimulator: () => motionCueSimulator,
       getIsInitialized: () => true,
       init: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
     }

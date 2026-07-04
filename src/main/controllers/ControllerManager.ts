@@ -23,6 +23,7 @@ import { noopRuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 import { RigChain } from './RigChain'
 import { ChainFanout } from './ChainFanout'
 import { TestEffectRunner } from './TestEffectRunner'
+import { MotionCueSimulator } from './MotionCueSimulator'
 import { ListenerLifecycleController } from './ListenerLifecycleController'
 import {
   SenderLifecycleController,
@@ -118,6 +119,7 @@ export class ControllerManager {
   private pendingValidationErrors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }> = []
 
   private readonly testEffectRunner: TestEffectRunner
+  private readonly motionCueSimulator: MotionCueSimulator
   private readonly senderLifecycle: SenderLifecycleController
   private readonly listenerLifecycle: ListenerLifecycleController
   private readonly registryInit: RegistryInitializer
@@ -139,6 +141,9 @@ export class ControllerManager {
       getChainFanout: () => this.chainFanout,
       ensureChainsHaveYargHandlers: () => this.ensureChainsHaveYargHandlersForSimulation(),
       ensureInitialized: () => this.init(),
+    })
+    this.motionCueSimulator = new MotionCueSimulator({
+      getChainFanout: () => this.chainFanout,
     })
     this.listenerLifecycle = new ListenerLifecycleController(
       {
@@ -768,6 +773,11 @@ export class ControllerManager {
     return this.chainFanout
   }
 
+  /** The Cue-Simulation motion-cue state holder (reset on restart). */
+  public getMotionCueSimulator(): MotionCueSimulator {
+    return this.motionCueSimulator
+  }
+
   /**
    * Idempotent: ensures every active rig chain has a `YargCueHandler` attached, creating
    * one bound to the chain's own `(dmxLightManager, sequencer)` for any chain whose slot is
@@ -917,6 +927,15 @@ export class ControllerManager {
       // Prevents a stale strobe slot from driving hardware-strobe-channel
       // lights after an input-platform switch.
       getStrobeStateManager().setActive(null)
+
+      // Drop any active simulated motion cue — the chains it drove are being rebuilt, so a held cue
+      // would otherwise execute against torn-down sequencers on the next simulate tick. Wrapped so a
+      // reset failure can never abort the controller restart.
+      try {
+        this.motionCueSimulator.reset()
+      } catch (err) {
+        log.error('Error resetting motion cue simulator during restart:', err)
+      }
 
       // Clear the shared tick source so `init()` builds a fresh one rather than reusing
       // a clock whose tick callbacks have been unregistered.
