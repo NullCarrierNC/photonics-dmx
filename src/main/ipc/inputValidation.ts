@@ -538,9 +538,32 @@ export function validateDmxRigPayload(data: unknown): ValidationResult<DmxRig> {
  * locations they choose, so shell open/show operations are scoped to the home tree rather than a
  * single app directory.
  */
+/**
+ * Whether this process is a packaged build. Outside a real Electron runtime (e.g. tests) the answer
+ * is unknowable, so this fails closed: unknown counts as packaged.
+ */
+function isPackagedBuild(): boolean {
+  try {
+    // Lazy require: this module is also loaded by tests without an Electron runtime.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const electron = require('electron') as { app?: { isPackaged?: boolean } }
+    return electron.app ? electron.app.isPackaged === true : true
+  } catch {
+    return true
+  }
+}
+
+/**
+ * Packaged apps launched from Finder/Dock run with cwd '/', under which EVERY absolute path is
+ * "inside the root" — so the cwd root is only granted in dev runs, where it points at the project.
+ */
+function defaultAllowedRoots(): string[] {
+  return [...(isPackagedBuild() ? [] : [process.cwd()]), os.homedir(), os.tmpdir()]
+}
+
 export function validatePathUnderAllowedRoots(
   targetPath: unknown,
-  allowedRoots: string[] = [process.cwd(), os.homedir(), os.tmpdir()],
+  allowedRoots: string[] = defaultAllowedRoots(),
 ): ValidationResult<string> {
   if (!isNonEmptyString(targetPath)) {
     return { ok: false, error: 'Path must be a non-empty string' }

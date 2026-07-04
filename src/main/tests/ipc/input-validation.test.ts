@@ -1,4 +1,6 @@
 import { describe, expect, it } from '@jest/globals'
+import * as os from 'os'
+import * as path from 'path'
 import {
   isPlainObject,
   validateCueGroupSelectionMode,
@@ -581,6 +583,20 @@ describe('inputValidation', () => {
     it('rejects path when allowed roots is empty', () => {
       const result = validatePathUnderAllowedRoots('/tmp/foo', [])
       expect(result.ok).toBe(false)
+    })
+
+    describe('default roots', () => {
+      // Outside a real Electron runtime the packaged check fails closed, so the defaults here are
+      // homedir + tmpdir WITHOUT cwd — the same roots a packaged app gets. (A packaged app launched
+      // from Finder has cwd '/', under which every path would pass.)
+      it('rejects a system path with the default roots', () => {
+        expect(validatePathUnderAllowedRoots('/etc/hosts').ok).toBe(false)
+      })
+
+      it('accepts a homedir path with the default roots', () => {
+        const result = validatePathUnderAllowedRoots(path.join(os.homedir(), 'somefile.json'))
+        expect(result.ok).toBe(true)
+      })
     })
   })
 

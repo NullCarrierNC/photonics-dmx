@@ -271,7 +271,7 @@ export interface IpcInvokeMap {
   }
   [SHELL.OPEN_PATH]: {
     request: string
-    response: IpcErrorResult | { success: true; result: string }
+    response: IpcSuccessResult | IpcErrorResult
   }
 
   // ---- Cue / listeners ----
