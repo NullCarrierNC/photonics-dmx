@@ -464,8 +464,10 @@ export class LightTransitionController {
           const correctedState = this.validateAndCorrectLightState(lightId, newState)
           layerStates.set(layer, correctedState)
 
-          // If transition is complete, mark for removal
-          if (progress >= 0.999) {
+          // If transition is complete, mark for removal. progress is Math.min(elapsed/duration, 1),
+          // so it hits exactly 1 the frame elapsed reaches the duration — complete there and let the
+          // fade run its full length to the exact end colour (the 0.999 epsilon predated the clamp).
+          if (progress >= 1) {
             transitionUpdates.push({
               lightId,
               layer,
@@ -863,10 +865,14 @@ export class LightTransitionController {
    */
   private cleanupOrphanedTransitions(): void {
     const currentTime = performance.now()
-    const maxTransitionAge = 5000
+    // Absolute floor for the orphan cutoff; a longer transition gets a proportionally longer grace
+    // so a legitimate multi-second fade isn't reaped mid-fade.
+    const minTransitionAge = 5000
 
     for (const [lightId, layerMap] of this._transitionsByLight.entries()) {
       for (const [layer, transitionData] of layerMap.entries()) {
+        const duration = transitionData.transition.transform.duration
+        const maxTransitionAge = Math.max(minTransitionAge, duration * 1.5)
         if (currentTime - transitionData.startTime > maxTransitionAge) {
           const position = this.getLightPosition(lightId)
           log.warn(

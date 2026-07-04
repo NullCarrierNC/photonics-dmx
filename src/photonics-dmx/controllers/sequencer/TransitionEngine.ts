@@ -127,7 +127,9 @@ export class TransitionEngine implements ITransitionEngine {
       const hasQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId) !== undefined
       if (!hasNewEffect && !hasQueuedEffect) {
         this.lightTransitionController.removeLightLayer(lightId, layer)
-        this.layerManager.clearLayerStates(layer)
+        // Clear only THIS light's stored state on the layer — other lights on the same layer may
+        // still be running and must keep their state.
+        this.layerManager.clearLightLayerState(layer, lightId)
       }
     }
     this._pendingLayerRemovals = []

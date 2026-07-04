@@ -51,6 +51,46 @@ describe('LightTransitionController', () => {
     ltc._currentLayerStates = new Map()
   })
 
+  describe('orphaned-transition reaper (D-11)', () => {
+    it('does not reap a long fade before duration * 1.5', () => {
+      let mockNow = 1000
+      const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => mockNow)
+      try {
+        // startTime is stamped from performance.now() at 1000.
+        lightTransitionController.setTransition(
+          'l',
+          1,
+          createMockRGBIP({ red: 0 }),
+          createMockRGBIP({ red: 255 }),
+          8000,
+          'linear',
+        )
+        const transitions = ltcAccess(lightTransitionController)._transitionsByLight
+        expect(transitions.get('l')?.has(1)).toBe(true)
+
+        // Age 6000ms: past the old fixed 5000ms cutoff, but under 8000 * 1.5 = 12000.
+        mockNow = 1000 + 6000
+        lightTransitionController.advanceFrame({
+          frameStartTime: 1000 + 6000,
+          deltaTime: 16,
+          frameIndex: 1,
+        })
+        expect(transitions.get('l')?.has(1)).toBe(true) // still alive
+
+        // Age 13000ms: past duration * 1.5, so now genuinely orphaned and reaped.
+        mockNow = 1000 + 13000
+        lightTransitionController.advanceFrame({
+          frameStartTime: 1000 + 13000,
+          deltaTime: 16,
+          frameIndex: 2,
+        })
+        expect(transitions.get('l')?.has(1) ?? false).toBe(false)
+      } finally {
+        nowSpy.mockRestore()
+      }
+    })
+  })
+
   describe('setTransition', () => {
     it('should add a new transition', () => {
       const lightId = 'test-light'

@@ -93,6 +93,7 @@ export interface ILayerManager {
   captureFinalStates(layer: number, lights: TrackedLight[]): void
   getLightState(layer: number, lightId: string): RGBIO | undefined
   clearLayerStates(layer: number): void
+  clearLightLayerState(layer: number, lightId: string): void
   getLightTransitionController(): LightTransitionController
 
   // Per-light effect management

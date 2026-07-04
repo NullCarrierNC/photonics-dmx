@@ -92,6 +92,7 @@ describe('TransitionEngine', () => {
       getQueuedEffect: jest.fn(),
       getLightState: jest.fn(),
       clearLayerStates: jest.fn(),
+      clearLightLayerState: jest.fn(),
       captureFinalStates: jest.fn(),
     } as unknown as jest.Mocked<LayerManager>
 
@@ -249,7 +250,8 @@ describe('TransitionEngine', () => {
       transitionEngine.updateTransitions()
 
       expect(lightTransitionController.removeLightLayer).toHaveBeenCalledWith('test-light-1', 1)
-      expect(layerManager.clearLayerStates).toHaveBeenCalledWith(1)
+      // Only this light's state is cleared, not the whole layer (other lights may still run there).
+      expect(layerManager.clearLightLayerState).toHaveBeenCalledWith(1, 'test-light-1')
     })
 
     it('skips deferred removeLightLayer when a new effect is active on the next frame', () => {
