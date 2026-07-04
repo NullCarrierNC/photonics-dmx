@@ -895,5 +895,32 @@ describe('EffectManager', () => {
 
       expect(callbacks.size).toBe(0)
     })
+
+    it('setEffectWithCallback keeps the callback registered after the internal clear', () => {
+      const effect: Effect = {
+        id: 'cb-effect',
+        description: 'callback effect',
+        transitions: [
+          {
+            layer: 1,
+            lights: [createMockTrackedLight()],
+            transform: {
+              color: createMockRGBIP(),
+              easing: 'linear',
+              duration: 100,
+              waitFor: 0,
+              waitUntil: 0,
+            },
+          } as unknown as EffectTransition,
+        ],
+      }
+      const onComplete = jest.fn()
+      effectManager.setEffectWithCallback('cb-effect', effect, onComplete)
+
+      const callbacks = (effectManager as any).effectCallbacks as Map<string, () => void>
+      // setEffect clears callbacks internally, so registering before it (the old order) would have
+      // left this empty; the callback must survive to fire on completion.
+      expect(callbacks.get('cb-effect')).toBe(onComplete)
+    })
   })
 })

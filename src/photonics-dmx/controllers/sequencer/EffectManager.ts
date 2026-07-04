@@ -142,8 +142,10 @@ export class EffectManager implements IEffectManager {
     onComplete: () => void,
     isPersistent: boolean = false,
   ): void {
-    this.effectCallbacks.set(name, onComplete)
+    // setEffect clears all effects (and their callbacks) first, so register AFTER it — registering
+    // before would immediately erase this callback and the completion would never fire.
     this.setEffect(name, effect, isPersistent)
+    this.effectCallbacks.set(name, onComplete)
   }
 
   /**

@@ -11,6 +11,14 @@ import { createLogger } from '../../shared/logger'
 
 const log = createLogger('DmxLightManager')
 
+/** Targets whose result is a fresh random draw each call, so they must never be cached. */
+const RANDOM_TARGETS: ReadonlySet<LightTarget> = new Set<LightTarget>([
+  'random-1',
+  'random-2',
+  'random-3',
+  'random-4',
+])
+
 /**
  * Requests lights based on groups and targets.
  * Groups: Locations like Front and Back.
@@ -107,11 +115,15 @@ export class DmxLightManager {
     const groups = Array.isArray(group) ? group : [group]
     const targets = Array.isArray(target) ? target : [target]
 
+    // random-* targets must re-roll on every call, so they bypass the cache entirely — caching a
+    // random pick would freeze it for the rest of the session.
+    const hasRandom = targets.some((t) => RANDOM_TARGETS.has(t))
+
     // Generate cache key by sorting groups and targets for consistency
     const cacheKey = `${[...groups].sort().join(',')}|${[...targets].sort().join(',')}`
 
     // Check cache first
-    if (this._lightsCache.has(cacheKey)) {
+    if (!hasRandom && this._lightsCache.has(cacheKey)) {
       return this._lightsCache.get(cacheKey)!
     }
 
@@ -128,10 +140,31 @@ export class DmxLightManager {
 
     const result = Array.from(lightsSet).sort((a, b) => a.position - b.position)
 
-    // Cache the result
-    this._lightsCache.set(cacheKey, result)
+    // Cache the result (never a random pick).
+    if (!hasRandom) {
+      this._lightsCache.set(cacheKey, result)
+    }
 
     return result
+  }
+
+  /**
+   * Picks up to `count` distinct lights at random (sample without replacement). Returns `[]` for an
+   * empty pool and never yields duplicates or `undefined` entries.
+   */
+  private sampleRandomLights(lights: TrackedLight[], count: number): TrackedLight[] {
+    if (lights.length === 0) {
+      return []
+    }
+    const pool = [...lights]
+    const take = Math.min(count, pool.length)
+    const picked: TrackedLight[] = []
+    for (let i = 0; i < take; i++) {
+      const idx = randomBetween(0, pool.length - 1)
+      picked.push(pool[idx])
+      pool.splice(idx, 1)
+    }
+    return picked
   }
 
   /**
@@ -209,25 +242,13 @@ export class DmxLightManager {
       case 'inverse-linear':
         return [...lights].sort((a, b) => b.position - a.position)
       case 'random-1':
-        return [lights[randomBetween(0, lights.length - 1)]]
+        return this.sampleRandomLights(lights, 1)
       case 'random-2':
-        return [
-          lights[randomBetween(0, lights.length - 1)],
-          lights[randomBetween(0, lights.length - 1)],
-        ]
+        return this.sampleRandomLights(lights, 2)
       case 'random-3':
-        return [
-          lights[randomBetween(0, lights.length - 1)],
-          lights[randomBetween(0, lights.length - 1)],
-          lights[randomBetween(0, lights.length - 1)],
-        ]
+        return this.sampleRandomLights(lights, 3)
       case 'random-4':
-        return [
-          lights[randomBetween(0, lights.length - 1)],
-          lights[randomBetween(0, lights.length - 1)],
-          lights[randomBetween(0, lights.length - 1)],
-          lights[randomBetween(0, lights.length - 1)],
-        ]
+        return this.sampleRandomLights(lights, 4)
       default:
         log.warn(`Unknown target: ${target}`)
         return []
