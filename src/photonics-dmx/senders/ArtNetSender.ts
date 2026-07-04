@@ -25,6 +25,9 @@ export class ArtNetSender extends BaseSender {
   private eventEmitter: EventEmitter
   private lastSendTimeMs: number = 0
   private minIntervalMs: number = 0
+  /** Latest frame withheld by the rate limiter, flushed by {@link flushTimer}. */
+  private pendingBuffer: Record<number, number> | null = null
+  private flushTimer: NodeJS.Timeout | null = null
 
   constructor(
     private host: string = '127.0.0.1',
@@ -48,7 +51,13 @@ export class ArtNetSender extends BaseSender {
     try {
       this.universe = await this.dmx.addUniverse(
         'artnet-universe',
-        new ArtnetDriver(this.host, this.options),
+        // dmx-ts reads the keepalive as `unchangedDataInterval` (it maps that onto dmxnet's
+        // base_refresh_interval internally); the config side carries the value under the dmxnet
+        // name, so translate here where the driver is constructed.
+        new ArtnetDriver(this.host, {
+          ...this.options,
+          unchangedDataInterval: this.options.base_refresh_interval,
+        }),
       )
     } catch (err) {
       const errorEvent = new SenderError(err, { senderId: 'artnet' })
@@ -63,6 +72,14 @@ export class ArtNetSender extends BaseSender {
     }
 
     log.info(`Stopping ArtNet sender on host ${this.host}...`)
+
+    // Drop any withheld frame and its flush timer BEFORE the blackout write, so the last frame on
+    // the wire is the blackout rather than a stale queued cue frame.
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer)
+      this.flushTimer = null
+    }
+    this.pendingBuffer = null
 
     try {
       this.lastSendTimeMs = 0
@@ -127,10 +144,29 @@ export class ArtNetSender extends BaseSender {
         const now = performance.now()
         const elapsed = now - this.lastSendTimeMs
         if (elapsed < this.minIntervalMs && this.lastSendTimeMs !== 0) {
+          // Throttled: keep the latest frame and schedule a trailing-edge flush so the
+          // final frame of a burst still reaches the wire instead of being dropped. Snapshot
+          // the frame: the publisher reuses and mutates its slot buffer in place each frame, so
+          // holding it by reference would let the trailing flush send a newer frame than the one
+          // withheld. The buffer is a flat channel->value record, so a shallow copy suffices.
+          this.pendingBuffer = { ...universeBuffer }
+          if (!this.flushTimer) {
+            this.flushTimer = setTimeout(() => {
+              this.flushTimer = null
+              const buffer = this.pendingBuffer
+              this.pendingBuffer = null
+              if (buffer) {
+                void this.send(buffer)
+              }
+            }, this.minIntervalMs - elapsed)
+          }
           return
         }
         this.lastSendTimeMs = now
       }
+
+      // A frame that goes out now supersedes any queued trailing frame.
+      this.pendingBuffer = null
 
       // Convert from 1-based DMX indexing to 0-based ArtNet indexing
       const convertedBuffer: Record<number, number> = {}

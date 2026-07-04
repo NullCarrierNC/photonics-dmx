@@ -113,4 +113,66 @@ describe('ArtNetSender', () => {
       })
     })
   })
+
+  describe('rate limiting', () => {
+    it('flushes the last throttled frame on the trailing edge', async () => {
+      jest.useFakeTimers()
+      try {
+        const throttled = new ArtNetSender('127.0.0.1', { universe: 1, maxOutputRate: 40 }) // 25ms interval
+        await throttled.start()
+        mockUpdate.mockClear()
+        jest.advanceTimersByTime(1000) // move the mocked clock off 0 (0 doubles as "never sent")
+
+        await throttled.send({ 1: 10 }) // leading frame goes out immediately
+        await throttled.send({ 1: 20 }) // within the interval: withheld, not dropped
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
+        expect(mockUpdate).toHaveBeenCalledWith({ 0: 10 })
+
+        jest.advanceTimersByTime(30) // past the interval: the trailing flush sends the kept frame
+        await Promise.resolve()
+        expect(mockUpdate).toHaveBeenCalledWith({ 0: 20 })
+      } finally {
+        jest.useRealTimers()
+      }
+    })
+
+    it('stop() drops a pending trailing frame so the blackout is the final frame', async () => {
+      jest.useFakeTimers()
+      try {
+        const throttled = new ArtNetSender('127.0.0.1', { universe: 1, maxOutputRate: 40 })
+        await throttled.start()
+        mockUpdate.mockClear()
+        jest.advanceTimersByTime(1000) // move the mocked clock off 0 (0 doubles as "never sent")
+
+        await throttled.send({ 1: 10 })
+        await throttled.send({ 1: 20 }) // withheld
+        const stopping = throttled.stop()
+        await jest.advanceTimersByTimeAsync(500) // run stop's internal delays + any stray flush timer
+        await stopping
+
+        // The withheld cue frame never reaches the wire; the last payload is the blackout.
+        expect(mockUpdate).not.toHaveBeenCalledWith({ 0: 20 })
+        const lastPayload = mockUpdate.mock.calls[mockUpdate.mock.calls.length - 1][0] as Record<
+          number,
+          number
+        >
+        expect(lastPayload[0]).toBe(0)
+        expect(lastPayload[511]).toBe(0)
+      } finally {
+        jest.useRealTimers()
+      }
+    })
+  })
+
+  describe('driver options', () => {
+    it('passes the keepalive to the driver as unchangedDataInterval', async () => {
+      const { ArtnetDriver } = jest.requireMock('dmx-ts') as { ArtnetDriver: jest.Mock }
+      ArtnetDriver.mockClear()
+      const sender = new ArtNetSender('127.0.0.1', { universe: 1, base_refresh_interval: 250 })
+      await sender.start()
+      const optionsArg = ArtnetDriver.mock.calls[0][1] as { unchangedDataInterval?: number }
+      expect(optionsArg.unchangedDataInterval).toBe(250)
+      await sender.stop().catch(() => {})
+    })
+  })
 })
