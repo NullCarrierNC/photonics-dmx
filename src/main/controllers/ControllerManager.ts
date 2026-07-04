@@ -1002,6 +1002,11 @@ export class ControllerManager {
         activeSendersBeforeRestart ?? undefined,
       )
 
+      // Single source of the restart broadcast: every caller of restartControllers() used to fire
+      // this itself (and SET_CLOCK_RATE forgot to), so broadcast once here after a successful restart
+      // and let the callers drop their copies.
+      sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
+
       log.info('Controllers restarted successfully')
     } catch (error) {
       if (error instanceof LifecycleAbortedError) {

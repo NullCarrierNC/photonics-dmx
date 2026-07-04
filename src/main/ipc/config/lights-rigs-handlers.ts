@@ -2,9 +2,8 @@ import { IpcMain, dialog } from 'electron'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { ControllerManager } from '../../controllers/ControllerManager'
-import { sendToAllWindows } from '../../utils/windowUtils'
 import { ipcError, ipcSuccess } from '../ipcResult'
-import { CONFIG, RENDERER_RECEIVE, RIGS } from '../../../shared/ipcChannels'
+import { CONFIG, RIGS } from '../../../shared/ipcChannels'
 import {
   validateLightingConfiguration,
   validateDmxFixturesArray,
@@ -54,7 +53,6 @@ export function registerLightsRigsConfigHandlers(
       const rigsChanged = await config.syncRigsWithUserLights()
       if (rigsChanged) {
         await controllerManager.restartControllers()
-        sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
       }
       return ipcSuccess()
     } catch (err) {
@@ -81,8 +79,6 @@ export function registerLightsRigsConfigHandlers(
       await controllerManager.getConfig().updateLightingLayout(validation.value)
 
       await controllerManager.restartControllers()
-
-      sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
 
       return { success: true }
     } catch (error) {
@@ -134,7 +130,6 @@ export function registerLightsRigsConfigHandlers(
       const isNowOrWasActive = rig.active || previousActiveState
       if (isNowOrWasActive) {
         await controllerManager.restartControllers()
-        sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
       }
 
       return { success: true }
@@ -154,7 +149,6 @@ export function registerLightsRigsConfigHandlers(
 
       if (wasActive) {
         await controllerManager.restartControllers()
-        sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
       }
 
       return { success: true }
