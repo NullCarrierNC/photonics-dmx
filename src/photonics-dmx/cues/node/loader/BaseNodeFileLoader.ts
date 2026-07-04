@@ -125,6 +125,12 @@ export abstract class BaseNodeFileLoader<
     const dir = mode === 'yarg' ? this.yargDir : this.audioDir
     const files = await fs.readdir(dir).catch(() => [] as string[])
 
+    // Paths this mode registered on its previous load, so a file that has since vanished from disk
+    // (e.g. a manual reload() with no chokidar unlink event) is unregistered rather than left stale
+    // in the registry.
+    const previousPaths = new Set(this.summaries[mode].map((s) => s.path))
+    const currentPaths = new Set<string>()
+
     let loaded = 0
     let failed = 0
     const errors: string[] = []
@@ -136,6 +142,7 @@ export abstract class BaseNodeFileLoader<
       }
 
       const filePath = path.join(dir, file)
+      currentPaths.add(filePath)
       try {
         const summary = await this.loadFile(mode, filePath)
         if (summary) {
@@ -147,6 +154,13 @@ export abstract class BaseNodeFileLoader<
         const message = error instanceof Error ? error.message : String(error)
         summaries.push(this.makeErrorSummary(mode, filePath, message))
         errors.push(`${path.basename(file)}: ${message}`)
+      }
+    }
+
+    // Unregister files present last time but gone now.
+    for (const stalePath of previousPaths) {
+      if (!currentPaths.has(stalePath)) {
+        this.removeRegistration(stalePath)
       }
     }
 

@@ -154,6 +154,23 @@ describe('NodeCueLoader', () => {
     expect(loader.getAvailableCueTypes('yarg', 'motion')).toEqual([])
   })
 
+  it('unregisters a cue file that vanished from disk on reload (C-11)', async () => {
+    const file = yargMotionOnlyFile()
+    const yargDir = path.join(tmpDir, 'node-data', 'cues', 'yarg')
+    fs.mkdirSync(yargDir, { recursive: true })
+    const filePath = path.join(yargDir, 'motion-only.json')
+    fs.writeFileSync(filePath, JSON.stringify(file), 'utf-8')
+
+    await loader.loadAll()
+    expect(yargRegistry.getGroup('loader-test-yarg-motion')).toBeDefined()
+
+    // Delete the file and reload with no watcher unlink event — the stale group must be dropped.
+    fs.rmSync(filePath)
+    await loader.reload()
+
+    expect(yargRegistry.getGroup('loader-test-yarg-motion')).toBeUndefined()
+  })
+
   it('surfaces a per-cue compile failure on the file summary', async () => {
     const file = yargMotionOnlyFile()
     // Second motion cue whose action has no incoming connection: schema-valid but fails
