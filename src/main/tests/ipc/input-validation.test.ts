@@ -6,6 +6,7 @@ import {
   validateCueGroupSelectionMode,
   validateCueRefPayload,
   validateCueType,
+  validateDmxFixturesArray,
   validateDmxRigPayload,
   validateHost,
   validateLightingConfiguration,
@@ -583,6 +584,52 @@ describe('inputValidation', () => {
     it('rejects path when allowed roots is empty', () => {
       const result = validatePathUnderAllowedRoots('/tmp/foo', [])
       expect(result.ok).toBe(false)
+    })
+
+    describe('channel bounds', () => {
+      const lightWith = (channels: Record<string, number>) => ({
+        id: 'l1',
+        name: 'L1',
+        label: 'L1',
+        isStrobeEnabled: false,
+        universe: 1,
+        fixture: 'RGB',
+        group: 'front',
+        position: 1,
+        channels,
+      })
+      const configWith = (channels: Record<string, number>) => ({
+        numLights: 1,
+        lightLayout: { id: 'two-rows', label: 'Two Rows' },
+        strobeType: 'None',
+        frontLights: [lightWith(channels)],
+        backLights: [],
+        strobeLights: [],
+      })
+
+      it('accepts integer channels in 0-512 (0 = unassigned template slot)', () => {
+        const result = validateLightingConfiguration(
+          configWith({ red: 1, green: 2, blue: 3, masterDimmer: 0 }),
+        )
+        expect(result.ok).toBe(true)
+      })
+
+      it.each([
+        ['huge masterDimmer', { red: 1, green: 2, blue: 3, masterDimmer: 5e9 }],
+        ['negative channel', { red: -1, green: 2, blue: 3, masterDimmer: 4 }],
+        ['NaN channel', { red: NaN, green: 2, blue: 3, masterDimmer: 4 }],
+        ['fractional channel', { red: 1.5, green: 2, blue: 3, masterDimmer: 4 }],
+      ])('rejects %s', (_label, channels) => {
+        const result = validateLightingConfiguration(configWith(channels))
+        expect(result.ok).toBe(false)
+      })
+
+      it('rejects out-of-range template channels in validateDmxFixturesArray', () => {
+        const result = validateDmxFixturesArray([
+          lightWith({ red: 1, green: 700, blue: 3, masterDimmer: 4 }),
+        ])
+        expect(result.ok).toBe(false)
+      })
     })
 
     describe('default roots', () => {

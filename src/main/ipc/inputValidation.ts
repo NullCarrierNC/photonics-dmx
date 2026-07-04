@@ -436,6 +436,48 @@ const VALID_STROBE_TYPES = new Set<string>([
   ConfigStrobeType.AllCapable,
 ])
 
+/**
+ * Every value in a fixture `channels` record must be an integer 0–512. 0 is accepted as
+ * "unassigned" (fixture templates initialise unbound slots to 0; the publisher skips it at write
+ * time) — what must never persist is NaN, a negative, or an out-of-range number that would become
+ * an unbounded buffer index in the wire senders. Returns null when valid.
+ */
+function validateFixtureChannelNumbers(
+  channels: Record<string, unknown>,
+  fieldName: string,
+): string | null {
+  for (const [name, num] of Object.entries(channels)) {
+    if (num == null) {
+      continue
+    }
+    if (typeof num !== 'number' || !Number.isInteger(num) || num < 0 || num > 512) {
+      return `${fieldName}.${name} must be an integer DMX channel between 0 and 512`
+    }
+  }
+  return null
+}
+
+/**
+ * Element-validates a light array from a rig/layout payload: each entry must be an object whose
+ * `channels` record passes {@link validateFixtureChannelNumbers}. Returns null when valid.
+ */
+function validateLightArrayChannels(lights: unknown[], fieldName: string): string | null {
+  for (let i = 0; i < lights.length; i++) {
+    const el = lights[i]
+    if (!isPlainObject(el)) {
+      return `${fieldName}[${i}] must be an object`
+    }
+    if (!isPlainObject(el.channels)) {
+      return `${fieldName}[${i}].channels must be an object`
+    }
+    const channelError = validateFixtureChannelNumbers(el.channels, `${fieldName}[${i}].channels`)
+    if (channelError) {
+      return channelError
+    }
+  }
+  return null
+}
+
 export function validateLightingConfiguration(
   data: unknown,
 ): ValidationResult<LightingConfiguration> {
@@ -471,6 +513,17 @@ export function validateLightingConfiguration(
   }
   if (!Array.isArray(data.strobeLights)) {
     return { ok: false, error: 'LightingConfiguration.strobeLights must be an array' }
+  }
+
+  for (const [arrayName, lights] of [
+    ['frontLights', data.frontLights],
+    ['backLights', data.backLights],
+    ['strobeLights', data.strobeLights],
+  ] as const) {
+    const lightsError = validateLightArrayChannels(lights, `LightingConfiguration.${arrayName}`)
+    if (lightsError) {
+      return { ok: false, error: lightsError }
+    }
   }
 
   const value: LightingConfiguration = {
@@ -1102,6 +1155,10 @@ export function validateDmxFixturesArray(
     }
     if (!isPlainObject(el.channels)) {
       return { ok: false, error: `${fieldName}[${i}].channels must be an object` }
+    }
+    const channelError = validateFixtureChannelNumbers(el.channels, `${fieldName}[${i}].channels`)
+    if (channelError) {
+      return { ok: false, error: channelError }
     }
     if (el.strobeValues != null) {
       const strobeValuesError = validateStrobeChannelValues(

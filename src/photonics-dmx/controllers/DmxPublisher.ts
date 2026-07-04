@@ -166,6 +166,9 @@ export class DmxPublisher {
   private _immediateBlackoutData: Record<number, number> = {}
   /** When true, `publish` ignores light states; output comes only from `setManualBuffer`. */
   private _manualMode = false
+  /** Light ids already reported for out-of-range channel numbers, so the skip logs once per light
+   *  rather than every frame. */
+  private _reportedBadChannelLights = new Set<string>()
   /**
    * Per-light peak colour seen since the current strobe became active. The stock strobe cues
    * modulate opacity, which the blender bakes into rgb/intensity — so the brightest blended
@@ -573,6 +576,19 @@ export class DmxPublisher {
               break
             default:
               continue
+          }
+
+          // DMX-addressable channels are 1–512; anything else (0 = unassigned template slot,
+          // NaN/negative/huge from a bad config already on disk) must not become a buffer key the
+          // wire senders index with. Skip and report once per light — not per frame.
+          if (!Number.isInteger(channelNumber) || channelNumber < 1 || channelNumber > 512) {
+            if (!this._reportedBadChannelLights.has(lightId)) {
+              this._reportedBadChannelLights.add(lightId)
+              log.warn(
+                `Light ${lightId}: channel "${channelName}" = ${channelNumber} is outside DMX 1-512; skipping`,
+              )
+            }
+            continue
           }
 
           const clamped = Math.max(0, Math.min(255, value))
