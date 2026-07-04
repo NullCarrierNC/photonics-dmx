@@ -66,6 +66,9 @@ describe('SystemEffectsController', () => {
       cleanupUnusedLayers: jest.fn(),
       getBlackoutLayersUnder: jest.fn().mockReturnValue(255),
       getActiveEffects: jest.fn().mockReturnValue(new Map()),
+      getAllLayers: jest.fn().mockReturnValue([0, 200, 255]),
+      removeActiveEffect: jest.fn(),
+      removeQueuedEffect: jest.fn(),
     } as unknown as jest.Mocked<LayerManager>
 
     // Create mock for Clock
@@ -196,6 +199,56 @@ describe('SystemEffectsController', () => {
     it('should return the correct blackout layer threshold', () => {
       // Verify getBlackoutLayersUnder returns the expected value
       expect(systemEffectsController.getBlackoutLayersUnder()).toBe(255)
+    })
+  })
+
+  describe('cancel race', () => {
+    it('a cancelled blackout never runs its terminal wipe or forced black', async () => {
+      const blackoutPromise = systemEffectsController.blackout(1000)
+      await jest.advanceTimersByTimeAsync(500)
+      systemEffectsController.cancelBlackout()
+      await jest.advanceTimersByTimeAsync(2000)
+      await blackoutPromise
+
+      // The effect wipe and the base-layer forced black belong to a COMPLETED blackout only —
+      // after a cancel, whatever cue started since owns the lights.
+      expect(layerManager.removeActiveEffect).not.toHaveBeenCalled()
+      expect(layerManager.removeQueuedEffect).not.toHaveBeenCalled()
+      const baseLayerWrites = (
+        lightTransitionController.setTransition as jest.Mock
+      ).mock.calls.filter((call) => call[1] === 0)
+      expect(baseLayerWrites).toHaveLength(0)
+      // The fade transitions themselves are removed so new effects can override.
+      expect(lightTransitionController.removeTransitionsByLayer).toHaveBeenCalledWith(255)
+      expect(systemEffectsController.isBlackoutActive()).toBe(false)
+    })
+
+    it('a second blackout after a cancel still completes with its wipe', async () => {
+      const first = systemEffectsController.blackout(1000)
+      await jest.advanceTimersByTimeAsync(200)
+      systemEffectsController.cancelBlackout()
+      await first
+
+      const onComplete = jest.fn()
+      systemEffectsController.setOnBlackoutCompleteCallback(onComplete)
+      const second = systemEffectsController.blackout(100)
+      await jest.advanceTimersByTimeAsync(500)
+      await second
+
+      expect(layerManager.removeActiveEffect).toHaveBeenCalled()
+      expect(onComplete).toHaveBeenCalledTimes(1)
+      expect(systemEffectsController.isBlackoutActive()).toBe(false)
+    })
+
+    it('dispose mid-blackout clears the timers and skips the wipe', async () => {
+      const blackoutPromise = systemEffectsController.blackout(1000)
+      await jest.advanceTimersByTimeAsync(100)
+      systemEffectsController.dispose()
+      await blackoutPromise
+
+      expect(jest.getTimerCount()).toBe(0)
+      await jest.advanceTimersByTimeAsync(2000)
+      expect(layerManager.removeActiveEffect).not.toHaveBeenCalled()
     })
   })
 })

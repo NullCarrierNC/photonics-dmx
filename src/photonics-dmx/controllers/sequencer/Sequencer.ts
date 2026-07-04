@@ -447,6 +447,7 @@ export class Sequencer implements ILightingController {
       // ticking against the same Clock.
       this.clock.offTick(this.handleClockTick)
 
+      this.systemEffectsController.dispose()
       this.removeAllEffects()
 
       log.info('PhotonicsSequencer shutdown: completed')
