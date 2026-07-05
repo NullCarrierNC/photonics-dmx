@@ -1,4 +1,5 @@
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
+import { normalizeRb3ProcessingMode } from '../../services/configuration/configurationDefaults'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
 import { getStrobeStateManager } from '../../photonics-dmx/controllers/StrobeStateManager'
@@ -169,7 +170,7 @@ export class ControllerManager {
           this.cueHandler = h
         },
         getRb3ProcessingMode: () =>
-          this.config.getPreference('rb3Prefs')?.processingMode ?? 'direct',
+          normalizeRb3ProcessingMode(this.config.getPreference('rb3Prefs')?.processingMode),
       },
       {
         getDmxLightManager: () => this.dmxLightManager,

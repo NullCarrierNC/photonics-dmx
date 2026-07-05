@@ -123,6 +123,14 @@ export interface AppPreferences {
   }
 }
 
+/**
+ * Normalizes a persisted RB3 processing mode. Prefs loaded from disk bypass IPC validation, so
+ * anything other than the literal 'cue' (missing, null, or garbage) runs direct mode.
+ */
+export function normalizeRb3ProcessingMode(value: unknown): 'direct' | 'cue' {
+  return value === 'cue' ? 'cue' : 'direct'
+}
+
 export const DEFAULT_PREFERENCES: AppPreferences = {
   effectDebounce: 0,
   complex: true,
