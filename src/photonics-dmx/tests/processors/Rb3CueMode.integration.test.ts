@@ -32,12 +32,16 @@ describe('RB3 cue mode (integration)', () => {
   let fanout: ChainFanout
   let handleCue: jest.Mock
   let handleSongEvent: jest.Mock
+  let playMenuFrame: jest.Mock
+  let clear: jest.Mock
   let manager: ProcessorManager
 
   beforeEach(() => {
     listener = new EventEmitter()
     handleCue = jest.fn(async () => {})
     handleSongEvent = jest.fn()
+    playMenuFrame = jest.fn()
+    clear = jest.fn()
     fanout = new ChainFanout()
     fanout.setChains([
       {
@@ -45,6 +49,7 @@ describe('RB3 cue mode (integration)', () => {
         isPrimary: true,
         yargCueHandler: { handleCue },
         sequencer: { handleSongEvent },
+        rb3MenuCueHandler: { playMenuFrame, clear },
       } as unknown as RigChain,
     ])
   })
@@ -78,5 +83,16 @@ describe('RB3 cue mode (integration)', () => {
   it('reports cue as the active mode', () => {
     manager = new ProcessorManager(fanout, { mode: 'cue' })
     expect(manager.getCurrentMode()).toBe('cue')
+  })
+
+  it('drives the menu look on a hub screen and clears it when gameplay begins', () => {
+    manager = new ProcessorManager(fanout, { mode: 'cue' })
+    manager.setNetworkListener(listener)
+
+    listener.emit('rb3e:screenName', { screenName: 'main_hub_screen' })
+    expect(playMenuFrame).toHaveBeenCalled()
+
+    listener.emit('rb3e:gameState', { gameState: 'InGame' })
+    expect(clear).toHaveBeenCalled()
   })
 })

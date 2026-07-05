@@ -180,7 +180,11 @@ export class ProcessorManager extends EventEmitter {
     log.info('ProcessorManager: Starting cue mode...')
 
     if (!this.stageKitCueProcessor) {
-      this.stageKitCueProcessor = new Rb3StageKitCueProcessor(this.chainFanout)
+      // The chain fanout is both the cue runtime (RB3 gameplay cues) and the menu dispatch
+      // (playMenuFrame / clear to each rig's RB3 menu handler).
+      this.stageKitCueProcessor = new Rb3StageKitCueProcessor(this.chainFanout, {
+        menuDispatch: this.chainFanout,
+      })
     }
     this.stageKitCueProcessor.startListening(this.networkListener!)
     log.info('ProcessorManager: Cue mode started')

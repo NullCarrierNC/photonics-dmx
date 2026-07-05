@@ -1,11 +1,18 @@
 import { EventEmitter } from 'events'
 import type { YargCueRuntime } from '../listeners/YARG/YargNetworkListener'
+import type { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import { CueType, defaultCueData, ledAggregateMask } from '../cues/types/cueTypes'
 import type { CueData, StrobeState } from '../cues/types/cueTypes'
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('rb3-cue')
+
+// RB3E screen names that map to the main menu, matching the direct processor's menu trigger.
+const RB3_MAIN_HUB_SCREEN = 'main_hub_screen'
+const RB3_SONG_SELECT_SCREEN = 'song_select_screen'
+/** Menu-look re-render cadence, mirroring the direct processor's menu animation timer. */
+const MENU_ANIMATION_MS = 1000
 
 const STROBE_STATE: Record<'slow' | 'medium' | 'fast' | 'fastest' | 'off', StrobeState> = {
   slow: 'Strobe_Slow',
@@ -47,6 +54,9 @@ const DEFAULT_KEEPALIVE_MS = 33
 export interface Rb3StageKitCueProcessorOptions {
   /** Keepalive re-dispatch interval; null disables the timer (tests drive tick() directly). */
   keepaliveMs?: number | null
+  /** Menu-look dispatch (the ChainFanout in production); drives the RB3 menu cue while in menus.
+   *  Omitted in unit tests that only exercise the gameplay cue path. */
+  menuDispatch?: Rb3MenuCueDispatch
 }
 
 /**
@@ -68,11 +78,15 @@ export class Rb3StageKitCueProcessor {
 
   private listener: EventEmitter | null = null
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null
+  private menuAnimationTimer: ReturnType<typeof setInterval> | null = null
   private readonly keepaliveMs: number | null
+  private readonly menuDispatch: Rb3MenuCueDispatch | null
 
   private readonly boundStageKit = (data: StageKitData): void => this.handleStageKit(data)
   private readonly boundGameState = (data: { gameState: string }): void =>
     this.handleGameState(data)
+  private readonly boundScreenName = (data: { screenName: string }): void =>
+    this.handleScreenName(data)
 
   constructor(
     private readonly runtime: YargCueRuntime,
@@ -80,6 +94,7 @@ export class Rb3StageKitCueProcessor {
   ) {
     this.keepaliveMs =
       options.keepaliveMs === undefined ? DEFAULT_KEEPALIVE_MS : options.keepaliveMs
+    this.menuDispatch = options.menuDispatch ?? null
   }
 
   startListening(listener: EventEmitter): void {
@@ -87,6 +102,10 @@ export class Rb3StageKitCueProcessor {
     this.listener = listener
     listener.on('stagekit:data', this.boundStageKit)
     listener.on('rb3e:gameState', this.boundGameState)
+    // Menu looks only run when a menu dispatch is wired (production ChainFanout).
+    if (this.menuDispatch) {
+      listener.on('rb3e:screenName', this.boundScreenName)
+    }
     if (this.keepaliveMs && this.keepaliveMs > 0) {
       this.keepaliveTimer = setInterval(() => this.tick(), this.keepaliveMs)
     }
@@ -97,12 +116,14 @@ export class Rb3StageKitCueProcessor {
     if (this.listener) {
       this.listener.off('stagekit:data', this.boundStageKit)
       this.listener.off('rb3e:gameState', this.boundGameState)
+      this.listener.off('rb3e:screenName', this.boundScreenName)
       this.listener = null
     }
     if (this.keepaliveTimer) {
       clearInterval(this.keepaliveTimer)
       this.keepaliveTimer = null
     }
+    this.stopMenuAnimation()
   }
 
   destroy(): void {
@@ -124,10 +145,44 @@ export class Rb3StageKitCueProcessor {
     if (menu === this.inMenu) return
     this.inMenu = menu
     if (menu) {
-      // Leaving gameplay: clear the accumulated look so a returning game starts clean.
+      // Leaving gameplay: clear the accumulated look so a returning game starts clean, then show the
+      // menu look (matching direct mode's menu animation on the return to Menus).
       this.reset()
       void this.runtime.handleCue(CueType.Blackout_Fast, this.buildFrame())
+      this.startMenuAnimation()
+    } else {
+      // Gameplay resumed: the RB3 cue drives the look, so stop painting menu frames.
+      this.stopMenuAnimation()
     }
+  }
+
+  /** RB3E hub / song-select screens drive the same menu look as direct mode; other screens are
+   *  ignored. Only fires when a menu dispatch is wired. */
+  private handleScreenName(data: { screenName: string }): void {
+    if (data.screenName !== RB3_MAIN_HUB_SCREEN && data.screenName !== RB3_SONG_SELECT_SCREEN) {
+      return
+    }
+    this.inMenu = true
+    this.startMenuAnimation()
+  }
+
+  /** Re-render the RB3 menu cue on a fixed cadence while in menus. Guarded on `inMenu` so a stale
+   *  tick never paints over gameplay. No-op without a menu dispatch. */
+  private startMenuAnimation(): void {
+    if (!this.menuDispatch || this.menuAnimationTimer) return
+    const dispatch = this.menuDispatch
+    this.menuAnimationTimer = setInterval(() => {
+      if (this.inMenu) dispatch.playMenuFrame()
+    }, MENU_ANIMATION_MS)
+    dispatch.playMenuFrame()
+  }
+
+  private stopMenuAnimation(): void {
+    if (this.menuAnimationTimer) {
+      clearInterval(this.menuAnimationTimer)
+      this.menuAnimationTimer = null
+    }
+    this.menuDispatch?.clear()
   }
 
   private handleStageKit(data: StageKitData): void {
