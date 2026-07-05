@@ -105,6 +105,23 @@ export const YARG_CUE_DATA_PROPERTIES = [
   'fog-state',
   'time-since-cue-start',
   'time-since-last-cue',
+  // RB3 StageKit LED / effect state (populated by the RB3 cue-mode processor).
+  'led-color',
+  'led-states',
+  'led-count',
+  'led-red-states',
+  'led-green-states',
+  'led-blue-states',
+  'led-yellow-states',
+  'led-1-on',
+  'led-2-on',
+  'led-3-on',
+  'led-4-on',
+  'led-5-on',
+  'led-6-on',
+  'led-7-on',
+  'led-8-on',
+  'strobe-state',
 ] as const
 
 /**

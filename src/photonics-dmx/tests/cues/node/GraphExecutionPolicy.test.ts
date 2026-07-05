@@ -251,3 +251,122 @@ describe('GraphExecutionPolicy vocal events', () => {
     expect(types).not.toContain('vocal-note-off')
   })
 })
+
+/** Motion cue carrying RB3 LED (position 3) and fog event nodes. */
+function ledFogEventCue(): YargMotionNodeCueDefinition {
+  const ev = (id: string, eventType: YargEventNode['eventType']): YargEventNode => ({
+    id,
+    type: 'event',
+    eventType,
+  })
+  const action: ActionNode = {
+    id: 'a1',
+    type: 'action',
+    effectType: 'set-position',
+    target: {
+      groups: { source: 'literal', value: 'front' },
+      filter: { source: 'literal', value: 'all' },
+    },
+    position: {
+      mode: 'direction',
+      bearing: { source: 'literal', value: 'downstage' },
+      angle: { source: 'literal', value: 10 },
+    },
+    timing: {
+      waitForCondition: { source: 'literal', value: 'none' },
+      waitForTime: { source: 'literal', value: 0 },
+      duration: { source: 'literal', value: 200 },
+      waitUntilCondition: { source: 'literal', value: 'none' },
+      waitUntilTime: { source: 'literal', value: 0 },
+    },
+    layer: { source: 'literal', value: 0 },
+  }
+  const events = [
+    ev('ev-on', 'led-3'),
+    ev('ev-off', 'led-3-off'),
+    ev('ev-fog-on', 'fog-on'),
+    ev('ev-fog-off', 'fog-off'),
+  ]
+  return {
+    kind: 'motion',
+    id: 'm-led',
+    name: 'Led',
+    nodes: { events, actions: [action], logic: [] },
+    connections: events.map((e) => ({ from: e.id, to: 'a1' })),
+  }
+}
+
+describe('GraphExecutionPolicy LED and fog events (RB3 StageKit)', () => {
+  const LED3 = 1 << 2 // position 3 → bit index 2
+  const LED1 = 1 << 0
+
+  const triggered = (params: CueData): string[] => {
+    const compiled = NodeCueCompiler.compileYargCue(ledFogEventCue())
+    const policy = cueGraphPolicy('g', 'c')
+    const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: true })
+    return nodes.map((n) => (n as YargEventNode).eventType)
+  }
+
+  const bank = (mask: number): { red: number; green: number; blue: number; yellow: number } => ({
+    red: mask,
+    green: 0,
+    blue: 0,
+    yellow: 0,
+  })
+
+  const frame = (over: Partial<CueData>): CueData => ({ ...minimalParams(), ...over })
+
+  it('fires led-3 on a rising edge only', () => {
+    const t = triggered(frame({ ledBanks: bank(LED3), previousFrame: { ledBanks: bank(0) } }))
+    expect(t).toContain('led-3')
+    expect(t).not.toContain('led-3-off')
+  })
+
+  it('fires led-3-off on a falling edge only', () => {
+    const t = triggered(frame({ ledBanks: bank(0), previousFrame: { ledBanks: bank(LED3) } }))
+    expect(t).toContain('led-3-off')
+    expect(t).not.toContain('led-3')
+  })
+
+  it('fires neither edge while the LED is held lit across frames', () => {
+    const t = triggered(frame({ ledBanks: bank(LED3), previousFrame: { ledBanks: bank(LED3) } }))
+    expect(t).not.toContain('led-3')
+    expect(t).not.toContain('led-3-off')
+  })
+
+  it('ignores a change on a different position', () => {
+    const t = triggered(frame({ ledBanks: bank(LED1), previousFrame: { ledBanks: bank(0) } }))
+    expect(t).not.toContain('led-3')
+    expect(t).not.toContain('led-3-off')
+  })
+
+  it('detects the edge across colour banks (aggregate any-bank mask)', () => {
+    // Lit in blue now, was lit in green before → still on in the aggregate, so no edge.
+    const held = triggered(
+      frame({
+        ledBanks: { red: 0, green: 0, blue: LED3, yellow: 0 },
+        previousFrame: { ledBanks: { red: 0, green: LED3, blue: 0, yellow: 0 } },
+      }),
+    )
+    expect(held).not.toContain('led-3')
+    expect(held).not.toContain('led-3-off')
+  })
+
+  it('treats a missing previousFrame as unlit (first-frame rising edge)', () => {
+    const t = triggered(frame({ ledBanks: bank(LED3), previousFrame: undefined }))
+    expect(t).toContain('led-3')
+    expect(t).not.toContain('led-3-off')
+  })
+
+  it('fires fog edges against the previous frame', () => {
+    const on = triggered(frame({ fogState: true, previousFrame: { fogState: false } }))
+    expect(on).toContain('fog-on')
+    expect(on).not.toContain('fog-off')
+    const off = triggered(frame({ fogState: false, previousFrame: { fogState: true } }))
+    expect(off).toContain('fog-off')
+    expect(off).not.toContain('fog-on')
+    const held = triggered(frame({ fogState: true, previousFrame: { fogState: true } }))
+    expect(held).not.toContain('fog-on')
+    expect(held).not.toContain('fog-off')
+  })
+})

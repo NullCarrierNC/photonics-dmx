@@ -6,7 +6,7 @@ import type { BaseEventNode } from '../../types/nodeCueTypes'
 import type { CompiledYargCue } from '../compiler/NodeCueCompiler'
 import type { CompiledEffect } from '../compiler/EffectCompiler'
 import type { CueData } from '../../types/cueTypes'
-import { isInstrumentEventTriggered, isVocalActive } from '../../types/cueTypes'
+import { isInstrumentEventTriggered, isVocalActive, isLedOn } from '../../types/cueTypes'
 
 /** Cue data or effect parameter payload. */
 export type ExecutionParameters = CueData | Record<string, unknown>
@@ -103,6 +103,22 @@ function cueLikeGraphPolicy(
         }
         if (eventType === 'vocal-note-off') {
           return !isVocalActive(cueData) && isVocalActive(cueData.previousFrame ?? {})
+        }
+        // RB3 StageKit LED position edges, matched like vocal events against the previous frame.
+        // LED bank state persists between packets, so a level trigger would re-fire every frame; the
+        // edge fires once when the aggregate (any-bank) position lights up (led-N) or clears (led-N-off).
+        const ledMatch = /^led-([1-8])(-off)?$/.exec(eventType)
+        if (ledMatch) {
+          const idx = Number(ledMatch[1]) - 1
+          const now = isLedOn(cueData, idx)
+          const prev = isLedOn(cueData.previousFrame ?? {}, idx)
+          return ledMatch[2] ? !now && prev : now && !prev
+        }
+        if (eventType === 'fog-on') {
+          return cueData.fogState === true && (cueData.previousFrame?.fogState ?? false) === false
+        }
+        if (eventType === 'fog-off') {
+          return cueData.fogState === false && (cueData.previousFrame?.fogState ?? false) === true
         }
         const instrumentResult = isInstrumentEventTriggered(
           eventType,

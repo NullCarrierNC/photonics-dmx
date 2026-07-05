@@ -5,7 +5,7 @@
 
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { monotonicNowMs } from '../../../../shared/time'
-import { CueData } from '../../types/cueTypes'
+import { CueData, ledAggregateMask, isLedOn } from '../../types/cueTypes'
 import { AudioCueData } from '../../types/audioCueTypes'
 import { TrackedLight, LightTarget } from '../../../types'
 import { YargCueDataProperty, AudioCueDataProperty } from '../../types/nodeCueTypes'
@@ -84,9 +84,55 @@ export function extractYargCueDataValue(
       return monotonicNowMs() - (cueData.cueStartTime ?? monotonicNowMs())
     case 'time-since-last-cue':
       return cueData.timeSinceLastCue ?? 0
+    // RB3 StageKit LED / effect state.
+    case 'led-color':
+      // Latest packet's bank colour name (palette-compatible: 'red'|'green'|'blue'|'yellow'), or
+      // 'off' when nothing is lit, so it can drive set-color / an effect colour param directly.
+      return cueData.ledColor ?? 'off'
+    case 'led-states':
+      return ledAggregateMask(cueData)
+    case 'led-count':
+      return countBits(ledAggregateMask(cueData))
+    case 'led-red-states':
+      return cueData.ledBanks?.red ?? 0
+    case 'led-green-states':
+      return cueData.ledBanks?.green ?? 0
+    case 'led-blue-states':
+      return cueData.ledBanks?.blue ?? 0
+    case 'led-yellow-states':
+      return cueData.ledBanks?.yellow ?? 0
+    case 'led-1-on':
+      return isLedOn(cueData, 0)
+    case 'led-2-on':
+      return isLedOn(cueData, 1)
+    case 'led-3-on':
+      return isLedOn(cueData, 2)
+    case 'led-4-on':
+      return isLedOn(cueData, 3)
+    case 'led-5-on':
+      return isLedOn(cueData, 4)
+    case 'led-6-on':
+      return isLedOn(cueData, 5)
+    case 'led-7-on':
+      return isLedOn(cueData, 6)
+    case 'led-8-on':
+      return isLedOn(cueData, 7)
+    case 'strobe-state':
+      return cueData.strobeState
     default:
       return 0
   }
+}
+
+/** Count set bits in an 8-bit LED mask (number of lit positions). */
+function countBits(mask: number): number {
+  let n = 0
+  let m = mask & 0xff
+  while (m) {
+    m &= m - 1
+    n++
+  }
+  return n
 }
 
 /**

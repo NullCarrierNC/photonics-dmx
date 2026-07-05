@@ -117,6 +117,55 @@ describe('dataExtractors', () => {
       const cueData = minimalCueData({ performer: 2 })
       expect(extractYargCueDataValue('performer', cueData, 'my-cue')).toBe(2)
     })
+
+    describe('RB3 StageKit LED properties', () => {
+      // LEDs 1 and 3 lit in red, LED 5 lit in blue: bits 0, 2 (red) and 4 (blue).
+      const banks = { red: 0b00000101, green: 0, blue: 0b00010000, yellow: 0 }
+      const led = (overrides?: Partial<CueData>): CueData =>
+        minimalCueData({
+          ledBanks: banks,
+          ledColor: 'red',
+          strobeState: 'Strobe_Fast',
+          ...overrides,
+        })
+
+      it('led-color returns the current bank colour, or off when unset', () => {
+        expect(extractYargCueDataValue('led-color', led(), 'c')).toBe('red')
+        expect(extractYargCueDataValue('led-color', minimalCueData(), 'c')).toBe('off')
+      })
+
+      it('led-states is the aggregate any-bank mask', () => {
+        expect(extractYargCueDataValue('led-states', led(), 'c')).toBe(0b00010101)
+      })
+
+      it('led-count is the number of lit positions', () => {
+        expect(extractYargCueDataValue('led-count', led(), 'c')).toBe(3)
+      })
+
+      it('exposes per-bank masks', () => {
+        expect(extractYargCueDataValue('led-red-states', led(), 'c')).toBe(0b00000101)
+        expect(extractYargCueDataValue('led-blue-states', led(), 'c')).toBe(0b00010000)
+        expect(extractYargCueDataValue('led-green-states', led(), 'c')).toBe(0)
+      })
+
+      it('exposes per-position booleans', () => {
+        expect(extractYargCueDataValue('led-1-on', led(), 'c')).toBe(true)
+        expect(extractYargCueDataValue('led-2-on', led(), 'c')).toBe(false)
+        expect(extractYargCueDataValue('led-3-on', led(), 'c')).toBe(true)
+        expect(extractYargCueDataValue('led-5-on', led(), 'c')).toBe(true)
+      })
+
+      it('strobe-state returns the current strobe', () => {
+        expect(extractYargCueDataValue('strobe-state', led(), 'c')).toBe('Strobe_Fast')
+      })
+
+      it('defaults to unlit when ledBanks is absent', () => {
+        const bare = minimalCueData()
+        expect(extractYargCueDataValue('led-states', bare, 'c')).toBe(0)
+        expect(extractYargCueDataValue('led-count', bare, 'c')).toBe(0)
+        expect(extractYargCueDataValue('led-1-on', bare, 'c')).toBe(false)
+      })
+    })
   })
 
   describe('extractAudioCueDataValue', () => {

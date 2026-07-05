@@ -168,6 +168,28 @@ export const WAIT_CONDITIONS = [
   // Vocal events (note-on/note-off edges from any vocal or harmony part)
   'vocal-note',
   'vocal-note-off',
+  // RB3 StageKit LED position edges (aggregate across colour banks). led-N fires when position N
+  // lights up; led-N-off when it clears. LED bank state persists between packets, so these are
+  // edge-triggered against the previous frame (like vocal events), not level-triggered.
+  'led-1',
+  'led-2',
+  'led-3',
+  'led-4',
+  'led-5',
+  'led-6',
+  'led-7',
+  'led-8',
+  'led-1-off',
+  'led-2-off',
+  'led-3-off',
+  'led-4-off',
+  'led-5-off',
+  'led-6-off',
+  'led-7-off',
+  'led-8-off',
+  // RB3 StageKit fog on/off edges.
+  'fog-on',
+  'fog-off',
 ] as const
 
 /**

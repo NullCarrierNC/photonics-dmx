@@ -48,6 +48,23 @@ export const YARG_CUE_DATA_PROPERTY_META: CueDataPropertyMeta[] = [
   { id: 'fog-state', label: 'Fog State', type: 'boolean' },
   { id: 'time-since-cue-start', label: 'Time Since Cue Start', type: 'number' },
   { id: 'time-since-last-cue', label: 'Time Since Last Cue', type: 'number' },
+  // RB3 StageKit LED / effect state.
+  { id: 'led-color', label: 'LED Colour', type: 'string' },
+  { id: 'led-states', label: 'LED States (mask 0-255)', type: 'number' },
+  { id: 'led-count', label: 'LED Count (lit)', type: 'number' },
+  { id: 'led-red-states', label: 'LED Red Mask', type: 'number' },
+  { id: 'led-green-states', label: 'LED Green Mask', type: 'number' },
+  { id: 'led-blue-states', label: 'LED Blue Mask', type: 'number' },
+  { id: 'led-yellow-states', label: 'LED Yellow Mask', type: 'number' },
+  { id: 'led-1-on', label: 'LED 1 On', type: 'boolean' },
+  { id: 'led-2-on', label: 'LED 2 On', type: 'boolean' },
+  { id: 'led-3-on', label: 'LED 3 On', type: 'boolean' },
+  { id: 'led-4-on', label: 'LED 4 On', type: 'boolean' },
+  { id: 'led-5-on', label: 'LED 5 On', type: 'boolean' },
+  { id: 'led-6-on', label: 'LED 6 On', type: 'boolean' },
+  { id: 'led-7-on', label: 'LED 7 On', type: 'boolean' },
+  { id: 'led-8-on', label: 'LED 8 On', type: 'boolean' },
+  { id: 'strobe-state', label: 'Strobe State', type: 'string' },
 ]
 
 /** Lookup map: property id -> metadata */

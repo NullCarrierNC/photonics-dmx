@@ -224,7 +224,25 @@ export class SongEventHandler implements ISongEventHandler {
       | 'keys-blue'
       | 'keys-orange'
       | 'vocal-note'
-      | 'vocal-note-off',
+      | 'vocal-note-off'
+      | 'led-1'
+      | 'led-2'
+      | 'led-3'
+      | 'led-4'
+      | 'led-5'
+      | 'led-6'
+      | 'led-7'
+      | 'led-8'
+      | 'led-1-off'
+      | 'led-2-off'
+      | 'led-3-off'
+      | 'led-4-off'
+      | 'led-5-off'
+      | 'led-6-off'
+      | 'led-7-off'
+      | 'led-8-off'
+      | 'fog-on'
+      | 'fog-off',
   ): void {
     const currentTime = performance.now()
 

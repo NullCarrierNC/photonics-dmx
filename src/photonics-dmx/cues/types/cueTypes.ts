@@ -109,6 +109,24 @@ export function isVocalActive(frame: Partial<CueData>): boolean {
   )
 }
 
+/**
+ * The aggregate RB3 StageKit LED mask: bit i (0..7) set when position i is lit in ANY colour bank.
+ * RB3 sends one colour bank per packet, so the cue-mode processor ORs each bank's 8-bit mask into
+ * `ledBanks`; this collapses them to "which positions are lit at all", used by the led-N events and
+ * the led-states / led-N-on cue-data properties.
+ */
+export function ledAggregateMask(frame: Partial<CueData> | undefined): number {
+  const b = frame?.ledBanks
+  if (!b) return 0
+  return (b.red | b.green | b.blue | b.yellow) & 0xff
+}
+
+/** Whether LED position `index` (0..7) is lit in any colour bank of `frame`. */
+export function isLedOn(frame: Partial<CueData> | undefined, index: number): boolean {
+  if (index < 0 || index > 7) return false
+  return (ledAggregateMask(frame) & (1 << index)) !== 0
+}
+
 // Import RB3E types
 import { Rb3Difficulty, Rb3TrackType } from '../../listeners/RB3/rb3eTypes'
 
@@ -219,9 +237,14 @@ export type CueData = {
   timeSinceLastCue?: number
   previousFrame?: Partial<CueData>
 
-  // Optional RB3E-specific properties
+  // Optional RB3E-specific properties.
+  // `ledColor` / `ledPositions` describe the MOST RECENT StageKit packet (its colour bank + lit
+  // positions). `ledBanks` is the persistent per-colour-bank state the RB3 cue-mode processor
+  // maintains across packets (each value an 8-bit position mask), read by the led-* events and
+  // cue-data properties. See ledAggregateMask / isLedOn.
   ledColor?: string | null
   ledPositions?: number[]
+  ledBanks?: { red: number; green: number; blue: number; yellow: number }
 
   sustainDurationMs?: number
   measureOrBeat?: number
@@ -282,6 +305,7 @@ export const defaultCueData: CueData = {
   cueStartTime: 0,
   timeSinceLastCue: 0,
   ledColor: null,
+  ledBanks: { red: 0, green: 0, blue: 0, yellow: 0 },
   rb3Platform: 'Unknown',
   rb3BuildTag: '',
   rb3SongName: '',
