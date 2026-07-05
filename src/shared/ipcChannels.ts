@@ -177,7 +177,12 @@ export const CONFIG = {
   SET_STAGE_KIT_PRIORITY: 'set-stage-kit-priority',
 } as const
 
-/** All handle/invoke channel names in one object for lookup. */
+/**
+ * Handle/invoke channel names merged by KEY for lookup convenience. Groups share key names
+ * (LIST, EXPORT, SENDER_ENABLE, ...), so later spreads shadow earlier entries and this object's
+ * VALUES are an incomplete channel set. Any complete-set consumer (e.g. the preload's runtime
+ * allowlist) must use ALL_INVOKE_CHANNELS instead.
+ */
 export const CHANNELS = {
   ...NODE_CUES,
   ...EFFECTS,
@@ -191,6 +196,24 @@ export const CHANNELS = {
 } as const
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS]
+
+/** Every invokable channel group. Kept next to CHANNELS so a new group is added to both. */
+const INVOKE_CHANNEL_GROUPS = [
+  NODE_CUES,
+  EFFECTS,
+  RIGS,
+  WINDOW,
+  SHELL,
+  LIFECYCLE,
+  CUE,
+  LIGHT,
+  CONFIG,
+] as const
+
+/** The complete, collision-proof set of invoke channel VALUES (union across all groups). */
+export const ALL_INVOKE_CHANNELS: readonly string[] = INVOKE_CHANNEL_GROUPS.flatMap((group) =>
+  Object.values(group),
+)
 
 /** Main process -> renderer (one-way send). Use when main calls webContents.send(). */
 export const RENDERER_RECEIVE = {

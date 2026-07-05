@@ -9,15 +9,16 @@ import type {
   IpcRendererSendChannel,
   IpcRendererSendMap,
 } from '../shared/ipcTypes'
-import { CHANNELS, RENDERER_RECEIVE, RENDERER_SEND } from '../shared/ipcChannels'
+import { ALL_INVOKE_CHANNELS, RENDERER_RECEIVE, RENDERER_SEND } from '../shared/ipcChannels'
 import { createLogger } from '../shared/logger'
 
 const log = createLogger('preload')
 
 // Runtime channel allowlists derived from the same constants the type maps are built on. The generic
 // signatures are compile-time only; these Sets reject any channel string a compromised or buggy
-// renderer might pass at runtime, per direction.
-const MAIN_CHANNELS = new Set<string>(Object.values(CHANNELS))
+// renderer might pass at runtime, per direction. The invoke allowlist comes from the value-complete
+// union (NOT Object.values(CHANNELS), whose key collisions drop channels like node-cues:list).
+const MAIN_CHANNELS = new Set<string>(ALL_INVOKE_CHANNELS)
 const EVENT_CHANNELS = new Set<string>(Object.values(RENDERER_RECEIVE))
 const RENDERER_SEND_CHANNELS = new Set<string>(Object.values(RENDERER_SEND))
 

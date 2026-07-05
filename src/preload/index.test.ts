@@ -9,7 +9,21 @@ const ipcRenderer = {
 }
 jest.mock('electron', () => ({ contextBridge: { exposeInMainWorld }, ipcRenderer }))
 
-import { CHANNELS, RENDERER_RECEIVE, RENDERER_SEND } from '../shared/ipcChannels'
+import {
+  ALL_INVOKE_CHANNELS,
+  CHANNELS,
+  CONFIG,
+  CUE,
+  EFFECTS,
+  LIFECYCLE,
+  LIGHT,
+  NODE_CUES,
+  RENDERER_RECEIVE,
+  RENDERER_SEND,
+  RIGS,
+  SHELL,
+  WINDOW,
+} from '../shared/ipcChannels'
 
 type PreloadApi = {
   invoke: (channel: string, data?: unknown) => Promise<unknown>
@@ -31,6 +45,22 @@ describe('preload IPC channel allowlist (M-11)', () => {
   it('forwards invoke on a known main channel', async () => {
     await expect(api.invoke(CHANNELS.GET_PREFS, undefined)).resolves.toBe('ok')
     expect(ipcRenderer.invoke).toHaveBeenCalledWith(CHANNELS.GET_PREFS, undefined)
+  })
+
+  it('allows EVERY channel of EVERY group (groups share key names, so a key-merged set loses values)', async () => {
+    const groups = { NODE_CUES, EFFECTS, RIGS, WINDOW, SHELL, LIFECYCLE, CUE, LIGHT, CONFIG }
+    for (const [groupName, group] of Object.entries(groups)) {
+      for (const channel of Object.values(group)) {
+        // Completeness of the shared union constant...
+        expect({ groupName, channel, allowed: ALL_INVOKE_CHANNELS.includes(channel) }).toEqual({
+          groupName,
+          channel,
+          allowed: true,
+        })
+        // ...and of the live preload allowlist built from it.
+        await expect(api.invoke(channel, undefined)).resolves.toBe('ok')
+      }
+    }
   })
 
   it('rejects invoke on an unknown channel without reaching ipcRenderer', async () => {
