@@ -5,6 +5,7 @@ import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetwo
 import { Rb3MenuCueHandler } from '../../photonics-dmx/cueHandlers/Rb3MenuCueHandler'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
+import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import {
@@ -31,7 +32,7 @@ export interface ListenerCoordinatorDeps {
   sendToAllWindows: (channel: string, payload: unknown) => void
   runtimeBroadcaster: RuntimeBroadcaster
   setCueHandlerRef: (h: YargCueHandler | null) => void
-  getRb3ProcessingMode: () => 'direct' | 'cue'
+  getRb3ProcessingMode: () => ProcessingMode
 }
 
 export class ListenerCoordinator {
@@ -101,9 +102,7 @@ export class ListenerCoordinator {
       log.error('Failed to start YARG listener:', err)
       this.yargListener = null
       this.isYargEnabled = false
-      this.disposeYargChainHandlers()
-      this.cueHandler = null
-      this.deps.setCueHandlerRef(null)
+      this.clearYargCueHandlers()
       this.deps.sendToAllWindows(RENDERER_RECEIVE.YARG_ERROR, {
         type: isPortInUse ? 'port-in-use' : 'start-failed',
         message,
@@ -132,9 +131,7 @@ export class ListenerCoordinator {
       this.yargListener = null
     }
     this.isYargEnabled = false
-    this.disposeYargChainHandlers()
-    this.cueHandler = null
-    this.deps.setCueHandlerRef(null)
+    this.clearYargCueHandlers()
   }
 
   /**
@@ -163,6 +160,13 @@ export class ListenerCoordinator {
     const primary = chains.find((c) => c.isPrimary) ?? chains[0]
     this.cueHandler = primary.yargCueHandler
     this.deps.setCueHandlerRef(this.cueHandler)
+  }
+
+  /** Shutdown every chain's YARG handler and drop the shared cue-handler reference. */
+  private clearYargCueHandlers(): void {
+    this.disposeYargChainHandlers()
+    this.cueHandler = null
+    this.deps.setCueHandlerRef(null)
   }
 
   /** Shutdown every chain's YARG handler. Safe to call when no handlers exist. */
@@ -197,9 +201,7 @@ export class ListenerCoordinator {
     if (this.isYargEnabled) {
       await this.disableYarg()
     }
-    this.disposeYargChainHandlers()
-    this.cueHandler = null
-    this.deps.setCueHandlerRef(null)
+    this.clearYargCueHandlers()
 
     // One menu-cue handler per chain so menu lighting renders independently on each rig.
     for (const chain of chains) {
@@ -243,9 +245,7 @@ export class ListenerCoordinator {
       this.isRb3Enabled = false
       this.processorManager.destroy()
       this.processorManager = null
-      this.disposeYargChainHandlers()
-      this.cueHandler = null
-      this.deps.setCueHandlerRef(null)
+      this.clearYargCueHandlers()
       for (const chain of chains) {
         if (chain.rb3MenuCueHandler) {
           chain.rb3MenuCueHandler.shutdown()
@@ -281,9 +281,7 @@ export class ListenerCoordinator {
       this.processorManager = null
     }
     // Cue mode built per-chain YargCueHandlers; direct mode leaves none. Safe either way.
-    this.disposeYargChainHandlers()
-    this.cueHandler = null
-    this.deps.setCueHandlerRef(null)
+    this.clearYargCueHandlers()
     for (const chain of this.deps.getRigChains()) {
       if (chain.rb3MenuCueHandler) {
         chain.rb3MenuCueHandler.shutdown()
@@ -292,7 +290,7 @@ export class ListenerCoordinator {
     }
   }
 
-  public getRb3Mode(): 'direct' | 'cue' | 'none' {
+  public getRb3Mode(): ProcessingMode | 'none' {
     if (!this.isRb3Enabled || !this.processorManager) {
       return 'none'
     }

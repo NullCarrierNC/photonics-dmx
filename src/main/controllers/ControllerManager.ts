@@ -7,6 +7,7 @@ import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
 import { LightingConfiguration, ConfigStrobeType, FixtureConfig } from '../../photonics-dmx/types'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
+import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
 import {
   AudioConfig,
   AudioGameModeConfig,
@@ -598,7 +599,7 @@ export class ControllerManager {
   /**
    * Get current RB3 processing mode
    */
-  public getRb3Mode(): 'direct' | 'cue' | 'none' {
+  public getRb3Mode(): ProcessingMode | 'none' {
     return this.listenerLifecycle.yargRb3.getRb3Mode()
   }
 

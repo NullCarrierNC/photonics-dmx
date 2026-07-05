@@ -11,6 +11,7 @@ import {
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio'
 import { createDefaultCueDomains, type CueDomainPrefs, type CueDomain } from './cueDomainTypes'
+import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
 
 /**
  * Application preferences (persisted in prefs.json).
@@ -80,7 +81,7 @@ export interface AppPreferences {
   rb3Prefs?: {
     /** 'direct' drives the DMX sequencer straight from StageKit packets; 'cue' dispatches an
      *  always-active RB3 gameplay cue (CueType.RB3) so node cues react to the LED state. */
-    processingMode: 'direct' | 'cue'
+    processingMode: ProcessingMode
   }
   dmxSettingsPrefs?: {
     artNetExpanded: boolean
@@ -127,7 +128,7 @@ export interface AppPreferences {
  * Normalizes a persisted RB3 processing mode. Prefs loaded from disk bypass IPC validation, so
  * anything other than the literal 'cue' (missing, null, or garbage) runs direct mode.
  */
-export function normalizeRb3ProcessingMode(value: unknown): 'direct' | 'cue' {
+export function normalizeRb3ProcessingMode(value: unknown): ProcessingMode {
   return value === 'cue' ? 'cue' : 'direct'
 }
 

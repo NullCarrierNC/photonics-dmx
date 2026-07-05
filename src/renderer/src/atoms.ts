@@ -1,6 +1,7 @@
 import { atom, getDefaultStore } from 'jotai'
 import { atomFamily, atomWithStorage, createJSONStorage } from 'jotai/utils'
 import type { CueDomain, CueDomainPrefs } from '../../services/configuration/cueDomainTypes'
+import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
 import {
   DmxFixture,
   LightingConfiguration,
@@ -304,7 +305,7 @@ export interface LightingPreferences {
     yargPriority: 'prefer-for-tracked' | 'random' | 'never'
   }
   rb3Prefs?: {
-    processingMode: 'direct' | 'cue'
+    processingMode: ProcessingMode
   }
   dmxSettingsPrefs?: {
     artNetExpanded: boolean

@@ -2,6 +2,7 @@ import React from 'react'
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom, rb3eListenerEnabledAtom } from '../atoms'
 import { setRb3ProcessingMode } from '../ipcApi'
+import type { ProcessingMode } from '../../../photonics-dmx/processors/ProcessorManager'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('StageKitRb3EnhancedSettings')
@@ -25,7 +26,7 @@ const StageKitRb3EnhancedSettings: React.FC = () => {
   const [isRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
   const mode = prefs.rb3Prefs?.processingMode ?? 'direct'
 
-  const handleModeChange = async (processingMode: 'direct' | 'cue') => {
+  const handleModeChange = async (processingMode: ProcessingMode) => {
     setPrefs((prev) => ({
       ...prev,
       rb3Prefs: { ...prev.rb3Prefs, processingMode },
@@ -65,7 +66,7 @@ const StageKitRb3EnhancedSettings: React.FC = () => {
             <select
               id="rb3-processing-mode"
               value={mode}
-              onChange={(e) => handleModeChange(e.target.value as 'direct' | 'cue')}
+              onChange={(e) => handleModeChange(e.target.value as ProcessingMode)}
               className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
               {modeOptions.map((option) => (
                 <option key={option.value} value={option.value}>
