@@ -285,7 +285,7 @@ export interface IpcInvokeMap {
   }
   [CUE.RB3E_GET_MODE]: {
     request: void
-    response: 'direct' | 'none'
+    response: 'direct' | 'cue' | 'none'
   }
   [CUE.RB3E_GET_STATS]: {
     request: void

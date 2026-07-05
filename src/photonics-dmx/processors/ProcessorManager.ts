@@ -38,7 +38,6 @@ export const DEFAULT_PROCESSOR_CONFIG: ProcessorManagerConfig = {
 }
 
 export class ProcessorManager extends EventEmitter {
-  private currentMode: ProcessingMode = 'direct'
   private networkListener: EventEmitter | null = null
 
   private stageKitDirectProcessor: Rb3StageKitDirectProcessor | null = null
@@ -53,7 +52,6 @@ export class ProcessorManager extends EventEmitter {
     super()
     this.chainFanout = chainFanout
     this.config = { ...DEFAULT_PROCESSOR_CONFIG, ...config }
-    this.currentMode = this.config.mode
 
     log.info('ProcessorManager initialized with config:', this.config)
   }
@@ -63,7 +61,6 @@ export class ProcessorManager extends EventEmitter {
    */
   public setNetworkListener(networkListener: EventEmitter): void {
     log.info('ProcessorManager: setNetworkListener called with:', networkListener.constructor.name)
-    log.info('ProcessorManager: Current mode is:', this.currentMode)
 
     // Stop listening to previous listener if any
     if (this.networkListener) {
@@ -72,13 +69,9 @@ export class ProcessorManager extends EventEmitter {
     }
 
     this.networkListener = networkListener
-    log.info('ProcessorManager: Network listener set')
 
-    // Start processors based on current mode
-    log.info('ProcessorManager: Starting processors for mode:', this.currentMode)
+    log.info('ProcessorManager: Starting processors for mode:', this.config.mode)
     this.startProcessors()
-
-    log.info('ProcessorManager: Network listener set and processors started')
   }
 
   /**
@@ -97,7 +90,7 @@ export class ProcessorManager extends EventEmitter {
    * Get current processing mode
    */
   public getCurrentMode(): ProcessingMode {
-    return this.currentMode
+    return this.config.mode
   }
 
   /**
@@ -133,7 +126,7 @@ export class ProcessorManager extends EventEmitter {
     // Set up event listeners for processors
     this.setupProcessorEventListeners()
 
-    if (this.currentMode === 'cue') {
+    if (this.config.mode === 'cue') {
       this.startCueMode()
     } else {
       this.startDirectMode()
@@ -217,22 +210,22 @@ export class ProcessorManager extends EventEmitter {
    * Check if a specific mode is active
    */
   public isModeActive(mode: ProcessingMode): boolean {
-    return this.currentMode === mode
+    return this.config.mode === mode
   }
 
   /**
-   * Get processor statistics
+   * Get processor statistics. `stageKitProcessorActive` reports whether the active mode's
+   * processor has been constructed.
    */
   public getProcessorStats(): {
     currentMode: ProcessingMode
     stageKitProcessorActive: boolean
-    traditionalProcessorActive: boolean
     networkListenerActive: boolean
   } {
     return {
-      currentMode: this.currentMode,
-      stageKitProcessorActive: !!this.stageKitDirectProcessor,
-      traditionalProcessorActive: false,
+      currentMode: this.config.mode,
+      stageKitProcessorActive:
+        this.config.mode === 'cue' ? !!this.stageKitCueProcessor : !!this.stageKitDirectProcessor,
       networkListenerActive: !!this.networkListener,
     }
   }
