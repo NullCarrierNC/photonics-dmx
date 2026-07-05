@@ -37,6 +37,20 @@ const STROBE_CUE: Record<StrobeState, CueType> = {
 const COLOUR_BANKS = ['red', 'green', 'blue', 'yellow'] as const
 type ColourBank = (typeof COLOUR_BANKS)[number]
 
+// Position → wait-condition name, indexed 0..7 (LED 1..8). Typed const so they satisfy the
+// SongEventCondition union without a cast.
+const LED_ON = ['led-1', 'led-2', 'led-3', 'led-4', 'led-5', 'led-6', 'led-7', 'led-8'] as const
+const LED_OFF = [
+  'led-1-off',
+  'led-2-off',
+  'led-3-off',
+  'led-4-off',
+  'led-5-off',
+  'led-6-off',
+  'led-7-off',
+  'led-8-off',
+] as const
+
 /** ~30 Hz keepalive so cue-called graphs advance while the LED state is static. */
 const DEFAULT_KEEPALIVE_MS = 33
 
@@ -124,10 +138,14 @@ export class Rb3StageKitCueProcessor {
 
   private handleStageKit(data: StageKitData): void {
     if (this.inMenu) return
+    const before = this.ledSnapshot()
 
-    // DisableAll (0xFF): full StageKit reset — blank everything.
+    // DisableAll (0xFF): full StageKit reset — blank everything (the RB3 cue stays active so its
+    // led-N-off / fog-off edges fire and the graph renders its own dark state; deliberate deviation
+    // from the plan's Blackout_Fast, which would kill the cue).
     if (data.rightChannel === 0xff) {
       this.reset()
+      this.emitEdges(before)
       void this.runtime.handleCue(CueType.Strobe_Off, this.buildFrame())
       void this.runtime.handleCue(CueType.RB3, this.buildFrame())
       return
@@ -136,9 +154,10 @@ export class Rb3StageKitCueProcessor {
     // Fog rides the event's fog field (the listener already folded persistent fog in).
     this.fogState = data.fog
 
-    // Strobe command: drive the strobe slot; strobe packets carry no colour bank.
+    // Strobe command: drive the strobe slot; strobe packets carry no colour bank (but may flip fog).
     if (data.strobeEffect) {
       this.strobeState = STROBE_STATE[data.strobeEffect]
+      this.emitEdges(before)
       void this.runtime.handleCue(STROBE_CUE[this.strobeState], this.buildFrame())
       return
     }
@@ -151,7 +170,29 @@ export class Rb3StageKitCueProcessor {
     }
     // color 'off' with no strobe (a fog / no-op packet) leaves the banks as-is, like direct mode.
 
+    this.emitEdges(before)
     void this.runtime.handleCue(CueType.RB3, this.buildFrame())
+  }
+
+  /** Snapshot the current aggregate LED mask + fog, taken before a packet mutates state. */
+  private ledSnapshot(): { mask: number; fog: boolean } {
+    return { mask: ledAggregateMask({ ledBanks: this.banks }), fog: this.fogState }
+  }
+
+  /** Advance action-timing waits gated on the led-N / fog edges this packet produced, diffing the new
+   *  state against `before`. Called before the handleCue dispatch, matching YARG's sequencer-then-cue
+   *  order; the keepalive tick never calls this, so a held look produces no edges. */
+  private emitEdges(before: { mask: number; fog: boolean }): void {
+    const after = ledAggregateMask({ ledBanks: this.banks })
+    for (let i = 0; i < 8; i++) {
+      const bit = 1 << i
+      const was = (before.mask & bit) !== 0
+      const now = (after & bit) !== 0
+      if (now && !was) this.runtime.handleSongEvent?.(LED_ON[i])
+      else if (was && !now) this.runtime.handleSongEvent?.(LED_OFF[i])
+    }
+    if (this.fogState && !before.fog) this.runtime.handleSongEvent?.('fog-on')
+    else if (!this.fogState && before.fog) this.runtime.handleSongEvent?.('fog-off')
   }
 
   private reset(): void {

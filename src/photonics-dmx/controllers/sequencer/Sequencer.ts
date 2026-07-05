@@ -11,6 +11,7 @@ import {
   FrameContext,
   ILightingController,
   LightEffectState,
+  SongEventCondition,
 } from './interfaces'
 import { LayerManager } from './LayerManager'
 import { SystemEffectsController } from './SystemEffectsController'
@@ -398,6 +399,15 @@ export class Sequencer implements ILightingController {
    */
   public onVocalNote(active: boolean): void {
     this.eventHandler.onVocalNote(active)
+  }
+
+  /**
+   * Advance action-timing waits gated on a raw song-event condition (e.g. an RB3 `led-3` / `fog-on`
+   * edge). Forwards straight to the event handler; the RB3 processor is the semantic translator here,
+   * the way onDrumNote/onVocalNote are for their events.
+   */
+  public handleSongEvent(condition: SongEventCondition): void {
+    this.eventHandler.handleEvent(condition)
   }
 
   /**

@@ -275,6 +275,10 @@ export interface ISongEventHandler {
   ): void
 }
 
+/** The condition union accepted by {@link ISongEventHandler.handleEvent} — the single source shared by
+ *  every layer that forwards a song event (sequencer, ChainFanout, YargCueRuntime). */
+export type SongEventCondition = Parameters<ISongEventHandler['handleEvent']>[0]
+
 /**
  * @interface ISystemEffectsController
  * @description Controls system-wide effects like blackouts
@@ -403,6 +407,9 @@ export interface ILightingController {
   onKeysNote(noteType: InstrumentNoteType): void
   /** Vocal note edge: true = note-on (singing started), false = note-off (singing stopped). */
   onVocalNote(active: boolean): void
+  /** Advance action-timing waits gated on a raw song-event condition (e.g. an RB3 `led-3` / `fog-on`
+   *  edge). The RB3 cue-mode processor produces these; instrument/beat events use the on* methods. */
+  handleSongEvent(condition: SongEventCondition): void
 
   // System effects methods
   blackout(duration: number): Promise<void>

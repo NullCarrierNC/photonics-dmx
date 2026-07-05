@@ -6,14 +6,18 @@ import { EventEmitter } from 'events'
 import { describe, expect, it, jest } from '@jest/globals'
 import { Rb3StageKitCueProcessor } from '../../processors/Rb3StageKitCueProcessor'
 import type { YargCueRuntime } from '../../listeners/YARG/YargNetworkListener'
+import { ChainFanout } from '../../controllers/ChainFanout'
+import type { RigChain } from '../../controllers/RigChain'
 import { CueType } from '../../cues/types/cueTypes'
 import type { CueData } from '../../cues/types/cueTypes'
 
 function mockRuntime(): {
   runtime: YargCueRuntime
   calls: Array<{ cueType: CueType; frame: CueData }>
+  events: string[]
 } {
   const calls: Array<{ cueType: CueType; frame: CueData }> = []
+  const events: string[] = []
   const runtime: YargCueRuntime = {
     notifySongStart: jest.fn(),
     notifySongEnd: jest.fn(),
@@ -30,8 +34,11 @@ function mockRuntime(): {
     handleBassNote: jest.fn(),
     handleKeysNote: jest.fn(),
     handleVocalNote: jest.fn(),
+    handleSongEvent: jest.fn((condition: string) => {
+      events.push(condition)
+    }) as YargCueRuntime['handleSongEvent'],
   }
-  return { runtime, calls }
+  return { runtime, calls, events }
 }
 
 /** A StageKit colour-bank packet. */
@@ -45,12 +52,13 @@ function setup(keepaliveMs: number | null = null): {
   emitter: EventEmitter
   proc: Rb3StageKitCueProcessor
   calls: Array<{ cueType: CueType; frame: CueData }>
+  events: string[]
 } {
   const emitter = new EventEmitter()
-  const { runtime, calls } = mockRuntime()
+  const { runtime, calls, events } = mockRuntime()
   const proc = new Rb3StageKitCueProcessor(runtime, { keepaliveMs })
   proc.startListening(emitter)
-  return { emitter, proc, calls }
+  return { emitter, proc, calls, events }
 }
 
 const lastRb3 = (calls: Array<{ cueType: CueType; frame: CueData }>): CueData | undefined =>
@@ -175,5 +183,97 @@ describe('Rb3StageKitCueProcessor', () => {
     proc.stopListening()
     emitter.emit('stagekit:data', colourPacket('red', [0], RC.red))
     expect(calls).toHaveLength(0)
+  })
+})
+
+describe('Rb3StageKitCueProcessor wait-gate edges (handleSongEvent)', () => {
+  it('fires led-N on the rising edge and led-N-off on the falling edge, exactly once', () => {
+    const { emitter, events } = setup()
+    emitter.emit('stagekit:data', colourPacket('red', [2], RC.red)) // LED 3 lights
+    expect(events).toEqual(['led-3'])
+    emitter.emit('stagekit:data', colourPacket('red', [2], RC.red)) // held → no edge
+    expect(events).toEqual(['led-3'])
+    emitter.emit('stagekit:data', colourPacket('red', [], RC.red)) // LED 3 clears
+    expect(events).toEqual(['led-3', 'led-3-off'])
+  })
+
+  it('fires an edge only for positions that actually changed', () => {
+    const { emitter, events } = setup()
+    emitter.emit('stagekit:data', colourPacket('red', [0, 2], RC.red)) // LEDs 1 and 3
+    expect(events).toEqual(['led-1', 'led-3'])
+    events.length = 0
+    emitter.emit('stagekit:data', colourPacket('red', [2, 4], RC.red)) // 1 off, 3 held, 5 on
+    expect(events).toEqual(['led-1-off', 'led-5'])
+  })
+
+  it('detects edges across colour banks via the aggregate mask', () => {
+    const { emitter, events } = setup()
+    emitter.emit('stagekit:data', colourPacket('green', [2], RC.green)) // LED 3 via green
+    expect(events).toEqual(['led-3'])
+    events.length = 0
+    emitter.emit('stagekit:data', colourPacket('red', [2], RC.red)) // LED 3 also via red → still lit
+    expect(events).toEqual([]) // no edge; aggregate unchanged
+  })
+
+  it('fires fog edges and emits nothing on the keepalive tick', () => {
+    const { emitter, proc, events } = setup(null)
+    emitter.emit('stagekit:data', {
+      positions: [0],
+      color: 'red',
+      brightness: 'medium',
+      fog: true,
+      rightChannel: RC.red,
+      timestamp: 0,
+    })
+    expect(events).toEqual(['led-1', 'fog-on'])
+    events.length = 0
+    proc.tick() // keepalive, no state change
+    expect(events).toEqual([])
+  })
+
+  it('DisableAll emits off-edges for every lit position and fog-off', () => {
+    const { emitter, events } = setup()
+    emitter.emit('stagekit:data', {
+      positions: [0, 2],
+      color: 'red',
+      brightness: 'medium',
+      fog: true,
+      rightChannel: RC.red,
+      timestamp: 0,
+    })
+    events.length = 0
+    emitter.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      brightness: 'medium',
+      fog: false,
+      strobeEffect: 'off',
+      rightChannel: 0xff,
+      timestamp: 0,
+    })
+    expect(events).toEqual(['led-1-off', 'led-3-off', 'fog-off'])
+  })
+
+  it('fans the edge through a real ChainFanout to every chain sequencer', () => {
+    // End-to-end wiring: processor → ChainFanout.handleSongEvent → each sequencer.handleSongEvent
+    // (which forwards to SongEventHandler.handleEvent, the same mechanism drum/vocal waits already use).
+    const seqA = { handleSongEvent: jest.fn() }
+    const seqB = { handleSongEvent: jest.fn() }
+    const fanout = new ChainFanout()
+    fanout.setChains([
+      { rigId: 'a', isPrimary: true, sequencer: seqA, yargCueHandler: null } as unknown as RigChain,
+      {
+        rigId: 'b',
+        isPrimary: false,
+        sequencer: seqB,
+        yargCueHandler: null,
+      } as unknown as RigChain,
+    ])
+    const proc = new Rb3StageKitCueProcessor(fanout, { keepaliveMs: null })
+    const emitter = new EventEmitter()
+    proc.startListening(emitter)
+    emitter.emit('stagekit:data', colourPacket('red', [2], RC.red))
+    expect(seqA.handleSongEvent).toHaveBeenCalledWith('led-3')
+    expect(seqB.handleSongEvent).toHaveBeenCalledWith('led-3')
   })
 })

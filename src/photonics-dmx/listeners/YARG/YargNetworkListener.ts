@@ -15,6 +15,7 @@ import {
   DrumNoteType,
 } from '../../cues/types/cueTypes'
 import { createLogger } from '../../../shared/logger'
+import type { SongEventCondition } from '../../controllers/sequencer/interfaces'
 import { monotonicNowMs } from '../../../shared/time'
 import {
   PlatformByte,
@@ -45,6 +46,12 @@ export interface YargCueRuntime {
   handleBassNote(noteType: InstrumentNoteType, data: CueData): void
   handleKeysNote(noteType: InstrumentNoteType, data: CueData): void
   handleVocalNote(data: CueData): void
+  /**
+   * Advance action-timing waits gated on a song event (e.g. an RB3 `led-3` / `fog-on` edge). Optional
+   * so existing YARG-only runtimes need no change; the RB3 cue-mode processor calls it. Typed off the
+   * sequencer union so the two can't drift.
+   */
+  handleSongEvent?(condition: SongEventCondition): void
 }
 
 const PORT = 36107

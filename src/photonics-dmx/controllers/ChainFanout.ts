@@ -3,6 +3,7 @@ import { AudioConfig, AudioLightingData } from '../listeners/Audio/AudioTypes'
 import { CueData, CueType, DrumNoteType, InstrumentNoteType } from '../cues/types/cueTypes'
 import { YargCueRuntime } from '../listeners/YARG/YargNetworkListener'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
+import type { SongEventCondition } from './sequencer/interfaces'
 import { RigChain } from './RigChain'
 
 /**
@@ -86,6 +87,12 @@ export class ChainFanout implements YargCueRuntime, Rb3MenuCueDispatch {
 
   public handleVocalNote(data: CueData): void {
     for (const c of this.chains) c.yargCueHandler?.handleVocalNote(data)
+  }
+
+  /** Advance every chain's action-timing waits gated on a song-event condition (RB3 led/fog edges).
+   *  Goes straight to each sequencer — the condition is already resolved, so no cue handler is needed. */
+  public handleSongEvent(condition: SongEventCondition): void {
+    for (const c of this.chains) c.sequencer.handleSongEvent(condition)
   }
 
   // ── Audio ─────────────────────────────────────────────────────────────────────────────
