@@ -75,10 +75,12 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
   let ipc: FakeIpcMain
   let controllerManager: {
     setOnConsoleEnter: jest.Mock
+    setOnSimulationPreempt: jest.Mock
     ensureChainsHaveYargHandlersForSimulation: jest.Mock
     getChainFanout: () => ChainFanout
     getMotionCueSimulator: () => MotionCueSimulator
     getIsInitialized: () => boolean
+    getIsRb3Enabled: () => boolean
     init: jest.Mock
   }
   // Cast for setupSimulationHandlers' parameter type — the IPC handlers exercise only a
@@ -100,10 +102,12 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
     const motionCueSimulator = new MotionCueSimulator({ getChainFanout: () => fanout })
     controllerManager = {
       setOnConsoleEnter: jest.fn(),
+      setOnSimulationPreempt: jest.fn(),
       ensureChainsHaveYargHandlersForSimulation: jest.fn(),
       getChainFanout: () => fanout,
       getMotionCueSimulator: () => motionCueSimulator,
       getIsInitialized: () => true,
+      getIsRb3Enabled: () => false,
       init: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
     }
     setupSimulationHandlers(ipc as never, asControllerManager(controllerManager))

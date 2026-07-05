@@ -17,8 +17,10 @@ describe('simulation handlers console integration', () => {
     })
     const controllerManager = {
       setOnConsoleEnter: jest.fn(),
+      setOnSimulationPreempt: jest.fn(),
       getChainFanout,
       getMotionCueSimulator: () => motionCueSimulator,
+      getIsRb3Enabled: () => false,
     } as any
 
     setupSimulationHandlers(ipcMain, controllerManager)

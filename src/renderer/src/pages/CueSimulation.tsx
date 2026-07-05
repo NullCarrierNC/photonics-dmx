@@ -4,6 +4,7 @@ import {
   audioListenerEnabledAtom,
   lightingPrefsAtom,
   previewRigIdAtom,
+  rb3eListenerEnabledAtom,
   resolveLastUsedRigId,
 } from '@renderer/atoms'
 import { EffectSelector } from '../../../photonics-dmx/types'
@@ -52,6 +53,7 @@ const isYargVisualCueGroup = (g: CueGroup) => g.cueTypes.length > 0
 
 const CueSimulation: React.FC = () => {
   const [isAudioReactiveEnabled] = useAtom(audioListenerEnabledAtom)
+  const [isRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
   const [lightingPrefs] = useAtom(lightingPrefsAtom)
   const advancedModeEnabled = lightingPrefs.advancedModeEnabled ?? false
   const [selectedEffect, setSelectedEffect] = useState<EffectSelector | null>(null)
@@ -561,8 +563,13 @@ const CueSimulation: React.FC = () => {
 
       {!isAudioReactiveEnabled && (
         <>
+          {isRb3Enabled && (
+            <div className="mb-4 p-3 rounded border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 text-sm text-amber-800 dark:text-amber-300">
+              RB3E is enabled and owns the lights. Disable RB3E to simulate cues.
+            </div>
+          )}
           <CueSimulationActions
-            disabled={!selectedEffect || !selectedGroupId}
+            disabled={!selectedEffect || !selectedGroupId || isRb3Enabled}
             onTestEffect={handleTestEffect}
             onStopTestEffect={handleStopTestEffect}
             onSimulateBeat={handleSimulateBeat}
@@ -573,7 +580,7 @@ const CueSimulation: React.FC = () => {
             selectedInstrument={selectedInstrument}
             onInstrumentChange={setSelectedInstrument}
             onSimulateNote={handleSimulateInstrumentNote}
-            disabled={!selectedGroupId}
+            disabled={!selectedGroupId || isRb3Enabled}
           />
           {advancedModeEnabled && <CueSimulationMotion />}
         </>

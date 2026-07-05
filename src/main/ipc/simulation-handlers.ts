@@ -30,7 +30,7 @@ export function setupSimulationHandlers(
 ): void {
   const sim = controllerManager.getMotionCueSimulator()
 
-  controllerManager.setOnConsoleEnter(() => {
+  const stopMotionSimAndNotify = (): void => {
     const hadYargSim = sim.hasYargActive()
     sim.stop()
     if (hadYargSim) {
@@ -40,7 +40,17 @@ export function setupSimulationHandlers(
         manualFallback: false,
       })
     }
-  })
+  }
+
+  controllerManager.setOnConsoleEnter(stopMotionSimAndNotify)
+  // Enabling RB3E hands the rig chains to the listener; stop any running simulation with the
+  // same teardown so the renderer's motion-sim state clears too.
+  controllerManager.setOnSimulationPreempt(stopMotionSimAndNotify)
+
+  // Simulation dispatches through the same chain cue handlers RB3E drives (cue mode re-dispatches
+  // the RB3 look at ~30 Hz), so simulation requests are refused while the RB3E listener is enabled.
+  const rb3Blocked = (): boolean => controllerManager.getIsRb3Enabled()
+  const RB3_BLOCKED_ERROR = 'Disable RB3E before simulating cues'
 
   ipcMain.handle(LIGHT.GET_AUDIO_CUE_GROUPS, async () => {
     try {
@@ -116,6 +126,9 @@ export function setupSimulationHandlers(
         `IPC start-test-effect called with effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}, cueGroup: ${cueGroup ?? 'none'}`,
       )
       try {
+        if (rb3Blocked()) {
+          return { success: false, error: RB3_BLOCKED_ERROR }
+        }
         if (!controllerManager.getIsInitialized()) {
           log.info('System not initialized, initializing now before testing effect')
           await controllerManager.init()
@@ -150,7 +163,7 @@ export function setupSimulationHandlers(
         effectId?: string | null
       },
     ) => {
-      if (!controllerManager.getIsInitialized()) return false
+      if (rb3Blocked() || !controllerManager.getIsInitialized()) return false
       // Make sure every chain has a YARG handler so the fanout `handleCue` actually
       // reaches secondary rigs even when no real network listener has run.
       controllerManager.ensureChainsHaveYargHandlersForSimulation()
@@ -202,7 +215,7 @@ export function setupSimulationHandlers(
         effectId?: string | null
       },
     ) => {
-      if (!controllerManager.getIsInitialized()) return false
+      if (rb3Blocked() || !controllerManager.getIsInitialized()) return false
       controllerManager.ensureChainsHaveYargHandlersForSimulation()
       const fanout = controllerManager.getChainFanout()
 
@@ -252,7 +265,7 @@ export function setupSimulationHandlers(
         effectId?: string | null
       },
     ) => {
-      if (!controllerManager.getIsInitialized()) return false
+      if (rb3Blocked() || !controllerManager.getIsInitialized()) return false
       controllerManager.ensureChainsHaveYargHandlersForSimulation()
       const fanout = controllerManager.getChainFanout()
 
@@ -306,6 +319,9 @@ export function setupSimulationHandlers(
     ) => {
       try {
         const { instrument, noteType, venueSize = 'Small', bpm = 120, cueGroup, effectId } = data
+        if (rb3Blocked()) {
+          return { success: false, error: RB3_BLOCKED_ERROR }
+        }
         if (!controllerManager.getIsInitialized()) {
           return { success: false, error: 'Lighting system not initialized' }
         }
@@ -370,6 +386,9 @@ export function setupSimulationHandlers(
 
   ipcMain.handle(LIGHT.START_YARG_MOTION_CUE_SIMULATION, async (_, data: unknown) => {
     try {
+      if (rb3Blocked()) {
+        return ipcError(new Error(RB3_BLOCKED_ERROR))
+      }
       if (!isPlainObject(data)) {
         return ipcError(new Error('Invalid motion simulation payload'))
       }
@@ -425,6 +444,9 @@ export function setupSimulationHandlers(
 
   ipcMain.handle(LIGHT.START_AUDIO_MOTION_CUE_SIMULATION, async (_, data: unknown) => {
     try {
+      if (rb3Blocked()) {
+        return ipcError(new Error(RB3_BLOCKED_ERROR))
+      }
       if (!isPlainObject(data)) {
         return ipcError(new Error('Invalid motion simulation payload'))
       }

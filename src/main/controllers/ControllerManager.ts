@@ -117,6 +117,7 @@ export class ControllerManager {
   private effectLoader: EffectLoader | null = null
 
   private pendingValidationErrors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }> = []
+  private onSimulationPreempt: (() => void) | null = null
 
   private readonly testEffectRunner: TestEffectRunner
   private readonly motionCueSimulator: MotionCueSimulator
@@ -575,10 +576,13 @@ export class ControllerManager {
   }
 
   /**
-   * Enable Rb3 listener
+   * Enable Rb3 listener. Running simulations are stopped first — the listener owns the rig
+   * chains from here and simulation IPC is refused while RB3E is enabled.
    */
   public async enableRb3(): Promise<void> {
     await this.awaitInFlightLifecycleWork()
+    await this.stopTestEffect()
+    this.onSimulationPreempt?.()
     await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
   }
 
@@ -760,6 +764,11 @@ export class ControllerManager {
 
   public setOnConsoleEnter(callback: (() => void) | null): void {
     this.consoleMode.setOnConsoleEnter(callback)
+  }
+
+  /** Called when a listener takes over the rig chains (RB3E enable) so running simulations stop. */
+  public setOnSimulationPreempt(callback: (() => void) | null): void {
+    this.onSimulationPreempt = callback
   }
 
   public getCueHandler(): YargCueHandler | null {
