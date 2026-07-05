@@ -86,9 +86,11 @@ export function extractYargCueDataValue(
       return cueData.timeSinceLastCue ?? 0
     // RB3 StageKit LED / effect state.
     case 'led-color':
-      // Latest packet's bank colour name (palette-compatible: 'red'|'green'|'blue'|'yellow'), or
-      // 'off' when nothing is lit, so it can drive set-color / an effect colour param directly.
-      return cueData.ledColor ?? 'off'
+      // Latest packet's bank colour name ('red'|'green'|'blue'|'yellow'), or 'transparent' when nothing
+      // is lit. 'transparent' is a real palette colour (fully-transparent black), so binding this to a
+      // set-color / effect colour param lets a lower layer show through when the StageKit goes dark
+      // rather than painting black — and avoids the unknown-name resolver fallback (which maps to blue).
+      return !cueData.ledColor || cueData.ledColor === 'off' ? 'transparent' : cueData.ledColor
     case 'led-states':
       return ledAggregateMask(cueData)
     case 'led-count':

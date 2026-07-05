@@ -129,9 +129,13 @@ describe('dataExtractors', () => {
           ...overrides,
         })
 
-      it('led-color returns the current bank colour, or off when unset', () => {
+      it('led-color returns the current bank colour, or transparent when unset', () => {
         expect(extractYargCueDataValue('led-color', led(), 'c')).toBe('red')
-        expect(extractYargCueDataValue('led-color', minimalCueData(), 'c')).toBe('off')
+        // Unlit → 'transparent' (a real palette colour) so a layered lower look shows through.
+        expect(extractYargCueDataValue('led-color', minimalCueData(), 'c')).toBe('transparent')
+        expect(extractYargCueDataValue('led-color', led({ ledColor: 'off' }), 'c')).toBe(
+          'transparent',
+        )
       })
 
       it('led-states is the aggregate any-bank mask', () => {
