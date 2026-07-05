@@ -159,16 +159,67 @@ describe('Rb3StageKitCueProcessor', () => {
     expect(lastRb3(calls)!.fogState).toBe(true)
   })
 
-  it('blanks on the menu transition and ignores packets while in a menu', () => {
+  it('blanks on the menu transition and ignores teardown packets while in a menu', () => {
     const { emitter, calls } = setup()
     emitter.emit('rb3e:gameState', { gameState: 'Menus' })
     expect(calls.some((c) => c.cueType === CueType.Blackout_Fast)).toBe(true)
     calls.length = 0
-    emitter.emit('stagekit:data', colourPacket('red', [0], RC.red))
-    expect(calls).toHaveLength(0) // ignored while in menu
+    // End-of-song teardown traffic: none of these are gameplay evidence.
+    emitter.emit('stagekit:data', colourPacket('red', [], RC.red)) // empty bank clear
+    emitter.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      brightness: 'medium',
+      fog: false,
+      strobeEffect: 'off',
+      leftChannel: 0,
+      rightChannel: 0x07,
+      timestamp: 0,
+    })
+    emitter.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      brightness: 'medium',
+      fog: false,
+      leftChannel: 0,
+      rightChannel: 0xff,
+      timestamp: 0,
+    })
+    expect(calls).toHaveLength(0)
     emitter.emit('rb3e:gameState', { gameState: 'InGame' })
     emitter.emit('stagekit:data', colourPacket('red', [0], RC.red))
     expect(lastRb3(calls)!.ledBanks!.red).toBe(0b1)
+  })
+
+  it('a lit colour packet while in a menu exits the menu and renders', () => {
+    const { emitter, calls } = setup()
+    emitter.emit('rb3e:gameState', { gameState: 'Menus' })
+    calls.length = 0
+    emitter.emit('stagekit:data', colourPacket('red', [0, 2], RC.red))
+    const frame = lastRb3(calls)!
+    expect(frame.ledBanks).toEqual({ red: 0b101, green: 0, blue: 0, yellow: 0 })
+  })
+
+  it('a screen-name menu entry blanks the rig and clears the accumulated look', () => {
+    const { emitter, calls } = setup()
+    emitter.emit('stagekit:data', colourPacket('red', [0], RC.red))
+    calls.length = 0
+    emitter.emit('rb3e:screenName', { screenName: 'song_select_screen' })
+    expect(calls.some((c) => c.cueType === CueType.Blackout_Fast)).toBe(true)
+    calls.length = 0
+    // Re-entering gameplay starts from clean banks: only the new packet's bank is lit.
+    emitter.emit('stagekit:data', colourPacket('green', [1], RC.green))
+    expect(lastRb3(calls)!.ledBanks).toEqual({ red: 0, green: 0b10, blue: 0, yellow: 0 })
+  })
+
+  it('a game-state and a screen-name announcing the same menu blank only once', () => {
+    const { emitter, calls } = setup()
+    emitter.emit('stagekit:data', colourPacket('red', [0], RC.red))
+    calls.length = 0
+    emitter.emit('rb3e:gameState', { gameState: 'Menus' })
+    emitter.emit('rb3e:screenName', { screenName: 'main_hub_screen' })
+    const blackouts = calls.filter((c) => c.cueType === CueType.Blackout_Fast)
+    expect(blackouts).toHaveLength(1)
   })
 
   it('keepalive tick re-dispatches the current look (and strobe when active)', () => {

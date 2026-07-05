@@ -95,4 +95,16 @@ describe('RB3 cue mode (integration)', () => {
     listener.emit('rb3e:gameState', { gameState: 'InGame' })
     expect(clear).toHaveBeenCalled()
   })
+
+  it('a lit colour packet during the menu clears the menu look and renders the RB3 frame', () => {
+    manager = new ProcessorManager(fanout, { mode: 'cue' })
+    manager.setNetworkListener(listener)
+
+    listener.emit('rb3e:screenName', { screenName: 'song_select_screen' })
+    handleCue.mockClear()
+
+    listener.emit('stagekit:data', colourPacket('blue', [4], RC.blue))
+    expect(clear).toHaveBeenCalled()
+    expect(handleCue.mock.calls.some((c) => c[0] === CueType.RB3)).toBe(true)
+  })
 })

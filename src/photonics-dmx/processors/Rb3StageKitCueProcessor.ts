@@ -3,6 +3,7 @@ import type { YargCueRuntime } from '../listeners/YARG/YargNetworkListener'
 import type { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import { CueType, defaultCueData, ledAggregateMask } from '../cues/types/cueTypes'
 import type { CueData, StrobeState } from '../cues/types/cueTypes'
+import { Rb3RightChannel } from '../listeners/RB3/rb3eTypes'
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { createLogger } from '../../shared/logger'
 
@@ -102,10 +103,8 @@ export class Rb3StageKitCueProcessor {
     this.listener = listener
     listener.on('stagekit:data', this.boundStageKit)
     listener.on('rb3e:gameState', this.boundGameState)
-    // Menu looks only run when a menu dispatch is wired (production ChainFanout).
-    if (this.menuDispatch) {
-      listener.on('rb3e:screenName', this.boundScreenName)
-    }
+    // Screen-name events drive menu entry (state cleanup + the menu look when a dispatch is wired).
+    listener.on('rb3e:screenName', this.boundScreenName)
     if (this.keepaliveMs && this.keepaliveMs > 0) {
       this.keepaliveTimer = setInterval(() => this.tick(), this.keepaliveMs)
     }
@@ -142,17 +141,10 @@ export class Rb3StageKitCueProcessor {
   private handleGameState(data: { gameState: string }): void {
     const menu = data.gameState !== 'InGame'
     if (!menu) this.started = true // InGame is gameplay evidence; the keepalive may run
-    if (menu === this.inMenu) return
-    this.inMenu = menu
     if (menu) {
-      // Leaving gameplay: clear the accumulated look so a returning game starts clean, then show the
-      // menu look (matching direct mode's menu animation on the return to Menus).
-      this.reset()
-      void this.runtime.handleCue(CueType.Blackout_Fast, this.buildFrame())
-      this.startMenuAnimation()
+      this.enterMenu()
     } else {
-      // Gameplay resumed: the RB3 cue drives the look, so stop painting menu frames.
-      this.stopMenuAnimation()
+      this.exitMenu()
     }
   }
 
@@ -162,8 +154,25 @@ export class Rb3StageKitCueProcessor {
     if (data.screenName !== RB3_MAIN_HUB_SCREEN && data.screenName !== RB3_SONG_SELECT_SCREEN) {
       return
     }
+    this.enterMenu()
+  }
+
+  /** Enter the menu look: clear the accumulated gameplay state so a returning game starts clean,
+   *  blank the rig, and start painting menu frames. No-op when already in a menu — a game-state
+   *  and a screen-name event announcing the same menu must not re-blank. */
+  private enterMenu(): void {
+    if (this.inMenu) return
     this.inMenu = true
+    this.reset()
+    void this.runtime.handleCue(CueType.Blackout_Fast, this.buildFrame())
     this.startMenuAnimation()
+  }
+
+  /** Leave the menu look: from here the RB3 cue drives the lights. No-op outside a menu. */
+  private exitMenu(): void {
+    if (!this.inMenu) return
+    this.inMenu = false
+    this.stopMenuAnimation()
   }
 
   /** Re-render the RB3 menu cue on a fixed cadence while in menus. Guarded on `inMenu` so a stale
@@ -186,14 +195,21 @@ export class Rb3StageKitCueProcessor {
   }
 
   private handleStageKit(data: StageKitData): void {
-    if (this.inMenu) return
+    if (this.inMenu) {
+      // Menu-time packets: only active gameplay evidence (a lit colour bank, a strobe turning on,
+      // or fog turning on) pulls the processor out of the menu. End-of-song teardown traffic —
+      // DisableAll, strobe/fog off, bank clears — leaves the menu look running, and a lost or
+      // late InGame game-state event no longer keeps the song's opening packets from rendering.
+      if (!this.isActiveGameplayPacket(data)) return
+      this.exitMenu()
+    }
     this.started = true // a real packet is gameplay evidence; the keepalive may run
     const before = this.ledSnapshot()
 
     // DisableAll (0xFF): full StageKit reset — blank everything (the RB3 cue stays active so its
     // led-N-off / fog-off edges fire and the graph renders its own dark state; deliberate deviation
     // from the plan's Blackout_Fast, which would kill the cue).
-    if (data.rightChannel === 0xff) {
+    if (data.rightChannel === Rb3RightChannel.DisableAll) {
       this.reset()
       this.emitEdges(before)
       void this.runtime.handleCue(CueType.Strobe_Off, this.buildFrame())
@@ -222,6 +238,18 @@ export class Rb3StageKitCueProcessor {
 
     this.emitEdges(before)
     void this.runtime.handleCue(CueType.RB3, this.buildFrame())
+  }
+
+  /** A packet that lights something: a colour bank with LEDs set, a strobe turning on, or fog on. */
+  private isActiveGameplayPacket(data: StageKitData): boolean {
+    if (
+      (COLOUR_BANKS as readonly string[]).includes(data.color) &&
+      (data.leftChannel & 0xff) !== 0
+    ) {
+      return true
+    }
+    if (data.strobeEffect && data.strobeEffect !== 'off') return true
+    return data.rightChannel === Rb3RightChannel.FogOn
   }
 
   /** Snapshot the current aggregate LED mask + fog, taken before a packet mutates state. */
