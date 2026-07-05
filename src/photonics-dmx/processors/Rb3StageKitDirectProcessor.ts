@@ -15,13 +15,12 @@ import { CueData } from '../cues/types/cueTypes'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import { Rb3StageKitRigProcessor } from './Rb3StageKitRigProcessor'
 import { ChainFanout } from '../controllers/ChainFanout'
+import { RB3_MAIN_HUB_SCREEN, RB3_SONG_SELECT_SCREEN } from '../listeners/RB3/rb3eTypes'
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
+import { Rb3MenuFramePump } from './rb3MenuAnimation'
 import { createLogger } from '../../shared/logger'
 import { monotonicNowMs } from '../../shared/time'
 const log = createLogger('Rb3StageKitDirectProcessor')
-
-const RB3_MAIN_HUB_SCREEN = 'main_hub_screen'
-const RB3_SONG_SELECT_SCREEN = 'song_select_screen'
 
 export class Rb3StageKitDirectProcessor extends EventEmitter {
   private config: StageKitConfig
@@ -42,8 +41,14 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   // Track if we're currently in a song (using direct control)
   private _inSong: boolean = false
 
-  // Menu animation timer
-  private menuAnimationTimer: NodeJS.Timeout | null = null
+  // Menu-look pump: no immediate first frame (the first paint lands one interval after Menus),
+  // start() restarts the interval, frames gated on the Menus game state.
+  private readonly menuFramePump = new Rb3MenuFramePump({
+    getDispatch: () => this.cueHandler ?? null,
+    isActive: () => this._currentGameState === 'Menus',
+    immediateFirstFrame: false,
+    restartOnStart: true,
+  })
 
   /**
    * Builds one `Rb3StageKitRigProcessor` per active rig in the supplied `ChainFanout`.
@@ -209,7 +214,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   private isDefaultMenuCueRunning(): boolean {
-    return this._currentGameState === 'Menus' && this.menuAnimationTimer !== null
+    return this._currentGameState === 'Menus' && this.menuFramePump.isRunning()
   }
 
   /**
@@ -625,45 +630,19 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   /**
-   * Start the menu animation timer to drive RB3E-only menu frame every 1000ms
+   * Start the menu animation pump to drive the RB3E-only menu frame every 1000ms
    */
   private startMenuAnimationTimer(): void {
-    log.info('StageKitDirectProcessor: startMenuAnimationTimer called')
-    this.clearMenuAnimationTimer()
-
-    if (!this.cueHandler || typeof this.cueHandler.playMenuFrame !== 'function') {
-      log.warn(
-        'StageKitDirectProcessor: Cannot start menu animation - no menu cue handler available',
-      )
-      return
-    }
-
-    log.info('StageKitDirectProcessor: Starting menu animation timer (1000ms interval)')
-
-    this.menuAnimationTimer = setInterval(() => {
-      if (this._currentGameState === 'Menus' && this.cueHandler) {
-        try {
-          this.cueHandler.playMenuFrame()
-        } catch (error) {
-          log.error('StageKitDirectProcessor: Error in menu cue playMenuFrame:', error)
-        }
-      }
-    }, 1000)
+    log.info('StageKitDirectProcessor: Starting the menu animation pump')
+    this.menuFramePump.start()
   }
 
   /**
-   * Clear the menu animation timer and any RB3E menu-layer effects
+   * Stop the menu animation pump, clearing any RB3E menu-layer effects
    */
   private clearMenuAnimationTimer(): void {
-    log.info('StageKitDirectProcessor: clearMenuAnimationTimer called')
-    if (this.menuAnimationTimer) {
-      log.info('StageKitDirectProcessor: Clearing menu animation timer')
-      clearInterval(this.menuAnimationTimer)
-      this.menuAnimationTimer = null
-    } else {
-      log.info('StageKitDirectProcessor: No menu animation timer to clear')
-    }
-    this.cueHandler?.clear()
+    log.info('StageKitDirectProcessor: Stopping the menu animation pump')
+    this.menuFramePump.stop()
   }
 
   /**

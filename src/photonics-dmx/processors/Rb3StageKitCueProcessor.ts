@@ -3,17 +3,16 @@ import type { YargCueRuntime } from '../listeners/YARG/YargNetworkListener'
 import type { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import { CueType, defaultCueData, ledAggregateMask } from '../cues/types/cueTypes'
 import type { CueData, StrobeState } from '../cues/types/cueTypes'
-import { Rb3RightChannel } from '../listeners/RB3/rb3eTypes'
+import {
+  Rb3RightChannel,
+  RB3_MAIN_HUB_SCREEN,
+  RB3_SONG_SELECT_SCREEN,
+} from '../listeners/RB3/rb3eTypes'
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
+import { Rb3MenuFramePump } from './rb3MenuAnimation'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('rb3-cue')
-
-// RB3E screen names that map to the main menu, matching the direct processor's menu trigger.
-const RB3_MAIN_HUB_SCREEN = 'main_hub_screen'
-const RB3_SONG_SELECT_SCREEN = 'song_select_screen'
-/** Menu-look re-render cadence, mirroring the direct processor's menu animation timer. */
-const MENU_ANIMATION_MS = 1000
 
 const STROBE_STATE: Record<'slow' | 'medium' | 'fast' | 'fastest' | 'off', StrobeState> = {
   slow: 'Strobe_Slow',
@@ -81,9 +80,16 @@ export class Rb3StageKitCueProcessor {
 
   private listener: EventEmitter | null = null
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null
-  private menuAnimationTimer: ReturnType<typeof setInterval> | null = null
   private readonly keepaliveMs: number | null
   private readonly menuDispatch: Rb3MenuCueDispatch | null
+  // Menu-look pump: an immediate first frame (enterMenu already set inMenu), no restart on a
+  // repeated start, frames gated on inMenu so a stale tick never paints over gameplay.
+  private readonly menuFramePump = new Rb3MenuFramePump({
+    getDispatch: () => this.menuDispatch,
+    isActive: () => this.inMenu,
+    immediateFirstFrame: true,
+    restartOnStart: false,
+  })
 
   private readonly boundStageKit = (data: StageKitData): void => this.handleStageKit(data)
   private readonly boundGameState = (data: { gameState: string }): void =>
@@ -124,7 +130,7 @@ export class Rb3StageKitCueProcessor {
       clearInterval(this.keepaliveTimer)
       this.keepaliveTimer = null
     }
-    this.stopMenuAnimation()
+    this.menuFramePump.stop()
     // Close an open song span so the registry's once-per-song locks don't outlive the processor.
     if (this.wasInSong) {
       this.wasInSong = false
@@ -189,33 +195,16 @@ export class Rb3StageKitCueProcessor {
     this.inMenu = true
     this.reset()
     void this.runtime.handleCue(CueType.Blackout_Fast, this.buildFrame())
-    this.startMenuAnimation()
+    if (this.menuDispatch) {
+      this.menuFramePump.start()
+    }
   }
 
   /** Leave the menu look: from here the RB3 cue drives the lights. No-op outside a menu. */
   private exitMenu(): void {
     if (!this.inMenu) return
     this.inMenu = false
-    this.stopMenuAnimation()
-  }
-
-  /** Re-render the RB3 menu cue on a fixed cadence while in menus. Guarded on `inMenu` so a stale
-   *  tick never paints over gameplay. No-op without a menu dispatch. */
-  private startMenuAnimation(): void {
-    if (!this.menuDispatch || this.menuAnimationTimer) return
-    const dispatch = this.menuDispatch
-    this.menuAnimationTimer = setInterval(() => {
-      if (this.inMenu) dispatch.playMenuFrame()
-    }, MENU_ANIMATION_MS)
-    dispatch.playMenuFrame()
-  }
-
-  private stopMenuAnimation(): void {
-    if (this.menuAnimationTimer) {
-      clearInterval(this.menuAnimationTimer)
-      this.menuAnimationTimer = null
-    }
-    this.menuDispatch?.clear()
+    this.menuFramePump.stop()
   }
 
   private handleStageKit(data: StageKitData): void {
