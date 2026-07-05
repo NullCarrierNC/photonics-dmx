@@ -47,6 +47,7 @@ function makeDeps(): ListenerCoordinatorDeps {
     sendToAllWindows: jest.fn(),
     runtimeBroadcaster: noopRuntimeBroadcaster(),
     setCueHandlerRef: jest.fn(),
+    getRb3ProcessingMode: () => 'direct',
   }
 }
 

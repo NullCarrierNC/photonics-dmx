@@ -167,6 +167,8 @@ export class ControllerManager {
         setCueHandlerRef: (h) => {
           this.cueHandler = h
         },
+        getRb3ProcessingMode: () =>
+          this.config.getPreference('rb3Prefs')?.processingMode ?? 'direct',
       },
       {
         getDmxLightManager: () => this.dmxLightManager,
@@ -591,7 +593,7 @@ export class ControllerManager {
   /**
    * Get current RB3 processing mode
    */
-  public getRb3Mode(): 'direct' | 'none' {
+  public getRb3Mode(): 'direct' | 'cue' | 'none' {
     return this.listenerLifecycle.yargRb3.getRb3Mode()
   }
 

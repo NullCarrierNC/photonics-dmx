@@ -5,6 +5,7 @@
  */
 import { EventEmitter } from 'events'
 import { Rb3StageKitDirectProcessor } from './Rb3StageKitDirectProcessor'
+import { Rb3StageKitCueProcessor } from './Rb3StageKitCueProcessor'
 import { ChainFanout } from '../controllers/ChainFanout'
 import { StageKitConfig } from '../listeners/RB3/StageKitTypes'
 import { CueData } from '../cues/types/cueTypes'
@@ -13,9 +14,10 @@ import { createLogger } from '../../shared/logger'
 const log = createLogger('ProcessorManager')
 
 /**
- * Available processing modes.
+ * Available processing modes. 'direct' drives the DMX sequencer straight from StageKit packets;
+ * 'cue' dispatches an always-active RB3 gameplay cue so node cues react to the LED state.
  */
-export type ProcessingMode = 'direct'
+export type ProcessingMode = 'direct' | 'cue'
 
 /**
  * Configuration for the processor manager
@@ -40,6 +42,7 @@ export class ProcessorManager extends EventEmitter {
   private networkListener: EventEmitter | null = null
 
   private stageKitDirectProcessor: Rb3StageKitDirectProcessor | null = null
+  private stageKitCueProcessor: Rb3StageKitCueProcessor | null = null
 
   private readonly chainFanout: ChainFanout
   private cueHandler: Rb3MenuCueDispatch | null = null
@@ -50,10 +53,7 @@ export class ProcessorManager extends EventEmitter {
     super()
     this.chainFanout = chainFanout
     this.config = { ...DEFAULT_PROCESSOR_CONFIG, ...config }
-
-    if (config.mode && config.mode !== 'direct') {
-      throw new Error(`Invalid mode: ${config.mode}. Only 'direct' mode is supported.`)
-    }
+    this.currentMode = this.config.mode
 
     log.info('ProcessorManager initialized with config:', this.config)
   }
@@ -133,7 +133,11 @@ export class ProcessorManager extends EventEmitter {
     // Set up event listeners for processors
     this.setupProcessorEventListeners()
 
-    this.startDirectMode()
+    if (this.currentMode === 'cue') {
+      this.startCueMode()
+    } else {
+      this.startDirectMode()
+    }
   }
 
   /**
@@ -169,12 +173,29 @@ export class ProcessorManager extends EventEmitter {
   }
 
   /**
+   * Start cue mode: turn the StageKit packet stream into RB3 node-cue dispatches. The processor
+   * dispatches through the ChainFanout, which fans the RB3 cue to every rig chain's YargCueHandler.
+   */
+  private startCueMode(): void {
+    log.info('ProcessorManager: Starting cue mode...')
+
+    if (!this.stageKitCueProcessor) {
+      this.stageKitCueProcessor = new Rb3StageKitCueProcessor(this.chainFanout)
+    }
+    this.stageKitCueProcessor.startListening(this.networkListener!)
+    log.info('ProcessorManager: Cue mode started')
+  }
+
+  /**
    * Stop all processors
    */
   private stopAllProcessors(): void {
     if (this.networkListener) {
       if (this.stageKitDirectProcessor) {
         this.stageKitDirectProcessor.stopListening(this.networkListener)
+      }
+      if (this.stageKitCueProcessor) {
+        this.stageKitCueProcessor.stopListening()
       }
     }
 
@@ -244,6 +265,10 @@ export class ProcessorManager extends EventEmitter {
     if (this.stageKitDirectProcessor) {
       this.stageKitDirectProcessor.destroy()
       this.stageKitDirectProcessor = null
+    }
+    if (this.stageKitCueProcessor) {
+      this.stageKitCueProcessor.destroy()
+      this.stageKitCueProcessor = null
     }
 
     // Remove all listeners

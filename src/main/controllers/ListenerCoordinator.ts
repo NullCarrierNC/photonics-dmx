@@ -31,6 +31,7 @@ export interface ListenerCoordinatorDeps {
   sendToAllWindows: (channel: string, payload: unknown) => void
   runtimeBroadcaster: RuntimeBroadcaster
   setCueHandlerRef: (h: YargCueHandler | null) => void
+  getRb3ProcessingMode: () => 'direct' | 'cue'
 }
 
 export class ListenerCoordinator {
@@ -67,27 +68,7 @@ export class ListenerCoordinator {
     if (this.isRb3Enabled) {
       await this.disableRb3()
     }
-    // Create one YargCueHandler per rig chain so each chain resolves cues against its own
-    // lights and sequencer. Only the primary chain's handler emits renderer broadcasts so
-    // the UI gets one event per logical cue rather than one per rig.
-    for (const chain of chains) {
-      if (chain.yargCueHandler) {
-        chain.yargCueHandler.shutdown()
-      }
-      const handler = new YargCueHandler(chain.dmxLightManager, chain.sequencer, {
-        getMotionCueMinimumHoldMs: this.deps.getMotionCueMinimumHoldMs,
-        getMotionCueProbabilityPercent: this.deps.getMotionCueProbabilityPercent,
-        // Secondary chains share a no-op broadcaster so they don't produce duplicate
-        // renderer events for the same cue running on every rig.
-        runtimeBroadcaster: chain.isPrimary ? this.deps.runtimeBroadcaster : noopBroadcaster(),
-      })
-      handler.setMotionEnabled(this.deps.getMotionEnabled())
-      handler.setManualMotionRef(this.deps.getActiveYargMotionCueRef())
-      chain.yargCueHandler = handler
-    }
-    const primary = chains.find((c) => c.isPrimary) ?? chains[0]
-    this.cueHandler = primary.yargCueHandler
-    this.deps.setCueHandlerRef(this.cueHandler)
+    this.buildYargChainHandlers(chains)
     if (this.yargListener) {
       await this.yargListener.shutdown()
     }
@@ -156,6 +137,34 @@ export class ListenerCoordinator {
     this.deps.setCueHandlerRef(null)
   }
 
+  /**
+   * Create one YargCueHandler per rig chain so each chain resolves cues against its own lights
+   * and sequencer, and expose the primary chain's handler as the shared cue handler. Only the
+   * primary chain's handler emits renderer broadcasts so the UI gets one event per logical cue
+   * rather than one per rig. Used by both the YARG listener and RB3 cue mode (whose cues fan out
+   * through these same handlers).
+   */
+  private buildYargChainHandlers(chains: RigChain[]): void {
+    for (const chain of chains) {
+      if (chain.yargCueHandler) {
+        chain.yargCueHandler.shutdown()
+      }
+      const handler = new YargCueHandler(chain.dmxLightManager, chain.sequencer, {
+        getMotionCueMinimumHoldMs: this.deps.getMotionCueMinimumHoldMs,
+        getMotionCueProbabilityPercent: this.deps.getMotionCueProbabilityPercent,
+        // Secondary chains share a no-op broadcaster so they don't produce duplicate
+        // renderer events for the same cue running on every rig.
+        runtimeBroadcaster: chain.isPrimary ? this.deps.runtimeBroadcaster : noopBroadcaster(),
+      })
+      handler.setMotionEnabled(this.deps.getMotionEnabled())
+      handler.setManualMotionRef(this.deps.getActiveYargMotionCueRef())
+      chain.yargCueHandler = handler
+    }
+    const primary = chains.find((c) => c.isPrimary) ?? chains[0]
+    this.cueHandler = primary.yargCueHandler
+    this.deps.setCueHandlerRef(this.cueHandler)
+  }
+
   /** Shutdown every chain's YARG handler. Safe to call when no handlers exist. */
   private disposeYargChainHandlers(): void {
     for (const chain of this.deps.getRigChains()) {
@@ -199,11 +208,18 @@ export class ListenerCoordinator {
       }
       chain.rb3MenuCueHandler = new Rb3MenuCueHandler(chain.dmxLightManager, chain.sequencer)
     }
+    const mode = this.deps.getRb3ProcessingMode()
+    // Cue mode dispatches an always-active RB3 cue through the chain fanout, so each chain needs a
+    // YargCueHandler to resolve CueType.RB3 against its own lights (the same handlers the YARG
+    // listener uses). Direct mode drives the sequencer straight from the packet stream instead.
+    if (mode === 'cue') {
+      this.buildYargChainHandlers(chains)
+    }
     // The processor takes the chain fanout directly: the StageKit pipeline builds one
     // per-rig render processor for every chain, and the menu cue handler dispatches
     // `playMenuFrame` / `clear` to every chain's RB3 menu handler.
-    log.info('ListenerCoordinator: Creating ProcessorManager with mode: direct')
-    this.processorManager = new ProcessorManager(this.deps.getChainFanout(), { mode: 'direct' })
+    log.info(`ListenerCoordinator: Creating ProcessorManager with mode: ${mode}`)
+    this.processorManager = new ProcessorManager(this.deps.getChainFanout(), { mode })
     this.processorManager.setCueHandler(this.deps.getChainFanout())
     this.rb3eListener = new Rb3eNetworkListener()
     this.processorManager.setNetworkListener(this.rb3eListener)
@@ -213,7 +229,7 @@ export class ListenerCoordinator {
     try {
       await this.rb3eListener.start()
       this.isRb3Enabled = true
-      log.info('RB3 listener enabled in direct StageKit mode')
+      log.info(`RB3 listener enabled in ${mode} StageKit mode`)
     } catch (err) {
       const code = (err as NodeJS.ErrnoException)?.code
       const isPortInUse = code === 'EADDRINUSE'
@@ -227,6 +243,9 @@ export class ListenerCoordinator {
       this.isRb3Enabled = false
       this.processorManager.destroy()
       this.processorManager = null
+      this.disposeYargChainHandlers()
+      this.cueHandler = null
+      this.deps.setCueHandlerRef(null)
       for (const chain of chains) {
         if (chain.rb3MenuCueHandler) {
           chain.rb3MenuCueHandler.shutdown()
@@ -261,6 +280,10 @@ export class ListenerCoordinator {
       this.processorManager.destroy()
       this.processorManager = null
     }
+    // Cue mode built per-chain YargCueHandlers; direct mode leaves none. Safe either way.
+    this.disposeYargChainHandlers()
+    this.cueHandler = null
+    this.deps.setCueHandlerRef(null)
     for (const chain of this.deps.getRigChains()) {
       if (chain.rb3MenuCueHandler) {
         chain.rb3MenuCueHandler.shutdown()
@@ -269,7 +292,7 @@ export class ListenerCoordinator {
     }
   }
 
-  public getRb3Mode(): 'direct' | 'none' {
+  public getRb3Mode(): 'direct' | 'cue' | 'none' {
     if (!this.isRb3Enabled || !this.processorManager) {
       return 'none'
     }

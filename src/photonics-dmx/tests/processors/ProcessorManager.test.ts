@@ -1,12 +1,8 @@
 /**
- * ProcessorManager tests: direct mode lifecycle, getCurrentMode, getProcessorStats, destroy.
+ * ProcessorManager tests: direct/cue mode selection, getCurrentMode, getProcessorStats, destroy.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import {
-  ProcessorManager,
-  ProcessingMode,
-  DEFAULT_PROCESSOR_CONFIG,
-} from '../../processors/ProcessorManager'
+import { ProcessorManager, DEFAULT_PROCESSOR_CONFIG } from '../../processors/ProcessorManager'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { ChainFanout } from '../../controllers/ChainFanout'
@@ -112,9 +108,9 @@ describe('ProcessorManager', () => {
     expect(stats.traditionalProcessorActive).toBe(false)
   })
 
-  it('throws on invalid mode in constructor', () => {
-    expect(() => {
-      new ProcessorManager(chainFanout, { mode: 'invalid' as ProcessingMode })
-    }).toThrow(/Invalid mode/)
+  it('reports cue as the current mode when constructed in cue mode', () => {
+    const cueManager = new ProcessorManager(chainFanout, { mode: 'cue' })
+    expect(cueManager.getCurrentMode()).toBe('cue')
+    expect(cueManager.isModeActive('cue')).toBe(true)
   })
 })
