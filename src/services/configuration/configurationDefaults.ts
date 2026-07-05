@@ -81,8 +81,6 @@ export interface AppPreferences {
     /** 'direct' drives the DMX sequencer straight from StageKit packets; 'cue' dispatches an
      *  always-active RB3 gameplay cue (CueType.RB3) so node cues react to the LED state. */
     processingMode: 'direct' | 'cue'
-    /** Cue group the RB3 cue mode picks its RB3 implementation from; unset means any enabled group. */
-    preferredGroupId?: string
   }
   dmxSettingsPrefs?: {
     artNetExpanded: boolean

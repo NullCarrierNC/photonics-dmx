@@ -305,7 +305,6 @@ export interface LightingPreferences {
   }
   rb3Prefs?: {
     processingMode: 'direct' | 'cue'
-    preferredGroupId?: string
   }
   dmxSettingsPrefs?: {
     artNetExpanded: boolean

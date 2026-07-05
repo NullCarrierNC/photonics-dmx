@@ -718,6 +718,14 @@ describe('inputValidation', () => {
         )
       })
 
+      it('validates rb3Prefs.processingMode against the allowed set', () => {
+        expect(validatePreferencesPayload({ rb3Prefs: { processingMode: 'direct' } }).ok).toBe(true)
+        expect(validatePreferencesPayload({ rb3Prefs: { processingMode: 'cue' } }).ok).toBe(true)
+        expect(validatePreferencesPayload({ rb3Prefs: { processingMode: 'Cue' } }).ok).toBe(false)
+        expect(validatePreferencesPayload({ rb3Prefs: {} }).ok).toBe(false)
+        expect(validatePreferencesPayload({ rb3Prefs: 'cue' }).ok).toBe(false)
+      })
+
       it('requires dmxSettingsPrefs expansion flags to be booleans', () => {
         expect(validatePreferencesPayload({ dmxSettingsPrefs: { artNetExpanded: true } }).ok).toBe(
           true,

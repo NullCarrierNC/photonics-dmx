@@ -144,6 +144,7 @@ export function validateStringUnion<T extends string>(
 const YARG_AUDIO_MOTION_SELECTION_MODES = ['oncePerSong', 'perCueChange', 'none'] as const
 const CUE_GROUP_SELECTION_MODES = ['oncePerSong', 'withinSong'] as const
 const STAGE_KIT_PRIORITIES = ['prefer-for-tracked', 'random', 'never'] as const
+const RB3_PROCESSING_MODES = ['direct', 'cue'] as const
 
 export type YargAudioMotionSelectionMode = (typeof YARG_AUDIO_MOTION_SELECTION_MODES)[number]
 export type CueGroupSelectionMode = (typeof CUE_GROUP_SELECTION_MODES)[number]
@@ -884,15 +885,9 @@ export function validatePreferencesPayload(
     if (!isPlainObject(r)) {
       return { ok: false, error: 'rb3Prefs must be an object' }
     }
-    if (r.processingMode !== 'direct' && r.processingMode !== 'cue') {
-      return { ok: false, error: 'rb3Prefs.processingMode must be direct or cue' }
-    }
-    if (
-      'preferredGroupId' in r &&
-      r.preferredGroupId != null &&
-      typeof r.preferredGroupId !== 'string'
-    ) {
-      return { ok: false, error: 'rb3Prefs.preferredGroupId must be a string' }
+    const mode = validateStringUnion(r.processingMode, RB3_PROCESSING_MODES, 'processingMode')
+    if (!mode.ok) {
+      return { ok: false, error: `rb3Prefs.${mode.error}` }
     }
   }
 
