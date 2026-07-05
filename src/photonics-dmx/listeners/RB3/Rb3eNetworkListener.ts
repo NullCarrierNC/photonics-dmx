@@ -6,6 +6,7 @@ import {
   Rb3PlatformID,
   Rb3TrackType,
   Rb3Difficulty,
+  StageKitData,
 } from './rb3eTypes'
 import { CueData, StrobeState } from '../../cues/types/cueTypes'
 import { createLogger } from '../../../shared/logger'
@@ -644,19 +645,7 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @param rightChannel The right channel value (color bank or effect control)
    * @returns Clean StageKit data structure
    */
-  private parseStageKitData(
-    leftChannel: number,
-    rightChannel: number,
-  ): {
-    positions: number[]
-    color: string
-    brightness: 'low' | 'medium' | 'high'
-    fog: boolean
-    strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off'
-    /** Raw RB3E right-channel byte, so a consumer can tell DisableAll (0xFF) from StrobeOff (0x07). */
-    rightChannel: number
-    timestamp: number
-  } {
+  private parseStageKitData(leftChannel: number, rightChannel: number): StageKitData {
     // Parse left channel as LED position bitmask
     const positions: number[] = []
     for (let i = 0; i < 8; i++) {
@@ -752,6 +741,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       brightness: this._currentBrightness,
       fog: this._currentFogState,
       strobeEffect,
+      leftChannel,
       rightChannel,
       timestamp: Date.now(),
     }

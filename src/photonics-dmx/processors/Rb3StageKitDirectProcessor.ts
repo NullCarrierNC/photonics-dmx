@@ -15,24 +15,13 @@ import { CueData } from '../cues/types/cueTypes'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import { Rb3StageKitRigProcessor } from './Rb3StageKitRigProcessor'
 import { ChainFanout } from '../controllers/ChainFanout'
+import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { createLogger } from '../../shared/logger'
 import { monotonicNowMs } from '../../shared/time'
 const log = createLogger('Rb3StageKitDirectProcessor')
 
 const RB3_MAIN_HUB_SCREEN = 'main_hub_screen'
 const RB3_SONG_SELECT_SCREEN = 'song_select_screen'
-
-/**
- * StageKit data structure
- */
-export interface StageKitData {
-  positions: number[] // LED positions [0,1,2,3,4,5,6,7]
-  color: string // Color: 'red', 'green', 'blue', 'yellow', 'off'
-  brightness: 'low' | 'medium' | 'high'
-  fog?: boolean // StageKit FogOn/FogOff state (no DMX fog output yet; see fogState propagation)
-  strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off' // Strobe effect type
-  timestamp: number
-}
 
 export class Rb3StageKitDirectProcessor extends EventEmitter {
   private config: StageKitConfig

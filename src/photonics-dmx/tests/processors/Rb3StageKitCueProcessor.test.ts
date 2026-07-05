@@ -41,9 +41,18 @@ function mockRuntime(): {
   return { runtime, calls, events }
 }
 
-/** A StageKit colour-bank packet. */
+/** A StageKit colour-bank packet (leftChannel is the raw bitmask derived from the positions). */
 function colourPacket(color: string, positions: number[], rightChannel: number): unknown {
-  return { positions, color, brightness: 'medium', fog: false, rightChannel, timestamp: 0 }
+  const leftChannel = positions.reduce((m, p) => m | (1 << p), 0)
+  return {
+    positions,
+    color,
+    brightness: 'medium',
+    fog: false,
+    leftChannel,
+    rightChannel,
+    timestamp: 0,
+  }
 }
 
 const RC = { red: 0x80, green: 0x40, blue: 0x20, yellow: 0x60 }
@@ -143,6 +152,7 @@ describe('Rb3StageKitCueProcessor', () => {
       color: 'red',
       brightness: 'medium',
       fog: true,
+      leftChannel: 0b1,
       rightChannel: RC.red,
       timestamp: 0,
     })
@@ -239,6 +249,7 @@ describe('Rb3StageKitCueProcessor wait-gate edges (handleSongEvent)', () => {
       color: 'red',
       brightness: 'medium',
       fog: true,
+      leftChannel: 0b1,
       rightChannel: RC.red,
       timestamp: 0,
     })
@@ -255,6 +266,7 @@ describe('Rb3StageKitCueProcessor wait-gate edges (handleSongEvent)', () => {
       color: 'red',
       brightness: 'medium',
       fog: true,
+      leftChannel: 0b101,
       rightChannel: RC.red,
       timestamp: 0,
     })

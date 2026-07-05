@@ -2,20 +2,10 @@ import { EventEmitter } from 'events'
 import type { YargCueRuntime } from '../listeners/YARG/YargNetworkListener'
 import { CueType, defaultCueData, ledAggregateMask } from '../cues/types/cueTypes'
 import type { CueData, StrobeState } from '../cues/types/cueTypes'
+import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('rb3-cue')
-
-/** Payload of the listener's `stagekit:data` event (see Rb3eNetworkListener.parseStageKitData). */
-interface StageKitData {
-  positions: number[]
-  color: string
-  brightness: 'low' | 'medium' | 'high'
-  fog: boolean
-  strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off'
-  rightChannel: number
-  timestamp: number
-}
 
 const STROBE_STATE: Record<'slow' | 'medium' | 'fast' | 'fastest' | 'off', StrobeState> = {
   slow: 'Strobe_Slow',
@@ -167,10 +157,10 @@ export class Rb3StageKitCueProcessor {
       return
     }
 
-    // Colour-bank packet: REPLACE that bank's 8-bit mask (mirrors the direct processor's
-    // updateColorBank replace semantics); the other three banks persist.
+    // Colour-bank packet: REPLACE that bank's 8-bit mask with the raw leftChannel (mirrors the direct
+    // processor's updateColorBank replace semantics); the other three banks persist.
     if ((COLOUR_BANKS as readonly string[]).includes(data.color)) {
-      this.banks[data.color as ColourBank] = this.maskFromPositions(data.positions)
+      this.banks[data.color as ColourBank] = data.leftChannel & 0xff
       this.lastColour = data.color as ColourBank
     }
     // color 'off' with no strobe (a fog / no-op packet) leaves the banks as-is, like direct mode.
@@ -205,14 +195,6 @@ export class Rb3StageKitCueProcessor {
     this.fogState = false
     this.strobeState = 'Strobe_Off'
     this.lastColour = 'off'
-  }
-
-  private maskFromPositions(positions: number[]): number {
-    let mask = 0
-    for (const p of positions) {
-      if (p >= 0 && p <= 7) mask |= 1 << p
-    }
-    return mask & 0xff
   }
 
   /** Build a fresh RB3 cue frame from the current accumulated state (no previousFrame — the handler
