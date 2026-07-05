@@ -760,6 +760,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'globalDmxPublishingRateHz',
   'dmxOutputConfig',
   'stageKitPrefs',
+  'rb3Prefs',
   'dmxSettingsPrefs',
   'allowMultipleActiveRigs',
   'advancedModeEnabled',
@@ -875,6 +876,23 @@ export function validatePreferencesPayload(
     const priority = validateStageKitPriority(s.yargPriority)
     if (!priority.ok) {
       return { ok: false, error: `stageKitPrefs.yargPriority: ${priority.error}` }
+    }
+  }
+
+  if ('rb3Prefs' in cleaned) {
+    const r = cleaned.rb3Prefs
+    if (!isPlainObject(r)) {
+      return { ok: false, error: 'rb3Prefs must be an object' }
+    }
+    if (r.processingMode !== 'direct' && r.processingMode !== 'cue') {
+      return { ok: false, error: 'rb3Prefs.processingMode must be direct or cue' }
+    }
+    if (
+      'preferredGroupId' in r &&
+      r.preferredGroupId != null &&
+      typeof r.preferredGroupId !== 'string'
+    ) {
+      return { ok: false, error: 'rb3Prefs.preferredGroupId must be a string' }
     }
   }
 
