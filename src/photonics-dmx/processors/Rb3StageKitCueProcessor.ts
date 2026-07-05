@@ -72,6 +72,9 @@ export class Rb3StageKitCueProcessor {
   private strobeState: StrobeState = 'Strobe_Off'
   private lastColour: ColourBank | 'off' = 'off'
   private inMenu = false
+  // Gameplay evidence gate: the keepalive stays silent until the first StageKit packet (or an InGame
+  // game-state) arrives, so cue mode doesn't dispatch a blank RB3 look at ~30 Hz before a song starts.
+  private started = false
 
   private listener: EventEmitter | null = null
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null
@@ -118,7 +121,7 @@ export class Rb3StageKitCueProcessor {
 
   /** Keepalive dispatch: re-runs the active look so cue-called graphs advance without a new packet. */
   tick(): void {
-    if (this.inMenu) return
+    if (this.inMenu || !this.started) return
     void this.runtime.handleCue(CueType.RB3, this.buildFrame())
     if (this.strobeState !== 'Strobe_Off') {
       void this.runtime.handleCue(STROBE_CUE[this.strobeState], this.buildFrame())
@@ -127,6 +130,7 @@ export class Rb3StageKitCueProcessor {
 
   private handleGameState(data: { gameState: string }): void {
     const menu = data.gameState !== 'InGame'
+    if (!menu) this.started = true // InGame is gameplay evidence; the keepalive may run
     if (menu === this.inMenu) return
     this.inMenu = menu
     if (menu) {
@@ -138,6 +142,7 @@ export class Rb3StageKitCueProcessor {
 
   private handleStageKit(data: StageKitData): void {
     if (this.inMenu) return
+    this.started = true // a real packet is gameplay evidence; the keepalive may run
     const before = this.ledSnapshot()
 
     // DisableAll (0xFF): full StageKit reset — blank everything (the RB3 cue stays active so its

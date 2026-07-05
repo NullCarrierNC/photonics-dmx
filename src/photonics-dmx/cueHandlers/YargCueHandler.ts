@@ -367,9 +367,8 @@ class YargCueHandler extends EventEmitter {
       }
 
       await cue.execute(historicCueData, this._sequencer, this._lightManager)
-    } else {
-      log.error(`No implementation found for cue: ${cueType}`)
     }
+    // No `else` log here: the registry already logs (and dedups) a missing cue implementation.
 
     // Strobe cues run in their own slot and must not drive motion selection (which is gated on
     // the primary cue's executionCount); only non-strobe cues touch the motion pick.

@@ -88,6 +88,10 @@ export class YargCueRegistry {
   /** When once-per-song lock is active, this is the single group used for every cue in the song (null until first cue request) */
   private lockedGroupIdForSong: string | null = null
 
+  /** Last cueType logged as missing, so a repeatedly-queried missing cue (e.g. an unregistered RB3
+   *  slot at ~30 Hz) is logged once rather than every call. Cleared on a successful resolution. */
+  private lastMissingCue: CueType | null = null
+
   /** Optional callback for sending cue state updates to frontend */
   private cueStateUpdateCallback: ((state: CueStateUpdate) => void) | null = null
 
@@ -299,9 +303,15 @@ export class YargCueRegistry {
     // No consistent selection available, get a new random selection
     const tempSelection = this.getRandomCueFromActiveGroups(cueType)
     if (!tempSelection) {
-      log.error(`No implementation found for cue: ${cueType}`)
+      // Dedup consecutive identical misses: an always-active cue slot (RB3) with no cue registered
+      // is queried ~30x/s, which would otherwise flood the log with the same error.
+      if (this.lastMissingCue !== cueType) {
+        log.error(`No implementation found for cue: ${cueType}`)
+        this.lastMissingCue = cueType
+      }
       return null
     }
+    this.lastMissingCue = null
 
     if (this.lockSelectionsForSong && this.lockedGroupIdForSong === null) {
       this.lockedGroupIdForSong = tempSelection.groupId

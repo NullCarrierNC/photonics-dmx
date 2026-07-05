@@ -184,6 +184,23 @@ describe('Rb3StageKitCueProcessor', () => {
     emitter.emit('stagekit:data', colourPacket('red', [0], RC.red))
     expect(calls).toHaveLength(0)
   })
+
+  it('keepalive stays silent until the first packet (no dispatch at startup)', () => {
+    const { emitter, proc, calls } = setup(null)
+    proc.tick() // no packet yet → nothing dispatched
+    expect(calls).toHaveLength(0)
+    emitter.emit('stagekit:data', colourPacket('red', [0], RC.red)) // first packet activates
+    calls.length = 0
+    proc.tick()
+    expect(calls.some((c) => c.cueType === CueType.RB3)).toBe(true)
+  })
+
+  it('an InGame game-state also activates the keepalive', () => {
+    const { emitter, proc, calls } = setup(null)
+    emitter.emit('rb3e:gameState', { gameState: 'InGame' })
+    proc.tick()
+    expect(calls.some((c) => c.cueType === CueType.RB3)).toBe(true)
+  })
 })
 
 describe('Rb3StageKitCueProcessor wait-gate edges (handleSongEvent)', () => {

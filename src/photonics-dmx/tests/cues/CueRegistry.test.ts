@@ -4,6 +4,7 @@ import { ICueGroup } from '../../cues/interfaces/INetCueGroup'
 import { CueData, CueType } from '../../cues/types/cueTypes'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
+import { setLogSink } from '../../../shared/logger'
 import { beforeEach, describe, it, expect } from '@jest/globals'
 
 // Mock implementations
@@ -107,6 +108,27 @@ describe('YargCueRegistry', () => {
       registry.setActiveGroups(['custom'])
       const implementation = registry.getCueImplementation(CueType.BigRockEnding)
       expect(implementation).toBeNull()
+    })
+
+    it('logs a repeatedly-missing cue only once (dedup for the 30 Hz RB3 slot)', () => {
+      registry.setActiveGroups(['custom'])
+      // Prime the dedup with a different missing cue so the target's first miss is guaranteed to log,
+      // regardless of state left by earlier tests on the singleton.
+      registry.getCueImplementation(CueType.Sweep)
+      const errors: string[] = []
+      setLogSink((e) => {
+        if (e.level === 'error') errors.push(e.message)
+      })
+      try {
+        registry.getCueImplementation(CueType.BigRockEnding)
+        registry.getCueImplementation(CueType.BigRockEnding)
+        registry.getCueImplementation(CueType.BigRockEnding)
+      } finally {
+        setLogSink(undefined)
+      }
+      expect(
+        errors.filter((m) => m.includes('No implementation found for cue: BigRockEnding')),
+      ).toHaveLength(1)
     })
   })
 
