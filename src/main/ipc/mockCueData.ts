@@ -11,6 +11,10 @@ export type MockCueDataOptions = {
   keyframe?: CueData['keyframe']
   /** When set with trackMode 'simulated', use this group for deterministic cue resolution. */
   simulationCueGroup?: string
+  /** RB3 StageKit LED state, so the simulator can exercise an RB3 cue's led-* branches. */
+  ledBanks?: CueData['ledBanks']
+  ledColor?: string | null
+  ledPositions?: number[]
 }
 
 /**
@@ -24,6 +28,9 @@ export function createMockCueData(options: MockCueDataOptions = {}): CueData {
     beat = 'Unknown',
     keyframe = 'Off',
     simulationCueGroup,
+    ledBanks = { red: 0, green: 0, blue: 0, yellow: 0 },
+    ledColor = 'off',
+    ledPositions = [],
   } = options
 
   const base: CueData = {
@@ -52,8 +59,9 @@ export function createMockCueData(options: MockCueDataOptions = {}): CueData {
     beat,
     keyframe,
     bonusEffect: false,
-    ledPositions: [],
-    ledColor: 'off',
+    ledPositions,
+    ledColor,
+    ledBanks,
   }
   return { ...base, timestamp: Date.now() } as CueData
 }
