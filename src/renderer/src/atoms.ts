@@ -303,6 +303,10 @@ export interface LightingPreferences {
   stageKitPrefs?: {
     yargPriority: 'prefer-for-tracked' | 'random' | 'never'
   }
+  rb3Prefs?: {
+    processingMode: 'direct' | 'cue'
+    preferredGroupId?: string
+  }
   dmxSettingsPrefs?: {
     artNetExpanded: boolean
     enttecProExpanded: boolean

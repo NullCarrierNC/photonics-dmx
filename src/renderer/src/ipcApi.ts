@@ -281,6 +281,9 @@ export const getStageKitPriority = () => window.api.invoke(CONFIG.GET_STAGE_KIT_
 export const setStageKitPriority = (priority: 'prefer-for-tracked' | 'random' | 'never') =>
   window.api.invoke(CONFIG.SET_STAGE_KIT_PRIORITY, priority)
 
+export const setRb3ProcessingMode = (processingMode: 'direct' | 'cue') =>
+  savePrefs({ rb3Prefs: { processingMode } })
+
 // ---------------------------------------------------------------------------
 // Clock rate
 // ---------------------------------------------------------------------------
