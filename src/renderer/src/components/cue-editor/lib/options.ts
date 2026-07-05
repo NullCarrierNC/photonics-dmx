@@ -53,12 +53,20 @@ const YARG_EVENT_OPTIONS_CATEGORIZED = getYargEventCategories()
 /** Audio analysis only fires discrete beat edges today (no measure/keyframe). */
 const AUDIO_ACTION_WAIT_CONDITIONS: WaitCondition[] = ['beat']
 
+// RB3 StageKit LED / fog conditions only fire in RB3 cue mode; tag them so an author of a
+// YARG-driven cue sees they won't fire from a normal song.
+const RB3_CONDITION = /^(led-[1-8](-off)?|fog-(on|off))$/
+const waitLabel = (value: string): string => (RB3_CONDITION.test(value) ? `${value} (RB3)` : value)
+
 // Wait options for ACTION TIMING - song events only (no system events)
 const ACTION_WAIT_CONDITIONS: WaitCondition[] = [...WAIT_CONDITIONS_WITH_NONE_DELAY]
 const ACTION_WAIT_OPTIONS_YARG = [
   { value: 'none', label: 'None' },
   { value: 'delay', label: 'Delay' },
-  ...withDefaultLabels(ACTION_WAIT_CONDITIONS.filter((c) => c !== 'none' && c !== 'delay')),
+  ...ACTION_WAIT_CONDITIONS.filter((c) => c !== 'none' && c !== 'delay').map((value) => ({
+    value,
+    label: waitLabel(value),
+  })),
 ] as const
 
 const ACTION_WAIT_OPTIONS_AUDIO = [

@@ -87,5 +87,21 @@ export function getYargEventCategories(): EventCategory[] {
         { value: 'vocal-note-off', label: 'Vocal Note Off' },
       ],
     },
+    {
+      // RB3 StageKit LED / fog edges — only fire in RB3 cue mode (from the StageKit packet stream).
+      category: 'RB3 StageKit',
+      events: [
+        ...Array.from({ length: 8 }, (_, i) => ({
+          value: `led-${i + 1}`,
+          label: `LED ${i + 1} On`,
+        })),
+        ...Array.from({ length: 8 }, (_, i) => ({
+          value: `led-${i + 1}-off`,
+          label: `LED ${i + 1} Off`,
+        })),
+        { value: 'fog-on', label: 'Fog On' },
+        { value: 'fog-off', label: 'Fog Off' },
+      ],
+    },
   ]
 }
