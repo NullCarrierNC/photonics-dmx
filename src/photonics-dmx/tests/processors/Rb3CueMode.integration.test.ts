@@ -32,6 +32,8 @@ describe('RB3 cue mode (integration)', () => {
   let fanout: ChainFanout
   let handleCue: jest.Mock
   let handleSongEvent: jest.Mock
+  let notifySongStart: jest.Mock
+  let notifySongEnd: jest.Mock
   let playMenuFrame: jest.Mock
   let clear: jest.Mock
   let manager: ProcessorManager
@@ -40,6 +42,8 @@ describe('RB3 cue mode (integration)', () => {
     listener = new EventEmitter()
     handleCue = jest.fn(async () => {})
     handleSongEvent = jest.fn()
+    notifySongStart = jest.fn()
+    notifySongEnd = jest.fn()
     playMenuFrame = jest.fn()
     clear = jest.fn()
     fanout = new ChainFanout()
@@ -47,7 +51,7 @@ describe('RB3 cue mode (integration)', () => {
       {
         rigId: 'primary',
         isPrimary: true,
-        yargCueHandler: { handleCue },
+        yargCueHandler: { handleCue, notifySongStart, notifySongEnd },
         sequencer: { handleSongEvent },
         rb3MenuCueHandler: { playMenuFrame, clear },
       } as unknown as RigChain,
@@ -106,5 +110,16 @@ describe('RB3 cue mode (integration)', () => {
     listener.emit('stagekit:data', colourPacket('blue', [4], RC.blue))
     expect(clear).toHaveBeenCalled()
     expect(handleCue.mock.calls.some((c) => c[0] === CueType.RB3)).toBe(true)
+  })
+
+  it('fans song start and end notifications to the chain handler across the song span', () => {
+    manager = new ProcessorManager(fanout, { mode: 'cue' })
+    manager.setNetworkListener(listener)
+
+    listener.emit('stagekit:data', colourPacket('red', [0], RC.red))
+    expect(notifySongStart).toHaveBeenCalledTimes(1)
+
+    listener.emit('rb3e:gameState', { gameState: 'Menus' })
+    expect(notifySongEnd).toHaveBeenCalledTimes(1)
   })
 })

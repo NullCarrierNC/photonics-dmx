@@ -62,12 +62,13 @@ function setup(keepaliveMs: number | null = null): {
   proc: Rb3StageKitCueProcessor
   calls: Array<{ cueType: CueType; frame: CueData }>
   events: string[]
+  runtime: YargCueRuntime
 } {
   const emitter = new EventEmitter()
   const { runtime, calls, events } = mockRuntime()
   const proc = new Rb3StageKitCueProcessor(runtime, { keepaliveMs })
   proc.startListening(emitter)
-  return { emitter, proc, calls, events }
+  return { emitter, proc, calls, events, runtime }
 }
 
 const lastRb3 = (calls: Array<{ cueType: CueType; frame: CueData }>): CueData | undefined =>
@@ -261,6 +262,54 @@ describe('Rb3StageKitCueProcessor', () => {
     emitter.emit('rb3e:gameState', { gameState: 'InGame' })
     proc.tick()
     expect(calls.some((c) => c.cueType === CueType.RB3)).toBe(true)
+  })
+})
+
+describe('Rb3StageKitCueProcessor song span (notifySongStart / notifySongEnd)', () => {
+  it('notifies song start exactly once on the first packet', () => {
+    const { emitter, runtime } = setup()
+    emitter.emit('stagekit:data', colourPacket('red', [0], RC.red))
+    emitter.emit('stagekit:data', colourPacket('red', [1], RC.red))
+    expect(runtime.notifySongStart).toHaveBeenCalledTimes(1)
+    expect(runtime.notifySongEnd).not.toHaveBeenCalled()
+  })
+
+  it('notifies song start on an InGame game-state with no prior menu', () => {
+    const { emitter, runtime } = setup()
+    emitter.emit('rb3e:gameState', { gameState: 'InGame' })
+    expect(runtime.notifySongStart).toHaveBeenCalledTimes(1)
+  })
+
+  it('notifies song end on the menu transition and starts a new span on the next song', () => {
+    const { emitter, runtime } = setup()
+    emitter.emit('stagekit:data', colourPacket('red', [0], RC.red))
+    emitter.emit('rb3e:gameState', { gameState: 'Menus' })
+    expect(runtime.notifySongEnd).toHaveBeenCalledTimes(1)
+    emitter.emit('rb3e:gameState', { gameState: 'InGame' })
+    expect(runtime.notifySongStart).toHaveBeenCalledTimes(2)
+  })
+
+  it('a screen-name menu entry also ends the span', () => {
+    const { emitter, runtime } = setup()
+    emitter.emit('stagekit:data', colourPacket('red', [0], RC.red))
+    emitter.emit('rb3e:screenName', { screenName: 'main_hub_screen' })
+    expect(runtime.notifySongEnd).toHaveBeenCalledTimes(1)
+  })
+
+  it('keepalive ticks never fire song notifications', () => {
+    const { emitter, proc, runtime } = setup(null)
+    emitter.emit('stagekit:data', colourPacket('red', [0], RC.red))
+    proc.tick()
+    proc.tick()
+    expect(runtime.notifySongStart).toHaveBeenCalledTimes(1)
+    expect(runtime.notifySongEnd).not.toHaveBeenCalled()
+  })
+
+  it('stopListening closes an open span', () => {
+    const { emitter, proc, runtime } = setup()
+    emitter.emit('stagekit:data', colourPacket('red', [0], RC.red))
+    proc.stopListening()
+    expect(runtime.notifySongEnd).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -76,6 +76,8 @@ export class Rb3StageKitCueProcessor {
   // Gameplay evidence gate: the keepalive stays silent until the first StageKit packet (or an InGame
   // game-state) arrives, so cue mode doesn't dispatch a blank RB3 look at ~30 Hz before a song starts.
   private started = false
+  // Last song-span value (started && !inMenu); syncSongSpan fires song notifications on its edges.
+  private wasInSong = false
 
   private listener: EventEmitter | null = null
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null
@@ -123,6 +125,11 @@ export class Rb3StageKitCueProcessor {
       this.keepaliveTimer = null
     }
     this.stopMenuAnimation()
+    // Close an open song span so the registry's once-per-song locks don't outlive the processor.
+    if (this.wasInSong) {
+      this.wasInSong = false
+      this.runtime.notifySongEnd()
+    }
   }
 
   destroy(): void {
@@ -146,15 +153,32 @@ export class Rb3StageKitCueProcessor {
     } else {
       this.exitMenu()
     }
+    this.syncSongSpan()
   }
 
   /** RB3E hub / song-select screens drive the same menu look as direct mode; other screens are
-   *  ignored. Only fires when a menu dispatch is wired. */
+   *  ignored. */
   private handleScreenName(data: { screenName: string }): void {
     if (data.screenName !== RB3_MAIN_HUB_SCREEN && data.screenName !== RB3_SONG_SELECT_SCREEN) {
       return
     }
     this.enterMenu()
+    this.syncSongSpan()
+  }
+
+  /** Song span = gameplay evidence seen and not in a menu. Fires the runtime's song notifications
+   *  on the span's edges so shared once-per-song state (cue-group and motion locks, consistency
+   *  tracking) follows RB3 songs the way it follows YARG songs. Called after every mutation of
+   *  `started` / `inMenu`; the keepalive tick mutates neither, so it never re-fires. */
+  private syncSongSpan(): void {
+    const inSong = this.started && !this.inMenu
+    if (inSong === this.wasInSong) return
+    this.wasInSong = inSong
+    if (inSong) {
+      this.runtime.notifySongStart()
+    } else {
+      this.runtime.notifySongEnd()
+    }
   }
 
   /** Enter the menu look: clear the accumulated gameplay state so a returning game starts clean,
@@ -204,6 +228,7 @@ export class Rb3StageKitCueProcessor {
       this.exitMenu()
     }
     this.started = true // a real packet is gameplay evidence; the keepalive may run
+    this.syncSongSpan()
     const before = this.ledSnapshot()
 
     // DisableAll (0xFF): full StageKit reset — blank everything (the RB3 cue stays active so its
