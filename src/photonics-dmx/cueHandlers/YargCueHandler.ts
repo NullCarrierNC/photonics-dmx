@@ -206,6 +206,10 @@ class YargCueHandler extends EventEmitter {
       harmony2Note: parameters.harmony2Note,
       beat: parameters.beat,
       keyframe: parameters.keyframe,
+      // RB3 cue mode: carry LED/fog state so led-N / fog edges fire against the previous frame,
+      // exactly like the vocal edges above.
+      fogState: parameters.fogState,
+      ledBanks: parameters.ledBanks,
     }
 
     return historicCueData

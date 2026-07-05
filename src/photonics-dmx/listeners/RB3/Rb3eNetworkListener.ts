@@ -653,6 +653,8 @@ export class Rb3eNetworkListener extends EventEmitter {
     brightness: 'low' | 'medium' | 'high'
     fog: boolean
     strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off'
+    /** Raw RB3E right-channel byte, so a consumer can tell DisableAll (0xFF) from StrobeOff (0x07). */
+    rightChannel: number
     timestamp: number
   } {
     // Parse left channel as LED position bitmask
@@ -750,6 +752,7 @@ export class Rb3eNetworkListener extends EventEmitter {
       brightness: this._currentBrightness,
       fog: this._currentFogState,
       strobeEffect,
+      rightChannel,
       timestamp: Date.now(),
     }
   }

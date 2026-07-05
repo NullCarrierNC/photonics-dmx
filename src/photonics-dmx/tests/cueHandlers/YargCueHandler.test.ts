@@ -217,6 +217,37 @@ describe('YargCueHandler vocal note edge detection', () => {
   })
 })
 
+describe('YargCueHandler RB3 LED edge history', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('stamps previousFrame with the prior ledBanks and fogState so LED/fog edges fire', async () => {
+    const registry = YargCueRegistry.getInstance()
+    const cue = makeFakeCue(CueStyle.Primary, 'rb3')
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(cue)
+    jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+
+    const banksA = { red: 0b0001, green: 0, blue: 0, yellow: 0 }
+    const banksB = { red: 0b0101, green: 0, blue: 0, yellow: 0 }
+    await handler.handleCue(
+      CueType.RB3,
+      gameplayCueData({ lightingCue: CueType.RB3, ledBanks: banksA, fogState: true }),
+    )
+    await handler.handleCue(
+      CueType.RB3,
+      gameplayCueData({ lightingCue: CueType.RB3, ledBanks: banksB, fogState: false }),
+    )
+
+    // The frame the cue saw on the second call carries the FIRST frame's LED/fog state as previousFrame,
+    // which is exactly what the led-N / fog edge conditions compare against.
+    const secondFrame = cue.execute.mock.calls[1][0] as CueData
+    expect(secondFrame.previousFrame?.ledBanks).toEqual(banksA)
+    expect(secondFrame.previousFrame?.fogState).toBe(true)
+  })
+})
+
 describe('YargCueHandler Fallback motion suppression', () => {
   let registry: YargCueRegistry
 

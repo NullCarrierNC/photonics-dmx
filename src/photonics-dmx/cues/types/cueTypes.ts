@@ -385,6 +385,7 @@ export enum CueType {
   Unknown = 'UnknownCue',
   Strobe = 'Strobe', // RB3 has a discreet strobe cue
   DisableAll = 'DisableAll', // RB3 has a discreet disable all cue
+  RB3 = 'RB3', // RB3 cue mode: the always-active gameplay cue driven by StageKit LED state
 }
 
 /** All valid {@link CueType} string values, for membership checks against wire data. */
