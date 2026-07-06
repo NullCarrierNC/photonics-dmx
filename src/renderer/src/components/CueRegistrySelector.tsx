@@ -49,6 +49,13 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   const [groups, setGroups] = useState<CueGroup[]>([])
   const [selectedGroup, setSelectedGroup] = useState<string>('')
   const isInitialMount = useRef(true)
+  // Always holds the latest selected registry so an in-flight fetch can detect that the registry
+  // changed (YARG <-> RB3E) before its awaits resolved and discard its now-stale results. Updated
+  // in an effect (not during render) so it commits before any fetch's awaits resolve.
+  const registryRef = useRef(selectedRegistryType)
+  useEffect(() => {
+    registryRef.current = selectedRegistryType
+  }, [selectedRegistryType])
 
   // Wrap callback to avoid infinite loops
   const handleGroupChangeCallback = useCallback(
@@ -67,6 +74,12 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
       const enabledGroupIds = isRb3 ? await getEnabledRb3CueGroups() : await getEnabledCueGroups()
       const allGroups = isRb3 ? await getRb3CueGroups() : await getCueGroups()
 
+      // A registry switch since this fetch started makes these results stale; discard them so a
+      // late YARG fetch can't clobber the RB3E selection (or vice versa).
+      if (registryRef.current !== selectedRegistryType) {
+        return
+      }
+
       // Motion-only groups (no lighting cue types) are chosen under Motion Cue Simulation.
       const enabledGroups = allGroups.filter(
         (g: CueGroup) => enabledGroupIds.includes(g.id) && g.cueTypes.length > 0,
@@ -79,29 +92,27 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
       log.info(`Enabled groups:`, sortedGroups)
       setGroups(sortedGroups)
 
-      if (selectedGroup === '') {
-        if (sortedGroups.length > 0 && isInitialMount.current) {
+      const selectionValid =
+        selectedGroup !== '' && sortedGroups.some((g) => g.id === selectedGroup)
+      if (!selectionValid) {
+        // No valid current selection — initial load, a registry switch (YARG <-> RB3E), or the
+        // selected group was removed. Auto-select the first group and notify the parent so the
+        // downstream venue/bpm/effect controls enable even when there is only one group (which
+        // can't be picked via the dropdown's onChange).
+        if (sortedGroups.length > 0) {
           const firstGroup = sortedGroups[0]
           setSelectedGroup(firstGroup.id)
           handleGroupChangeCallback(firstGroup.id)
-          isInitialMount.current = false
         }
-      } else if (isInitialMount.current && sortedGroups.length > 0) {
+      } else if (isInitialMount.current) {
+        // Valid restored selection on first load: re-notify the parent to sync.
         handleGroupChangeCallback(selectedGroup)
-        isInitialMount.current = false
       }
+      isInitialMount.current = false
     } catch (error) {
       log.error('Error fetching cue groups:', error)
     }
   }, [handleGroupChangeCallback, selectedGroup, selectedRegistryType])
-
-  // Switching registry (YARG <-> RB3E) invalidates the current selection: reset so the new
-  // registry's first group auto-selects on the next fetch.
-  useEffect(() => {
-    isInitialMount.current = true
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset selection on registry switch
-    setSelectedGroup('')
-  }, [selectedRegistryType])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetchGroups sets state in async callback
