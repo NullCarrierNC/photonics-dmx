@@ -42,6 +42,9 @@ export type YargCueHandlerOptions = {
   /** Probability (0-100) that an automatic motion cue pick will play on a new lighting cue. Defaults to 100 (always). */
   getMotionCueProbabilityPercent?: () => number
   runtimeBroadcaster?: RuntimeBroadcaster
+  /** Cue registry to resolve against. Defaults to the shared YARG singleton; a separate domain
+   *  (e.g. RB3 cue mode) passes its own instance so its selections stay isolated. */
+  registry?: YargCueRegistry
 }
 
 class YargCueHandler extends EventEmitter {
@@ -119,7 +122,7 @@ class YargCueHandler extends EventEmitter {
     super()
     this._lightManager = lightManager
     this._sequencer = photonicsSequencer
-    this.registry = YargCueRegistry.getInstance()
+    this.registry = options?.registry ?? YargCueRegistry.getInstance()
     this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
     this.getMotionCueProbabilityPercent = options?.getMotionCueProbabilityPercent ?? (() => 100)
     this.runtimeBroadcaster = options?.runtimeBroadcaster ?? noopRuntimeBroadcaster()
@@ -127,12 +130,12 @@ class YargCueHandler extends EventEmitter {
 
   public notifySongStart(): void {
     this.registry.onSongStart()
-    YargCueRegistry.getInstance().onMotionSongStart()
+    this.registry.onMotionSongStart()
   }
 
   public notifySongEnd(): void {
     this.registry.onSongEnd()
-    YargCueRegistry.getInstance().onMotionSongEnd()
+    this.registry.onMotionSongEnd()
   }
 
   public reset(): void {
@@ -385,7 +388,7 @@ class YargCueHandler extends EventEmitter {
           this.emitYargMotionCueChange(null, 'cleared')
         }
       } else {
-        const registry = YargCueRegistry.getInstance()
+        const registry = this.registry
         const isNewCue = historicCueData.executionCount === 1
         const isManualChange = this.manualMotionRef !== this.lastManualMotionRefForMotion
         const now = monotonicNowMs()

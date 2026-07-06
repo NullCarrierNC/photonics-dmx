@@ -248,6 +248,33 @@ describe('YargCueHandler RB3 LED edge history', () => {
   })
 })
 
+describe('YargCueHandler injected registry', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('resolves cues and song notifications against the injected registry, not the singleton', async () => {
+    const singleton = YargCueRegistry.getInstance()
+    const injected = YargCueRegistry.create()
+    const cue = makeFakeCue(CueStyle.Primary, 'injected')
+    jest.spyOn(injected, 'getCueImplementation').mockReturnValue(cue)
+    jest.spyOn(injected, 'getRandomMotionCue').mockReturnValue(null)
+    const singletonResolve = jest.spyOn(singleton, 'getCueImplementation')
+    const injectedSongStart = jest.spyOn(injected, 'onSongStart')
+    const singletonSongStart = jest.spyOn(singleton, 'onSongStart')
+
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), { registry: injected })
+    handler.setMotionEnabled(false)
+    handler.notifySongStart()
+    await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
+
+    expect(cue.execute).toHaveBeenCalledTimes(1)
+    expect(singletonResolve).not.toHaveBeenCalled()
+    expect(injectedSongStart).toHaveBeenCalledTimes(1)
+    expect(singletonSongStart).not.toHaveBeenCalled()
+  })
+})
+
 describe('YargCueHandler Fallback motion suppression', () => {
   let registry: YargCueRegistry
 

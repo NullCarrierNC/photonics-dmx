@@ -9,6 +9,7 @@ import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
 import { Rb3MenuCueHandler } from '../cueHandlers/Rb3MenuCueHandler'
 import { YargCueRegistry } from '../cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
+import { getRb3CueRegistry } from '../cues/registries/Rb3CueRegistry'
 import { applyMirrorToConfig, RigMirror } from '../helpers/mirrorRig'
 import { createLogger } from '../../shared/logger'
 
@@ -113,6 +114,11 @@ export class RigChain {
       AudioCueRegistry.getInstance().releaseSequencerFromAllCues(this.sequencer)
     } catch (err) {
       log.error(`Error releasing sequencer from audio cues for rig ${this.rigId}:`, err)
+    }
+    try {
+      getRb3CueRegistry().releaseSequencerFromAllCues(this.sequencer)
+    } catch (err) {
+      log.error(`Error releasing sequencer from RB3 cues for rig ${this.rigId}:`, err)
     }
     try {
       this.sequencer.shutdown()

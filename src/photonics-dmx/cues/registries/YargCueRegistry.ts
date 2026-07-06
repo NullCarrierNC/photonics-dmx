@@ -174,6 +174,15 @@ export class YargCueRegistry {
   }
 
   /**
+   * Create a standalone registry instance separate from the shared singleton. Used by domains
+   * that reuse the YARG cue-selection machinery but need their own group/lock/consistency state
+   * (e.g. RB3 cue mode), so their selections never cross with the YARG listener's.
+   */
+  public static create(): YargCueRegistry {
+    return new YargCueRegistry()
+  }
+
+  /**
    * Register a new group of cue implementations.
    * @param group The group to register
    */
