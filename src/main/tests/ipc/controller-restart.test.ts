@@ -219,6 +219,51 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect(getIsYargEnabled).toHaveBeenCalled()
   })
 
+  it('restartControllers shuts down and clears the RB3 cue handler ref', async () => {
+    const rb3Shutdown = jest.fn()
+    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
+      listenerLifecycle: listenerStub(),
+      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
+      dmxPublisher: {
+        shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
+        setManualBuffer: jest.fn(),
+      },
+      cueHandler: { shutdown: jest.fn() },
+      rb3CueHandler: { shutdown: rb3Shutdown },
+      rigChains: [],
+      clock: { destroy: jest.fn() },
+      dmxLightManager: {},
+      lightStateManager: {},
+      lightTransitionController: {},
+      sequencer: {},
+      isInitialized: true,
+      lifecyclePhase: 'running',
+      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+      init: jest.fn().mockImplementation(function (this: RestartFake) {
+        this.isInitialized = true
+        this.lifecyclePhase = 'running'
+        return Promise.resolve()
+      }),
+      senderLifecycle: {
+        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
+        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
+        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
+      },
+      consoleMode: {
+        onControllersReinitializedWhileConsoleOpen: jest.fn(),
+        getConsoleRestore: jest.fn().mockReturnValue(null),
+      },
+    })
+
+    await ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager)
+
+    expect(rb3Shutdown).toHaveBeenCalledTimes(1)
+    expect(fake.rb3CueHandler).toBeNull()
+  })
+
   it('getLifecyclePhase returns the current phase on a prototype-based stub', () => {
     const stub = Object.assign(Object.create(ControllerManager.prototype), {
       lifecyclePhase: 'restarting' as const,

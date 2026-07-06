@@ -789,6 +789,16 @@ export class ControllerManager {
         }
       }
 
+      if (this.rb3CueHandler) {
+        try {
+          this.rb3CueHandler.shutdown()
+          this.rb3CueHandler = null
+          log.info('ControllerManager shutdown: RB3 cue handler stopped')
+        } catch (err) {
+          log.error('Error shutting down RB3 cue handler:', err)
+        }
+      }
+
       // Dispose every rig chain. The shared clock is stopped separately below so a chain
       // tearing down can't take ticks away from any sibling chain.
       for (const chain of this.rigChains) {
@@ -1064,6 +1074,10 @@ export class ControllerManager {
         this.cueHandler.shutdown()
       }
 
+      if (this.rb3CueHandler) {
+        this.rb3CueHandler.shutdown()
+      }
+
       // Gguarantee the process-wide strobe state is cleared on every restart,
       // even if no cue handler was active to clear it during its own shutdown.
       // Prevents a stale strobe slot from driving hardware-strobe-channel
@@ -1090,6 +1104,7 @@ export class ControllerManager {
       this.effectsController = null
       this.dmxPublisher = null
       this.cueHandler = null
+      this.rb3CueHandler = null
 
       this.isInitialized = false
 
