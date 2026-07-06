@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { EffectSelector } from 'src/photonics-dmx/types'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getAvailableCues } from '../ipcApi'
+import { getAvailableCues, getAvailableRb3Cues } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('EffectSelector')
 
@@ -12,6 +12,8 @@ interface EffectsDropdownProps {
   value?: string
   disabled?: boolean
   autoSelectFirst?: boolean
+  /** Which registry to pull cue details from; RB3E reads the RB3 cue registry. */
+  registryType?: 'YARG' | 'RB3E'
 }
 
 export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
@@ -20,6 +22,7 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
   value,
   disabled = false,
   autoSelectFirst = false,
+  registryType = 'YARG',
 }) => {
   const [effects, setEffects] = useState<EffectSelector[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,7 +43,10 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
       // Clear current selection when switching groups
       setSelectedEffect(null)
       // This retrieves cues from the specified group without changing the active group state
-      const availableEffects = await getAvailableCues(groupId)
+      const availableEffects =
+        registryType === 'RB3E'
+          ? await getAvailableRb3Cues(groupId)
+          : await getAvailableCues(groupId)
 
       if (Array.isArray(availableEffects) && availableEffects.length > 0) {
         // Sort effects by ID in ascending order for consistent display
@@ -60,7 +66,7 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
     } finally {
       setLoading(false)
     }
-  }, [groupId]) // Removed 'value' dependency to avoid interference with the useEffect below
+  }, [groupId, registryType]) // Removed 'value' dependency to avoid interference with the useEffect below
 
   // Fetch effects when group changes
   useEffect(() => {

@@ -338,6 +338,15 @@ export interface IpcInvokeMap {
     }
     response: IpcSuccessResult | IpcErrorResult
   }
+  [LIGHT.START_RB3_TEST_EFFECT]: {
+    request: {
+      effectId: string
+      venueSize?: 'NoVenue' | 'Small' | 'Large'
+      bpm?: number
+      cueGroup?: string
+    }
+    response: IpcSuccessResult | IpcErrorResult
+  }
   [LIGHT.STOP_TEST_EFFECT]: {
     request: void
     response: boolean

@@ -1,7 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getEnabledCueGroups, getCueGroups } from '../ipcApi'
+import {
+  getEnabledCueGroups,
+  getCueGroups,
+  getEnabledRb3CueGroups,
+  getRb3CueGroups,
+} from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('CueRegistrySelector')
 
@@ -22,6 +27,8 @@ interface CueRegistrySelectorProps {
   selectedBpm: number
   onBpmChange: (bpm: number) => void
   selectedGroupId: string
+  /** Which registry's cue groups to list (YARG lighting vs RB3 cue-mode groups). */
+  selectedRegistryType: CueRegistryType
 
   /**
    * When true, the component will initialize with the currently active group selected.
@@ -37,8 +44,8 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   selectedBpm,
   onBpmChange,
   selectedGroupId,
+  selectedRegistryType,
 }) => {
-  const [registryType] = useState<CueRegistryType>('YARG')
   const [groups, setGroups] = useState<CueGroup[]>([])
   const [selectedGroup, setSelectedGroup] = useState<string>('')
   const isInitialMount = useRef(true)
@@ -56,8 +63,9 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
     try {
       log.info('Fetching enabled cue groups...')
 
-      const enabledGroupIds = await getEnabledCueGroups()
-      const allGroups = await getCueGroups()
+      const isRb3 = selectedRegistryType === 'RB3E'
+      const enabledGroupIds = isRb3 ? await getEnabledRb3CueGroups() : await getEnabledCueGroups()
+      const allGroups = isRb3 ? await getRb3CueGroups() : await getCueGroups()
 
       // Motion-only groups (no lighting cue types) are chosen under Motion Cue Simulation.
       const enabledGroups = allGroups.filter(
@@ -85,12 +93,20 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
     } catch (error) {
       log.error('Error fetching cue groups:', error)
     }
-  }, [handleGroupChangeCallback, selectedGroup])
+  }, [handleGroupChangeCallback, selectedGroup, selectedRegistryType])
+
+  // Switching registry (YARG <-> RB3E) invalidates the current selection: reset so the new
+  // registry's first group auto-selects on the next fetch.
+  useEffect(() => {
+    isInitialMount.current = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset selection on registry switch
+    setSelectedGroup('')
+  }, [selectedRegistryType])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetchGroups sets state in async callback
     fetchGroups()
-  }, [fetchGroups, registryType])
+  }, [fetchGroups])
 
   useEffect(() => {
     const handleNodeCuesChanged = () => {

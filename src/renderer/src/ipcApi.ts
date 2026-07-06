@@ -460,6 +460,13 @@ export const startTestEffect = (
   cueGroup?: string,
 ) => window.api.invoke(LIGHT.START_TEST_EFFECT, { effectId, venueSize, bpm, cueGroup })
 
+export const startRb3TestEffect = (
+  effectId: string,
+  venueSize?: 'NoVenue' | 'Small' | 'Large',
+  bpm?: number,
+  cueGroup?: string,
+) => window.api.invoke(LIGHT.START_RB3_TEST_EFFECT, { effectId, venueSize, bpm, cueGroup })
+
 export const stopTestEffect = () => window.api.invoke(LIGHT.STOP_TEST_EFFECT, undefined)
 
 export const simulateBeat = (data?: {

@@ -842,6 +842,29 @@ export class ControllerManager {
     }
   }
 
+  /**
+   * Idempotent RB3 twin of {@link ensureChainsHaveYargHandlersForSimulation}: attaches an RB3 cue
+   * handler (bound to the RB3 cue registry) to every chain whose slot is still null, so the cue
+   * simulator can dispatch RB3 cues through `Rb3ChainRuntime` even when the live RB3E listener has
+   * never run. Handler construction mirrors `ListenerCoordinator.buildRb3ChainHandlers`: RB3 motion
+   * preferences, RB3 registry, and only the primary chain gets the main runtime broadcaster.
+   */
+  public ensureChainsHaveRb3HandlersForSimulation(): void {
+    const motion = this.getRb3MotionDomain()
+    for (const chain of this.rigChains) {
+      if (chain.rb3CueHandler) continue
+      const handler = new YargCueHandler(chain.dmxLightManager, chain.sequencer, {
+        registry: getRb3CueRegistry(),
+        getMotionCueMinimumHoldMs: () => this.getRb3MotionDomain().minimumHoldMs,
+        getMotionCueProbabilityPercent: () => this.getRb3MotionDomain().probabilityPercent,
+        runtimeBroadcaster: chain.isPrimary ? mainRuntimeBroadcaster : noopRuntimeBroadcaster(),
+      })
+      handler.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
+      handler.setManualMotionRef(motion.activeCueRef)
+      chain.rb3CueHandler = handler
+    }
+  }
+
   public getNodeCueLoader(): NodeCueLoader | null {
     return this.nodeCueLoader
   }

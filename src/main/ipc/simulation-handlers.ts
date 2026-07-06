@@ -7,6 +7,7 @@ import {
   getCueTypeFromId,
 } from '../../photonics-dmx/cues/types/cueTypes'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
+import { Rb3ChainRuntime } from '../../photonics-dmx/controllers/Rb3ChainRuntime'
 import { sendToAllWindows } from '../utils/windowUtils'
 import { ipcError } from './ipcResult'
 import { createMockAudioCueData, createMockCueData } from './mockCueData'
@@ -137,6 +138,52 @@ export function setupSimulationHandlers(
         return { success: true }
       } catch (error) {
         log.error('Error starting test effect:', error)
+        return ipcError(error)
+      }
+    },
+  )
+
+  // RB3 twin of START_TEST_EFFECT: dispatches the selected RB3 cue through the RB3 chain runtime
+  // (own registry / rb3CueHandler slots) rather than the YARG test-effect runner. Firing is refused
+  // while the live RB3E listener owns the rig chains (same guard as every simulate handler).
+  ipcMain.handle(
+    LIGHT.START_RB3_TEST_EFFECT,
+    async (
+      _,
+      data: {
+        effectId: string
+        venueSize?: 'NoVenue' | 'Small' | 'Large'
+        bpm?: number
+        cueGroup?: string
+      },
+    ) => {
+      const { effectId, venueSize, bpm, cueGroup } = data ?? {}
+      try {
+        if (rb3Blocked()) {
+          return { success: false, error: RB3_BLOCKED_ERROR }
+        }
+        if (!controllerManager.getIsInitialized()) {
+          await controllerManager.init()
+        }
+        const cueType = getCueTypeFromId(effectId)
+        if (!cueType) {
+          return { success: false, error: `Unknown RB3 cue: ${effectId}` }
+        }
+        controllerManager.ensureChainsHaveRb3HandlersForSimulation()
+        const mockCueData = createMockCueData({
+          venueSize: venueSize ?? 'Small',
+          bpm: bpm ?? 120,
+          effectId,
+          beat: 'Strong',
+          keyframe: 'Unknown',
+          simulationCueGroup: cueGroup,
+        })
+        const runtime = new Rb3ChainRuntime(controllerManager.getChainFanout())
+        await runtime.handleCue(cueType, mockCueData)
+        sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
+        return { success: true }
+      } catch (error) {
+        log.error('Error starting RB3 test effect:', error)
         return ipcError(error)
       }
     },

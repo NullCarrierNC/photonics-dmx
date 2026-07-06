@@ -24,11 +24,14 @@ import CueSimulationInstrument from './CueSimulation/CueSimulationInstrument'
 import CueSimulationMotion from './CueSimulation/CueSimulationMotion'
 import {
   startTestEffect,
+  startRb3TestEffect,
   stopTestEffect,
   getPrefs,
   savePrefs,
   getCueGroups,
+  getRb3CueGroups,
   getAvailableCues,
+  getAvailableRb3Cues,
   getActiveRigs,
   simulateBeat,
   simulateKeyframe,
@@ -50,6 +53,10 @@ type CueGroup = {
 }
 
 const isYargVisualCueGroup = (g: CueGroup) => g.cueTypes.length > 0
+
+/** Cue groups come from the YARG registry or the separate RB3 cue registry, by selected game type. */
+const fetchCueGroupsForRegistry = (registryType: CueRegistryType) =>
+  registryType === 'RB3E' ? getRb3CueGroups() : getCueGroups()
 
 const CueSimulation: React.FC = () => {
   const [isAudioReactiveEnabled] = useAtom(audioListenerEnabledAtom)
@@ -167,7 +174,9 @@ const CueSimulation: React.FC = () => {
           }
           if (savedSettings.groupId) {
             try {
-              const allGroups = await getCueGroups()
+              const allGroups = await fetchCueGroupsForRegistry(
+                savedSettings.registryType ?? 'YARG',
+              )
               const group = allGroups.find((g: CueGroup) => g.id === savedSettings.groupId)
               if (group && isYargVisualCueGroup(group)) {
                 if (savedSettings.effectId) {
@@ -246,7 +255,10 @@ const CueSimulation: React.FC = () => {
       // Wait for effects to be loaded by EffectsDropdown
       const checkForEffects = async (retries = 10) => {
         try {
-          const availableEffects = await getAvailableCues(selectedGroupId)
+          const availableEffects =
+            selectedRegistryType === 'RB3E'
+              ? await getAvailableRb3Cues(selectedGroupId)
+              : await getAvailableCues(selectedGroupId)
           if (availableEffects && availableEffects.length > 0) {
             const savedEffect = availableEffects.find(
               (e: EffectSelector) => e.id === savedEffectIdRef.current,
@@ -280,7 +292,7 @@ const CueSimulation: React.FC = () => {
     if (selectedGroupId && savedEffectIdRef.current) {
       loadSavedEffect()
     }
-  }, [selectedGroupId])
+  }, [selectedGroupId, selectedRegistryType])
 
   // Reset the hasLoadedSavedEffect flag when group changes (user-initiated change)
   useEffect(() => {
@@ -312,7 +324,8 @@ const CueSimulation: React.FC = () => {
     }
 
     try {
-      const result = await startTestEffect(
+      const fire = selectedRegistryType === 'RB3E' ? startRb3TestEffect : startTestEffect
+      const result = await fire(
         selectedEffect.id,
         selectedVenueSize,
         selectedBpm,
@@ -381,8 +394,13 @@ const CueSimulation: React.FC = () => {
   }
 
   const handleRegistryChange = (type: CueRegistryType) => {
+    if (type === selectedRegistryType) return
+    // Switching registry invalidates the current group/effect (different registries, different
+    // group ids); clear so the selector re-inits against the newly chosen registry.
     setSelectedRegistryType(type)
-    // UI is currently YARG-only; registry type is not yet wired to a different backend.
+    setSelectedGroup('')
+    setSelectedGroupId('')
+    setSelectedEffect(null)
   }
 
   // Memoize handleGroupChange to prevent unnecessary re-renders/calls from CueRegistrySelector
@@ -395,7 +413,7 @@ const CueSimulation: React.FC = () => {
         setSelectedEffect(null)
 
         try {
-          const allGroups = await getCueGroups()
+          const allGroups = await fetchCueGroupsForRegistry(selectedRegistryType)
           const group = allGroups.find((g: CueGroup) => g.id === groupId && isYargVisualCueGroup(g))
           if (!group) {
             setSelectedGroup('')
@@ -423,7 +441,7 @@ const CueSimulation: React.FC = () => {
         setSelectedEffect(null)
       }
     },
-    [setSelectedGroup],
+    [setSelectedGroup, selectedRegistryType],
   )
 
   // Fetch current group info when selected group changes
@@ -441,7 +459,7 @@ const CueSimulation: React.FC = () => {
           setSelectedEffect(null) // Clear selected effect when no group is selected
         } else {
           // Single group selection
-          const groups = await getCueGroups()
+          const groups = await fetchCueGroupsForRegistry(selectedRegistryType)
           const group = groups.find(
             (g: CueGroup) => g.id === selectedGroupId && isYargVisualCueGroup(g),
           )
@@ -469,7 +487,7 @@ const CueSimulation: React.FC = () => {
     if (selectedGroup) {
       fetchGroupInfo()
     }
-  }, [selectedGroup, selectedGroupId])
+  }, [selectedGroup, selectedGroupId, selectedRegistryType])
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
@@ -507,18 +525,16 @@ const CueSimulation: React.FC = () => {
             <div className="flex flex-wrap gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Game Type: YARG
+                  Game Type
                 </label>
-                {/* <select
+                <select
                   value={selectedRegistryType}
-                  onChange={(e) => setSelectedRegistryType(e.target.value as CueRegistryType)}
+                  onChange={(e) => handleRegistryChange(e.target.value as CueRegistryType)}
                   className="p-2 pr-8 border rounded dark:bg-gray-700 dark:text-gray-200 h-10"
                   style={{ width: '150px' }}>
                   <option value="YARG">YARG</option>
-                  <option value="RB3E" disabled>
-                    RB3E (Uses direct)
-                  </option>
-                </select> */}
+                  <option value="RB3E">RB3E</option>
+                </select>
               </div>
             </div>
 
@@ -532,6 +548,7 @@ const CueSimulation: React.FC = () => {
                   selectedBpm={selectedBpm}
                   onBpmChange={setSelectedBpm}
                   selectedGroupId={selectedGroupId}
+                  selectedRegistryType={selectedRegistryType}
                 />
               </div>
               <div className="lg:w-64">
@@ -540,6 +557,7 @@ const CueSimulation: React.FC = () => {
                   groupId={selectedGroupId}
                   value={selectedEffect?.id}
                   disabled={!selectedGroupId}
+                  registryType={selectedRegistryType}
                 />
               </div>
             </div>
