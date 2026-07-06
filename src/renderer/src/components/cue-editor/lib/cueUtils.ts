@@ -37,7 +37,16 @@ const getTextColorForBg = (name: string): string => {
   return lightish.includes(name) ? '#111827' : '#f9fafb'
 }
 
-const HIDDEN_CUE_TYPES = new Set(['NoCue', 'UnknownCue', 'Strobe', 'DisableAll', 'Strobe_Off'])
+// 'RB3' is the fixed always-active RB3 gameplay cue, authored only on the RB3 editor platform;
+// it must never surface in the YARG "Game Event Trigger" picker.
+const HIDDEN_CUE_TYPES = new Set([
+  'NoCue',
+  'UnknownCue',
+  'Strobe',
+  'DisableAll',
+  'Strobe_Off',
+  'RB3',
+])
 
 /** Returns false for internal/system cue types that should never appear in the UI selector. */
 function isCueTypeSelectable(type: string): boolean {

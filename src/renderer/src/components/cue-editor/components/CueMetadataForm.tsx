@@ -174,6 +174,30 @@ const CueMetadataForm: React.FC<Props> = ({
               </label>
             </>
           )}
+          {!isEffectMode && activeMode === 'rb3' && currentCue?.kind === 'lighting' && (
+            <>
+              {/* rb3 authors the single fixed always-active gameplay cue; the trigger is not
+                  author-chosen, so it is shown as a static indicator instead of a selector. */}
+              <div className="flex flex-col font-medium">
+                Game Event Trigger
+                <div className="mt-1 rounded border px-2 py-1 bg-gray-100 dark:bg-gray-700 dark:border-gray-600 text-gray-600 dark:text-gray-400">
+                  RB3 (gameplay)
+                </div>
+              </div>
+              <label className="flex flex-col font-medium">
+                Cue Style
+                <select
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                  value={(currentCue as Extract<YargNodeCueDefinition, { kind: 'lighting' }>).style}
+                  onChange={(event) =>
+                    onCueMetadataChange({ style: event.target.value as 'primary' | 'secondary' })
+                  }>
+                  <option value="primary">Primary</option>
+                  <option value="secondary">Secondary</option>
+                </select>
+              </label>
+            </>
+          )}
           {!isEffectMode && activeMode === 'audio' && currentCue?.kind === 'lighting' && (
             <>
               <label className="flex flex-col font-medium">

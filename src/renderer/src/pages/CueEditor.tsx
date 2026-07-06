@@ -232,7 +232,12 @@ const CueEditor: React.FC = () => {
   const isEffectMode = editorMode === 'effect'
 
   const handleCuePlatformChange = useCallback(
-    (p: 'yarg' | 'audio') => {
+    (p: 'yarg' | 'audio' | 'rb3') => {
+      // rb3 authors the single fixed lighting cue: no effects, no motion.
+      if (p === 'rb3') {
+        handleModeChange('rb3-cue')
+        return
+      }
       if (isEffectMode) {
         handleModeChange(p === 'audio' ? 'audio-effect' : 'yarg-effect')
         return
@@ -248,7 +253,8 @@ const CueEditor: React.FC = () => {
 
   const handleCueKindChange = useCallback(
     (k: NodeCueKind) => {
-      if (isEffectMode) return
+      // The kind toggle is hidden for rb3 (fixed lighting cue), so it only maps yarg/audio.
+      if (isEffectMode || mode === 'rb3') return
       setCueKind(k)
       if (k === 'motion') {
         handleModeChange(mode === 'yarg' ? 'yarg-motion-cue' : 'audio-motion-cue')
@@ -261,12 +267,13 @@ const CueEditor: React.FC = () => {
 
   const handleEffectToggle = useCallback(
     (isEffect: boolean) => {
+      // rb3 has no effects, so the effects toggle never routes through the rb3 platform.
       if (isEffect) {
         setCueKind('lighting')
         const effectKey = mode === 'audio' ? 'audio-effect' : 'yarg-effect'
         handleModeChange(effectKey)
       } else {
-        const cueKey = mode === 'yarg' ? 'yarg-cue' : 'audio-cue'
+        const cueKey = mode === 'audio' ? 'audio-cue' : 'yarg-cue'
         handleModeChange(cueKey)
       }
     },
@@ -386,9 +393,10 @@ const CueEditor: React.FC = () => {
       cueFile.cues
         .filter((cue) => cue.id !== selectedCueId && cue.kind === 'lighting')
         .map((cue) =>
-          cueFile.mode === 'yarg'
-            ? (cue as YargNodeCueDefinition & { kind: 'lighting' }).cueType
-            : (cue as AudioNodeCueDefinition & { kind: 'lighting' }).cueTypeId,
+          // rb3 is YARG-shaped (keyed by cueType); only audio cues are keyed by cueTypeId.
+          cueFile.mode === 'audio'
+            ? (cue as AudioNodeCueDefinition & { kind: 'lighting' }).cueTypeId
+            : (cue as YargNodeCueDefinition & { kind: 'lighting' }).cueType,
         )
         .filter(Boolean),
     )
@@ -747,7 +755,8 @@ const CueEditor: React.FC = () => {
     let cancelled = false
 
     const loadEffects = async () => {
-      const effectFileList = mode === 'yarg' ? groupedEffectFiles.yarg : groupedEffectFiles.audio
+      // rb3 cues reference YARG effects, so rb3 reads the yarg effect bucket; only audio differs.
+      const effectFileList = mode === 'audio' ? groupedEffectFiles.audio : groupedEffectFiles.yarg
       const promises = effectRefs.map(async (effectRef) => {
         try {
           const fileEntry = effectFileList.find((f) => f.groupId === effectRef.effectFileId)
@@ -872,8 +881,10 @@ const CueEditor: React.FC = () => {
     setIsDirty(false)
   }, [pendingNavigation, revertCurrentFileToDisk, setIsDirty])
 
-  const fileList = mode === 'yarg' ? groupedFiles.yarg : groupedFiles.audio
-  const effectFiles = mode === 'yarg' ? groupedEffectFiles.yarg : groupedEffectFiles.audio
+  const fileList =
+    mode === 'rb3' ? groupedFiles.rb3 : mode === 'audio' ? groupedFiles.audio : groupedFiles.yarg
+  // rb3 has no effect files of its own; only audio differs from the yarg effect bucket.
+  const effectFiles = mode === 'audio' ? groupedEffectFiles.audio : groupedEffectFiles.yarg
 
   const hasFile = !!editorDoc?.path
 
@@ -885,9 +896,7 @@ const CueEditor: React.FC = () => {
   return (
     <div className="p-4 space-y-4 text-sm h-full flex flex-col">
       <CueEditorToolbar
-        // The editor is a binary yarg/audio surface; rb3 cue files are loaded headlessly and
-        // never selected here, so narrow the widened NodeCueMode to the two platforms it shows.
-        cuePlatform={mode === 'audio' ? 'audio' : 'yarg'}
+        cuePlatform={mode}
         cueKind={cueKind}
         isEffectMode={isEffectMode}
         onCuePlatformChange={(p) => guardJsonEditorNavigation(() => handleCuePlatformChange(p))}

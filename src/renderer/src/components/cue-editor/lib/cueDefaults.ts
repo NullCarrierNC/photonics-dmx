@@ -7,6 +7,7 @@ import {
   type NodeCueGroupMeta,
   type NodeCueKind,
   type NodeCueMode,
+  type Rb3NodeCueFile,
   type YargEventNode,
   type YargNodeCueDefinition,
   type YargNodeCueFile,
@@ -125,13 +126,8 @@ const createDefaultCue = (
   mode: NodeCueMode,
   kind: NodeCueKind,
 ): YargNodeCueDefinition | AudioNodeCueDefinition => {
-  const isYarg = mode === 'yarg'
-  const eventNode =
-    kind === 'motion' && !isYarg
-      ? buildDefaultAudioEvent()
-      : isYarg
-        ? buildDefaultYargEvent()
-        : buildDefaultAudioEvent()
+  // rb3 is YARG-shaped, so it uses the YARG event node; only audio uses the audio event.
+  const eventNode = mode === 'audio' ? buildDefaultAudioEvent() : buildDefaultYargEvent()
   const actionNode = kind === 'motion' ? buildDefaultSetPositionAction() : buildDefaultAction()
   const base = {
     id: `cue-${createId()}`,
@@ -145,6 +141,16 @@ const createDefaultCue = (
     layout: {
       nodePositions: {},
     },
+  }
+
+  // rb3 authors the single fixed always-active gameplay cue (CueType.RB3), YARG-shaped.
+  if (mode === 'rb3') {
+    return {
+      ...base,
+      kind: 'lighting',
+      cueType: 'RB3',
+      style: 'primary',
+    } as YargNodeCueDefinition
   }
 
   if (mode === 'yarg' && kind === 'lighting') {
@@ -182,13 +188,8 @@ const createBlankCue = (
   mode: NodeCueMode,
   kind: NodeCueKind,
 ): YargNodeCueDefinition | AudioNodeCueDefinition => {
-  const isYarg = mode === 'yarg'
-  const eventNode =
-    kind === 'motion' && !isYarg
-      ? buildDefaultAudioEvent()
-      : isYarg
-        ? buildDefaultYargCueStartedEvent()
-        : buildDefaultAudioEvent()
+  // rb3 is YARG-shaped, so it uses the YARG cue-started event; only audio uses the audio event.
+  const eventNode = mode === 'audio' ? buildDefaultAudioEvent() : buildDefaultYargCueStartedEvent()
   const actionNode = kind === 'motion' ? buildDefaultSetPositionAction() : buildDefaultAction()
   const base = {
     id: `cue-${createId()}`,
@@ -202,6 +203,16 @@ const createBlankCue = (
     layout: {
       nodePositions: {},
     },
+  }
+
+  // rb3 authors the single fixed always-active gameplay cue (CueType.RB3), YARG-shaped.
+  if (mode === 'rb3') {
+    return {
+      ...base,
+      kind: 'lighting',
+      cueType: 'RB3',
+      style: 'primary',
+    } as YargNodeCueDefinition
   }
 
   if (mode === 'yarg' && kind === 'lighting') {
@@ -239,14 +250,26 @@ const createDefaultFile = (mode: NodeCueMode, kind: NodeCueKind): NodeCueFile =>
   const group: NodeCueGroupMeta = {
     id: `node-group-${Date.now()}`,
     name:
-      mode === 'yarg'
-        ? kind === 'motion'
-          ? 'New YARG Motion Group'
-          : 'New YARG Group'
-        : kind === 'motion'
-          ? 'New Audio Motion Group'
-          : 'New Audio Group',
+      mode === 'rb3'
+        ? 'New RB3 Group'
+        : mode === 'yarg'
+          ? kind === 'motion'
+            ? 'New YARG Motion Group'
+            : 'New YARG Group'
+          : kind === 'motion'
+            ? 'New Audio Motion Group'
+            : 'New Audio Group',
     description: '',
+  }
+
+  if (mode === 'rb3') {
+    return {
+      version: 1,
+      mode,
+      group,
+      cues: [createBlankCue('rb3', 'lighting') as YargNodeCueDefinition],
+      bundled: false,
+    } as Rb3NodeCueFile
   }
 
   if (mode === 'yarg') {

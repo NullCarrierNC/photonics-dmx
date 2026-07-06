@@ -85,6 +85,7 @@ const useCueFiles = ({
   const [mode, setMode] = useState<NodeCueMode>(() => {
     const stored = getLastActiveMode()
     if (stored?.startsWith('audio')) return 'audio'
+    if (stored?.startsWith('rb3')) return 'rb3'
     return 'yarg'
   })
   const [cueKind, setCueKind] = useState<NodeCueKind>(() => {
@@ -111,7 +112,7 @@ const useCueFiles = ({
   const refreshFiles = useCallback(async () => {
     try {
       const summary = await listNodeCueFiles()
-      setFiles([...summary.yarg, ...summary.audio])
+      setFiles([...summary.yarg, ...summary.audio, ...summary.rb3])
     } catch (error) {
       log.error('Failed to list node cue files', error)
     }
@@ -274,6 +275,11 @@ const useCueFiles = ({
 
         if (pendingImport.kind === 'cue') {
           const cuePayload = raw as NodeCueFile
+          // Importing into the rb3 platform re-stamps the file mode so a YARG-shaped cue lands as
+          // an rb3 cue (rb3 reuses the YARG cue shape). yarg/audio imports keep the file's own mode.
+          if (pendingImport.saveMode === 'rb3') {
+            cuePayload.mode = 'rb3'
+          }
           const validation = await validateNodeCue({ content: cuePayload })
           if (!validation.valid) {
             onError?.(`Import validation failed: ${validation.errors.join(', ')}`)
@@ -290,7 +296,7 @@ const useCueFiles = ({
           }
           await refreshFiles()
           const summaryList = await listNodeCueFiles()
-          const flat = [...summaryList.yarg, ...summaryList.audio]
+          const flat = [...summaryList.yarg, ...summaryList.audio, ...summaryList.rb3]
           const summary = flat.find((s) => s.path === response.path)
           if (summary) {
             await fileIO.selectFile(summary)
@@ -361,6 +367,7 @@ const useCueFiles = ({
     () => ({
       yarg: files.filter((file) => file.mode === 'yarg'),
       audio: files.filter((file) => file.mode === 'audio'),
+      rb3: files.filter((file) => file.mode === 'rb3'),
     }),
     [files],
   )
@@ -377,22 +384,26 @@ const useCueFiles = ({
     (nextMode: string) => {
       const isEffect = nextMode === 'yarg-effect' || nextMode === 'audio-effect'
       const cueMode: NodeCueMode =
-        nextMode === 'yarg-effect' || nextMode === 'yarg-cue' || nextMode === 'yarg-motion-cue'
-          ? 'yarg'
-          : 'audio'
+        nextMode === 'rb3-cue'
+          ? 'rb3'
+          : nextMode === 'yarg-effect' || nextMode === 'yarg-cue' || nextMode === 'yarg-motion-cue'
+            ? 'yarg'
+            : 'audio'
       const nextKind: NodeCueKind =
         nextMode === 'yarg-motion-cue' || nextMode === 'audio-motion-cue' ? 'motion' : 'lighting'
       const modeKey: EditorModeKey = isEffect
         ? cueMode === 'yarg'
           ? 'yarg-effect'
           : 'audio-effect'
-        : nextMode === 'yarg-motion-cue'
-          ? 'yarg-motion-cue'
-          : nextMode === 'audio-motion-cue'
-            ? 'audio-motion-cue'
-            : cueMode === 'yarg'
-              ? 'yarg-cue'
-              : 'audio-cue'
+        : nextMode === 'rb3-cue'
+          ? 'rb3-cue'
+          : nextMode === 'yarg-motion-cue'
+            ? 'yarg-motion-cue'
+            : nextMode === 'audio-motion-cue'
+              ? 'audio-motion-cue'
+              : cueMode === 'yarg'
+                ? 'yarg-cue'
+                : 'audio-cue'
 
       setMode(cueMode)
       if (!isEffect) {
@@ -445,8 +456,12 @@ const useCueFiles = ({
   useEffect(() => {
     fileIO.refreshFiles()
     fileIO.refreshEffectFiles()
-    const handler = (payload: { yarg: NodeCueFileSummary[]; audio: NodeCueFileSummary[] }) => {
-      setFiles([...payload.yarg, ...payload.audio])
+    const handler = (payload: {
+      yarg: NodeCueFileSummary[]
+      audio: NodeCueFileSummary[]
+      rb3: NodeCueFileSummary[]
+    }) => {
+      setFiles([...payload.yarg, ...payload.audio, ...payload.rb3])
     }
     const effectHandler = (payload: { yarg: EffectFileSummary[]; audio: EffectFileSummary[] }) => {
       setEffectFiles([...payload.yarg, ...payload.audio])
@@ -475,6 +490,7 @@ const useCueFiles = ({
         ? 'yarg-effect'
         : 'audio-effect'
       : (() => {
+          if (cueMode === 'rb3') return 'rb3-cue'
           const currentCue = (editorDoc.file as NodeCueFile).cues.find(
             (c) => c.id === selectedCueId,
           )

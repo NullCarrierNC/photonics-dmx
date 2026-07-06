@@ -5,6 +5,7 @@ const LAST_ACTIVE_MODE_KEY = `${STORAGE_PREFIX}.lastActiveMode`
 export type EditorModeKey =
   | 'yarg-cue'
   | 'audio-cue'
+  | 'rb3-cue'
   | 'yarg-motion-cue'
   | 'audio-motion-cue'
   | 'yarg-effect'
@@ -117,6 +118,7 @@ const getLastActiveMode = (): EditorModeKey | null => {
     if (
       raw !== 'yarg-cue' &&
       raw !== 'audio-cue' &&
+      raw !== 'rb3-cue' &&
       raw !== 'yarg-motion-cue' &&
       raw !== 'audio-motion-cue' &&
       raw !== 'yarg-effect' &&

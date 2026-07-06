@@ -75,14 +75,16 @@ const ACTION_WAIT_OPTIONS_AUDIO = [
   ...withDefaultLabels(AUDIO_ACTION_WAIT_CONDITIONS),
 ] as const
 
+// RB3 cues are YARG-shaped (same event/wait vocabulary, and the "(RB3)" LED/fog wait conditions
+// already live in the YARG set), so rb3 routes to the YARG option sets; only audio differs.
 const getActionWaitOptions = (platform: NodeCueMode) =>
-  platform === 'yarg' ? ACTION_WAIT_OPTIONS_YARG : ACTION_WAIT_OPTIONS_AUDIO
+  platform === 'audio' ? ACTION_WAIT_OPTIONS_AUDIO : ACTION_WAIT_OPTIONS_YARG
 
 const getEventOptionsForMode = (platform: NodeCueMode) =>
-  platform === 'yarg' ? YARG_EVENT_OPTIONS_CATEGORIZED : AUDIO_EVENT_OPTIONS
+  platform === 'audio' ? AUDIO_EVENT_OPTIONS : YARG_EVENT_OPTIONS_CATEGORIZED
 
 const getDefaultEventOption = (platform: NodeCueMode, kind: NodeCueKind = 'lighting') => {
-  if (platform === 'yarg') {
+  if (platform !== 'audio') {
     const beat = YARG_EVENT_OPTIONS.find((option) => option.value === 'beat')
     return beat ?? YARG_EVENT_OPTIONS[0]
   }
