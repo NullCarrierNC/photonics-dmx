@@ -5,6 +5,8 @@ import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import {
   validateYargNodeCueFile,
   validateAudioNodeCueFile,
+  validateRb3NodeCueFile,
+  validateNodeCueFile,
   validateYargEffectFile,
   validateAudioEffectFile,
   validateEffectFile,
@@ -66,6 +68,78 @@ describe('Node cue validation', () => {
     })
 
     expect(result.valid).toBe(true)
+  })
+
+  it('validates a simple RB3 node cue (YARG-shaped, mode rb3)', () => {
+    const definition: YargNodeCueDefinition = {
+      id: 'rb3-cue',
+      name: 'RB3 Cue',
+      kind: 'lighting',
+      cueType: CueType.Strobe_Fast,
+      style: 'secondary',
+      nodes: {
+        events: [{ id: 'event-1', type: 'event', eventType: 'cue-called' }],
+        actions: [
+          {
+            id: 'action-1',
+            type: 'action',
+            effectType: 'set-color',
+            target: {
+              groups: { source: 'literal', value: 'front' },
+              filter: { source: 'literal', value: 'all' },
+            },
+            color: {
+              name: { source: 'literal', value: 'white' },
+              brightness: { source: 'literal', value: 'max' },
+            },
+            timing: {
+              waitForCondition: { source: 'literal', value: 'none' },
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 200 },
+              waitUntilCondition: { source: 'literal', value: 'none' },
+              waitUntilTime: { source: 'literal', value: 0 },
+            },
+          },
+        ],
+      },
+      connections: [{ from: 'event-1', to: 'action-1' }],
+      layout: { nodePositions: {} },
+    }
+
+    const file = {
+      version: 1,
+      mode: 'rb3',
+      group: { id: 'rb3-group', name: 'RB3' },
+      cues: [definition],
+    }
+    const result = validateRb3NodeCueFile(file)
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      expect(result.mode).toBe('rb3')
+    }
+    // validateNodeCueFile dispatches on the mode discriminant to the rb3 validator.
+    expect(validateNodeCueFile(file).valid).toBe(true)
+  })
+
+  it('rejects an RB3 file whose mode is not "rb3"', () => {
+    const result = validateRb3NodeCueFile({
+      version: 1,
+      mode: 'yarg',
+      group: { id: 'g', name: 'G' },
+      cues: [],
+    })
+    expect(result.valid).toBe(false)
+  })
+
+  it('reports the three-mode error for an unknown mode', () => {
+    const result = validateNodeCueFile({
+      version: 1,
+      mode: 'bogus',
+      group: { id: 'g', name: 'G' },
+      cues: [],
+    })
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain('mode must be "yarg", "audio", or "rb3"')
   })
 
   it('validates a simple audio node cue', () => {
@@ -1317,6 +1391,33 @@ describe('Node cue validation', () => {
       }
       // every cue must lay its nodes out (no stacking at the origin in the editor)
       for (const cue of result.data.cues) {
+        const positions = cue.layout?.nodePositions ?? {}
+        expect(Object.keys(positions).length).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('validates bundled rb3-stagekit.json (strobe-only, compiles, lays out nodes)', () => {
+    const filePath = path.join(
+      __dirname,
+      '../../../../../resources/defaults/node-data/cues/rb3/rb3-stagekit.json',
+    )
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const result = validateRb3NodeCueFile(JSON.parse(raw))
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      expect(result.data.group.id).toBe('rb3-stagekit')
+      expect(result.data.group.isStageKit).toBe(true)
+      // strobe-only: the four strobe rates, and no non-strobe base cue yet.
+      const cueTypes = result.data.cues.map((c) => (c.kind === 'lighting' ? c.cueType : c.id))
+      expect(cueTypes).toEqual([
+        CueType.Strobe_Slow,
+        CueType.Strobe_Medium,
+        CueType.Strobe_Fast,
+        CueType.Strobe_Fastest,
+      ])
+      for (const cue of result.data.cues) {
+        expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
         const positions = cue.layout?.nodePositions ?? {}
         expect(Object.keys(positions).length).toBeGreaterThan(0)
       }

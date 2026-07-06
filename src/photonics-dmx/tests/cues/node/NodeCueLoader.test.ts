@@ -11,6 +11,7 @@ import { AudioCueRegistry } from '../../../cues/registries/AudioCueRegistry'
 import { getRb3CueRegistry } from '../../../cues/registries/Rb3CueRegistry'
 import {
   validateAudioNodeCueFile,
+  validateRb3NodeCueFile,
   validateYargNodeCueFile,
 } from '../../../cues/node/schema/validation'
 import type {
@@ -18,11 +19,58 @@ import type {
   AudioEventNodeUnion,
   AudioMotionNodeCueDefinition,
   AudioNodeCueFile,
+  Rb3NodeCueFile,
   YargEventNode,
+  YargLightingNodeCueDefinition,
   YargMotionNodeCueDefinition,
   YargNodeCueFile,
 } from '../../../cues/types/nodeCueTypes'
+import { CueType } from '../../../cues/types/cueTypes'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+
+/** A minimal RB3 lighting cue file (YARG-shaped, mode 'rb3') keyed to a real CueType. */
+function rb3LightingFile(
+  cueType: CueType = CueType.Strobe_Fast,
+  groupId = 'loader-test-rb3',
+): Rb3NodeCueFile {
+  const ev: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+  const action: ActionNode = {
+    id: 'a1',
+    type: 'action',
+    effectType: 'set-color',
+    target: {
+      groups: { source: 'literal', value: 'all' },
+      filter: { source: 'literal', value: 'all' },
+    },
+    color: {
+      name: { source: 'literal', value: 'white' },
+      brightness: { source: 'literal', value: 'max' },
+    },
+    timing: {
+      waitForCondition: { source: 'literal', value: 'none' },
+      waitForTime: { source: 'literal', value: 0 },
+      duration: { source: 'literal', value: 200 },
+      waitUntilCondition: { source: 'literal', value: 'none' },
+      waitUntilTime: { source: 'literal', value: 0 },
+    },
+    layer: { source: 'literal', value: 100 },
+  }
+  const cue: YargLightingNodeCueDefinition = {
+    kind: 'lighting',
+    id: 'c1',
+    name: 'RB3 light',
+    cueType,
+    style: 'secondary',
+    nodes: { events: [ev], actions: [action], logic: [] },
+    connections: [{ from: 'ev-called', to: 'a1' }],
+  }
+  return {
+    version: 1,
+    mode: 'rb3',
+    group: { id: groupId, name: 'Loader test RB3', isStageKit: true },
+    cues: [cue],
+  }
+}
 
 function yargMotionOnlyFile(): YargNodeCueFile {
   const ev: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
@@ -121,6 +169,8 @@ describe('NodeCueLoader', () => {
     audioRegistry = AudioCueRegistry.getInstance()
     yargRegistry.reset()
     audioRegistry.reset()
+    // The RB3 registry is a module singleton; reset it so rb3 groups don't leak across tests.
+    getRb3CueRegistry().reset()
 
     loader = new NodeCueLoader({
       runtimeBroadcaster: noopRuntimeBroadcaster(),
@@ -134,6 +184,7 @@ describe('NodeCueLoader', () => {
   afterEach(() => {
     yargRegistry.reset()
     audioRegistry.reset()
+    getRb3CueRegistry().reset()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
@@ -383,6 +434,66 @@ describe('NodeCueLoader', () => {
       const file = yargMotionOnlyFile()
       await loader.saveFile('yarg', 'only.json', file)
       await expect(loader.saveFile('yarg', 'only.json', file)).resolves.toMatchObject({
+        success: true,
+      })
+    })
+  })
+
+  describe('RB3 cue mode', () => {
+    const writeRb3 = (filename: string, file: Rb3NodeCueFile): void => {
+      const rb3Dir = path.join(tmpDir, 'node-data', 'cues', 'rb3')
+      fs.mkdirSync(rb3Dir, { recursive: true })
+      fs.writeFileSync(path.join(rb3Dir, filename), JSON.stringify(file), 'utf-8')
+    }
+
+    it('loads RB3 cues into the RB3 registry, not the YARG registry', async () => {
+      const file = rb3LightingFile(CueType.Strobe_Fast)
+      expect(validateRb3NodeCueFile(file).valid).toBe(true)
+      writeRb3('rb3.json', file)
+
+      await loader.loadAll()
+
+      const group = getRb3CueRegistry().getGroup('loader-test-rb3')
+      expect(group).toBeDefined()
+      expect(group!.cues.get(CueType.Strobe_Fast)).toBeDefined()
+      // The RB3 domain is isolated from the YARG listener's registry.
+      expect(yargRegistry.getGroup('loader-test-rb3')).toBeUndefined()
+    })
+
+    it('exposes only CueType.RB3 for rb3 and hides it from the YARG picker', () => {
+      expect(loader.getAvailableCueTypes('rb3')).toEqual([CueType.RB3])
+      expect(loader.getAvailableCueTypes('yarg')).not.toContain(CueType.RB3)
+    })
+
+    it('renders strobes but no-ops the unauthored base cue (strobe resolves, RB3 is null)', async () => {
+      writeRb3('rb3.json', rb3LightingFile(CueType.Strobe_Fast))
+      await loader.loadAll()
+
+      const rb3 = getRb3CueRegistry()
+      // The registered strobe resolves to a cue implementation...
+      expect(rb3.getCueImplementation(CueType.Strobe_Fast, 'simulated')).not.toBeNull()
+      // ...while the always-active base RB3 cue is unauthored and resolves to a clean no-op.
+      expect(rb3.getCueImplementation(CueType.RB3, 'simulated')).toBeNull()
+    })
+
+    it('round-trips a saved RB3 file and scopes group-id conflicts to the rb3 domain', async () => {
+      const file = rb3LightingFile(CueType.Strobe_Fast, 'rb3-shared')
+      await expect(loader.saveFile('rb3', 'first.json', file)).resolves.toMatchObject({
+        success: true,
+      })
+
+      const read = await loader.readFile(path.join('node-data', 'cues', 'rb3', 'first.json'))
+      expect(read.mode).toBe('rb3')
+      expect(read.group.id).toBe('rb3-shared')
+
+      // Same group id in the rb3 domain on a different path conflicts...
+      await expect(loader.saveFile('rb3', 'second.json', file)).rejects.toThrow(
+        /already uses group id/,
+      )
+      // ...but a YARG file reusing the id is fine — the domains are independent.
+      const yargFile = yargMotionOnlyFile()
+      yargFile.group.id = 'rb3-shared'
+      await expect(loader.saveFile('yarg', 'yarg-shared.json', yargFile)).resolves.toMatchObject({
         success: true,
       })
     })
