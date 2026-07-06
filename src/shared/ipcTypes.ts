@@ -477,6 +477,14 @@ export interface IpcInvokeMap {
     request: void
     response: Array<{ id: string; name: string; description?: string; cueCount: number }>
   }
+  [LIGHT.GET_RB3_CUE_GROUPS]: {
+    request: void
+    response: Array<{ id: string; name: string; description: string; cueTypes: CueType[] }>
+  }
+  [LIGHT.GET_RB3_MOTION_CUE_GROUPS]: {
+    request: void
+    response: Array<{ id: string; name: string; description?: string; cueCount: number }>
+  }
   [LIGHT.GET_AVAILABLE_YARG_MOTION_CUES]: {
     request: string | undefined
     response: Array<{ id: string; name: string; description: string }>
@@ -731,6 +739,38 @@ export interface IpcInvokeMap {
     response: Record<string, string[]>
   }
   [CONFIG.SET_DISABLED_AUDIO_MOTION_CUES]: {
+    request: Record<string, string[]>
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [CONFIG.GET_ENABLED_RB3_CUE_GROUPS]: {
+    request: void
+    response: string[]
+  }
+  [CONFIG.SET_ENABLED_RB3_CUE_GROUPS]: {
+    request: string[]
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [CONFIG.GET_DISABLED_RB3_CUES]: {
+    request: void
+    response: Record<string, string[]>
+  }
+  [CONFIG.SET_DISABLED_RB3_CUES]: {
+    request: Record<string, string[]>
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [CONFIG.GET_ENABLED_RB3_MOTION_CUE_GROUPS]: {
+    request: void
+    response: string[]
+  }
+  [CONFIG.SET_ENABLED_RB3_MOTION_CUE_GROUPS]: {
+    request: string[]
+    response: IpcSuccessResult | IpcErrorResult
+  }
+  [CONFIG.GET_DISABLED_RB3_MOTION_CUES]: {
+    request: void
+    response: Record<string, string[]>
+  }
+  [CONFIG.SET_DISABLED_RB3_MOTION_CUES]: {
     request: Record<string, string[]>
     response: IpcSuccessResult | IpcErrorResult
   }

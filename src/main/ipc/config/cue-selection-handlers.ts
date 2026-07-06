@@ -3,6 +3,7 @@ import { ControllerManager } from '../../controllers/ControllerManager'
 import { sendToAllWindows } from '../../utils/windowUtils'
 import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../../photonics-dmx/cues/registries/AudioCueRegistry'
+import { getRb3CueRegistry } from '../../../photonics-dmx/cues/registries/Rb3CueRegistry'
 import { ipcError } from '../ipcResult'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { validateOptionalStringArray, validateDisabledCuesMap } from '../inputValidation'
@@ -330,6 +331,142 @@ export function registerCueSelectionConfigHandlers(
       return { success: true }
     } catch (error) {
       log.error('Error setting disabled audio motion cues:', error)
+      return ipcError(error)
+    }
+  })
+
+  // RB3 cue mode reuses the YARG registry API against its own registry instance and domains.
+  ipcMain.handle(CONFIG.GET_ENABLED_RB3_CUE_GROUPS, async () => {
+    const registry = getRb3CueRegistry()
+    const config = controllerManager.getConfig()
+    const prefs = config.getAllPreferences()
+    let enabled = prefs.cueDomains.rb3.enabledGroups
+    const allGroups = registry.getAllGroups()
+    const knownGroups = prefs.cueDomains.rb3.knownGroups ?? []
+
+    const newGroups = allGroups.filter((id) => !knownGroups.includes(id))
+    if (newGroups.length > 0) {
+      enabled = [...enabled, ...newGroups]
+    }
+    enabled = enabled.filter((id) => allGroups.includes(id))
+    await config.updateCueDomain('rb3', { enabledGroups: enabled })
+    await config.updateCueDomain('rb3', { knownGroups: allGroups })
+    registry.setEnabledGroups(enabled)
+    registry.setDisabledCues(prefs.cueDomains.rb3.disabledCues)
+    return enabled
+  })
+
+  ipcMain.handle(CONFIG.SET_ENABLED_RB3_CUE_GROUPS, async (_, groupIds: unknown) => {
+    try {
+      const validation = validateOptionalStringArray(groupIds, 'groupIds')
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
+      }
+      const registry = getRb3CueRegistry()
+      await controllerManager
+        .getConfig()
+        .updateCueDomain('rb3', { enabledGroups: validation.value })
+      registry.setEnabledGroups(validation.value)
+      registry.setActiveGroups(registry.getEnabledGroups())
+      registry.setDisabledCues(
+        controllerManager.getConfig().getPreference('cueDomains').rb3.disabledCues,
+      )
+      sendToAllWindows(RENDERER_RECEIVE.RB3_CUE_GROUPS_CHANGED, undefined)
+      return { success: true }
+    } catch (error) {
+      log.error('Error setting enabled RB3 cue groups:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(CONFIG.GET_DISABLED_RB3_CUES, async () => {
+    const disabled = controllerManager.getConfig().getPreference('cueDomains').rb3.disabledCues
+    getRb3CueRegistry().setDisabledCues(disabled)
+    return disabled
+  })
+
+  ipcMain.handle(CONFIG.SET_DISABLED_RB3_CUES, async (_, payload: unknown) => {
+    try {
+      const validation = validateDisabledCuesMap(payload, 'disabledRb3Cues')
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
+      }
+      await controllerManager.getConfig().updateCueDomain('rb3', { disabledCues: validation.value })
+      getRb3CueRegistry().setDisabledCues(validation.value)
+      sendToAllWindows(RENDERER_RECEIVE.RB3_CUE_GROUPS_CHANGED, undefined)
+      return { success: true }
+    } catch (error) {
+      log.error('Error setting disabled RB3 cues:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(CONFIG.GET_ENABLED_RB3_MOTION_CUE_GROUPS, async () => {
+    const registry = getRb3CueRegistry()
+    const config = controllerManager.getConfig()
+    const prefs = config.getAllPreferences()
+    let enabled = prefs.cueDomains.rb3Motion.enabledGroups
+    const allGroups = registry.getRegisteredMotionGroupIds()
+    const knownGroups = prefs.cueDomains.rb3Motion.knownGroups ?? []
+
+    if (!enabled || enabled.length === 0) {
+      enabled = allGroups
+    } else {
+      const newGroups = allGroups.filter((id) => !knownGroups.includes(id))
+      if (newGroups.length > 0) {
+        enabled = [...enabled, ...newGroups]
+      }
+    }
+    await config.updateCueDomain('rb3Motion', { enabledGroups: enabled })
+    await config.updateCueDomain('rb3Motion', { knownGroups: allGroups })
+    registry.setEnabledMotionGroups(enabled)
+    registry.setDisabledMotionCues(prefs.cueDomains.rb3Motion.disabledCues)
+    return enabled
+  })
+
+  ipcMain.handle(CONFIG.SET_ENABLED_RB3_MOTION_CUE_GROUPS, async (_, groupIds: unknown) => {
+    try {
+      const validation = validateOptionalStringArray(groupIds, 'groupIds')
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
+      }
+      const registry = getRb3CueRegistry()
+      await controllerManager
+        .getConfig()
+        .updateCueDomain('rb3Motion', { enabledGroups: validation.value })
+      registry.setEnabledMotionGroups(validation.value)
+      registry.setDisabledMotionCues(
+        controllerManager.getConfig().getPreference('cueDomains').rb3Motion.disabledCues,
+      )
+      sendToAllWindows(RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED, undefined)
+      return { success: true }
+    } catch (error) {
+      log.error('Error setting enabled RB3 motion cue groups:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(CONFIG.GET_DISABLED_RB3_MOTION_CUES, async () => {
+    const disabled = controllerManager.getConfig().getPreference('cueDomains')
+      .rb3Motion.disabledCues
+    getRb3CueRegistry().setDisabledMotionCues(disabled)
+    return disabled
+  })
+
+  ipcMain.handle(CONFIG.SET_DISABLED_RB3_MOTION_CUES, async (_, payload: unknown) => {
+    try {
+      const validation = validateDisabledCuesMap(payload, 'disabledRb3MotionCues')
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
+      }
+      await controllerManager
+        .getConfig()
+        .updateCueDomain('rb3Motion', { disabledCues: validation.value })
+      getRb3CueRegistry().setDisabledMotionCues(validation.value)
+      sendToAllWindows(RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED, undefined)
+      return { success: true }
+    } catch (error) {
+      log.error('Error setting disabled RB3 motion cues:', error)
       return ipcError(error)
     }
   })

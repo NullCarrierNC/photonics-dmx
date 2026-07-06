@@ -245,6 +245,34 @@ export const getDisabledAudioMotionCues = () =>
 export const setDisabledAudioMotionCues = (disabled: Record<string, string[]>) =>
   window.api.invoke(CONFIG.SET_DISABLED_AUDIO_MOTION_CUES, disabled)
 
+export const getRb3CueGroups = () => window.api.invoke(LIGHT.GET_RB3_CUE_GROUPS, undefined)
+
+export const getRb3MotionCueGroups = () =>
+  window.api.invoke(LIGHT.GET_RB3_MOTION_CUE_GROUPS, undefined)
+
+export const getEnabledRb3CueGroups = () =>
+  window.api.invoke(CONFIG.GET_ENABLED_RB3_CUE_GROUPS, undefined)
+
+export const setEnabledRb3CueGroups = (groupIds: string[]) =>
+  window.api.invoke(CONFIG.SET_ENABLED_RB3_CUE_GROUPS, groupIds)
+
+export const getDisabledRb3Cues = () => window.api.invoke(CONFIG.GET_DISABLED_RB3_CUES, undefined)
+
+export const setDisabledRb3Cues = (disabled: Record<string, string[]>) =>
+  window.api.invoke(CONFIG.SET_DISABLED_RB3_CUES, disabled)
+
+export const getEnabledRb3MotionCueGroups = () =>
+  window.api.invoke(CONFIG.GET_ENABLED_RB3_MOTION_CUE_GROUPS, undefined)
+
+export const setEnabledRb3MotionCueGroups = (groupIds: string[]) =>
+  window.api.invoke(CONFIG.SET_ENABLED_RB3_MOTION_CUE_GROUPS, groupIds)
+
+export const getDisabledRb3MotionCues = () =>
+  window.api.invoke(CONFIG.GET_DISABLED_RB3_MOTION_CUES, undefined)
+
+export const setDisabledRb3MotionCues = (disabled: Record<string, string[]>) =>
+  window.api.invoke(CONFIG.SET_DISABLED_RB3_MOTION_CUES, disabled)
+
 export const getAudioReactiveCues = () =>
   window.api.invoke(CONFIG.GET_AUDIO_REACTIVE_CUES, undefined)
 

@@ -37,6 +37,7 @@ import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { LifecyclePhase } from '../../shared/ipcTypes'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
+import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
 import {
   AudioCueType,
   AudioMotionCueRef,
@@ -300,6 +301,7 @@ export class ControllerManager {
     await this.initializeRigChains()
     await this.registryInit.initializeCueRegistry()
     await this.registryInit.initializeAudioCueRegistry()
+    await this.registryInit.initializeRb3CueRegistry()
     await this.applyMotionPreferencesFromConfig()
     const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
     await copyDefaultData(process.resourcesPath, baseDir)
@@ -307,8 +309,10 @@ export class ControllerManager {
     await this.registryInit.initializeNodeCueLoader()
     await this.applyYargEnabledGroupsFromConfig()
     await this.applyAudioEnabledGroupsFromConfig()
+    await this.applyRb3EnabledGroupsFromConfig()
     await this.applyYargMotionEnabledGroupsFromConfig()
     await this.applyAudioMotionEnabledGroupsFromConfig()
+    await this.applyRb3MotionEnabledGroupsFromConfig()
     await this.initializeListeners()
 
     this.isInitialized = true
@@ -404,11 +408,20 @@ export class ControllerManager {
   private async applyMotionPreferencesFromConfig(): Promise<void> {
     const yarg = YargCueRegistry.getInstance()
     const audio = AudioCueRegistry.getInstance()
+    const rb3 = getRb3CueRegistry()
     yarg.setMotionSelectionMode(this.config.getMotionGroupSelectionMode())
     yarg.setDisabledMotionCues(this.config.getPreference('cueDomains').yargMotion.disabledCues)
     audio.setMotionSelectionMode(this.config.getAudioMotionGroupSelectionMode())
     audio.setDisabledMotionCues(this.config.getPreference('cueDomains').audioMotion.disabledCues)
-    log.info('YARG + Audio motion registries initialized (selection modes from preferences).')
+    rb3.setMotionSelectionMode(this.rb3MotionSelectionMode())
+    rb3.setDisabledMotionCues(this.config.getPreference('cueDomains').rb3Motion.disabledCues)
+    log.info('YARG + Audio + RB3 motion registries initialized (selection modes from preferences).')
+  }
+
+  /** RB3 motion selection mode from the RB3 motion domain, narrowed to the motion union. */
+  private rb3MotionSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
+    const mode = this.config.getPreference('cueDomains').rb3Motion.selectionMode
+    return mode === 'oncePerSong' || mode === 'none' ? mode : 'perCueChange'
   }
 
   /**
@@ -539,6 +552,66 @@ export class ControllerManager {
     const disabledMotion = this.config.getPreference('cueDomains').audioMotion.disabledCues
     registry.setDisabledMotionCues(disabledMotion)
     log.info('Audio motion enabled groups re-applied from config:', enabledGroupIds)
+  }
+
+  /**
+   * Re-apply RB3 enabled groups from configuration after node cues are registered. Mirrors the
+   * YARG path against the separate RB3 cue registry so RB3 cue mode's enabled groups are its own.
+   */
+  private async applyRb3EnabledGroupsFromConfig(): Promise<void> {
+    const registry = getRb3CueRegistry()
+    const registeredIds = registry.getAllGroups()
+    const rb3Domain = this.config.getPreference('cueDomains').rb3
+    let enabledGroupIds = rb3Domain.enabledGroups ?? []
+    const knownGroups = rb3Domain.knownGroups ?? []
+
+    if (!enabledGroupIds || enabledGroupIds.length === 0) {
+      enabledGroupIds = registeredIds
+      if (registeredIds.length > 0) {
+        await this.config.updateCueDomain('rb3', { enabledGroups: enabledGroupIds })
+      }
+    } else {
+      const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
+      if (newGroups.length > 0) {
+        enabledGroupIds = [...enabledGroupIds, ...newGroups]
+        await this.config.updateCueDomain('rb3', { enabledGroups: enabledGroupIds })
+      }
+    }
+
+    await this.config.updateCueDomain('rb3', { knownGroups: registeredIds })
+    const restricted = enabledGroupIds.filter((id) => registeredIds.includes(id))
+    registry.setEnabledGroups(restricted)
+    registry.setDisabledCues(this.config.getPreference('cueDomains').rb3.disabledCues)
+    log.info('Rb3CueRegistry enabled groups re-applied from config:', restricted)
+  }
+
+  /**
+   * Re-apply RB3 motion enabled groups from configuration after node cues are registered.
+   */
+  private async applyRb3MotionEnabledGroupsFromConfig(): Promise<void> {
+    const registry = getRb3CueRegistry()
+    const registeredIds = registry.getRegisteredMotionGroupIds()
+    const motionDomain = this.config.getPreference('cueDomains').rb3Motion
+    let enabledGroupIds = motionDomain.enabledGroups
+    const knownGroups = motionDomain.knownGroups ?? []
+
+    if (!enabledGroupIds || enabledGroupIds.length === 0) {
+      enabledGroupIds = registeredIds
+      if (registeredIds.length > 0) {
+        await this.config.updateCueDomain('rb3Motion', { enabledGroups: enabledGroupIds })
+      }
+    } else {
+      const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
+      if (newGroups.length > 0) {
+        enabledGroupIds = [...enabledGroupIds, ...newGroups]
+        await this.config.updateCueDomain('rb3Motion', { enabledGroups: enabledGroupIds })
+      }
+    }
+
+    await this.config.updateCueDomain('rb3Motion', { knownGroups: registeredIds })
+    registry.setEnabledMotionGroups(enabledGroupIds)
+    registry.setDisabledMotionCues(this.config.getPreference('cueDomains').rb3Motion.disabledCues)
+    log.info('RB3 motion enabled groups re-applied from config:', enabledGroupIds)
   }
 
   /**
@@ -810,16 +883,18 @@ export class ControllerManager {
     return this.rb3CueHandler
   }
 
-  /**
-   * RB3 motion tunables for the RB3 cue handlers. Defaults until the RB3 motion cue domain is
-   * wired to preferences.
-   */
+  /** RB3 motion preferences for the RB3 cue handlers, from the RB3 motion cue domain. */
   private getRb3MotionDomain(): {
     activeCueRef: YargMotionCueRef | null
     minimumHoldMs: number
     probabilityPercent: number
   } {
-    return { activeCueRef: null, minimumHoldMs: 5000, probabilityPercent: 100 }
+    const domain = this.config.getPreference('cueDomains').rb3Motion
+    return {
+      activeCueRef: domain.activeCueRef ?? null,
+      minimumHoldMs: domain.minimumHoldMs ?? 5000,
+      probabilityPercent: domain.probabilityPercent ?? 100,
+    }
   }
 
   /**

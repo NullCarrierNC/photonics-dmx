@@ -104,6 +104,8 @@ export const LIGHT = {
   GET_CONSISTENCY_STATUS: 'get-consistency-status',
   GET_YARG_MOTION_CUE_GROUPS: 'get-yarg-motion-cue-groups',
   GET_AUDIO_MOTION_CUE_GROUPS: 'get-audio-motion-cue-groups',
+  GET_RB3_CUE_GROUPS: 'get-rb3-cue-groups',
+  GET_RB3_MOTION_CUE_GROUPS: 'get-rb3-motion-cue-groups',
   GET_AVAILABLE_YARG_MOTION_CUES: 'get-available-yarg-motion-cues',
   GET_AVAILABLE_AUDIO_MOTION_CUES: 'get-available-audio-motion-cues',
   GET_YARG_MOTION_GROUP_SELECTION_MODE: 'get-yarg-motion-group-selection-mode',
@@ -163,6 +165,14 @@ export const CONFIG = {
   SET_ENABLED_AUDIO_MOTION_CUE_GROUPS: 'set-enabled-audio-motion-cue-groups',
   GET_DISABLED_AUDIO_MOTION_CUES: 'get-disabled-audio-motion-cues',
   SET_DISABLED_AUDIO_MOTION_CUES: 'set-disabled-audio-motion-cues',
+  GET_ENABLED_RB3_CUE_GROUPS: 'get-enabled-rb3-cue-groups',
+  SET_ENABLED_RB3_CUE_GROUPS: 'set-enabled-rb3-cue-groups',
+  GET_DISABLED_RB3_CUES: 'get-disabled-rb3-cues',
+  SET_DISABLED_RB3_CUES: 'set-disabled-rb3-cues',
+  GET_ENABLED_RB3_MOTION_CUE_GROUPS: 'get-enabled-rb3-motion-cue-groups',
+  SET_ENABLED_RB3_MOTION_CUE_GROUPS: 'set-enabled-rb3-motion-cue-groups',
+  GET_DISABLED_RB3_MOTION_CUES: 'get-disabled-rb3-motion-cues',
+  SET_DISABLED_RB3_MOTION_CUES: 'set-disabled-rb3-motion-cues',
   GET_AUDIO_REACTIVE_CUES: 'get-audio-reactive-cues',
   SET_ACTIVE_AUDIO_CUE: 'set-active-audio-cue',
   GET_AUDIO_GAME_MODE: 'get-audio-game-mode',
@@ -235,6 +245,10 @@ export const RENDERER_RECEIVE = {
   YARG_MOTION_CUE_GROUPS_CHANGED: 'yarg-motion:cue-groups-changed',
   /** Audio motion enabled groups or per-cue disables changed (Preferences → all windows). */
   AUDIO_MOTION_CUE_GROUPS_CHANGED: 'audio-motion:cue-groups-changed',
+  /** RB3 enabled groups or per-cue disables changed (Preferences → all windows). */
+  RB3_CUE_GROUPS_CHANGED: 'rb3:cue-groups-changed',
+  /** RB3 motion enabled groups or per-cue disables changed (Preferences → all windows). */
+  RB3_MOTION_CUE_GROUPS_CHANGED: 'rb3-motion:cue-groups-changed',
   /** Global motion master toggle changed (YARG + audio motion handlers). */
   MOTION_ENABLED_CHANGED: 'motion:enabled-changed',
   /** Active audio motion program changed (manual/auto selection result). */

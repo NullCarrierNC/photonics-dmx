@@ -3,6 +3,7 @@ import { app } from 'electron'
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
+import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
 import {
   NodeCueLoader,
   NodeCueListSummary,
@@ -55,6 +56,29 @@ export class RegistryInitializer {
 
     const disabledYarg = config.getPreference('cueDomains').yarg.disabledCues
     registry.setDisabledCues(disabledYarg)
+  }
+
+  public async initializeRb3CueRegistry(): Promise<void> {
+    const registry = getRb3CueRegistry()
+    const config = this.ctx.getConfig()
+
+    const enabledGroupIds = config.getPreference('cueDomains').rb3.enabledGroups ?? []
+    if (enabledGroupIds.length > 0) {
+      registry.setEnabledGroups(enabledGroupIds)
+      log.info('Rb3CueRegistry initialized with enabled groups:', enabledGroupIds)
+    } else {
+      const allGroups = registry.getAllGroups()
+      registry.setEnabledGroups(allGroups)
+      log.info('Rb3CueRegistry initialized with all groups (no preference set):', allGroups)
+    }
+
+    registry.setCueConsistencyWindow(config.getPreference('cueConsistencyWindow'))
+    registry.setCueGroupSelectionMode(
+      config.getPreference('cueDomains').rb3.selectionMode === 'oncePerSong'
+        ? 'oncePerSong'
+        : 'withinSong',
+    )
+    registry.setDisabledCues(config.getPreference('cueDomains').rb3.disabledCues)
   }
 
   public async initializeAudioCueRegistry(): Promise<void> {
@@ -122,6 +146,7 @@ export class RegistryInitializer {
       baseDir,
       yargRegistry: YargCueRegistry.getInstance(),
       audioRegistry: AudioCueRegistry.getInstance(),
+      rb3Registry: getRb3CueRegistry(),
       effectLoader: this.ctx.getEffectLoader() ?? undefined,
       runtimeBroadcaster: this.ctx.runtimeBroadcaster,
     })

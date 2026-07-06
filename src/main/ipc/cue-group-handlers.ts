@@ -1,5 +1,6 @@
 import { IpcMain } from 'electron'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
+import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
 import { ipcError } from './ipcResult'
 import { isNonEmptyString, validateCueType } from './inputValidation'
 import { LIGHT } from '../../shared/ipcChannels'
@@ -16,6 +17,25 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
     const registry = YargCueRegistry.getInstance()
     const groupIds = registry.getAllGroups()
     return groupIds
+      .map((groupId) => {
+        const group = registry.getGroup(groupId)
+        if (!group || group.cues.size === 0) {
+          return null
+        }
+        return {
+          id: groupId,
+          name: group.name,
+          description: group.description,
+          cueTypes: Array.from(group.cues.keys()),
+        }
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null)
+  })
+
+  ipcMain.handle(LIGHT.GET_RB3_CUE_GROUPS, async () => {
+    const registry = getRb3CueRegistry()
+    return registry
+      .getAllGroups()
       .map((groupId) => {
         const group = registry.getGroup(groupId)
         if (!group || group.cues.size === 0) {

@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
 import { NodeCueLoader } from '../../../cues/node/loader/NodeCueLoader'
 import { YargCueRegistry } from '../../../cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../../cues/registries/AudioCueRegistry'
+import { getRb3CueRegistry } from '../../../cues/registries/Rb3CueRegistry'
 import {
   validateAudioNodeCueFile,
   validateYargNodeCueFile,
@@ -126,6 +127,7 @@ describe('NodeCueLoader', () => {
       baseDir: tmpDir,
       yargRegistry,
       audioRegistry,
+      rb3Registry: getRb3CueRegistry(),
     })
   })
 

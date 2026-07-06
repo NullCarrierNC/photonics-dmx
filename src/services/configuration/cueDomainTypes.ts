@@ -2,7 +2,14 @@
  * Shared types for per-domain cue configuration (YARG, audio, and motion layers).
  */
 
-export const CUE_DOMAINS = ['yarg', 'audio', 'yargMotion', 'audioMotion'] as const
+export const CUE_DOMAINS = [
+  'yarg',
+  'audio',
+  'rb3',
+  'yargMotion',
+  'audioMotion',
+  'rb3Motion',
+] as const
 
 export type CueDomain = (typeof CUE_DOMAINS)[number]
 
@@ -40,9 +47,9 @@ export function createDefaultCueDomainPrefs(
     knownGroups: [],
     disabledCues: {},
   }
-  if (domain === 'yarg') {
+  if (domain === 'yarg' || domain === 'rb3') {
     base.selectionMode = 'withinSong'
-  } else if (domain === 'yargMotion' || domain === 'audioMotion') {
+  } else if (domain === 'yargMotion' || domain === 'audioMotion' || domain === 'rb3Motion') {
     base.selectionMode = 'perCueChange'
     base.probabilityPercent = 50
     base.minimumHoldMs = 5000
@@ -59,8 +66,10 @@ export function createDefaultCueDomains(): Record<CueDomain, CueDomainPrefs> {
   return {
     yarg: createDefaultCueDomainPrefs('yarg'),
     audio: createDefaultCueDomainPrefs('audio'),
+    rb3: createDefaultCueDomainPrefs('rb3'),
     yargMotion: createDefaultCueDomainPrefs('yargMotion'),
     audioMotion: createDefaultCueDomainPrefs('audioMotion'),
+    rb3Motion: createDefaultCueDomainPrefs('rb3Motion'),
   }
 }
 

@@ -2,6 +2,7 @@ import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
+import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
 import { ipcError } from './ipcResult'
 import { LIGHT } from '../../shared/ipcChannels'
 import { validateMotionSelectionMode } from './inputValidation'
@@ -29,6 +30,15 @@ export function setupMotionGroupHandlers(
       return AudioCueRegistry.getInstance().getAudioMotionGroupsInfo()
     } catch (error) {
       log.error('Error getting audio motion cue groups:', error)
+      return []
+    }
+  })
+
+  ipcMain.handle(LIGHT.GET_RB3_MOTION_CUE_GROUPS, async () => {
+    try {
+      return getRb3CueRegistry().getYargMotionGroupsInfo()
+    } catch (error) {
+      log.error('Error getting RB3 motion cue groups:', error)
       return []
     }
   })

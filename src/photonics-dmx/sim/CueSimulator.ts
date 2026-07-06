@@ -9,6 +9,7 @@ import { NodeCueLoader } from '../cues/node/loader/NodeCueLoader'
 import { EffectLoader } from '../cues/node/loader/EffectLoader'
 import { YargCueRegistry } from '../cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
+import { getRb3CueRegistry } from '../cues/registries/Rb3CueRegistry'
 import { YargCueHandler } from '../cueHandlers/YargCueHandler'
 import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
 import {
@@ -153,6 +154,7 @@ export class CueSimulator {
       baseDir: this.opts.baseDir,
       yargRegistry: registry,
       audioRegistry: AudioCueRegistry.getInstance(),
+      rb3Registry: getRb3CueRegistry(),
       effectLoader,
       runtimeBroadcaster: noopRuntimeBroadcaster(),
     })

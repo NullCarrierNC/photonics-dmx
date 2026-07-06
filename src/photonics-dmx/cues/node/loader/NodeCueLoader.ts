@@ -57,6 +57,7 @@ interface NodeCueLoaderOptions {
   baseDir: string
   yargRegistry: YargCueRegistry
   audioRegistry: AudioCueRegistry
+  rb3Registry: YargCueRegistry
   effectLoader?: EffectLoader
   /** Injected host emit for cue/effect runtime IPC; required for production main. */
   runtimeBroadcaster: RuntimeBroadcaster
