@@ -1,4 +1,9 @@
-import { CueData, StrobeState, getCueTypeFromId } from '../../photonics-dmx/cues/types/cueTypes'
+import {
+  CueData,
+  CueType,
+  StrobeState,
+  getCueTypeFromId,
+} from '../../photonics-dmx/cues/types/cueTypes'
 import { sendToAllWindows } from '../utils/windowUtils'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { ChainFanout } from '../../photonics-dmx/controllers/ChainFanout'
@@ -7,12 +12,21 @@ const log = createLogger('TestEffectRunner')
 
 export interface TestEffectRunnerContext {
   getChainFanout: () => ChainFanout
-  /**
-   * Ensure every active rig chain has a `YargCueHandler` attached so test cues dispatched
-   * through the fanout reach every rig — not just the primary chain. Idempotent.
-   */
-  ensureChainsHaveYargHandlers: () => void
   ensureInitialized: () => Promise<void>
+}
+
+/**
+ * The per-domain cue plumbing the runner drives. The interval, CueData building, and blackout are
+ * domain-agnostic; only which per-chain handler receives the cue (and stops) differs between YARG
+ * and RB3, so those are injected.
+ */
+export interface TestCueDispatcher {
+  /** Attach this domain's cue handlers to every active rig chain (idempotent). */
+  ensureHandlers: () => void
+  /** Dispatch one cue to this domain's per-chain handlers. */
+  dispatch: (cue: CueType, data: CueData) => void
+  /** Stop this domain's active cue on every chain (the runner handles blackout separately). */
+  stopActiveCue: () => void
 }
 
 /**
@@ -25,7 +39,10 @@ export class TestEffectRunner {
   private effectId: string | null = null
   private testCueGroup: string | undefined = undefined
 
-  constructor(private readonly ctx: TestEffectRunnerContext) {}
+  constructor(
+    private readonly ctx: TestEffectRunnerContext,
+    private readonly dispatcher: TestCueDispatcher,
+  ) {}
 
   public startTestEffect(
     effectId: string,
@@ -72,17 +89,17 @@ export class TestEffectRunner {
 
     // Stop the active cue on every chain's handler and blackout every chain's sequencer
     // (not just the primary). Without this, secondary rigs would stay lit at the last
-    // test-effect frame after stop.
+    // test-effect frame after stop. Blackout is per-chain sequencer work shared across domains.
     const fanout = this.ctx.getChainFanout()
-    fanout.yargStopActiveCue()
+    this.dispatcher.stopActiveCue()
     await fanout.yargBlackout(0)
   }
 
   private startInternal(): void {
-    // Make sure every active rig chain has a YARG handler attached before we start
-    // dispatching test cues — without this, only chains whose listener has already
-    // enabled would see the cue.
-    this.ctx.ensureChainsHaveYargHandlers()
+    // Make sure every active rig chain has this domain's cue handler attached before we start
+    // dispatching test cues — without this, only chains whose listener has already enabled
+    // would see the cue.
+    this.dispatcher.ensureHandlers()
 
     const fanout = this.ctx.getChainFanout()
     if (fanout.getChains().length === 0) {
@@ -140,9 +157,9 @@ export class TestEffectRunner {
     }
 
     try {
-      // Always dispatch through the fanout — `startInternal` guarantees handlers exist on
-      // every chain, so this reaches every rig in lockstep.
-      void this.ctx.getChainFanout().handleCue(cue, data)
+      // Dispatch through the injected domain dispatcher — `startInternal` guarantees this
+      // domain's handlers exist on every chain, so this reaches every rig in lockstep.
+      this.dispatcher.dispatch(cue, data)
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, data)
     } catch (error) {
       log.error('Error handling cue:', error)

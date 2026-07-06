@@ -48,6 +48,11 @@ export class Rb3ChainRuntime implements YargCueRuntime {
     )
   }
 
+  /** Stop the active RB3 cue on every chain; mirrors ChainFanout.yargStopActiveCue for the RB3 slot. */
+  public stopActiveCue(): void {
+    for (const c of this.fanout.getChains()) c.rb3CueHandler?.stopActiveCue()
+  }
+
   public handleDrumNote(noteType: DrumNoteType, data: CueData): void {
     for (const c of this.fanout.getChains()) c.rb3CueHandler?.handleDrumNote(noteType, data)
   }

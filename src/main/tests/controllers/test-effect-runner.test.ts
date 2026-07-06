@@ -1,6 +1,7 @@
 /**
- * TestEffectRunner under multi-rig: start ensures every chain has a YARG handler so the
- * test cue reaches every rig (not just the primary), and stop blackouts every chain.
+ * TestEffectRunner under multi-rig: start ensures every chain has this domain's handler so the
+ * test cue reaches every rig (not just the primary), the interval re-dispatches the cue
+ * continuously (so a held strobe keeps flashing), and stop stops the active cue and blackouts.
  */
 import { describe, expect, it, jest } from '@jest/globals'
 
@@ -8,7 +9,11 @@ jest.mock('../../utils/windowUtils', () => ({
   sendToAllWindows: jest.fn(),
 }))
 
-import { TestEffectRunner, type TestEffectRunnerContext } from '../../controllers/TestEffectRunner'
+import {
+  TestEffectRunner,
+  type TestEffectRunnerContext,
+  type TestCueDispatcher,
+} from '../../controllers/TestEffectRunner'
 import type { ChainFanout } from '../../../photonics-dmx/controllers/ChainFanout'
 import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
 
@@ -32,40 +37,46 @@ function makeFanout(chains: RigChain[]): ChainFanout {
   } as unknown as ChainFanout
 }
 
+/** A dispatcher wired like the YARG domain: dispatch/stop delegate to the fanout mocks. */
+function makeDispatcher(fanout: ChainFanout, ensureHandlers: () => void): TestCueDispatcher {
+  return {
+    ensureHandlers,
+    dispatch: (cue, data) => void fanout.handleCue(cue, data),
+    stopActiveCue: () => fanout.yargStopActiveCue(),
+  }
+}
+
 describe('TestEffectRunner under multi-rig', () => {
-  it('startTestEffect ensures every chain has a YARG handler before ticking', async () => {
+  it('startTestEffect ensures every chain has a handler before ticking', async () => {
     const chains = [makeChainStub('a'), makeChainStub('b')]
     const fanout = makeFanout(chains)
-    const ensureChainsHaveYargHandlers = jest.fn(() => {
-      // Simulate the helper attaching handlers.
+    const ensureHandlers = jest.fn(() => {
       for (const c of chains) {
         c.yargCueHandler = {} as unknown as RigChain['yargCueHandler']
       }
     })
     const ctx: TestEffectRunnerContext = {
       getChainFanout: () => fanout,
-      ensureChainsHaveYargHandlers,
       ensureInitialized: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
     }
-    const runner = new TestEffectRunner(ctx)
+    const runner = new TestEffectRunner(ctx, makeDispatcher(fanout, ensureHandlers))
 
     runner.startTestEffect('Chorus')
     await Promise.resolve() // let ensureInitialized resolve
     await Promise.resolve()
 
-    expect(ensureChainsHaveYargHandlers).toHaveBeenCalledTimes(1)
+    expect(ensureHandlers).toHaveBeenCalledTimes(1)
     await runner.stopTestEffect()
   })
 
-  it('stopTestEffect stops every chain and awaits per-chain blackout', async () => {
+  it('stopTestEffect stops the active cue and awaits per-chain blackout', async () => {
     const chains = [makeChainStub('a'), makeChainStub('b')]
     const fanout = makeFanout(chains)
     const ctx: TestEffectRunnerContext = {
       getChainFanout: () => fanout,
-      ensureChainsHaveYargHandlers: jest.fn(),
       ensureInitialized: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
     }
-    const runner = new TestEffectRunner(ctx)
+    const runner = new TestEffectRunner(ctx, makeDispatcher(fanout, jest.fn()))
 
     // startTestEffect first so stopTestEffect doesn't early-return.
     runner.startTestEffect('Chorus')
@@ -78,25 +89,27 @@ describe('TestEffectRunner under multi-rig', () => {
     expect(fanout.yargBlackout).toHaveBeenCalledWith(0)
   })
 
-  it('test cue is dispatched through the fanout, not a single primary handler', async () => {
+  it('re-dispatches the cue continuously on the interval (held strobe keeps flashing)', async () => {
     jest.useFakeTimers()
     try {
       const chains = [makeChainStub('a'), makeChainStub('b')]
       const fanout = makeFanout(chains)
       const ctx: TestEffectRunnerContext = {
         getChainFanout: () => fanout,
-        ensureChainsHaveYargHandlers: jest.fn(() => {
-          for (const c of chains) c.yargCueHandler = {} as unknown as RigChain['yargCueHandler']
-        }),
         ensureInitialized: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
       }
-      const runner = new TestEffectRunner(ctx)
-      runner.startTestEffect('Chorus')
+      const ensureHandlers = jest.fn(() => {
+        for (const c of chains) c.yargCueHandler = {} as unknown as RigChain['yargCueHandler']
+      })
+      const runner = new TestEffectRunner(ctx, makeDispatcher(fanout, ensureHandlers))
+      runner.startTestEffect('Strobe_Fast')
       // Drain the ensureInitialized microtask so the interval is armed.
       await Promise.resolve()
       await Promise.resolve()
-      jest.advanceTimersByTime(20)
-      expect(fanout.handleCue).toHaveBeenCalled()
+
+      // A single tick would flash once; several ticks must dispatch several times.
+      jest.advanceTimersByTime(16 * 5)
+      expect((fanout.handleCue as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(3)
       await runner.stopTestEffect()
     } finally {
       jest.useRealTimers()
@@ -107,10 +120,9 @@ describe('TestEffectRunner under multi-rig', () => {
     const fanout = makeFanout([])
     const ctx: TestEffectRunnerContext = {
       getChainFanout: () => fanout,
-      ensureChainsHaveYargHandlers: jest.fn(),
       ensureInitialized: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
     }
-    const runner = new TestEffectRunner(ctx)
+    const runner = new TestEffectRunner(ctx, makeDispatcher(fanout, jest.fn()))
 
     runner.startTestEffect('Chorus')
     await Promise.resolve()

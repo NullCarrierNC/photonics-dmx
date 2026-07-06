@@ -25,6 +25,7 @@ import { noopRuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 import { RigChain } from './RigChain'
 import { ChainFanout } from './ChainFanout'
 import { TestEffectRunner } from './TestEffectRunner'
+import { Rb3ChainRuntime } from '../../photonics-dmx/controllers/Rb3ChainRuntime'
 import { MotionCueSimulator } from './MotionCueSimulator'
 import { ListenerLifecycleController } from './ListenerLifecycleController'
 import {
@@ -131,6 +132,10 @@ export class ControllerManager {
   private onSimulationPreempt: (() => void) | null = null
 
   private readonly testEffectRunner: TestEffectRunner
+  /** RB3 cue-mode twin of {@link testEffectRunner}: dispatches through the RB3 chain runtime. */
+  private readonly rb3TestEffectRunner: TestEffectRunner
+  /** Reused RB3 dispatch surface for the RB3 test-effect runner (the fanout is stable). */
+  private readonly rb3SimRuntime = new Rb3ChainRuntime(this.chainFanout)
   private readonly motionCueSimulator: MotionCueSimulator
   private readonly senderLifecycle: SenderLifecycleController
   private readonly listenerLifecycle: ListenerLifecycleController
@@ -149,10 +154,19 @@ export class ControllerManager {
       broadcaster: mainRuntimeBroadcaster,
       hasReceivers: hasBrowserWindows,
     })
-    this.testEffectRunner = new TestEffectRunner({
+    const testEffectCtx = {
       getChainFanout: () => this.chainFanout,
-      ensureChainsHaveYargHandlers: () => this.ensureChainsHaveYargHandlersForSimulation(),
       ensureInitialized: () => this.init(),
+    }
+    this.testEffectRunner = new TestEffectRunner(testEffectCtx, {
+      ensureHandlers: () => this.ensureChainsHaveYargHandlersForSimulation(),
+      dispatch: (cue, data) => void this.chainFanout.handleCue(cue, data),
+      stopActiveCue: () => this.chainFanout.yargStopActiveCue(),
+    })
+    this.rb3TestEffectRunner = new TestEffectRunner(testEffectCtx, {
+      ensureHandlers: () => this.ensureChainsHaveRb3HandlersForSimulation(),
+      dispatch: (cue, data) => void this.rb3SimRuntime.handleCue(cue, data),
+      stopActiveCue: () => this.rb3SimRuntime.stopActiveCue(),
     })
     this.motionCueSimulator = new MotionCueSimulator({
       getChainFanout: () => this.chainFanout,
@@ -524,10 +538,25 @@ export class ControllerManager {
   }
 
   /**
-   * Stop the currently running test effect
+   * Start an RB3 cue-mode test effect: interval-driven dispatch through the RB3 chain runtime so a
+   * held strobe re-fires `cue-called` continuously, mirroring the live processor keepalive.
+   */
+  public startRb3TestEffect(
+    effectId: string,
+    venueSize?: 'NoVenue' | 'Small' | 'Large',
+    bpm?: number,
+    cueGroup?: string,
+  ): void {
+    this.rb3TestEffectRunner.startTestEffect(effectId, venueSize, bpm, cueGroup)
+  }
+
+  /**
+   * Stop the currently running test effect. Both domain runners are stopped; the idle one
+   * early-returns, so this is a safe no-op for whichever domain isn't running.
    */
   public async stopTestEffect(): Promise<void> {
     await this.testEffectRunner.stopTestEffect()
+    await this.rb3TestEffectRunner.stopTestEffect()
   }
 
   /**
