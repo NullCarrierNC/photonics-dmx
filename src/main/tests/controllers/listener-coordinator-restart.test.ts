@@ -11,6 +11,8 @@ import { DmxLightManager } from '../../../photonics-dmx/controllers/DmxLightMana
 import { ILightingController } from '../../../photonics-dmx/controllers/sequencer/interfaces'
 import { ChainFanout } from '../../../photonics-dmx/controllers/ChainFanout'
 import { noopRuntimeBroadcaster } from '../../../photonics-dmx/runtime/broadcaster'
+import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
+import { getRb3CueRegistry } from '../../../photonics-dmx/cues/registries/Rb3CueRegistry'
 import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
 
 function makeDeps(): ListenerCoordinatorDeps {
@@ -42,11 +44,15 @@ function makeDeps(): ListenerCoordinatorDeps {
     getActiveYargMotionCueRef: () => null,
     getMotionCueMinimumHoldMs: () => 5000,
     getMotionCueProbabilityPercent: () => 100,
+    getActiveRb3MotionCueRef: () => null,
+    getRb3MotionCueMinimumHoldMs: () => 5000,
+    getRb3MotionCueProbabilityPercent: () => 100,
     getFallbackCueTimeMs: () => 20000,
     sendSenderError: jest.fn(),
     sendToAllWindows: jest.fn(),
     runtimeBroadcaster: noopRuntimeBroadcaster(),
     setCueHandlerRef: jest.fn(),
+    setRb3CueHandlerRef: jest.fn(),
     getRb3ProcessingMode: () => 'direct',
   }
 }
@@ -102,5 +108,51 @@ describe('ListenerCoordinator listener shutdown ordering', () => {
     expect(co.isRb3Enabled).toBe(false)
     expect(co.rb3eListener).toBeNull()
     expect(co.processorManager).toBeNull()
+  })
+})
+
+describe('ListenerCoordinator ends the song span on disable so locks do not leak', () => {
+  it('disableYarg ends the YARG registry song and leaves the RB3 registry untouched', async () => {
+    const lc = new ListenerCoordinator(makeDeps())
+    const yargEnd = jest.spyOn(YargCueRegistry.getInstance(), 'onSongEnd')
+    const yargMotionEnd = jest.spyOn(YargCueRegistry.getInstance(), 'onMotionSongEnd')
+    const rb3End = jest.spyOn(getRb3CueRegistry(), 'onSongEnd')
+
+    const co = lc as unknown as {
+      isYargEnabled: boolean
+      yargListener: { shutdown: () => Promise<void> } | null
+    }
+    co.isYargEnabled = true
+    co.yargListener = { shutdown: () => Promise.resolve() }
+
+    await lc.disableYarg()
+
+    expect(yargEnd).toHaveBeenCalled()
+    expect(yargMotionEnd).toHaveBeenCalled()
+    expect(rb3End).not.toHaveBeenCalled()
+    jest.restoreAllMocks()
+  })
+
+  it('disableRb3 ends the RB3 registry song and leaves the YARG registry untouched', async () => {
+    const lc = new ListenerCoordinator(makeDeps())
+    const rb3End = jest.spyOn(getRb3CueRegistry(), 'onSongEnd')
+    const rb3MotionEnd = jest.spyOn(getRb3CueRegistry(), 'onMotionSongEnd')
+    const yargEnd = jest.spyOn(YargCueRegistry.getInstance(), 'onSongEnd')
+
+    const co = lc as unknown as {
+      isRb3Enabled: boolean
+      rb3eListener: { shutdown: () => Promise<void> } | null
+      processorManager: { destroy: () => void } | null
+    }
+    co.isRb3Enabled = true
+    co.rb3eListener = { shutdown: () => Promise.resolve() }
+    co.processorManager = { destroy: jest.fn() }
+
+    await lc.disableRb3()
+
+    expect(rb3End).toHaveBeenCalled()
+    expect(rb3MotionEnd).toHaveBeenCalled()
+    expect(yargEnd).not.toHaveBeenCalled()
+    jest.restoreAllMocks()
   })
 })

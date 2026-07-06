@@ -57,6 +57,7 @@ export class RigChain {
    * this chain's sequencer + light manager so events resolve against this rig's lights.
    */
   public yargCueHandler: YargCueHandler | null = null
+  public rb3CueHandler: YargCueHandler | null = null
   public audioCueHandler: AudioCueHandler | null = null
   public rb3MenuCueHandler: Rb3MenuCueHandler | null = null
 
@@ -85,6 +86,14 @@ export class RigChain {
         log.error(`Error shutting down YARG cue handler for rig ${this.rigId}:`, err)
       }
       this.yargCueHandler = null
+    }
+    if (this.rb3CueHandler) {
+      try {
+        this.rb3CueHandler.shutdown()
+      } catch (err) {
+        log.error(`Error shutting down RB3 cue handler for rig ${this.rigId}:`, err)
+      }
+      this.rb3CueHandler = null
     }
     if (this.audioCueHandler) {
       try {

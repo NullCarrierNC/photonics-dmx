@@ -115,6 +115,8 @@ export class ControllerManager {
   private dmxPublisher: DmxPublisher | null = null
 
   private cueHandler: YargCueHandler | null = null
+  private rb3CueHandler: YargCueHandler | null = null
+  private listenerOpChain: Promise<void> = Promise.resolve()
   private nodeCueLoader: NodeCueLoader | null = null
   private effectLoader: EffectLoader | null = null
 
@@ -161,6 +163,10 @@ export class ControllerManager {
           this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
         getMotionCueProbabilityPercent: () =>
           this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
+        getActiveRb3MotionCueRef: () => this.getRb3MotionDomain().activeCueRef ?? null,
+        getRb3MotionCueMinimumHoldMs: () => this.getRb3MotionDomain().minimumHoldMs ?? 5000,
+        getRb3MotionCueProbabilityPercent: () =>
+          this.getRb3MotionDomain().probabilityPercent ?? 100,
         getFallbackCueTimeMs: () => this.config.getPreference('yargFallbackCueTimeMs') ?? 20000,
         sendSenderError: (message: string) => {
           sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
@@ -169,6 +175,9 @@ export class ControllerManager {
         runtimeBroadcaster: mainRuntimeBroadcaster,
         setCueHandlerRef: (h) => {
           this.cueHandler = h
+        },
+        setRb3CueHandlerRef: (h) => {
+          this.rb3CueHandler = h
         },
         getRb3ProcessingMode: () =>
           normalizeRb3ProcessingMode(this.config.getPreference('rb3Prefs')?.processingMode),
@@ -252,6 +261,21 @@ export class ControllerManager {
     } catch {
       // The owner already logged / rethrew; we just needed to wait.
     }
+  }
+
+  /**
+   * Serialize listener enable/disable so a YARG and an RB3 toggle can't interleave. Each op waits
+   * for the previous one to settle (success or failure) before running, so handler slots are never
+   * built and torn down concurrently.
+   */
+  private runListenerOp<T>(op: () => Promise<T>): Promise<T> {
+    const previous = this.listenerOpChain ?? Promise.resolve()
+    const run = previous.then(op, op)
+    this.listenerOpChain = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
   }
 
   public getLifecyclePhase(): LifecyclePhase {
@@ -558,23 +582,24 @@ export class ControllerManager {
   }
 
   /**
-   * Enable YARG listener.
-   * Awaits any in-flight restart so enable/disable cannot interleave with teardown/reinit.
+   * Enable YARG listener. Serialized against the other listener toggles and any in-flight restart
+   * so enable/disable cannot interleave with each other or with teardown/reinit.
    */
-  public enableYarg(): void {
-    void this.awaitInFlightLifecycleWork()
-      .then(() => {
-        this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
-      })
-      .catch((err) => log.error('Error enabling YARG after in-flight lifecycle work:', err))
+  public async enableYarg(): Promise<void> {
+    await this.runListenerOp(async () => {
+      await this.awaitInFlightLifecycleWork()
+      await this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
+    })
   }
 
   /**
    * Disable YARG listener
    */
   public async disableYarg(): Promise<void> {
-    await this.awaitInFlightLifecycleWork()
-    await this.listenerLifecycle.yargRb3.disableYarg()
+    await this.runListenerOp(async () => {
+      await this.awaitInFlightLifecycleWork()
+      await this.listenerLifecycle.yargRb3.disableYarg()
+    })
   }
 
   /**
@@ -582,18 +607,22 @@ export class ControllerManager {
    * chains from here and simulation IPC is refused while RB3E is enabled.
    */
   public async enableRb3(): Promise<void> {
-    await this.awaitInFlightLifecycleWork()
-    await this.stopTestEffect()
-    this.onSimulationPreempt?.()
-    await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
+    await this.runListenerOp(async () => {
+      await this.awaitInFlightLifecycleWork()
+      await this.stopTestEffect()
+      this.onSimulationPreempt?.()
+      await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
+    })
   }
 
   /**
    * Disable Rb3 listener
    */
   public async disableRb3(): Promise<void> {
-    await this.awaitInFlightLifecycleWork()
-    await this.listenerLifecycle.yargRb3.disableRb3()
+    await this.runListenerOp(async () => {
+      await this.awaitInFlightLifecycleWork()
+      await this.listenerLifecycle.yargRb3.disableRb3()
+    })
   }
 
   /**
@@ -775,6 +804,22 @@ export class ControllerManager {
 
   public getCueHandler(): YargCueHandler | null {
     return this.cueHandler
+  }
+
+  public getRb3CueHandler(): YargCueHandler | null {
+    return this.rb3CueHandler
+  }
+
+  /**
+   * RB3 motion tunables for the RB3 cue handlers. Defaults until the RB3 motion cue domain is
+   * wired to preferences.
+   */
+  private getRb3MotionDomain(): {
+    activeCueRef: YargMotionCueRef | null
+    minimumHoldMs: number
+    probabilityPercent: number
+  } {
+    return { activeCueRef: null, minimumHoldMs: 5000, probabilityPercent: 100 }
   }
 
   /**
@@ -1000,7 +1045,7 @@ export class ControllerManager {
 
       if (wasYargEnabled) {
         // Use the listener directly to avoid re-entering the in-flight restart guard.
-        this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
+        await this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
       } else if (wasRb3Enabled) {
         await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
       }
@@ -1134,6 +1179,7 @@ export class ControllerManager {
   public setMotionEnabledGlobal(enabled: boolean): void {
     for (const chain of this.rigChains) {
       chain.yargCueHandler?.setMotionEnabled(enabled)
+      chain.rb3CueHandler?.setMotionEnabled(enabled)
     }
     this.listenerLifecycle.audio.setMotionEnabled(enabled)
   }

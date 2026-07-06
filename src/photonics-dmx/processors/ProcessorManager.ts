@@ -10,6 +10,7 @@ import { ChainFanout } from '../controllers/ChainFanout'
 import { StageKitConfig } from '../listeners/RB3/StageKitTypes'
 import { CueData } from '../cues/types/cueTypes'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
+import type { YargCueRuntime } from '../listeners/YARG/YargNetworkListener'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('ProcessorManager')
 
@@ -26,6 +27,9 @@ export interface ProcessorManagerConfig {
   mode: ProcessingMode
   stageKitConfig?: Partial<StageKitConfig>
   debug?: boolean
+  /** Cue-mode dispatch surface. Defaults to the chain fanout; the coordinator passes the RB3
+   *  runtime so cue mode drives the RB3 handler slot, and the laser branch wraps it with its tee. */
+  cueRuntime?: YargCueRuntime
 }
 
 /**
@@ -167,17 +171,17 @@ export class ProcessorManager extends EventEmitter {
 
   /**
    * Start cue mode: turn the StageKit packet stream into RB3 node-cue dispatches. The processor
-   * dispatches through the ChainFanout, which fans the RB3 cue to every rig chain's YargCueHandler.
+   * dispatches through the RB3 cue runtime (the coordinator's RB3 handler fanout, or the chain
+   * fanout as a fallback), and the chain fanout dispatches the menu look to each rig.
    */
   private startCueMode(): void {
     log.info('ProcessorManager: Starting cue mode...')
 
     if (!this.stageKitCueProcessor) {
-      // The chain fanout is both the cue runtime (RB3 gameplay cues) and the menu dispatch
-      // (playMenuFrame / clear to each rig's RB3 menu handler).
-      this.stageKitCueProcessor = new Rb3StageKitCueProcessor(this.chainFanout, {
-        menuDispatch: this.chainFanout,
-      })
+      this.stageKitCueProcessor = new Rb3StageKitCueProcessor(
+        this.config.cueRuntime ?? this.chainFanout,
+        { menuDispatch: this.chainFanout },
+      )
     }
     this.stageKitCueProcessor.startListening(this.networkListener!)
     log.info('ProcessorManager: Cue mode started')

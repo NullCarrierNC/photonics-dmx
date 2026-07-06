@@ -4,6 +4,9 @@ import { YargNetworkListener } from '../../photonics-dmx/listeners/YARG/YargNetw
 import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetworkListener'
 import { Rb3MenuCueHandler } from '../../photonics-dmx/cueHandlers/Rb3MenuCueHandler'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
+import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
+import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
+import { Rb3ChainRuntime } from '../../photonics-dmx/controllers/Rb3ChainRuntime'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
 import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
@@ -27,11 +30,15 @@ export interface ListenerCoordinatorDeps {
   getActiveYargMotionCueRef: () => { groupId: string; cueId: string } | null
   getMotionCueMinimumHoldMs: () => number
   getMotionCueProbabilityPercent: () => number
+  getActiveRb3MotionCueRef: () => { groupId: string; cueId: string } | null
+  getRb3MotionCueMinimumHoldMs: () => number
+  getRb3MotionCueProbabilityPercent: () => number
   getFallbackCueTimeMs: () => number
   sendSenderError: (message: string) => void
   sendToAllWindows: (channel: string, payload: unknown) => void
   runtimeBroadcaster: RuntimeBroadcaster
   setCueHandlerRef: (h: YargCueHandler | null) => void
+  setRb3CueHandlerRef: (h: YargCueHandler | null) => void
   getRb3ProcessingMode: () => ProcessingMode
 }
 
@@ -40,24 +47,18 @@ export class ListenerCoordinator {
   private rb3eListener: Rb3eNetworkListener | null = null
   private processorManager: ProcessorManager | null = null
   private cueHandler: YargCueHandler | null = null
+  private rb3CueHandler: YargCueHandler | null = null
   private isYargEnabled = false
   private isRb3Enabled = false
 
   constructor(private readonly deps: ListenerCoordinatorDeps) {}
 
-  public enableYarg(isInitialized: boolean, initAsync: () => Promise<void>): void {
+  public async enableYarg(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
     if (!isInitialized) {
       log.info('Initializing system before enabling YARG')
-      initAsync()
-        .then(() => this.enableYargInternal())
-        .catch((error) => {
-          log.error('Error during initialization:', error)
-        })
-      return
+      await initAsync()
     }
-    void this.enableYargInternal().catch((error) => {
-      log.error('Error enabling YARG:', error)
-    })
+    await this.enableYargInternal()
   }
 
   public async enableYargInternal(): Promise<void> {
@@ -162,11 +163,55 @@ export class ListenerCoordinator {
     this.deps.setCueHandlerRef(this.cueHandler)
   }
 
-  /** Shutdown every chain's YARG handler and drop the shared cue-handler reference. */
+  /**
+   * Build one RB3 cue handler per chain, pointed at the RB3 cue registry so RB3 cue mode's group,
+   * lock, consistency, and motion state stay isolated from the YARG listener's. Populates the
+   * RB3-only slot (not `yargCueHandler`) and exposes the primary chain's handler as the RB3 cue
+   * handler reference; motion tunables come from the RB3 motion domain.
+   */
+  private buildRb3ChainHandlers(chains: RigChain[]): void {
+    for (const chain of chains) {
+      if (chain.rb3CueHandler) {
+        chain.rb3CueHandler.shutdown()
+      }
+      const handler = new YargCueHandler(chain.dmxLightManager, chain.sequencer, {
+        registry: getRb3CueRegistry(),
+        getMotionCueMinimumHoldMs: this.deps.getRb3MotionCueMinimumHoldMs,
+        getMotionCueProbabilityPercent: this.deps.getRb3MotionCueProbabilityPercent,
+        runtimeBroadcaster: chain.isPrimary ? this.deps.runtimeBroadcaster : noopBroadcaster(),
+      })
+      handler.setMotionEnabled(this.deps.getMotionEnabled())
+      handler.setManualMotionRef(this.deps.getActiveRb3MotionCueRef())
+      chain.rb3CueHandler = handler
+    }
+    const primary = chains.find((c) => c.isPrimary) ?? chains[0]
+    this.rb3CueHandler = primary.rb3CueHandler
+    this.deps.setRb3CueHandlerRef(this.rb3CueHandler)
+  }
+
+  /** Shutdown every chain's YARG handler, drop the shared reference, and end any open YARG song so
+   *  the registry's once-per-song and motion locks don't survive into the next session. */
   private clearYargCueHandlers(): void {
     this.disposeYargChainHandlers()
     this.cueHandler = null
     this.deps.setCueHandlerRef(null)
+    YargCueRegistry.getInstance().onSongEnd()
+    YargCueRegistry.getInstance().onMotionSongEnd()
+  }
+
+  /** Shutdown every chain's RB3 cue handler, drop the reference, and end any open RB3 song so the
+   *  RB3 registry's locks don't survive into the next session. */
+  private clearRb3CueHandlers(): void {
+    for (const chain of this.deps.getRigChains()) {
+      if (chain.rb3CueHandler) {
+        chain.rb3CueHandler.shutdown()
+        chain.rb3CueHandler = null
+      }
+    }
+    this.rb3CueHandler = null
+    this.deps.setRb3CueHandlerRef(null)
+    getRb3CueRegistry().onSongEnd()
+    getRb3CueRegistry().onMotionSongEnd()
   }
 
   /** Shutdown every chain's YARG handler. Safe to call when no handlers exist. */
@@ -211,17 +256,18 @@ export class ListenerCoordinator {
       chain.rb3MenuCueHandler = new Rb3MenuCueHandler(chain.dmxLightManager, chain.sequencer)
     }
     const mode = this.deps.getRb3ProcessingMode()
-    // Cue mode dispatches an always-active RB3 cue through the chain fanout, so each chain needs a
-    // YargCueHandler to resolve CueType.RB3 against its own lights (the same handlers the YARG
-    // listener uses). Direct mode drives the sequencer straight from the packet stream instead.
+    // Cue mode dispatches an always-active RB3 cue to each chain's own RB3 cue handler (resolved
+    // against the RB3 cue registry), driven by the RB3 chain runtime. Direct mode drives the
+    // sequencer straight from the packet stream and needs no cue handlers.
+    let cueRuntime: Rb3ChainRuntime | undefined
     if (mode === 'cue') {
-      this.buildYargChainHandlers(chains)
+      this.buildRb3ChainHandlers(chains)
+      cueRuntime = new Rb3ChainRuntime(this.deps.getChainFanout())
     }
-    // The processor takes the chain fanout directly: the StageKit pipeline builds one
-    // per-rig render processor for every chain, and the menu cue handler dispatches
-    // `playMenuFrame` / `clear` to every chain's RB3 menu handler.
+    // The processor takes the chain fanout for menu dispatch (playMenuFrame / clear to each rig's
+    // RB3 menu handler) and, in cue mode, the RB3 chain runtime for gameplay cue dispatch.
     log.info(`ListenerCoordinator: Creating ProcessorManager with mode: ${mode}`)
-    this.processorManager = new ProcessorManager(this.deps.getChainFanout(), { mode })
+    this.processorManager = new ProcessorManager(this.deps.getChainFanout(), { mode, cueRuntime })
     this.processorManager.setCueHandler(this.deps.getChainFanout())
     this.rb3eListener = new Rb3eNetworkListener()
     this.processorManager.setNetworkListener(this.rb3eListener)
@@ -245,7 +291,7 @@ export class ListenerCoordinator {
       this.isRb3Enabled = false
       this.processorManager.destroy()
       this.processorManager = null
-      this.clearYargCueHandlers()
+      this.clearRb3CueHandlers()
       for (const chain of chains) {
         if (chain.rb3MenuCueHandler) {
           chain.rb3MenuCueHandler.shutdown()
@@ -280,8 +326,8 @@ export class ListenerCoordinator {
       this.processorManager.destroy()
       this.processorManager = null
     }
-    // Cue mode built per-chain YargCueHandlers; direct mode leaves none. Safe either way.
-    this.clearYargCueHandlers()
+    // Cue mode built per-chain RB3 cue handlers; direct mode leaves none. Safe either way.
+    this.clearRb3CueHandlers()
     for (const chain of this.deps.getRigChains()) {
       if (chain.rb3MenuCueHandler) {
         chain.rb3MenuCueHandler.shutdown()
@@ -314,6 +360,10 @@ export class ListenerCoordinator {
 
   public getCueHandler(): YargCueHandler | null {
     return this.cueHandler
+  }
+
+  public getRb3CueHandler(): YargCueHandler | null {
+    return this.rb3CueHandler
   }
 
   public getProcessorManager(): ProcessorManager | null {

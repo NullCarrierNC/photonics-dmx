@@ -15,7 +15,7 @@ const log = createLogger('cue-handlers')
 export function setupCueHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
   // Event listeners for YARG and RB3
   ipcMain.on(CUE.YARG_LISTENER_ENABLED, () => {
-    controllerManager.enableYarg()
+    void controllerManager.enableYarg()
   })
 
   ipcMain.on(CUE.YARG_LISTENER_DISABLED, async () => {
@@ -69,12 +69,11 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
 
   // Listen for cue data
   ipcMain.on(CUE.SET_LISTEN_CUE_DATA, (_, shouldListen: boolean) => {
+    // The YARG listener and RB3 cue mode expose the cue-mirror through separate handler refs;
+    // at most one is non-null at a time, so subscribing both covers whichever is active.
     if (shouldListen) {
-      // Listen to cue handler if it exists
-      const cueHandler = controllerManager.getCueHandler()
-      if (cueHandler) {
-        cueHandler.addCueHandledListener(sendCueHandledData)
-      }
+      controllerManager.getCueHandler()?.addCueHandledListener(sendCueHandledData)
+      controllerManager.getRb3CueHandler()?.addCueHandledListener(sendCueHandledData)
 
       // Also listen to ProcessorManager for RB3E direct mode
       const processorManager = controllerManager.getProcessorManager()
@@ -82,11 +81,8 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
         processorManager.on('cueHandled', sendCueHandledData)
       }
     } else {
-      // Remove listeners
-      const cueHandler = controllerManager.getCueHandler()
-      if (cueHandler) {
-        cueHandler.removeCueHandledListener(sendCueHandledData)
-      }
+      controllerManager.getCueHandler()?.removeCueHandledListener(sendCueHandledData)
+      controllerManager.getRb3CueHandler()?.removeCueHandledListener(sendCueHandledData)
 
       const processorManager = controllerManager.getProcessorManager()
       if (processorManager) {
