@@ -272,9 +272,13 @@ export class ControllerManager {
   private runListenerOp<T>(op: () => Promise<T>): Promise<T> {
     const previous = this.listenerOpChain ?? Promise.resolve()
     const run = previous.then(op, op)
+    // Flatten so the next op runs regardless of this one's outcome, and log any failure here
+    // exactly once so fire-and-forget callers (`void enableYarg()`) don't discard it silently.
     this.listenerOpChain = run.then(
       () => undefined,
-      () => undefined,
+      (err) => {
+        log.error('Listener operation failed:', err)
+      },
     )
     return run
   }
