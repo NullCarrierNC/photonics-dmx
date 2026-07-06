@@ -1,23 +1,12 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { CueGroup } from 'src/photonics-dmx/types'
 import {
-  getYargMotionCueGroups,
-  getAudioMotionCueGroups,
-  getEnabledYargMotionCueGroups,
-  setEnabledYargMotionCueGroups,
-  getAvailableYargMotionCues,
-  getDisabledYargMotionCues,
-  setDisabledYargMotionCues,
-  getEnabledAudioMotionCueGroups,
-  setEnabledAudioMotionCueGroups,
-  getAvailableAudioMotionCues,
-  getDisabledAudioMotionCues,
-  setDisabledAudioMotionCues,
-  getRb3MotionCueGroups,
-  getEnabledRb3MotionCueGroups,
-  setEnabledRb3MotionCueGroups,
-  getAvailableRb3MotionCues,
-  getDisabledRb3MotionCues,
-  setDisabledRb3MotionCues,
+  getRb3CueGroups,
+  getEnabledRb3CueGroups,
+  setEnabledRb3CueGroups,
+  getAvailableRb3Cues,
+  getDisabledRb3Cues,
+  setDisabledRb3Cues,
 } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
 import { CueGroupEnableList } from './cue-groups/CueGroupEnableList'
@@ -25,78 +14,24 @@ import { CueGroupRow } from './cue-groups/CueGroupRow'
 import { useCueGroupRovingTabIndex } from './cue-groups/useCueGroupRovingTabIndex'
 import { useLatestGenerationGate } from './cue-groups/useLatestGenerationGate'
 
-const log = createLogger('MotionEnabledCueGroups')
+const log = createLogger('Rb3EnabledCueGroups')
 
-interface MotionCueInfo {
+interface CueInfo {
   id: string
-  name: string
-  description: string
+  yargDescription: string
+  rb3Description: string
+  groupName?: string
 }
 
-interface MotionCueGroupDetails {
-  id: string
-  name: string
-  description?: string
-  cueCount: number
-  cues: MotionCueInfo[]
+interface GroupCueDetails extends CueGroup {
+  cues: CueInfo[]
   isExpanded: boolean
-}
-
-export interface MotionEnabledCueGroupsProps {
-  /**
-   * YARG motion runs with YARG lighting; audio motion runs alongside audio-reactive lighting;
-   * rb3 motion runs with the RB3 StageKit cue-mode look.
-   */
-  platform: 'yarg' | 'audio' | 'rb3'
-}
-
-/** Per-platform IPC + copy binding; the three motion domains share identical channel shapes. */
-const motionPlatformBinding = (platform: 'yarg' | 'audio' | 'rb3') => {
-  switch (platform) {
-    case 'yarg':
-      return {
-        getGroups: getYargMotionCueGroups,
-        getEnabled: getEnabledYargMotionCueGroups,
-        getDisabled: getDisabledYargMotionCues,
-        setEnabled: setEnabledYargMotionCueGroups,
-        setDisabled: setDisabledYargMotionCues,
-        getAvailable: getAvailableYargMotionCues,
-        title: 'YARG Motion Cue Groups',
-        description:
-          'YARG motion programs run in parallel with YARG lighting cues and control pan/tilt on moving heads. Enable the groups you want in the random pool. You can disable individual motion programs within an enabled group; the group stays enabled if at least one program remains on.',
-      }
-    case 'rb3':
-      return {
-        getGroups: getRb3MotionCueGroups,
-        getEnabled: getEnabledRb3MotionCueGroups,
-        getDisabled: getDisabledRb3MotionCues,
-        setEnabled: setEnabledRb3MotionCueGroups,
-        setDisabled: setDisabledRb3MotionCues,
-        getAvailable: getAvailableRb3MotionCues,
-        title: 'RB3 Motion Cue Groups',
-        description:
-          'RB3 motion programs run alongside the RB3 StageKit cue-mode look and control pan/tilt on moving heads. Enable the groups you want in the random pool. You can disable individual motion programs within an enabled group; the group stays enabled if at least one program remains on.',
-      }
-    case 'audio':
-    default:
-      return {
-        getGroups: getAudioMotionCueGroups,
-        getEnabled: getEnabledAudioMotionCueGroups,
-        getDisabled: getDisabledAudioMotionCues,
-        setEnabled: setEnabledAudioMotionCueGroups,
-        setDisabled: setDisabledAudioMotionCues,
-        getAvailable: getAvailableAudioMotionCues,
-        title: 'Audio Motion Cue Groups',
-        description:
-          'Audio motion programs run alongside audio-reactive lighting cues (same timing as your primary/secondary/strobe layers) and control pan/tilt on moving heads. Enable the groups you want in the random pool. You can disable individual motion programs within an enabled group; the group stays enabled if at least one program remains on.',
-      }
-  }
 }
 
 type RowError = { message: string; onRetry: () => void }
 
-const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platform }) => {
-  const [allGroups, setAllGroups] = useState<MotionCueGroupDetails[]>([])
+const Rb3EnabledCueGroups: React.FC = () => {
+  const [allGroups, setAllGroups] = useState<GroupCueDetails[]>([])
   const [enabledGroupIds, setEnabledGroupIds] = useState<string[]>([])
   const [disabledByGroup, setDisabledByGroup] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
@@ -105,37 +40,42 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
   const [persistErrorByGroup, setPersistErrorByGroup] = useState<Record<string, RowError>>({})
   const persistGeneration = useLatestGenerationGate()
   const roving = useCueGroupRovingTabIndex(allGroups.map((g) => g.id))
-  const api = useMemo(() => motionPlatformBinding(platform), [platform])
 
   const fetchGroups = useCallback(async () => {
     try {
       setLoading(true)
       setLoadError(null)
-      const [groups, enabled, disabled] = await Promise.all([
-        api.getGroups(),
-        api.getEnabled(),
-        api.getDisabled(),
+      const [all, enabled, disabled] = await Promise.all([
+        getRb3CueGroups(),
+        getEnabledRb3CueGroups(),
+        getDisabledRb3Cues(),
       ])
 
-      const mappedGroups: MotionCueGroupDetails[] = groups.map((group) => ({
-        ...group,
-        cues: [],
-        isExpanded: false,
-      }))
+      const groupsWithDetails: GroupCueDetails[] = all
+        .map((group) => ({
+          ...group,
+          cues: [],
+          isExpanded: false,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
 
-      setAllGroups(mappedGroups)
+      setAllGroups(groupsWithDetails)
       setEnabledGroupIds(enabled)
       setDisabledByGroup(disabled)
       setExpandErrorByGroup({})
       setPersistErrorByGroup({})
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load motion cue groups'
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to load cue groups'
       setLoadError(message)
-      log.error('Failed to fetch motion cue groups:', error)
+      if (e instanceof Error) {
+        log.error('Failed to fetch cue groups:', e.message)
+      } else {
+        log.error('An unknown error occurred:', e)
+      }
     } finally {
       setLoading(false)
     }
-  }, [api])
+  }, [])
 
   useEffect(() => {
     fetchGroups()
@@ -156,38 +96,35 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
   ): Promise<{ ok: true } | { ok: false; error: string } | { stale: true }> => {
     const token = persistGeneration.nextGeneration()
     try {
-      const enabledResult = await api.setEnabled(nextEnabled)
+      const enabledResult = await setEnabledRb3CueGroups(nextEnabled)
       if (!persistGeneration.isCurrentGeneration(token)) {
         return { stale: true }
       }
       if (enabledResult && 'success' in enabledResult && enabledResult.success === false) {
-        log.error('Failed to save enabled motion cue groups')
-        return {
-          ok: false,
-          error: enabledResult.error || 'Failed to save enabled motion cue groups',
-        }
+        log.error('Failed to save enabled cue groups')
+        return { ok: false, error: enabledResult.error || 'Failed to save enabled cue groups' }
       }
-      const disabledResult = await api.setDisabled(nextDisabled)
+      const disabledResult = await setDisabledRb3Cues(nextDisabled)
       if (!persistGeneration.isCurrentGeneration(token)) {
         return { stale: true }
       }
       if (disabledResult && 'success' in disabledResult && disabledResult.success === false) {
-        log.error('Failed to save disabled motion cues')
-        return { ok: false, error: disabledResult.error || 'Failed to save disabled motion cues' }
+        log.error('Failed to save disabled RB3 cues')
+        return { ok: false, error: disabledResult.error || 'Failed to save disabled RB3 cues' }
       }
       setEnabledGroupIds(nextEnabled)
       setDisabledByGroup(nextDisabled)
       return { ok: true }
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to save motion cue group settings'
-      log.error('Persistence error for motion cue groups:', error)
+        error instanceof Error ? error.message : 'Failed to save RB3 cue group settings'
+      log.error('Persistence error for RB3 cue groups:', error)
       return { ok: false, error: message }
     }
   }
 
   const getGroupCheckboxState = (
-    group: MotionCueGroupDetails,
+    group: GroupCueDetails,
   ): { checked: boolean; indeterminate: boolean } => {
     if (!enabledGroupIds.includes(group.id)) {
       return { checked: false, indeterminate: false }
@@ -240,18 +177,11 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
     })()
   }
 
-  const expandRow = useCallback((groupId: string, cues: MotionCueInfo[]) => {
+  const expandRow = useCallback((groupId: string, cues: CueInfo[]) => {
     setAllGroups((prev) =>
       prev.map((g) => (g.id === groupId ? { ...g, cues, isExpanded: true } : g)),
     )
   }, [])
-
-  const fetchCuesForGroup = useCallback(
-    async (groupId: string): Promise<MotionCueInfo[]> => {
-      return api.getAvailable(groupId)
-    },
-    [api],
-  )
 
   const handleAccordionToggle = async (groupId: string) => {
     const group = allGroups.find((g) => g.id === groupId)
@@ -259,7 +189,7 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
 
     if (!group.isExpanded && group.cues.length === 0) {
       try {
-        const cueDetails = await fetchCuesForGroup(groupId)
+        const cueDetails = await getAvailableRb3Cues(group.id)
         setExpandErrorByGroup((prev) => {
           if (!prev[groupId]) return prev
           const next = { ...prev }
@@ -269,8 +199,9 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
         expandRow(groupId, cueDetails)
         return
       } catch (error) {
-        log.error('Error fetching motion cue details:', error)
-        const message = error instanceof Error ? error.message : 'Failed to load motion cues'
+        log.error('Error fetching cue details:', error)
+        const message =
+          error instanceof Error ? error.message : 'Failed to load cues for this group'
         setExpandErrorByGroup((prev) => ({
           ...prev,
           [groupId]: { message, onRetry: () => void handleAccordionToggle(groupId) },
@@ -288,11 +219,11 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
     let cues = allGroups.find((g) => g.id === groupId)?.cues ?? []
     if (cues.length === 0) {
       try {
-        cues = await fetchCuesForGroup(groupId)
+        cues = await getAvailableRb3Cues(groupId)
         expandRow(groupId, cues)
       } catch (e) {
-        log.error('Failed to load motion cues for toggle:', e)
-        const message = e instanceof Error ? e.message : 'Failed to load motion cues'
+        log.error('Failed to load cues for toggle:', e)
+        const message = e instanceof Error ? e.message : 'Failed to load cues for this group'
         setExpandErrorByGroup((prev) => ({
           ...prev,
           [groupId]: { message, onRetry: () => void handleCueToggle(groupId, cueId, turnOn) },
@@ -342,13 +273,10 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
     }
   }
 
-  const title = api.title
-  const description = api.description
-
   return (
     <CueGroupEnableList
-      title={title}
-      description={description}
+      title="RB3 Lighting Cue Groups"
+      description="Cue groups contain different implementations of the same cue triggered by the RB3 StageKit stream in cue mode. Having multiple groups enabled allows for a wider range of visual effects during gameplay. You can disable individual cues within an enabled group; the group stays enabled if at least one cue remains on."
       loading={loading}
       loadError={loadError}
       onRetryLoad={() => {
@@ -376,18 +304,18 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
             persistError={persistErrorByGroup[group.id] ?? null}>
             {group.cues.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-                No motion programs found in this group.
+                No cues found in this group.
               </p>
             ) : (
               <div className="space-y-1">
-                <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300">
-                  Motion programs in this group ({group.cues.length}):
+                <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 ">
+                  Cues in this group ({group.cues.length}):
                 </h4>
                 {group.cues
                   .sort((a, b) => a.id.localeCompare(b.id))
                   .map((cue) => {
                     const isOn = enabledGroupIds.includes(group.id) && !disabledSet.has(cue.id)
-                    const rowLabelId = `motion-cue-${platform}-${group.id}-${cue.id}-label`
+                    const rowLabelId = `rb3-cue-${group.id}-${cue.id}-label`
                     return (
                       <div key={cue.id} className="flex items-start gap-2 pl-4">
                         <input
@@ -399,10 +327,9 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
                         />
                         <p id={rowLabelId} className="text-xs text-gray-600 dark:text-gray-400">
                           <span className="font-medium text-gray-800 dark:text-gray-200">
-                            {cue.name}
-                          </span>
-                          <span className="text-gray-500 dark:text-gray-500"> ({cue.id})</span>
-                          {cue.description ? <> — {cue.description}</> : null}
+                            {cue.id}:
+                          </span>{' '}
+                          {cue.rb3Description || cue.yargDescription}
                         </p>
                       </div>
                     )
@@ -416,4 +343,4 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
   )
 }
 
-export default MotionEnabledCueGroups
+export default Rb3EnabledCueGroups

@@ -3,6 +3,7 @@ import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
 import YargEnabledCueGroups from '../components/YargEnabledCueGroups'
 import AudioEnabledCueGroups from '../components/AudioEnabledCueGroups'
+import Rb3EnabledCueGroups from '../components/Rb3EnabledCueGroups'
 import MotionEnabledCueGroups from '../components/MotionEnabledCueGroups'
 import MotionMasterToggle from '../components/MotionMasterToggle'
 import CueConsistencySettings from '../components/CueConsistencySettings'
@@ -143,7 +144,19 @@ const Preferences: React.FC = () => {
         aria-labelledby={tabId('rb3')}
         hidden={effectiveTab !== 'rb3'}
         className="space-y-2">
-        {effectiveTab === 'rb3' && <StageKitRb3EnhancedSettings />}
+        {effectiveTab === 'rb3' && (
+          <>
+            <StageKitRb3EnhancedSettings />
+            {/* The cue-group pickers only apply to RB3 cue mode; direct mode drives the rig
+                straight from LED state with no cue selection. */}
+            {prefs.rb3Prefs?.processingMode === 'cue' && (
+              <>
+                <Rb3EnabledCueGroups />
+                {motionMasterEnabled && <MotionEnabledCueGroups platform="rb3" />}
+              </>
+            )}
+          </>
+        )}
       </div>
 
       {advancedModeEnabled && (
