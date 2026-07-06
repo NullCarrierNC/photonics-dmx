@@ -38,7 +38,7 @@ import type { LifecyclePhase } from '../../shared/ipcTypes'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
-import { reconcileEnabledGroups } from './cueGroupReconcile'
+import { reconcileEnabledGroups, persistReconciledGroups } from './cueGroupReconcile'
 import { CUE_DOMAIN_BINDINGS, type CueDomainRegistryBinding } from './cueDomainBindings'
 import {
   AudioCueType,
@@ -464,16 +464,21 @@ export class ControllerManager {
   private async applyEnabledGroupsFromConfig(binding: CueDomainRegistryBinding): Promise<void> {
     const { domain } = binding
     const domainPrefs = this.config.getPreference('cueDomains')[domain]
-    const { enabled, known } = reconcileEnabledGroups(
+    const reconciled = reconcileEnabledGroups(
       domainPrefs.enabledGroups,
       domainPrefs.knownGroups,
       binding.getRegisteredIds(),
     )
-    await this.config.updateCueDomain(domain, { enabledGroups: enabled })
-    await this.config.updateCueDomain(domain, { knownGroups: known })
-    binding.setEnabled(enabled)
+    await persistReconciledGroups(
+      this.config,
+      domain,
+      reconciled,
+      domainPrefs.enabledGroups,
+      domainPrefs.knownGroups,
+    )
+    binding.setEnabled(reconciled.enabled)
     binding.setDisabled(this.config.getPreference('cueDomains')[domain].disabledCues)
-    log.info(`${domain} enabled groups re-applied from config:`, enabled)
+    log.info(`${domain} enabled groups re-applied from config:`, reconciled.enabled)
   }
 
   /** Re-apply every cue domain's enabled groups and disabled cues from configuration. */

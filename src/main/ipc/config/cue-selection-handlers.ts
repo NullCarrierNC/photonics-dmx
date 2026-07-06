@@ -3,7 +3,10 @@ import { ControllerManager } from '../../controllers/ControllerManager'
 import { sendToAllWindows } from '../../utils/windowUtils'
 import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
 import { getRb3CueRegistry } from '../../../photonics-dmx/cues/registries/Rb3CueRegistry'
-import { reconcileEnabledGroups } from '../../controllers/cueGroupReconcile'
+import {
+  reconcileEnabledGroups,
+  persistReconciledGroups,
+} from '../../controllers/cueGroupReconcile'
 import {
   cueDomainBinding,
   type CueDomainRegistryBinding,
@@ -54,17 +57,22 @@ function registerCueGroupDomain(
     const config = controllerManager.getConfig()
     const prefs = config.getAllPreferences()
     const domainPrefs = prefs.cueDomains[domain]
-    const { enabled, known } = reconcileEnabledGroups(
+    const reconciled = reconcileEnabledGroups(
       domainPrefs.enabledGroups,
       domainPrefs.knownGroups,
       binding.getRegisteredIds(),
     )
-    await config.updateCueDomain(domain, { enabledGroups: enabled })
-    await config.updateCueDomain(domain, { knownGroups: known })
-    binding.setEnabled(enabled)
+    await persistReconciledGroups(
+      config,
+      domain,
+      reconciled,
+      domainPrefs.enabledGroups,
+      domainPrefs.knownGroups,
+    )
+    binding.setEnabled(reconciled.enabled)
     binding.setDisabled(domainPrefs.disabledCues)
     spec.afterGet?.(prefs)
-    return enabled
+    return reconciled.enabled
   })
 
   ipcMain.handle(spec.channels.setEnabled, async (_, groupIds: unknown) => {

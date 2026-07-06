@@ -1,5 +1,9 @@
-import { describe, expect, it } from '@jest/globals'
-import { reconcileEnabledGroups } from '../../controllers/cueGroupReconcile'
+import { describe, expect, it, jest } from '@jest/globals'
+import {
+  reconcileEnabledGroups,
+  persistReconciledGroups,
+} from '../../controllers/cueGroupReconcile'
+import type { CueDomain, CueDomainPrefs } from '../../../services/configuration/cueDomainTypes'
 
 describe('reconcileEnabledGroups', () => {
   it('auto-enables registered groups never seen before', () => {
@@ -45,5 +49,56 @@ describe('reconcileEnabledGroups', () => {
   it('drops duplicate stored ids entirely', () => {
     const { enabled } = reconcileEnabledGroups(['a', 'a', 'b'], ['a', 'b'], ['a', 'b'])
     expect(enabled).toEqual(['a', 'b'])
+  })
+})
+
+describe('persistReconciledGroups', () => {
+  const makeConfig = () => ({
+    updateCueDomain: jest.fn<(domain: CueDomain, patch: Partial<CueDomainPrefs>) => Promise<void>>(
+      async () => {},
+    ),
+  })
+
+  it('skips the write when the reconcile matches the stored values', async () => {
+    const config = makeConfig()
+    const wrote = await persistReconciledGroups(
+      config,
+      'yarg',
+      { enabled: ['a', 'b'], known: ['a', 'b'] },
+      ['a', 'b'],
+      ['a', 'b'],
+    )
+    expect(wrote).toBe(false)
+    expect(config.updateCueDomain).not.toHaveBeenCalled()
+  })
+
+  it('writes enabled and known in a single call when changed', async () => {
+    const config = makeConfig()
+    const wrote = await persistReconciledGroups(
+      config,
+      'yarg',
+      { enabled: ['a', 'b'], known: ['a', 'b'] },
+      ['a'],
+      ['a'],
+    )
+    expect(wrote).toBe(true)
+    expect(config.updateCueDomain).toHaveBeenCalledTimes(1)
+    expect(config.updateCueDomain).toHaveBeenCalledWith('yarg', {
+      enabledGroups: ['a', 'b'],
+      knownGroups: ['a', 'b'],
+    })
+  })
+
+  it('writes when only the known baseline changed', async () => {
+    const config = makeConfig()
+    const wrote = await persistReconciledGroups(
+      config,
+      'audio',
+      { enabled: ['a'], known: ['a', 'b'] },
+      ['a'],
+      ['a'],
+    )
+    expect(wrote).toBe(true)
+    expect(config.updateCueDomain).toHaveBeenCalledTimes(1)
   })
 })
