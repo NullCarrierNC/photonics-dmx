@@ -23,7 +23,7 @@ export interface EffectFileSummary {
   bundled?: boolean
 }
 
-export type EffectListSummary = BaseListSummary<EffectFileSummary>
+export type EffectListSummary = BaseListSummary<EffectMode, EffectFileSummary>
 
 export type EffectLoadResult = BaseLoadResult
 
@@ -33,7 +33,7 @@ interface EffectLoaderOptions {
 
 export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSummary> {
   constructor(options: EffectLoaderOptions) {
-    super(options.baseDir, 'effects')
+    super(options.baseDir, 'effects', ['yarg', 'audio'])
   }
 
   public async readFile(filePath: string): Promise<EffectFile> {
@@ -81,7 +81,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
       throw new Error(validation.errors.join(', '))
     }
 
-    const targetDir = mode === 'yarg' ? this.yargDir : this.audioDir
+    const targetDir = this.dirs[mode]
     const sanitizedName = this.sanitizeFilename(filename)
     const filePath = this.resolveInDir(targetDir, sanitizedName)
 
@@ -115,7 +115,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     ref: EffectReference,
     mode: EffectMode,
   ): Promise<EffectFile | null> {
-    const dir = mode === 'yarg' ? this.yargDir : this.audioDir
+    const dir = this.dirs[mode]
     const files = await fs.readdir(dir).catch(() => [])
 
     for (const file of files) {
@@ -197,7 +197,7 @@ export class EffectLoader extends BaseNodeFileLoader<EffectMode, EffectFileSumma
     if (!key) {
       return
     }
-    const summaries = mode === 'yarg' ? this.summaries.yarg : this.summaries.audio
+    const summaries = this.summaries[mode]
     for (const s of summaries) {
       if (path.resolve(s.path) === normalizedTarget) {
         continue

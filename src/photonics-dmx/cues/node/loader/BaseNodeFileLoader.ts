@@ -7,13 +7,15 @@ import chokidar, { FSWatcher } from 'chokidar'
  * Shared file-system plumbing for the node-cue and effect loaders.
  *
  * Owns the orchestration both {@link NodeCueLoader} and {@link EffectLoader}
- * need: reading JSON files from a `yarg` and an `audio` directory under a base
- * dir, registering the results, keeping a per-mode summary list, watching the
- * directories for changes, and sandboxing all paths to those two roots.
+ * need: reading JSON files from one directory per mode under a base dir,
+ * registering the results, keeping a per-mode summary list, watching the
+ * directories for changes, and sandboxing all paths to those roots.
  *
- * The mode discriminant (`'yarg' | 'audio'`) is the same string union in both
- * loaders (`NodeCueMode` / `EffectMode`), captured here as the generic
- * `TMode extends 'yarg' | 'audio'`. `TSummary` is the per-file summary entry
+ * The mode discriminant is a string union that differs per loader
+ * (`NodeCueMode` = `'yarg' | 'audio' | 'rb3'`, `EffectMode` = `'yarg' | 'audio'`),
+ * captured here as the generic `TMode extends string`. The concrete mode list is
+ * supplied to the constructor, so each mode is a data-driven directory/summary
+ * bucket rather than a hardcoded branch. `TSummary` is the per-file summary entry
  * type, which always carries at least a `path` and `mode`.
  *
  * Subclasses supply only their specifics via the protected abstract hooks:
@@ -24,17 +26,15 @@ import chokidar, { FSWatcher } from 'chokidar'
  * Subclasses keep their own loader-specific public API on top (readFile,
  * saveFile, deleteFile, the *ForIpc resolvers, conflict checks, etc.).
  */
-export interface BaseFileSummary<TMode extends 'yarg' | 'audio'> {
+export interface BaseFileSummary<TMode extends string> {
   path: string
   mode: TMode
   updatedAt: number
   errors?: string[]
 }
 
-export interface BaseListSummary<TSummary> {
-  yarg: TSummary[]
-  audio: TSummary[]
-}
+/** One summary bucket per mode, keyed by the mode discriminant. */
+export type BaseListSummary<TMode extends string, TSummary> = Record<TMode, TSummary[]>
 
 export interface BaseLoadResult {
   loaded: number
@@ -45,26 +45,33 @@ export interface BaseLoadResult {
 export const isJsonFile = (filename: string): boolean => filename.toLowerCase().endsWith('.json')
 
 export abstract class BaseNodeFileLoader<
-  TMode extends 'yarg' | 'audio',
+  TMode extends string,
   TSummary extends BaseFileSummary<TMode>,
 > extends EventEmitter {
   protected readonly baseDir: string
-  protected readonly yargDir: string
-  protected readonly audioDir: string
+  protected readonly modes: readonly TMode[]
+  protected readonly dirs: Record<TMode, string>
   protected watcher: FSWatcher | null = null
-  protected summaries: BaseListSummary<TSummary> = { yarg: [], audio: [] }
+  protected summaries: BaseListSummary<TMode, TSummary>
 
   /**
    * @param baseDir application base directory
    * @param subDir  segment under `node-data` that scopes this loader's roots,
-   *                e.g. `'cues'` or `'effects'`; the yarg/audio dirs are
-   *                `<baseDir>/node-data/<subDir>/{yarg,audio}`.
+   *                e.g. `'cues'` or `'effects'`.
+   * @param modes   the mode discriminants this loader handles; each maps to a
+   *                directory `<baseDir>/node-data/<subDir>/<mode>` and a summary
+   *                bucket.
    */
-  constructor(baseDir: string, subDir: string) {
+  constructor(baseDir: string, subDir: string, modes: readonly TMode[]) {
     super()
     this.baseDir = baseDir
-    this.yargDir = path.join(this.baseDir, 'node-data', subDir, 'yarg')
-    this.audioDir = path.join(this.baseDir, 'node-data', subDir, 'audio')
+    this.modes = modes
+    this.dirs = {} as Record<TMode, string>
+    this.summaries = {} as BaseListSummary<TMode, TSummary>
+    for (const mode of modes) {
+      this.dirs[mode] = path.join(this.baseDir, 'node-data', subDir, mode)
+      this.summaries[mode] = []
+    }
   }
 
   // ---- per-loader specifics -------------------------------------------------
@@ -84,10 +91,7 @@ export abstract class BaseNodeFileLoader<
     await this.ensureDirectories()
     this.onBeforeLoadAll()
 
-    const results = await Promise.all([
-      this.loadDirectory('yarg' as TMode),
-      this.loadDirectory('audio' as TMode),
-    ])
+    const results = await Promise.all(this.modes.map((mode) => this.loadDirectory(mode)))
 
     const summary = results.reduce<BaseLoadResult>(
       (acc, curr) => ({
@@ -109,20 +113,20 @@ export abstract class BaseNodeFileLoader<
   /** Hook for subclasses to reset transient state before a full (re)load. */
   protected onBeforeLoadAll(): void {}
 
-  public getSummary(): BaseListSummary<TSummary> {
-    return {
-      yarg: [...this.summaries.yarg],
-      audio: [...this.summaries.audio],
+  public getSummary(): BaseListSummary<TMode, TSummary> {
+    const result = {} as BaseListSummary<TMode, TSummary>
+    for (const mode of this.modes) {
+      result[mode] = [...this.summaries[mode]]
     }
+    return result
   }
 
   protected async ensureDirectories(): Promise<void> {
-    await fs.mkdir(this.yargDir, { recursive: true })
-    await fs.mkdir(this.audioDir, { recursive: true })
+    await Promise.all(this.modes.map((mode) => fs.mkdir(this.dirs[mode], { recursive: true })))
   }
 
   protected async loadDirectory(mode: TMode): Promise<BaseLoadResult> {
-    const dir = mode === 'yarg' ? this.yargDir : this.audioDir
+    const dir = this.dirs[mode]
     const files = await fs.readdir(dir).catch(() => [] as string[])
 
     // Paths this mode registered on its previous load, so a file that has since vanished from disk
@@ -173,14 +177,17 @@ export abstract class BaseNodeFileLoader<
   public async startWatching(): Promise<void> {
     await this.ensureDirectories()
 
-    this.watcher = chokidar.watch([this.yargDir, this.audioDir], {
-      ignoreInitial: true,
-      persistent: true,
-      awaitWriteFinish: {
-        stabilityThreshold: 300,
-        pollInterval: 100,
+    this.watcher = chokidar.watch(
+      this.modes.map((mode) => this.dirs[mode]),
+      {
+        ignoreInitial: true,
+        persistent: true,
+        awaitWriteFinish: {
+          stabilityThreshold: 300,
+          pollInterval: 100,
+        },
       },
-    })
+    )
 
     this.watcher.on('add', (file) => this.handleFileChange(file))
     this.watcher.on('change', (file) => this.handleFileChange(file))
@@ -225,7 +232,7 @@ export abstract class BaseNodeFileLoader<
   // ---- summary bookkeeping --------------------------------------------------
 
   protected updateSummary(summary: TSummary): void {
-    const summaries = summary.mode === 'yarg' ? this.summaries.yarg : this.summaries.audio
+    const summaries = this.summaries[summary.mode]
     const existingIndex = summaries.findIndex((item) => item.path === summary.path)
     if (existingIndex >= 0) {
       summaries[existingIndex] = summary
@@ -235,18 +242,18 @@ export abstract class BaseNodeFileLoader<
   }
 
   protected removeSummary(filePath: string): void {
-    this.summaries.yarg = this.summaries.yarg.filter((summary) => summary.path !== filePath)
-    this.summaries.audio = this.summaries.audio.filter((summary) => summary.path !== filePath)
+    for (const mode of this.modes) {
+      this.summaries[mode] = this.summaries[mode].filter((summary) => summary.path !== filePath)
+    }
   }
 
   // ---- path helpers ---------------------------------------------------------
 
   protected getModeFromPath(filePath: string): TMode | null {
-    if (this.isPathWithinDir(filePath, this.yargDir)) {
-      return 'yarg' as TMode
-    }
-    if (this.isPathWithinDir(filePath, this.audioDir)) {
-      return 'audio' as TMode
+    for (const mode of this.modes) {
+      if (this.isPathWithinDir(filePath, this.dirs[mode])) {
+        return mode
+      }
     }
     return null
   }
@@ -267,8 +274,8 @@ export abstract class BaseNodeFileLoader<
   }
 
   /**
-   * Resolves a user-supplied path to an absolute path that must lie under the
-   * YARG or audio roots. Relative segments are anchored to {@link baseDir} so
+   * Resolves a user-supplied path to an absolute path that must lie under one of
+   * this loader's mode roots. Relative segments are anchored to {@link baseDir} so
    * paths cannot escape via cwd. The `label` is woven into the error messages so
    * each loader keeps its existing wording (e.g. "Node cue", "Effect file").
    */
@@ -283,10 +290,7 @@ export abstract class BaseNodeFileLoader<
     const resolved = path.isAbsolute(trimmed)
       ? path.resolve(trimmed)
       : path.resolve(this.baseDir, trimmed)
-    if (
-      !this.isPathWithinDir(resolved, this.yargDir) &&
-      !this.isPathWithinDir(resolved, this.audioDir)
-    ) {
+    if (!this.modes.some((mode) => this.isPathWithinDir(resolved, this.dirs[mode]))) {
       throw new Error(`${dirLabel}`)
     }
     return resolved

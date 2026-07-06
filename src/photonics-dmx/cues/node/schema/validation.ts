@@ -1,5 +1,5 @@
 import { DefinedError } from 'ajv'
-import { validateAudioSchema, validateYargSchema } from './cueFiles'
+import { validateAudioSchema, validateRb3Schema, validateYargSchema } from './cueFiles'
 import { validateAudioEffectSchema, validateYargEffectSchema } from './effectFiles'
 import {
   checkConditionalValidValues,
@@ -19,6 +19,7 @@ import type {
   EffectFile,
   NodeCueFile,
   NodeCueMode,
+  Rb3NodeCueFile,
   VariableDefinition,
   YargEffectFile,
   YargNodeCueFile,
@@ -27,7 +28,7 @@ import type { EffectMode } from '../../types/nodeCueTypes'
 import type { StructuredValidationError } from './helpers'
 
 // Re-export public schema surface for call sites that need compiled validators
-export { validateYargSchema, validateAudioSchema } from './cueFiles'
+export { validateYargSchema, validateAudioSchema, validateRb3Schema } from './cueFiles'
 export { validateYargEffectSchema, validateAudioEffectSchema } from './effectFiles'
 export type { StructuredValidationError } from './helpers'
 
@@ -131,6 +132,87 @@ export const validateYargNodeCueFile = (
   }
 }
 
+export const validateRb3NodeCueFile = (value: unknown): NodeCueValidationResult<Rb3NodeCueFile> => {
+  const migrated = migrateEasingInNodeCueFile(value)
+  if (!validateRb3Schema(migrated)) {
+    return {
+      valid: false,
+      errors: formatErrors(validateRb3Schema.errors as DefinedError[]),
+      structuredErrors: extractStructuredErrors(validateRb3Schema.errors as DefinedError[]),
+    }
+  }
+
+  const semanticErrors: string[] = []
+  const fileData = migrated as Rb3NodeCueFile
+
+  // Check for duplicate group-level variable names
+  const groupVariables = fileData.group.variables ?? []
+  const groupVarNames = new Set<string>()
+  for (const varDef of groupVariables) {
+    if (groupVarNames.has(varDef.name)) {
+      semanticErrors.push(`Duplicate group-level variable name: '${varDef.name}'`)
+    }
+    groupVarNames.add(varDef.name)
+  }
+
+  const seenLightingCueTypes = new Set<string>()
+  const seenMotionCueIds = new Set<string>()
+  for (const cue of fileData.cues) {
+    if (cue.kind === 'lighting') {
+      if (seenLightingCueTypes.has(cue.cueType)) {
+        semanticErrors.push(`Duplicate cueType '${cue.cueType}' in group '${fileData.group.name}'.`)
+      }
+      seenLightingCueTypes.add(cue.cueType)
+    } else {
+      if (seenMotionCueIds.has(cue.id)) {
+        semanticErrors.push(
+          `Duplicate motion cue id '${cue.id}' in motion group '${fileData.group.name}'.`,
+        )
+      }
+      seenMotionCueIds.add(cue.id)
+    }
+  }
+
+  for (const cue of fileData.cues) {
+    // Check for duplicate cue-level variable names
+    const cueVariables = cue.variables ?? []
+    const cueVarNames = new Set<string>()
+    for (const varDef of cueVariables) {
+      if (cueVarNames.has(varDef.name)) {
+        semanticErrors.push(
+          `cue '${cue.name}': Duplicate cue-level variable name: '${varDef.name}'`,
+        )
+      }
+      cueVarNames.add(varDef.name)
+    }
+
+    // Check for circular dependencies (only logic-only cycles are invalid)
+    const logicIds = new Set((cue.nodes.logic ?? []).map((node) => node.id))
+    const actionIds = new Set(cue.nodes.actions.map((a) => a.id))
+    const nonEventIds = new Set<string>([...logicIds, ...actionIds])
+    const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds)
+    semanticErrors.push(...cycleErrors.map((e) => `cue '${cue.name}': ${e}`))
+
+    // Check conditional nodes: literal vs variable validValues
+    const cueVarDefs: VariableDefinition[] = [...groupVariables, ...cueVariables]
+    checkConditionalValidValues(cue.name, 'cue', cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
+  }
+
+  if (semanticErrors.length > 0) {
+    return {
+      valid: false,
+      errors: semanticErrors,
+    }
+  }
+
+  return {
+    valid: true,
+    data: fileData,
+    errors: [],
+    mode: 'rb3',
+  }
+}
+
 export const validateAudioNodeCueFile = (
   value: unknown,
 ): NodeCueValidationResult<AudioNodeCueFile> => {
@@ -231,9 +313,13 @@ export const validateNodeCueFile = (value: unknown): NodeCueValidationResult => 
     return validateYargNodeCueFile(value)
   }
 
+  if (mode === 'rb3') {
+    return validateRb3NodeCueFile(value)
+  }
+
   return {
     valid: false,
-    errors: ['mode must be "yarg" or "audio"'],
+    errors: ['mode must be "yarg", "audio", or "rb3"'],
   }
 }
 

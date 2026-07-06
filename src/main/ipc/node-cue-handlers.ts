@@ -36,7 +36,7 @@ async function persistGroupEnableAfterNodeCueSave(
   groupId: string,
 ): Promise<void> {
   const config = controllerManager.getConfig()
-  const domain = mode === 'yarg' ? 'yarg' : 'audio'
+  const domain = mode === 'yarg' ? 'yarg' : mode === 'rb3' ? 'rb3' : 'audio'
   const binding = cueDomainBinding(domain)
   const domainPrefs = config.getPreference('cueDomains')[domain]
 

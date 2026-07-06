@@ -4,11 +4,13 @@ import {
   validateNodeCueFile,
   validateAudioNodeCueFile,
   validateYargNodeCueFile,
+  validateRb3NodeCueFile,
 } from '../schema/validation'
 import {
   AudioNodeCueFile,
   NodeCueFile,
   NodeCueMode,
+  Rb3NodeCueFile,
   YargNodeCueFile,
 } from '../../types/nodeCueTypes'
 import { NodeCueCompilationError, NodeCueCompiler } from '../compiler/NodeCueCompiler'
@@ -46,7 +48,7 @@ export interface NodeCueFileSummary {
   bundled?: boolean
 }
 
-export type NodeCueListSummary = BaseListSummary<NodeCueFileSummary>
+export type NodeCueListSummary = BaseListSummary<NodeCueMode, NodeCueFileSummary>
 
 export type NodeCueLoadResult = BaseLoadResult
 
@@ -75,11 +77,23 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
   private customAudioCueTypes: Set<AudioCueType> = new Set()
 
   constructor(private readonly options: NodeCueLoaderOptions) {
-    super(options.baseDir, 'cues')
+    super(options.baseDir, 'cues', ['yarg', 'audio', 'rb3'])
   }
 
   protected onBeforeLoadAll(): void {
     this.customAudioCueTypes.clear()
+  }
+
+  /** Runs the per-mode validator for a parsed node cue file. */
+  private validateForMode(mode: NodeCueMode, parsed: unknown) {
+    switch (mode) {
+      case 'yarg':
+        return validateYargNodeCueFile(parsed)
+      case 'rb3':
+        return validateRb3NodeCueFile(parsed)
+      case 'audio':
+        return validateAudioNodeCueFile(parsed)
+    }
   }
 
   public async readFile(filePath: string): Promise<NodeCueFile> {
@@ -92,8 +106,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     const data = await fs.readFile(resolvedPath, 'utf-8')
     const parsed = JSON.parse(data)
     migrateLegacyBearings(parsed)
-    const validation =
-      mode === 'yarg' ? validateYargNodeCueFile(parsed) : validateAudioNodeCueFile(parsed)
+    const validation = this.validateForMode(mode, parsed)
 
     if (!validation.valid) {
       throw new Error(`Invalid node cue file: ${validation.errors.join(', ')}`)
@@ -125,7 +138,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       throw new Error(validation.errors.join(', '))
     }
 
-    const targetDir = mode === 'yarg' ? this.yargDir : this.audioDir
+    const targetDir = this.dirs[mode]
     const sanitizedName = this.sanitizeFilename(filename)
     const filePath = this.resolveInDir(targetDir, sanitizedName)
 
@@ -158,13 +171,19 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     if (kind === 'motion') {
       return []
     }
-    if (mode === 'yarg') {
-      return Object.values(CueType)
+    switch (mode) {
+      case 'yarg':
+        // RB3 is its own domain (a single always-active gameplay cue), not a YARG-selectable
+        // look, so it is excluded from the YARG lighting picker.
+        return Object.values(CueType).filter((t) => t !== CueType.RB3)
+      case 'rb3':
+        return [CueType.RB3]
+      case 'audio': {
+        const registryTypes = new Set(this.options.audioRegistry.getAvailableCueTypes(true))
+        this.customAudioCueTypes.forEach((type) => registryTypes.add(type))
+        return Array.from(registryTypes)
+      }
     }
-
-    const registryTypes = new Set(this.options.audioRegistry.getAvailableCueTypes(true))
-    this.customAudioCueTypes.forEach((type) => registryTypes.add(type))
-    return Array.from(registryTypes)
   }
 
   protected async loadFile(
@@ -174,8 +193,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed = JSON.parse(contents)
     migrateLegacyBearings(parsed)
-    const validation =
-      mode === 'yarg' ? validateYargNodeCueFile(parsed) : validateAudioNodeCueFile(parsed)
+    const validation = this.validateForMode(mode, parsed)
 
     if (!validation.valid) {
       throw new Error(validation.errors.join(', '))
@@ -235,6 +253,17 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       if (groupMeta.isStageKit) {
         this.options.yargRegistry.setStageKitGroup(group.id)
       }
+    } else if (mode === 'rb3') {
+      // RB3 cue mode compiles through the YARG path but registers into its own registry instance.
+      const group = await this.buildYargGroup(file as Rb3NodeCueFile, compileErrors)
+      this.options.rb3Registry.registerGroup(group)
+      const groupMeta = file.group
+      if (groupMeta.isDefault) {
+        this.options.rb3Registry.setDefaultGroup(group.id)
+      }
+      if (groupMeta.isStageKit) {
+        this.options.rb3Registry.setStageKitGroup(group.id)
+      }
     } else {
       const group = await this.buildAudioGroup(file as AudioNodeCueFile, compileErrors)
       this.options.audioRegistry.registerGroup(group)
@@ -259,16 +288,22 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
 
     if (registration.mode === 'yarg') {
       this.options.yargRegistry.unregisterGroup(registration.groupId)
-      this.summaries.yarg = this.summaries.yarg.filter((summary) => summary.path !== filePath)
+    } else if (registration.mode === 'rb3') {
+      this.options.rb3Registry.unregisterGroup(registration.groupId)
     } else {
       this.options.audioRegistry.unregisterGroup(registration.groupId)
-      this.summaries.audio = this.summaries.audio.filter((summary) => summary.path !== filePath)
     }
+    this.summaries[registration.mode] = this.summaries[registration.mode].filter(
+      (summary) => summary.path !== filePath,
+    )
 
     this.fileRegistrations.delete(filePath)
   }
 
-  private async buildYargGroup(file: YargNodeCueFile, compileErrors: string[]): Promise<ICueGroup> {
+  private async buildYargGroup(
+    file: YargNodeCueFile | Rb3NodeCueFile,
+    compileErrors: string[],
+  ): Promise<ICueGroup> {
     const cueMap = new Map<CueType, INetCue>()
     const motionMap = new Map<string, INetCue>()
 

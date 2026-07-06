@@ -885,7 +885,9 @@ const CueEditor: React.FC = () => {
   return (
     <div className="p-4 space-y-4 text-sm h-full flex flex-col">
       <CueEditorToolbar
-        cuePlatform={mode}
+        // The editor is a binary yarg/audio surface; rb3 cue files are loaded headlessly and
+        // never selected here, so narrow the widened NodeCueMode to the two platforms it shows.
+        cuePlatform={mode === 'audio' ? 'audio' : 'yarg'}
         cueKind={cueKind}
         isEffectMode={isEffectMode}
         onCuePlatformChange={(p) => guardJsonEditorNavigation(() => handleCuePlatformChange(p))}

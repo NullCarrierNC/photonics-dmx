@@ -7,7 +7,7 @@ import {
   AUDIO_CUE_DATA_PROPERTIES,
 } from '../../constants/nodeConstants'
 
-export type NodeCueMode = 'yarg' | 'audio'
+export type NodeCueMode = 'yarg' | 'audio' | 'rb3'
 
 /** Lighting = colour/intensity cues; motion = pan/tilt / motion-pattern (parallel layer). */
 export type NodeCueKind = 'lighting' | 'motion'
@@ -396,7 +396,23 @@ export interface AudioNodeCueFile {
   bundled?: boolean
 }
 
-export type NodeCueFile = YargNodeCueFile | AudioNodeCueFile
+/**
+ * RB3 cue-mode file. Cues compile through the YARG path (RB3 cue mode reuses the YARG
+ * cue-selection machinery against its own registry instance), so `cues` are YARG cue
+ * definitions; only the `mode` discriminant and the target registry differ.
+ */
+export interface Rb3NodeCueFile {
+  /** Schema version. */
+  version: 1
+  /** Bundled content revision; used at startup to refresh defaults from the app bundle. */
+  cueVersion?: number
+  mode: 'rb3'
+  group: NodeCueGroupMeta
+  cues: YargNodeCueDefinition[]
+  bundled?: boolean
+}
+
+export type NodeCueFile = YargNodeCueFile | AudioNodeCueFile | Rb3NodeCueFile
 
 export interface BaseEventNode {
   id: string
