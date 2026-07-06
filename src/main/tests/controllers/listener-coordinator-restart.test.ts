@@ -13,6 +13,7 @@ import { ChainFanout } from '../../../photonics-dmx/controllers/ChainFanout'
 import { noopRuntimeBroadcaster } from '../../../photonics-dmx/runtime/broadcaster'
 import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
 import { getRb3CueRegistry } from '../../../photonics-dmx/cues/registries/Rb3CueRegistry'
+import { YargCueHandler } from '../../../photonics-dmx/cueHandlers/YargCueHandler'
 import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
 
 function makeDeps(): ListenerCoordinatorDeps {
@@ -149,8 +150,13 @@ describe('ListenerCoordinator enableRb3 initialization ordering', () => {
 })
 
 describe('ListenerCoordinator ends the song span on disable so locks do not leak', () => {
-  it('disableYarg ends the YARG registry song and leaves the RB3 registry untouched', async () => {
-    const lc = new ListenerCoordinator(makeDeps())
+  it('disableYarg ends the YARG registry song via its handler and leaves the RB3 registry untouched', async () => {
+    const deps = makeDeps()
+    const chain = deps.getRigChains()[0]
+    chain.yargCueHandler = new YargCueHandler(chain.dmxLightManager, chain.sequencer, {
+      registry: YargCueRegistry.getInstance(),
+    })
+    const lc = new ListenerCoordinator(deps)
     const yargEnd = jest.spyOn(YargCueRegistry.getInstance(), 'onSongEnd')
     const yargMotionEnd = jest.spyOn(YargCueRegistry.getInstance(), 'onMotionSongEnd')
     const rb3End = jest.spyOn(getRb3CueRegistry(), 'onSongEnd')
@@ -170,8 +176,13 @@ describe('ListenerCoordinator ends the song span on disable so locks do not leak
     jest.restoreAllMocks()
   })
 
-  it('disableRb3 ends the RB3 registry song and leaves the YARG registry untouched', async () => {
-    const lc = new ListenerCoordinator(makeDeps())
+  it('disableRb3 ends the RB3 registry song via its handler and leaves the YARG registry untouched', async () => {
+    const deps = makeDeps()
+    const chain = deps.getRigChains()[0]
+    chain.rb3CueHandler = new YargCueHandler(chain.dmxLightManager, chain.sequencer, {
+      registry: getRb3CueRegistry(),
+    })
+    const lc = new ListenerCoordinator(deps)
     const rb3End = jest.spyOn(getRb3CueRegistry(), 'onSongEnd')
     const rb3MotionEnd = jest.spyOn(getRb3CueRegistry(), 'onMotionSongEnd')
     const yargEnd = jest.spyOn(YargCueRegistry.getInstance(), 'onSongEnd')

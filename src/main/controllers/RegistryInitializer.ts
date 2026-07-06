@@ -62,23 +62,15 @@ export class RegistryInitializer {
     const registry = getRb3CueRegistry()
     const config = this.ctx.getConfig()
 
-    const enabledGroupIds = config.getPreference('cueDomains').rb3.enabledGroups ?? []
-    if (enabledGroupIds.length > 0) {
-      registry.setEnabledGroups(enabledGroupIds)
-      log.info('Rb3CueRegistry initialized with enabled groups:', enabledGroupIds)
-    } else {
-      const allGroups = registry.getAllGroups()
-      registry.setEnabledGroups(allGroups)
-      log.info('Rb3CueRegistry initialized with all groups (no preference set):', allGroups)
-    }
-
+    // This runs before the node-cue loader registers any groups, so enabled/disabled state would
+    // apply to an empty registry; ControllerManager.applyRb3EnabledGroupsFromConfig reconciles
+    // those once groups exist. Only the registry-wide settings are lasting here.
     registry.setCueConsistencyWindow(config.getPreference('cueConsistencyWindow'))
     registry.setCueGroupSelectionMode(
       config.getPreference('cueDomains').rb3.selectionMode === 'oncePerSong'
         ? 'oncePerSong'
         : 'withinSong',
     )
-    registry.setDisabledCues(config.getPreference('cueDomains').rb3.disabledCues)
   }
 
   public async initializeAudioCueRegistry(): Promise<void> {

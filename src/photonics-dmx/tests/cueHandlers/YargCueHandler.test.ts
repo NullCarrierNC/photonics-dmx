@@ -138,6 +138,18 @@ describe('YargCueHandler shutdown lifecycle', () => {
 
     expect(getStrobeStateManager().getActive()).toBeNull()
   })
+
+  it('shutdown ends the registry song so once-per-song and motion locks do not leak', () => {
+    const injected = YargCueRegistry.getInstance()
+    const songEnd = jest.spyOn(injected, 'onSongEnd')
+    const motionSongEnd = jest.spyOn(injected, 'onMotionSongEnd')
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), { registry: injected })
+
+    handler.shutdown()
+
+    expect(songEnd).toHaveBeenCalled()
+    expect(motionSongEnd).toHaveBeenCalled()
+  })
 })
 
 describe('YargCueHandler strobe history isolation', () => {

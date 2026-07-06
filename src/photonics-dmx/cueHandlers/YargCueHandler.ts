@@ -547,6 +547,11 @@ class YargCueHandler extends EventEmitter {
       this.currentMotionCue = null
       this.currentMotionCueStartTime = null
     }
+    // End any open song on the registry so once-per-song and motion locks never survive a teardown.
+    // This is the single owner of song-end on teardown, covering every path that disposes a handler
+    // (coordinator clear, RigChain.dispose). Both calls are idempotent.
+    this.registry.onSongEnd()
+    this.registry.onMotionSongEnd()
     this.removeAllListeners()
   }
 }

@@ -4,7 +4,6 @@ import { YargNetworkListener } from '../../photonics-dmx/listeners/YARG/YargNetw
 import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetworkListener'
 import { Rb3MenuCueHandler } from '../../photonics-dmx/cueHandlers/Rb3MenuCueHandler'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
-import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
 import { Rb3ChainRuntime } from '../../photonics-dmx/controllers/Rb3ChainRuntime'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
@@ -189,18 +188,16 @@ export class ListenerCoordinator {
     this.deps.setRb3CueHandlerRef(this.rb3CueHandler)
   }
 
-  /** Shutdown every chain's YARG handler, drop the shared reference, and end any open YARG song so
-   *  the registry's once-per-song and motion locks don't survive into the next session. */
+  /** Shutdown every chain's YARG handler and drop the shared reference. Each handler's shutdown ends
+   *  any open YARG song, so the registry's once-per-song and motion locks don't survive the session. */
   private clearYargCueHandlers(): void {
     this.disposeYargChainHandlers()
     this.cueHandler = null
     this.deps.setCueHandlerRef(null)
-    YargCueRegistry.getInstance().onSongEnd()
-    YargCueRegistry.getInstance().onMotionSongEnd()
   }
 
-  /** Shutdown every chain's RB3 cue handler, drop the reference, and end any open RB3 song so the
-   *  RB3 registry's locks don't survive into the next session. */
+  /** Shutdown every chain's RB3 cue handler and drop the reference. Each handler's shutdown ends any
+   *  open RB3 song, so the RB3 registry's locks don't survive into the next session. */
   private clearRb3CueHandlers(): void {
     for (const chain of this.deps.getRigChains()) {
       if (chain.rb3CueHandler) {
@@ -210,8 +207,6 @@ export class ListenerCoordinator {
     }
     this.rb3CueHandler = null
     this.deps.setRb3CueHandlerRef(null)
-    getRb3CueRegistry().onSongEnd()
-    getRb3CueRegistry().onMotionSongEnd()
   }
 
   /** Shutdown every chain's YARG handler. Safe to call when no handlers exist. */

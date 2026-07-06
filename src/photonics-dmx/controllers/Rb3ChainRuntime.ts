@@ -71,9 +71,4 @@ export class Rb3ChainRuntime implements YargCueRuntime {
   public handleSongEvent(condition: SongEventCondition): void {
     for (const c of this.fanout.getChains()) c.sequencer.handleSongEvent(condition)
   }
-
-  /** Stop the active RB3 cue on every chain's handler. Used on teardown. */
-  public stopActiveCue(): void {
-    for (const c of this.fanout.getChains()) c.rb3CueHandler?.stopActiveCue()
-  }
 }
