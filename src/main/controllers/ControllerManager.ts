@@ -39,6 +39,7 @@ import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegi
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
 import { reconcileEnabledGroups } from './cueGroupReconcile'
+import { CUE_DOMAIN_BINDINGS, type CueDomainRegistryBinding } from './cueDomainBindings'
 import {
   AudioCueType,
   AudioMotionCueRef,
@@ -340,12 +341,7 @@ export class ControllerManager {
     await copyDefaultData(process.resourcesPath, baseDir)
     await this.registryInit.initializeEffectLoader() // effects before node cues
     await this.registryInit.initializeNodeCueLoader()
-    await this.applyYargEnabledGroupsFromConfig()
-    await this.applyAudioEnabledGroupsFromConfig()
-    await this.applyRb3EnabledGroupsFromConfig()
-    await this.applyYargMotionEnabledGroupsFromConfig()
-    await this.applyAudioMotionEnabledGroupsFromConfig()
-    await this.applyRb3MotionEnabledGroupsFromConfig()
+    await this.applyAllEnabledGroupsFromConfig()
     await this.initializeListeners()
 
     this.isInitialized = true
@@ -458,120 +454,35 @@ export class ControllerManager {
   }
 
   /**
-   * Re-apply Yarg enabled groups from configuration after all groups are registered.
-   * Node cue groups are registered in initializeNodeCueLoader(), and each registerGroup()
-   * adds the group to enabled by default, which would overwrite a saved "disabled" preference.
-   * Calling this after the node cue loader ensures the persisted preference wins.
-   * Auto-enables groups that were never seen before (vs knownYargCueGroups); user-disabled
-   * groups stay disabled because they remain in the known set.
+   * Re-apply one cue domain's enabled groups and disabled cues from configuration after all groups
+   * are registered. Node cue groups are registered in initializeNodeCueLoader(), and each
+   * registerGroup() adds the group to enabled by default, which would overwrite a saved "disabled"
+   * preference; running this after the loader ensures the persisted preference wins. Auto-enables
+   * groups never seen before (vs the known set); user-disabled groups stay disabled because they
+   * remain in the known set, and deregistered groups are dropped.
    */
-  private async applyYargEnabledGroupsFromConfig(): Promise<void> {
-    const registry = YargCueRegistry.getInstance()
-    const yargDomain = this.config.getPreference('cueDomains').yarg
+  private async applyEnabledGroupsFromConfig(binding: CueDomainRegistryBinding): Promise<void> {
+    const { domain } = binding
+    const domainPrefs = this.config.getPreference('cueDomains')[domain]
     const { enabled, known } = reconcileEnabledGroups(
-      yargDomain.enabledGroups,
-      yargDomain.knownGroups,
-      registry.getAllGroups(),
+      domainPrefs.enabledGroups,
+      domainPrefs.knownGroups,
+      binding.getRegisteredIds(),
     )
-    await this.config.updateCueDomain('yarg', { enabledGroups: enabled })
-    await this.config.updateCueDomain('yarg', { knownGroups: known })
-    registry.setEnabledGroups(enabled)
-    registry.setDisabledCues(this.config.getPreference('cueDomains').yarg.disabledCues)
-    log.info('CueRegistry enabled groups re-applied from config:', enabled)
+    await this.config.updateCueDomain(domain, { enabledGroups: enabled })
+    await this.config.updateCueDomain(domain, { knownGroups: known })
+    binding.setEnabled(enabled)
+    binding.setDisabled(this.config.getPreference('cueDomains')[domain].disabledCues)
+    log.info(`${domain} enabled groups re-applied from config:`, enabled)
   }
 
-  /**
-   * Re-apply audio enabled groups from configuration after all groups are registered.
-   * Auto-enables groups that were never seen before (vs the known set); user-disabled groups stay
-   * disabled because they remain in the known set.
-   */
-  private async applyAudioEnabledGroupsFromConfig(): Promise<void> {
-    const registry = AudioCueRegistry.getInstance()
-    const audioDomain = this.config.getPreference('cueDomains').audio
-    const { enabled, known } = reconcileEnabledGroups(
-      audioDomain.enabledGroups,
-      audioDomain.knownGroups,
-      registry.getRegisteredGroups(),
-    )
-    await this.config.updateCueDomain('audio', { enabledGroups: enabled })
-    await this.config.updateCueDomain('audio', { knownGroups: known })
-    registry.setEnabledGroups(enabled)
-    registry.setDisabledCues(this.config.getPreference('cueDomains').audio.disabledCues)
-    log.info('AudioCueRegistry enabled groups re-applied from config:', enabled)
+  /** Re-apply every cue domain's enabled groups and disabled cues from configuration. */
+  private async applyAllEnabledGroupsFromConfig(): Promise<void> {
+    for (const binding of CUE_DOMAIN_BINDINGS) {
+      await this.applyEnabledGroupsFromConfig(binding)
+    }
+    // Audio selection reads the freshly-applied enabled/disabled state; refresh once after the loop.
     this.refreshAudioCueSelection()
-  }
-
-  /**
-   * Re-apply YARG motion enabled groups from configuration after node cues are registered.
-   */
-  private async applyYargMotionEnabledGroupsFromConfig(): Promise<void> {
-    const registry = YargCueRegistry.getInstance()
-    const motionDomain = this.config.getPreference('cueDomains').yargMotion
-    const { enabled, known } = reconcileEnabledGroups(
-      motionDomain.enabledGroups,
-      motionDomain.knownGroups,
-      registry.getRegisteredMotionGroupIds(),
-    )
-    await this.config.updateCueDomain('yargMotion', { enabledGroups: enabled })
-    await this.config.updateCueDomain('yargMotion', { knownGroups: known })
-    registry.setEnabledMotionGroups(enabled)
-    registry.setDisabledMotionCues(this.config.getPreference('cueDomains').yargMotion.disabledCues)
-    log.info('YARG motion enabled groups re-applied from config:', enabled)
-  }
-
-  /**
-   * Re-apply audio motion enabled groups from configuration after node cues are registered.
-   */
-  private async applyAudioMotionEnabledGroupsFromConfig(): Promise<void> {
-    const registry = AudioCueRegistry.getInstance()
-    const audioMotionDomain = this.config.getPreference('cueDomains').audioMotion
-    const { enabled, known } = reconcileEnabledGroups(
-      audioMotionDomain.enabledGroups,
-      audioMotionDomain.knownGroups,
-      registry.getRegisteredMotionGroupIds(),
-    )
-    await this.config.updateCueDomain('audioMotion', { enabledGroups: enabled })
-    await this.config.updateCueDomain('audioMotion', { knownGroups: known })
-    registry.setEnabledMotionGroups(enabled)
-    registry.setDisabledMotionCues(this.config.getPreference('cueDomains').audioMotion.disabledCues)
-    log.info('Audio motion enabled groups re-applied from config:', enabled)
-  }
-
-  /**
-   * Re-apply RB3 enabled groups from configuration after node cues are registered. Mirrors the
-   * YARG path against the separate RB3 cue registry so RB3 cue mode's enabled groups are its own.
-   */
-  private async applyRb3EnabledGroupsFromConfig(): Promise<void> {
-    const registry = getRb3CueRegistry()
-    const rb3Domain = this.config.getPreference('cueDomains').rb3
-    const { enabled, known } = reconcileEnabledGroups(
-      rb3Domain.enabledGroups,
-      rb3Domain.knownGroups,
-      registry.getAllGroups(),
-    )
-    await this.config.updateCueDomain('rb3', { enabledGroups: enabled })
-    await this.config.updateCueDomain('rb3', { knownGroups: known })
-    registry.setEnabledGroups(enabled)
-    registry.setDisabledCues(this.config.getPreference('cueDomains').rb3.disabledCues)
-    log.info('Rb3CueRegistry enabled groups re-applied from config:', enabled)
-  }
-
-  /**
-   * Re-apply RB3 motion enabled groups from configuration after node cues are registered.
-   */
-  private async applyRb3MotionEnabledGroupsFromConfig(): Promise<void> {
-    const registry = getRb3CueRegistry()
-    const motionDomain = this.config.getPreference('cueDomains').rb3Motion
-    const { enabled, known } = reconcileEnabledGroups(
-      motionDomain.enabledGroups,
-      motionDomain.knownGroups,
-      registry.getRegisteredMotionGroupIds(),
-    )
-    await this.config.updateCueDomain('rb3Motion', { enabledGroups: enabled })
-    await this.config.updateCueDomain('rb3Motion', { knownGroups: known })
-    registry.setEnabledMotionGroups(enabled)
-    registry.setDisabledMotionCues(this.config.getPreference('cueDomains').rb3Motion.disabledCues)
-    log.info('RB3 motion enabled groups re-applied from config:', enabled)
   }
 
   /**
