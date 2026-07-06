@@ -57,6 +57,32 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.cueDomains.rb3Motion).toBeDefined()
   })
 
+  it('seeds cue domains missing from a same-version v6 file instead of wiping it', () => {
+    const appData = freshAppData()
+    const all = createDefaultCueDomains()
+    // A v6 file written before a domain was added to CUE_DOMAINS: rb3/rb3Motion absent. Without
+    // load-time seeding the AJV required-check would fail and corrupt-recovery would wipe prefs.
+    seedPrefs(appData, 6, {
+      ...DEFAULT_PREFERENCES,
+      effectDebounce: 55,
+      cueDomains: {
+        yarg: { ...all.yarg, enabledGroups: ['stagekit', 'mine'] },
+        audio: all.audio,
+        yargMotion: all.yargMotion,
+        audioMotion: all.audioMotion,
+      },
+    })
+
+    const onCorruptRecovery = jest.fn()
+    const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+    expect(onCorruptRecovery).not.toHaveBeenCalled()
+    expect(prefs.effectDebounce).toBe(55)
+    expect(prefs.cueDomains.yarg.enabledGroups).toEqual(['stagekit', 'mine'])
+    expect(prefs.cueDomains.rb3).toBeDefined()
+    expect(prefs.cueDomains.rb3Motion).toBeDefined()
+  })
+
   it('migrates a stored v4 file end-to-end without throwing or recovering', () => {
     const appData = freshAppData()
     const all = createDefaultCueDomains()

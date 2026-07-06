@@ -1,7 +1,12 @@
 import { ConfigFile, type ConfigFileHooks } from './ConfigFile'
 import type { AppPreferences } from './configurationDefaults'
 import { DEFAULT_PREFERENCES } from './configurationDefaults'
-import { migratePrefsV3ToV4, migratePrefsV4ToV5, migratePrefsV5ToV6 } from './preferencesMigration'
+import {
+  migratePrefsV3ToV4,
+  migratePrefsV4ToV5,
+  migratePrefsV5ToV6,
+  seedMissingCueDomains,
+} from './preferencesMigration'
 import { validateAppPreferencesData } from './configDataValidators'
 
 /**
@@ -11,7 +16,11 @@ import { validateAppPreferencesData } from './configDataValidators'
  */
 export class PreferencesConfigFile extends ConfigFile<AppPreferences> {
   constructor(hooks: ConfigFileHooks<AppPreferences> = {}) {
-    super('prefs.json', DEFAULT_PREFERENCES, 6, { validate: validateAppPreferencesData, ...hooks })
+    super('prefs.json', DEFAULT_PREFERENCES, 6, {
+      validate: validateAppPreferencesData,
+      normalizeLoaded: seedMissingCueDomains,
+      ...hooks,
+    })
   }
 
   protected override applyMigration(

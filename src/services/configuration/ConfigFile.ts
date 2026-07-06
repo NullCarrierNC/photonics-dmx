@@ -24,6 +24,13 @@ export type ConfigFileHooks<T> = {
   onCorruptRecovery?: (info: ConfigCorruptInfo) => void
   /** If the file is legacy unversioned JSON, reshape before `migrateData` (e.g. lights array → `{ lights }`). */
   coerceUnversioned?: (raw: unknown) => T
+  /**
+   * Runs on every load after migration and before validation. Returns the data unchanged (same
+   * reference) when nothing needs fixing, or a repaired copy otherwise; a changed reference is
+   * persisted. Use to seed shape additions (e.g. new required keys) so a same-version file that
+   * predates them passes validation instead of triggering corrupt-recovery.
+   */
+  normalizeLoaded?: (data: T) => T
 }
 
 /**
@@ -46,6 +53,7 @@ export class ConfigFile<T> {
   private readonly validate: ConfigDataValidCheck<T> | undefined
   private readonly onCorruptRecovery: ((info: ConfigCorruptInfo) => void) | undefined
   private readonly coerceUnversioned: ((raw: unknown) => T) | undefined
+  private readonly normalizeLoaded: ((data: T) => T) | undefined
   // Serializes saves so only one writeFile+rename is in flight per file at a time,
   // avoiding concurrent renames racing the same destination.
   private saveChain: Promise<void> = Promise.resolve()
@@ -70,6 +78,7 @@ export class ConfigFile<T> {
     this.validate = hooks.validate
     this.onCorruptRecovery = hooks.onCorruptRecovery
     this.coerceUnversioned = hooks.coerceUnversioned
+    this.normalizeLoaded = hooks.normalizeLoaded
     this.ensureConfigDirectory(configDir)
     this.data = this.load()
   }
@@ -191,6 +200,15 @@ export class ConfigFile<T> {
       if (version < this.currentVersion) {
         data = this.migrateData(data, version, this.currentVersion)
         migratedNeedsPersist = true
+      }
+      if (this.normalizeLoaded) {
+        // Repair shape additions that a same-version file may predate (e.g. new required keys),
+        // so validation below never fails on them. Persist only when it actually changed the data.
+        const normalized = this.normalizeLoaded(data)
+        if (normalized !== data) {
+          data = normalized
+          migratedNeedsPersist = true
+        }
       }
     } catch (error) {
       log.error(

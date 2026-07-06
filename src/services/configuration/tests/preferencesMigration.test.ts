@@ -4,7 +4,9 @@ import {
   migratePrefsV3ToV4,
   migratePrefsV4ToV5,
   migratePrefsV5ToV6,
+  seedMissingCueDomains,
 } from '../preferencesMigration'
+import type { AppPreferences } from '../configurationDefaults'
 import {
   CUE_DOMAINS,
   createDefaultCueDomainPrefs,
@@ -235,6 +237,38 @@ describe('migratePrefsV5ToV6', () => {
     const once = migratePrefsV5ToV6(DEFAULT_PREFERENCES, DEFAULT_PREFERENCES)
     const again = migratePrefsV5ToV6(once, DEFAULT_PREFERENCES)
     expect(again).toEqual(once)
+  })
+})
+
+describe('seedMissingCueDomains', () => {
+  it('returns the same object when every cue domain is present', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, cueDomains: createDefaultCueDomains() }
+    expect(seedMissingCueDomains(prefs)).toBe(prefs)
+  })
+
+  it('seeds only the missing domains and preserves the rest', () => {
+    const all = createDefaultCueDomains()
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      effectDebounce: 9,
+      cueDomains: {
+        yarg: { ...all.yarg, enabledGroups: ['stagekit', 'mine'] },
+        audio: all.audio,
+        yargMotion: all.yargMotion,
+        audioMotion: all.audioMotion,
+      },
+    } as unknown as AppPreferences
+    const out = seedMissingCueDomains(prefs)
+    expect(out).not.toBe(prefs)
+    expect(out.effectDebounce).toBe(9)
+    expect(out.cueDomains.yarg.enabledGroups).toEqual(['stagekit', 'mine'])
+    expect(out.cueDomains.rb3).toEqual(createDefaultCueDomainPrefs('rb3'))
+    expect(out.cueDomains.rb3Motion).toEqual(createDefaultCueDomainPrefs('rb3Motion'))
+  })
+
+  it('leaves a malformed cueDomains untouched for validation to reject', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, cueDomains: null } as unknown as AppPreferences
+    expect(seedMissingCueDomains(prefs)).toBe(prefs)
   })
 })
 
