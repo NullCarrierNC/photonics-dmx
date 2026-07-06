@@ -16,12 +16,18 @@ export function reconcileEnabledGroups(
   storedKnown: string[] | undefined,
   registeredIds: string[],
 ): ReconciledCueGroups {
-  const known = storedKnown ?? []
-  let enabled = storedEnabled ?? []
-  const newGroups = registeredIds.filter((id) => !known.includes(id))
-  if (newGroups.length > 0) {
-    enabled = [...enabled, ...newGroups]
+  const known = new Set(storedKnown ?? [])
+  const registered = new Set(registeredIds)
+  const newGroups = registeredIds.filter((id) => !known.has(id))
+  // Keep stored order, drop deregistered ids, and de-duplicate: a stored id that is also "new"
+  // (e.g. it slipped out of a stale knownGroups) must not appear twice in the persisted/applied set.
+  const enabled: string[] = []
+  const seen = new Set<string>()
+  for (const id of [...(storedEnabled ?? []), ...newGroups]) {
+    if (registered.has(id) && !seen.has(id)) {
+      seen.add(id)
+      enabled.push(id)
+    }
   }
-  enabled = enabled.filter((id) => registeredIds.includes(id))
   return { enabled, known: registeredIds }
 }

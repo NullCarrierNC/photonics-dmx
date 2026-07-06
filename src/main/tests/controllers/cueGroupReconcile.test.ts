@@ -35,4 +35,15 @@ describe('reconcileEnabledGroups', () => {
     expect(enabled).toEqual([])
     expect(known).toEqual([])
   })
+
+  it('does not duplicate a stored id that is also treated as new (stale knownGroups)', () => {
+    // enabled has 'b' but known lacks it, so 'b' is also a "new" group — must appear once.
+    const { enabled } = reconcileEnabledGroups(['a', 'b'], ['a'], ['a', 'b'])
+    expect(enabled).toEqual(['a', 'b'])
+  })
+
+  it('drops duplicate stored ids entirely', () => {
+    const { enabled } = reconcileEnabledGroups(['a', 'a', 'b'], ['a', 'b'], ['a', 'b'])
+    expect(enabled).toEqual(['a', 'b'])
+  })
 })
