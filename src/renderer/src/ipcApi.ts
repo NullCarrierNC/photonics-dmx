@@ -301,6 +301,12 @@ export const getActiveYargMotionCue = () =>
 export const setActiveYargMotionCue = (ref: { groupId: string; cueId: string } | null) =>
   window.api.invoke(CONFIG.SET_ACTIVE_YARG_MOTION_CUE, ref)
 
+export const getActiveRb3MotionCue = () =>
+  window.api.invoke(CONFIG.GET_ACTIVE_RB3_MOTION_CUE, undefined)
+
+export const setActiveRb3MotionCue = (ref: { groupId: string; cueId: string } | null) =>
+  window.api.invoke(CONFIG.SET_ACTIVE_RB3_MOTION_CUE, ref)
+
 // ---------------------------------------------------------------------------
 // Stage kit
 // ---------------------------------------------------------------------------

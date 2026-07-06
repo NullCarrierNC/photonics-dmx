@@ -83,6 +83,12 @@ type ValidatorMapAlignment = [
   >,
   AssertTrue<
     Assignable<
+      ValidatorOk<typeof validateCueRefPayload>,
+      IpcInvokeMap[typeof CONFIG.SET_ACTIVE_RB3_MOTION_CUE]['request']
+    >
+  >,
+  AssertTrue<
+    Assignable<
       ValidatorOk<typeof validateNumberInRange>,
       IpcInvokeMap[typeof LIGHT.SET_CUE_CONSISTENCY_WINDOW]['request']
     >
@@ -124,7 +130,8 @@ describe('IpcInvokeMap ↔ inputValidation contract', () => {
       true,
       true,
       true,
+      true,
     ]
-    expect(_alignmentProof).toHaveLength(12)
+    expect(_alignmentProof).toHaveLength(13)
   })
 })

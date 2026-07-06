@@ -144,6 +144,27 @@ export function registerAudioMotionConfigHandlers(
     }
   })
 
+  ipcMain.handle(CONFIG.GET_ACTIVE_RB3_MOTION_CUE, async () => {
+    return controllerManager.getConfig().getPreference('cueDomains').rb3Motion.activeCueRef ?? null
+  })
+
+  ipcMain.handle(CONFIG.SET_ACTIVE_RB3_MOTION_CUE, async (_, ref: unknown) => {
+    try {
+      const validation = validateCueRefPayload(ref)
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
+      }
+      await controllerManager
+        .getConfig()
+        .updateCueDomain('rb3Motion', { activeCueRef: validation.value })
+      controllerManager.setActiveRb3MotionCueRef(validation.value)
+      return { success: true }
+    } catch (error) {
+      log.error('Error setting active RB3 motion cue:', error)
+      return { ...ipcError(error), success: false }
+    }
+  })
+
   ipcMain.handle(CONFIG.GET_STAGE_KIT_PRIORITY, async () => {
     const prefs = controllerManager.getConfig().getAllPreferences()
     return prefs.stageKitPrefs?.yargPriority || 'random'

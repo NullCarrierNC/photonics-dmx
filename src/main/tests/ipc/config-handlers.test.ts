@@ -21,6 +21,11 @@ const baseCueDomains = () => ({
     activeCueRef: null as { groupId: string; cueId: string } | null,
     disabledCues: {} as Record<string, string[]>,
   },
+  rb3: { disabledCues: {} as Record<string, string[]> },
+  rb3Motion: {
+    activeCueRef: null as { groupId: string; cueId: string } | null,
+    disabledCues: {} as Record<string, string[]>,
+  },
 })
 
 const mockConfig = {
@@ -58,6 +63,7 @@ const mockControllerManager = {
   setMotionEnabledGlobal: jest.fn(),
   setActiveAudioMotionCueRef: jest.fn(),
   setActiveYargMotionCueRef: jest.fn(),
+  setActiveRb3MotionCueRef: jest.fn(),
   flushValidationErrors: jest.fn().mockReturnValue([]),
   getIsInitialized: jest.fn().mockReturnValue(true),
 }
@@ -253,6 +259,48 @@ describe('CONFIG motion IPC (config-handlers)', () => {
     it('SET_ACTIVE_YARG_MOTION_CUE rejects empty groupId or cueId after trim', async () => {
       const handler = handlers.get(CONFIG.SET_ACTIVE_YARG_MOTION_CUE)!
       const result = await handler({}, { groupId: '', cueId: 'x' })
+      expect(result).toMatchObject({ success: false })
+      expect(mockConfig.updateCueDomain).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('GET_ACTIVE_RB3_MOTION_CUE / SET_ACTIVE_RB3_MOTION_CUE', () => {
+    it('GET_ACTIVE_RB3_MOTION_CUE returns ref from ConfigurationManager', async () => {
+      const ref = { groupId: 'g-rb3', cueId: 'cue-m1' }
+      const cd = baseCueDomains()
+      cd.rb3Motion.activeCueRef = ref
+      mockConfig.getPreference.mockImplementation((key: unknown) =>
+        key === 'cueDomains' ? cd : undefined,
+      )
+      const handler = handlers.get(CONFIG.GET_ACTIVE_RB3_MOTION_CUE)!
+      const result = await handler({}, undefined)
+      expect(result).toEqual(ref)
+    })
+
+    it('SET_ACTIVE_RB3_MOTION_CUE persists valid ref and applies to the RB3 handler path', async () => {
+      const handler = handlers.get(CONFIG.SET_ACTIVE_RB3_MOTION_CUE)!
+      const result = await handler({}, { groupId: '  g1  ', cueId: ' c1 ' })
+      expect(result).toEqual({ success: true })
+      expect(mockConfig.updateCueDomain).toHaveBeenCalledWith('rb3Motion', {
+        activeCueRef: { groupId: 'g1', cueId: 'c1' },
+      })
+      expect(mockControllerManager.setActiveRb3MotionCueRef).toHaveBeenCalledWith({
+        groupId: 'g1',
+        cueId: 'c1',
+      })
+    })
+
+    it('SET_ACTIVE_RB3_MOTION_CUE clears ref when payload is null', async () => {
+      const handler = handlers.get(CONFIG.SET_ACTIVE_RB3_MOTION_CUE)!
+      const result = await handler({}, null)
+      expect(result).toEqual({ success: true })
+      expect(mockConfig.updateCueDomain).toHaveBeenCalledWith('rb3Motion', { activeCueRef: null })
+      expect(mockControllerManager.setActiveRb3MotionCueRef).toHaveBeenCalledWith(null)
+    })
+
+    it('SET_ACTIVE_RB3_MOTION_CUE rejects invalid shape', async () => {
+      const handler = handlers.get(CONFIG.SET_ACTIVE_RB3_MOTION_CUE)!
+      const result = await handler({}, 'not-an-object')
       expect(result).toMatchObject({ success: false })
       expect(mockConfig.updateCueDomain).not.toHaveBeenCalled()
     })

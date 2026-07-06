@@ -828,6 +828,14 @@ export interface IpcInvokeMap {
     request: { groupId: string; cueId: string } | null
     response: IpcSuccessResult | IpcErrorResult
   }
+  [CONFIG.GET_ACTIVE_RB3_MOTION_CUE]: {
+    request: void
+    response: { groupId: string; cueId: string } | null
+  }
+  [CONFIG.SET_ACTIVE_RB3_MOTION_CUE]: {
+    request: { groupId: string; cueId: string } | null
+    response: IpcSuccessResult | IpcErrorResult
+  }
   [CONFIG.GET_STAGE_KIT_PRIORITY]: {
     request: void
     response: 'prefer-for-tracked' | 'random' | 'never'

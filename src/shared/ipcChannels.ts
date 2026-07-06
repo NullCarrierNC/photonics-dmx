@@ -183,6 +183,8 @@ export const CONFIG = {
   SET_ACTIVE_AUDIO_MOTION_CUE: 'set-active-audio-motion-cue',
   GET_ACTIVE_YARG_MOTION_CUE: 'get-active-yarg-motion-cue',
   SET_ACTIVE_YARG_MOTION_CUE: 'set-active-yarg-motion-cue',
+  GET_ACTIVE_RB3_MOTION_CUE: 'get-active-rb3-motion-cue',
+  SET_ACTIVE_RB3_MOTION_CUE: 'set-active-rb3-motion-cue',
   GET_STAGE_KIT_PRIORITY: 'get-stage-kit-priority',
   SET_STAGE_KIT_PRIORITY: 'set-stage-kit-priority',
 } as const

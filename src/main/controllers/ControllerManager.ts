@@ -1288,6 +1288,16 @@ export class ControllerManager {
   }
 
   /**
+   * Update the manual RB3 motion cue reference on every active rig's RB3 handler so all rigs
+   * pick up the new reference together.
+   */
+  public setActiveRb3MotionCueRef(ref: YargMotionCueRef | null): void {
+    for (const chain of this.rigChains) {
+      chain.rb3CueHandler?.setManualMotionRef(ref)
+    }
+  }
+
+  /**
    * Routes analysed audio frames to the Audio Preview window (wired from IPC setup).
    */
   public setAudioMirrorBroadcaster(fn: (data: AudioLightingData) => void): void {
