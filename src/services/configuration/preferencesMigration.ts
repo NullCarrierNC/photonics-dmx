@@ -268,6 +268,34 @@ export function migratePrefsV4ToV5(legacy: unknown, defaults: AppPreferences): A
   return normalizeCueDomains(out)
 }
 
+/**
+ * Seeds cue-domain entries added after v5 (`rb3`, `rb3Motion`) when a stored prefs.json predates
+ * them. Every other field is preserved untouched. New installs never run this — they start at the
+ * current version with the full DEFAULT_PREFERENCES.
+ */
+export function migratePrefsV5ToV6(legacy: unknown, defaults: AppPreferences): AppPreferences {
+  const base =
+    legacy != null && typeof legacy === 'object' && !Array.isArray(legacy)
+      ? (legacy as AppPreferences)
+      : defaults
+
+  const currentDomains =
+    base.cueDomains != null &&
+    typeof base.cueDomains === 'object' &&
+    !Array.isArray(base.cueDomains)
+      ? base.cueDomains
+      : createDefaultCueDomains()
+
+  const seeded: Record<CueDomain, CueDomainPrefs> = { ...currentDomains }
+  for (const d of CUE_DOMAINS) {
+    if (seeded[d] == null) {
+      seeded[d] = createDefaultCueDomainPrefs(d)
+    }
+  }
+
+  return normalizeCueDomains({ ...base, cueDomains: seeded })
+}
+
 function pickNonLegacyTopLevel(src: Record<string, unknown>): Partial<AppPreferences> {
   const o: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(src)) {
@@ -403,7 +431,7 @@ function hasAnyFlatV3Key(src: Record<string, unknown>): boolean {
 function normalizeCueDomains(prefs: AppPreferences): AppPreferences {
   const m = mergePartialCueDomains(prefs.cueDomains, {})
   for (const d of CUE_DOMAINS) {
-    const c = m[d]
+    const c = m[d] ?? createDefaultCueDomainPrefs(d)
     m[d] = {
       ...c,
       disabledCues: c.disabledCues && typeof c.disabledCues === 'object' ? c.disabledCues : {},

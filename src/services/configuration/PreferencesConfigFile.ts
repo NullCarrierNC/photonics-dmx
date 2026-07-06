@@ -1,16 +1,17 @@
 import { ConfigFile, type ConfigFileHooks } from './ConfigFile'
 import type { AppPreferences } from './configurationDefaults'
 import { DEFAULT_PREFERENCES } from './configurationDefaults'
-import { migratePrefsV3ToV4, migratePrefsV4ToV5 } from './preferencesMigration'
+import { migratePrefsV3ToV4, migratePrefsV4ToV5, migratePrefsV5ToV6 } from './preferencesMigration'
 import { validateAppPreferencesData } from './configDataValidators'
 
 /**
- * App preferences (prefs.json) with v3 → v4 migration into `cueDomains` and a one-time
- * v4 → v5 refresh of the settings whose shipped defaults changed.
+ * App preferences (prefs.json) with v3 → v4 migration into `cueDomains`, a one-time v4 → v5
+ * refresh of the settings whose shipped defaults changed, and a v5 → v6 seeding of the `rb3` /
+ * `rb3Motion` cue domains for files that predate them.
  */
 export class PreferencesConfigFile extends ConfigFile<AppPreferences> {
   constructor(hooks: ConfigFileHooks<AppPreferences> = {}) {
-    super('prefs.json', DEFAULT_PREFERENCES, 5, { validate: validateAppPreferencesData, ...hooks })
+    super('prefs.json', DEFAULT_PREFERENCES, 6, { validate: validateAppPreferencesData, ...hooks })
   }
 
   protected override applyMigration(
@@ -23,6 +24,9 @@ export class PreferencesConfigFile extends ConfigFile<AppPreferences> {
     }
     if (fromVersion === 4 && toVersion === 5) {
       return migratePrefsV4ToV5(data as unknown, DEFAULT_PREFERENCES)
+    }
+    if (fromVersion === 5 && toVersion === 6) {
+      return migratePrefsV5ToV6(data as unknown, DEFAULT_PREFERENCES)
     }
     return data
   }
