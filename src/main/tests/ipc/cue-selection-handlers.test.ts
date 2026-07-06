@@ -68,3 +68,60 @@ describe('cue-selection-handlers: enabling a group at runtime', () => {
     expect(registry.getCueImplementationFromGroup(CueType.Default, 'groupB')).not.toBeNull()
   })
 })
+
+describe('cue-selection-handlers: GET/SET serialization per domain', () => {
+  it('does not let a mid-flight GET revert a concurrent SET on the registry', async () => {
+    const registry = YargCueRegistry.getInstance()
+    registry.reset()
+    registry.registerGroup(makeGroup('groupA'))
+    registry.registerGroup(makeGroup('groupB'))
+    registry.registerGroup(makeGroup('groupC'))
+
+    // Stored state whose knownGroups lags the registry, so the GET reconcile computes a change and
+    // therefore issues a write we can park on a barrier while a SET is enqueued behind it.
+    const stored = {
+      yarg: {
+        enabledGroups: ['groupA'],
+        knownGroups: ['groupA'],
+        disabledCues: {} as Record<string, string[]>,
+      },
+    }
+    let releaseGetWrite!: () => void
+    const getWriteBarrier = new Promise<void>((r) => {
+      releaseGetWrite = r
+    })
+    let writes = 0
+
+    const handlers = new Map<string, (...args: unknown[]) => unknown>()
+    const ipcMain = {
+      handle: (channel: string, fn: (...args: unknown[]) => unknown) => handlers.set(channel, fn),
+      on: jest.fn(),
+    }
+    const config = {
+      getAllPreferences: () => ({ cueDomains: stored, stageKitPrefs: { yargPriority: 'random' } }),
+      getPreference: (key: string) => (key === 'cueDomains' ? stored : undefined),
+      updateCueDomain: jest.fn(async (domain: 'yarg', patch: Record<string, unknown>) => {
+        writes += 1
+        if (writes === 1) {
+          await getWriteBarrier // hold the GET's write open
+        }
+        Object.assign(stored[domain], patch)
+      }),
+    }
+    const controllerManager = { getConfig: () => config }
+
+    registerCueSelectionConfigHandlers(ipcMain as never, controllerManager as never)
+    const getEnabled = handlers.get(CONFIG.GET_ENABLED_CUE_GROUPS)!
+    const setEnabled = handlers.get(CONFIG.SET_ENABLED_CUE_GROUPS)!
+
+    const getPromise = getEnabled({}) // parks on the write barrier mid-reconcile
+    const setPromise = setEnabled({}, ['groupB']) // queued behind the GET on the domain's op chain
+
+    await Promise.resolve()
+    releaseGetWrite()
+    await Promise.all([getPromise, setPromise])
+
+    // The SET ran strictly after the GET, so the registry reflects the SET, not the GET's snapshot.
+    expect(registry.getEnabledGroups()).toEqual(['groupB'])
+  })
+})

@@ -53,75 +53,98 @@ function registerCueGroupDomain(
   const { binding } = spec
   const { domain } = binding
 
-  ipcMain.handle(spec.channels.getEnabled, async () => {
-    const config = controllerManager.getConfig()
-    const prefs = config.getAllPreferences()
-    const domainPrefs = prefs.cueDomains[domain]
-    const reconciled = reconcileEnabledGroups(
-      domainPrefs.enabledGroups,
-      domainPrefs.knownGroups,
-      binding.getRegisteredIds(),
+  // Serialize this domain's get/set handlers so a GET's read-reconcile-persist-apply sequence can't
+  // interleave with a concurrent SET and revert the registry to a stale snapshot. Each op waits for
+  // the previous to settle; failures don't poison the chain.
+  let opChain: Promise<unknown> = Promise.resolve()
+  const serialize = <T>(op: () => Promise<T>): Promise<T> => {
+    const run = opChain.then(op, op)
+    opChain = run.then(
+      () => undefined,
+      () => undefined,
     )
-    await persistReconciledGroups(
-      config,
-      domain,
-      reconciled,
-      domainPrefs.enabledGroups,
-      domainPrefs.knownGroups,
-    )
-    binding.setEnabled(reconciled.enabled)
-    binding.setDisabled(domainPrefs.disabledCues)
-    spec.afterGet?.(prefs)
-    return reconciled.enabled
-  })
+    return run
+  }
 
-  ipcMain.handle(spec.channels.setEnabled, async (_, groupIds: unknown) => {
-    try {
-      const validation = validateOptionalStringArray(groupIds, 'groupIds')
-      if (!validation.ok) {
-        return { success: false, error: validation.error }
-      }
+  ipcMain.handle(spec.channels.getEnabled, () =>
+    serialize(async () => {
       const config = controllerManager.getConfig()
-      await config.updateCueDomain(domain, { enabledGroups: validation.value })
-      binding.setEnabled(validation.value)
-      binding.setDisabled(config.getPreference('cueDomains')[domain].disabledCues)
-      spec.afterSetEnabled?.(controllerManager)
-      if (spec.changedEvent) {
-        sendToAllWindows(spec.changedEvent, undefined)
-      }
-      log.info(`Updated ${domain} enabled cue groups:`, validation.value)
-      return { success: true }
-    } catch (error) {
-      log.error(`Error setting enabled ${domain} cue groups:`, error)
-      return ipcError(error)
-    }
-  })
+      const prefs = config.getAllPreferences()
+      const domainPrefs = prefs.cueDomains[domain]
+      const reconciled = reconcileEnabledGroups(
+        domainPrefs.enabledGroups,
+        domainPrefs.knownGroups,
+        binding.getRegisteredIds(),
+      )
+      await persistReconciledGroups(
+        config,
+        domain,
+        reconciled,
+        domainPrefs.enabledGroups,
+        domainPrefs.knownGroups,
+      )
+      binding.setEnabled(reconciled.enabled)
+      binding.setDisabled(domainPrefs.disabledCues)
+      spec.afterGet?.(prefs)
+      return reconciled.enabled
+    }),
+  )
 
-  ipcMain.handle(spec.channels.getDisabled, async () => {
-    const disabled = controllerManager.getConfig().getPreference('cueDomains')[domain].disabledCues
-    binding.setDisabled(disabled)
-    return disabled
-  })
+  ipcMain.handle(spec.channels.setEnabled, (_, groupIds: unknown) =>
+    serialize(async () => {
+      try {
+        const validation = validateOptionalStringArray(groupIds, 'groupIds')
+        if (!validation.ok) {
+          return { success: false, error: validation.error }
+        }
+        const config = controllerManager.getConfig()
+        await config.updateCueDomain(domain, { enabledGroups: validation.value })
+        binding.setEnabled(validation.value)
+        binding.setDisabled(config.getPreference('cueDomains')[domain].disabledCues)
+        spec.afterSetEnabled?.(controllerManager)
+        if (spec.changedEvent) {
+          sendToAllWindows(spec.changedEvent, undefined)
+        }
+        log.info(`Updated ${domain} enabled cue groups:`, validation.value)
+        return { success: true }
+      } catch (error) {
+        log.error(`Error setting enabled ${domain} cue groups:`, error)
+        return ipcError(error)
+      }
+    }),
+  )
 
-  ipcMain.handle(spec.channels.setDisabled, async (_, payload: unknown) => {
-    try {
-      const validation = validateDisabledCuesMap(payload, spec.disabledLabel)
-      if (!validation.ok) {
-        return { success: false, error: validation.error }
+  ipcMain.handle(spec.channels.getDisabled, () =>
+    serialize(async () => {
+      const disabled = controllerManager.getConfig().getPreference('cueDomains')[
+        domain
+      ].disabledCues
+      binding.setDisabled(disabled)
+      return disabled
+    }),
+  )
+
+  ipcMain.handle(spec.channels.setDisabled, (_, payload: unknown) =>
+    serialize(async () => {
+      try {
+        const validation = validateDisabledCuesMap(payload, spec.disabledLabel)
+        if (!validation.ok) {
+          return { success: false, error: validation.error }
+        }
+        const config = controllerManager.getConfig()
+        await config.updateCueDomain(domain, { disabledCues: validation.value })
+        binding.setDisabled(validation.value)
+        spec.afterSetDisabled?.(controllerManager)
+        if (spec.changedEvent) {
+          sendToAllWindows(spec.changedEvent, undefined)
+        }
+        return { success: true }
+      } catch (error) {
+        log.error(`Error setting disabled ${domain} cues:`, error)
+        return ipcError(error)
       }
-      const config = controllerManager.getConfig()
-      await config.updateCueDomain(domain, { disabledCues: validation.value })
-      binding.setDisabled(validation.value)
-      spec.afterSetDisabled?.(controllerManager)
-      if (spec.changedEvent) {
-        sendToAllWindows(spec.changedEvent, undefined)
-      }
-      return { success: true }
-    } catch (error) {
-      log.error(`Error setting disabled ${domain} cues:`, error)
-      return ipcError(error)
-    }
-  })
+    }),
+  )
 }
 
 /** Activate the enabled groups so a group enabled at runtime is immediately selectable (no restart). */
