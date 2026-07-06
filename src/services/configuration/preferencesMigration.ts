@@ -286,14 +286,9 @@ export function migratePrefsV5ToV6(legacy: unknown, defaults: AppPreferences): A
       ? base.cueDomains
       : createDefaultCueDomains()
 
-  const seeded: Record<CueDomain, CueDomainPrefs> = { ...currentDomains }
-  for (const d of CUE_DOMAINS) {
-    if (seeded[d] == null) {
-      seeded[d] = createDefaultCueDomainPrefs(d)
-    }
-  }
-
-  return normalizeCueDomains({ ...base, cueDomains: seeded })
+  // normalizeCueDomains defaults any missing domain (including rb3 / rb3Motion) via its
+  // `?? createDefaultCueDomainPrefs(d)` fallback, so no separate seeding pass is needed here.
+  return normalizeCueDomains({ ...base, cueDomains: currentDomains })
 }
 
 /**
