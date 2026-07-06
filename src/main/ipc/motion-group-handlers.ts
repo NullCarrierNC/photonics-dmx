@@ -75,6 +75,22 @@ export function setupMotionGroupHandlers(
     }
   })
 
+  ipcMain.handle(LIGHT.GET_AVAILABLE_RB3_MOTION_CUES, async (_, groupId?: unknown) => {
+    try {
+      const registry = getRb3CueRegistry()
+      const resolvedGroupId = typeof groupId === 'string' ? groupId : undefined
+      const targetGroupId =
+        resolvedGroupId || registry.getDefaultGroupId() || registry.getEnabledMotionGroups()[0]
+      if (!targetGroupId) {
+        return []
+      }
+      return registry.getYargMotionCueDetails(targetGroupId)
+    } catch (error) {
+      log.error('Error getting available RB3 motion cues:', error)
+      return []
+    }
+  })
+
   ipcMain.handle(LIGHT.GET_YARG_MOTION_GROUP_SELECTION_MODE, async () => {
     try {
       const mode = controllerManager.getConfig().getMotionGroupSelectionMode()

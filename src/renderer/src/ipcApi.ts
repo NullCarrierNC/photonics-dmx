@@ -107,6 +107,9 @@ export const getAvailableYargMotionCues = (groupId?: string) =>
 export const getAvailableAudioMotionCues = (groupId?: string) =>
   window.api.invoke(LIGHT.GET_AVAILABLE_AUDIO_MOTION_CUES, groupId)
 
+export const getAvailableRb3MotionCues = (groupId?: string) =>
+  window.api.invoke(LIGHT.GET_AVAILABLE_RB3_MOTION_CUES, groupId)
+
 export const startYargMotionCueSimulation = (groupId: string, cueId: string) =>
   window.api.invoke(LIGHT.START_YARG_MOTION_CUE_SIMULATION, { groupId, cueId })
 
@@ -145,6 +148,9 @@ export const getAudioCueGroups = () => window.api.invoke(LIGHT.GET_AUDIO_CUE_GRO
 
 export const getAvailableAudioCues = (groupId?: string) =>
   window.api.invoke(LIGHT.GET_AVAILABLE_AUDIO_CUES, groupId)
+
+export const getAvailableRb3Cues = (groupId?: string) =>
+  window.api.invoke(LIGHT.GET_AVAILABLE_RB3_CUES, groupId)
 
 // ---------------------------------------------------------------------------
 // Light management

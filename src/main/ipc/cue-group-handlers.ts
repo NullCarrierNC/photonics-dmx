@@ -51,6 +51,35 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
       .filter((row): row is NonNullable<typeof row> => row !== null)
   })
 
+  ipcMain.handle(LIGHT.GET_AVAILABLE_RB3_CUES, async (_, groupId?: unknown) => {
+    try {
+      const registry = getRb3CueRegistry()
+      const resolvedGroupId =
+        typeof groupId === 'string' && groupId.trim() !== '' ? groupId : undefined
+      const targetGroupId =
+        resolvedGroupId ?? registry.getDefaultGroupId() ?? registry.getEnabledGroups()[0]
+      if (!targetGroupId) {
+        return []
+      }
+      const group = registry.getGroup(targetGroupId)
+      if (!group) {
+        return []
+      }
+      return Array.from(group.cues.keys()).map((cueType) => {
+        const implementation = group.cues.get(cueType)!
+        return {
+          id: cueType,
+          yargDescription: implementation.description,
+          rb3Description: implementation.description,
+          groupName: group.name,
+        }
+      })
+    } catch (error) {
+      log.error('Error getting available RB3 cues:', error)
+      return []
+    }
+  })
+
   ipcMain.handle(LIGHT.ENABLE_CUE_GROUP, async (_, groupId: unknown) => {
     if (!isNonEmptyString(groupId)) {
       return { success: false, error: 'groupId is required' }

@@ -399,6 +399,15 @@ export interface IpcInvokeMap {
     request: string | undefined
     response: Array<{ id: string; description: string }>
   }
+  [LIGHT.GET_AVAILABLE_RB3_CUES]: {
+    request: string | undefined
+    response: Array<{
+      id: string
+      yargDescription: string
+      rb3Description: string
+      groupName: string
+    }>
+  }
   [LIGHT.GET_AUDIO_CUE_GROUPS]: {
     request: void
     response: Array<{ id: string; name: string; description: string }>
@@ -490,6 +499,10 @@ export interface IpcInvokeMap {
     response: Array<{ id: string; name: string; description: string }>
   }
   [LIGHT.GET_AVAILABLE_AUDIO_MOTION_CUES]: {
+    request: string | undefined
+    response: Array<{ id: string; name: string; description: string }>
+  }
+  [LIGHT.GET_AVAILABLE_RB3_MOTION_CUES]: {
     request: string | undefined
     response: Array<{ id: string; name: string; description: string }>
   }
