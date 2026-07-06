@@ -1023,6 +1023,11 @@ export class ControllerManager {
     this.setLifecyclePhase('restarting')
     log.info('Restarting controllers to apply configuration changes')
 
+    // Let any in-flight listener enable/disable settle before teardown: the was-enabled
+    // snapshot below must reflect the toggle's final state, and rig chains must not be
+    // disposed while an enable is still building handlers against their sequencers.
+    await (this.listenerOpChain ?? Promise.resolve()).catch(() => {})
+
     const wasYargEnabled = this.listenerLifecycle.yargRb3.getIsYargEnabled()
     const wasRb3Enabled = this.listenerLifecycle.yargRb3.getIsRb3Enabled()
     const wasAudioEnabled = this.listenerLifecycle.audio.getIsAudioEnabled()

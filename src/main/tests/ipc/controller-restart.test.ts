@@ -161,6 +161,64 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect(initCount).toBe(1)
   })
 
+  it('runRestartControllers waits for an in-flight listener op before snapshotting enabled state', async () => {
+    let releaseOp!: () => void
+    const opBarrier = new Promise<void>((r) => {
+      releaseOp = r
+    })
+    const listeners = listenerStub()
+    const getIsYargEnabled = listeners.yargRb3.getIsYargEnabled as jest.Mock
+    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
+      listenerOpChain: opBarrier,
+      listenerLifecycle: listeners,
+      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
+      dmxPublisher: {
+        shutdown: jest.fn().mockImplementation(() => Promise.resolve()),
+        setManualBuffer: jest.fn(),
+      },
+      cueHandler: { shutdown: jest.fn() },
+      rigChains: [],
+      clock: { destroy: jest.fn() },
+      dmxLightManager: {},
+      lightStateManager: {},
+      lightTransitionController: {},
+      sequencer: {},
+      isInitialized: true,
+      lifecyclePhase: 'running',
+      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+      init: jest.fn().mockImplementation(function (this: RestartFake) {
+        this.isInitialized = true
+        this.lifecyclePhase = 'running'
+        return Promise.resolve()
+      }),
+      senderLifecycle: {
+        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
+        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
+        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
+      },
+      consoleMode: {
+        onControllersReinitializedWhileConsoleOpen: jest.fn(),
+        getConsoleRestore: jest.fn().mockReturnValue(null),
+      },
+    })
+
+    const p = ControllerManager.prototype.restartControllers.call(
+      fake as unknown as ControllerManager,
+    )
+    await Promise.resolve()
+    await Promise.resolve()
+    // Teardown must not begin while a listener toggle is mid-flight: the enabled-state
+    // snapshot is read only after the op settles.
+    expect(getIsYargEnabled).not.toHaveBeenCalled()
+
+    releaseOp()
+    await p
+    expect(getIsYargEnabled).toHaveBeenCalled()
+  })
+
   it('getLifecyclePhase returns the current phase on a prototype-based stub', () => {
     const stub = Object.assign(Object.create(ControllerManager.prototype), {
       lifecyclePhase: 'restarting' as const,
