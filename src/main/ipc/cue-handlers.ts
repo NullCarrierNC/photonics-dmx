@@ -13,21 +13,24 @@ const log = createLogger('cue-handlers')
  * @param controllerManager The controller manager instance
  */
 export function setupCueHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  // Event listeners for YARG and RB3
+  // Event listeners for YARG and RB3. These are fire-and-forget: the lifecycle queue already logs
+  // any enable/disable failure once, so a no-op catch here just keeps an init-time rejection from
+  // surfacing as an unhandledRejection in the main process.
+  const ignoreToggleRejection = () => {}
   ipcMain.on(CUE.YARG_LISTENER_ENABLED, () => {
-    void controllerManager.enableYarg()
+    controllerManager.enableYarg().catch(ignoreToggleRejection)
   })
 
-  ipcMain.on(CUE.YARG_LISTENER_DISABLED, async () => {
-    await controllerManager.disableYarg()
+  ipcMain.on(CUE.YARG_LISTENER_DISABLED, () => {
+    controllerManager.disableYarg().catch(ignoreToggleRejection)
   })
 
   ipcMain.on(CUE.RB3E_LISTENER_ENABLED, () => {
-    controllerManager.enableRb3()
+    controllerManager.enableRb3().catch(ignoreToggleRejection)
   })
 
-  ipcMain.on(CUE.RB3E_LISTENER_DISABLED, async () => {
-    await controllerManager.disableRb3()
+  ipcMain.on(CUE.RB3E_LISTENER_DISABLED, () => {
+    controllerManager.disableRb3().catch(ignoreToggleRejection)
   })
 
   // Disable YARG
