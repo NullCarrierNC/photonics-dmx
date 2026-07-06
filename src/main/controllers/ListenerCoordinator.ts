@@ -227,12 +227,7 @@ export class ListenerCoordinator {
   public async enableRb3(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
     if (!isInitialized) {
       log.info('Initializing system before enabling RB3')
-      initAsync()
-        .then(() => this.enableRb3Internal())
-        .catch((error) => {
-          log.error('Error during initialization:', error)
-        })
-      return
+      await initAsync()
     }
     await this.enableRb3Internal()
   }

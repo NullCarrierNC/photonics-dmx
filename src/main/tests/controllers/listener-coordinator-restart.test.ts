@@ -111,6 +111,43 @@ describe('ListenerCoordinator listener shutdown ordering', () => {
   })
 })
 
+describe('ListenerCoordinator enableRb3 initialization ordering', () => {
+  it('awaits initialization before enabling so a serialized op sees the finished enable', async () => {
+    const lc = new ListenerCoordinator(makeDeps())
+    const order: string[] = []
+    let releaseInit: (() => void) | undefined
+    const initP = new Promise<void>((resolve) => {
+      releaseInit = resolve
+    })
+    const initAsync = jest.fn<() => Promise<void>>().mockImplementation(() => {
+      order.push('init-start')
+      return initP.then(() => {
+        order.push('init-done')
+      })
+    })
+    ;(lc as unknown as { enableRb3Internal: () => Promise<void> }).enableRb3Internal = jest.fn(
+      async () => {
+        order.push('enable')
+      },
+    )
+
+    const enableP = lc.enableRb3(false, initAsync)
+    let resolved = false
+    void enableP.then(() => {
+      resolved = true
+    })
+
+    await Promise.resolve()
+    // enableRb3 must not resolve while initialization is still in flight.
+    expect(resolved).toBe(false)
+
+    releaseInit!()
+    await enableP
+    expect(resolved).toBe(true)
+    expect(order).toEqual(['init-start', 'init-done', 'enable'])
+  })
+})
+
 describe('ListenerCoordinator ends the song span on disable so locks do not leak', () => {
   it('disableYarg ends the YARG registry song and leaves the RB3 registry untouched', async () => {
     const lc = new ListenerCoordinator(makeDeps())
