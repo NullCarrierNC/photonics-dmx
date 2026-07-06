@@ -6,8 +6,8 @@ import { sendToAllWindows } from '../utils/windowUtils'
 import { NodeCueMode, NodeCueFile, NodeCueKind } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateNodeCueFile } from '../../photonics-dmx/cues/node/schema/validation'
 import { NodeExecutionEngine } from '../../photonics-dmx/cues/node/runtime/NodeExecutionEngine'
-import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
-import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
+import { reconcileEnabledGroups, persistReconciledGroups } from '../controllers/cueGroupReconcile'
+import { cueDomainBinding } from '../controllers/cueDomainBindings'
 import { ipcError } from './ipcResult'
 import { NODE_CUES, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 
@@ -36,29 +36,30 @@ async function persistGroupEnableAfterNodeCueSave(
   groupId: string,
 ): Promise<void> {
   const config = controllerManager.getConfig()
+  const domain = mode === 'yarg' ? 'yarg' : 'audio'
+  const binding = cueDomainBinding(domain)
+  const domainPrefs = config.getPreference('cueDomains')[domain]
 
-  if (mode === 'yarg') {
-    const enabled = config.getPreference('cueDomains').yarg.enabledGroups ?? []
-    if (!enabled.includes(groupId)) {
-      const next = [...enabled, groupId]
-      await config.updateCueDomain('yarg', { enabledGroups: next })
-      YargCueRegistry.getInstance().setEnabledGroups(next)
-      await config.updateCueDomain('yarg', {
-        knownGroups: YargCueRegistry.getInstance().getAllGroups(),
-      })
-    }
-  } else {
-    const enabled = config.getPreference('cueDomains').audio.enabledGroups ?? []
-    if (!enabled.includes(groupId)) {
-      const next = [...enabled, groupId]
-      await config.updateCueDomain('audio', { enabledGroups: next })
-      AudioCueRegistry.getInstance().setEnabledGroups(next)
-      await config.updateCueDomain('audio', {
-        knownGroups: AudioCueRegistry.getInstance().getRegisteredGroups(),
-      })
-      controllerManager.refreshAudioCueSelection()
-      sendToAllWindows(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, undefined)
-    }
+  // Saving a group opts it in: seed it into the enabled set, then reconcile against the registry so
+  // other newly-registered groups are auto-enabled, deregistered ids are dropped, and the known
+  // baseline is refreshed. Persist as one write (skipped when unchanged) and apply.
+  const reconciled = reconcileEnabledGroups(
+    [...(domainPrefs.enabledGroups ?? []), groupId],
+    domainPrefs.knownGroups,
+    binding.getRegisteredIds(),
+  )
+  await persistReconciledGroups(
+    config,
+    domain,
+    reconciled,
+    domainPrefs.enabledGroups,
+    domainPrefs.knownGroups,
+  )
+  binding.setEnabled(reconciled.enabled)
+
+  if (domain === 'audio') {
+    controllerManager.refreshAudioCueSelection()
+    sendToAllWindows(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, undefined)
   }
 }
 
