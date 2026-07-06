@@ -161,7 +161,7 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect(initCount).toBe(1)
   })
 
-  it('runRestartControllers waits for an in-flight listener op before snapshotting enabled state', async () => {
+  it('restart is enqueued behind an in-flight listener op before snapshotting enabled state', async () => {
     let releaseOp!: () => void
     const opBarrier = new Promise<void>((r) => {
       releaseOp = r
@@ -169,7 +169,7 @@ describe('ControllerManager lifecycle and sender restore', () => {
     const listeners = listenerStub()
     const getIsYargEnabled = listeners.yargRb3.getIsYargEnabled as jest.Mock
     const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
-      listenerOpChain: opBarrier,
+      lifecycleOpChain: opBarrier,
       listenerLifecycle: listeners,
       effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
       dmxPublisher: {
@@ -790,18 +790,58 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect(fake.lifecyclePhase).toBe('shuttingDown')
   })
 
-  it('disableYarg awaits an in-flight restart before disabling', async () => {
-    let restartReleased = false
-    let resolveRestart!: () => void
+  it('a listener toggle queued behind a restart waits for the restart to finish', async () => {
+    let releaseRestart!: () => void
     const restartBarrier = new Promise<void>((r) => {
-      resolveRestart = r
+      releaseRestart = r
+    })
+    const order: string[] = []
+    const yargDisable = jest.fn().mockImplementation(() => {
+      order.push('disable')
+      return Promise.resolve()
+    })
+    const fake = Object.assign(Object.create(ControllerManager.prototype), {
+      lifecycleOpChain: Promise.resolve(),
+      restartControllersInFlight: null,
+      controllerShutdownPromise: null,
+      lifecyclePhase: 'running',
+      isInitialized: true,
+      runRestartControllers: jest.fn().mockImplementation(async () => {
+        await restartBarrier
+        order.push('restart')
+      }),
+      listenerLifecycle: { yargRb3: { disableYarg: yargDisable } },
+    })
+
+    const restartPromise = ControllerManager.prototype.restartControllers.call(
+      fake as unknown as ControllerManager,
+    )
+    const disablePromise = ControllerManager.prototype.disableYarg.call(
+      fake as unknown as ControllerManager,
+    )
+
+    await Promise.resolve()
+    await Promise.resolve()
+    // The restart holds the shared lifecycle queue; the toggle behind it must not run yet.
+    expect(yargDisable).not.toHaveBeenCalled()
+
+    releaseRestart()
+    await Promise.all([restartPromise, disablePromise])
+
+    expect(order).toEqual(['restart', 'disable'])
+    expect(yargDisable).toHaveBeenCalledTimes(1)
+  })
+
+  it('disableYarg awaits an in-flight shutdown before disabling', async () => {
+    let releaseShutdown!: () => void
+    const shutdownBarrier = new Promise<void>((r) => {
+      releaseShutdown = r
     })
     const yargDisable = jest.fn().mockImplementation(() => Promise.resolve())
     const fake = Object.assign(Object.create(ControllerManager.prototype), {
-      restartControllersInFlight: restartBarrier.then(() => {
-        restartReleased = true
-      }),
-      controllerShutdownPromise: null,
+      lifecycleOpChain: Promise.resolve(),
+      restartControllersInFlight: null,
+      controllerShutdownPromise: shutdownBarrier,
       listenerLifecycle: { yargRb3: { disableYarg: yargDisable } },
     })
 
@@ -809,15 +849,47 @@ describe('ControllerManager lifecycle and sender restore', () => {
       fake as unknown as ControllerManager,
     )
 
-    // Give the microtask queue a turn; disableYarg should still be waiting on the in-flight restart.
     await Promise.resolve()
     expect(yargDisable).not.toHaveBeenCalled()
 
-    resolveRestart()
+    releaseShutdown()
     await disablePromise
 
-    expect(restartReleased).toBe(true)
     expect(yargDisable).toHaveBeenCalledTimes(1)
+  })
+
+  it('a listener toggle then a restart in the same tick both settle without deadlock', async () => {
+    const order: string[] = []
+    const fake = Object.assign(Object.create(ControllerManager.prototype), {
+      lifecycleOpChain: Promise.resolve(),
+      restartControllersInFlight: null,
+      controllerShutdownPromise: null,
+      lifecyclePhase: 'running',
+      isInitialized: true,
+      listenerLifecycle: {
+        yargRb3: {
+          enableYarg: jest.fn().mockImplementation(async () => {
+            order.push('toggle')
+          }),
+        },
+      },
+      runRestartControllers: jest.fn().mockImplementation(async () => {
+        order.push('restart')
+      }),
+    })
+
+    // Old code deadlocked here: the queued toggle awaited the restart memo while the restart
+    // awaited the op chain containing the toggle. jest's test timeout is the deadlock detector.
+    const pToggle = ControllerManager.prototype.enableYarg.call(
+      fake as unknown as ControllerManager,
+    )
+    const pRestart = ControllerManager.prototype.restartControllers.call(
+      fake as unknown as ControllerManager,
+    )
+    await Promise.all([pToggle, pRestart])
+
+    expect(order).toEqual(['toggle', 'restart'])
+    expect(fake.restartControllersInFlight).toBeNull()
   })
 
   it('shutdown.call against fresh stub uses the in-flight promise (no double shutdown)', async () => {

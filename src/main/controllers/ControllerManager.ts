@@ -68,7 +68,11 @@ const log = createLogger('ControllerManager')
  * - `failed`: reinitialization after teardown did not complete; call `restartControllers()` or `init()` to recover.
  *
  * Concurrency:
- * - `enable*` / `disable*` listener-lifecycle methods await any in-flight restart before proceeding.
+ * - YARG/RB3 toggles and `restartControllers()` serialize on one lifecycle queue (`runLifecycleOp`),
+ *   so no two of them ever interleave. Queued ops additionally await any in-flight shutdown.
+ * - Audio toggles run off the queue and await any in-flight restart/shutdown (one-directional).
+ * - `shutdown()` runs off the queue and must NEVER drain it: queued ops await `controllerShutdownPromise`,
+ *   so a shutdown that waited on the queue would deadlock against them.
  * - `init()` rejects with a `LifecycleAbortedError` if called while shutting down.
  */
 // LifecyclePhase is owned by `shared/ipcTypes` so the renderer hook can reference the same union.
@@ -118,7 +122,7 @@ export class ControllerManager {
 
   private cueHandler: YargCueHandler | null = null
   private rb3CueHandler: YargCueHandler | null = null
-  private listenerOpChain: Promise<void> = Promise.resolve()
+  private lifecycleOpChain: Promise<void> = Promise.resolve()
   private nodeCueLoader: NodeCueLoader | null = null
   private effectLoader: EffectLoader | null = null
 
@@ -251,9 +255,13 @@ export class ControllerManager {
   }
 
   /**
-   * Wait for any in-flight restart (or shutdown) to settle before mutating listener lifecycle.
+   * Wait for any in-flight restart (or shutdown) to settle before mutating audio lifecycle.
    * Errors from the in-flight operation are swallowed here so that the caller can still attempt
    * its own work; the operation that owns the promise is responsible for surfacing its error.
+   *
+   * Off-queue callers only (audio enable/disable). Never call this from inside a queued lifecycle
+   * op: the restart is itself a queued op, so a queued op awaiting `restartControllersInFlight`
+   * that sits behind it on the queue would deadlock. Queued ops use `awaitShutdownWork` instead.
    */
   private async awaitInFlightLifecycleWork(): Promise<void> {
     const pending = this.restartControllersInFlight ?? this.controllerShutdownPromise
@@ -266,19 +274,39 @@ export class ControllerManager {
   }
 
   /**
-   * Serialize listener enable/disable so a YARG and an RB3 toggle can't interleave. Each op waits
-   * for the previous one to settle (success or failure) before running, so handler slots are never
-   * built and torn down concurrently.
+   * Wait for an in-flight shutdown to settle. Used by queued lifecycle ops, which already exclude
+   * each other and any restart via the queue, but must still yield to `shutdown()` (which runs off
+   * the queue). Deliberately does NOT await `restartControllersInFlight` — the restart is a queued
+   * op, so a toggle queued ahead of it awaiting that memo would deadlock.
    */
-  private runListenerOp<T>(op: () => Promise<T>): Promise<T> {
-    const previous = this.listenerOpChain ?? Promise.resolve()
+  private async awaitShutdownWork(): Promise<void> {
+    if (!this.controllerShutdownPromise) return
+    try {
+      await this.controllerShutdownPromise
+    } catch {
+      // The owner already logged / rethrew; we just needed to wait.
+    }
+  }
+
+  /**
+   * Serialize every listener toggle and controller restart on one lifecycle queue: each op waits
+   * for the previous one to settle (success or failure) before running, so handler slots and rig
+   * chains are never built and torn down concurrently.
+   */
+  private runLifecycleOp<T>(op: () => Promise<T>): Promise<T> {
+    const previous = this.lifecycleOpChain ?? Promise.resolve()
     const run = previous.then(op, op)
     // Flatten so the next op runs regardless of this one's outcome, and log any failure here
     // exactly once so fire-and-forget callers (`void enableYarg()`) don't discard it silently.
-    this.listenerOpChain = run.then(
+    // A LifecycleAbortedError is a clean shutdown/restart abort, not a fault, so log it at info.
+    this.lifecycleOpChain = run.then(
       () => undefined,
       (err) => {
-        log.error('Listener operation failed:', err)
+        if (err instanceof LifecycleAbortedError) {
+          log.info('Lifecycle operation aborted:', err.message)
+        } else {
+          log.error('Lifecycle operation failed:', err)
+        }
       },
     )
     return run
@@ -587,12 +615,13 @@ export class ControllerManager {
   }
 
   /**
-   * Enable YARG listener. Serialized against the other listener toggles and any in-flight restart
-   * so enable/disable cannot interleave with each other or with teardown/reinit.
+   * Enable YARG listener. Runs on the shared lifecycle queue with the other toggles and controller
+   * restarts, so enable/disable cannot interleave with each other or with teardown/reinit, and
+   * additionally yields to any in-flight shutdown.
    */
   public async enableYarg(): Promise<void> {
-    await this.runListenerOp(async () => {
-      await this.awaitInFlightLifecycleWork()
+    await this.runLifecycleOp(async () => {
+      await this.awaitShutdownWork()
       await this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
     })
   }
@@ -601,8 +630,8 @@ export class ControllerManager {
    * Disable YARG listener
    */
   public async disableYarg(): Promise<void> {
-    await this.runListenerOp(async () => {
-      await this.awaitInFlightLifecycleWork()
+    await this.runLifecycleOp(async () => {
+      await this.awaitShutdownWork()
       await this.listenerLifecycle.yargRb3.disableYarg()
     })
   }
@@ -612,8 +641,8 @@ export class ControllerManager {
    * chains from here and simulation IPC is refused while RB3E is enabled.
    */
   public async enableRb3(): Promise<void> {
-    await this.runListenerOp(async () => {
-      await this.awaitInFlightLifecycleWork()
+    await this.runLifecycleOp(async () => {
+      await this.awaitShutdownWork()
       await this.stopTestEffect()
       this.onSimulationPreempt?.()
       await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
@@ -624,8 +653,8 @@ export class ControllerManager {
    * Disable Rb3 listener
    */
   public async disableRb3(): Promise<void> {
-    await this.runListenerOp(async () => {
-      await this.awaitInFlightLifecycleWork()
+    await this.runLifecycleOp(async () => {
+      await this.awaitShutdownWork()
       await this.listenerLifecycle.yargRb3.disableRb3()
     })
   }
@@ -649,6 +678,9 @@ export class ControllerManager {
    * Idempotent: subsequent calls return the in-flight promise (or resolve immediately when
    * teardown has already completed). A teardown rejection leaves `controllerShutdownCompleted`
    * unset so `shutdown()` can be retried; only a successful teardown is "completed".
+   *
+   * Runs off the lifecycle queue and must NOT be changed to drain it: queued toggles await
+   * `controllerShutdownPromise` (assigned below), so waiting on the queue here would deadlock.
    */
   public async shutdown(): Promise<void> {
     if (this.controllerShutdownCompleted) {
@@ -954,22 +986,35 @@ export class ControllerManager {
     if (this.restartControllersInFlight) {
       return this.restartControllersInFlight
     }
-    this.restartControllersInFlight = this.runRestartControllers().finally(() => {
+    // A restart is a peer on the lifecycle queue with the listener toggles, so teardown never runs
+    // while a toggle is mid-flight (and vice versa). The memo dedupes overlapping calls and gates
+    // the off-queue audio toggles. Assigned synchronously so a same-tick second call shares it.
+    this.restartControllersInFlight = this.runLifecycleOp(() =>
+      this.runRestartControllers(),
+    ).finally(() => {
       this.restartControllersInFlight = null
     })
     return this.restartControllersInFlight
   }
 
   private async runRestartControllers(): Promise<void> {
+    // A shutdown may have started while this restart waited its turn on the queue; abort cleanly
+    // (typed) rather than failing assertPhase with a generic invalid-lifecycle error. Snapshot into
+    // a local so the check doesn't narrow `this.lifecyclePhase` for the post-teardown guard below.
+    const phaseAtDequeue: LifecyclePhase = this.lifecyclePhase
+    if (
+      phaseAtDequeue === 'shuttingDown' ||
+      phaseAtDequeue === 'stopped' ||
+      this.controllerShutdownPromise
+    ) {
+      throw new LifecycleAbortedError('restartControllers aborted: shutdown in progress')
+    }
     this.assertPhase(['running', 'consoleMode', 'failed'], 'restartControllers')
     this.setLifecyclePhase('restarting')
     log.info('Restarting controllers to apply configuration changes')
 
-    // Let any in-flight listener enable/disable settle before teardown: the was-enabled
-    // snapshot below must reflect the toggle's final state, and rig chains must not be
-    // disposed while an enable is still building handlers against their sequencers.
-    await (this.listenerOpChain ?? Promise.resolve()).catch(() => {})
-
+    // The lifecycle queue guarantees no listener toggle is mid-flight here, so the was-enabled
+    // snapshot is stable and rig chains can't be disposed under an in-flight enable.
     const wasYargEnabled = this.listenerLifecycle.yargRb3.getIsYargEnabled()
     const wasRb3Enabled = this.listenerLifecycle.yargRb3.getIsRb3Enabled()
     const wasAudioEnabled = this.listenerLifecycle.audio.getIsAudioEnabled()
@@ -1071,7 +1116,8 @@ export class ControllerManager {
       this.consoleMode.onControllersReinitializedWhileConsoleOpen()
 
       if (wasYargEnabled) {
-        // Use the listener directly to avoid re-entering the in-flight restart guard.
+        // Drive the listener directly: the public toggles are queued lifecycle ops and would
+        // deadlock behind this restart's own queue slot.
         await this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
       } else if (wasRb3Enabled) {
         await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
