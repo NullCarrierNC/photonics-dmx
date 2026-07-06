@@ -52,10 +52,11 @@ const CueEditorToolbar: React.FC<CueEditorToolbarProps> = ({
   exportLabel,
   deleteLabel,
 }) => {
-  // rb3 authors the single fixed CueType.RB3 lighting cue and has no effects, so the
-  // Cues/Effects and Lighting/Motion toggles don't apply to it.
+  // rb3 authors the single fixed CueType.RB3 lighting cue (no motion), so the Lighting/Motion
+  // toggle doesn't apply. rb3 cues reference YARG effects, so the Cues/Effects toggle stays
+  // available — switching to Effects edits those effects under the YARG platform.
   const isRb3 = cuePlatform === 'rb3'
-  const showCueEffectsToggle = (cueKind === 'lighting' || isEffectMode) && !isRb3
+  const showCueEffectsToggle = cueKind === 'lighting' || isEffectMode
 
   return (
     <div className="relative flex justify-between items-center gap-4 flex-wrap">

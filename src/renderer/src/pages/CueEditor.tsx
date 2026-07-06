@@ -267,7 +267,8 @@ const CueEditor: React.FC = () => {
 
   const handleEffectToggle = useCallback(
     (isEffect: boolean) => {
-      // rb3 has no effects, so the effects toggle never routes through the rb3 platform.
+      // There is no rb3 effect mode: rb3 cues reference YARG effects, so from rb3 the Effects
+      // toggle switches to the YARG effect platform (where those effects are authored).
       if (isEffect) {
         setCueKind('lighting')
         const effectKey = mode === 'audio' ? 'audio-effect' : 'yarg-effect'
