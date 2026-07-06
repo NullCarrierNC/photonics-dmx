@@ -655,25 +655,7 @@ export class ControllerManager {
         }
       }
 
-      if (this.cueHandler) {
-        try {
-          this.cueHandler.shutdown()
-          this.cueHandler = null
-          log.info('ControllerManager shutdown: cue handler stopped')
-        } catch (err) {
-          log.error('Error shutting down cue handler:', err)
-        }
-      }
-
-      if (this.rb3CueHandler) {
-        try {
-          this.rb3CueHandler.shutdown()
-          this.rb3CueHandler = null
-          log.info('ControllerManager shutdown: RB3 cue handler stopped')
-        } catch (err) {
-          log.error('Error shutting down RB3 cue handler:', err)
-        }
-      }
+      this.shutdownDomainCueHandlerRefs()
 
       // Dispose every rig chain. The shared clock is stopped separately below so a chain
       // tearing down can't take ticks away from any sibling chain.
@@ -771,6 +753,33 @@ export class ControllerManager {
 
   public getRb3CueHandler(): YargCueHandler | null {
     return this.rb3CueHandler
+  }
+
+  /**
+   * Shut down and null every domain cue-handler ref (YARG + RB3). Single owner for both the
+   * shutdown and restart-teardown paths, so a handler ref can never survive teardown pointing at a
+   * disposed handler. Each is guarded independently so one failing shutdown can't strand the other;
+   * a new domain adds one block here rather than another pair of mirrored teardown sites.
+   */
+  private shutdownDomainCueHandlerRefs(): void {
+    if (this.cueHandler) {
+      try {
+        this.cueHandler.shutdown()
+      } catch (err) {
+        log.error('Error shutting down cue handler:', err)
+      }
+      this.cueHandler = null
+      log.info('ControllerManager teardown: cue handler stopped')
+    }
+    if (this.rb3CueHandler) {
+      try {
+        this.rb3CueHandler.shutdown()
+      } catch (err) {
+        log.error('Error shutting down RB3 cue handler:', err)
+      }
+      this.rb3CueHandler = null
+      log.info('ControllerManager teardown: RB3 cue handler stopped')
+    }
   }
 
   /** RB3 motion preferences for the RB3 cue handlers, from the RB3 motion cue domain. */
@@ -959,13 +968,7 @@ export class ControllerManager {
       }
       await this.senderLifecycle.resetSenderForControllerRestart()
 
-      if (this.cueHandler) {
-        this.cueHandler.shutdown()
-      }
-
-      if (this.rb3CueHandler) {
-        this.rb3CueHandler.shutdown()
-      }
+      this.shutdownDomainCueHandlerRefs()
 
       // Gguarantee the process-wide strobe state is cleared on every restart,
       // even if no cue handler was active to clear it during its own shutdown.
@@ -992,8 +995,6 @@ export class ControllerManager {
       this.dmxLightManager = null
       this.effectsController = null
       this.dmxPublisher = null
-      this.cueHandler = null
-      this.rb3CueHandler = null
 
       this.isInitialized = false
 

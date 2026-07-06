@@ -264,6 +264,26 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect(fake.rb3CueHandler).toBeNull()
   })
 
+  it('shutdownDomainCueHandlerRefs stops and nulls both handlers even if one throws', () => {
+    const rb3Shutdown = jest.fn()
+    const fake = Object.assign(Object.create(ControllerManager.prototype), {
+      cueHandler: {
+        shutdown: jest.fn(() => {
+          throw new Error('boom')
+        }),
+      },
+      rb3CueHandler: { shutdown: rb3Shutdown },
+    })
+
+    ;(
+      ControllerManager.prototype as unknown as { shutdownDomainCueHandlerRefs: () => void }
+    ).shutdownDomainCueHandlerRefs.call(fake)
+
+    expect(fake.cueHandler).toBeNull()
+    expect(rb3Shutdown).toHaveBeenCalledTimes(1)
+    expect(fake.rb3CueHandler).toBeNull()
+  })
+
   it('getLifecyclePhase returns the current phase on a prototype-based stub', () => {
     const stub = Object.assign(Object.create(ControllerManager.prototype), {
       lifecyclePhase: 'restarting' as const,
