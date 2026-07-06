@@ -7,6 +7,7 @@ import { EventEmitter } from 'events'
 import { Rb3StageKitDirectProcessor } from './Rb3StageKitDirectProcessor'
 import { Rb3StageKitCueProcessor } from './Rb3StageKitCueProcessor'
 import { ChainFanout } from '../controllers/ChainFanout'
+import { Rb3ChainRuntime } from '../controllers/Rb3ChainRuntime'
 import { StageKitConfig } from '../listeners/RB3/StageKitTypes'
 import { CueData } from '../cues/types/cueTypes'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
@@ -27,8 +28,9 @@ export interface ProcessorManagerConfig {
   mode: ProcessingMode
   stageKitConfig?: Partial<StageKitConfig>
   debug?: boolean
-  /** Cue-mode dispatch surface. Defaults to the chain fanout; the coordinator passes the RB3
-   *  runtime so cue mode drives the RB3 handler slot, and the laser branch wraps it with its tee. */
+  /** Cue-mode dispatch surface. Defaults to an RB3 chain runtime over the fanout so cue mode
+   *  drives the RB3 handler slot; the coordinator passes its own runtime and the laser branch
+   *  wraps it with its tee. */
   cueRuntime?: YargCueRuntime
 }
 
@@ -179,7 +181,7 @@ export class ProcessorManager extends EventEmitter {
 
     if (!this.stageKitCueProcessor) {
       this.stageKitCueProcessor = new Rb3StageKitCueProcessor(
-        this.config.cueRuntime ?? this.chainFanout,
+        this.config.cueRuntime ?? new Rb3ChainRuntime(this.chainFanout),
         { menuDispatch: this.chainFanout },
       )
     }

@@ -85,6 +85,16 @@ describe('RB3 cue mode (integration)', () => {
     expect(yargHandleCue).not.toHaveBeenCalled()
   })
 
+  it('defaults to the RB3 runtime when no cueRuntime is supplied, dispatching to the RB3 slot', () => {
+    manager = new ProcessorManager(fanout, { mode: 'cue' })
+    manager.setNetworkListener(listener)
+
+    listener.emit('stagekit:data', colourPacket('red', [0, 2], RC.red))
+
+    expect(rb3HandleCue.mock.calls.some((c) => c[0] === CueType.RB3)).toBe(true)
+    expect(yargHandleCue).not.toHaveBeenCalled()
+  })
+
   it('fans an LED-on edge out to the chain sequencer', () => {
     startCueMode()
 
