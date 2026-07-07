@@ -5,6 +5,8 @@ import {
   type EventListenerNode,
   type LogicNode,
   type MathLogicNode,
+  type ClampLogicNode,
+  type SelectFromListLogicNode,
   type NodeCueKind,
   type NodeCueMode,
   type NodeEffectType,
@@ -171,6 +173,29 @@ const useNodeCreation = ({
           right: { source: 'literal', value: 0 },
           assignTo: 'result',
         }) satisfies MathLogicNode,
+      'clamp': (id) =>
+        ({
+          id,
+          type: 'logic',
+          logicType: 'clamp',
+          label: 'clamp',
+          outputs: [],
+          value: { source: 'literal', value: 0 },
+          min: { source: 'literal', value: 0 },
+          max: { source: 'literal', value: 1 },
+          assignTo: 'result',
+        }) satisfies ClampLogicNode,
+      'select-from-list': (id) =>
+        ({
+          id,
+          type: 'logic',
+          logicType: 'select-from-list',
+          label: 'select-from-list',
+          outputs: [],
+          list: [0, 1, 2],
+          index: { source: 'literal', value: 0 },
+          assignTo: 'result',
+        }) satisfies SelectFromListLogicNode,
       'cue-data': (id) =>
         ({
           id,

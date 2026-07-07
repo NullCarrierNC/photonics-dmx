@@ -18,7 +18,7 @@ export const AUDIO_EVENT_TYPES: AudioEventType[] = AUDIO_EVENT_OPTIONS_WITH_NONE
 )
 
 export const LOGIC_COMPARATORS = ['>', '>=', '<', '<=', '==', '!='] as const
-export const MATH_OPERATORS = ['add', 'subtract', 'multiply', 'divide', 'modulus'] as const
+export const MATH_OPERATORS = ['add', 'subtract', 'multiply', 'divide', 'modulus', 'wrap'] as const
 
 export const ajv = new Ajv({
   allErrors: true,

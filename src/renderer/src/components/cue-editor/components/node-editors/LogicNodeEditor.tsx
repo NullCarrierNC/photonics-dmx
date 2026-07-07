@@ -3,6 +3,8 @@ import type {
   LogicNode,
   VariableLogicNode,
   MathLogicNode,
+  ClampLogicNode,
+  SelectFromListLogicNode,
   ConditionalLogicNode,
   CueDataLogicNode,
   ConfigDataLogicNode,
@@ -26,6 +28,8 @@ import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nod
 
 import VariableLogicEditor from './logic/VariableLogicEditor'
 import MathLogicEditor from './logic/MathLogicEditor'
+import ClampLogicEditor from './logic/ClampLogicEditor'
+import SelectFromListLogicEditor from './logic/SelectFromListLogicEditor'
 import CueDataLogicEditor from './logic/CueDataLogicEditor'
 import ConfigDataLogicEditor from './logic/ConfigDataLogicEditor'
 import ConditionalLogicEditor from './logic/ConditionalLogicEditor'
@@ -84,6 +88,26 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     return (
       <MathLogicEditor
         node={node as MathLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'clamp') {
+    return (
+      <ClampLogicEditor
+        node={node as ClampLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'select-from-list') {
+    return (
+      <SelectFromListLogicEditor
+        node={node as SelectFromListLogicNode}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />

@@ -27,6 +27,7 @@ const MathLogicEditor: React.FC<MathLogicEditorProps> = ({
         <option value="multiply">multiply</option>
         <option value="divide">divide</option>
         <option value="modulus">modulus</option>
+        <option value="wrap">wrap</option>
       </select>
     </label>
     <ValueSourceEditor

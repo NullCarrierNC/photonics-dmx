@@ -72,7 +72,7 @@ export interface EventDefinition {
 }
 
 export type LogicComparator = '>' | '>=' | '<' | '<=' | '==' | '!='
-export type MathOperator = 'add' | 'subtract' | 'multiply' | 'divide' | 'modulus'
+export type MathOperator = 'add' | 'subtract' | 'multiply' | 'divide' | 'modulus' | 'wrap'
 
 export interface BaseLogicNode {
   id: string
@@ -95,6 +95,21 @@ export interface MathLogicNode extends BaseLogicNode {
   left: ValueSource
   right: ValueSource
   assignTo?: string
+}
+
+export interface ClampLogicNode extends BaseLogicNode {
+  logicType: 'clamp'
+  value: ValueSource
+  min: ValueSource
+  max: ValueSource
+  assignTo: string
+}
+
+export interface SelectFromListLogicNode extends BaseLogicNode {
+  logicType: 'select-from-list'
+  list: number[] // Inline numeric list to select from
+  index: ValueSource // Index into the list (with wraparound modulo list length)
+  assignTo: string // Variable written with type 'number'
 }
 
 export interface ConditionalLogicNode extends BaseLogicNode {
@@ -234,6 +249,8 @@ export interface ForEachLightLogicNode extends BaseLogicNode {
 export type LogicNode =
   | VariableLogicNode
   | MathLogicNode
+  | ClampLogicNode
+  | SelectFromListLogicNode
   | ConditionalLogicNode
   | CueDataLogicNode
   | ConfigDataLogicNode

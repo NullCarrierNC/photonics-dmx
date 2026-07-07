@@ -94,6 +94,11 @@ export function evaluateLogicNode(
         case 'modulus':
           result = right === 0 ? 0 : left % right
           break
+        // Proper modulo, always in [0, right), unlike `modulus` which keeps JS `%` sign. Wraps a
+        // possibly-negative index or step back into range (the ((n % r) + r) % r idiom used elsewhere).
+        case 'wrap':
+          result = right === 0 ? 0 : ((left % right) + right) % right
+          break
       }
 
       if (logicNode.assignTo) {
@@ -101,6 +106,34 @@ export function evaluateLogicNode(
         varStore.set(logicNode.assignTo, { type: 'number', value: result })
       }
 
+      return edges.map((edge) => edge.to)
+    }
+
+    case 'clamp': {
+      const value = Number(resolveValue('number', logicNode.value, context, variableDefinitions))
+      const min = Number(resolveValue('number', logicNode.min, context, variableDefinitions))
+      const max = Number(resolveValue('number', logicNode.max, context, variableDefinitions))
+      // Constrain value to [min, max]. A degenerate range (min > max) clamps to max, since
+      // Math.min(max, Math.max(min, value)) resolves to max rather than throwing.
+      const result = Math.min(Math.max(value, min), max)
+      const varStore = getVarStore(logicNode.assignTo)
+      varStore.set(logicNode.assignTo, { type: 'number', value: result })
+      return edges.map((edge) => edge.to)
+    }
+
+    case 'select-from-list': {
+      // Pick a number from an inline list by index, with wraparound (the numeric analogue of
+      // color-from-index). An empty list leaves the target variable unwritten.
+      const list = logicNode.list
+      if (!list || list.length === 0) {
+        log.warn(`select-from-list node ${nodeId}: list is empty`)
+        return edges.map((edge) => edge.to)
+      }
+      const rawIndex = Number(resolveValue('number', logicNode.index, context, variableDefinitions))
+      const idx = Math.floor(isNaN(rawIndex) ? 0 : rawIndex)
+      const wrapped = ((idx % list.length) + list.length) % list.length
+      const targetVarStore = getVarStore(logicNode.assignTo)
+      targetVarStore.set(logicNode.assignTo, { type: 'number', value: list[wrapped] })
       return edges.map((edge) => edge.to)
     }
 

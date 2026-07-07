@@ -1010,6 +1010,46 @@ describe('Node cue validation', () => {
       expect(result.errors.length).toBeGreaterThan(0)
     })
 
+    it('accepts a cue using the wrap operator, clamp, and select-from-list nodes', () => {
+      const cue = validCue()
+      cue.nodes.logic = [
+        {
+          id: 'wrap-1',
+          type: 'logic',
+          logicType: 'math',
+          operator: 'wrap',
+          left: { source: 'literal', value: -1 },
+          right: { source: 'literal', value: 5 },
+          assignTo: 'a',
+        },
+        {
+          id: 'clamp-1',
+          type: 'logic',
+          logicType: 'clamp',
+          value: { source: 'variable', name: 'a' },
+          min: { source: 'literal', value: 0 },
+          max: { source: 'literal', value: 2 },
+          assignTo: 'b',
+        },
+        {
+          id: 'sel-1',
+          type: 'logic',
+          logicType: 'select-from-list',
+          list: [100, 200, 300],
+          index: { source: 'variable', name: 'b' },
+          assignTo: 'c',
+        },
+      ] as any
+      cue.connections = [
+        { from: 'event-1', to: 'wrap-1' },
+        { from: 'wrap-1', to: 'clamp-1' },
+        { from: 'clamp-1', to: 'sel-1' },
+        { from: 'sel-1', to: 'action-1' },
+      ]
+      const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
+      expect(result.valid).toBe(true)
+    })
+
     describe('effect raiser and effect listener', () => {
       it('rejects effect raiser with wrong type discriminator', () => {
         const cue = validCue()

@@ -70,6 +70,36 @@ function minimalAction(id: string): ActionNode {
   }
 }
 
+/** Effect-factory + sequencer mocks so a compiled cue can run and we can inspect which action fired. */
+function setupEffectMocks() {
+  const addEffect = jest.fn()
+  const sequencer = {
+    addEffect,
+    setEffectUnblockedName: jest.fn().mockReturnValue(true),
+    addEffectUnblockedNameWithCallback: jest
+      .fn()
+      .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
+    setEffectUnblockedNameWithCallback: jest
+      .fn()
+      .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
+  } as any
+  const lightManager = {
+    getLights: jest.fn().mockReturnValue([{ id: 'l1', position: 0 }]),
+  } as any
+  jest
+    .spyOn(ActionEffectFactory, 'resolveLights')
+    .mockReturnValue([{ id: 'l1', position: 0 } as any])
+  const buildEffectSpy = jest.spyOn(ActionEffectFactory, 'buildEffect').mockImplementation(
+    ({ action }: any) =>
+      ({
+        id: action.id,
+        description: 'mock',
+        transitions: [],
+      }) as any,
+  )
+  return { sequencer, lightManager, buildEffectSpy }
+}
+
 describe('Node cue logic runtime', () => {
   afterEach(() => {
     jest.restoreAllMocks()
@@ -224,6 +254,82 @@ describe('Node cue logic runtime', () => {
       expect.objectContaining({ action: expect.objectContaining({ id: 'action-false' }) }),
     )
     expect(addEffect).toHaveBeenCalledTimes(1)
+  })
+
+  it('computes wrap, clamp, and select-from-list in a chain and branches on the result', async () => {
+    const definition: YargNodeCueDefinition = {
+      id: 'p6-cue',
+      name: 'P6 Cue',
+      kind: 'lighting',
+      cueType: CueType.Chorus,
+      style: 'primary',
+      nodes: {
+        events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
+        actions: [minimalAction('action-true'), minimalAction('action-false')],
+        logic: [
+          // wrap(-1, 5): proper modulo is 4, where JS `%` (modulus) would give -1.
+          {
+            id: 'wrap-1',
+            type: 'logic',
+            logicType: 'math',
+            operator: 'wrap',
+            left: { source: 'literal', value: -1 },
+            right: { source: 'literal', value: 5 },
+            assignTo: 'a',
+          },
+          // clamp(a=4, 0, 2) -> 2.
+          {
+            id: 'clamp-1',
+            type: 'logic',
+            logicType: 'clamp',
+            value: { source: 'variable', name: 'a' },
+            min: { source: 'literal', value: 0 },
+            max: { source: 'literal', value: 2 },
+            assignTo: 'b',
+          },
+          // select-from-list [100,200,300] at index b=2 -> 300.
+          {
+            id: 'sel-1',
+            type: 'logic',
+            logicType: 'select-from-list',
+            list: [100, 200, 300],
+            index: { source: 'variable', name: 'b' },
+            assignTo: 'c',
+          },
+          {
+            id: 'cond-1',
+            type: 'logic',
+            logicType: 'conditional',
+            comparator: '==',
+            left: { source: 'variable', name: 'c' },
+            right: { source: 'literal', value: 300 },
+          },
+        ],
+      },
+      connections: [
+        { from: 'event-1', to: 'wrap-1' },
+        { from: 'wrap-1', to: 'clamp-1' },
+        { from: 'clamp-1', to: 'sel-1' },
+        { from: 'sel-1', to: 'cond-1' },
+        { from: 'cond-1', to: 'action-true', fromPort: 'true' },
+        { from: 'cond-1', to: 'action-false', fromPort: 'false' },
+      ],
+      layout: { nodePositions: {} },
+    }
+
+    const compiled = NodeCueCompiler.compileYargCue(definition)
+    const cue = new YargNodeCue('group-1', compiled)
+    const { sequencer, lightManager, buildEffectSpy } = setupEffectMocks()
+
+    await cue.execute({ beat: 'Strong' } as any, sequencer, lightManager)
+
+    // 4 -> clamped to 2 -> [100,200,300][2] = 300, so 300 == 300 is true.
+    expect(buildEffectSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ action: expect.objectContaining({ id: 'action-true' }) }),
+    )
+    expect(buildEffectSpy).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: expect.objectContaining({ id: 'action-false' }) }),
+    )
   })
 
   describe('shuffle-lights', () => {

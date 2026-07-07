@@ -191,6 +191,18 @@ const LogicNodesSection: React.FC<{
         Math
       </button>
       <button
+        className={getLogicNodeButtonClasses('clamp')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'clamp' })}
+        onClick={() => addLogicNode('clamp')}>
+        Clamp
+      </button>
+      <button
+        className={getLogicNodeButtonClasses('select-from-list')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'select-from-list' })}
+        onClick={() => addLogicNode('select-from-list')}>
+        Select From List
+      </button>
+      <button
         className={getLogicNodeButtonClasses('random')}
         {...makeDragHandlers({ kind: 'logic', logicType: 'random' })}
         onClick={() => addLogicNode('random')}>

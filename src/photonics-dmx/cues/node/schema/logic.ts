@@ -7,7 +7,9 @@ import {
 import type {
   ArrayLengthLogicNode,
   BuildRingLogicNode,
+  ClampLogicNode,
   ColorFromIndexLogicNode,
+  SelectFromListLogicNode,
   ConcatColorsLogicNode,
   ConcatLightsLogicNode,
   ConditionalLogicNode,
@@ -91,6 +93,47 @@ const mathLogicSchema = {
     assignTo: { type: 'string', nullable: true },
   },
 } as unknown as JSONSchemaType<MathLogicNode>
+
+const clampLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'value', 'min', 'max', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'clamp' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    value: valueSourceSchema,
+    min: valueSourceSchema,
+    max: valueSourceSchema,
+    assignTo: { type: 'string' },
+  },
+} as unknown as JSONSchemaType<ClampLogicNode>
+
+const selectFromListLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'list', 'index', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'select-from-list' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    list: { type: 'array', items: { type: 'number' } },
+    index: valueSourceSchema,
+    assignTo: { type: 'string' },
+  },
+} as unknown as JSONSchemaType<SelectFromListLogicNode>
 
 const conditionalLogicSchema = {
   type: 'object',
@@ -456,6 +499,8 @@ export const logicNodeSchema = {
   oneOf: [
     variableLogicSchema,
     mathLogicSchema,
+    clampLogicSchema,
+    selectFromListLogicSchema,
     conditionalLogicSchema,
     cueDataLogicSchema,
     configDataLogicSchema,
