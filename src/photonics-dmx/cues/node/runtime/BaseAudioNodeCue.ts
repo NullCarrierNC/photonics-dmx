@@ -18,29 +18,11 @@ import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluat
 import { createExecutionStateMachineLifecycle } from './executionStateMachineLifecycle'
 import { VariableValue } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
+import { evaluateAudioEvent, type AudioEventState } from './audioEventEvaluator'
 import { findBestMatchingBandId, getBandEnergy } from '../../../listeners/Audio/bandEnergy'
 import { createLogger } from '../../../../shared/logger'
 import { monotonicNowMs } from '../../../../shared/time'
 const log = createLogger('BaseAudioNodeCue')
-
-interface AudioEventState {
-  previousValue: number
-  active: boolean
-}
-
-interface EdgeEvaluation {
-  mode: 'edge'
-  triggered: boolean
-  intensity: number
-}
-
-interface LevelEvaluation {
-  mode: 'level'
-  active: boolean
-  intensity: number
-}
-
-type AudioEventEvaluation = EdgeEvaluation | LevelEvaluation
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value))
@@ -299,7 +281,7 @@ export abstract class BaseAudioNodeCue {
         continue
       }
       const eventState = this.getEventState(state, event.id)
-      const evaluation = this.evaluateEvent(event as AudioEventNode, safeData, eventState)
+      const evaluation = evaluateAudioEvent(event as AudioEventNode, safeData, eventState)
       const effectKey = this.effectKey(event.id)
 
       if (evaluation.mode === 'edge') {
@@ -647,73 +629,6 @@ export abstract class BaseAudioNodeCue {
       state.eventStates.set(eventId, { previousValue: 0, active: false })
     }
     return state.eventStates.get(eventId)!
-  }
-
-  private evaluateEvent(
-    event: AudioEventNode,
-    data: AudioCueData,
-    state: AudioEventState,
-  ): AudioEventEvaluation {
-    const threshold = clamp(event.threshold ?? 0.5, 0, 1)
-    const currentValue = clamp(this.getEventValue(event.eventType, data), 0, 1)
-
-    if (event.triggerMode === 'edge') {
-      let triggered = state.previousValue < threshold && currentValue >= threshold
-      if (triggered && event.useOnsetGating) {
-        const bandOnsets = data.audioData.bandOnsets
-        const onsetThreshold = clamp(event.onsetThreshold ?? 0.3, 0, 1)
-        let maxOnset = 0
-        if (bandOnsets && Object.keys(bandOnsets).length > 0) {
-          maxOnset = Math.max(...Object.values(bandOnsets))
-        }
-        if (maxOnset < onsetThreshold) {
-          triggered = false
-        }
-      }
-      state.previousValue = currentValue
-      state.active = triggered
-      return {
-        mode: 'edge',
-        triggered,
-        intensity: currentValue,
-      }
-    }
-
-    const isActive = currentValue >= threshold
-    const normalizedRange = threshold >= 1 ? 1 : (currentValue - threshold) / (1 - threshold)
-    const intensity = isActive ? clamp(normalizedRange, 0.05, 1) : 0
-    state.previousValue = currentValue
-    state.active = isActive
-
-    return {
-      mode: 'level',
-      active: isActive,
-      intensity,
-    }
-  }
-
-  private getEventValue(eventType: AudioEventNode['eventType'], data: AudioCueData): number {
-    const { audioData } = data
-    switch (eventType) {
-      case 'cue-started':
-        return 0
-      case 'cue-called':
-        return 0
-      case 'beat':
-        return audioData.beatDetected ? 1 : 0
-      case 'audio-energy':
-        return clamp(audioData.energy ?? 0, 0, 1)
-      case 'audio-trigger':
-        return 0
-      case 'audio-centroid':
-        return clamp(audioData.spectralCentroid ?? 0, 0, 1)
-      case 'audio-flatness':
-        return clamp(audioData.spectralFlatness ?? 0, 0, 1)
-      case 'audio-hfc':
-        return clamp(audioData.hfcOnset ?? 0, 0, 1)
-      default:
-        return 0
-    }
   }
 
   /**
