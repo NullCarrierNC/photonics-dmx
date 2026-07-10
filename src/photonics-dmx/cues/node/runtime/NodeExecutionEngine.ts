@@ -432,7 +432,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${eventNode.id}: ${msg}`)
+      this.emitRuntimeError(eventNode.id, msg)
       log.error(`Error starting execution for event ${eventNode.id}:`, error)
     }
   }
@@ -588,7 +588,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
       effectEngine.triggerEffect(context.cueData)
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${raiserNode.id}: ${msg}`)
+      this.emitRuntimeError(raiserNode.id, msg)
       log.error(`Error executing effect raiser node ${raiserNode.id}:`, error)
       this.emitNodeExecution('deactivated', raiserNode.id)
     }
@@ -643,7 +643,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${listenerNode.id}: ${msg}`)
+      this.emitRuntimeError(listenerNode.id, msg)
       log.error(`Error starting listener execution for ${listenerNode.id}:`, error)
     }
   }

@@ -2162,7 +2162,7 @@ describe('NodeExecutionEngine', () => {
       jest.runAllTimers()
       expect(emit).toHaveBeenCalledWith(
         RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
-        expect.stringContaining('nonExistentColor'),
+        expect.objectContaining({ message: expect.stringContaining('nonExistentColor') }),
       )
     })
 

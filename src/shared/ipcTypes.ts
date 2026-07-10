@@ -910,6 +910,18 @@ export interface NodeExecutionPayload {
   timestamp: number
 }
 
+export interface NodeCueRuntimeErrorPayload {
+  /** Graph the error came from — cue: `${groupId}:${cueId}`, effect: the effect definition id —
+   *  matching the editor's currentGraphId (as {@link NodeExecutionPayload.cueId} does) so the highlight
+   *  can be scoped to the open graph. Optional: emitters without graph context omit it, and consumers
+   *  must still surface an unattributed error rather than drop it. */
+  graphId?: string
+  /** Id of the node that threw, for editor highlighting. */
+  nodeId: string
+  /** Human-readable error message (no longer prefixed with the node id). */
+  message: string
+}
+
 export interface IpcEventMap {
   [RENDERER_RECEIVE.SENDER_START_FAILED]: { sender: string; error: string }
   [RENDERER_RECEIVE.SENDER_ERROR]: string
@@ -955,7 +967,7 @@ export interface IpcEventMap {
     timestamp: number
   }
   [RENDERER_RECEIVE.NODE_EXECUTION]: NodeExecutionPayload
-  [RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR]: string
+  [RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR]: NodeCueRuntimeErrorPayload
   [RENDERER_RECEIVE.LIFECYCLE_PHASE_CHANGED]: LifecyclePhase
 }
 

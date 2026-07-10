@@ -315,10 +315,11 @@ export abstract class BaseAudioNodeCue {
           actionId = this.findFirstAction(state, event, cueData, lightManager)
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error)
-          this.runtimeBroadcaster.emit(
-            RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
-            `${event.id}: ${msg}`,
-          )
+          this.runtimeBroadcaster.emit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, {
+            graphId: this.id,
+            nodeId: event.id,
+            message: msg,
+          })
           log.error(`Error in findFirstAction for event ${event.id}:`, error)
           continue
         }

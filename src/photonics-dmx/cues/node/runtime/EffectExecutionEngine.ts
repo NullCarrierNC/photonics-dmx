@@ -22,7 +22,6 @@ import { VariableValue, NodeRuntimeCallbacks } from './executionTypes'
 import { BaseNodeExecutionEngine, CompiledGraph } from './BaseNodeExecutionEngine'
 import { RevisitPolicy } from './GraphExecutionPolicy'
 import { resolveValue } from './valueResolver'
-import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('EffectExecutionEngine')
@@ -146,7 +145,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     return {
       onNodeError: (nodeId, error) => {
         const msg = error instanceof Error ? error.message : String(error)
-        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
+        this.emitRuntimeError(nodeId, msg)
         log.error(`Error executing node ${nodeId}:`, error)
       },
     }

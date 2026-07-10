@@ -4,7 +4,7 @@ import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import type { LightingPreferences } from '../atoms'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getAppVersion, getCorruptRecoveryEvents, getPrefs, getValidationErrors } from '../ipcApi'
-import type { CueStateUpdatePayload } from '../../../shared/ipcTypes'
+import type { CueStateUpdatePayload, NodeCueRuntimeErrorPayload } from '../../../shared/ipcTypes'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../../shared/dmxOutputRefresh'
 import { createLogger } from '../../../shared/logger'
@@ -19,7 +19,7 @@ export interface UseAppIpcListenersParams {
   handleSenderError: (msg: string) => void
   handleYargError: (payload: { type: string; message: string; autoDisabled?: boolean }) => void
   handleRb3Error: (payload: { type: string; message: string; autoDisabled?: boolean }) => void
-  handleNodeCueRuntimeError: (msg: string) => void
+  handleNodeCueRuntimeError: (payload: NodeCueRuntimeErrorPayload) => void
   handleSenderNetworkError: (data: { sender: string; error: string; autoDisabled: boolean }) => void
   handleCueStateUpdate: (cueState: CueStateUpdatePayload) => void
   handleSenderStartFailure: (data: { sender: string; error: string }) => void
@@ -182,7 +182,8 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
       p().handleYargError(payload)
     const onRb3Error = (payload: { type: string; message: string; autoDisabled?: boolean }) =>
       p().handleRb3Error(payload)
-    const onNodeCueRuntimeError = (msg: string) => p().handleNodeCueRuntimeError(msg)
+    const onNodeCueRuntimeError = (payload: NodeCueRuntimeErrorPayload) =>
+      p().handleNodeCueRuntimeError(payload)
     const onSenderNetworkError = (data: { sender: string; error: string; autoDisabled: boolean }) =>
       p().handleSenderNetworkError(data)
     const onCueStateUpdate = (state: CueStateUpdatePayload) => p().handleCueStateUpdate(state)

@@ -37,7 +37,7 @@ import ToastContainer from './components/Toast'
 import { ConfirmModalHost } from './components/ConfirmModalHost'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useDarkMode } from './DarkModeProvider'
-import type { CueStateUpdatePayload } from '../../shared/ipcTypes'
+import type { CueStateUpdatePayload, NodeCueRuntimeErrorPayload } from '../../shared/ipcTypes'
 import {
   setAudioEnabled,
   savePrefs,
@@ -127,9 +127,10 @@ export const App = (): JSX.Element => {
   )
 
   const handleNodeCueRuntimeError = useCallback(
-    (msg: string): void => {
-      log.error('Node cue runtime error:', msg)
-      showToast(msg, 'error', 5000)
+    (payload: NodeCueRuntimeErrorPayload): void => {
+      const text = payload?.nodeId ? `${payload.nodeId}: ${payload.message}` : payload?.message
+      log.error('Node cue runtime error:', text)
+      showToast(text ?? 'Node cue runtime error', 'error', 5000)
     },
     [showToast],
   )

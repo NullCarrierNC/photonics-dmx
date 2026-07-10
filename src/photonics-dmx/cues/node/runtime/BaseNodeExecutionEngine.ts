@@ -201,6 +201,16 @@ export abstract class BaseNodeExecutionEngine {
     }
   }
 
+  /** Report a runtime error scoped to this graph so the editor can highlight the offending node and
+   *  filter the highlight to the open cue/effect (see NodeCueRuntimeErrorPayload). */
+  protected emitRuntimeError(nodeId: string, message: string): void {
+    this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, {
+      graphId: this.getEmitCueId(),
+      nodeId,
+      message,
+    })
+  }
+
   protected emitNodeExecution(type: 'activated' | 'deactivated', nodeId: string): void {
     this.trackActivation(type, nodeId)
     this.runtimeEmit(RENDERER_RECEIVE.NODE_EXECUTION, {
@@ -459,7 +469,7 @@ export abstract class BaseNodeExecutionEngine {
       context.addTimer(timerId)
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
+      this.emitRuntimeError(nodeId, msg)
       log.error(`Error executing delay node ${nodeId}:`, error)
       this.emitNodeExecution('deactivated', nodeId)
     }
@@ -597,7 +607,7 @@ export abstract class BaseNodeExecutionEngine {
       this.emitNodeExecution('deactivated', nodeId)
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
+      this.emitRuntimeError(nodeId, msg)
       log.error(`Error executing logic node ${nodeId}:`, error)
       this.emitNodeExecution('deactivated', nodeId)
     }
@@ -625,7 +635,7 @@ export abstract class BaseNodeExecutionEngine {
       this.continueToNextNodes(raiserNode.id, context)
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${raiserNode.id}: ${msg}`)
+      this.emitRuntimeError(raiserNode.id, msg)
       log.error(`Error executing event raiser node ${raiserNode.id}:`, error)
       this.emitNodeExecution('deactivated', raiserNode.id)
     }
@@ -944,7 +954,7 @@ export abstract class BaseNodeExecutionEngine {
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${actionNode.id}: ${msg}`)
+      this.emitRuntimeError(actionNode.id, msg)
       log.error(`Error executing action node ${actionNode.id}:`, error)
       this.emitNodeExecution('deactivated', actionNode.id)
     }

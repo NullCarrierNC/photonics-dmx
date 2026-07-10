@@ -283,7 +283,7 @@ describe('AudioNodeCue level mode', () => {
     await expect(cue.execute(audioCueData(0.5), sequencer, lightManager)).resolves.toBeUndefined()
     expect(emit).toHaveBeenCalledWith(
       RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
-      expect.stringContaining('ev-energy'),
+      expect.objectContaining({ nodeId: 'ev-energy' }),
     )
     expect(sequencer.addEffect).not.toHaveBeenCalled()
   })
