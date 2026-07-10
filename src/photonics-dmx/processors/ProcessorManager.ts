@@ -32,6 +32,9 @@ export interface ProcessorManagerConfig {
    *  drives the RB3 handler slot; the coordinator passes its own runtime and the laser branch
    *  wraps it with its tee. */
   cueRuntime?: YargCueRuntime
+  /** RB3 motion switch-timer range (seconds) from the rb3Motion prefs; passed through to the cue
+   *  processor so it can drive LED-1-triggered motion switching. */
+  getRb3MotionCueDurationRangeSec?: () => { min: number; max: number }
 }
 
 /**
@@ -182,7 +185,10 @@ export class ProcessorManager extends EventEmitter {
     if (!this.stageKitCueProcessor) {
       this.stageKitCueProcessor = new Rb3StageKitCueProcessor(
         this.config.cueRuntime ?? new Rb3ChainRuntime(this.chainFanout),
-        { menuDispatch: this.chainFanout },
+        {
+          menuDispatch: this.chainFanout,
+          getMotionSwitchDurationRangeSec: this.config.getRb3MotionCueDurationRangeSec,
+        },
       )
     }
     this.stageKitCueProcessor.startListening(this.networkListener!)

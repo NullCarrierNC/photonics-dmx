@@ -32,6 +32,7 @@ export interface ListenerCoordinatorDeps {
   getActiveRb3MotionCueRef: () => { groupId: string; cueId: string } | null
   getRb3MotionCueMinimumHoldMs: () => number
   getRb3MotionCueProbabilityPercent: () => number
+  getRb3MotionCueDurationRangeSec: () => { min: number; max: number }
   getFallbackCueTimeMs: () => number
   sendSenderError: (message: string) => void
   sendToAllWindows: (channel: string, payload: unknown) => void
@@ -178,6 +179,7 @@ export class ListenerCoordinator {
         getMotionCueMinimumHoldMs: this.deps.getRb3MotionCueMinimumHoldMs,
         getMotionCueProbabilityPercent: this.deps.getRb3MotionCueProbabilityPercent,
         runtimeBroadcaster: chain.isPrimary ? this.deps.runtimeBroadcaster : noopBroadcaster(),
+        motionChangeChannel: RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE,
       })
       handler.setMotionEnabled(this.deps.getMotionEnabled())
       handler.setManualMotionRef(this.deps.getActiveRb3MotionCueRef())
@@ -257,7 +259,11 @@ export class ListenerCoordinator {
     // The processor takes the chain fanout for menu dispatch (playMenuFrame / clear to each rig's
     // RB3 menu handler) and, in cue mode, the RB3 chain runtime for gameplay cue dispatch.
     log.info(`ListenerCoordinator: Creating ProcessorManager with mode: ${mode}`)
-    this.processorManager = new ProcessorManager(this.deps.getChainFanout(), { mode, cueRuntime })
+    this.processorManager = new ProcessorManager(this.deps.getChainFanout(), {
+      mode,
+      cueRuntime,
+      getRb3MotionCueDurationRangeSec: this.deps.getRb3MotionCueDurationRangeSec,
+    })
     this.processorManager.setCueHandler(this.deps.getChainFanout())
     this.rb3eListener = new Rb3eNetworkListener()
     this.processorManager.setNetworkListener(this.rb3eListener)

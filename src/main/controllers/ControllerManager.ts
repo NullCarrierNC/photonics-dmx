@@ -193,6 +193,10 @@ export class ControllerManager {
         getRb3MotionCueMinimumHoldMs: () => this.getRb3MotionDomain().minimumHoldMs ?? 5000,
         getRb3MotionCueProbabilityPercent: () =>
           this.getRb3MotionDomain().probabilityPercent ?? 100,
+        getRb3MotionCueDurationRangeSec: () => {
+          const d = this.getRb3MotionDomain()
+          return { min: d.cueDurationMin, max: d.cueDurationMax }
+        },
         getFallbackCueTimeMs: () => this.config.getPreference('yargFallbackCueTimeMs') ?? 20000,
         sendSenderError: (message: string) => {
           sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
@@ -837,12 +841,16 @@ export class ControllerManager {
     activeCueRef: YargMotionCueRef | null
     minimumHoldMs: number
     probabilityPercent: number
+    cueDurationMin: number
+    cueDurationMax: number
   } {
     const domain = this.config.getPreference('cueDomains').rb3Motion
     return {
       activeCueRef: domain.activeCueRef ?? null,
       minimumHoldMs: domain.minimumHoldMs ?? 5000,
       probabilityPercent: domain.probabilityPercent ?? 100,
+      cueDurationMin: domain.cueDurationMin ?? 5,
+      cueDurationMax: domain.cueDurationMax ?? 20,
     }
   }
 
@@ -908,6 +916,7 @@ export class ControllerManager {
         getMotionCueMinimumHoldMs: () => this.getRb3MotionDomain().minimumHoldMs,
         getMotionCueProbabilityPercent: () => this.getRb3MotionDomain().probabilityPercent,
         runtimeBroadcaster: chain.isPrimary ? mainRuntimeBroadcaster : noopRuntimeBroadcaster(),
+        motionChangeChannel: RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE,
       })
       handler.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
       handler.setManualMotionRef(motion.activeCueRef)

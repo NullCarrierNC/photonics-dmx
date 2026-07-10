@@ -10,6 +10,7 @@ import {
 } from '../listeners/RB3/rb3eTypes'
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { Rb3MenuFramePump } from './rb3MenuAnimation'
+import { Rb3MotionSwitchScheduler } from './Rb3MotionSwitchScheduler'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('rb3-cue')
@@ -57,6 +58,10 @@ export interface Rb3StageKitCueProcessorOptions {
   /** Menu-look dispatch (the ChainFanout in production); drives the RB3 menu cue while in menus.
    *  Omitted in unit tests that only exercise the gameplay cue path. */
   menuDispatch?: Rb3MenuCueDispatch
+  /** RB3 motion switch-timer range (seconds), from the rb3Motion prefs. When set, the processor arms
+   *  a motion re-pick on the countdown and fires it on the next Light-1 edge. Omitted in tests that
+   *  don't exercise motion switching. */
+  getMotionSwitchDurationRangeSec?: () => { min: number; max: number }
 }
 
 /**
@@ -97,6 +102,9 @@ export class Rb3StageKitCueProcessor {
   private readonly boundScreenName = (data: { screenName: string }): void =>
     this.handleScreenName(data)
 
+  /** Motion switch scheduler; null when no duration range was supplied (motion switching off). */
+  private readonly motionScheduler: Rb3MotionSwitchScheduler | null
+
   constructor(
     private readonly runtime: YargCueRuntime,
     options: Rb3StageKitCueProcessorOptions = {},
@@ -104,6 +112,11 @@ export class Rb3StageKitCueProcessor {
     this.keepaliveMs =
       options.keepaliveMs === undefined ? DEFAULT_KEEPALIVE_MS : options.keepaliveMs
     this.menuDispatch = options.menuDispatch ?? null
+    this.motionScheduler = options.getMotionSwitchDurationRangeSec
+      ? new Rb3MotionSwitchScheduler(options.getMotionSwitchDurationRangeSec, () =>
+          this.runtime.requestMotionRepick?.(),
+        )
+      : null
   }
 
   startListening(listener: EventEmitter): void {
@@ -145,6 +158,8 @@ export class Rb3StageKitCueProcessor {
   /** Keepalive dispatch: re-runs the active look so cue-called graphs advance without a new packet. */
   tick(): void {
     if (this.inMenu || !this.started) return
+    // Arm a motion switch once the countdown elapses; it fires on the next Light-1 edge (emitEdges).
+    this.motionScheduler?.tick()
     void this.runtime.handleCue(CueType.RB3, this.buildFrame())
     if (this.strobeState !== 'Strobe_Off') {
       void this.runtime.handleCue(STROBE_CUE[this.strobeState], this.buildFrame())
@@ -182,8 +197,10 @@ export class Rb3StageKitCueProcessor {
     this.wasInSong = inSong
     if (inSong) {
       this.runtime.notifySongStart()
+      this.motionScheduler?.start()
     } else {
       this.runtime.notifySongEnd()
+      this.motionScheduler?.stop()
     }
   }
 
@@ -282,6 +299,8 @@ export class Rb3StageKitCueProcessor {
       const now = (after & bit) !== 0
       if (now && !was) this.runtime.handleSongEvent?.(LED_ON[i])
       else if (was && !now) this.runtime.handleSongEvent?.(LED_OFF[i])
+      // Light 1 (bit 0) drives motion switching: any change fires a pending re-pick (RB3 has no beat).
+      if (i === 0 && was !== now) this.motionScheduler?.notifyLight1Edge()
     }
     if (this.fogState && !before.fog) this.runtime.handleSongEvent?.('fog-on')
     else if (!this.fogState && before.fog) this.runtime.handleSongEvent?.('fog-off')
