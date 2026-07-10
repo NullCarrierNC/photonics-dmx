@@ -76,4 +76,8 @@ export class Rb3ChainRuntime implements YargCueRuntime {
   public handleSongEvent(condition: SongEventCondition): void {
     for (const c of this.fanout.getChains()) c.sequencer.handleSongEvent(condition)
   }
+
+  public requestMotionRepick(): void {
+    for (const c of this.fanout.getChains()) c.rb3CueHandler?.requestMotionRepick()
+  }
 }

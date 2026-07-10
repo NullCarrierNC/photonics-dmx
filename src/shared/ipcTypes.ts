@@ -952,6 +952,11 @@ export interface IpcEventMap {
     source: 'manual' | 'auto' | 'cleared'
     manualFallback: boolean
   }
+  [RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE]: {
+    ref: { groupId: string; cueId: string } | null
+    source: 'manual' | 'auto' | 'cleared'
+    manualFallback: boolean
+  }
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE]: { activeCueType: string }
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_DEADLINE]: AudioGameModeSchedulePayload
   [RENDERER_RECEIVE.AUDIO_STROBE_STATE]: {

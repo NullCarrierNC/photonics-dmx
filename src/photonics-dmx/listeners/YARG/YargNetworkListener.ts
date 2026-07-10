@@ -52,6 +52,11 @@ export interface YargCueRuntime {
    * sequencer union so the two can't drift.
    */
   handleSongEvent?(condition: SongEventCondition): void
+  /**
+   * Force a motion-cue re-pick on every chain. Optional; the RB3 cue-mode processor calls it when its
+   * switch-timer has elapsed and Light 1 changes state (RB3 has no beat to key motion selection on).
+   */
+  requestMotionRepick?(): void
 }
 
 const PORT = 36107

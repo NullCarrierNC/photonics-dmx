@@ -9,6 +9,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 import { YargCueHandler } from '../../cueHandlers/YargCueHandler'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { monotonicNowMs } from '../../../shared/time'
 import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
 import { CueStyle, INetCue } from '../../cues/interfaces/INetCue'
@@ -335,5 +336,88 @@ describe('YargCueHandler Fallback motion suppression', () => {
     expect(getRandomMotionCue).not.toHaveBeenCalled()
     expect(motion.execute).not.toHaveBeenCalled()
     expect(internals.currentMotionCue).toBeNull()
+  })
+})
+
+describe('YargCueHandler requestMotionRepick (RB3 external trigger)', () => {
+  let registry: YargCueRegistry
+
+  beforeEach(() => {
+    registry = YargCueRegistry.getInstance()
+    jest.restoreAllMocks()
+  })
+
+  function motionInternals(handler: YargCueHandler) {
+    return handler as unknown as {
+      currentMotionCue: INetCue | null
+      currentMotionCueStartTime: number | null
+      lastManualMotionRefForMotion: unknown
+    }
+  }
+
+  it('swaps in a random motion cue without executing it (the frame dispatch runs it)', () => {
+    const motion = makeFakeCue(CueStyle.Primary, 'motion')
+    jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(motion)
+    jest
+      .spyOn(registry, 'findYargMotionCueRef')
+      .mockReturnValue({ groupId: 'rb3-motion-default', cueId: 'rb3-motion-wave' })
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), { registry })
+
+    handler.requestMotionRepick()
+
+    expect(motionInternals(handler).currentMotionCue).toBe(motion)
+    // The swapped cue runs on the next keepalive dispatch, not from the trigger itself.
+    expect(motion.execute).not.toHaveBeenCalled()
+  })
+
+  it('respects the min-hold floor (no re-pick within the hold window)', () => {
+    const motion = makeFakeCue(CueStyle.Primary, 'motion')
+    const getRandom = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(motion)
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), {
+      registry,
+      getMotionCueMinimumHoldMs: () => 60_000,
+    })
+    const internals = motionInternals(handler)
+    internals.currentMotionCue = motion
+    internals.currentMotionCueStartTime = monotonicNowMs()
+    // Neutralize the initial manual-change sync (null !== undefined) so only the min-hold gate is under test.
+    internals.lastManualMotionRefForMotion = null
+
+    handler.requestMotionRepick()
+
+    expect(getRandom).not.toHaveBeenCalled()
+    expect(internals.currentMotionCue).toBe(motion)
+  })
+
+  it('is a no-op while motion is disabled', () => {
+    const getRandom = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), { registry })
+    handler.setMotionEnabled(false)
+
+    handler.requestMotionRepick()
+
+    expect(getRandom).not.toHaveBeenCalled()
+  })
+
+  it('broadcasts motion changes on the injected RB3 channel, not the YARG one', () => {
+    const motion = makeFakeCue(CueStyle.Primary, 'motion')
+    jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(motion)
+    jest
+      .spyOn(registry, 'findYargMotionCueRef')
+      .mockReturnValue({ groupId: 'rb3-motion-default', cueId: 'rb3-motion-wave' })
+    const emit = jest.fn()
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), {
+      registry,
+      runtimeBroadcaster: { emit } as never,
+      motionChangeChannel: RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE,
+    })
+
+    handler.requestMotionRepick()
+
+    expect(emit).toHaveBeenCalledWith(RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE, expect.anything())
+    expect(emit).not.toHaveBeenCalledWith(
+      RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE,
+      expect.anything(),
+    )
   })
 })

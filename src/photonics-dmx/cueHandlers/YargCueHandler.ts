@@ -45,6 +45,11 @@ export type YargCueHandlerOptions = {
   /** Cue registry to resolve against. Defaults to the shared YARG singleton; a separate domain
    *  (e.g. RB3 cue mode) passes its own instance so its selections stay isolated. */
   registry?: YargCueRegistry
+  /** Which motion-cue-change channel to broadcast on. Defaults to YARG; RB3 cue mode passes its own
+   *  so its motion selections don't surface as YARG changes. */
+  motionChangeChannel?:
+    | typeof RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE
+    | typeof RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE
 }
 
 class YargCueHandler extends EventEmitter {
@@ -64,6 +69,9 @@ class YargCueHandler extends EventEmitter {
   private readonly getMotionCueMinimumHoldMs: () => number
   private readonly getMotionCueProbabilityPercent: () => number
   private readonly runtimeBroadcaster: RuntimeBroadcaster
+  private readonly motionChangeChannel:
+    | typeof RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE
+    | typeof RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE
   private cueHistory: CueType[] = []
   private currentCue?: CueType
   private executionCount = 0
@@ -88,7 +96,7 @@ class YargCueHandler extends EventEmitter {
       return
     }
     this.lastEmittedMotionKey = key
-    this.runtimeBroadcaster.emit(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
+    this.runtimeBroadcaster.emit(this.motionChangeChannel, {
       ref,
       source,
       manualFallback: manualFallback === true,
@@ -126,6 +134,8 @@ class YargCueHandler extends EventEmitter {
     this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
     this.getMotionCueProbabilityPercent = options?.getMotionCueProbabilityPercent ?? (() => 100)
     this.runtimeBroadcaster = options?.runtimeBroadcaster ?? noopRuntimeBroadcaster()
+    this.motionChangeChannel =
+      options?.motionChangeChannel ?? RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE
   }
 
   public notifySongStart(): void {
@@ -388,68 +398,7 @@ class YargCueHandler extends EventEmitter {
           this.emitYargMotionCueChange(null, 'cleared')
         }
       } else {
-        const registry = this.registry
-        const isNewCue = historicCueData.executionCount === 1
-        const isManualChange = this.manualMotionRef !== this.lastManualMotionRefForMotion
-        const now = monotonicNowMs()
-        const minHold = this.getMotionCueMinimumHoldMs()
-        const heldLongEnough =
-          this.currentMotionCueStartTime == null || now - this.currentMotionCueStartTime >= minHold
-        const needNewMotionPick = isManualChange || (isNewCue && heldLongEnough)
-
-        let motionCue: INetCue | null = null
-
-        if (needNewMotionPick) {
-          this.lastManualMotionRefForMotion = this.manualMotionRef
-          let pickSource: 'manual' | 'auto' = 'auto'
-          let pickManualFallback = false
-          if (this.manualMotionRef) {
-            motionCue = registry.getMotionCueImplementation(this.manualMotionRef)
-            if (motionCue) {
-              pickSource = 'manual'
-            } else {
-              pickManualFallback = true
-              motionCue = registry.getRandomMotionCue()
-              pickSource = 'auto'
-              this.runtimeBroadcaster.emit(RENDERER_RECEIVE.DEBUG_LOG, {
-                message:
-                  'Selected YARG motion cue is unavailable (disabled or unknown); using a random motion program.',
-                variables: [],
-                timestamp: Date.now(),
-              })
-            }
-          } else {
-            const probability = this.getMotionCueProbabilityPercent()
-            if (probability >= 100 || Math.random() * 100 < probability) {
-              motionCue = registry.getRandomMotionCue()
-            }
-          }
-
-          if (motionCue) {
-            const prevMotion = this.currentMotionCue
-            if (this.currentMotionCue && this.currentMotionCue !== motionCue) {
-              this.currentMotionCue.onStop?.()
-            }
-            this.currentMotionCue = motionCue
-            if (prevMotion !== motionCue) {
-              this.currentMotionCueStartTime = now
-            }
-            this._sequencer.cancelPanTiltClear()
-            const ref = registry.findYargMotionCueRef(motionCue)
-            if (ref) {
-              this.emitYargMotionCueChange(ref, pickSource, pickManualFallback)
-            }
-          } else if (this.currentMotionCue) {
-            this.currentMotionCue.onStop?.()
-            this.currentMotionCue = null
-            this.currentMotionCueStartTime = null
-            this._sequencer.schedulePanTiltClear()
-            this.emitYargMotionCueChange(null, 'cleared')
-          }
-        } else {
-          motionCue = this.currentMotionCue
-        }
-
+        const motionCue = this.selectMotionCue(historicCueData.executionCount === 1, false)
         try {
           if (motionCue) {
             await motionCue.execute(historicCueData, this._sequencer, this._lightManager)
@@ -468,6 +417,88 @@ class YargCueHandler extends EventEmitter {
     }
 
     this.emit('cueHandled', historicCueData)
+  }
+
+  /**
+   * Re-pick the motion cue and return the one that should run this frame. A fresh pick happens on a
+   * new primary cue (`isNewCue`), a manual-ref change, or an external `force` trigger — each subject
+   * to the min-hold floor; otherwise the current motion cue is retained. This swaps
+   * `currentMotionCue` and emits the change but does NOT execute the cue: the caller runs it on its
+   * own frame cadence.
+   */
+  private selectMotionCue(isNewCue: boolean, force: boolean): INetCue | null {
+    const registry = this.registry
+    const isManualChange = this.manualMotionRef !== this.lastManualMotionRefForMotion
+    const now = monotonicNowMs()
+    const minHold = this.getMotionCueMinimumHoldMs()
+    const heldLongEnough =
+      this.currentMotionCueStartTime == null || now - this.currentMotionCueStartTime >= minHold
+    const needNewMotionPick = isManualChange || ((isNewCue || force) && heldLongEnough)
+
+    if (!needNewMotionPick) {
+      return this.currentMotionCue
+    }
+
+    this.lastManualMotionRefForMotion = this.manualMotionRef
+    let motionCue: INetCue | null = null
+    let pickSource: 'manual' | 'auto' = 'auto'
+    let pickManualFallback = false
+    if (this.manualMotionRef) {
+      motionCue = registry.getMotionCueImplementation(this.manualMotionRef)
+      if (motionCue) {
+        pickSource = 'manual'
+      } else {
+        pickManualFallback = true
+        motionCue = registry.getRandomMotionCue()
+        pickSource = 'auto'
+        this.runtimeBroadcaster.emit(RENDERER_RECEIVE.DEBUG_LOG, {
+          message:
+            'Selected YARG motion cue is unavailable (disabled or unknown); using a random motion program.',
+          variables: [],
+          timestamp: Date.now(),
+        })
+      }
+    } else {
+      const probability = this.getMotionCueProbabilityPercent()
+      if (probability >= 100 || Math.random() * 100 < probability) {
+        motionCue = registry.getRandomMotionCue()
+      }
+    }
+
+    if (motionCue) {
+      const prevMotion = this.currentMotionCue
+      if (this.currentMotionCue && this.currentMotionCue !== motionCue) {
+        this.currentMotionCue.onStop?.()
+      }
+      this.currentMotionCue = motionCue
+      if (prevMotion !== motionCue) {
+        this.currentMotionCueStartTime = now
+      }
+      this._sequencer.cancelPanTiltClear()
+      const ref = registry.findYargMotionCueRef(motionCue)
+      if (ref) {
+        this.emitYargMotionCueChange(ref, pickSource, pickManualFallback)
+      }
+    } else if (this.currentMotionCue) {
+      this.currentMotionCue.onStop?.()
+      this.currentMotionCue = null
+      this.currentMotionCueStartTime = null
+      this._sequencer.schedulePanTiltClear()
+      this.emitYargMotionCueChange(null, 'cleared')
+    }
+    return this.currentMotionCue
+  }
+
+  /**
+   * External trigger (RB3 switch-timer + Light-1 edge): force a probability-gated motion re-pick.
+   * The swapped cue runs on the next frame dispatch (the RB3 keepalive), so this does not execute it.
+   * No-op while motion is disabled.
+   */
+  public requestMotionRepick(): void {
+    if (!this.motionEnabled) {
+      return
+    }
+    this.selectMotionCue(false, true)
   }
 
   /**
