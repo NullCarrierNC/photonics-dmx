@@ -467,6 +467,14 @@ export const startRb3TestEffect = (
   cueGroup?: string,
 ) => window.api.invoke(LIGHT.START_RB3_TEST_EFFECT, { effectId, venueSize, bpm, cueGroup })
 
+export const setRb3SimLedState = (state: {
+  red: number
+  green: number
+  blue: number
+  yellow: number
+  fog: boolean
+}) => window.api.invoke(LIGHT.SET_RB3_SIM_LED_STATE, state)
+
 export const stopTestEffect = () => window.api.invoke(LIGHT.STOP_TEST_EFFECT, undefined)
 
 export const simulateBeat = (data?: {

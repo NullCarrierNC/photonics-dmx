@@ -175,6 +175,36 @@ export function setupSimulationHandlers(
     },
   )
 
+  ipcMain.handle(
+    LIGHT.SET_RB3_SIM_LED_STATE,
+    async (
+      _,
+      data: { red?: unknown; green?: unknown; blue?: unknown; yellow?: unknown; fog?: unknown },
+    ) => {
+      try {
+        if (rb3Blocked()) {
+          return { success: false, error: RB3_BLOCKED_ERROR }
+        }
+        // Clamp each bank to a valid 8-bit mask; ignore non-numeric input rather than throw.
+        const mask = (v: unknown): number => {
+          const n = typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : 0
+          return Math.max(0, Math.min(255, n))
+        }
+        controllerManager.setRb3SimulationLedState({
+          red: mask(data?.red),
+          green: mask(data?.green),
+          blue: mask(data?.blue),
+          yellow: mask(data?.yellow),
+          fog: data?.fog === true,
+        })
+        return { success: true }
+      } catch (error) {
+        log.error('Error setting RB3 simulation LED state:', error)
+        return ipcError(error)
+      }
+    },
+  )
+
   ipcMain.handle(LIGHT.STOP_TEST_EFFECT, async () => {
     try {
       await controllerManager.stopTestEffect()

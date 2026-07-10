@@ -24,7 +24,7 @@ import { ILightingController } from '../../photonics-dmx/controllers/sequencer/i
 import { noopRuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 import { RigChain } from './RigChain'
 import { ChainFanout } from './ChainFanout'
-import { TestEffectRunner } from './TestEffectRunner'
+import { TestEffectRunner, type Rb3LedState } from './TestEffectRunner'
 import { Rb3ChainRuntime } from '../../photonics-dmx/controllers/Rb3ChainRuntime'
 import { MotionCueSimulator } from './MotionCueSimulator'
 import { ListenerLifecycleController } from './ListenerLifecycleController'
@@ -171,6 +171,7 @@ export class ControllerManager {
       ensureHandlers: () => this.ensureChainsHaveRb3HandlersForSimulation(),
       dispatch: (cue, data) => void this.rb3SimRuntime.handleCue(cue, data),
       stopActiveCue: () => this.rb3SimRuntime.stopActiveCue(),
+      songEvent: (condition) => this.rb3SimRuntime.handleSongEvent(condition),
     })
     this.motionCueSimulator = new MotionCueSimulator({
       getChainFanout: () => this.chainFanout,
@@ -552,6 +553,11 @@ export class ControllerManager {
     cueGroup?: string,
   ): void {
     this.rb3TestEffectRunner.startTestEffect(effectId, venueSize, bpm, cueGroup)
+  }
+
+  /** Set the simulated RB3 StageKit LED bank masks + fog driving the running RB3 test effect. */
+  public setRb3SimulationLedState(state: Rb3LedState): void {
+    this.rb3TestEffectRunner.setRb3LedState(state)
   }
 
   /**

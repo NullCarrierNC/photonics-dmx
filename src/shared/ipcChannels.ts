@@ -81,6 +81,7 @@ export const LIGHT = {
   GET_NETWORK_INTERFACES: 'get-network-interfaces',
   START_TEST_EFFECT: 'start-test-effect',
   START_RB3_TEST_EFFECT: 'start-rb3-test-effect',
+  SET_RB3_SIM_LED_STATE: 'set-rb3-sim-led-state',
   STOP_TEST_EFFECT: 'stop-test-effect',
   SIMULATE_BEAT: 'simulate-beat',
   SIMULATE_KEYFRAME: 'simulate-keyframe',

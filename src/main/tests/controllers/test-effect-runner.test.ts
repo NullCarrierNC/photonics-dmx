@@ -132,3 +132,98 @@ describe('TestEffectRunner under multi-rig', () => {
     await runner.stopTestEffect()
   })
 })
+
+describe('TestEffectRunner RB3 LED state', () => {
+  function makeRb3Runner() {
+    const chains = [makeChainStub('a')]
+    const fanout = makeFanout(chains)
+    const ensureHandlers = jest.fn(() => {
+      for (const c of chains) c.yargCueHandler = {} as unknown as RigChain['yargCueHandler']
+    })
+    const songEvent = jest.fn()
+    const dispatcher: TestCueDispatcher = {
+      ensureHandlers,
+      dispatch: (cue, data) => void fanout.handleCue(cue, data),
+      stopActiveCue: () => fanout.yargStopActiveCue(),
+      songEvent,
+    }
+    const ctx: TestEffectRunnerContext = {
+      getChainFanout: () => fanout,
+      ensureInitialized: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    }
+    return { runner: new TestEffectRunner(ctx, dispatcher), fanout, songEvent }
+  }
+
+  it('merges the LED bank masks + fog into dispatched frames', async () => {
+    jest.useFakeTimers()
+    try {
+      const { runner, fanout } = makeRb3Runner()
+      runner.startTestEffect('RB3')
+      await Promise.resolve()
+      await Promise.resolve()
+      runner.setRb3LedState({ red: 0b0101, green: 0, blue: 0, yellow: 0b0100, fog: true })
+      jest.advanceTimersByTime(16)
+      const lastFrame = (fanout.handleCue as jest.Mock).mock.calls.at(-1)![1] as {
+        ledBanks: { red: number; yellow: number }
+        fogState: boolean
+        ledColor: string
+        ledPositions: number[]
+      }
+      expect(lastFrame.ledBanks.red).toBe(0b0101)
+      expect(lastFrame.ledBanks.yellow).toBe(0b0100)
+      expect(lastFrame.fogState).toBe(true)
+      expect(lastFrame.ledColor).toBe('red')
+      expect(lastFrame.ledPositions).toEqual([0, 2])
+      await runner.stopTestEffect()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('emits led/fog edges once per state change, not per keepalive frame', async () => {
+    jest.useFakeTimers()
+    try {
+      const { runner, songEvent } = makeRb3Runner()
+      runner.startTestEffect('RB3')
+      await Promise.resolve()
+      await Promise.resolve()
+
+      runner.setRb3LedState({ red: 0b0001, green: 0, blue: 0, yellow: 0, fog: false })
+      jest.advanceTimersByTime(16 * 4) // several keepalives, no further state change
+      expect(songEvent.mock.calls).toEqual([['led-1']])
+
+      // Turning it off emits the off-edge exactly once.
+      songEvent.mockClear()
+      runner.setRb3LedState({ red: 0, green: 0, blue: 0, yellow: 0, fog: true })
+      expect(songEvent.mock.calls).toEqual([['led-1-off'], ['fog-on']])
+      await runner.stopTestEffect()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('resets LED state on stop so a restart begins dark', async () => {
+    jest.useFakeTimers()
+    try {
+      const { runner, fanout } = makeRb3Runner()
+      runner.startTestEffect('RB3')
+      await Promise.resolve()
+      await Promise.resolve()
+      runner.setRb3LedState({ red: 0xff, green: 0, blue: 0, yellow: 0, fog: false })
+      await runner.stopTestEffect()
+
+      runner.startTestEffect('RB3')
+      await Promise.resolve()
+      await Promise.resolve()
+      ;(fanout.handleCue as jest.Mock).mockClear()
+      jest.advanceTimersByTime(16)
+      const frame = (fanout.handleCue as jest.Mock).mock.calls.at(-1)![1] as {
+        ledBanks: { red: number }
+      }
+      expect(frame.ledBanks.red).toBe(0)
+      await runner.stopTestEffect()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+})

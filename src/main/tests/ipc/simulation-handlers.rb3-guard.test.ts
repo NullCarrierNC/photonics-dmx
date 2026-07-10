@@ -24,6 +24,7 @@ describe('simulation IPC handlers while RB3E is enabled', () => {
   let onBeat: jest.Mock
   let startTestEffect: jest.Mock
   let startRb3TestEffect: jest.Mock
+  let setRb3SimulationLedState: jest.Mock
 
   beforeEach(() => {
     handlers = new Map()
@@ -36,6 +37,7 @@ describe('simulation IPC handlers while RB3E is enabled', () => {
     onBeat = jest.fn()
     startTestEffect = jest.fn()
     startRb3TestEffect = jest.fn()
+    setRb3SimulationLedState = jest.fn()
     const fanout = new ChainFanout()
     fanout.setChains([
       {
@@ -59,6 +61,7 @@ describe('simulation IPC handlers while RB3E is enabled', () => {
       getIsRb3Enabled: () => true,
       startTestEffect,
       startRb3TestEffect,
+      setRb3SimulationLedState,
       init: jest.fn(),
     }
     setupSimulationHandlers(
@@ -85,6 +88,15 @@ describe('simulation IPC handlers while RB3E is enabled', () => {
     const result = await handlers.get(LIGHT.START_RB3_TEST_EFFECT)!({}, { effectId: 'Strobe_Fast' })
     expect(result).toEqual(BLOCKED)
     expect(startRb3TestEffect).not.toHaveBeenCalled()
+  })
+
+  it('SET_RB3_SIM_LED_STATE returns the blocked error without setting state', async () => {
+    const result = await handlers.get(LIGHT.SET_RB3_SIM_LED_STATE)!(
+      {},
+      { red: 1, green: 0, blue: 0, yellow: 0, fog: false },
+    )
+    expect(result).toEqual(BLOCKED)
+    expect(setRb3SimulationLedState).not.toHaveBeenCalled()
   })
 
   it('SIMULATE_INSTRUMENT_NOTE returns the blocked error', async () => {

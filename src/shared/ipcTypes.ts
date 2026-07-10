@@ -347,6 +347,10 @@ export interface IpcInvokeMap {
     }
     response: IpcSuccessResult | IpcErrorResult
   }
+  [LIGHT.SET_RB3_SIM_LED_STATE]: {
+    request: { red: number; green: number; blue: number; yellow: number; fog: boolean }
+    response: IpcSuccessResult | IpcErrorResult
+  }
   [LIGHT.STOP_TEST_EFFECT]: {
     request: void
     response: boolean

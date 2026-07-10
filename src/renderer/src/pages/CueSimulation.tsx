@@ -18,6 +18,7 @@ import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPrev
 import DmxRigSelector from '@renderer/components/DmxRigSelector'
 import { useTimeoutEffect } from '../utils/useTimeout'
 import CueRegistrySelector from '@renderer/components/CueRegistrySelector'
+import StageKitLedPanel from '@renderer/components/StageKitLedPanel'
 import CueSimulationAbout from './CueSimulation/CueSimulationAbout'
 import CueSimulationActions from './CueSimulation/CueSimulationActions'
 import CueSimulationInstrument from './CueSimulation/CueSimulationInstrument'
@@ -594,6 +595,7 @@ const CueSimulation: React.FC = () => {
             onSimulateMeasure={handleSimulateMeasure}
             onSimulateKeyframe={handleSimulateKeyframe}
           />
+          {selectedRegistryType === 'RB3E' && !isRb3Enabled && <StageKitLedPanel />}
           <CueSimulationInstrument
             selectedInstrument={selectedInstrument}
             onInstrumentChange={setSelectedInstrument}
