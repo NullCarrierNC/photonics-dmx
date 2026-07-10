@@ -1574,7 +1574,7 @@ describe('Node cue validation', () => {
     }
   })
 
-  it('validates bundled rb3-stagekit.json (strobe-only, compiles, lays out nodes)', () => {
+  it('validates bundled rb3-stagekit.json (strobes + RB3 base cue, compiles, lays out nodes)', () => {
     const filePath = path.join(
       __dirname,
       '../../../../../resources/defaults/node-data/cues/rb3/rb3-stagekit.json',
@@ -1585,13 +1585,14 @@ describe('Node cue validation', () => {
     if (result.valid) {
       expect(result.data.group.id).toBe('rb3-stagekit')
       expect(result.data.group.isStageKit).toBe(true)
-      // strobe-only: the four strobe rates, and no non-strobe base cue yet.
+      // The four strobe rates plus the always-active RB3 gameplay mirror.
       const cueTypes = result.data.cues.map((c) => (c.kind === 'lighting' ? c.cueType : c.id))
       expect(cueTypes).toEqual([
         CueType.Strobe_Slow,
         CueType.Strobe_Medium,
         CueType.Strobe_Fast,
         CueType.Strobe_Fastest,
+        CueType.RB3,
       ])
       for (const cue of result.data.cues) {
         expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
