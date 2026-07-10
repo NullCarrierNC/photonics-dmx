@@ -1,6 +1,7 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
+import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
 import {
   DrumNoteType,
   InstrumentNoteType,
@@ -261,6 +262,7 @@ export function setupSimulationHandlers(
       }
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
       await sim.runYarg(mockCueData)
+      await sim.runRb3(mockCueData)
       await sim.runAudio()
       fanout.yargOnBeat()
       return true
@@ -311,6 +313,7 @@ export function setupSimulationHandlers(
       }
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
       await sim.runYarg(mockCueData)
+      await sim.runRb3(mockCueData)
       await sim.runAudio()
       fanout.yargOnKeyframe()
       return true
@@ -361,6 +364,7 @@ export function setupSimulationHandlers(
       }
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
       await sim.runYarg(mockCueData)
+      await sim.runRb3(mockCueData)
       await sim.runAudio()
       fanout.yargOnMeasure()
       return true
@@ -501,6 +505,61 @@ export function setupSimulationHandlers(
       return { success: true as const }
     } catch (error) {
       log.error('Error starting YARG motion cue simulation:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(LIGHT.START_RB3_MOTION_CUE_SIMULATION, async (_, data: unknown) => {
+    try {
+      if (rb3Blocked()) {
+        return ipcError(new Error(RB3_BLOCKED_ERROR))
+      }
+      if (!isPlainObject(data)) {
+        return ipcError(new Error('Invalid motion simulation payload'))
+      }
+      const groupId = data.groupId
+      const cueId = data.cueId
+      if (!isNonEmptyString(groupId) || !isNonEmptyString(cueId)) {
+        return ipcError(new Error('groupId and cueId are required'))
+      }
+      if (!controllerManager.getIsInitialized()) {
+        await controllerManager.init()
+      }
+      const fanout = controllerManager.getChainFanout()
+      if (fanout.getChains().length === 0) {
+        return ipcError(new Error('Lighting system not available'))
+      }
+      const group = getRb3CueRegistry().getGroup(groupId)
+      if (!group) {
+        return ipcError(new Error(`RB3 motion group not found: ${groupId}`))
+      }
+      const cue = group.motionCues?.get(cueId)
+      if (!cue) {
+        return ipcError(new Error(`RB3 motion cue not found: ${groupId}/${cueId}`))
+      }
+      sim.clearActive()
+      fanout.yargCancelPanTiltClear()
+      const mockCueData = createMockCueData({
+        venueSize: 'Small',
+        bpm: 120,
+        simulationCueGroup: groupId,
+      })
+      // Execute once to start the (time-driven) motion; RB3 motion has no beat to re-run on.
+      for (const chain of fanout.getChains()) {
+        const maybePromise = cue.execute(mockCueData, chain.sequencer, chain.dmxLightManager)
+        if (maybePromise instanceof Promise) {
+          await maybePromise
+        }
+      }
+      sim.setRb3Cue(cue)
+      sendToAllWindows(RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE, {
+        ref: { groupId, cueId },
+        source: 'auto',
+        manualFallback: false,
+      })
+      return { success: true as const }
+    } catch (error) {
+      log.error('Error starting RB3 motion cue simulation:', error)
       return ipcError(error)
     }
   })

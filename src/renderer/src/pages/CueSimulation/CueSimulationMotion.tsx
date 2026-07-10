@@ -4,6 +4,9 @@ import {
   getYargMotionCueGroups,
   getAvailableYargMotionCues,
   startYargMotionCueSimulation,
+  getRb3MotionCueGroups,
+  getAvailableRb3MotionCues,
+  startRb3MotionCueSimulation,
   stopMotionCueSimulation,
 } from '../../ipcApi'
 import { createLogger } from '../../../../shared/logger'
@@ -16,12 +19,21 @@ type MotionCueRow = { id: string; name: string; description: string }
 interface CueSimulationMotionProps {
   /** When true, controls are non-interactive (e.g. parent gated simulation off). */
   disabled?: boolean
+  /** Which motion registry to drive; RB3 in RB3E simulation, YARG otherwise. */
+  platform?: 'yarg' | 'rb3'
 }
 
 /**
- * Collapsible YARG motion group/cue selection and start/stop for simulating motion cues in Cue Simulation.
+ * Collapsible motion group/cue selection and start/stop for simulating motion cues in Cue Simulation.
  */
-export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabled = false }) => {
+export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({
+  disabled = false,
+  platform = 'yarg',
+}) => {
+  const isRb3 = platform === 'rb3'
+  const loadGroups = isRb3 ? getRb3MotionCueGroups : getYargMotionCueGroups
+  const loadCues = isRb3 ? getAvailableRb3MotionCues : getAvailableYargMotionCues
+  const startSim = isRb3 ? startRb3MotionCueSimulation : startYargMotionCueSimulation
   const [isOpen, setIsOpen] = useState(false)
   const [groups, setGroups] = useState<MotionGroupRow[]>([])
   const [groupId, setGroupId] = useState('')
@@ -33,7 +45,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
     let cancelled = false
     const load = async () => {
       try {
-        const list = await getYargMotionCueGroups()
+        const list = await loadGroups()
         if (!cancelled && Array.isArray(list)) {
           const sorted = [...list].sort((a, b) =>
             a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
@@ -48,7 +60,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [loadGroups])
 
   useEffect(() => {
     if (!groupId) {
@@ -59,7 +71,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
     let cancelled = false
     const load = async () => {
       try {
-        const list = await getAvailableYargMotionCues(groupId)
+        const list = await loadCues(groupId)
         if (!cancelled && Array.isArray(list)) {
           const sorted = [...list].sort((a, b) =>
             a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
@@ -78,13 +90,13 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
     return () => {
       cancelled = true
     }
-  }, [groupId])
+  }, [groupId, loadCues])
 
   const handleStart = useCallback(async () => {
     if (!groupId || !cueId || disabled || isStarting) return
     setIsStarting(true)
     try {
-      const result = await startYargMotionCueSimulation(groupId, cueId)
+      const result = await startSim(groupId, cueId)
       if (!result.success) {
         log.error('Failed to start motion cue simulation:', 'error' in result ? result.error : '')
       }
@@ -93,7 +105,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({ disabl
     } finally {
       setIsStarting(false)
     }
-  }, [groupId, cueId, disabled, isStarting])
+  }, [groupId, cueId, disabled, isStarting, startSim])
 
   const handleStop = useCallback(async () => {
     try {

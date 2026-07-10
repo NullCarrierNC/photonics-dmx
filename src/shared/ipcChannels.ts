@@ -126,6 +126,7 @@ export const LIGHT = {
   SET_RB3_MOTION_GROUP_SELECTION_MODE: 'set-rb3-motion-group-selection-mode',
   START_YARG_MOTION_CUE_SIMULATION: 'start-yarg-motion-cue-simulation',
   START_AUDIO_MOTION_CUE_SIMULATION: 'start-audio-motion-cue-simulation',
+  START_RB3_MOTION_CUE_SIMULATION: 'start-rb3-motion-cue-simulation',
   STOP_MOTION_CUE_SIMULATION: 'stop-motion-cue-simulation',
   UPDATE_SACN_CONFIG: 'update-sacn-config',
   UPDATE_ARTNET_CONFIG: 'update-artnet-config',

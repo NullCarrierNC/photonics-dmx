@@ -17,6 +17,7 @@ interface MotionCueSimulatorDeps {
 export class MotionCueSimulator {
   private yargCue: INetCue | null = null
   private audioCue: IAudioCue | null = null
+  private rb3Cue: INetCue | null = null
   private audioExecutionCount = 0
 
   constructor(private readonly deps: MotionCueSimulatorDeps) {}
@@ -33,12 +34,18 @@ export class MotionCueSimulator {
     this.audioCue = cue
   }
 
-  /** Stop and clear both active cues without touching pan/tilt (used by start-paths and restart). */
+  setRb3Cue(cue: INetCue): void {
+    this.rb3Cue = cue
+  }
+
+  /** Stop and clear every active cue without touching pan/tilt (used by start-paths and restart). */
   clearActive(): void {
     this.yargCue?.onStop?.()
     this.yargCue = null
     this.audioCue?.onStop?.()
     this.audioCue = null
+    this.rb3Cue?.onStop?.()
+    this.rb3Cue = null
     this.audioExecutionCount = 0
   }
 
@@ -64,6 +71,17 @@ export class MotionCueSimulator {
     if (!this.yargCue) return
     for (const chain of this.deps.getChainFanout().getChains()) {
       const maybePromise = this.yargCue.execute(mockCueData, chain.sequencer, chain.dmxLightManager)
+      if (maybePromise instanceof Promise) {
+        await maybePromise
+      }
+    }
+  }
+
+  /** Execute the active RB3 motion cue once per active rig chain. */
+  async runRb3(mockCueData: CueData): Promise<void> {
+    if (!this.rb3Cue) return
+    for (const chain of this.deps.getChainFanout().getChains()) {
+      const maybePromise = this.rb3Cue.execute(mockCueData, chain.sequencer, chain.dmxLightManager)
       if (maybePromise instanceof Promise) {
         await maybePromise
       }

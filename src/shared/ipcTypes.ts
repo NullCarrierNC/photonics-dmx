@@ -575,6 +575,10 @@ export interface IpcInvokeMap {
     request: { groupId: string; cueId: string }
     response: IpcSuccessResult | IpcErrorResult
   }
+  [LIGHT.START_RB3_MOTION_CUE_SIMULATION]: {
+    request: { groupId: string; cueId: string }
+    response: IpcSuccessResult | IpcErrorResult
+  }
   [LIGHT.STOP_MOTION_CUE_SIMULATION]: {
     request: void
     response: IpcSuccessResult | IpcErrorResult

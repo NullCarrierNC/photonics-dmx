@@ -140,6 +140,9 @@ export const startYargMotionCueSimulation = (groupId: string, cueId: string) =>
 export const startAudioMotionCueSimulation = (groupId: string, cueId: string) =>
   window.api.invoke(LIGHT.START_AUDIO_MOTION_CUE_SIMULATION, { groupId, cueId })
 
+export const startRb3MotionCueSimulation = (groupId: string, cueId: string) =>
+  window.api.invoke(LIGHT.START_RB3_MOTION_CUE_SIMULATION, { groupId, cueId })
+
 export const stopMotionCueSimulation = () =>
   window.api.invoke(LIGHT.STOP_MOTION_CUE_SIMULATION, undefined)
 

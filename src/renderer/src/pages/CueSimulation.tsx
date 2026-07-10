@@ -606,7 +606,9 @@ const CueSimulation: React.FC = () => {
               disabled={!selectedGroupId || isRb3Enabled}
             />
           )}
-          {advancedModeEnabled && <CueSimulationMotion />}
+          {advancedModeEnabled && (
+            <CueSimulationMotion platform={selectedRegistryType === 'RB3E' ? 'rb3' : 'yarg'} />
+          )}
         </>
       )}
 

@@ -30,6 +30,23 @@ describe('MotionCueSimulator', () => {
     expect(cue.execute).toHaveBeenCalledTimes(2)
   })
 
+  it('runs the active RB3 cue once per chain and clears it on reset', async () => {
+    const chains = [
+      { sequencer: 's1', dmxLightManager: 'l1' },
+      { sequencer: 's2', dmxLightManager: 'l2' },
+    ]
+    const sim = new MotionCueSimulator({ getChainFanout: () => fanoutStub(chains) })
+    const cue = cueStub()
+    sim.setRb3Cue(cue)
+    await sim.runRb3({} as never)
+    expect(cue.execute).toHaveBeenCalledTimes(2)
+
+    sim.reset()
+    expect(cue.onStop).toHaveBeenCalledTimes(1)
+    await sim.runRb3({} as never)
+    expect(cue.execute).toHaveBeenCalledTimes(2) // no further runs after reset
+  })
+
   it('reset() stops the active cue so it no longer runs (the restart fix)', async () => {
     const sim = new MotionCueSimulator({ getChainFanout: () => fanoutStub([{ sequencer: 's' }]) })
     const cue = cueStub()
