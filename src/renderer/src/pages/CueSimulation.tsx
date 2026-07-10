@@ -594,14 +594,18 @@ const CueSimulation: React.FC = () => {
             onSimulateBeat={handleSimulateBeat}
             onSimulateMeasure={handleSimulateMeasure}
             onSimulateKeyframe={handleSimulateKeyframe}
+            showSongSimulation={selectedRegistryType !== 'RB3E'}
           />
           {selectedRegistryType === 'RB3E' && !isRb3Enabled && <StageKitLedPanel />}
-          <CueSimulationInstrument
-            selectedInstrument={selectedInstrument}
-            onInstrumentChange={setSelectedInstrument}
-            onSimulateNote={handleSimulateInstrumentNote}
-            disabled={!selectedGroupId || isRb3Enabled}
-          />
+          {/* RB3 mode has no instrument-note song events — LED state drives it instead. */}
+          {selectedRegistryType !== 'RB3E' && (
+            <CueSimulationInstrument
+              selectedInstrument={selectedInstrument}
+              onInstrumentChange={setSelectedInstrument}
+              onSimulateNote={handleSimulateInstrumentNote}
+              disabled={!selectedGroupId || isRb3Enabled}
+            />
+          )}
           {advancedModeEnabled && <CueSimulationMotion />}
         </>
       )}
