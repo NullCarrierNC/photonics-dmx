@@ -446,14 +446,23 @@ function hasAnyFlatV3Key(src: Record<string, unknown>): boolean {
   return false
 }
 
+const MOTION_DOMAINS: readonly CueDomain[] = ['yargMotion', 'audioMotion', 'rb3Motion']
+
 function normalizeCueDomains(prefs: AppPreferences): AppPreferences {
   const m = mergePartialCueDomains(prefs.cueDomains, {})
   for (const d of CUE_DOMAINS) {
     const c = m[d] ?? createDefaultCueDomainPrefs(d)
-    m[d] = {
+    const normalized = {
       ...c,
       disabledCues: c.disabledCues && typeof c.disabledCues === 'object' ? c.disabledCues : {},
     }
+    // Backfill the switch-timer range on motion domains for installs that predate it.
+    if (MOTION_DOMAINS.includes(d)) {
+      const defaults = createDefaultCueDomainPrefs(d)
+      normalized.cueDurationMin = normalized.cueDurationMin ?? defaults.cueDurationMin
+      normalized.cueDurationMax = normalized.cueDurationMax ?? defaults.cueDurationMax
+    }
+    m[d] = normalized
   }
   return { ...prefs, cueDomains: m }
 }

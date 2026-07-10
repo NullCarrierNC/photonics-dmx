@@ -15,4 +15,14 @@ describe('RB3 cue domains', () => {
     expect(domains.rb3Motion.probabilityPercent).toBe(50)
     expect(domains.rb3Motion.minimumHoldMs).toBe(5000)
   })
+
+  it('defaults the switch-timer range (seconds) on every motion domain', () => {
+    const domains = createDefaultCueDomains()
+    for (const d of ['yargMotion', 'audioMotion', 'rb3Motion'] as const) {
+      expect(domains[d].cueDurationMin).toBe(5)
+      expect(domains[d].cueDurationMax).toBe(20)
+    }
+    // Lighting domains carry no switch timer.
+    expect(domains.rb3.cueDurationMin).toBeUndefined()
+  })
 })

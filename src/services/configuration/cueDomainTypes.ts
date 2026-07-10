@@ -36,6 +36,10 @@ export interface CueDomainPrefs {
   probabilityPercent?: number
   /** Shared min-hold (ms) for YARG and audio motion automatic picks. */
   minimumHoldMs?: number
+  /** Motion domains: randomized switch-timer range (seconds). RB3 arms a switch when a countdown
+   *  drawn from [min, max] elapses, then fires on the next trigger edge. */
+  cueDurationMin?: number
+  cueDurationMax?: number
 }
 
 export function createDefaultCueDomainPrefs(
@@ -54,6 +58,8 @@ export function createDefaultCueDomainPrefs(
     base.probabilityPercent = 50
     base.minimumHoldMs = 5000
     base.activeCueRef = null
+    base.cueDurationMin = 5
+    base.cueDurationMax = 20
   }
   return {
     ...base,
