@@ -77,6 +77,24 @@ export const getAudioMotionCueProbabilityPercent = () =>
 export const setAudioMotionCueProbabilityPercent = (percent: number) =>
   window.api.invoke(LIGHT.SET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT, percent)
 
+export const getRb3MotionCueProbabilityPercent = () =>
+  window.api.invoke(LIGHT.GET_RB3_MOTION_CUE_PROBABILITY_PERCENT, undefined)
+
+export const setRb3MotionCueProbabilityPercent = (percent: number) =>
+  window.api.invoke(LIGHT.SET_RB3_MOTION_CUE_PROBABILITY_PERCENT, percent)
+
+export const getRb3MotionCueMinHoldMs = () =>
+  window.api.invoke(LIGHT.GET_RB3_MOTION_CUE_MIN_HOLD_MS, undefined)
+
+export const setRb3MotionCueMinHoldMs = (minHoldMs: number) =>
+  window.api.invoke(LIGHT.SET_RB3_MOTION_CUE_MIN_HOLD_MS, minHoldMs)
+
+export const getRb3MotionCueDuration = () =>
+  window.api.invoke(LIGHT.GET_RB3_MOTION_CUE_DURATION, undefined)
+
+export const setRb3MotionCueDuration = (range: { min: number; max: number }) =>
+  window.api.invoke(LIGHT.SET_RB3_MOTION_CUE_DURATION, range)
+
 export const getCueGroupSelectionMode = () =>
   window.api.invoke(LIGHT.GET_CUE_GROUP_SELECTION_MODE, undefined)
 
@@ -94,6 +112,12 @@ export const getAudioMotionGroupSelectionMode = () =>
 
 export const setAudioMotionGroupSelectionMode = (mode: 'oncePerSong' | 'perCueChange' | 'none') =>
   window.api.invoke(LIGHT.SET_AUDIO_MOTION_GROUP_SELECTION_MODE, mode)
+
+export const getRb3MotionGroupSelectionMode = () =>
+  window.api.invoke(LIGHT.GET_RB3_MOTION_GROUP_SELECTION_MODE, undefined)
+
+export const setRb3MotionGroupSelectionMode = (mode: 'oncePerSong' | 'perCueChange' | 'none') =>
+  window.api.invoke(LIGHT.SET_RB3_MOTION_GROUP_SELECTION_MODE, mode)
 
 export const getYargMotionCueGroups = () =>
   window.api.invoke(LIGHT.GET_YARG_MOTION_CUE_GROUPS, undefined)

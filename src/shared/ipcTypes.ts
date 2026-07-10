@@ -479,6 +479,30 @@ export interface IpcInvokeMap {
     request: number
     response: { success: true; percent: number } | IpcErrorResult
   }
+  [LIGHT.GET_RB3_MOTION_CUE_PROBABILITY_PERCENT]: {
+    request: void
+    response: { success: true; percent: number } | IpcErrorResult
+  }
+  [LIGHT.SET_RB3_MOTION_CUE_PROBABILITY_PERCENT]: {
+    request: number
+    response: { success: true; percent: number } | IpcErrorResult
+  }
+  [LIGHT.GET_RB3_MOTION_CUE_MIN_HOLD_MS]: {
+    request: void
+    response: { success: true; minHoldMs: number } | IpcErrorResult
+  }
+  [LIGHT.SET_RB3_MOTION_CUE_MIN_HOLD_MS]: {
+    request: number
+    response: { success: true; minHoldMs: number } | IpcErrorResult
+  }
+  [LIGHT.GET_RB3_MOTION_CUE_DURATION]: {
+    request: void
+    response: { success: true; min: number; max: number } | IpcErrorResult
+  }
+  [LIGHT.SET_RB3_MOTION_CUE_DURATION]: {
+    request: { min: number; max: number }
+    response: { success: true; min: number; max: number } | IpcErrorResult
+  }
   [LIGHT.SET_CUE_GROUP_SELECTION_MODE]: {
     request: 'oncePerSong' | 'withinSong'
     response: { success: true; mode: 'oncePerSong' | 'withinSong' } | IpcErrorResult
@@ -532,6 +556,14 @@ export interface IpcInvokeMap {
     response: { success: true; mode: 'oncePerSong' | 'perCueChange' | 'none' } | IpcErrorResult
   }
   [LIGHT.SET_AUDIO_MOTION_GROUP_SELECTION_MODE]: {
+    request: 'oncePerSong' | 'perCueChange' | 'none'
+    response: { success: true; mode: 'oncePerSong' | 'perCueChange' | 'none' } | IpcErrorResult
+  }
+  [LIGHT.GET_RB3_MOTION_GROUP_SELECTION_MODE]: {
+    request: void
+    response: { success: true; mode: 'oncePerSong' | 'perCueChange' | 'none' } | IpcErrorResult
+  }
+  [LIGHT.SET_RB3_MOTION_GROUP_SELECTION_MODE]: {
     request: 'oncePerSong' | 'perCueChange' | 'none'
     response: { success: true; mode: 'oncePerSong' | 'perCueChange' | 'none' } | IpcErrorResult
   }

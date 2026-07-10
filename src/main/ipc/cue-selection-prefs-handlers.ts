@@ -154,6 +154,94 @@ export function setupCueSelectionPrefsHandlers(
     }
   })
 
+  ipcMain.handle(LIGHT.GET_RB3_MOTION_CUE_PROBABILITY_PERCENT, async () => {
+    try {
+      const percent =
+        controllerManager.getConfig().getPreference('cueDomains').rb3Motion.probabilityPercent ?? 50
+      return { success: true, percent }
+    } catch (error) {
+      log.error('Error getting RB3 motion cue probability percent:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(LIGHT.SET_RB3_MOTION_CUE_PROBABILITY_PERCENT, async (_, percent: unknown) => {
+    try {
+      const validated = validateNumberInRange(percent, 0, 100, 'rb3MotionCueProbabilityPercent')
+      if (!validated.ok) {
+        return ipcError(new Error(validated.error))
+      }
+      await controllerManager
+        .getConfig()
+        .updateCueDomain('rb3Motion', { probabilityPercent: validated.value })
+      const stored =
+        controllerManager.getConfig().getPreference('cueDomains').rb3Motion.probabilityPercent ?? 50
+      return { success: true, percent: stored }
+    } catch (error) {
+      log.error('Error setting RB3 motion cue probability percent:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(LIGHT.GET_RB3_MOTION_CUE_MIN_HOLD_MS, async () => {
+    try {
+      const minHoldMs =
+        controllerManager.getConfig().getPreference('cueDomains').rb3Motion.minimumHoldMs ?? 5000
+      return { success: true, minHoldMs }
+    } catch (error) {
+      log.error('Error getting RB3 motion cue min hold:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(LIGHT.SET_RB3_MOTION_CUE_MIN_HOLD_MS, async (_, ms: unknown) => {
+    try {
+      const validated = validateNumberInRange(ms, 0, 600000, 'rb3MotionCueMinimumHoldMs')
+      if (!validated.ok) {
+        return ipcError(new Error(validated.error))
+      }
+      await controllerManager
+        .getConfig()
+        .updateCueDomain('rb3Motion', { minimumHoldMs: validated.value })
+      const minHoldMs =
+        controllerManager.getConfig().getPreference('cueDomains').rb3Motion.minimumHoldMs ?? 5000
+      return { success: true, minHoldMs }
+    } catch (error) {
+      log.error('Error setting RB3 motion cue min hold:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(LIGHT.GET_RB3_MOTION_CUE_DURATION, async () => {
+    try {
+      const domain = controllerManager.getConfig().getPreference('cueDomains').rb3Motion
+      return { success: true, min: domain.cueDurationMin ?? 5, max: domain.cueDurationMax ?? 20 }
+    } catch (error) {
+      log.error('Error getting RB3 motion cue duration:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(LIGHT.SET_RB3_MOTION_CUE_DURATION, async (_, range: unknown) => {
+    try {
+      const r = range as { min?: unknown; max?: unknown }
+      const minV = validateNumberInRange(r?.min, 0, 600, 'rb3MotionCueDurationMin')
+      const maxV = validateNumberInRange(r?.max, 0, 600, 'rb3MotionCueDurationMax')
+      if (!minV.ok) return ipcError(new Error(minV.error))
+      if (!maxV.ok) return ipcError(new Error(maxV.error))
+      // Keep the range ordered so the countdown draw never inverts.
+      const min = Math.min(minV.value, maxV.value)
+      const max = Math.max(minV.value, maxV.value)
+      await controllerManager
+        .getConfig()
+        .updateCueDomain('rb3Motion', { cueDurationMin: min, cueDurationMax: max })
+      return { success: true, min, max }
+    } catch (error) {
+      log.error('Error setting RB3 motion cue duration:', error)
+      return ipcError(error)
+    }
+  })
+
   ipcMain.handle(LIGHT.SET_CUE_GROUP_SELECTION_MODE, async (_, mode: unknown) => {
     try {
       const validated = validateCueGroupSelectionMode(mode)

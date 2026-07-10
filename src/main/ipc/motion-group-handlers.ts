@@ -144,4 +144,33 @@ export function setupMotionGroupHandlers(
       return ipcError(error)
     }
   })
+
+  ipcMain.handle(LIGHT.GET_RB3_MOTION_GROUP_SELECTION_MODE, async () => {
+    try {
+      const mode =
+        controllerManager.getConfig().getPreference('cueDomains').rb3Motion.selectionMode ??
+        'perCueChange'
+      return { success: true, mode }
+    } catch (error) {
+      log.error('Error getting RB3 motion group selection mode:', error)
+      return ipcError(error)
+    }
+  })
+
+  ipcMain.handle(LIGHT.SET_RB3_MOTION_GROUP_SELECTION_MODE, async (_, mode: unknown) => {
+    try {
+      const validation = validateMotionSelectionMode(mode)
+      if (!validation.ok) {
+        return ipcError(new Error(validation.error))
+      }
+      await controllerManager
+        .getConfig()
+        .updateCueDomain('rb3Motion', { selectionMode: validation.value })
+      getRb3CueRegistry().setMotionSelectionMode(validation.value)
+      return { success: true, mode: validation.value }
+    } catch (error) {
+      log.error('Error setting RB3 motion group selection mode:', error)
+      return ipcError(error)
+    }
+  })
 }
