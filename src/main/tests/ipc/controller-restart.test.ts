@@ -961,4 +961,19 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect(senderShutdown).toHaveBeenCalledTimes(1)
     expect(stub.lifecyclePhase).toBe('stopped')
   })
+
+  it('addOnControllerRestart accumulates multiple listeners and unregister removes one', () => {
+    const fake = Object.assign(Object.create(ControllerManager.prototype), {
+      onControllerRestartListeners: [] as Array<() => void>,
+    })
+    const cm = fake as unknown as ControllerManager
+    const a = (): void => {}
+    const b = (): void => {}
+    const offA = cm.addOnControllerRestart(a)
+    cm.addOnControllerRestart(b)
+    // Both registrations coexist — a second consumer never overwrites the first.
+    expect(fake.onControllerRestartListeners).toEqual([a, b])
+    offA()
+    expect(fake.onControllerRestartListeners).toEqual([b])
+  })
 })

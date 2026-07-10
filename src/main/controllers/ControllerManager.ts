@@ -147,6 +147,10 @@ export class ControllerManager {
   private controllerShutdownPromise: Promise<void> | null = null
   private controllerShutdownCompleted = false
   private restartControllersInFlight: Promise<void> | null = null
+  /** Invoked during restart teardown so process-scoped consumers (e.g. laser sim) drop state tied to the
+   *  engine/registry being rebuilt. A list, not a single slot, so multiple consumers can register without
+   *  overwriting each other. */
+  private readonly onControllerRestartListeners: Array<() => void> = []
 
   constructor() {
     this.config = new ConfigurationManager()
@@ -771,6 +775,17 @@ export class ControllerManager {
     this.consoleMode.setOnConsoleEnter(callback)
   }
 
+  /** Register a callback run during restart teardown. Returns an unregister function. */
+  public addOnControllerRestart(callback: () => void): () => void {
+    this.onControllerRestartListeners.push(callback)
+    return () => {
+      const i = this.onControllerRestartListeners.indexOf(callback)
+      if (i !== -1) {
+        this.onControllerRestartListeners.splice(i, 1)
+      }
+    }
+  }
+
   /** Called when a listener takes over the rig chains (RB3E enable) so running simulations stop. */
   public setOnSimulationPreempt(callback: (() => void) | null): void {
     this.onSimulationPreempt = callback
@@ -1027,6 +1042,18 @@ export class ControllerManager {
       // Prevents a stale strobe slot from driving hardware-strobe-channel
       // lights after an input-platform switch.
       getStrobeStateManager().setActive(null)
+
+      // Drop process-scoped state bound to the engine/registry being rebuilt (e.g. an active laser sim
+      // cue + its render tick). Each callback is wrapped so one consumer's failure can neither abort the
+      // restart nor skip the others. Iterate a snapshot so a listener that unregisters during the loop
+      // cannot shift the array under the iterator and skip its neighbour.
+      for (const listener of [...(this.onControllerRestartListeners ?? [])]) {
+        try {
+          listener()
+        } catch (err) {
+          log.error('Error running controller-restart callback:', err)
+        }
+      }
 
       // Drop any active simulated motion cue — the chains it drove are being rebuilt, so a held cue
       // would otherwise execute against torn-down sequencers on the next simulate tick. Wrapped so a
