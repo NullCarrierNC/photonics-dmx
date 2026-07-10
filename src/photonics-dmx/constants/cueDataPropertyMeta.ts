@@ -21,6 +21,32 @@ export interface CueDataPropertyMeta {
 
 const CUE_TYPE_VALUES = Object.values(CueType) as string[]
 
+/**
+ * RB3 StageKit LED / effect state. Authored only in RB3 cues (the StageKit packet stream fills these);
+ * shared here so the RB3 dropdown list and the YARG lookup map both reference the same definitions.
+ */
+const LED_STATE_PROPERTIES: CueDataPropertyMeta[] = [
+  { id: 'led-color', label: 'LED Colour', type: 'string' },
+  { id: 'led-states', label: 'LED States (mask 0-255)', type: 'number' },
+  { id: 'led-count', label: 'LED Count (lit)', type: 'number' },
+  { id: 'led-red-states', label: 'LED Red Mask', type: 'number' },
+  { id: 'led-green-states', label: 'LED Green Mask', type: 'number' },
+  { id: 'led-blue-states', label: 'LED Blue Mask', type: 'number' },
+  { id: 'led-yellow-states', label: 'LED Yellow Mask', type: 'number' },
+  { id: 'led-1-on', label: 'LED 1 On', type: 'boolean' },
+  { id: 'led-2-on', label: 'LED 2 On', type: 'boolean' },
+  { id: 'led-3-on', label: 'LED 3 On', type: 'boolean' },
+  { id: 'led-4-on', label: 'LED 4 On', type: 'boolean' },
+  { id: 'led-5-on', label: 'LED 5 On', type: 'boolean' },
+  { id: 'led-6-on', label: 'LED 6 On', type: 'boolean' },
+  { id: 'led-7-on', label: 'LED 7 On', type: 'boolean' },
+  { id: 'led-8-on', label: 'LED 8 On', type: 'boolean' },
+]
+
+/**
+ * YARG cue-data properties shown in the YARG editor's cue-data dropdown. The LED/StageKit state is
+ * deliberately excluded (it never populates from a YARG datagram) — it lives on RB3 cues instead.
+ */
 export const YARG_CUE_DATA_PROPERTY_META: CueDataPropertyMeta[] = [
   { id: 'cue-name', label: 'Cue Name', type: 'string' },
   { id: 'cue-type', label: 'Cue Type', type: 'cue-type', validValues: CUE_TYPE_VALUES },
@@ -48,28 +74,40 @@ export const YARG_CUE_DATA_PROPERTY_META: CueDataPropertyMeta[] = [
   { id: 'fog-state', label: 'Fog State', type: 'boolean' },
   { id: 'time-since-cue-start', label: 'Time Since Cue Start', type: 'number' },
   { id: 'time-since-last-cue', label: 'Time Since Last Cue', type: 'number' },
-  // RB3 StageKit LED / effect state.
-  { id: 'led-color', label: 'LED Colour', type: 'string' },
-  { id: 'led-states', label: 'LED States (mask 0-255)', type: 'number' },
-  { id: 'led-count', label: 'LED Count (lit)', type: 'number' },
-  { id: 'led-red-states', label: 'LED Red Mask', type: 'number' },
-  { id: 'led-green-states', label: 'LED Green Mask', type: 'number' },
-  { id: 'led-blue-states', label: 'LED Blue Mask', type: 'number' },
-  { id: 'led-yellow-states', label: 'LED Yellow Mask', type: 'number' },
-  { id: 'led-1-on', label: 'LED 1 On', type: 'boolean' },
-  { id: 'led-2-on', label: 'LED 2 On', type: 'boolean' },
-  { id: 'led-3-on', label: 'LED 3 On', type: 'boolean' },
-  { id: 'led-4-on', label: 'LED 4 On', type: 'boolean' },
-  { id: 'led-5-on', label: 'LED 5 On', type: 'boolean' },
-  { id: 'led-6-on', label: 'LED 6 On', type: 'boolean' },
-  { id: 'led-7-on', label: 'LED 7 On', type: 'boolean' },
-  { id: 'led-8-on', label: 'LED 8 On', type: 'boolean' },
   { id: 'strobe-state', label: 'Strobe State', type: 'string' },
 ]
 
-/** Lookup map: property id -> metadata */
+/**
+ * RB3 cue-data properties shown in the RB3 editor's cue-data dropdown: the StageKit LED/effect state
+ * plus the generic frame fields that carry meaning under an RB3 gameplay frame. The YARG-song
+ * properties (bpm, note counts, score, venue, beat/keyframe, …) are excluded — they never populate.
+ */
+export const RB3_CUE_DATA_PROPERTY_META: CueDataPropertyMeta[] = [
+  { id: 'cue-name', label: 'Cue Name', type: 'string' },
+  { id: 'cue-type', label: 'Cue Type', type: 'cue-type', validValues: CUE_TYPE_VALUES },
+  { id: 'previous-cue', label: 'Previous Cue', type: 'cue-type', validValues: CUE_TYPE_VALUES },
+  { id: 'execution-count', label: 'Execution Count', type: 'number' },
+  {
+    id: 'current-scene',
+    label: 'Current Scene',
+    type: 'string',
+    validValues: [...SCENE_VALUES],
+  },
+  { id: 'fog-state', label: 'Fog State', type: 'boolean' },
+  { id: 'time-since-cue-start', label: 'Time Since Cue Start', type: 'number' },
+  { id: 'time-since-last-cue', label: 'Time Since Last Cue', type: 'number' },
+  ...LED_STATE_PROPERTIES,
+  { id: 'strobe-state', label: 'Strobe State', type: 'string' },
+]
+
+/**
+ * Lookup map: property id -> metadata. The UNION of the YARG and RB3 lists (the LED block resolves
+ * even though it's hidden from the YARG dropdown), so `getYargCueDataPropertyMeta` resolves any id a
+ * mode-`yarg`/`rb3` file may carry — validValues sync and legacy nodes keep working. The lists drive
+ * the per-mode dropdowns; this map is the resolution superset.
+ */
 export const YARG_CUE_DATA_PROPERTY_MAP = new Map<string, CueDataPropertyMeta>(
-  YARG_CUE_DATA_PROPERTY_META.map((m) => [m.id, m]),
+  [...YARG_CUE_DATA_PROPERTY_META, ...LED_STATE_PROPERTIES].map((m) => [m.id, m]),
 )
 
 /** Audio cue data properties: global frame data and trigger-specific context. */

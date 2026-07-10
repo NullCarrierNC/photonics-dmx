@@ -11,6 +11,7 @@ import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/constants/options
 import {
   AUDIO_EVENT_OPTIONS,
   YARG_EVENT_OPTIONS_CATEGORIZED,
+  RB3_EVENT_OPTIONS_CATEGORIZED,
   getDefaultEventOption,
 } from '../../lib/options'
 
@@ -35,12 +36,13 @@ function getInitialValueInput(
   cueKind: NodeCueKind,
 ) {
   const defaultEventValue = getDefaultEventOption(activeMode, cueKind)?.value ?? ''
+  // Categorized event set per mode (RB3 and YARG are both categorized; audio is a flat list).
+  const categorizedEvents =
+    activeMode === 'rb3' ? RB3_EVENT_OPTIONS_CATEGORIZED : YARG_EVENT_OPTIONS_CATEGORIZED
   const eventOptionValues =
-    activeMode === 'yarg'
-      ? YARG_EVENT_OPTIONS_CATEGORIZED.flatMap((category) =>
-          category.events.map((event) => event.value),
-        )
-      : AUDIO_EVENT_OPTIONS.map((option) => option.value)
+    activeMode === 'audio'
+      ? AUDIO_EVENT_OPTIONS.map((option) => option.value)
+      : categorizedEvents.flatMap((category) => category.events.map((event) => event.value))
   const selectedEventValue =
     typeof value === 'string' && eventOptionValues.includes(value) ? value : defaultEventValue
 
@@ -84,8 +86,13 @@ function getInitialValueInput(
           className="rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={selectedEventValue}
           onChange={(e) => onChange(e.target.value)}>
-          {activeMode === 'yarg'
-            ? YARG_EVENT_OPTIONS_CATEGORIZED.map((category) => (
+          {activeMode === 'audio'
+            ? AUDIO_EVENT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))
+            : categorizedEvents.map((category) => (
                 <optgroup key={category.category} label={category.category}>
                   {category.events.map((event) => (
                     <option key={event.value} value={event.value}>
@@ -93,11 +100,6 @@ function getInitialValueInput(
                     </option>
                   ))}
                 </optgroup>
-              ))
-            : AUDIO_EVENT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
               ))}
         </select>
       )

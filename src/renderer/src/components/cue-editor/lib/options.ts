@@ -34,8 +34,15 @@ const EASING_OPTIONS = [
   'cubicInOut',
 ] as const
 
-// Event options for EVENT NODES - includes system events (cue-started, cue-called)
-const YARG_EVENT_TYPES: YargEventType[] = [...YARG_EVENTS_BASE]
+// RB3 StageKit LED / fog conditions only ever fire in RB3 cue mode (from the StageKit packet
+// stream), so they are excluded from every YARG vocabulary — a YARG cue can never receive them.
+const RB3_CONDITION = /^(led-[1-8](-off)?|fog-(on|off))$/
+
+// Event options for EVENT NODES - includes system events (cue-started, cue-called), minus the
+// RB3-only LED/fog conditions (which live on RB3 cues).
+const YARG_EVENT_TYPES: YargEventType[] = [...YARG_EVENTS_BASE].filter(
+  (t) => !RB3_CONDITION.test(t),
+)
 const YARG_EVENT_OPTIONS = withDefaultLabels(YARG_EVENT_TYPES)
 const AUDIO_EVENT_LABELS: Partial<Record<AudioEventType, string>> = {
   'cue-started': 'Cue Started (once per lifecycle)',
@@ -65,19 +72,17 @@ const RB3_EVENT_OPTIONS = RB3_EVENT_OPTIONS_CATEGORIZED.flatMap((c) => c.events)
 /** Audio analysis only fires discrete beat edges today (no measure/keyframe). */
 const AUDIO_ACTION_WAIT_CONDITIONS: WaitCondition[] = ['beat']
 
-// RB3 StageKit LED / fog conditions only fire in RB3 cue mode; tag them so an author of a
-// YARG-driven cue sees they won't fire from a normal song.
-const RB3_CONDITION = /^(led-[1-8](-off)?|fog-(on|off))$/
-const waitLabel = (value: string): string => (RB3_CONDITION.test(value) ? `${value} (RB3)` : value)
-
-// Wait options for ACTION TIMING - song events only (no system events)
+// Wait options for ACTION TIMING - song events only (no system events). RB3 LED/fog conditions are
+// excluded from the YARG set (they never fire from a normal song).
 const ACTION_WAIT_CONDITIONS: WaitCondition[] = [...WAIT_CONDITIONS_WITH_NONE_DELAY]
 const ACTION_WAIT_OPTIONS_YARG = [
   { value: 'none', label: 'None' },
   { value: 'delay', label: 'Delay' },
-  ...ACTION_WAIT_CONDITIONS.filter((c) => c !== 'none' && c !== 'delay').map((value) => ({
+  ...ACTION_WAIT_CONDITIONS.filter(
+    (c) => c !== 'none' && c !== 'delay' && !RB3_CONDITION.test(c),
+  ).map((value) => ({
     value,
-    label: waitLabel(value),
+    label: value,
   })),
 ] as const
 
@@ -138,6 +143,7 @@ export {
   ACTION_WAIT_OPTIONS_RB3,
   AUDIO_EVENT_OPTIONS,
   EASING_OPTIONS,
+  YARG_EVENT_TYPES,
   YARG_EVENT_OPTIONS,
   YARG_EVENT_OPTIONS_CATEGORIZED,
   RB3_EVENT_OPTIONS,

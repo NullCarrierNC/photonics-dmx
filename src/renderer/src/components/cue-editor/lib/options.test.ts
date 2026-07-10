@@ -2,16 +2,38 @@ import { describe, expect, it } from '@jest/globals'
 import {
   ACTION_WAIT_OPTIONS_AUDIO,
   ACTION_WAIT_OPTIONS_RB3,
+  ACTION_WAIT_OPTIONS_YARG,
   RB3_EVENT_OPTIONS,
   RB3_EVENT_OPTIONS_CATEGORIZED,
+  YARG_EVENT_OPTIONS_CATEGORIZED,
   getActionWaitOptions,
   getEventOptionsForMode,
   getDefaultEventOption,
 } from './options'
 
+const RB3_CONDITION = /^(led-[1-8](-off)?|fog-(on|off))$/
+
 describe('cue-editor action wait options (audio)', () => {
   it('exposes only none, delay, and beat for audio mode', () => {
     expect(ACTION_WAIT_OPTIONS_AUDIO.map((o) => o.value)).toEqual(['none', 'delay', 'beat'])
+  })
+})
+
+describe('cue-editor YARG vocabulary excludes RB3 constructs', () => {
+  it('YARG event categories contain no LED/fog events and no RB3 category', () => {
+    const cats = YARG_EVENT_OPTIONS_CATEGORIZED
+    expect(cats.find((c) => c.category === 'RB3 StageKit')).toBeUndefined()
+    const values = cats.flatMap((c) => c.events.map((e) => e.value))
+    expect(values.some((v) => RB3_CONDITION.test(v))).toBe(false)
+  })
+
+  it('YARG wait options contain no LED/fog conditions and no "(RB3)" labels', () => {
+    expect(getActionWaitOptions('yarg')).toBe(ACTION_WAIT_OPTIONS_YARG)
+    const values = ACTION_WAIT_OPTIONS_YARG.map((o) => o.value)
+    expect(values.some((v) => RB3_CONDITION.test(v))).toBe(false)
+    // Normal song conditions are still present.
+    expect(values).toContain('beat')
+    expect(ACTION_WAIT_OPTIONS_YARG.every((o) => !o.label.includes('(RB3)'))).toBe(true)
   })
 })
 

@@ -8,13 +8,14 @@ import ColorListEditor from './ColorListEditor'
 import type { Color } from '../../../../../../photonics-dmx/types'
 import {
   COLOR_OPTIONS,
-  YARG_EVENT_OPTIONS,
   AUDIO_EVENT_OPTIONS,
 } from '../../../../../../photonics-dmx/constants/options'
 import { CueType } from '../../../../../../photonics-dmx/cues/types/cueTypes'
-import { RB3_EVENT_OPTIONS } from '../../lib/options'
+import { YARG_EVENT_TYPES, RB3_EVENT_OPTIONS } from '../../lib/options'
 
 const CUE_TYPE_VALUES = Object.values(CueType) as string[]
+// Per-mode event value lists: YARG (RB3 conditions filtered out) and the curated RB3 set.
+const YARG_EVENT_VALUES = [...YARG_EVENT_TYPES]
 const RB3_EVENT_VALUES = RB3_EVENT_OPTIONS.map((o) => o.value)
 
 interface ValueSourceEditorProps {
@@ -65,7 +66,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
     if (expected === 'event' && activeMode) {
       if (activeMode === 'audio') return [...AUDIO_EVENT_OPTIONS]
       if (activeMode === 'rb3') return [...RB3_EVENT_VALUES]
-      return [...YARG_EVENT_OPTIONS]
+      return [...YARG_EVENT_VALUES]
     }
     return undefined
   })()
