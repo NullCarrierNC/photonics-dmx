@@ -1602,6 +1602,26 @@ describe('Node cue validation', () => {
     }
   })
 
+  it('validates bundled rb3-motion-default.json (time-driven motion cues, compiles)', () => {
+    const filePath = path.join(
+      __dirname,
+      '../../../../../resources/defaults/node-data/cues/rb3/rb3-motion-default.json',
+    )
+    const result = validateRb3NodeCueFile(JSON.parse(fs.readFileSync(filePath, 'utf8')))
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      expect(result.data.group.id).toBe('rb3-motion-default')
+      // Every cue is a motion cue and compiles; none depend on beat/measure/keyframe events.
+      expect(result.data.cues.length).toBe(9)
+      for (const cue of result.data.cues) {
+        expect(cue.kind).toBe('motion')
+        expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+        const eventTypes = (cue.nodes?.events ?? []).map((e) => e.eventType)
+        expect(eventTypes).toEqual(['cue-started'])
+      }
+    }
+  })
+
   for (const fileName of ['yarg-fade.json']) {
     it(`validates bundled ${fileName} (compiles, caps brightness at high, no strobes)`, () => {
       const filePath = path.join(
