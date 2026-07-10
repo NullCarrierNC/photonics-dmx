@@ -178,7 +178,8 @@ export function useNodeSelection({
           const label = (() => {
             switch (node.data.kind) {
               case 'event': {
-                if (activeMode === 'yarg') return (nextPayload as YargEventNode).eventType
+                // RB3 nodes are YARG-shaped; only audio carries the trigger/label variant.
+                if (activeMode !== 'audio') return (nextPayload as YargEventNode).eventType
                 const audioPayload = nextPayload as AudioEventNodeUnion
                 return audioPayload.eventType === 'audio-trigger'
                   ? (audioPayload as AudioTriggerNode).nodeLabel

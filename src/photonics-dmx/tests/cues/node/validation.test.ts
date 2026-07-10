@@ -196,6 +196,68 @@ describe('Node cue validation', () => {
     expect(validateNodeCueFile(file).valid).toBe(true)
   })
 
+  it('accepts a StageKit LED event node and rejects an audio-shaped one in an RB3 cue', () => {
+    const makeFile = (event: Record<string, unknown>) => ({
+      version: 1,
+      mode: 'rb3',
+      group: { id: 'rb3-group', name: 'RB3' },
+      cues: [
+        {
+          id: 'rb3-cue',
+          name: 'RB3 Cue',
+          kind: 'lighting',
+          cueType: CueType.RB3,
+          style: 'primary',
+          nodes: {
+            events: [event],
+            actions: [
+              {
+                id: 'action-1',
+                type: 'action',
+                effectType: 'set-color',
+                target: {
+                  groups: { source: 'literal', value: 'front' },
+                  filter: { source: 'literal', value: 'all' },
+                },
+                color: {
+                  name: { source: 'literal', value: 'red' },
+                  brightness: { source: 'literal', value: 'medium' },
+                },
+                timing: {
+                  waitForCondition: { source: 'literal', value: 'none' },
+                  waitForTime: { source: 'literal', value: 0 },
+                  duration: { source: 'literal', value: 200 },
+                  waitUntilCondition: { source: 'literal', value: 'none' },
+                  waitUntilTime: { source: 'literal', value: 0 },
+                },
+              },
+            ],
+          },
+          connections: [{ from: 'event-1', to: 'action-1' }],
+          layout: { nodePositions: {} },
+        },
+      ],
+    })
+
+    // A YARG-shaped LED edge event validates.
+    expect(
+      validateRb3NodeCueFile(makeFile({ id: 'event-1', type: 'event', eventType: 'led-3' })).valid,
+    ).toBe(true)
+
+    // The audio node shape (extra threshold/triggerMode props) is rejected by the rb3 schema.
+    expect(
+      validateRb3NodeCueFile(
+        makeFile({
+          id: 'event-1',
+          type: 'event',
+          eventType: 'led-3',
+          threshold: 0.5,
+          triggerMode: 'edge',
+        }),
+      ).valid,
+    ).toBe(false)
+  })
+
   it('rejects an RB3 file whose mode is not "rb3"', () => {
     const result = validateRb3NodeCueFile({
       version: 1,

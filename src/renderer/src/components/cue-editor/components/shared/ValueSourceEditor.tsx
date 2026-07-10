@@ -12,8 +12,10 @@ import {
   AUDIO_EVENT_OPTIONS,
 } from '../../../../../../photonics-dmx/constants/options'
 import { CueType } from '../../../../../../photonics-dmx/cues/types/cueTypes'
+import { RB3_EVENT_OPTIONS } from '../../lib/options'
 
 const CUE_TYPE_VALUES = Object.values(CueType) as string[]
+const RB3_EVENT_VALUES = RB3_EVENT_OPTIONS.map((o) => o.value)
 
 interface ValueSourceEditorProps {
   label: string
@@ -61,7 +63,9 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
     if (expected === 'color') return COLOR_OPTIONS
     if (expected === 'cue-type') return CUE_TYPE_VALUES
     if (expected === 'event' && activeMode) {
-      return activeMode === 'yarg' ? [...YARG_EVENT_OPTIONS] : [...AUDIO_EVENT_OPTIONS]
+      if (activeMode === 'audio') return [...AUDIO_EVENT_OPTIONS]
+      if (activeMode === 'rb3') return [...RB3_EVENT_VALUES]
+      return [...YARG_EVENT_OPTIONS]
     }
     return undefined
   })()

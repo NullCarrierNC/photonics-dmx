@@ -426,7 +426,8 @@ const useNodeCreation = ({
               ? 'Audio Trigger'
               : defaultOption.label,
           payload:
-            nodeMode === 'yarg'
+            // RB3 nodes are YARG-shaped; only audio uses the threshold/triggerMode shape.
+            nodeMode !== 'audio'
               ? {
                   id: newEventId,
                   type: 'event',

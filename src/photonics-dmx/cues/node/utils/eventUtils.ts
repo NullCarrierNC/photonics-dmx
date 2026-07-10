@@ -90,18 +90,44 @@ export function getYargEventCategories(): EventCategory[] {
     {
       // RB3 StageKit LED / fog edges — only fire in RB3 cue mode (from the StageKit packet stream).
       category: 'RB3 StageKit',
+      events: rb3StageKitEvents(),
+    },
+  ]
+}
+
+/** RB3 StageKit LED-on/off and fog edge events (values are valid YargEventType wait conditions). */
+function rb3StageKitEvents(): { value: string; label: string }[] {
+  return [
+    ...Array.from({ length: 8 }, (_, i) => ({
+      value: `led-${i + 1}`,
+      label: `LED ${i + 1} On`,
+    })),
+    ...Array.from({ length: 8 }, (_, i) => ({
+      value: `led-${i + 1}-off`,
+      label: `LED ${i + 1} Off`,
+    })),
+    { value: 'fog-on', label: 'Fog On' },
+    { value: 'fog-off', label: 'Fog Off' },
+  ]
+}
+
+/**
+ * Categorized event options for RB3 cue mode. RB3 graphs are YARG-shaped, but the StageKit packet
+ * stream only ever yields the lifecycle events plus LED/fog edges — so the vocabulary is curated to
+ * exactly those; the beat/measure/instrument events in the YARG set never fire under RB3.
+ */
+export function getRb3EventCategories(): EventCategory[] {
+  return [
+    {
+      category: 'Timing',
       events: [
-        ...Array.from({ length: 8 }, (_, i) => ({
-          value: `led-${i + 1}`,
-          label: `LED ${i + 1} On`,
-        })),
-        ...Array.from({ length: 8 }, (_, i) => ({
-          value: `led-${i + 1}-off`,
-          label: `LED ${i + 1} Off`,
-        })),
-        { value: 'fog-on', label: 'Fog On' },
-        { value: 'fog-off', label: 'Fog Off' },
+        { value: 'cue-started', label: 'Cue Started (once per lifecycle)' },
+        { value: 'cue-called', label: 'Cue Called (every call)' },
       ],
+    },
+    {
+      category: 'RB3 StageKit',
+      events: rb3StageKitEvents(),
     },
   ]
 }

@@ -29,15 +29,16 @@ const CueDataLogicEditor: React.FC<CueDataLogicEditorProps> = ({
   updateNode,
   onSyncVariableValidValues,
 }) => {
+  // RB3 cues read the YARG cue-data vocabulary (which holds the LED/fog StageKit properties).
   const cueDataProperties =
-    activeMode === 'yarg' ? YARG_CUE_DATA_PROPERTY_META : AUDIO_CUE_DATA_PROPERTY_META
+    activeMode === 'audio' ? AUDIO_CUE_DATA_PROPERTY_META : YARG_CUE_DATA_PROPERTY_META
 
   useEffect(() => {
     if (!node.assignTo || !node.dataProperty || !onSyncVariableValidValues) return
     const meta =
-      activeMode === 'yarg'
-        ? getYargCueDataPropertyMeta(node.dataProperty)
-        : getAudioCueDataPropertyMeta(node.dataProperty)
+      activeMode === 'audio'
+        ? getAudioCueDataPropertyMeta(node.dataProperty)
+        : getYargCueDataPropertyMeta(node.dataProperty)
     if (!meta?.validValues?.length) return
     const varDef = availableVariables.find((v) => v.name === node.assignTo)
     if (!varDef) return

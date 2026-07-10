@@ -10,7 +10,11 @@ import type {
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { YargEventType } from '../../../../../../photonics-dmx/types'
-import { YARG_EVENT_OPTIONS_CATEGORIZED, AUDIO_EVENT_OPTIONS } from '../../lib/options'
+import {
+  YARG_EVENT_OPTIONS_CATEGORIZED,
+  RB3_EVENT_OPTIONS_CATEGORIZED,
+  AUDIO_EVENT_OPTIONS,
+} from '../../lib/options'
 import {
   getInstrumentTriggerPreset,
   INSTRUMENT_TRIGGER_PRESETS,
@@ -222,10 +226,11 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
   updateYargNode,
   updateAudioNode,
 }) => {
+  // RB3 nodes are YARG-shaped, so anything that isn't audio reads/writes the YARG event fields.
   const eventType =
-    activeMode === 'yarg'
-      ? (node as YargEventNode).eventType
-      : (node as AudioEventNodeUnion).eventType
+    activeMode === 'audio'
+      ? (node as AudioEventNodeUnion).eventType
+      : (node as YargEventNode).eventType
   const isTrigger = activeMode === 'audio' && eventType === 'audio-trigger'
   const trigger = isTrigger ? (node as AudioTriggerNode) : null
 
@@ -254,7 +259,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={eventType}
           onChange={(event) => {
-            if (activeMode === 'yarg') {
+            if (activeMode !== 'audio') {
               updateYargNode({ eventType: event.target.value as YargEventType })
             } else {
               const newType = event.target.value as AudioEventType
@@ -272,8 +277,16 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
               }
             }
           }}>
-          {activeMode === 'yarg'
-            ? YARG_EVENT_OPTIONS_CATEGORIZED.map((category) => (
+          {activeMode === 'audio'
+            ? AUDIO_EVENT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))
+            : (activeMode === 'rb3'
+                ? RB3_EVENT_OPTIONS_CATEGORIZED
+                : YARG_EVENT_OPTIONS_CATEGORIZED
+              ).map((category) => (
                 <optgroup key={category.category} label={category.category}>
                   {category.events.map((event) => (
                     <option key={event.value} value={event.value}>
@@ -281,11 +294,6 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
                     </option>
                   ))}
                 </optgroup>
-              ))
-            : AUDIO_EVENT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
               ))}
         </select>
         {activeMode === 'audio' && AUDIO_EVENT_TYPE_DOCS[eventType as AudioEventType] && (
