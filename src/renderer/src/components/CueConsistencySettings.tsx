@@ -14,6 +14,14 @@ import {
   setMotionCueProbabilityPercent,
   getAudioMotionCueProbabilityPercent,
   setAudioMotionCueProbabilityPercent,
+  getRb3MotionGroupSelectionMode,
+  setRb3MotionGroupSelectionMode,
+  getRb3MotionCueProbabilityPercent,
+  setRb3MotionCueProbabilityPercent,
+  getRb3MotionCueMinHoldMs,
+  setRb3MotionCueMinHoldMs,
+  getRb3MotionCueDuration,
+  setRb3MotionCueDuration,
 } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
 
@@ -41,6 +49,12 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
   const [motionMinHoldMs, setMotionMinHoldMsState] = useState(5000)
   const [yargMotionProbability, setYargMotionProbability] = useState(50)
   const [audioMotionProbability, setAudioMotionProbability] = useState(50)
+  const [rb3MotionSelectionMode, setRb3MotionSelectionModeState] =
+    useState<MotionGroupSelectionMode>('perCueChange')
+  const [rb3MotionProbability, setRb3MotionProbability] = useState(50)
+  const [rb3MotionMinHoldMs, setRb3MotionMinHoldMsState] = useState(5000)
+  const [rb3MotionDurationMin, setRb3MotionDurationMin] = useState(5)
+  const [rb3MotionDurationMax, setRb3MotionDurationMax] = useState(20)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -50,6 +64,11 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
     lastSentValue: number | null
   }>({ timer: null, pendingValue: null, lastSentValue: null })
   const audioProbabilitySaveRef = useRef<{
+    timer: ReturnType<typeof setTimeout> | null
+    pendingValue: number | null
+    lastSentValue: number | null
+  }>({ timer: null, pendingValue: null, lastSentValue: null })
+  const rb3ProbabilitySaveRef = useRef<{
     timer: ReturnType<typeof setTimeout> | null
     pendingValue: number | null
     lastSentValue: number | null
@@ -66,6 +85,10 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           minHoldResult,
           yargProbabilityResult,
           audioProbabilityResult,
+          rb3MotionResult,
+          rb3ProbabilityResult,
+          rb3MinHoldResult,
+          rb3DurationResult,
         ] = await Promise.all([
           getCueConsistencyWindow(),
           getCueGroupSelectionMode(),
@@ -74,6 +97,10 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           getMotionCueMinHoldMs(),
           getMotionCueProbabilityPercent(),
           getAudioMotionCueProbabilityPercent(),
+          getRb3MotionGroupSelectionMode(),
+          getRb3MotionCueProbabilityPercent(),
+          getRb3MotionCueMinHoldMs(),
+          getRb3MotionCueDuration(),
         ])
         if (windowResult.success) setConsistencyWindow(windowResult.windowMs)
         if (modeResult.success) setSelectionMode(modeResult.mode)
@@ -99,6 +126,27 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
         ) {
           setAudioMotionProbability(audioProbabilityResult.percent)
           audioProbabilitySaveRef.current.lastSentValue = audioProbabilityResult.percent
+        }
+        if (rb3MotionResult?.success === true && rb3MotionResult.mode) {
+          setRb3MotionSelectionModeState(rb3MotionResult.mode)
+        }
+        if (
+          rb3ProbabilityResult?.success === true &&
+          typeof rb3ProbabilityResult.percent === 'number'
+        ) {
+          setRb3MotionProbability(rb3ProbabilityResult.percent)
+          rb3ProbabilitySaveRef.current.lastSentValue = rb3ProbabilityResult.percent
+        }
+        if (rb3MinHoldResult?.success === true && typeof rb3MinHoldResult.minHoldMs === 'number') {
+          setRb3MotionMinHoldMsState(rb3MinHoldResult.minHoldMs)
+        }
+        if (
+          rb3DurationResult?.success === true &&
+          typeof rb3DurationResult.min === 'number' &&
+          typeof rb3DurationResult.max === 'number'
+        ) {
+          setRb3MotionDurationMin(rb3DurationResult.min)
+          setRb3MotionDurationMax(rb3DurationResult.max)
         }
       } catch (error) {
         log.error('Failed to load cue consistency settings:', error)
@@ -266,17 +314,39 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
     [armProbabilitySave, flushAudioProbability],
   )
 
+  const flushRb3Probability = useCallback(() => {
+    if (rb3ProbabilitySaveRef.current.timer) {
+      clearTimeout(rb3ProbabilitySaveRef.current.timer)
+      rb3ProbabilitySaveRef.current.timer = null
+    }
+    void sendProbability(
+      rb3ProbabilitySaveRef,
+      setRb3MotionCueProbabilityPercent,
+      getRb3MotionCueProbabilityPercent,
+      setRb3MotionProbability,
+      'RB3 motion probability',
+    )
+  }, [sendProbability])
+
+  const handleRb3ProbabilityChange = useCallback(
+    (value: number) => {
+      const clamped = Math.max(0, Math.min(100, Math.round(value)))
+      setRb3MotionProbability(clamped)
+      armProbabilitySave(rb3ProbabilitySaveRef, clamped, flushRb3Probability)
+    },
+    [armProbabilitySave, flushRb3Probability],
+  )
+
   useEffect(() => {
     const yargRef = yargProbabilitySaveRef
     const audioRef = audioProbabilitySaveRef
+    const rb3Ref = rb3ProbabilitySaveRef
     return () => {
-      if (yargRef.current.timer) {
-        clearTimeout(yargRef.current.timer)
-        yargRef.current.timer = null
-      }
-      if (audioRef.current.timer) {
-        clearTimeout(audioRef.current.timer)
-        audioRef.current.timer = null
+      for (const ref of [yargRef, audioRef, rb3Ref]) {
+        if (ref.current.timer) {
+          clearTimeout(ref.current.timer)
+          ref.current.timer = null
+        }
       }
       void sendProbability(
         yargRef,
@@ -291,6 +361,13 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
         getAudioMotionCueProbabilityPercent,
         () => {},
         'audio motion probability',
+      )
+      void sendProbability(
+        rb3Ref,
+        setRb3MotionCueProbabilityPercent,
+        getRb3MotionCueProbabilityPercent,
+        () => {},
+        'RB3 motion probability',
       )
     }
   }, [sendProbability])
@@ -318,6 +395,57 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
         if (reload.success && typeof reload.minHoldMs === 'number') {
           setMotionMinHoldMsState(reload.minHoldMs)
         }
+      } finally {
+        setIsSaving(false)
+      }
+    },
+    [isSaving],
+  )
+
+  const handleRb3MinHoldChange = useCallback(
+    async (value: number) => {
+      if (isSaving) return
+      const newValue = Math.max(0, Math.min(600000, value))
+      setRb3MotionMinHoldMsState(newValue)
+      try {
+        setIsSaving(true)
+        const result = await setRb3MotionCueMinHoldMs(newValue)
+        if (result.success && typeof result.minHoldMs === 'number') {
+          setRb3MotionMinHoldMsState(result.minHoldMs)
+        } else if (!result.success) {
+          const reload = await getRb3MotionCueMinHoldMs()
+          if (reload.success && typeof reload.minHoldMs === 'number') {
+            setRb3MotionMinHoldMsState(reload.minHoldMs)
+          }
+        }
+      } catch (error) {
+        log.error('Failed to save RB3 motion min hold:', error)
+      } finally {
+        setIsSaving(false)
+      }
+    },
+    [isSaving],
+  )
+
+  const handleRb3DurationChange = useCallback(
+    async (min: number, max: number) => {
+      if (isSaving) return
+      const range = { min: Math.max(0, Math.min(600, min)), max: Math.max(0, Math.min(600, max)) }
+      try {
+        setIsSaving(true)
+        const result = await setRb3MotionCueDuration(range)
+        if (result.success && typeof result.min === 'number' && typeof result.max === 'number') {
+          setRb3MotionDurationMin(result.min)
+          setRb3MotionDurationMax(result.max)
+        } else if (!result.success) {
+          const reload = await getRb3MotionCueDuration()
+          if (reload.success) {
+            setRb3MotionDurationMin(reload.min)
+            setRb3MotionDurationMax(reload.max)
+          }
+        }
+      } catch (error) {
+        log.error('Failed to save RB3 motion duration:', error)
       } finally {
         setIsSaving(false)
       }
@@ -573,6 +701,149 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
             Minimum time to hold a motion cue after it starts. Prevents thrashing if the lighting
             cue flip-flops very rapidly. Changes faster than this value will be ignored, and the
             next change will be used.
+          </p>
+        </div>
+        <div>
+          <label
+            htmlFor="rb3-motion-group-selection-mode"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            RB3 motion cue selection mode
+          </label>
+          <select
+            id="rb3-motion-group-selection-mode"
+            value={rb3MotionSelectionMode}
+            onChange={async (e) => {
+              const mode = e.target.value as MotionGroupSelectionMode
+              if (mode !== 'oncePerSong' && mode !== 'perCueChange' && mode !== 'none') return
+              setRb3MotionSelectionModeState(mode)
+              if (isSaving) return
+              try {
+                setIsSaving(true)
+                const result = await setRb3MotionGroupSelectionMode(mode)
+                if (!result.success) {
+                  log.error('Failed to save RB3 motion group selection mode:', result.error)
+                  setRb3MotionSelectionModeState(rb3MotionSelectionMode)
+                }
+              } catch (error) {
+                log.error('Failed to save RB3 motion group selection mode:', error)
+                setRb3MotionSelectionModeState(rb3MotionSelectionMode)
+              } finally {
+                setIsSaving(false)
+              }
+            }}
+            className="block w-full max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading || isSaving || !motionGloballyEnabled}>
+            <option value="perCueChange">Per Light-1 Change (on the switch timer)</option>
+            <option value="oncePerSong">Once Per Song</option>
+            <option value="none">No RB3 Motion Cues</option>
+          </select>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            RB3 has no beat, so a new motion cue is chosen on a Light-1 state change once the switch
+            timer below has elapsed.
+          </p>
+        </div>
+        <div>
+          <label
+            htmlFor="rb3-motion-probability"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            RB3 motion cue probability
+          </label>
+          <div className="flex items-center space-x-4">
+            <input
+              type="range"
+              id="rb3-motion-probability"
+              min={0}
+              max={100}
+              step={1}
+              value={rb3MotionProbability}
+              onChange={(e) => handleRb3ProbabilityChange(parseInt(e.target.value, 10))}
+              onMouseUp={flushRb3Probability}
+              onPointerUp={flushRb3Probability}
+              onBlur={flushRb3Probability}
+              className="flex-1 max-w-xs accent-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || !motionGloballyEnabled}
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300 w-12 text-right tabular-nums">
+              {rb3MotionProbability}%
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            Chance that a motion cue is picked when the RB3 switch timer fires. At 0% motion is
+            suppressed. Manual motion selection always plays regardless of this value.
+          </p>
+        </div>
+        <div>
+          <label
+            htmlFor="rb3-motion-duration"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            RB3 motion switch timer (random range)
+          </label>
+          <div className="flex items-center space-x-3">
+            <input
+              type="number"
+              id="rb3-motion-duration"
+              min="0"
+              max="600"
+              step="1"
+              value={rb3MotionDurationMin}
+              onChange={(e) =>
+                setRb3MotionDurationMin(
+                  Math.max(0, Math.min(600, parseInt(e.target.value, 10) || 0)),
+                )
+              }
+              onBlur={() => handleRb3DurationChange(rb3MotionDurationMin, rb3MotionDurationMax)}
+              className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || isSaving || !motionGloballyEnabled}
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-400">to</span>
+            <input
+              type="number"
+              min="0"
+              max="600"
+              step="1"
+              value={rb3MotionDurationMax}
+              onChange={(e) =>
+                setRb3MotionDurationMax(
+                  Math.max(0, Math.min(600, parseInt(e.target.value, 10) || 0)),
+                )
+              }
+              onBlur={() => handleRb3DurationChange(rb3MotionDurationMin, rb3MotionDurationMax)}
+              className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || isSaving || !motionGloballyEnabled}
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-400">seconds</span>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            The next RB3 motion switch is scheduled a random time within this range. Default 5–20s.
+          </p>
+        </div>
+        <div>
+          <label
+            htmlFor="rb3-motion-min-hold-ms"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            RB3 motion cue minimum hold time
+          </label>
+          <div className="flex items-center space-x-4">
+            <input
+              type="number"
+              id="rb3-motion-min-hold-ms"
+              min="0"
+              max="600000"
+              step="100"
+              value={rb3MotionMinHoldMs}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10) || 0
+                setRb3MotionMinHoldMsState(Math.max(0, Math.min(600000, v)))
+              }}
+              onBlur={() => handleRb3MinHoldChange(rb3MotionMinHoldMs)}
+              className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || isSaving || !motionGloballyEnabled}
+              placeholder="5000"
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-400">milliseconds</span>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            Floor on how soon a switch can re-pick, independent of the switch timer above.
           </p>
         </div>
       </div>
