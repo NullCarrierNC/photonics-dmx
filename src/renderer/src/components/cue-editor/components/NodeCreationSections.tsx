@@ -203,6 +203,12 @@ const LogicNodesSection: React.FC<{
         Select From List
       </button>
       <button
+        className={getLogicNodeButtonClasses('pulse')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'pulse' })}
+        onClick={() => addLogicNode('pulse')}>
+        Pulse
+      </button>
+      <button
         className={getLogicNodeButtonClasses('random')}
         {...makeDragHandlers({ kind: 'logic', logicType: 'random' })}
         onClick={() => addLogicNode('random')}>

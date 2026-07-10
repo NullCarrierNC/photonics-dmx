@@ -70,6 +70,81 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
   })
 
+  it('validates a YARG node cue containing a pulse logic node, and rejects one missing anchorVar', () => {
+    const makeDef = (pulse: Record<string, unknown>): YargNodeCueDefinition =>
+      ({
+        id: 'pulse-cue',
+        name: 'Pulse Cue',
+        description: '',
+        kind: 'lighting',
+        cueType: CueType.Chorus,
+        style: 'primary',
+        nodes: {
+          events: [{ id: 'event-1', type: 'event', eventType: 'cue-called' }],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'blue' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 200 },
+                waitUntilCondition: { source: 'literal', value: 'none' },
+                waitUntilTime: { source: 'literal', value: 0 },
+                easing: { source: 'literal', value: 'sinInOut' },
+                level: { source: 'literal', value: 1 },
+              },
+            },
+          ],
+          logic: [pulse as never],
+        },
+        connections: [
+          { from: 'event-1', to: 'logic-1' },
+          { from: 'logic-1', to: 'action-1' },
+        ],
+        layout: { nodePositions: {} },
+      }) as YargNodeCueDefinition
+
+    const validPulse = {
+      id: 'logic-1',
+      type: 'logic',
+      logicType: 'pulse',
+      interval: { source: 'literal', value: 500 },
+      anchorVar: 'anchor',
+      assignTo: 'idx',
+      assignPhase: 'phase',
+    }
+    expect(
+      validateYargNodeCueFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'g1', name: 'Group' },
+        cues: [makeDef(validPulse)],
+      }).valid,
+    ).toBe(true)
+
+    // anchorVar is required — omitting it fails schema validation.
+    const { anchorVar: _omit, ...missingAnchor } = validPulse
+    expect(
+      validateYargNodeCueFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'g1', name: 'Group' },
+        cues: [makeDef(missingAnchor)],
+      }).valid,
+    ).toBe(false)
+  })
+
   it('validates a simple RB3 node cue (YARG-shaped, mode rb3)', () => {
     const definition: YargNodeCueDefinition = {
       id: 'rb3-cue',

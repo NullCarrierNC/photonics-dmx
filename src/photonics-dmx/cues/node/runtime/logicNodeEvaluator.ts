@@ -18,6 +18,7 @@ import {
   UninitializedVariableError,
 } from './valueResolver'
 import { extractCueDataValue, extractConfigDataValue } from './dataExtractors'
+import { monotonicNowMs } from '../../../../shared/time'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('logicNodeEvaluator')
 
@@ -134,6 +135,38 @@ export function evaluateLogicNode(
       const wrapped = ((idx % list.length) + list.length) % list.length
       const targetVarStore = getVarStore(logicNode.assignTo)
       targetVarStore.set(logicNode.assignTo, { type: 'number', value: list[wrapped] })
+      return edges.map((edge) => edge.to)
+    }
+
+    case 'pulse': {
+      // Turn wall-clock time into a cycle index (+ optional fractional phase) so downstream nodes can
+      // strobe (conditional on phase) or sequence (wrap the index into select-from-list) at a
+      // tempo-locked, fps-independent rate. Stateful: the cycle origin is persisted in anchorVar, a
+      // cue-level var that resets on cue-started — so the phase is activation-relative and restarts each
+      // time the cue re-fires. The graph re-runs every cue-called frame, reading the clock afresh.
+      const now = monotonicNowMs()
+      const anchorStore = getVarStore(logicNode.anchorVar)
+      const stored = anchorStore.get(logicNode.anchorVar)
+      let anchor = stored ? Number(stored.value) : NaN
+      // Unseeded (undefined var) or reset-to-default 0 both mean "capture the origin now".
+      if (!Number.isFinite(anchor) || anchor <= 0) {
+        anchor = now
+        anchorStore.set(logicNode.anchorVar, { type: 'number', value: anchor })
+      }
+      // Guard interval to >= 1ms: a zero/negative/NaN interval would divide-by-zero the cycle math.
+      const interval = Math.max(
+        1,
+        Number(resolveValue('number', logicNode.interval, context, variableDefinitions)),
+      )
+      const cycles = (now - anchor) / interval
+      const index = Math.floor(cycles)
+      getVarStore(logicNode.assignTo).set(logicNode.assignTo, { type: 'number', value: index })
+      if (logicNode.assignPhase) {
+        getVarStore(logicNode.assignPhase).set(logicNode.assignPhase, {
+          type: 'number',
+          value: cycles - index,
+        })
+      }
       return edges.map((edge) => edge.to)
     }
 

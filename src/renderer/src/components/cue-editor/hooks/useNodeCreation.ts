@@ -7,6 +7,7 @@ import {
   type MathLogicNode,
   type ClampLogicNode,
   type SelectFromListLogicNode,
+  type PulseLogicNode,
   type NodeCueKind,
   type NodeCueMode,
   type NodeEffectType,
@@ -196,6 +197,18 @@ const useNodeCreation = ({
           index: { source: 'literal', value: 0 },
           assignTo: 'result',
         }) satisfies SelectFromListLogicNode,
+      'pulse': (id) =>
+        ({
+          id,
+          type: 'logic',
+          logicType: 'pulse',
+          label: 'pulse',
+          outputs: [],
+          interval: { source: 'literal', value: 500 },
+          anchorVar: 'pulseAnchor',
+          assignTo: 'pulseIndex',
+          assignPhase: 'pulsePhase',
+        }) satisfies PulseLogicNode,
       'cue-data': (id) =>
         ({
           id,

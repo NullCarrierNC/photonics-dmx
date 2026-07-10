@@ -112,6 +112,16 @@ export interface SelectFromListLogicNode extends BaseLogicNode {
   assignTo: string // Variable written with type 'number'
 }
 
+export interface PulseLogicNode extends BaseLogicNode {
+  logicType: 'pulse'
+  interval: ValueSource // Cycle length in ms (e.g. beat-duration-ms, optionally divided); guarded to >= 1
+  anchorVar: string // Declared number var holding the cycle origin; captured on the first eval of the
+  //                   activation and reset with cue-level vars on cue-started, so the phase is
+  //                   activation-relative.
+  assignTo: string // Declared number var written with the monotonic integer cycle index
+  assignPhase?: string // Optional declared number var written with the fractional phase in [0, 1)
+}
+
 export interface ConditionalLogicNode extends BaseLogicNode {
   logicType: 'conditional'
   comparator: LogicComparator
@@ -251,6 +261,7 @@ export type LogicNode =
   | MathLogicNode
   | ClampLogicNode
   | SelectFromListLogicNode
+  | PulseLogicNode
   | ConditionalLogicNode
   | CueDataLogicNode
   | ConfigDataLogicNode

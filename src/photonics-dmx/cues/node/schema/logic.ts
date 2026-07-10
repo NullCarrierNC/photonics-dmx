@@ -10,6 +10,7 @@ import type {
   ClampLogicNode,
   ColorFromIndexLogicNode,
   SelectFromListLogicNode,
+  PulseLogicNode,
   ConcatColorsLogicNode,
   ConcatLightsLogicNode,
   ConditionalLogicNode,
@@ -134,6 +135,27 @@ const selectFromListLogicSchema = {
     assignTo: { type: 'string' },
   },
 } as unknown as JSONSchemaType<SelectFromListLogicNode>
+
+const pulseLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'interval', 'anchorVar', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'pulse' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    interval: valueSourceSchema,
+    anchorVar: { type: 'string' },
+    assignTo: { type: 'string' },
+    assignPhase: { type: 'string', nullable: true },
+  },
+} as unknown as JSONSchemaType<PulseLogicNode>
 
 const conditionalLogicSchema = {
   type: 'object',
@@ -501,6 +523,7 @@ export const logicNodeSchema = {
     mathLogicSchema,
     clampLogicSchema,
     selectFromListLogicSchema,
+    pulseLogicSchema,
     conditionalLogicSchema,
     cueDataLogicSchema,
     configDataLogicSchema,
