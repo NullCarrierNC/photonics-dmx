@@ -7,6 +7,7 @@
 import fs from 'fs'
 import path from 'path'
 import { createSequencerHarness } from '../helpers/sequencerHarness'
+import { loadCoreEffectRegistry } from '../helpers/effectRegistry'
 import { YargNodeCue } from '../../cues/node/runtime/YargNodeCue'
 import { EffectRegistry } from '../../cues/node/runtime/EffectRegistry'
 import { NodeCueCompiler } from '../../cues/node/compiler/NodeCueCompiler'
@@ -86,5 +87,30 @@ describe('RB3 Pulse interpretive cue', () => {
     expect(i4).toBeGreaterThan(i2)
     expect(i8).toBeGreaterThan(i4)
     expect(i8).toBeGreaterThan(200) // near full at 8 LEDs
+  })
+
+  it('fires a white flash impulse on an LED on-edge', () => {
+    const h = createSequencerHarness({ frontCount: 4, backCount: 4 })
+    const cue = new YargNodeCue(
+      'rb3-pulse',
+      NodeCueCompiler.compileYargCue(pulseCueDef()),
+      loadCoreEffectRegistry(['effect-flash-color']),
+      noopCallbacks,
+    )
+    // Dark first (runs cue-started so allLights resolves), then a led-1 on-edge fires the flash.
+    const dark = frame(0)
+    cue.execute(dark, h.sequencer, h.lightManager)
+    h.advanceBy(33)
+    cue.execute({ ...frame(0b00000001), previousFrame: dark }, h.sequencer, h.lightManager)
+
+    // The white flash (brightness high) on layer 101 spikes well above the dim single-LED bed.
+    let maxFront = 0
+    for (let k = 0; k < 8; k++) {
+      h.advanceBy(30)
+      for (const id of h.frontLightIds) {
+        maxFront = Math.max(maxFront, h.getLightState(id)!.intensity)
+      }
+    }
+    expect(maxFront).toBeGreaterThan(120)
   })
 })

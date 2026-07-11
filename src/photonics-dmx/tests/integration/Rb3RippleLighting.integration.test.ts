@@ -1,0 +1,81 @@
+/**
+ * The bundled RB3 "Ripple" interpretive cue keeps a dim led-color bed and launches a colour sweep
+ * across the rig on every LED on-edge. This validates + compiles the bundled file and drives the real
+ * cue against a Sequencer, asserting a front light lights up well above the dim bed after a led-1
+ * on-edge (the §6 "fires a sweep on an on-edge" assertion) and that execution never throws.
+ */
+import fs from 'fs'
+import path from 'path'
+import { createSequencerHarness } from '../helpers/sequencerHarness'
+import { loadCoreEffectRegistry } from '../helpers/effectRegistry'
+import { YargNodeCue } from '../../cues/node/runtime/YargNodeCue'
+import { NodeCueCompiler } from '../../cues/node/compiler/NodeCueCompiler'
+import { validateRb3NodeCueFile } from '../../cues/node/schema/validation'
+import { createMockCueData } from '../../../main/ipc/mockCueData'
+import { CueType } from '../../cues/types/cueTypes'
+import type { CueData } from '../../cues/types/cueTypes'
+import type { NodeRuntimeCallbacks } from '../../cues/node/runtime/executionTypes'
+
+const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
+
+function loadRippleFile() {
+  const filePath = path.join(
+    __dirname,
+    '../../../../resources/defaults/node-data/cues/rb3/rb3-ripple.json',
+  )
+  const result = validateRb3NodeCueFile(JSON.parse(fs.readFileSync(filePath, 'utf8')))
+  if (!result.valid) throw new Error(`rb3-ripple.json failed validation: ${JSON.stringify(result)}`)
+  return result.data
+}
+
+function rippleCueDef() {
+  const def = loadRippleFile().cues.find((c) => c.kind === 'lighting' && c.cueType === CueType.RB3)
+  if (!def) throw new Error('Ripple RB3 cue not found')
+  return def
+}
+
+function frame(redMask: number): CueData {
+  return createMockCueData({
+    ledBanks: { red: redMask, green: 0, blue: 0, yellow: 0 },
+    ledColor: redMask > 0 ? 'red' : 'off',
+  })
+}
+
+describe('RB3 Ripple interpretive cue', () => {
+  it('validates and compiles the bundled file', () => {
+    expect(() => NodeCueCompiler.compileYargCue(rippleCueDef())).not.toThrow()
+    const cueTypes = loadRippleFile()
+      .cues.flatMap((c) => (c.kind === 'lighting' ? [c.cueType] : []))
+      .sort()
+    expect(cueTypes).toEqual(
+      ['RB3', 'Strobe_Fast', 'Strobe_Fastest', 'Strobe_Medium', 'Strobe_Slow'].sort(),
+    )
+  })
+
+  it('launches a sweep across the front row on a led-1 on-edge', () => {
+    const h = createSequencerHarness({ frontCount: 4, backCount: 4 })
+    const cue = new YargNodeCue(
+      'rb3-ripple',
+      NodeCueCompiler.compileYargCue(rippleCueDef()),
+      loadCoreEffectRegistry(['effect-sweep-color', 'effect-flash-color']),
+      noopCallbacks,
+    )
+
+    // Dark first (runs cue-started so the light rows resolve), then Light 1 on. The led-1 edge is
+    // detected against previousFrame (the handler stamps it in production), so wire it here.
+    const dark = frame(0)
+    cue.execute(dark, h.sequencer, h.lightManager)
+    h.advanceBy(33)
+    cue.execute({ ...frame(0b00000001), previousFrame: dark }, h.sequencer, h.lightManager)
+
+    // The sweep is staggered white (brightness high) over ~700ms and adds well above the dim bed.
+    let maxFront = 0
+    for (let k = 0; k < 20; k++) {
+      h.advanceBy(40)
+      for (const id of h.frontLightIds) {
+        maxFront = Math.max(maxFront, h.getLightState(id)!.intensity)
+      }
+    }
+    expect(maxFront).toBeGreaterThan(120)
+  })
+})
