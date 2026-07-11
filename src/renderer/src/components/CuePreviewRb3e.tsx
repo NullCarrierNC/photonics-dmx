@@ -19,14 +19,46 @@ interface ColorBankState {
   yellow: number[]
 }
 
+const EMPTY_BANKS: ColorBankState = { red: [], green: [], blue: [], yellow: [] }
+
+const maskToPositions = (mask = 0): number[] =>
+  Array.from({ length: 8 }, (_, i) => i).filter((i) => (mask & (1 << i)) !== 0)
+
+/**
+ * Derive the four StageKit colour banks (lit positions per colour) for the next render from an
+ * incoming cue frame. Pure so it can be unit-tested without mounting the component.
+ *
+ * `ledBanks` (cue mode + simulation) is the authoritative full snapshot: replace all four banks
+ * every frame so no bank can get stuck lit. Direct mode omits `ledBanks` and sends one colour per
+ * packet, so retain the other banks but honour explicit off frames — `ledColor:''` / `'off'` clears
+ * everything, and a colour frame with empty positions clears just that bank. A frame carrying no LED
+ * info at all leaves the banks untouched.
+ */
+export function nextColorBanks(prev: ColorBankState, cueData: CueData): ColorBankState {
+  if (cueData.ledBanks) {
+    const b = cueData.ledBanks
+    return {
+      red: maskToPositions(b.red),
+      green: maskToPositions(b.green),
+      blue: maskToPositions(b.blue),
+      yellow: maskToPositions(b.yellow),
+    }
+  }
+
+  const raw = cueData.ledColor
+  const color = raw?.toLowerCase()
+  if (color === 'red' || color === 'green' || color === 'blue' || color === 'yellow') {
+    return { ...prev, [color]: cueData.ledPositions ?? [] }
+  }
+  if (raw === '' || color === 'off') {
+    return { ...EMPTY_BANKS }
+  }
+  return prev
+}
+
 const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
   const [currentCueData, setCurrentCueData] = useState<CueData | null>(null)
-  const [colorBanks, setColorBanks] = useState<ColorBankState>({
-    red: [],
-    green: [],
-    blue: [],
-    yellow: [],
-  })
+  const [colorBanks, setColorBanks] = useState<ColorBankState>({ ...EMPTY_BANKS })
   const [rb3eListenerEnabled] = useAtom(rb3eListenerEnabledAtom)
 
   // Listen for cue events when RB3E listener is enabled
@@ -35,12 +67,7 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
       // Clear data when listener is disabled
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when listener disabled
       setCurrentCueData(null)
-      setColorBanks({
-        red: [],
-        green: [],
-        blue: [],
-        yellow: [],
-      })
+      setColorBanks({ ...EMPTY_BANKS })
       return
     }
 
@@ -48,21 +75,8 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
     setListenCueData(true)
 
     const handleCueData = (cueData: CueData) => {
-      log.info('Received RB3E cue data:', cueData)
-
-      // Update color banks based on LED positions
-      if (cueData.ledPositions !== undefined && cueData.ledColor) {
-        const color = cueData.ledColor.toLowerCase()
-        if (color === 'red' || color === 'green' || color === 'blue' || color === 'yellow') {
-          // If positions array is empty, clear the color bank
-          // If positions array has values, update the color bank
-          setColorBanks((prev) => ({
-            ...prev,
-            [color]: cueData.ledPositions || [],
-          }))
-        }
-      }
-
+      log.debug('Received RB3E cue data:', cueData)
+      setColorBanks((prev) => nextColorBanks(prev, cueData))
       setCurrentCueData(cueData)
     }
     addIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData)
