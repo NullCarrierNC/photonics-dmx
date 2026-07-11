@@ -1039,6 +1039,16 @@ export class YargCueRegistry {
   }
 
   /**
+   * Active groups that implement (and haven't disabled) the given cue type. Used by the RB3 game-mode
+   * manager as the primary-cue rotation pool: RB3 has a single primary cueType, so rotation is by group.
+   */
+  public getActiveGroupsImplementing(cueType: CueType): string[] {
+    return this.getActiveGroups().filter(
+      (id) => this.groups.get(id)?.cues.has(cueType) === true && !this.isCueDisabled(id, cueType),
+    )
+  }
+
+  /**
    * Get the ID of the default group.
    * @returns The default group ID or null if no default group is set
    */

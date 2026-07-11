@@ -10,7 +10,7 @@ import {
 } from '../listeners/RB3/rb3eTypes'
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { Rb3MenuFramePump } from './rb3MenuAnimation'
-import { Rb3MotionSwitchScheduler } from './Rb3MotionSwitchScheduler'
+import { Rb3GameModeManager, Rb3GameModeSchedulePayload } from './Rb3GameModeManager'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('rb3-cue')
@@ -58,10 +58,17 @@ export interface Rb3StageKitCueProcessorOptions {
   /** Menu-look dispatch (the ChainFanout in production); drives the RB3 menu cue while in menus.
    *  Omitted in unit tests that only exercise the gameplay cue path. */
   menuDispatch?: Rb3MenuCueDispatch
-  /** RB3 motion switch-timer range (seconds), from the rb3Motion prefs. When set, the processor arms
-   *  a motion re-pick on the countdown and fires it on the next Light-1 edge. Omitted in tests that
-   *  don't exercise motion switching. */
+  /** RB3 primary-cue dwell range (seconds), from the rb3Motion prefs. When set, the processor arms a
+   *  primary-cue switch on the countdown and fires it on the next Light-1 edge — rotating the primary
+   *  group and re-rolling motion. Omitted in tests that don't exercise switching. */
   getMotionSwitchDurationRangeSec?: () => { min: number; max: number }
+  /** Enabled primary-cue groups to rotate among (RB3 has one cueType, so rotation is by group).
+   *  Defaults to none, i.e. no visible rotation — the timer then only re-rolls motion. */
+  getPrimaryGroupPool?: () => string[]
+  /** Renderer push: the active primary-cue group changed (game mode). */
+  onPrimaryCueChange?: (groupId: string | null) => void
+  /** Renderer push: the primary-cue countdown schedule changed (game mode). */
+  onGameModeScheduleChange?: (info: Rb3GameModeSchedulePayload) => void
 }
 
 /**
@@ -102,8 +109,8 @@ export class Rb3StageKitCueProcessor {
   private readonly boundScreenName = (data: { screenName: string }): void =>
     this.handleScreenName(data)
 
-  /** Motion switch scheduler; null when no duration range was supplied (motion switching off). */
-  private readonly motionScheduler: Rb3MotionSwitchScheduler | null
+  /** Primary-cue rotation + dwell timer; null when no duration range was supplied (switching off). */
+  private readonly gameModeManager: Rb3GameModeManager | null
 
   constructor(
     private readonly runtime: YargCueRuntime,
@@ -112,11 +119,21 @@ export class Rb3StageKitCueProcessor {
     this.keepaliveMs =
       options.keepaliveMs === undefined ? DEFAULT_KEEPALIVE_MS : options.keepaliveMs
     this.menuDispatch = options.menuDispatch ?? null
-    this.motionScheduler = options.getMotionSwitchDurationRangeSec
-      ? new Rb3MotionSwitchScheduler(options.getMotionSwitchDurationRangeSec, () =>
-          this.runtime.requestMotionRepick?.(),
+    this.gameModeManager = options.getMotionSwitchDurationRangeSec
+      ? new Rb3GameModeManager(
+          options.getPrimaryGroupPool ?? (() => []),
+          options.getMotionSwitchDurationRangeSec,
+          () => this.runtime.requestMotionRepick?.(),
         )
       : null
+    if (this.gameModeManager) {
+      if (options.onPrimaryCueChange) {
+        this.gameModeManager.setOnPrimaryCueChange(options.onPrimaryCueChange)
+      }
+      if (options.onGameModeScheduleChange) {
+        this.gameModeManager.setOnScheduleChange(options.onGameModeScheduleChange)
+      }
+    }
   }
 
   startListening(listener: EventEmitter): void {
@@ -158,8 +175,8 @@ export class Rb3StageKitCueProcessor {
   /** Keepalive dispatch: re-runs the active look so cue-called graphs advance without a new packet. */
   tick(): void {
     if (this.inMenu || !this.started) return
-    // Arm a motion switch once the countdown elapses; it fires on the next Light-1 edge (emitEdges).
-    this.motionScheduler?.tick()
+    // Arm a primary-cue switch once the countdown elapses; it fires on the next Light-1 edge (emitEdges).
+    this.gameModeManager?.tick()
     void this.runtime.handleCue(CueType.RB3, this.buildFrame())
     if (this.strobeState !== 'Strobe_Off') {
       void this.runtime.handleCue(STROBE_CUE[this.strobeState], this.buildFrame())
@@ -197,10 +214,10 @@ export class Rb3StageKitCueProcessor {
     this.wasInSong = inSong
     if (inSong) {
       this.runtime.notifySongStart()
-      this.motionScheduler?.start()
+      this.gameModeManager?.start()
     } else {
       this.runtime.notifySongEnd()
-      this.motionScheduler?.stop()
+      this.gameModeManager?.stop()
     }
   }
 
@@ -299,8 +316,8 @@ export class Rb3StageKitCueProcessor {
       const now = (after & bit) !== 0
       if (now && !was) this.runtime.handleSongEvent?.(LED_ON[i])
       else if (was && !now) this.runtime.handleSongEvent?.(LED_OFF[i])
-      // Light 1 (bit 0) drives motion switching: any change fires a pending re-pick (RB3 has no beat).
-      if (i === 0 && was !== now) this.motionScheduler?.notifyLight1Edge()
+      // Light 1 (bit 0) gates the primary-cue switch: any change fires a pending switch (RB3 has no beat).
+      if (i === 0 && was !== now) this.gameModeManager?.notifyLight1Edge()
     }
     if (this.fogState && !before.fog) this.runtime.handleSongEvent?.('fog-on')
     else if (!this.fogState && before.fog) this.runtime.handleSongEvent?.('fog-off')
@@ -331,6 +348,8 @@ export class Rb3StageKitCueProcessor {
       ledBanks: banks,
       ledColor: aggregate === 0 ? 'off' : this.lastColour,
       ledPositions: positions,
+      // Force the game-mode-selected primary group (empty pool -> unset -> normal selection).
+      preferredCueGroup: this.gameModeManager?.getActivePrimaryGroupId() || undefined,
     }
   }
 }

@@ -1,7 +1,8 @@
 /**
- * End-to-end RB3 motion switching: the real Rb3StageKitCueProcessor + Rb3MotionSwitchScheduler drive
- * a motion re-pick on the first Light-1 (led-1) edge AFTER the switch-timer elapses — never before,
- * and not on any other LED. A controllable clock stands in for the monotonic timer.
+ * End-to-end RB3 game mode: the real Rb3StageKitCueProcessor + Rb3GameModeManager drive a primary-cue
+ * switch on the first Light-1 (led-1) edge AFTER the dwell timer elapses — never before, and not on any
+ * other LED. Each switch rotates the primary group (stamped on the dispatched frame) and re-rolls motion
+ * via requestMotionRepick. A controllable clock stands in for the monotonic timer.
  */
 let mockNowMs = 0
 jest.mock('../../../shared/time', () => ({
@@ -15,6 +16,7 @@ import { Rb3ChainRuntime } from '../../controllers/Rb3ChainRuntime'
 import { ChainFanout } from '../../controllers/ChainFanout'
 import { YargCueHandler } from '../../cueHandlers/YargCueHandler'
 import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
+import { CueType } from '../../cues/types/cueTypes'
 import type { YargCueRuntime } from '../../listeners/YARG/YargNetworkListener'
 import type { RigChain } from '../../controllers/RigChain'
 import type { INetCue } from '../../cues/interfaces/INetCue'
@@ -34,7 +36,7 @@ function colourPacket(color: string, positions: number[]): unknown {
 
 const DURATION = { min: 5, max: 5 } // deterministic 5s countdown
 
-describe('RB3 motion switch integration (processor + scheduler + runtime)', () => {
+describe('RB3 game-mode integration (processor + manager + runtime)', () => {
   function setup(runtime: YargCueRuntime) {
     mockNowMs = 0
     const emitter = new EventEmitter()
@@ -59,7 +61,7 @@ describe('RB3 motion switch integration (processor + scheduler + runtime)', () =
     } as unknown as YargCueRuntime
     const { proc, emit } = setup(runtime)
 
-    // Song starts and Light 1 turns on (arms the scheduler; deadline = 0 + 5000).
+    // Song starts and Light 1 turns on (arms the timer; deadline = 0 + 5000).
     emit('red', [0])
     expect(requestMotionRepick).not.toHaveBeenCalled()
 
@@ -99,6 +101,46 @@ describe('RB3 motion switch integration (processor + scheduler + runtime)', () =
     // A real Light-1 edge then fires it.
     emit('red', [])
     expect(requestMotionRepick).toHaveBeenCalledTimes(1)
+  })
+
+  it('rotates the primary group on the switch and stamps it on the dispatched frame', () => {
+    const requestMotionRepick = jest.fn()
+    const handleCue = jest.fn(async (_cue: CueType, _frame: unknown) => {})
+    const runtime = {
+      notifySongStart: jest.fn(),
+      notifySongEnd: jest.fn(),
+      handleCue,
+      handleSongEvent: jest.fn(),
+      requestMotionRepick,
+    } as unknown as YargCueRuntime
+    const onPrimaryCueChange = jest.fn()
+
+    mockNowMs = 0
+    const emitter = new EventEmitter()
+    const proc = new Rb3StageKitCueProcessor(runtime, {
+      keepaliveMs: null,
+      getMotionSwitchDurationRangeSec: () => DURATION,
+      getPrimaryGroupPool: () => ['g1', 'g2'],
+      onPrimaryCueChange,
+    })
+    proc.startListening(emitter)
+    const emit = (color: string, positions: number[]) =>
+      emitter.emit('stagekit:data', colourPacket(color, positions))
+
+    emit('red', [0]) // song start -> initial primary picked
+    const initial = onPrimaryCueChange.mock.calls[0]![0] as string
+    expect(['g1', 'g2']).toContain(initial)
+
+    mockNowMs = 6000
+    proc.tick() // arm
+    emit('red', []) // led-1 edge -> switch
+
+    expect(requestMotionRepick).toHaveBeenCalledTimes(1)
+    const rotated = onPrimaryCueChange.mock.calls.at(-1)![0] as string
+    expect(rotated).not.toBe(initial) // avoid-repeat rotation across the two groups
+    const rb3Frames = handleCue.mock.calls.filter((c) => c[0] === CueType.RB3)
+    const lastFrame = rb3Frames.at(-1)![1] as { preferredCueGroup?: string }
+    expect(lastFrame.preferredCueGroup).toBe(rotated)
   })
 
   it('reaches a real cue handler through Rb3ChainRuntime and picks a motion cue', () => {

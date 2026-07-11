@@ -225,6 +225,12 @@ export type CueData = {
   trackMode?: 'tracked' | 'autogen' | 'simulated'
   /** When set with trackMode 'simulated', use this group for cue resolution instead of random active-group selection. */
   simulationCueGroup?: string
+  /**
+   * Force this group for cue resolution in any track mode (RB3 game-mode primary rotation stamps the
+   * chosen primary group here so the handler renders it deterministically). Honored ahead of the
+   * simulation group and normal selection; unset by YARG.
+   */
+  preferredCueGroup?: string
   beat: Beat
   keyframe: 'Off' | 'First' | 'Next' | 'Previous' | 'Unknown'
   bonusEffect: boolean

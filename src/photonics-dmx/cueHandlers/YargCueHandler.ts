@@ -343,14 +343,14 @@ class YargCueHandler extends EventEmitter {
     // Get implementation from registry
     // Use trackMode, defaulting to 'tracked' if not specified
     const trackMode = parameters.trackMode || 'tracked'
-    const cue =
-      trackMode === 'simulated' && parameters.simulationCueGroup
-        ? this.registry.getCueImplementationFromGroup(
-            cueType,
-            parameters.simulationCueGroup,
-            trackMode,
-          )
-        : this.registry.getCueImplementation(cueType, trackMode)
+    // A forced group (RB3 game-mode primary rotation, any track mode) wins; then the simulation group;
+    // otherwise normal active-group selection. Both forced paths use the deterministic group resolver.
+    const forcedGroup =
+      parameters.preferredCueGroup ??
+      (trackMode === 'simulated' ? parameters.simulationCueGroup : undefined)
+    const cue = forcedGroup
+      ? this.registry.getCueImplementationFromGroup(cueType, forcedGroup, trackMode)
+      : this.registry.getCueImplementation(cueType, trackMode)
 
     if (cue) {
       const incomingIsSecondary = cue.style === CueStyle.Secondary

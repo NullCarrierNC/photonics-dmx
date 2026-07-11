@@ -421,3 +421,22 @@ describe('YargCueHandler requestMotionRepick (RB3 external trigger)', () => {
     )
   })
 })
+
+describe('YargCueHandler forced primary group (RB3 game-mode rotation)', () => {
+  it('routes a tracked frame with preferredCueGroup through getCueImplementationFromGroup', async () => {
+    const registry = YargCueRegistry.create()
+    const cue = makeFakeCue(CueStyle.Primary, 'rb3-primary')
+    const fromGroup = jest.spyOn(registry, 'getCueImplementationFromGroup').mockReturnValue(cue)
+    const normal = jest.spyOn(registry, 'getCueImplementation').mockReturnValue(null)
+
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), { registry })
+    await handler.handleCue(
+      CueType.RB3,
+      gameplayCueData({ lightingCue: CueType.RB3, preferredCueGroup: 'rb3-pulse' }),
+    )
+
+    expect(fromGroup).toHaveBeenCalledWith(CueType.RB3, 'rb3-pulse', 'tracked')
+    expect(normal).not.toHaveBeenCalled()
+    expect(cue.execute).toHaveBeenCalled()
+  })
+})
