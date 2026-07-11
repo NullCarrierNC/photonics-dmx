@@ -272,6 +272,10 @@ export const RENDERER_RECEIVE = {
   YARG_MOTION_CUE_CHANGE: 'yarg-motion:cue-active-change',
   /** Active RB3 motion program changed (manual/auto selection result). */
   RB3_MOTION_CUE_CHANGE: 'rb3-motion:cue-active-change',
+  /** RB3 game-mode primary cue group changed (main process → renderer). */
+  RB3_GAME_MODE_CUE_CHANGE: 'rb3:game-mode-cue-change',
+  /** RB3 game-mode primary-cue switch window (deadline + pending Light-1 edge) for countdown UI. */
+  RB3_GAME_MODE_DEADLINE: 'rb3:game-mode-deadline',
   /** Game Mode primary cue changed (main process → renderer). */
   AUDIO_GAME_MODE_CUE_CHANGE: 'audio:game-mode-cue-change',
   /** Game Mode next-cue switch window (deadline + pending beat) for countdown UI. */

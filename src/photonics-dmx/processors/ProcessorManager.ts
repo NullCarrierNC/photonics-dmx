@@ -6,6 +6,7 @@
 import { EventEmitter } from 'events'
 import { Rb3StageKitDirectProcessor } from './Rb3StageKitDirectProcessor'
 import { Rb3StageKitCueProcessor } from './Rb3StageKitCueProcessor'
+import type { Rb3GameModeSchedulePayload } from './Rb3GameModeManager'
 import { ChainFanout } from '../controllers/ChainFanout'
 import { Rb3ChainRuntime } from '../controllers/Rb3ChainRuntime'
 import { StageKitConfig } from '../listeners/RB3/StageKitTypes'
@@ -32,9 +33,15 @@ export interface ProcessorManagerConfig {
    *  drives the RB3 handler slot; the coordinator passes its own runtime and the laser branch
    *  wraps it with its tee. */
   cueRuntime?: YargCueRuntime
-  /** RB3 motion switch-timer range (seconds) from the rb3Motion prefs; passed through to the cue
-   *  processor so it can drive LED-1-triggered motion switching. */
+  /** RB3 primary-cue dwell range (seconds) from the rb3Motion prefs; passed through to the cue
+   *  processor so it can drive the LED-1-gated primary-cue switch (which also re-rolls motion). */
   getRb3MotionCueDurationRangeSec?: () => { min: number; max: number }
+  /** Enabled RB3 primary-cue groups to rotate among (game mode). */
+  getRb3PrimaryGroupPool?: () => string[]
+  /** Renderer push: the active RB3 primary-cue group changed. */
+  onRb3PrimaryCueChange?: (groupId: string | null) => void
+  /** Renderer push: the RB3 primary-cue countdown schedule changed. */
+  onRb3GameModeScheduleChange?: (info: Rb3GameModeSchedulePayload) => void
 }
 
 /**
@@ -188,6 +195,9 @@ export class ProcessorManager extends EventEmitter {
         {
           menuDispatch: this.chainFanout,
           getMotionSwitchDurationRangeSec: this.config.getRb3MotionCueDurationRangeSec,
+          getPrimaryGroupPool: this.config.getRb3PrimaryGroupPool,
+          onPrimaryCueChange: this.config.onRb3PrimaryCueChange,
+          onGameModeScheduleChange: this.config.onRb3GameModeScheduleChange,
         },
       )
     }

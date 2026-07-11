@@ -5,6 +5,7 @@ import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetwo
 import { Rb3MenuCueHandler } from '../../photonics-dmx/cueHandlers/Rb3MenuCueHandler'
 import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
 import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
+import { CueType } from '../../photonics-dmx/cues/types/cueTypes'
 import { Rb3ChainRuntime } from '../../photonics-dmx/controllers/Rb3ChainRuntime'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
 import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
@@ -263,6 +264,11 @@ export class ListenerCoordinator {
       mode,
       cueRuntime,
       getRb3MotionCueDurationRangeSec: this.deps.getRb3MotionCueDurationRangeSec,
+      getRb3PrimaryGroupPool: () => getRb3CueRegistry().getActiveGroupsImplementing(CueType.RB3),
+      onRb3PrimaryCueChange: (p) =>
+        this.deps.sendToAllWindows(RENDERER_RECEIVE.RB3_GAME_MODE_CUE_CHANGE, { groupId: p }),
+      onRb3GameModeScheduleChange: (p) =>
+        this.deps.sendToAllWindows(RENDERER_RECEIVE.RB3_GAME_MODE_DEADLINE, p),
     })
     this.processorManager.setCueHandler(this.deps.getChainFanout())
     this.rb3eListener = new Rb3eNetworkListener()

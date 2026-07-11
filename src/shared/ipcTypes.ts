@@ -64,6 +64,7 @@ export type {
   AudioGameModeSchedulePayload,
   AudioLightingData,
 } from '../photonics-dmx/listeners/Audio/AudioTypes'
+export type { Rb3GameModeSchedulePayload } from '../photonics-dmx/processors/Rb3GameModeManager'
 
 /**
  * Runtime lifecycle phases for the main-process controller graph.
@@ -126,6 +127,7 @@ import type {
   AudioGameModeSchedulePayload,
   AudioLightingData,
 } from '../photonics-dmx/listeners/Audio/AudioTypes'
+import type { Rb3GameModeSchedulePayload } from '../photonics-dmx/processors/Rb3GameModeManager'
 
 // ---------------------------------------------------------------------------
 // Shared response shapes
@@ -976,6 +978,7 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE]: AudioGameModeConfig
   [RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED]: undefined
   [RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED]: undefined
+  [RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED]: undefined
   [RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED]: undefined
   [RENDERER_RECEIVE.MOTION_ENABLED_CHANGED]: boolean
   [RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE]: {
@@ -995,6 +998,8 @@ export interface IpcEventMap {
   }
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE]: { activeCueType: string }
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_DEADLINE]: AudioGameModeSchedulePayload
+  [RENDERER_RECEIVE.RB3_GAME_MODE_CUE_CHANGE]: { groupId: string | null }
+  [RENDERER_RECEIVE.RB3_GAME_MODE_DEADLINE]: Rb3GameModeSchedulePayload
   [RENDERER_RECEIVE.AUDIO_STROBE_STATE]: {
     active: boolean
     strobeCueType: string | null
