@@ -309,6 +309,23 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
           </div>
         )}
       </label>
+      {activeMode !== 'audio' && /^led-[1-8]$/.test(eventType) && (
+        <div className="space-y-1">
+          <label className="flex items-center gap-2 font-medium cursor-pointer">
+            <input
+              type="checkbox"
+              checked={(node as YargEventNode).triggerOnColorChange ?? false}
+              onChange={(e) => updateYargNode({ triggerOnColorChange: e.target.checked })}
+              className="rounded"
+            />
+            Trigger on colour change
+          </label>
+          <p className="text-[10px] text-gray-500 dark:text-gray-400">
+            Also fire while this LED stays lit but its colour changes, not just on the on-edge.
+            Useful for lighting that holds every LED on and only swaps colours.
+          </p>
+        </div>
+      )}
       {activeMode === 'audio' && isTrigger && trigger && (
         <>
           <label className="flex flex-col font-medium">
