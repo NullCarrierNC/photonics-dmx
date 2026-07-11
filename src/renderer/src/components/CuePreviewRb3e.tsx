@@ -1,8 +1,16 @@
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useState, useEffect } from 'react'
 import { CueData } from '../../../photonics-dmx/cues/types/cueTypes'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { setListenCueData } from '../ipcApi'
+import type { Rb3GameModeSchedulePayload } from '../../../shared/ipcTypes'
+import {
+  setListenCueData,
+  getMotionEnabled,
+  getRb3CueGroups,
+  getRb3MotionCueGroups,
+  getAvailableRb3MotionCues,
+  getActiveRb3MotionCue,
+} from '../ipcApi'
 import { useAtom } from 'jotai'
 import { rb3eListenerEnabledAtom } from '../atoms'
 import { createLogger } from '../../../shared/logger'
@@ -60,14 +68,26 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
   const [currentCueData, setCurrentCueData] = useState<CueData | null>(null)
   const [colorBanks, setColorBanks] = useState<ColorBankState>({ ...EMPTY_BANKS })
   const [rb3eListenerEnabled] = useAtom(rb3eListenerEnabledAtom)
+  // Game-mode primary cue + countdown (live only; pushed from the RB3 game-mode manager).
+  const [primaryGroupLabel, setPrimaryGroupLabel] = useState<string | null>(null)
+  const [schedule, setSchedule] = useState<Rb3GameModeSchedulePayload | null>(null)
+  const [remainingSec, setRemainingSec] = useState<number | null>(null)
+  // Active motion cue (mirrors the YARG preview's motion block).
+  const [motionEnabled, setMotionEnabled] = useState(false)
+  const [motionGroupLabel, setMotionGroupLabel] = useState<string | null>(null)
+  const [motionCueLabel, setMotionCueLabel] = useState<string | null>(null)
 
   // Listen for cue events when RB3E listener is enabled
   useEffect(() => {
     if (!rb3eListenerEnabled) {
       // Clear data when listener is disabled
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when listener disabled
+      /* eslint-disable react-hooks/set-state-in-effect -- reset when listener disabled */
       setCurrentCueData(null)
       setColorBanks({ ...EMPTY_BANKS })
+      setPrimaryGroupLabel(null)
+      setSchedule(null)
+      setRemainingSec(null)
+      /* eslint-enable react-hooks/set-state-in-effect */
       return
     }
 
@@ -79,13 +99,116 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
       setColorBanks((prev) => nextColorBanks(prev, cueData))
       setCurrentCueData(cueData)
     }
+    const handlePrimaryChange = async (payload: { groupId: string | null }) => {
+      if (!payload.groupId) {
+        setPrimaryGroupLabel(null)
+        return
+      }
+      try {
+        const groups = await getRb3CueGroups()
+        const row = groups?.find((g) => g.id === payload.groupId)
+        setPrimaryGroupLabel(row?.name ?? payload.groupId)
+      } catch {
+        setPrimaryGroupLabel(payload.groupId)
+      }
+    }
+    const handleDeadline = (payload: Rb3GameModeSchedulePayload) => {
+      setSchedule(payload)
+      setRemainingSec(
+        payload.pending || payload.deadlineMs == null
+          ? null
+          : Math.max(0, Math.ceil((payload.deadlineMs - Date.now()) / 1000)),
+      )
+    }
     addIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData)
+    addIpcListener(RENDERER_RECEIVE.RB3_GAME_MODE_CUE_CHANGE, handlePrimaryChange)
+    addIpcListener(RENDERER_RECEIVE.RB3_GAME_MODE_DEADLINE, handleDeadline)
 
     return () => {
       setListenCueData(false)
       removeIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData)
+      removeIpcListener(RENDERER_RECEIVE.RB3_GAME_MODE_CUE_CHANGE, handlePrimaryChange)
+      removeIpcListener(RENDERER_RECEIVE.RB3_GAME_MODE_DEADLINE, handleDeadline)
     }
   }, [rb3eListenerEnabled])
+
+  // Resolve the active motion cue's group + cue labels (mirrors the YARG preview).
+  const loadMotionLabels = useCallback(async () => {
+    try {
+      const enabled = await getMotionEnabled()
+      setMotionEnabled(enabled === true)
+      if (!enabled) {
+        setMotionGroupLabel(null)
+        setMotionCueLabel(null)
+        return
+      }
+      const ref = await getActiveRb3MotionCue()
+      if (ref && typeof ref === 'object' && 'groupId' in ref) {
+        const r = ref as { groupId: string; cueId: string }
+        const groups = await getRb3MotionCueGroups()
+        setMotionGroupLabel(groups?.find((g) => g.id === r.groupId)?.name ?? r.groupId)
+        const cues = await getAvailableRb3MotionCues(r.groupId)
+        setMotionCueLabel(cues.find((c) => c.id === r.cueId)?.name ?? r.cueId)
+      } else {
+        setMotionGroupLabel(null)
+        setMotionCueLabel(null)
+      }
+    } catch {
+      setMotionGroupLabel(null)
+      setMotionCueLabel(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async; setState only after awaited IPC
+    void loadMotionLabels()
+    const onRefresh = () => void loadMotionLabels()
+    addIpcListener(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, onRefresh)
+    addIpcListener(RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED, onRefresh)
+    return () => {
+      removeIpcListener(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, onRefresh)
+      removeIpcListener(RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED, onRefresh)
+    }
+  }, [loadMotionLabels])
+
+  useEffect(() => {
+    const onMotionCueChange = async (payload: {
+      ref: { groupId: string; cueId: string } | null
+    }) => {
+      if (!payload.ref) {
+        setMotionGroupLabel(null)
+        setMotionCueLabel(null)
+        return
+      }
+      try {
+        const groups = await getRb3MotionCueGroups()
+        setMotionGroupLabel(
+          groups?.find((g) => g.id === payload.ref!.groupId)?.name ?? payload.ref.groupId,
+        )
+        const cues = await getAvailableRb3MotionCues(payload.ref.groupId)
+        setMotionCueLabel(cues.find((c) => c.id === payload.ref!.cueId)?.name ?? payload.ref.cueId)
+      } catch {
+        setMotionGroupLabel(payload.ref.groupId)
+        setMotionCueLabel(payload.ref.cueId)
+      }
+    }
+    addIpcListener(RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE, onMotionCueChange)
+    return () => {
+      removeIpcListener(RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE, onMotionCueChange)
+    }
+  }, [])
+
+  // Tick the countdown once a second while a live deadline is armed. Date.now stays out of render
+  // (an impure call there is disallowed); the seconds remaining are derived here and on each push.
+  useEffect(() => {
+    if (!schedule || schedule.pending || schedule.deadlineMs == null) return
+    const deadline = schedule.deadlineMs
+    const id = setInterval(
+      () => setRemainingSec(Math.max(0, Math.ceil((deadline - Date.now()) / 1000))),
+      1000,
+    )
+    return () => clearInterval(id)
+  }, [schedule])
 
   const getTitle = () => {
     return 'RB3E StageKit Status'
@@ -300,6 +423,35 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Cue Selection: active primary cue + countdown, and the active motion cue */}
+          <div className="border-t border-gray-300 dark:border-gray-600 pt-3 text-sm">
+            <div className="flex items-center justify-between gap-4">
+              <p className="min-w-0">
+                <span className="font-medium">Primary Cue:</span>{' '}
+                <span>{primaryGroupLabel ?? '—'}</span>
+              </p>
+              <span className="shrink-0 tabular-nums font-medium" aria-live="polite">
+                {schedule?.pending
+                  ? 'Waiting for Light 1…'
+                  : remainingSec != null
+                    ? `Next cue in ${remainingSec}s`
+                    : ''}
+              </span>
+            </div>
+            {motionEnabled && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                <p className="min-w-0">
+                  <span className="font-medium">Motion Cue Group:</span>{' '}
+                  <span>{motionGroupLabel ?? '—'}</span>
+                </p>
+                <p className="min-w-0">
+                  <span className="font-medium">Motion Cue:</span>{' '}
+                  <span>{motionCueLabel ?? '—'}</span>
+                </p>
+              </div>
+            )}
           </div>
         </div>
       ) : (
