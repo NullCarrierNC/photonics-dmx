@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 2,
+  "cueVersion": 3,
   "mode": "rb3",
   "group": {
     "id": "rb3-stagekit",
@@ -1518,7 +1518,7 @@
             "operator": "add",
             "left": {
               "source": "literal",
-              "value": 50
+              "value": 10
             },
             "right": {
               "source": "variable",
@@ -1577,7 +1577,7 @@
             "operator": "add",
             "left": {
               "source": "literal",
-              "value": 100
+              "value": 20
             },
             "right": {
               "source": "variable",
@@ -1636,7 +1636,7 @@
             "operator": "add",
             "left": {
               "source": "literal",
-              "value": 150
+              "value": 30
             },
             "right": {
               "source": "variable",
@@ -1695,7 +1695,7 @@
             "operator": "add",
             "left": {
               "source": "literal",
-              "value": 200
+              "value": 40
             },
             "right": {
               "source": "variable",
@@ -1722,7 +1722,7 @@
             "label": "Notes",
             "title": "Per-bank additive layers",
             "style": "notes",
-            "note": "Each bank paints on its own layer band (red 50+, green 100+, blue 150+, yellow 200+; +ring index) with blend 'add', so overlapping banks composite additively like the direct processor. An unlit cell paints 'transparent' (passes through). The set-colors are non-blocking with a 50ms hold so a layer>0 cell survives between ~30Hz keepalives."
+            "note": "Each bank paints on its own low layer band (red 10+, green 20+, blue 30+, yellow 40+; +ring index) with blend 'add', so overlapping banks composite additively like the direct processor. An unlit cell paints 'transparent' (passes through). The set-colors are non-blocking with a 50ms hold so a layer>0 cell survives between ~30Hz keepalives."
           }
         ]
       },
@@ -2090,7 +2090,7 @@
           "name": "layred",
           "type": "number",
           "scope": "cue",
-          "initialValue": 50,
+          "initialValue": 10,
           "isParameter": false
         },
         {
@@ -2118,7 +2118,7 @@
           "name": "laygreen",
           "type": "number",
           "scope": "cue",
-          "initialValue": 100,
+          "initialValue": 20,
           "isParameter": false
         },
         {
@@ -2146,7 +2146,7 @@
           "name": "layblue",
           "type": "number",
           "scope": "cue",
-          "initialValue": 150,
+          "initialValue": 30,
           "isParameter": false
         },
         {
@@ -2174,7 +2174,7 @@
           "name": "layyellow",
           "type": "number",
           "scope": "cue",
-          "initialValue": 200,
+          "initialValue": 40,
           "isParameter": false
         },
         {

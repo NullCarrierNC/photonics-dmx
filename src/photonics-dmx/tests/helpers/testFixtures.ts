@@ -33,6 +33,22 @@ export const createMockDmxLight = (overrides?: Partial<DmxLight>): DmxLight => (
   ...overrides,
 })
 
+/** An RGB moving-head DmxLight with pan/tilt channels and a default moving-head fixture config. */
+export const createMockMovingHeadDmxLight = (overrides?: Partial<DmxLight>): DmxLight =>
+  createMockDmxLight({
+    fixture: FixtureTypes.RGBMH,
+    channels: {
+      red: 1,
+      green: 2,
+      blue: 3,
+      masterDimmer: 4,
+      pan: 5,
+      tilt: 6,
+    },
+    config: { ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG },
+    ...overrides,
+  })
+
 export const createMockLightingConfig = (
   overrides?: Partial<LightingConfiguration>,
 ): LightingConfiguration => ({
