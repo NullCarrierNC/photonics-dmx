@@ -127,6 +127,23 @@ export function isLedOn(frame: Partial<CueData> | undefined, index: number): boo
   return (ledAggregateMask(frame) & (1 << index)) !== 0
 }
 
+/**
+ * The set of colour banks lighting LED position `index` (0..7), as a 4-bit nibble
+ * (bit0 red, bit1 green, bit2 blue, bit3 yellow); `0` when unlit or `ledBanks` is absent.
+ * Used by the led-N `triggerOnColorChange` gate to detect a colour change at a still-lit position.
+ */
+export function ledBankNibbleAt(frame: Partial<CueData> | undefined, index: number): number {
+  const b = frame?.ledBanks
+  if (!b || index < 0 || index > 7) return 0
+  const bit = 1 << index
+  return (
+    (b.red & bit ? 1 : 0) |
+    (b.green & bit ? 2 : 0) |
+    (b.blue & bit ? 4 : 0) |
+    (b.yellow & bit ? 8 : 0)
+  )
+}
+
 // Import RB3E types
 import { Rb3Difficulty, Rb3TrackType } from '../../listeners/RB3/rb3eTypes'
 

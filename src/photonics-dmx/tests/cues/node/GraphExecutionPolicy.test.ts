@@ -252,12 +252,18 @@ describe('GraphExecutionPolicy vocal events', () => {
   })
 })
 
-/** Motion cue carrying RB3 LED (position 3) and fog event nodes. */
-function ledFogEventCue(): YargMotionNodeCueDefinition {
-  const ev = (id: string, eventType: YargEventNode['eventType']): YargEventNode => ({
+/** Motion cue carrying RB3 LED (position 3) and fog event nodes. When `colorChange` is set, the
+ *  led-3 / led-3-off nodes carry `triggerOnColorChange`. */
+function ledFogEventCue(colorChange = false): YargMotionNodeCueDefinition {
+  const ev = (
+    id: string,
+    eventType: YargEventNode['eventType'],
+    onColorChange = false,
+  ): YargEventNode => ({
     id,
     type: 'event',
     eventType,
+    ...(onColorChange ? { triggerOnColorChange: true } : {}),
   })
   const action: ActionNode = {
     id: 'a1',
@@ -282,8 +288,8 @@ function ledFogEventCue(): YargMotionNodeCueDefinition {
     layer: { source: 'literal', value: 0 },
   }
   const events = [
-    ev('ev-on', 'led-3'),
-    ev('ev-off', 'led-3-off'),
+    ev('ev-on', 'led-3', colorChange),
+    ev('ev-off', 'led-3-off', colorChange),
     ev('ev-fog-on', 'fog-on'),
     ev('ev-fog-off', 'fog-off'),
   ]
@@ -368,5 +374,74 @@ describe('GraphExecutionPolicy LED and fog events (RB3 StageKit)', () => {
     const held = triggered(frame({ fogState: true, previousFrame: { fogState: true } }))
     expect(held).not.toContain('fog-on')
     expect(held).not.toContain('fog-off')
+  })
+})
+
+describe('GraphExecutionPolicy led-N triggerOnColorChange', () => {
+  const LED3 = 1 << 2 // position 3 → bit index 2
+
+  const triggeredCC = (params: CueData): string[] => {
+    const compiled = NodeCueCompiler.compileYargCue(ledFogEventCue(true))
+    const policy = cueGraphPolicy('g', 'c')
+    const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: true })
+    return nodes.map((n) => (n as YargEventNode).eventType)
+  }
+  const frame = (over: Partial<CueData>): CueData => ({ ...minimalParams(), ...over })
+  const inBank = (
+    b: 'red' | 'green' | 'blue' | 'yellow',
+    mask: number,
+  ): { red: number; green: number; blue: number; yellow: number } => ({
+    red: 0,
+    green: 0,
+    blue: 0,
+    yellow: 0,
+    [b]: mask,
+  })
+
+  it('fires led-3 when the position stays lit but its bank colour changes', () => {
+    // green→blue at position 3: aggregate is held on, so the plain edge would not fire.
+    const t = triggeredCC(
+      frame({ ledBanks: inBank('blue', LED3), previousFrame: { ledBanks: inBank('green', LED3) } }),
+    )
+    expect(t).toContain('led-3')
+    expect(t).not.toContain('led-3-off')
+  })
+
+  it('does not fire when the bank colour is unchanged (held on same colour)', () => {
+    const t = triggeredCC(
+      frame({ ledBanks: inBank('blue', LED3), previousFrame: { ledBanks: inBank('blue', LED3) } }),
+    )
+    expect(t).not.toContain('led-3')
+  })
+
+  it('still fires on the plain on-edge (off→on)', () => {
+    const t = triggeredCC(
+      frame({ ledBanks: inBank('red', LED3), previousFrame: { ledBanks: inBank('red', 0) } }),
+    )
+    expect(t).toContain('led-3')
+  })
+
+  it('led-3-off still fires only on the falling edge (flag does not affect off gates)', () => {
+    const off = triggeredCC(
+      frame({ ledBanks: inBank('red', 0), previousFrame: { ledBanks: inBank('green', LED3) } }),
+    )
+    expect(off).toContain('led-3-off')
+    expect(off).not.toContain('led-3')
+
+    // A colour change while lit must NOT fire led-3-off (the position never cleared).
+    const colourSwap = triggeredCC(
+      frame({ ledBanks: inBank('blue', LED3), previousFrame: { ledBanks: inBank('green', LED3) } }),
+    )
+    expect(colourSwap).not.toContain('led-3-off')
+  })
+
+  it('without the flag, a colour change while lit does NOT fire (default behaviour)', () => {
+    const compiled = NodeCueCompiler.compileYargCue(ledFogEventCue(false))
+    const nodes = cueGraphPolicy('g', 'c').getEntryNodes(
+      compiled,
+      frame({ ledBanks: inBank('blue', LED3), previousFrame: { ledBanks: inBank('green', LED3) } }),
+      { hasCueStartedFired: true },
+    )
+    expect(nodes.map((n) => (n as YargEventNode).eventType)).not.toContain('led-3')
   })
 })

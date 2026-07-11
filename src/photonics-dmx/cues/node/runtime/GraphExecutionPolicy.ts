@@ -2,11 +2,16 @@
  * Policy that parameterizes GraphExecutionEngine behaviour for cue graphs vs effect graphs.
  */
 
-import type { BaseEventNode } from '../../types/nodeCueTypes'
+import type { BaseEventNode, YargEventNode } from '../../types/nodeCueTypes'
 import type { CompiledYargCue } from '../compiler/NodeCueCompiler'
 import type { CompiledEffect } from '../compiler/EffectCompiler'
 import type { CueData } from '../../types/cueTypes'
-import { isInstrumentEventTriggered, isVocalActive, isLedOn } from '../../types/cueTypes'
+import {
+  isInstrumentEventTriggered,
+  isVocalActive,
+  isLedOn,
+  ledBankNibbleAt,
+} from '../../types/cueTypes'
 
 /** Cue data or effect parameter payload. */
 export type ExecutionParameters = CueData | Record<string, unknown>
@@ -67,7 +72,8 @@ function cueLikeGraphPolicy(
       const hasCueStartedFired = entryContext?.hasCueStartedFired ?? false
       const cueData = parameters as CueData
 
-      const isEventTriggered = (eventType: string): boolean => {
+      const isEventTriggered = (event: YargEventNode): boolean => {
+        const eventType = event.eventType
         if (eventType === 'cue-started') {
           return !hasCueStartedFired
         }
@@ -112,7 +118,16 @@ function cueLikeGraphPolicy(
           const idx = Number(ledMatch[1]) - 1
           const now = isLedOn(cueData, idx)
           const prev = isLedOn(cueData.previousFrame ?? {}, idx)
-          return ledMatch[2] ? !now && prev : now && !prev
+          if (ledMatch[2]) return !now && prev // led-N-off: clears the aggregate position
+          if (now && !prev) return true // on-edge: the position just lit up
+          // Opt-in colour change: the position stays lit but the banks lighting it changed. Lets
+          // sweeps/flashes fire on lighting that holds all LEDs on and only swaps colours.
+          if (now && prev && event.triggerOnColorChange) {
+            return (
+              ledBankNibbleAt(cueData, idx) !== ledBankNibbleAt(cueData.previousFrame ?? {}, idx)
+            )
+          }
+          return false
         }
         if (eventType === 'fog-on') {
           return cueData.fogState === true && (cueData.previousFrame?.fogState ?? false) === false
@@ -135,8 +150,8 @@ function cueLikeGraphPolicy(
 
       const events = Array.from(cue.eventMap.values())
       const triggeredEvents = events.filter((e) => {
-        const eventType = (e as { eventType?: string }).eventType
-        return eventType ? isEventTriggered(eventType) : false
+        const event = e as YargEventNode
+        return event.eventType ? isEventTriggered(event) : false
       })
 
       const cueStarted = triggeredEvents.filter(

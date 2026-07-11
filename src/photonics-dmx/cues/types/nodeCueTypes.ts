@@ -451,6 +451,12 @@ export interface BaseEventNode {
 
 export interface YargEventNode extends BaseEventNode {
   eventType: YargEventType
+  /**
+   * RB3 led-N gates only: when true, the ON gate also fires while the position stays lit but the set
+   * of banks lighting it changes (a colour change), not just on the off→on edge. Ignored by led-N-off
+   * and non-led events.
+   */
+  triggerOnColorChange?: boolean
 }
 
 export type AudioEventType =

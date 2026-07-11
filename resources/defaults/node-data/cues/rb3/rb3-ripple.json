@@ -30,42 +30,50 @@
           {
             "id": "rb3-ripple-led1",
             "type": "event",
-            "eventType": "led-1"
+            "eventType": "led-1",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-ripple-led2",
             "type": "event",
-            "eventType": "led-2"
+            "eventType": "led-2",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-ripple-led3",
             "type": "event",
-            "eventType": "led-3"
+            "eventType": "led-3",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-ripple-led4",
             "type": "event",
-            "eventType": "led-4"
+            "eventType": "led-4",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-ripple-led5",
             "type": "event",
-            "eventType": "led-5"
+            "eventType": "led-5",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-ripple-led6",
             "type": "event",
-            "eventType": "led-6"
+            "eventType": "led-6",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-ripple-led7",
             "type": "event",
-            "eventType": "led-7"
+            "eventType": "led-7",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-ripple-led8",
             "type": "event",
-            "eventType": "led-8"
+            "eventType": "led-8",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-ripple-fog",

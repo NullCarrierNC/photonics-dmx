@@ -78,4 +78,43 @@ describe('RB3 Ripple interpretive cue', () => {
     }
     expect(maxFront).toBeGreaterThan(120)
   })
+
+  it('launches a sweep when all LEDs stay lit but the colour changes', () => {
+    const h = createSequencerHarness({ frontCount: 4, backCount: 4 })
+    const cue = new YargNodeCue(
+      'rb3-ripple',
+      NodeCueCompiler.compileYargCue(rippleCueDef()),
+      loadCoreEffectRegistry(['effect-sweep-color', 'effect-flash-color']),
+      noopCallbacks,
+    )
+    const allRed = createMockCueData({
+      ledBanks: { red: 0xff, green: 0, blue: 0, yellow: 0 },
+      ledColor: 'red',
+    })
+    const allBlue = createMockCueData({
+      ledBanks: { red: 0, green: 0, blue: 0xff, yellow: 0 },
+      ledColor: 'blue',
+    })
+
+    // Steady all-red first (previousFrame all-red = no on-edge, no colour change) so cue-started runs
+    // and the light rows resolve without launching a sweep yet.
+    cue.execute(
+      { ...allRed, previousFrame: { ledBanks: { red: 0xff, green: 0, blue: 0, yellow: 0 } } },
+      h.sequencer,
+      h.lightManager,
+    )
+    h.advanceBy(33)
+    // Flip every position red -> blue: the aggregate mask is unchanged (all lit, no on-edge), so only
+    // the triggerOnColorChange gate fires the sweeps.
+    cue.execute({ ...allBlue, previousFrame: allRed }, h.sequencer, h.lightManager)
+
+    let maxFront = 0
+    for (let k = 0; k < 20; k++) {
+      h.advanceBy(40)
+      for (const id of h.frontLightIds) {
+        maxFront = Math.max(maxFront, h.getLightState(id)!.intensity)
+      }
+    }
+    expect(maxFront).toBeGreaterThan(120)
+  })
 })

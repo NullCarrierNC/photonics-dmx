@@ -211,6 +211,8 @@ export const yargEventSchema: JSONSchemaType<YargEventNode> = {
     // Uses YARG_EVENT_TYPES which includes both system events (cue-started, cue-called)
     // and song events (beat, measure, keyframe, instruments, etc.)
     eventType: { type: 'string', enum: YARG_EVENT_TYPES },
+    // RB3 led-N gates: also fire on a colour change while the position stays lit (see YargEventNode).
+    triggerOnColorChange: { type: 'boolean', nullable: true },
   },
 }
 

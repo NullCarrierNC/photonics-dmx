@@ -30,42 +30,50 @@
           {
             "id": "rb3-pulse-led1",
             "type": "event",
-            "eventType": "led-1"
+            "eventType": "led-1",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-pulse-led2",
             "type": "event",
-            "eventType": "led-2"
+            "eventType": "led-2",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-pulse-led3",
             "type": "event",
-            "eventType": "led-3"
+            "eventType": "led-3",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-pulse-led4",
             "type": "event",
-            "eventType": "led-4"
+            "eventType": "led-4",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-pulse-led5",
             "type": "event",
-            "eventType": "led-5"
+            "eventType": "led-5",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-pulse-led6",
             "type": "event",
-            "eventType": "led-6"
+            "eventType": "led-6",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-pulse-led7",
             "type": "event",
-            "eventType": "led-7"
+            "eventType": "led-7",
+            "triggerOnColorChange": true
           },
           {
             "id": "rb3-pulse-led8",
             "type": "event",
-            "eventType": "led-8"
+            "eventType": "led-8",
+            "triggerOnColorChange": true
           }
         ],
         "actions": [
