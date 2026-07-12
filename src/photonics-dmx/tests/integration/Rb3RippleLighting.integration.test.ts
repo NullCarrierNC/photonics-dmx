@@ -108,13 +108,18 @@ describe('RB3 Ripple interpretive cue', () => {
     // the triggerOnColorChange gate fires the sweeps.
     cue.execute({ ...allBlue, previousFrame: allRed }, h.sequencer, h.lightManager)
 
-    let maxFront = 0
+    // Capture the brightest front-light state over the sweep window.
+    let peak = { intensity: 0, red: 0, green: 0, blue: 0 }
     for (let k = 0; k < 20; k++) {
       h.advanceBy(40)
       for (const id of h.frontLightIds) {
-        maxFront = Math.max(maxFront, h.getLightState(id)!.intensity)
+        const s = h.getLightState(id)!
+        if (s.intensity > peak.intensity) peak = { ...s }
       }
     }
-    expect(maxFront).toBeGreaterThan(120)
+    expect(peak.intensity).toBeGreaterThan(120)
+    // The sweep carries the LED's colour (blue), not a white flash: blue present, red absent.
+    expect(peak.blue).toBeGreaterThan(120)
+    expect(peak.red).toBeLessThan(40)
   })
 })

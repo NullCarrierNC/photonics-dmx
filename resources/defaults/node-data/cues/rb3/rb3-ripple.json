@@ -252,6 +252,20 @@
             "logicType": "cue-data",
             "dataProperty": "led-color",
             "assignTo": "col"
+          },
+          {
+            "id": "rb3-ripple-sweep-col-f",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-color",
+            "assignTo": "col"
+          },
+          {
+            "id": "rb3-ripple-sweep-col-b",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-color",
+            "assignTo": "col"
           }
         ],
         "eventRaisers": [],
@@ -271,8 +285,8 @@
                 "value": 50
               },
               "color": {
-                "source": "literal",
-                "value": "white"
+                "source": "variable",
+                "name": "col"
               },
               "brightness": {
                 "source": "literal",
@@ -326,8 +340,8 @@
                 "value": 50
               },
               "color": {
-                "source": "literal",
-                "value": "white"
+                "source": "variable",
+                "name": "col"
               },
               "brightness": {
                 "source": "literal",
@@ -473,34 +487,42 @@
         },
         {
           "from": "rb3-ripple-led1",
-          "to": "rb3-ripple-sweep-front"
+          "to": "rb3-ripple-sweep-col-f"
         },
         {
           "from": "rb3-ripple-led2",
-          "to": "rb3-ripple-sweep-front"
+          "to": "rb3-ripple-sweep-col-f"
         },
         {
           "from": "rb3-ripple-led3",
-          "to": "rb3-ripple-sweep-front"
+          "to": "rb3-ripple-sweep-col-f"
         },
         {
           "from": "rb3-ripple-led4",
+          "to": "rb3-ripple-sweep-col-f"
+        },
+        {
+          "from": "rb3-ripple-sweep-col-f",
           "to": "rb3-ripple-sweep-front"
         },
         {
           "from": "rb3-ripple-led5",
-          "to": "rb3-ripple-sweep-back"
+          "to": "rb3-ripple-sweep-col-b"
         },
         {
           "from": "rb3-ripple-led6",
-          "to": "rb3-ripple-sweep-back"
+          "to": "rb3-ripple-sweep-col-b"
         },
         {
           "from": "rb3-ripple-led7",
-          "to": "rb3-ripple-sweep-back"
+          "to": "rb3-ripple-sweep-col-b"
         },
         {
           "from": "rb3-ripple-led8",
+          "to": "rb3-ripple-sweep-col-b"
+        },
+        {
+          "from": "rb3-ripple-sweep-col-b",
           "to": "rb3-ripple-sweep-back"
         },
         {
@@ -558,9 +580,13 @@
             "x": 840.0,
             "y": 0.0
           },
-          "rb3-ripple-sweep-front": {
+          "rb3-ripple-sweep-col-f": {
             "x": 840.0,
             "y": 150.0
+          },
+          "rb3-ripple-sweep-front": {
+            "x": 840.0,
+            "y": 300.0
           },
           "rb3-ripple-led2": {
             "x": 1120.0,
@@ -578,9 +604,13 @@
             "x": 1960.0,
             "y": 0.0
           },
-          "rb3-ripple-sweep-back": {
+          "rb3-ripple-sweep-col-b": {
             "x": 1960.0,
             "y": 150.0
+          },
+          "rb3-ripple-sweep-back": {
+            "x": 1960.0,
+            "y": 300.0
           },
           "rb3-ripple-led6": {
             "x": 2240.0,
