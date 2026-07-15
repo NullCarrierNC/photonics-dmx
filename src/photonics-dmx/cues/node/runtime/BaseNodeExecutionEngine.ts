@@ -495,6 +495,57 @@ export abstract class BaseNodeExecutionEngine {
   }
 
   /**
+   * Reachable body-node set per fan-out node, keyed by node id. The compiled graph is immutable after
+   * construction (the engine is rebuilt when a cue is edited), so the set for a given node never changes
+   * and this memo saves a graph walk on every frame a fan-out node runs. Treat the value as read-only.
+   */
+  private fanOutBodyNodeIds = new Map<string, ReadonlySet<string>>()
+
+  /**
+   * Shared fan-out driver for the iteration nodes (for-each-light, led-changed). Runs the `each` body
+   * `iterationCount` times, calling `seedIteration(i)` before each pass to write that iteration's variables
+   * (it returns the index to expose for effect naming — the loop counter for for-each-light, the LED
+   * position for led-changed), then continues the `done` branch. The forEachLightState bracket keeps
+   * tryComplete from disposing the context mid-loop, and unmarking the body nodes lets each pass re-walk
+   * under the strict revisit policy.
+   */
+  protected runFanOut(
+    nodeId: string,
+    context: ExecutionContext,
+    iterationCount: number,
+    seedIteration: (i: number) => number,
+  ): void {
+    const { adjacency } = this.compiled
+    const edges = adjacency.get(nodeId) ?? []
+    const eachTargets = edges.filter((e) => e.fromPort === 'each').map((e) => e.to)
+    const doneTargets = edges.filter((e) => e.fromPort === 'done').map((e) => e.to)
+
+    let bodyNodeIds = this.fanOutBodyNodeIds.get(nodeId)
+    if (!bodyNodeIds) {
+      bodyNodeIds = this.collectReachableNodes(adjacency, eachTargets, nodeId)
+      this.fanOutBodyNodeIds.set(nodeId, bodyNodeIds)
+    }
+
+    context.setForEachLightState(nodeId, { index: 0, length: iterationCount })
+
+    for (let i = 0; i < iterationCount; i++) {
+      const iterationIndex = seedIteration(i)
+      context.setForEachIterationIndex(iterationIndex)
+      for (const bodyId of bodyNodeIds) {
+        context.unmarkVisited(bodyId)
+      }
+      this.continueExecution(eachTargets, context)
+    }
+
+    context.clearForEachLightState(nodeId)
+    context.setForEachIterationIndex(-1)
+    context.markVisited(nodeId)
+
+    this.emitNodeExecution('deactivated', nodeId)
+    this.continueOrComplete(doneTargets, context)
+  }
+
+  /**
    * Execute a for-each-light node by eagerly iterating the source light-array, running the
    * body for each light (or group of `groupSize` lights), then continuing the 'done' branch.
    */
@@ -503,15 +554,16 @@ export abstract class BaseNodeExecutionEngine {
     context: ExecutionContext,
   ): void {
     const nodeId = logicNode.id
-    const { adjacency } = this.compiled
-    const edges = adjacency.get(nodeId) ?? []
-    const eachTargets = edges.filter((e) => e.fromPort === 'each').map((e) => e.to)
-    const doneTargets = edges.filter((e) => e.fromPort === 'done').map((e) => e.to)
 
     const sourceVar = this.getVarStore(logicNode.sourceVariable, context).get(
       logicNode.sourceVariable,
     )
     if (!sourceVar || sourceVar.type !== 'light-array') {
+      // Bad source: skip the body and continue the done branch (this guard keeps its own emit-after-continue
+      // order, distinct from runFanOut's teardown, so leave it here rather than fold it into the helper).
+      const doneTargets = (this.compiled.adjacency.get(nodeId) ?? [])
+        .filter((e) => e.fromPort === 'done')
+        .map((e) => e.to)
       this.debugLog(
         `for-each-light ${nodeId}: source "${logicNode.sourceVariable}" is not a light-array`,
         { sourceVar: sourceVar ?? null },
@@ -528,10 +580,7 @@ export abstract class BaseNodeExecutionEngine {
     const groupSize = this.resolveForEachGroupSize(logicNode, context)
     const length = groupSize > 1 ? Math.floor(rawLength / groupSize) : rawLength
 
-    const bodyNodeIds = this.collectReachableNodes(adjacency, eachTargets, nodeId)
-    context.setForEachLightState(nodeId, { index: 0, length })
-
-    for (let i = 0; i < length; i++) {
+    this.runFanOut(nodeId, context, length, (i) => {
       const currentLightArray =
         groupSize > 1
           ? lightsArray.slice(i * groupSize, (i + 1) * groupSize)
@@ -546,19 +595,8 @@ export abstract class BaseNodeExecutionEngine {
         logicNode.currentIndexVariable,
         { type: 'number', value: i },
       )
-      context.setForEachIterationIndex(i)
-      for (const bodyId of bodyNodeIds) {
-        context.unmarkVisited(bodyId)
-      }
-      this.continueExecution(eachTargets, context)
-    }
-
-    context.clearForEachLightState(nodeId)
-    context.setForEachIterationIndex(-1)
-    context.markVisited(nodeId)
-
-    this.emitNodeExecution('deactivated', nodeId)
-    this.continueOrComplete(doneTargets, context)
+      return i
+    })
   }
 
   /**
@@ -574,10 +612,6 @@ export abstract class BaseNodeExecutionEngine {
     context: ExecutionContext,
   ): void {
     const nodeId = logicNode.id
-    const { adjacency } = this.compiled
-    const edges = adjacency.get(nodeId) ?? []
-    const eachTargets = edges.filter((e) => e.fromPort === 'each').map((e) => e.to)
-    const doneTargets = edges.filter((e) => e.fromPort === 'done').map((e) => e.to)
 
     // led-changed only applies to StageKit (RB3) cue frames; an audio frame has no LED banks, so both
     // sides read empty and no position ever changes (the body runs zero times, straight to `done`).
@@ -596,9 +630,9 @@ export abstract class BaseNodeExecutionEngine {
       changed.push({ index: i, edge, color: ledColorAt(now, i) })
     }
 
-    const bodyNodeIds = this.collectReachableNodes(adjacency, eachTargets, nodeId)
-
-    for (const { index, edge, color } of changed) {
+    // Iteration index = LED position, so each cell's effect name is stable across frames.
+    this.runFanOut(nodeId, context, changed.length, (i) => {
+      const { index, edge, color } = changed[i]
       this.getVarStore(logicNode.assignIndex, context).set(logicNode.assignIndex, {
         type: 'number',
         value: index,
@@ -615,19 +649,8 @@ export abstract class BaseNodeExecutionEngine {
           value: edge,
         })
       }
-      // Iteration index = LED position, so the effect name is stable per cell across frames.
-      context.setForEachIterationIndex(index)
-      for (const bodyId of bodyNodeIds) {
-        context.unmarkVisited(bodyId)
-      }
-      this.continueExecution(eachTargets, context)
-    }
-
-    context.setForEachIterationIndex(-1)
-    context.markVisited(nodeId)
-
-    this.emitNodeExecution('deactivated', nodeId)
-    this.continueOrComplete(doneTargets, context)
+      return index
+    })
   }
 
   /**
