@@ -3,23 +3,13 @@ import type {
   IndexedVariableLogicNode,
   VariableType,
 } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { VARIABLE_TYPES } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
 
 export interface IndexedVariableLogicEditorProps extends LogicEditorCommonProps {
   node: IndexedVariableLogicNode
 }
-
-const VALUE_TYPES: VariableType[] = [
-  'number',
-  'boolean',
-  'string',
-  'color',
-  'light-array',
-  'color-array',
-  'cue-type',
-  'event',
-]
 
 /** Reads or writes one slot of a `${varName}#${index}` variable family, giving a cue a small per-position
  *  array (e.g. a lit latch per LED) without declaring a separate variable for every slot. */
@@ -66,7 +56,7 @@ const IndexedVariableLogicEditor: React.FC<IndexedVariableLogicEditorProps> = ({
         className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
         value={node.valueType ?? 'number'}
         onChange={(event) => updateNode({ valueType: event.target.value as VariableType })}>
-        {VALUE_TYPES.map((t) => (
+        {VARIABLE_TYPES.map((t) => (
           <option key={t} value={t}>
             {t}
           </option>

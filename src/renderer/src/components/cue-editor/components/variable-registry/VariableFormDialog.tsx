@@ -5,6 +5,7 @@ import type {
   NodeCueKind,
   NodeCueMode,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { VARIABLE_TYPES } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { TrackedLight, Color } from '../../../../../../photonics-dmx/types'
 import ColorListEditor from '../shared/ColorListEditor'
 import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
@@ -181,14 +182,11 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
               className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
               value={formData.type ?? 'number'}
               onChange={(e) => handleTypeChange(e.target.value as VariableType)}>
-              <option value="number">Number</option>
-              <option value="boolean">Boolean</option>
-              <option value="string">String</option>
-              <option value="color">Color</option>
-              <option value="light-array">Light Array</option>
-              <option value="color-array">Color Array</option>
-              <option value="cue-type">Cue Type</option>
-              <option value="event">Event</option>
+              {VARIABLE_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                </option>
+              ))}
             </select>
           </label>
 

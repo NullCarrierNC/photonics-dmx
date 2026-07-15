@@ -41,15 +41,20 @@ export interface Connection {
   toPort?: string
 }
 
-export type VariableType =
-  | 'number'
-  | 'boolean'
-  | 'string'
-  | 'color'
-  | 'light-array'
-  | 'color-array'
-  | 'cue-type'
-  | 'event'
+/** Every variable/value type, the single source both the schema enums and the editor dropdowns derive
+ *  from so they cannot drift from the VariableType union. */
+export const VARIABLE_TYPES = [
+  'number',
+  'boolean',
+  'string',
+  'color',
+  'light-array',
+  'color-array',
+  'cue-type',
+  'event',
+] as const
+
+export type VariableType = (typeof VARIABLE_TYPES)[number]
 
 export type ValueSource =
   | { source: 'literal'; value: number | boolean | string | TrackedLight[] | Color[] }

@@ -1,4 +1,5 @@
 import { JSONSchemaType } from 'ajv'
+import { VARIABLE_TYPES } from '../../types/nodeCueTypes'
 import {
   YARG_CUE_DATA_PROPERTIES,
   AUDIO_CUE_DATA_PROPERTIES,
@@ -64,16 +65,7 @@ const variableLogicSchema = {
     varName: { type: 'string' },
     valueType: {
       type: 'string',
-      enum: [
-        'number',
-        'boolean',
-        'string',
-        'color',
-        'light-array',
-        'color-array',
-        'cue-type',
-        'event',
-      ] as const,
+      enum: VARIABLE_TYPES,
     },
     value: { ...valueSourceSchema, nullable: true },
     assignments: {
@@ -87,16 +79,7 @@ const variableLogicSchema = {
           varName: { type: 'string' },
           valueType: {
             type: 'string',
-            enum: [
-              'number',
-              'boolean',
-              'string',
-              'color',
-              'light-array',
-              'color-array',
-              'cue-type',
-              'event',
-            ] as const,
+            enum: VARIABLE_TYPES,
           },
           value: { ...valueSourceSchema, nullable: true },
         },
@@ -665,16 +648,7 @@ const indexedVariableLogicSchema = {
     index: valueSourceSchema,
     valueType: {
       type: 'string',
-      enum: [
-        'number',
-        'boolean',
-        'string',
-        'color',
-        'light-array',
-        'color-array',
-        'cue-type',
-        'event',
-      ] as const,
+      enum: VARIABLE_TYPES,
     },
     value: { ...valueSourceSchema, nullable: true },
     assignTo: { type: 'string', nullable: true },
