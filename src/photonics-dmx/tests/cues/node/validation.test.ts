@@ -323,6 +323,111 @@ describe('Node cue validation', () => {
     expect(isValid({ id: 'logic-1', type: 'logic', logicType: 'tempo' })).toBe(false)
   })
 
+  it('validates indexed-variable and led-changed logic nodes, rejecting missing required fields', () => {
+    const makeDef = (logic: Record<string, unknown>): YargNodeCueDefinition =>
+      ({
+        id: 'logic-cue',
+        name: 'Logic Cue',
+        description: '',
+        kind: 'lighting',
+        cueType: CueType.RB3,
+        style: 'primary',
+        nodes: {
+          events: [{ id: 'event-1', type: 'event', eventType: 'cue-called' }],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'blue' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 200 },
+                waitUntilCondition: { source: 'literal', value: 'none' },
+                waitUntilTime: { source: 'literal', value: 0 },
+                easing: { source: 'literal', value: 'sinInOut' },
+                level: { source: 'literal', value: 1 },
+              },
+            },
+          ],
+          logic: [logic as never],
+        },
+        connections: [
+          { from: 'event-1', to: 'logic-1' },
+          { from: 'logic-1', to: 'action-1', fromPort: 'each' },
+        ],
+        layout: { nodePositions: {} },
+      }) as YargNodeCueDefinition
+
+    const isValid = (logic: Record<string, unknown>): boolean =>
+      validateYargNodeCueFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'g1', name: 'Group' },
+        cues: [makeDef(logic)],
+      }).valid
+
+    // indexed-variable: set (with value) and get (with assignTo).
+    expect(
+      isValid({
+        id: 'logic-1',
+        type: 'logic',
+        logicType: 'indexed-variable',
+        mode: 'set',
+        varName: 'lit',
+        index: { source: 'literal', value: 0 },
+        valueType: 'number',
+        value: { source: 'literal', value: 1 },
+      }),
+    ).toBe(true)
+    expect(
+      isValid({
+        id: 'logic-1',
+        type: 'logic',
+        logicType: 'indexed-variable',
+        mode: 'get',
+        varName: 'lit',
+        index: { source: 'variable', name: 'i' },
+        assignTo: 'out',
+      }),
+    ).toBe(true)
+    // index is required.
+    expect(
+      isValid({
+        id: 'logic-1',
+        type: 'logic',
+        logicType: 'indexed-variable',
+        mode: 'set',
+        varName: 'lit',
+      }),
+    ).toBe(false)
+
+    // led-changed: only assignIndex required, colour/edge optional.
+    expect(
+      isValid({ id: 'logic-1', type: 'logic', logicType: 'led-changed', assignIndex: 'i' }),
+    ).toBe(true)
+    expect(
+      isValid({
+        id: 'logic-1',
+        type: 'logic',
+        logicType: 'led-changed',
+        assignIndex: 'i',
+        assignColor: 'c',
+        assignEdge: 'e',
+      }),
+    ).toBe(true)
+    expect(isValid({ id: 'logic-1', type: 'logic', logicType: 'led-changed' })).toBe(false)
+  })
+
   it('validates a simple RB3 node cue (YARG-shaped, mode rb3)', () => {
     const definition: YargNodeCueDefinition = {
       id: 'rb3-cue',

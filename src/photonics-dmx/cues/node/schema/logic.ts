@@ -23,6 +23,8 @@ import type {
   DebuggerLogicNode,
   DelayLogicNode,
   ForEachLightLogicNode,
+  IndexedVariableLogicNode,
+  LedChangedLogicNode,
   LightsFromIndexLogicNode,
   LogicNode,
   MathLogicNode,
@@ -644,6 +646,62 @@ const forEachLightLogicSchema = {
   },
 } as unknown as JSONSchemaType<ForEachLightLogicNode>
 
+const indexedVariableLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'mode', 'varName', 'index'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'indexed-variable' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    mode: { type: 'string', enum: ['get', 'set'] as const },
+    varName: { type: 'string' },
+    index: valueSourceSchema,
+    valueType: {
+      type: 'string',
+      nullable: true,
+      enum: [
+        'number',
+        'boolean',
+        'string',
+        'color',
+        'light-array',
+        'color-array',
+        'cue-type',
+        'event',
+      ] as const,
+    },
+    value: { ...valueSourceSchema, nullable: true },
+    assignTo: { type: 'string', nullable: true },
+  },
+} as unknown as JSONSchemaType<IndexedVariableLogicNode>
+
+const ledChangedLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'assignIndex'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'led-changed' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    assignIndex: { type: 'string' },
+    assignColor: { type: 'string', nullable: true },
+    assignEdge: { type: 'string', nullable: true },
+  },
+} as unknown as JSONSchemaType<LedChangedLogicNode>
+
 export const logicNodeSchema = {
   oneOf: [
     variableLogicSchema,
@@ -672,5 +730,7 @@ export const logicNodeSchema = {
     randomLogicSchema,
     shuffleLightsLogicSchema,
     forEachLightLogicSchema,
+    indexedVariableLogicSchema,
+    ledChangedLogicSchema,
   ],
 } as unknown as JSONSchemaType<LogicNode>

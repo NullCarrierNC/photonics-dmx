@@ -317,6 +317,29 @@ export interface ForEachLightLogicNode extends BaseLogicNode {
   groupSize?: ValueSource
 }
 
+export interface IndexedVariableLogicNode extends BaseLogicNode {
+  logicType: 'indexed-variable'
+  // Read or write one slot of a variable family stored as `${varName}#${index}`. Gives a cue a small
+  // per-position array (e.g. a `lit#i` latch per StageKit LED) without declaring eight separate variables.
+  // The slot lives in the same scope (cue vs cue-group) as the base `varName`, so it clears on activation.
+  mode: 'get' | 'set'
+  varName: string // base family name
+  index: ValueSource // which slot of the family
+  valueType?: VariableType // set: type written to the slot (default 'number')
+  value?: ValueSource // set: value written to the slot
+  assignTo?: string // get: variable the slot's value is read into
+}
+
+export interface LedChangedLogicNode extends BaseLogicNode {
+  logicType: 'led-changed'
+  // A fan-out over the StageKit LED positions (0..7) whose colour changed since the previous frame. Runs
+  // the `each` branch once per changed position, seeding the position index / new colour / edge, then the
+  // `done` branch. Collapses the eight per-LED led-N event lanes an RB3 gameplay cue repeats into one.
+  assignIndex: string // number var: the 0-based position that changed
+  assignColor?: string // color var: the position's new colour (ledColorAt), 'transparent' when it turned off
+  assignEdge?: string // string var: 'on' (off→lit), 'off' (lit→off), or 'color' (stayed lit, banks changed)
+}
+
 export type LogicNode =
   | VariableLogicNode
   | MathLogicNode
@@ -344,6 +367,8 @@ export type LogicNode =
   | RandomLogicNode
   | ShuffleLightsLogicNode
   | ForEachLightLogicNode
+  | IndexedVariableLogicNode
+  | LedChangedLogicNode
 
 export interface EventRaiserNode {
   id: string

@@ -3045,4 +3045,137 @@ describe('NodeExecutionEngine', () => {
       expect(totalCallsAfter).toBeGreaterThan(totalCallsBefore)
     })
   })
+
+  describe('Led Changed Fan-Out', () => {
+    const bank = (positions: number[]): number => positions.reduce((mask, p) => mask | (1 << p), 0)
+    const banks = (red = 0, green = 0, blue = 0, yellow = 0) => ({ red, green, blue, yellow })
+    const frame = (
+      now: ReturnType<typeof banks>,
+      prev: ReturnType<typeof banks> | undefined,
+    ): CueData => ({
+      ...createCueData('Strong'),
+      lightingCue: CueType.RB3,
+      ledBanks: now,
+      previousFrame: prev === undefined ? undefined : { ledBanks: prev },
+    })
+
+    const ledChangedNode = {
+      id: 'lc1',
+      type: 'logic',
+      logicType: 'led-changed',
+      assignIndex: 'ledIndex',
+      assignColor: 'ledColor',
+      assignEdge: 'ledEdge',
+    } as unknown as LogicNode
+
+    const actionNode: ActionNode = {
+      id: 'action1',
+      type: 'action',
+      effectType: 'set-color',
+      target: {
+        groups: { source: 'literal', value: 'front' },
+        filter: { source: 'literal', value: 'all' },
+      },
+      color: {
+        name: { source: 'literal', value: 'red' },
+        brightness: { source: 'literal', value: 'high' },
+      },
+      timing: {
+        waitForCondition: { source: 'literal', value: 'none' },
+        waitForTime: { source: 'literal', value: 0 },
+        duration: { source: 'literal', value: 200 },
+        waitUntilCondition: { source: 'literal', value: 'none' },
+        waitUntilTime: { source: 'literal', value: 0 },
+        easing: { source: 'literal', value: 'linear' },
+      },
+    }
+
+    const eventNode: YargEventNode = { id: 'event1', type: 'event', eventType: 'beat' }
+
+    const buildEngine = (): NodeExecutionEngine => {
+      const definition: YargNodeCueDefinition = {
+        id: 'test-cue',
+        name: 'Test Cue',
+        kind: 'lighting',
+        cueType: CueType.RB3,
+        style: 'primary',
+        nodes: { events: [eventNode], actions: [actionNode], logic: [ledChangedNode] },
+        connections: [
+          { from: 'event1', to: 'lc1' },
+          { from: 'lc1', to: 'action1', fromPort: 'each' },
+        ],
+      }
+      const compiledCue: CompiledYargCue = {
+        definition,
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map([['action1', actionNode]]),
+        logicMap: new Map([['lc1', ledChangedNode]]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'lc1' }]],
+          ['lc1', [{ from: 'lc1', to: 'action1', fromPort: 'each' }]],
+        ]),
+      }
+      return new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        noopRuntimeBroadcaster(),
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        [
+          { name: 'ledIndex', type: 'number', scope: 'cue', initialValue: 0 },
+          { name: 'ledColor', type: 'string', scope: 'cue', initialValue: 'transparent' },
+          { name: 'ledEdge', type: 'string', scope: 'cue', initialValue: '' },
+        ],
+      )
+    }
+
+    const runFrame = (cueData: CueData): string[] => {
+      ;(mockSequencer.addEffect as jest.Mock).mockClear()
+      buildEngine().startExecution(eventNode, cueData)
+      return (mockSequencer.addEffect as jest.Mock).mock.calls.map((c) => c[0] as string)
+    }
+
+    it('fires once per changed position with a stable per-position effect name', () => {
+      // Positions 0 & 2 red, 4 blue; previous all-off, so three on-edges fan out.
+      const names = runFrame(frame(banks(bank([0, 2]), 0, bank([4]), 0), banks(0, 0, 0, 0)))
+      expect(names).toHaveLength(3)
+      expect(names).toEqual(
+        expect.arrayContaining([
+          'test-group:test-cue:action1:0',
+          'test-group:test-cue:action1:2',
+          'test-group:test-cue:action1:4',
+        ]),
+      )
+    })
+
+    it('runs nothing when no LED position changed between frames', () => {
+      const same = banks(bank([0, 2]), 0, bank([4]), 0)
+      expect(runFrame(frame(same, same))).toHaveLength(0)
+    })
+
+    it('seeds index / colour and classifies the edge as on, off, or color', () => {
+      // off -> red at position 0 is an on-edge.
+      runFrame(frame(banks(bank([0]), 0, 0, 0), banks(0, 0, 0, 0)))
+      expect(cueLevelVarStore.get('ledIndex')?.value).toBe(0)
+      expect(cueLevelVarStore.get('ledColor')?.value).toBe('red')
+      expect(cueLevelVarStore.get('ledEdge')?.value).toBe('on')
+
+      // red -> off is an off-edge, colour reads transparent.
+      runFrame(frame(banks(0, 0, 0, 0), banks(bank([0]), 0, 0, 0)))
+      expect(cueLevelVarStore.get('ledColor')?.value).toBe('transparent')
+      expect(cueLevelVarStore.get('ledEdge')?.value).toBe('off')
+
+      // red -> green while staying lit is a colour edge.
+      runFrame(frame(banks(0, bank([0]), 0, 0), banks(bank([0]), 0, 0, 0)))
+      expect(cueLevelVarStore.get('ledColor')?.value).toBe('green')
+      expect(cueLevelVarStore.get('ledEdge')?.value).toBe('color')
+    })
+  })
 })

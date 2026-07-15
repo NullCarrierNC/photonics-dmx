@@ -31,6 +31,7 @@ import {
 } from '../../types/nodeCueTypes'
 import type { Connection } from '../../types/nodeCueTypes'
 import type { CueData } from '../../types/cueTypes'
+import { ledBankNibbleAt, ledColorAt } from '../../types/cueTypes'
 import type { AudioCueData } from '../../types/audioCueTypes'
 import type { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
@@ -561,6 +562,75 @@ export abstract class BaseNodeExecutionEngine {
   }
 
   /**
+   * Execute a led-changed node: diff the current frame's StageKit LED banks against the previous frame,
+   * then run the `each` body once per position whose colour changed (seeding its index / new colour /
+   * edge), and finally the `done` branch. Mirrors {@link executeForEachLight}: the per-firing iteration
+   * index is the LED POSITION (0..7), so each position's action gets a stable `${cueId}:${nodeId}:${pos}`
+   * effect name — re-firing a position (colour change or clear) overwrites its own effect rather than
+   * stacking a new one. Positions are edge-detected, so an unchanged frame runs zero bodies.
+   */
+  protected executeLedChanged(
+    logicNode: LogicNode & { logicType: 'led-changed' },
+    context: ExecutionContext,
+  ): void {
+    const nodeId = logicNode.id
+    const { adjacency } = this.compiled
+    const edges = adjacency.get(nodeId) ?? []
+    const eachTargets = edges.filter((e) => e.fromPort === 'each').map((e) => e.to)
+    const doneTargets = edges.filter((e) => e.fromPort === 'done').map((e) => e.to)
+
+    // led-changed only applies to StageKit (RB3) cue frames; an audio frame has no LED banks, so both
+    // sides read empty and no position ever changes (the body runs zero times, straight to `done`).
+    const frame = context.cueData
+    const now: Partial<CueData> = 'ledBanks' in frame ? frame : {}
+    const prev: Partial<CueData> | undefined = 'ledBanks' in frame ? frame.previousFrame : undefined
+
+    // Positions (0..7) whose bank nibble changed, with the edge kind. The nibble captures both lit-state
+    // and colour, so a single inequality catches off->on, on->off, and a same-position colour swap.
+    const changed: { index: number; edge: 'on' | 'off' | 'color'; color: string }[] = []
+    for (let i = 0; i < 8; i++) {
+      const nowNibble = ledBankNibbleAt(now, i)
+      const prevNibble = ledBankNibbleAt(prev, i)
+      if (nowNibble === prevNibble) continue
+      const edge = prevNibble === 0 ? 'on' : nowNibble === 0 ? 'off' : 'color'
+      changed.push({ index: i, edge, color: ledColorAt(now, i) })
+    }
+
+    const bodyNodeIds = this.collectReachableNodes(adjacency, eachTargets, nodeId)
+
+    for (const { index, edge, color } of changed) {
+      this.getVarStore(logicNode.assignIndex, context).set(logicNode.assignIndex, {
+        type: 'number',
+        value: index,
+      })
+      if (logicNode.assignColor) {
+        this.getVarStore(logicNode.assignColor, context).set(logicNode.assignColor, {
+          type: 'string',
+          value: color,
+        })
+      }
+      if (logicNode.assignEdge) {
+        this.getVarStore(logicNode.assignEdge, context).set(logicNode.assignEdge, {
+          type: 'string',
+          value: edge,
+        })
+      }
+      // Iteration index = LED position, so the effect name is stable per cell across frames.
+      context.setForEachIterationIndex(index)
+      for (const bodyId of bodyNodeIds) {
+        context.unmarkVisited(bodyId)
+      }
+      this.continueExecution(eachTargets, context)
+    }
+
+    context.setForEachIterationIndex(-1)
+    context.markVisited(nodeId)
+
+    this.emitNodeExecution('deactivated', nodeId)
+    this.continueOrComplete(doneTargets, context)
+  }
+
+  /**
    * Hook run after a (non-delay, non-for-each) logic node is evaluated. Cue re-marks the
    * node visited (harmless under strict); effect leaves it unmarked so relaxed re-entry works.
    */
@@ -581,6 +651,10 @@ export abstract class BaseNodeExecutionEngine {
       }
       if (logicNode.logicType === 'for-each-light') {
         this.executeForEachLight(logicNode, context)
+        return
+      }
+      if (logicNode.logicType === 'led-changed') {
+        this.executeLedChanged(logicNode, context)
         return
       }
 

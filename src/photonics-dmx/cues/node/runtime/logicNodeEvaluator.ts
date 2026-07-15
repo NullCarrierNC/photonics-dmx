@@ -91,6 +91,40 @@ export function evaluateLogicNode(
       return edges.map((edge) => edge.to)
     }
 
+    case 'indexed-variable': {
+      // Read or write one slot of a `${varName}#${index}` family. The slot lives in the same store the
+      // base `varName` is declared in (cue vs cue-group), so a family of latches clears on activation.
+      const index = Math.floor(
+        Number(resolveValue('number', logicNode.index, context, variableDefinitions)),
+      )
+      const slotKey = `${logicNode.varName}#${index}`
+      const varStore = getVarStore(logicNode.varName)
+      const valueType = logicNode.valueType ?? 'number'
+      if (logicNode.mode === 'set') {
+        const value = resolveValue(valueType, logicNode.value, context, variableDefinitions)
+        varStore.set(slotKey, { type: valueType, value })
+      } else if (logicNode.assignTo) {
+        // get: always write the target so it can't read a stale value from a previous iteration. An empty
+        // slot yields the zero for the family type (0 / false / '' / 'transparent').
+        const slot = varStore.get(slotKey)
+        const targetStore = getVarStore(logicNode.assignTo)
+        if (slot !== undefined) {
+          targetStore.set(logicNode.assignTo, { type: slot.type, value: slot.value })
+        } else {
+          const zero =
+            valueType === 'boolean'
+              ? false
+              : valueType === 'number'
+                ? 0
+                : valueType === 'color'
+                  ? 'transparent'
+                  : ''
+          targetStore.set(logicNode.assignTo, { type: valueType, value: zero })
+        }
+      }
+      return edges.map((edge) => edge.to)
+    }
+
     case 'math': {
       const left = Number(resolveValue('number', logicNode.left, context, variableDefinitions))
       const right = Number(resolveValue('number', logicNode.right, context, variableDefinitions))
