@@ -121,6 +121,14 @@ export const YARG_CUE_DATA_PROPERTIES = [
   'led-6-on',
   'led-7-on',
   'led-8-on',
+  'led-1-color',
+  'led-2-color',
+  'led-3-color',
+  'led-4-color',
+  'led-5-color',
+  'led-6-color',
+  'led-7-color',
+  'led-8-color',
   'strobe-state',
 ] as const
 

@@ -121,6 +121,26 @@ export function ledAggregateMask(frame: Partial<CueData> | undefined): number {
   return (b.red | b.green | b.blue | b.yellow) & 0xff
 }
 
+/**
+ * Whether two frames carry the same StageKit LED state across ALL FOUR colour banks (absent `ledBanks` =
+ * all-zero). Stricter than comparing `ledAggregateMask`, which is colour-blind: a position that swaps banks
+ * (red→green) leaves the aggregate unchanged but changes a per-bank mask, so this returns false. Used to
+ * detect an un-ticked LED/colour edge the aggregate would miss (led-N triggerOnColorChange).
+ */
+export function ledBanksEqual(
+  a: Partial<CueData> | undefined,
+  b: Partial<CueData> | undefined,
+): boolean {
+  const x = a?.ledBanks
+  const y = b?.ledBanks
+  return (
+    ((x?.red ?? 0) & 0xff) === ((y?.red ?? 0) & 0xff) &&
+    ((x?.green ?? 0) & 0xff) === ((y?.green ?? 0) & 0xff) &&
+    ((x?.blue ?? 0) & 0xff) === ((y?.blue ?? 0) & 0xff) &&
+    ((x?.yellow ?? 0) & 0xff) === ((y?.yellow ?? 0) & 0xff)
+  )
+}
+
 /** Whether LED position `index` (0..7) is lit in any colour bank of `frame`. */
 export function isLedOn(frame: Partial<CueData> | undefined, index: number): boolean {
   if (index < 0 || index > 7) return false
@@ -142,6 +162,24 @@ export function ledBankNibbleAt(frame: Partial<CueData> | undefined, index: numb
     (b.blue & bit ? 4 : 0) |
     (b.yellow & bit ? 8 : 0)
   )
+}
+
+/**
+ * The colour of LED position `index` (0..7) as a palette name — the per-position analogue of the global
+ * `led-color` (which reports only the dominant bank across all positions). Priority red > green > blue >
+ * yellow when a position is lit in more than one bank (the rare overlap case); `'transparent'` when unlit,
+ * so binding it to a laser/effect colour lets a dark position show through rather than paint black.
+ */
+export function ledColorAt(
+  frame: Partial<CueData> | undefined,
+  index: number,
+): 'red' | 'green' | 'blue' | 'yellow' | 'transparent' {
+  const nibble = ledBankNibbleAt(frame, index)
+  if (nibble & 1) return 'red'
+  if (nibble & 2) return 'green'
+  if (nibble & 4) return 'blue'
+  if (nibble & 8) return 'yellow'
+  return 'transparent'
 }
 
 // Import RB3E types

@@ -5,7 +5,7 @@
 
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { monotonicNowMs } from '../../../../shared/time'
-import { CueData, ledAggregateMask, isLedOn } from '../../types/cueTypes'
+import { CueData, ledAggregateMask, isLedOn, ledColorAt } from '../../types/cueTypes'
 import { AudioCueData } from '../../types/audioCueTypes'
 import { TrackedLight, LightTarget } from '../../../types'
 import { YargCueDataProperty, AudioCueDataProperty } from '../../types/nodeCueTypes'
@@ -41,6 +41,13 @@ export function extractYargCueDataValue(
   cueData: CueData,
   cueId: string,
 ): number | string | boolean {
+  // The per-position LED families (`led-{1-8}-on` / `led-{1-8}-color`) parse to one 0-based index, so the
+  // hand-numbered switch arms collapse to a single regex — no per-property index arithmetic to mis-copy.
+  const ledMatch = /^led-([1-8])-(on|color)$/.exec(property)
+  if (ledMatch) {
+    const index = Number(ledMatch[1]) - 1
+    return ledMatch[2] === 'on' ? isLedOn(cueData, index) : ledColorAt(cueData, index)
+  }
   switch (property) {
     case 'cue-name':
       return cueId
@@ -103,22 +110,8 @@ export function extractYargCueDataValue(
       return cueData.ledBanks?.blue ?? 0
     case 'led-yellow-states':
       return cueData.ledBanks?.yellow ?? 0
-    case 'led-1-on':
-      return isLedOn(cueData, 0)
-    case 'led-2-on':
-      return isLedOn(cueData, 1)
-    case 'led-3-on':
-      return isLedOn(cueData, 2)
-    case 'led-4-on':
-      return isLedOn(cueData, 3)
-    case 'led-5-on':
-      return isLedOn(cueData, 4)
-    case 'led-6-on':
-      return isLedOn(cueData, 5)
-    case 'led-7-on':
-      return isLedOn(cueData, 6)
-    case 'led-8-on':
-      return isLedOn(cueData, 7)
+    // led-{1-8}-on and led-{1-8}-color are handled by the regex head above (per-position on / dominant
+    // bank colour), so they need no per-index switch arms here.
     case 'strobe-state':
       return cueData.strobeState
     default:

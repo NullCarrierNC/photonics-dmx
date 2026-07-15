@@ -159,6 +159,15 @@ describe('dataExtractors', () => {
         expect(extractYargCueDataValue('led-5-on', led(), 'c')).toBe(true)
       })
 
+      it('exposes each position OWN colour (not the single dominant led-color)', () => {
+        // LEDs 1 & 3 red, LED 5 blue at once: each position reports its own bank, unlit → transparent.
+        expect(extractYargCueDataValue('led-1-color', led(), 'c')).toBe('red')
+        expect(extractYargCueDataValue('led-3-color', led(), 'c')).toBe('red')
+        expect(extractYargCueDataValue('led-5-color', led(), 'c')).toBe('blue')
+        expect(extractYargCueDataValue('led-2-color', led(), 'c')).toBe('transparent')
+        expect(extractYargCueDataValue('led-1-color', minimalCueData(), 'c')).toBe('transparent')
+      })
+
       it('strobe-state returns the current strobe', () => {
         expect(extractYargCueDataValue('strobe-state', led(), 'c')).toBe('Strobe_Fast')
       })

@@ -41,6 +41,14 @@ const LED_STATE_PROPERTIES: CueDataPropertyMeta[] = [
   { id: 'led-6-on', label: 'LED 6 On', type: 'boolean' },
   { id: 'led-7-on', label: 'LED 7 On', type: 'boolean' },
   { id: 'led-8-on', label: 'LED 8 On', type: 'boolean' },
+  { id: 'led-1-color', label: 'LED 1 Colour', type: 'string' },
+  { id: 'led-2-color', label: 'LED 2 Colour', type: 'string' },
+  { id: 'led-3-color', label: 'LED 3 Colour', type: 'string' },
+  { id: 'led-4-color', label: 'LED 4 Colour', type: 'string' },
+  { id: 'led-5-color', label: 'LED 5 Colour', type: 'string' },
+  { id: 'led-6-color', label: 'LED 6 Colour', type: 'string' },
+  { id: 'led-7-color', label: 'LED 7 Colour', type: 'string' },
+  { id: 'led-8-color', label: 'LED 8 Colour', type: 'string' },
 ]
 
 /**
