@@ -8,6 +8,7 @@ import type {
   LogicNode,
   ValueSource,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { LOGIC_NODE_META } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 const formatValueSource = (value?: ValueSource): string => {
   if (!value) return ''
@@ -440,23 +441,14 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
     return logicType
   }
 
-  // Both the conditional and the frame-gate route flow through `true`/`false` output ports.
-  const isConditional = logicType === 'conditional' || logicType === 'frame-gate'
-  // for-each-light and led-changed both fan out through `each`/`done` output ports.
-  const isForEachLight = logicType === 'for-each-light' || logicType === 'led-changed'
-  const isDataNode = logicType === 'cue-data' || logicType === 'config-data'
-  const isArrayNode =
-    logicType === 'array-length' ||
-    logicType === 'reverse-lights' ||
-    logicType === 'create-pairs' ||
-    logicType === 'build-ring' ||
-    logicType === 'concat-lights' ||
-    logicType === 'shuffle-lights' ||
-    logicType === 'for-each-light' ||
-    logicType === 'reverse-colors' ||
-    logicType === 'concat-colors' ||
-    logicType === 'shuffle-colors'
-  const isDebugNode = logicType === 'debugger'
+  const meta = LOGIC_NODE_META[logicType]
+  // Conditional and frame-gate route flow through `true`/`false` ports; for-each-light and led-changed
+  // fan out through `each`/`done` ports. Category drives the colour bucket.
+  const isConditional = meta.ports === 'true-false'
+  const isForEachLight = meta.ports === 'each-done'
+  const isDataNode = meta.category === 'data'
+  const isArrayNode = meta.category === 'array'
+  const isDebugNode = meta.category === 'debug'
 
   const nodeStyles = isDebugNode
     ? 'border-red-400 bg-red-50 dark:bg-red-900/30 text-xs shadow-sm min-w-[150px] max-w-[320px]'

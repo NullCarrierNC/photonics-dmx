@@ -3,12 +3,17 @@ import type {
   NodeCueKind,
   NodeCueMode,
   LogicNode,
+  LogicNodeMeta,
   NodeEffectType,
   YargEventNode,
   AudioEventNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorMode, NotesVariant } from '../lib/types'
-import { getEffectTypesForCueKind } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import {
+  getEffectTypesForCueKind,
+  LOGIC_NODE_META,
+  NODE_LOGIC_TYPES,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { getDefaultEventOption } from '../lib/options'
 import type { EventOption } from '../lib/types'
 import { NODE_DRAG_MIME, serializeNodeDrag, type NodeDragPayload } from '../lib/nodeDragPayload'
@@ -25,35 +30,15 @@ const makeDragHandlers = (
   },
 })
 
-const getLogicNodeButtonClasses = (logicType: LogicNode['logicType']): string => {
-  const baseClasses = `border-2 rounded px-2 py-1 text-xs hover:opacity-80 transition-opacity ${DRAG_CURSOR_CLASSES}`
-
-  const isArrayNode =
-    logicType === 'array-length' ||
-    logicType === 'reverse-lights' ||
-    logicType === 'create-pairs' ||
-    logicType === 'build-ring' ||
-    logicType === 'concat-lights' ||
-    logicType === 'shuffle-lights' ||
-    logicType === 'for-each-light' ||
-    logicType === 'reverse-colors' ||
-    logicType === 'concat-colors' ||
-    logicType === 'shuffle-colors'
-  const isDataNode = logicType === 'cue-data' || logicType === 'config-data'
-  const isDebugNode = logicType === 'debugger'
-
-  if (isDebugNode) {
-    return `${baseClasses} border-red-400 bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-100`
-  }
-  if (isArrayNode) {
-    return `${baseClasses} border-teal-400 bg-teal-50 dark:bg-teal-900/30 text-teal-800 dark:text-teal-100`
-  }
-  if (isDataNode) {
-    return `${baseClasses} border-orange-800 bg-orange-50 dark:bg-orange-900/30 text-orange-800 dark:text-orange-100`
-  }
-  // Default: amber for variable, conditional, math, lights-from-index, delay
-  return `${baseClasses} border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-100`
+const LOGIC_CATEGORY_CLASSES: Record<LogicNodeMeta['category'], string> = {
+  debug: 'border-red-400 bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-100',
+  array: 'border-teal-400 bg-teal-50 dark:bg-teal-900/30 text-teal-800 dark:text-teal-100',
+  data: 'border-orange-800 bg-orange-50 dark:bg-orange-900/30 text-orange-800 dark:text-orange-100',
+  general: 'border-amber-400 bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-100',
 }
+
+const getLogicNodeButtonClasses = (category: LogicNodeMeta['category']): string =>
+  `border-2 rounded px-2 py-1 text-xs hover:opacity-80 transition-opacity ${DRAG_CURSOR_CLASSES} ${LOGIC_CATEGORY_CLASSES[category]}`
 
 interface NodeCreationSectionsProps {
   activeMode: NodeCueMode
@@ -146,179 +131,15 @@ const LogicNodesSection: React.FC<{
   <div>
     <h3 className="font-semibold text-sm mb-2">Logic Nodes</h3>
     <div className="grid grid-cols-3 gap-2 text-xs">
-      {/* Data nodes (orange) */}
-      <button
-        className={getLogicNodeButtonClasses('config-data')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'config-data' })}
-        onClick={() => addLogicNode('config-data')}>
-        Config Data
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('cue-data')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'cue-data' })}
-        onClick={() => addLogicNode('cue-data')}>
-        Cue Data
-      </button>
-      {/* Logic nodes (amber) */}
-      <button
-        className={getLogicNodeButtonClasses('conditional')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'conditional' })}
-        onClick={() => addLogicNode('conditional')}>
-        Conditional
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('delay')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'delay' })}
-        onClick={() => addLogicNode('delay')}>
-        Delay
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('lights-from-index')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'lights-from-index' })}
-        onClick={() => addLogicNode('lights-from-index')}>
-        Lights From Index
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('color-from-index')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'color-from-index' })}
-        onClick={() => addLogicNode('color-from-index')}>
-        Color From Index
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('math')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'math' })}
-        onClick={() => addLogicNode('math')}>
-        Math
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('expression')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'expression' })}
-        onClick={() => addLogicNode('expression')}>
-        Expression
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('clamp')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'clamp' })}
-        onClick={() => addLogicNode('clamp')}>
-        Clamp
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('frame-gate')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'frame-gate' })}
-        onClick={() => addLogicNode('frame-gate')}>
-        Frame Gate
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('tempo')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'tempo' })}
-        onClick={() => addLogicNode('tempo')}>
-        Tempo
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('indexed-variable')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'indexed-variable' })}
-        onClick={() => addLogicNode('indexed-variable')}>
-        Indexed Variable
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('led-changed')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'led-changed' })}
-        onClick={() => addLogicNode('led-changed')}>
-        LED Changed
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('select-from-list')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'select-from-list' })}
-        onClick={() => addLogicNode('select-from-list')}>
-        Select From List
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('pulse')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'pulse' })}
-        onClick={() => addLogicNode('pulse')}>
-        Pulse
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('random')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'random' })}
-        onClick={() => addLogicNode('random')}>
-        Random
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('variable')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'variable' })}
-        onClick={() => addLogicNode('variable')}>
-        Variable
-      </button>
-      {/* Light operations (teal) */}
-      <button
-        className={getLogicNodeButtonClasses('array-length')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'array-length' })}
-        onClick={() => addLogicNode('array-length')}>
-        Array Length
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('concat-lights')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'concat-lights' })}
-        onClick={() => addLogicNode('concat-lights')}>
-        Concat Lights
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('create-pairs')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'create-pairs' })}
-        onClick={() => addLogicNode('create-pairs')}>
-        Create Pairs
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('build-ring')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'build-ring' })}
-        onClick={() => addLogicNode('build-ring')}>
-        Build Ring
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('reverse-lights')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'reverse-lights' })}
-        onClick={() => addLogicNode('reverse-lights')}>
-        Reverse Lights
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('shuffle-lights')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'shuffle-lights' })}
-        onClick={() => addLogicNode('shuffle-lights')}>
-        Shuffle Lights
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('for-each-light')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'for-each-light' })}
-        onClick={() => addLogicNode('for-each-light')}>
-        For Each Light
-      </button>
-      {/* color operations */}
-      <button
-        className={getLogicNodeButtonClasses('reverse-colors')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'reverse-colors' })}
-        onClick={() => addLogicNode('reverse-colors')}>
-        Reverse Colors
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('concat-colors')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'concat-colors' })}
-        onClick={() => addLogicNode('concat-colors')}>
-        Concat Colors
-      </button>
-      <button
-        className={getLogicNodeButtonClasses('shuffle-colors')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'shuffle-colors' })}
-        onClick={() => addLogicNode('shuffle-colors')}>
-        Shuffle Colors
-      </button>
-      {/* Debug node (red) */}
-      <button
-        className={getLogicNodeButtonClasses('debugger')}
-        {...makeDragHandlers({ kind: 'logic', logicType: 'debugger' })}
-        onClick={() => addLogicNode('debugger')}>
-        Debugger
-      </button>
+      {NODE_LOGIC_TYPES.map((logicType) => (
+        <button
+          key={logicType}
+          className={getLogicNodeButtonClasses(LOGIC_NODE_META[logicType].category)}
+          {...makeDragHandlers({ kind: 'logic', logicType })}
+          onClick={() => addLogicNode(logicType)}>
+          {LOGIC_NODE_META[logicType].label}
+        </button>
+      ))}
     </div>
   </div>
 )

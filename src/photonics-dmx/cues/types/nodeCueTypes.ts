@@ -383,42 +383,61 @@ export type LogicNode =
   | IndexedVariableLogicNode
   | LedChangedLogicNode
 
-// Canonical list of every logic node type, the sibling of NODE_EFFECT_TYPES. The Record literal keeps it
-// exhaustive: adding a member to the LogicNode union without listing it here is a compile error, and an
-// unknown key is rejected by excess-property checking. Consumers (the editor palette drag parser, etc.)
-// derive from this so nobody hand-maintains a second copy that can silently drift.
-const LOGIC_TYPE_TABLE: Record<LogicNode['logicType'], true> = {
-  'variable': true,
-  'math': true,
-  'clamp': true,
-  'expression': true,
-  'select-from-list': true,
-  'pulse': true,
-  'conditional': true,
-  'frame-gate': true,
-  'tempo': true,
-  'cue-data': true,
-  'config-data': true,
-  'lights-from-index': true,
-  'color-from-index': true,
-  'reverse-colors': true,
-  'concat-colors': true,
-  'shuffle-colors': true,
-  'array-length': true,
-  'reverse-lights': true,
-  'create-pairs': true,
-  'concat-lights': true,
-  'build-ring': true,
-  'delay': true,
-  'debugger': true,
-  'random': true,
-  'shuffle-lights': true,
-  'for-each-light': true,
-  'indexed-variable': true,
-  'led-changed': true,
+/** Presentation + wiring metadata for one logic node type. Plain data only (labels, semantic category and
+ *  port shape) so the main process can share it; the renderer maps `category` to its own colours. */
+export interface LogicNodeMeta {
+  /** Human label shown on palette buttons, the canvas, and menus. */
+  label: string
+  /** Colour/grouping bucket in the editor. */
+  category: 'general' | 'array' | 'data' | 'debug'
+  /** Output port shape: one plain out, a conditional true/false pair, or a fan-out each/done pair. */
+  ports: 'single' | 'true-false' | 'each-done'
+  /** Nodes that need an engine-stepped path and are inert under level mode / an audio "during" context. */
+  timing?: true
 }
 
-export const NODE_LOGIC_TYPES = Object.keys(LOGIC_TYPE_TABLE) as LogicNode['logicType'][]
+// Canonical metadata for every logic node type, the sibling of NODE_EFFECT_TYPES. The Record keeps it
+// exhaustive: adding a member to the LogicNode union without listing it here is a compile error, and an
+// unknown key is rejected by excess-property checking. Insertion order is the editor palette order, and
+// every consumer (palette, canvas, pane menu, drag parser, level-mode check, layout) derives from this so
+// nobody hand-maintains a second copy that can silently drift.
+export const LOGIC_NODE_META: Record<LogicNode['logicType'], LogicNodeMeta> = {
+  'config-data': { label: 'Config Data', category: 'data', ports: 'single' },
+  'cue-data': { label: 'Cue Data', category: 'data', ports: 'single' },
+  'conditional': { label: 'Conditional', category: 'general', ports: 'true-false' },
+  'delay': { label: 'Delay', category: 'general', ports: 'single', timing: true },
+  'lights-from-index': { label: 'Lights From Index', category: 'general', ports: 'single' },
+  'color-from-index': { label: 'Color From Index', category: 'general', ports: 'single' },
+  'math': { label: 'Math', category: 'general', ports: 'single' },
+  'expression': { label: 'Expression', category: 'general', ports: 'single' },
+  'clamp': { label: 'Clamp', category: 'general', ports: 'single' },
+  'frame-gate': { label: 'Frame Gate', category: 'general', ports: 'true-false' },
+  'tempo': { label: 'Tempo', category: 'general', ports: 'single' },
+  'indexed-variable': { label: 'Indexed Variable', category: 'general', ports: 'single' },
+  'led-changed': { label: 'LED Changed', category: 'general', ports: 'each-done', timing: true },
+  'select-from-list': { label: 'Select From List', category: 'general', ports: 'single' },
+  'pulse': { label: 'Pulse', category: 'general', ports: 'single' },
+  'random': { label: 'Random', category: 'general', ports: 'single' },
+  'variable': { label: 'Variable', category: 'general', ports: 'single' },
+  'array-length': { label: 'Array Length', category: 'array', ports: 'single' },
+  'concat-lights': { label: 'Concat Lights', category: 'array', ports: 'single' },
+  'create-pairs': { label: 'Create Pairs', category: 'array', ports: 'single' },
+  'build-ring': { label: 'Build Ring', category: 'array', ports: 'single' },
+  'reverse-lights': { label: 'Reverse Lights', category: 'array', ports: 'single' },
+  'shuffle-lights': { label: 'Shuffle Lights', category: 'array', ports: 'single' },
+  'for-each-light': {
+    label: 'For Each Light',
+    category: 'array',
+    ports: 'each-done',
+    timing: true,
+  },
+  'reverse-colors': { label: 'Reverse Colors', category: 'array', ports: 'single' },
+  'concat-colors': { label: 'Concat Colors', category: 'array', ports: 'single' },
+  'shuffle-colors': { label: 'Shuffle Colors', category: 'array', ports: 'single' },
+  'debugger': { label: 'Debugger', category: 'debug', ports: 'single' },
+}
+
+export const NODE_LOGIC_TYPES = Object.keys(LOGIC_NODE_META) as LogicNode['logicType'][]
 
 export interface EventRaiserNode {
   id: string
