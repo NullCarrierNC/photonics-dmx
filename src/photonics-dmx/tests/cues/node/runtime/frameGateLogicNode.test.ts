@@ -63,4 +63,35 @@ describe('frame-gate logic node', () => {
     // Phase restarts: three falses then a true again, not off-by-the-stale-count.
     expect([tick(), tick(), tick(), tick()]).toEqual(['false', 'false', 'false', 'true'])
   })
+
+  it('falls back to divisor 1 (fires every frame) when the divisor resolves to NaN', () => {
+    const cueStore = new Map<string, VariableValue>()
+    cueStore.set('bad', { type: 'number', value: NaN })
+    const context = {
+      cueLevelVarStore: cueStore,
+      groupLevelVarStore: new Map(),
+      cueData: {},
+    } as unknown as ExecutionContext
+    const evalCtx: LogicNodeEvaluatorContext = {
+      cueId: 'g:c',
+      lightManager: {} as never,
+      cueLevelVarStore: cueStore,
+      groupLevelVarStore: new Map(),
+      variableDefinitions: [{ name: 'bad', type: 'number', scope: 'cue', initialValue: 0 }],
+      executeNode: () => {},
+    }
+    const edges: Connection[] = [
+      { from: 'fg', to: 'fired', fromPort: 'true' },
+      { from: 'fg', to: 'idle', fromPort: 'false' },
+    ]
+    const node: FrameGateLogicNode = {
+      id: 'fg',
+      type: 'logic',
+      logicType: 'frame-gate',
+      divisor: { source: 'variable', name: 'bad' },
+    }
+    // Without the finite guard, count % NaN is never 0 and the gate sticks on false; it must fire instead.
+    const fired = evaluateLogicNode(node, node.id, edges, context, evalCtx).includes('fired')
+    expect(fired).toBe(true)
+  })
 })

@@ -397,10 +397,11 @@ describe('Node cue validation', () => {
         mode: 'get',
         varName: 'lit',
         index: { source: 'variable', name: 'i' },
+        valueType: 'number',
         assignTo: 'out',
       }),
     ).toBe(true)
-    // index is required.
+    // index and valueType are required.
     expect(
       isValid({
         id: 'logic-1',
@@ -408,6 +409,18 @@ describe('Node cue validation', () => {
         logicType: 'indexed-variable',
         mode: 'set',
         varName: 'lit',
+        valueType: 'number',
+      }),
+    ).toBe(false)
+    expect(
+      isValid({
+        id: 'logic-1',
+        type: 'logic',
+        logicType: 'indexed-variable',
+        mode: 'get',
+        varName: 'lit',
+        index: { source: 'literal', value: 0 },
+        assignTo: 'out',
       }),
     ).toBe(false)
 

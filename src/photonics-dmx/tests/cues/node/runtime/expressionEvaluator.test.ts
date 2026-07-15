@@ -35,6 +35,14 @@ describe('expressionEvaluator', () => {
     expect(ev('5 % 0')).toBe(0)
   })
 
+  it('collapses any non-finite result (Infinity / NaN) to 0 so downstream vars are never poisoned', () => {
+    expect(ev('pow(0, -1)')).toBe(0) // Infinity
+    expect(ev('pow(-1, 0.5)')).toBe(0) // NaN
+    expect(ev('pow(10, 400)')).toBe(0) // overflow to Infinity
+    expect(ev('1 / a', { a: 0 })).toBe(0) // guarded divide already, still finite
+    expect(ev('pow(2, 10)')).toBe(1024) // a normal pow is untouched
+  })
+
   it('supports built-in functions and pi', () => {
     expect(ev('min(3, 1, 2)')).toBe(1)
     expect(ev('max(3, 1, 2)')).toBe(3)

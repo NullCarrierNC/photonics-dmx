@@ -99,4 +99,51 @@ describe('indexed-variable logic node', () => {
     run(getSlot('lit', 6, 'out'))
     expect(raw('out')).toEqual({ type: 'number', value: 1 })
   })
+
+  it('get on an empty light-array slot writes [] (not a string that would crash .map)', () => {
+    const { run, raw } = harness(['group', 'out'])
+    run({
+      id: 'ix',
+      type: 'logic',
+      logicType: 'indexed-variable',
+      mode: 'get',
+      varName: 'group',
+      index: { source: 'literal', value: 0 },
+      valueType: 'light-array',
+      assignTo: 'out',
+    })
+    expect(raw('out')).toEqual({ type: 'light-array', value: [] })
+  })
+
+  it('get on an empty colour slot writes the transparent zero', () => {
+    const { run, raw } = harness(['litColor', 'out'])
+    run({
+      id: 'ix',
+      type: 'logic',
+      logicType: 'indexed-variable',
+      mode: 'get',
+      varName: 'litColor',
+      index: { source: 'literal', value: 0 },
+      valueType: 'color',
+      assignTo: 'out',
+    })
+    expect(raw('out')).toEqual({ type: 'color', value: 'transparent' })
+  })
+
+  it('coerces a NaN index to slot 0 rather than a #NaN junk slot', () => {
+    const { run, raw, seedNumber } = harness(['lit', 'bad'])
+    seedNumber('bad', NaN)
+    run({
+      id: 'ix',
+      type: 'logic',
+      logicType: 'indexed-variable',
+      mode: 'set',
+      varName: 'lit',
+      index: { source: 'variable', name: 'bad' },
+      valueType: 'number',
+      value: { source: 'literal', value: 1 },
+    })
+    expect(raw('lit#0')).toEqual({ type: 'number', value: 1 })
+    expect(raw('lit#NaN')).toBeUndefined()
+  })
 })

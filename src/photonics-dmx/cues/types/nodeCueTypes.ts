@@ -176,6 +176,18 @@ export interface TempoLogicNode extends BaseLogicNode {
   cycleValues?: number[] // Cycle count per band, length = cycleBands.length + 1 (default [2, 3, 5])
 }
 
+/** Default values the tempo node uses for its optional fields, shared by the runtime and the editor so the
+ *  two never disagree about what "unset" means. */
+export const TEMPO_DEFAULTS = {
+  beatsPerBar: 4,
+  barsPerPhrase: 2,
+  minBeatMs: 250,
+  maxBeatMs: 1000,
+  fallbackBeatMs: 461,
+  cycleBands: [110, 150],
+  cycleValues: [2, 3, 5],
+} as const
+
 // YARG Cue Data Properties - derived from shared constants
 export type YargCueDataProperty = (typeof YARG_CUE_DATA_PROPERTIES)[number]
 
@@ -326,7 +338,7 @@ export interface IndexedVariableLogicNode extends BaseLogicNode {
   mode: 'get' | 'set'
   varName: string // base family name
   index: ValueSource // which slot of the family
-  valueType?: VariableType // set: type written to the slot (default 'number')
+  valueType: VariableType // the family's element type (set: type written; get: type of the empty-slot zero)
   value?: ValueSource // set: value written to the slot
   assignTo?: string // get: variable the slot's value is read into
 }

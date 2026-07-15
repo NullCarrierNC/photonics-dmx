@@ -10,6 +10,7 @@ import { randomBetween } from '../../../helpers/utils'
 import {
   LogicNode,
   RandomRoll,
+  TEMPO_DEFAULTS,
   ValueSource,
   VariableDefinition,
   VariableType,
@@ -28,6 +29,21 @@ import { compileExpression } from './expressionEvaluator'
 import { monotonicNowMs } from '../../../../shared/time'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('logicNodeEvaluator')
+
+/** The empty-slot / uninitialised value for a variable type, matching resolveValue's no-source defaults
+ *  (arrays -> [], number -> 0, boolean -> false, others -> ''), with 'transparent' for a colour so an
+ *  unwritten colour cell shows through rather than resolving to black. */
+function zeroForType(t: VariableType): number | boolean | string | TrackedLight[] | Color[] {
+  if (t === 'light-array' || t === 'color-array') return []
+  if (t === 'number') return 0
+  if (t === 'boolean') return false
+  if (t === 'color') return 'transparent'
+  return ''
+}
+
+/** Expression nodes whose formula failed to parse and have already been warned about, keyed by
+ *  `${nodeId}:${expression}`, so a malformed formula logs once instead of every frame. */
+const warnedExpressionParseErrors = new Set<string>()
 
 export interface LogicNodeEvaluatorContext {
   cueId: string
@@ -94,32 +110,24 @@ export function evaluateLogicNode(
     case 'indexed-variable': {
       // Read or write one slot of a `${varName}#${index}` family. The slot lives in the same store the
       // base `varName` is declared in (cue vs cue-group), so a family of latches clears on activation.
-      const index = Math.floor(
-        Number(resolveValue('number', logicNode.index, context, variableDefinitions)),
-      )
+      const rawIndex = Number(resolveValue('number', logicNode.index, context, variableDefinitions))
+      const index = Math.floor(isNaN(rawIndex) ? 0 : rawIndex)
       const slotKey = `${logicNode.varName}#${index}`
       const varStore = getVarStore(logicNode.varName)
-      const valueType = logicNode.valueType ?? 'number'
+      const valueType = logicNode.valueType
       if (logicNode.mode === 'set') {
         const value = resolveValue(valueType, logicNode.value, context, variableDefinitions)
         varStore.set(slotKey, { type: valueType, value })
       } else if (logicNode.assignTo) {
         // get: always write the target so it can't read a stale value from a previous iteration. An empty
-        // slot yields the zero for the family type (0 / false / '' / 'transparent').
+        // slot yields the family type's zero (matching resolveValue's no-source defaults, plus
+        // 'transparent' for a colour so an unwritten cell shows through rather than paints black).
         const slot = varStore.get(slotKey)
         const targetStore = getVarStore(logicNode.assignTo)
         if (slot !== undefined) {
           targetStore.set(logicNode.assignTo, { type: slot.type, value: slot.value })
         } else {
-          const zero =
-            valueType === 'boolean'
-              ? false
-              : valueType === 'number'
-                ? 0
-                : valueType === 'color'
-                  ? 'transparent'
-                  : ''
-          targetStore.set(logicNode.assignTo, { type: valueType, value: zero })
+          targetStore.set(logicNode.assignTo, { type: valueType, value: zeroForType(valueType) })
         }
       }
       return edges.map((edge) => edge.to)
@@ -166,8 +174,9 @@ export function evaluateLogicNode(
     case 'expression': {
       // Evaluate the formula, resolving each identifier as a number variable through the SAME resolver
       // every other node uses (so scope/typing match). An unresolvable (undeclared/uninitialized) variable
-      // reads as 0 rather than throwing — like the math node absorbing a divide-by-zero — so one stray name
-      // can't blank the whole cue. A PARSE error is logged once (cached) and leaves the target unwritten.
+      // reads as 0 rather than throwing, like the math node absorbing a divide-by-zero, so one stray name
+      // can't blank the whole cue. A formula that fails to parse warns once (the graph re-runs every frame)
+      // and leaves the target unwritten.
       let result = 0
       try {
         result = compileExpression(logicNode.expression).evaluate((name) => {
@@ -180,7 +189,11 @@ export function evaluateLogicNode(
           }
         })
       } catch (err) {
-        log.warn(`expression node ${nodeId}: ${err instanceof Error ? err.message : String(err)}`)
+        const warnKey = `${nodeId}:${logicNode.expression}`
+        if (!warnedExpressionParseErrors.has(warnKey)) {
+          warnedExpressionParseErrors.add(warnKey)
+          log.warn(`expression node ${nodeId}: ${err instanceof Error ? err.message : String(err)}`)
+        }
         return edges.map((edge) => edge.to)
       }
       const varStore = getVarStore(logicNode.assignTo)
@@ -337,30 +350,39 @@ export function evaluateLogicNode(
       const key = `__framegate_${nodeId}`
       const count = Number(cueLevelVarStore.get(key)?.value ?? 0) + 1
       cueLevelVarStore.set(key, { type: 'number', value: count })
-      const divisor = Math.max(
-        1,
-        Math.round(Number(resolveValue('number', logicNode.divisor, context, variableDefinitions))),
+      // A non-finite divisor (e.g. an expression that produced NaN) would make `count % divisor` never 0
+      // and stick the gate on the false port, so it falls back to 1 (fire every frame).
+      const rawDivisor = Number(
+        resolveValue('number', logicNode.divisor, context, variableDefinitions),
       )
+      const divisor = Number.isFinite(rawDivisor) ? Math.max(1, Math.round(rawDivisor)) : 1
       const branch = count % divisor === 0 ? 'true' : 'false'
       return edges.filter((edge) => edge.fromPort === branch).map((edge) => edge.to)
     }
 
     case 'tempo': {
       // Read the song tempo and write the derived timing vars in one node, replacing the per-cue
-      // read/guard/clamp/multiply/band chain. A song reporting no tempo (menus, practice) falls back to
-      // fallbackBeatMs before clamping, so tempo-locked tweens still breathe at a sensible default rate.
-      const numOr = (vs: ValueSource | undefined, dflt: number): number =>
-        vs === undefined ? dflt : Number(resolveValue('number', vs, context, variableDefinitions))
+      // read/guard/clamp/multiply/band chain. A song reporting no tempo (bpm <= 0 on menus/practice) falls
+      // back to fallbackBeatMs before clamping, so tempo-locked tweens still breathe at a sensible rate.
+      // numOr absorbs an absent (null/undefined) or non-numeric bound as the default rather than poisoning
+      // the whole derivation with NaN.
+      const numOr = (vs: ValueSource | undefined, dflt: number): number => {
+        if (vs == null) return dflt
+        const n = Number(resolveValue('number', vs, context, variableDefinitions))
+        return Number.isFinite(n) ? n : dflt
+      }
 
-      const beatRaw = Number(extractCueDataValue('beat-duration-ms', context.cueData, cueId))
-      // A missing song reports ~0ms; anything implausibly short means no tempo, so fall back.
-      const guarded = beatRaw < 60 ? numOr(logicNode.fallbackBeatMs, 461) : beatRaw
+      const bpm = Number(extractCueDataValue('bpm', context.cueData, cueId))
+      const beatMsRaw =
+        bpm > 0
+          ? Math.round(60000 / bpm)
+          : numOr(logicNode.fallbackBeatMs, TEMPO_DEFAULTS.fallbackBeatMs)
       const beatMs = Math.min(
-        Math.max(guarded, numOr(logicNode.minBeatMs, 250)),
-        numOr(logicNode.maxBeatMs, 1000),
+        Math.max(beatMsRaw, numOr(logicNode.minBeatMs, TEMPO_DEFAULTS.minBeatMs)),
+        numOr(logicNode.maxBeatMs, TEMPO_DEFAULTS.maxBeatMs),
       )
-      const barMs = beatMs * numOr(logicNode.beatsPerBar, 4)
-      const phraseMs = barMs * numOr(logicNode.barsPerPhrase, 2)
+      const barMs = beatMs * numOr(logicNode.beatsPerBar, TEMPO_DEFAULTS.beatsPerBar)
+      const phraseMs = barMs * numOr(logicNode.barsPerPhrase, TEMPO_DEFAULTS.barsPerPhrase)
 
       getVarStore(logicNode.assignBeatMs).set(logicNode.assignBeatMs, {
         type: 'number',
@@ -380,9 +402,8 @@ export function evaluateLogicNode(
       }
 
       if (logicNode.assignCycles) {
-        const bpm = Number(extractCueDataValue('bpm', context.cueData, cueId))
-        const bands = logicNode.cycleBands ?? [110, 150]
-        const values = logicNode.cycleValues ?? [2, 3, 5]
+        const bands = logicNode.cycleBands ?? TEMPO_DEFAULTS.cycleBands
+        const values = logicNode.cycleValues ?? TEMPO_DEFAULTS.cycleValues
         // Start at the base value and override to the next band's value for each ascending threshold met,
         // mirroring the chain's independent "if bpm >= band" set nodes.
         let cycles = values[0] ?? 0

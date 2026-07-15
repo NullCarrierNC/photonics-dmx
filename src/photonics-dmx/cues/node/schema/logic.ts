@@ -648,7 +648,7 @@ const forEachLightLogicSchema = {
 
 const indexedVariableLogicSchema = {
   type: 'object',
-  required: ['id', 'type', 'logicType', 'mode', 'varName', 'index'],
+  required: ['id', 'type', 'logicType', 'mode', 'varName', 'index', 'valueType'],
   additionalProperties: false,
   properties: {
     id: stringIdSchema,
@@ -665,7 +665,6 @@ const indexedVariableLogicSchema = {
     index: valueSourceSchema,
     valueType: {
       type: 'string',
-      nullable: true,
       enum: [
         'number',
         'boolean',

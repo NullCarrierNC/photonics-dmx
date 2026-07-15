@@ -25,7 +25,9 @@ type Node =
   | { k: 'call'; name: string; args: Node[] }
 
 export interface CompiledExpression {
-  /** Evaluate against a variable resolver. Never throws for math edge cases (div/mod by zero -> 0). */
+  /** Evaluate against a variable resolver. Always returns a finite number: div/mod by zero and any
+   *  non-finite result (overflow, pow of a negative to a fraction) collapse to 0, matching the math node's
+   *  "absorb bad operands" convention rather than poisoning downstream vars with NaN/Infinity. */
   evaluate(resolve: (name: string) => number): number
   /** Distinct VARIABLE identifiers referenced (excludes functions and `pi`) — for declared-var checks. */
   variables: string[]
@@ -226,7 +228,9 @@ function evalNode(node: Node, resolve: (name: string) => number): number {
 
 // Parse cache keyed by source text, so identical expressions across nodes share one AST and reparse never
 // happens on the per-frame path. Failures are cached too (thrown on every access) so a bad expression
-// doesn't reparse each frame.
+// doesn't reparse each frame. Statically-authored expressions are few, so the cache is bounded only as a
+// safety valve against a runaway caller that feeds ever-changing source strings.
+const EXPRESSION_CACHE_LIMIT = 1000
 const cache = new Map<string, CompiledExpression | ExpressionParseError>()
 
 /** Compile (memoized) an expression source into an evaluatable form. Throws {@link ExpressionParseError}. */
@@ -236,10 +240,14 @@ export function compileExpression(src: string): CompiledExpression {
     if (hit instanceof ExpressionParseError) throw hit
     return hit
   }
+  if (cache.size >= EXPRESSION_CACHE_LIMIT) cache.clear()
   try {
     const { ast, variables } = parse(src)
     const compiled: CompiledExpression = {
-      evaluate: (resolve) => evalNode(ast, resolve),
+      evaluate: (resolve) => {
+        const result = evalNode(ast, resolve)
+        return Number.isFinite(result) ? result : 0
+      },
       variables,
     }
     cache.set(src, compiled)

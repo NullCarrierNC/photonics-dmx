@@ -1,5 +1,6 @@
 import React from 'react'
 import type { TempoLogicNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { TEMPO_DEFAULTS } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
 
@@ -7,10 +8,14 @@ export interface TempoLogicEditorProps extends LogicEditorCommonProps {
   node: TempoLogicNode
 }
 
+/** Parse a comma-separated number field, dropping empty segments (trailing/double commas) first so they
+ *  don't map to a spurious 0 (Number('') === 0). */
 const parseNumberList = (raw: string): number[] =>
   raw
     .split(',')
-    .map((s) => Number(s.trim()))
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .map(Number)
     .filter((n) => !Number.isNaN(n))
 
 /** Reads the song tempo once and writes the derived beat/bar/phrase durations (and an optional BPM-banded
@@ -46,35 +51,35 @@ const TempoLogicEditor: React.FC<TempoLogicEditorProps> = ({
       {varField('Cycles → variable (optional)', 'assignCycles', 'wave_cycles')}
 
       <ValueSourceEditor
-        label="Beats per bar (default 4)"
+        label={`Beats per bar (default ${TEMPO_DEFAULTS.beatsPerBar})`}
         value={node.beatsPerBar}
         onChange={(next) => updateNode({ beatsPerBar: next })}
         expected="number"
         availableVariables={availableVariables}
       />
       <ValueSourceEditor
-        label="Bars per phrase (default 2)"
+        label={`Bars per phrase (default ${TEMPO_DEFAULTS.barsPerPhrase})`}
         value={node.barsPerPhrase}
         onChange={(next) => updateNode({ barsPerPhrase: next })}
         expected="number"
         availableVariables={availableVariables}
       />
       <ValueSourceEditor
-        label="Min beat ms (default 250)"
+        label={`Min beat ms (default ${TEMPO_DEFAULTS.minBeatMs})`}
         value={node.minBeatMs}
         onChange={(next) => updateNode({ minBeatMs: next })}
         expected="number"
         availableVariables={availableVariables}
       />
       <ValueSourceEditor
-        label="Max beat ms (default 1000)"
+        label={`Max beat ms (default ${TEMPO_DEFAULTS.maxBeatMs})`}
         value={node.maxBeatMs}
         onChange={(next) => updateNode({ maxBeatMs: next })}
         expected="number"
         availableVariables={availableVariables}
       />
       <ValueSourceEditor
-        label="Fallback beat ms when silent (default 461)"
+        label={`Fallback beat ms when silent (default ${TEMPO_DEFAULTS.fallbackBeatMs})`}
         value={node.fallbackBeatMs}
         onChange={(next) => updateNode({ fallbackBeatMs: next })}
         expected="number"
@@ -84,21 +89,21 @@ const TempoLogicEditor: React.FC<TempoLogicEditorProps> = ({
       {node.assignCycles && (
         <>
           <label className="flex flex-col font-medium">
-            Cycle BPM bands (ascending, default 110, 150)
+            Cycle BPM bands (ascending, default {TEMPO_DEFAULTS.cycleBands.join(', ')})
             <input
               type="text"
               className="mt-1 rounded border px-2 py-1 font-mono bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={(node.cycleBands ?? [110, 150]).join(', ')}
+              value={(node.cycleBands ?? TEMPO_DEFAULTS.cycleBands).join(', ')}
               spellCheck={false}
               onChange={(event) => updateNode({ cycleBands: parseNumberList(event.target.value) })}
             />
           </label>
           <label className="flex flex-col font-medium">
-            Cycle values (one more than bands, default 2, 3, 5)
+            Cycle values (one more than bands, default {TEMPO_DEFAULTS.cycleValues.join(', ')})
             <input
               type="text"
               className="mt-1 rounded border px-2 py-1 font-mono bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={(node.cycleValues ?? [2, 3, 5]).join(', ')}
+              value={(node.cycleValues ?? TEMPO_DEFAULTS.cycleValues).join(', ')}
               spellCheck={false}
               onChange={(event) => updateNode({ cycleValues: parseNumberList(event.target.value) })}
             />

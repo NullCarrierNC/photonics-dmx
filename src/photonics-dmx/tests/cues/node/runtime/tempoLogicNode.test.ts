@@ -73,11 +73,47 @@ describe('tempo logic node', () => {
     expect(fast.num('cycles')).toBe(5) // >= 150
   })
 
-  it('clamps the beat and falls back when the tempo is implausibly fast (no-tempo guard)', () => {
-    // 2000 bpm -> beat-duration-ms 30ms, below the 60ms guard, so the node uses fallbackBeatMs (461).
+  it('falls back to fallbackBeatMs when the song reports no tempo (bpm <= 0)', () => {
+    // A menu/practice frame reports bpm 0, so the node uses fallbackBeatMs (default 461) rather than a beat.
+    const silent = harness(0, ['beat_ms'])
+    silent.run(
+      fullNode({ assignBarMs: undefined, assignPhraseMs: undefined, assignCycles: undefined }),
+    )
+    expect(silent.num('beat_ms')).toBe(461)
+
+    // A custom fallback is honoured (previously the guard was dead and this had no effect).
+    const custom = harness(0, ['beat_ms'])
+    custom.run(
+      fullNode({
+        assignBarMs: undefined,
+        assignPhraseMs: undefined,
+        assignCycles: undefined,
+        fallbackBeatMs: { source: 'literal', value: 800 },
+      }),
+    )
+    expect(custom.num('beat_ms')).toBe(800)
+  })
+
+  it('clamps an implausibly fast tempo up to the min-beat floor', () => {
+    // 2000 bpm is a real (if absurd) tempo: 30ms beat, clamped up to the 250ms floor rather than fallback.
     const { run, num } = harness(2000, ['beat_ms'])
     run(fullNode({ assignBarMs: undefined, assignPhraseMs: undefined, assignCycles: undefined }))
-    expect(num('beat_ms')).toBe(461)
+    expect(num('beat_ms')).toBe(250)
+  })
+
+  it('treats a schema-valid null bound as unset (uses the default, not 0)', () => {
+    // The schema marks the bound fields nullable, so an explicit null must fall back to the default rather
+    // than resolve to 0 and collapse the beat.
+    const { run, num } = harness(120, ['beat_ms'])
+    run(
+      fullNode({
+        assignBarMs: undefined,
+        assignPhraseMs: undefined,
+        assignCycles: undefined,
+        maxBeatMs: null as unknown as undefined,
+      }),
+    )
+    expect(num('beat_ms')).toBe(500) // 60000/120, default max 1000 applied
   })
 
   it('honours custom beatsPerBar / barsPerPhrase / clamp / fallback', () => {
