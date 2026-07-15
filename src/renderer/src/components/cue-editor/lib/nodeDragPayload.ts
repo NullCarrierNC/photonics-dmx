@@ -20,7 +20,8 @@ export type NodeDragPayload =
   | { kind: 'notes'; variant: NotesVariant }
 
 // Membership set for validating dropped logic payloads, derived from the canonical NODE_LOGIC_TYPES so it
-// can never drift from the LogicNode union (a missing type previously made the dragged node vanish).
+// stays in lockstep with the LogicNode union. A type absent from this set makes parseNodeDrag reject the
+// drop, so the drag silently produces no node.
 const LOGIC_TYPES = new Set<string>(NODE_LOGIC_TYPES)
 
 const NOTES_VARIANTS: ReadonlyArray<NotesVariant> = ['notes', 'info', 'important']

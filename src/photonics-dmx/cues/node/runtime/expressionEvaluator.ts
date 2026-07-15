@@ -1,7 +1,7 @@
 /**
- * A tiny, dependency-free arithmetic expression compiler for the `expression` logic node. Collapses the
- * long math->math node chains authors previously hand-wired (progress `a+(b-a)*t`, geometry, index maths,
- * tempo multiples) into a single readable formula.
+ * A tiny, dependency-free arithmetic expression compiler for the `expression` logic node. Collapses a
+ * long math->math node chain (progress `a+(b-a)*t`, geometry, index maths, tempo multiples) into a single
+ * readable formula.
  *
  * Grammar (numbers, variables, the five arithmetic operators, parentheses, unary minus, and a fixed set of
  * built-in functions):

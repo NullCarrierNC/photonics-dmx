@@ -151,9 +151,10 @@ export interface ConditionalLogicNode extends BaseLogicNode {
 
 export interface FrameGateLogicNode extends BaseLogicNode {
   logicType: 'frame-gate'
-  // Fire the `true` port every `divisor`-th time this node is reached, the `false` port otherwise — an
-  // internal per-node counter (reset each activation) replaces the count++ / modulus / conditional trio
-  // authors previously wired for frame-rate strobes and self-driven step gates. divisor is guarded to >= 1.
+  // Fires the `true` port every `divisor`-th time this node is reached and the `false` port otherwise,
+  // using an internal per-node counter that resets each activation. Collapses the count++ / modulus /
+  // conditional trio a frame-rate strobe or self-driven step gate would otherwise need. divisor is
+  // guarded to >= 1.
   divisor: ValueSource
 }
 

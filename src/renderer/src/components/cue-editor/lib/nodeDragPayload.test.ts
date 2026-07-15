@@ -2,8 +2,8 @@ import { serializeNodeDrag, parseNodeDrag } from './nodeDragPayload'
 import type { LogicNode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 describe('nodeDragPayload logic round-trip', () => {
-  // clamp, select-from-list, and pulse were missing from the drag allowlist, so dragging them from the
-  // palette parsed to null and the node vanished on drop. Guard the whole logic-node vocabulary here.
+  // Every logic type must round-trip through drag serialize/parse, or dragging it from the palette parses
+  // to null and produces no node on drop. Guard the whole logic-node vocabulary here.
   const logicTypes: LogicNode['logicType'][] = [
     'variable',
     'math',
