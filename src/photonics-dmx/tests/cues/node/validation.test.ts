@@ -145,6 +145,102 @@ describe('Node cue validation', () => {
     ).toBe(false)
   })
 
+  it('validates multi-set variable and multi-roll random logic nodes, and rejects a roll missing assignTo', () => {
+    const makeDef = (logic: Record<string, unknown>): YargNodeCueDefinition =>
+      ({
+        id: 'logic-cue',
+        name: 'Logic Cue',
+        description: '',
+        kind: 'lighting',
+        cueType: CueType.Chorus,
+        style: 'primary',
+        nodes: {
+          events: [{ id: 'event-1', type: 'event', eventType: 'cue-called' }],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'blue' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 200 },
+                waitUntilCondition: { source: 'literal', value: 'none' },
+                waitUntilTime: { source: 'literal', value: 0 },
+                easing: { source: 'literal', value: 'sinInOut' },
+                level: { source: 'literal', value: 1 },
+              },
+            },
+          ],
+          logic: [logic as never],
+        },
+        connections: [
+          { from: 'event-1', to: 'logic-1' },
+          { from: 'logic-1', to: 'action-1' },
+        ],
+        layout: { nodePositions: {} },
+      }) as YargNodeCueDefinition
+
+    const isValid = (logic: Record<string, unknown>): boolean =>
+      validateYargNodeCueFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'g1', name: 'Group' },
+        cues: [makeDef(logic)],
+      }).valid
+
+    // Multi-set variable: assignments alongside the (still required) single-var envelope.
+    expect(
+      isValid({
+        id: 'logic-1',
+        type: 'logic',
+        logicType: 'variable',
+        mode: 'set',
+        varName: 'a',
+        valueType: 'number',
+        assignments: [
+          { varName: 'a', valueType: 'number', value: { source: 'literal', value: 1 } },
+          { varName: 'b', valueType: 'string', value: { source: 'literal', value: 'x' } },
+        ],
+      }),
+    ).toBe(true)
+
+    // Multi-roll random: rolls alongside the (still required) single-roll envelope.
+    const validRandom = {
+      id: 'logic-1',
+      type: 'logic',
+      logicType: 'random',
+      mode: 'random-integer',
+      assignTo: 'a',
+      rolls: [
+        {
+          mode: 'random-integer',
+          assignTo: 'x',
+          min: { source: 'literal', value: 0 },
+          max: { source: 'literal', value: 5 },
+        },
+        { mode: 'random-choice', assignTo: 'pick', choices: ['a', 'b'] },
+      ],
+    }
+    expect(isValid(validRandom)).toBe(true)
+
+    // A roll missing its assignTo fails schema validation.
+    const badRandom = {
+      ...validRandom,
+      rolls: [{ mode: 'random-integer', min: { source: 'literal', value: 0 } }],
+    }
+    expect(isValid(badRandom)).toBe(false)
+  })
+
   it('validates a simple RB3 node cue (YARG-shaped, mode rb3)', () => {
     const definition: YargNodeCueDefinition = {
       id: 'rb3-cue',

@@ -73,6 +73,32 @@ const variableLogicSchema = {
       ] as const,
     },
     value: { ...valueSourceSchema, nullable: true },
+    assignments: {
+      type: 'array',
+      nullable: true,
+      items: {
+        type: 'object',
+        required: ['varName', 'valueType'],
+        additionalProperties: false,
+        properties: {
+          varName: { type: 'string' },
+          valueType: {
+            type: 'string',
+            enum: [
+              'number',
+              'boolean',
+              'string',
+              'color',
+              'light-array',
+              'color-array',
+              'cue-type',
+              'event',
+            ] as const,
+          },
+          value: { ...valueSourceSchema, nullable: true },
+        },
+      },
+    },
   },
 } as unknown as JSONSchemaType<VariableLogicNode>
 
@@ -506,6 +532,31 @@ const randomLogicSchema = {
     sourceVariable: { type: 'string', nullable: true },
     count: { ...valueSourceSchema, nullable: true },
     assignTo: { type: 'string' },
+    rolls: {
+      type: 'array',
+      nullable: true,
+      items: {
+        type: 'object',
+        required: ['mode', 'assignTo'],
+        additionalProperties: false,
+        properties: {
+          mode: {
+            type: 'string',
+            enum: ['random-integer', 'random-choice', 'random-light'] as const,
+          },
+          min: { ...valueSourceSchema, nullable: true },
+          max: { ...valueSourceSchema, nullable: true },
+          choices: {
+            type: 'array',
+            nullable: true,
+            items: { type: 'string' },
+          },
+          sourceVariable: { type: 'string', nullable: true },
+          count: { ...valueSourceSchema, nullable: true },
+          assignTo: { type: 'string' },
+        },
+      },
+    },
   },
 } as unknown as JSONSchemaType<RandomLogicNode>
 

@@ -81,12 +81,22 @@ export interface BaseLogicNode {
   outputs?: string[]
 }
 
+/** One target of a multi-set variable node. Same shape as the single-var fields, one per variable. */
+export interface VariableAssignment {
+  varName: string
+  valueType: VariableType
+  value?: ValueSource
+}
+
 export interface VariableLogicNode extends BaseLogicNode {
   logicType: 'variable'
   mode: 'set' | 'get' | 'init'
   varName: string
   valueType: VariableType
   value?: ValueSource
+  // When present and non-empty, set/init every listed variable in order (honouring `mode`), instead of the
+  // single varName/valueType/value above. Collapses a run of set nodes (e.g. a transparent-clear pair) into one.
+  assignments?: VariableAssignment[]
 }
 
 export interface MathLogicNode extends BaseLogicNode {
@@ -248,6 +258,18 @@ export interface DebuggerLogicNode extends BaseLogicNode {
 
 export type RandomMode = 'random-integer' | 'random-choice' | 'random-light'
 
+/** One roll of a multi-roll random node. Structurally a RandomLogicNode minus the node envelope, so the
+ *  node itself satisfies this shape and legacy single-roll nodes read as a one-element list. */
+export interface RandomRoll {
+  mode: RandomMode
+  min?: ValueSource // random-integer: inclusive min
+  max?: ValueSource // random-integer: inclusive max
+  choices?: string[] // random-choice: list of string options
+  sourceVariable?: string // random-light: light-array variable name
+  count?: ValueSource // random-light: number of lights to pick
+  assignTo: string // variable to store result
+}
+
 export interface RandomLogicNode extends BaseLogicNode {
   logicType: 'random'
   mode: RandomMode
@@ -257,6 +279,9 @@ export interface RandomLogicNode extends BaseLogicNode {
   sourceVariable?: string // random-light: light-array variable name
   count?: ValueSource // random-light: number of lights to pick
   assignTo: string // variable to store result
+  // When present and non-empty, perform each roll in order instead of the single roll above. Collapses a
+  // run of random nodes (e.g. strobe x/y/rotation, or preset + duration) into one node.
+  rolls?: RandomRoll[]
 }
 
 export interface ShuffleLightsLogicNode extends BaseLogicNode {

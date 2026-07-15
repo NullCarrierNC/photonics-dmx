@@ -7,7 +7,13 @@ import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { TrackedLight, Color } from '../../../types'
 import { randomBetween } from '../../../helpers/utils'
-import { LogicNode, ValueSource, VariableDefinition, VariableType } from '../../types/nodeCueTypes'
+import {
+  LogicNode,
+  RandomRoll,
+  ValueSource,
+  VariableDefinition,
+  VariableType,
+} from '../../types/nodeCueTypes'
 import { ExecutionContext } from './ExecutionContext'
 import { VariableValue } from './executionTypes'
 import { Connection } from '../../types/nodeCueTypes'
@@ -54,20 +60,32 @@ export function evaluateLogicNode(
   switch (logicNode.logicType) {
     case 'variable': {
       if (logicNode.mode !== 'get') {
-        const value = resolveValue(
-          logicNode.valueType,
-          logicNode.value,
-          context,
-          variableDefinitions,
-        )
-        const varStore = getVarStore(logicNode.varName)
-
-        if (logicNode.mode === 'init') {
-          if (!varStore.has(logicNode.varName)) {
-            varStore.set(logicNode.varName, { type: logicNode.valueType, value })
+        // A multi-set node lists its targets in `assignments`; a legacy single-set node reads as one.
+        const assignments =
+          logicNode.assignments && logicNode.assignments.length > 0
+            ? logicNode.assignments
+            : [
+                {
+                  varName: logicNode.varName,
+                  valueType: logicNode.valueType,
+                  value: logicNode.value,
+                },
+              ]
+        for (const assignment of assignments) {
+          const value = resolveValue(
+            assignment.valueType,
+            assignment.value,
+            context,
+            variableDefinitions,
+          )
+          const varStore = getVarStore(assignment.varName)
+          if (logicNode.mode === 'init') {
+            if (!varStore.has(assignment.varName)) {
+              varStore.set(assignment.varName, { type: assignment.valueType, value })
+            }
+          } else {
+            varStore.set(assignment.varName, { type: assignment.valueType, value })
           }
-        } else {
-          varStore.set(logicNode.varName, { type: logicNode.valueType, value })
         }
       }
       return edges.map((edge) => edge.to)
@@ -684,54 +702,64 @@ export function evaluateLogicNode(
     }
 
     case 'random': {
-      const varStore = getVarStore(logicNode.assignTo)
-      if (logicNode.mode === 'random-integer') {
-        const minVal = Number(
-          resolveValue(
-            'number',
-            logicNode.min ?? { source: 'literal', value: 0 },
-            context,
-            variableDefinitions,
-          ),
-        )
-        const maxVal = Number(
-          resolveValue(
-            'number',
-            logicNode.max ?? { source: 'literal', value: 1 },
-            context,
-            variableDefinitions,
-          ),
-        )
-        const min = Math.floor(minVal)
-        const max = Math.floor(maxVal)
-        const result = min <= max ? randomBetween(min, max) : min
-        varStore.set(logicNode.assignTo, { type: 'number', value: result })
-      } else if (logicNode.mode === 'random-choice') {
-        const choices = logicNode.choices ?? []
-        const result = choices.length > 0 ? choices[randomBetween(0, choices.length - 1)] ?? '' : ''
-        varStore.set(logicNode.assignTo, { type: 'string', value: result })
-      } else if (logicNode.mode === 'random-light') {
-        const sourceVarStore = getVarStore(logicNode.sourceVariable ?? '')
-        const sourceVar = sourceVarStore.get(logicNode.sourceVariable ?? '')
-        if (!sourceVar || sourceVar.type !== 'light-array') {
-          log.warn(
-            `random node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`,
+      // Perform one roll into its assignTo var. A multi-roll node lists rolls in `rolls`; a legacy
+      // single-roll node reads as one roll (the node itself satisfies the RandomRoll shape).
+      const performRoll = (roll: RandomRoll): void => {
+        const varStore = getVarStore(roll.assignTo)
+        if (roll.mode === 'random-integer') {
+          const minVal = Number(
+            resolveValue(
+              'number',
+              roll.min ?? { source: 'literal', value: 0 },
+              context,
+              variableDefinitions,
+            ),
           )
-          return edges.map((edge) => edge.to)
+          const maxVal = Number(
+            resolveValue(
+              'number',
+              roll.max ?? { source: 'literal', value: 1 },
+              context,
+              variableDefinitions,
+            ),
+          )
+          const min = Math.floor(minVal)
+          const max = Math.floor(maxVal)
+          const result = min <= max ? randomBetween(min, max) : min
+          varStore.set(roll.assignTo, { type: 'number', value: result })
+        } else if (roll.mode === 'random-choice') {
+          const choices = roll.choices ?? []
+          const result =
+            choices.length > 0 ? choices[randomBetween(0, choices.length - 1)] ?? '' : ''
+          varStore.set(roll.assignTo, { type: 'string', value: result })
+        } else if (roll.mode === 'random-light') {
+          const sourceVarStore = getVarStore(roll.sourceVariable ?? '')
+          const sourceVar = sourceVarStore.get(roll.sourceVariable ?? '')
+          if (!sourceVar || sourceVar.type !== 'light-array') {
+            log.warn(
+              `random node ${nodeId}: source variable "${roll.sourceVariable}" is not a light-array`,
+            )
+            return
+          }
+          const lightsArray = sourceVar.value as TrackedLight[]
+          const countVal = Number(
+            resolveValue(
+              'number',
+              roll.count ?? { source: 'literal', value: 1 },
+              context,
+              variableDefinitions,
+            ),
+          )
+          const count = Math.max(0, Math.min(Math.floor(countVal), lightsArray.length))
+          const shuffled = [...lightsArray].sort(() => Math.random() - 0.5)
+          const picked = shuffled.slice(0, count)
+          varStore.set(roll.assignTo, { type: 'light-array', value: picked })
         }
-        const lightsArray = sourceVar.value as TrackedLight[]
-        const countVal = Number(
-          resolveValue(
-            'number',
-            logicNode.count ?? { source: 'literal', value: 1 },
-            context,
-            variableDefinitions,
-          ),
-        )
-        const count = Math.max(0, Math.min(Math.floor(countVal), lightsArray.length))
-        const shuffled = [...lightsArray].sort(() => Math.random() - 0.5)
-        const picked = shuffled.slice(0, count)
-        varStore.set(logicNode.assignTo, { type: 'light-array', value: picked })
+      }
+
+      const rolls = logicNode.rolls && logicNode.rolls.length > 0 ? logicNode.rolls : [logicNode]
+      for (const roll of rolls) {
+        performRoll(roll)
       }
       return edges.map((edge) => edge.to)
     }
