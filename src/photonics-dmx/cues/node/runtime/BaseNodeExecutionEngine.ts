@@ -31,7 +31,7 @@ import {
 } from '../../types/nodeCueTypes'
 import type { Connection } from '../../types/nodeCueTypes'
 import type { CueData } from '../../types/cueTypes'
-import { ledBankNibbleAt, ledColorAt } from '../../types/cueTypes'
+import { runFanOut as runFanOutLoop, computeLedChanges } from './fanOut'
 import type { AudioCueData } from '../../types/audioCueTypes'
 import type { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
@@ -58,7 +58,6 @@ import {
   resolveActionPosition,
 } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
-import { collectReachableNodes } from './engineUtils'
 import {
   runContextBatch,
   buildActionChain,
@@ -243,18 +242,6 @@ export abstract class BaseNodeExecutionEngine {
     const isAction = this.compiled.actionMap.has(nodeId)
     const isEventRaiser = this.compiled.eventRaiserMap.has(nodeId)
     return !(isAction || isEventRaiser)
-  }
-
-  /**
-   * Collect all node IDs reachable from startNodeIds, excluding excludeNodeId.
-   * Delegates to shared engineUtils for de-duplication.
-   */
-  protected collectReachableNodes(
-    adjacency: Map<string, Connection[]>,
-    startNodeIds: string[],
-    excludeNodeId: string,
-  ): Set<string> {
-    return collectReachableNodes(adjacency, startNodeIds, excludeNodeId)
   }
 
   /**
@@ -502,12 +489,9 @@ export abstract class BaseNodeExecutionEngine {
   private fanOutBodyNodeIds = new Map<string, ReadonlySet<string>>()
 
   /**
-   * Shared fan-out driver for the iteration nodes (for-each-light, led-changed). Runs the `each` body
-   * `iterationCount` times, calling `seedIteration(i)` before each pass to write that iteration's variables
-   * (it returns the index to expose for effect naming — the loop counter for for-each-light, the LED
-   * position for led-changed), then continues the `done` branch. The forEachLightState bracket keeps
-   * tryComplete from disposing the context mid-loop, and unmarking the body nodes lets each pass re-walk
-   * under the strict revisit policy.
+   * Fan-out driver for the iteration nodes (for-each-light, led-changed). Delegates to the shared
+   * {@link runFanOutLoop} (also used by LaserGraphExecutor) so the loop protocol lives in one place; the
+   * body-set memo stays on the engine because the compiled graph it keys off is engine-owned.
    */
   protected runFanOut(
     nodeId: string,
@@ -515,37 +499,13 @@ export abstract class BaseNodeExecutionEngine {
     iterationCount: number,
     seedIteration: (i: number) => number,
   ): void {
-    const { adjacency } = this.compiled
-    const edges = adjacency.get(nodeId) ?? []
-    const eachTargets = edges.filter((e) => e.fromPort === 'each').map((e) => e.to)
-    const doneTargets = edges.filter((e) => e.fromPort === 'done').map((e) => e.to)
-
-    let bodyNodeIds = this.fanOutBodyNodeIds.get(nodeId)
-    if (!bodyNodeIds) {
-      bodyNodeIds = this.collectReachableNodes(adjacency, eachTargets, nodeId)
-      this.fanOutBodyNodeIds.set(nodeId, bodyNodeIds)
-    }
-
-    context.setForEachLightState(nodeId, { index: 0, length: iterationCount })
-    try {
-      for (let i = 0; i < iterationCount; i++) {
-        const iterationIndex = seedIteration(i)
-        context.setForEachIterationIndex(iterationIndex)
-        for (const bodyId of bodyNodeIds) {
-          context.unmarkVisited(bodyId)
-        }
-        this.continueExecution(eachTargets, context)
-      }
-    } finally {
-      // Clear the loop bracket even if an iteration throws, so a leaked forEachLightState entry can't wedge
-      // tryComplete off and strand the context alive forever.
-      context.clearForEachLightState(nodeId)
-      context.setForEachIterationIndex(-1)
-    }
-
-    context.markVisited(nodeId)
-    this.emitNodeExecution('deactivated', nodeId)
-    this.continueOrComplete(doneTargets, context)
+    runFanOutLoop(nodeId, context, iterationCount, seedIteration, {
+      adjacency: this.compiled.adjacency,
+      bodyCache: this.fanOutBodyNodeIds,
+      continueExecution: (targets, ctx) => this.continueExecution(targets, ctx),
+      continueOrComplete: (targets, ctx) => this.continueOrComplete(targets, ctx),
+      emitDeactivated: (id) => this.emitNodeExecution('deactivated', id),
+    })
   }
 
   /**
@@ -615,23 +575,7 @@ export abstract class BaseNodeExecutionEngine {
     context: ExecutionContext,
   ): void {
     const nodeId = logicNode.id
-
-    // led-changed only applies to StageKit (RB3) cue frames; an audio frame has no LED banks, so both
-    // sides read empty and no position ever changes (the body runs zero times, straight to `done`).
-    const frame = context.cueData
-    const now: Partial<CueData> = 'ledBanks' in frame ? frame : {}
-    const prev: Partial<CueData> | undefined = 'ledBanks' in frame ? frame.previousFrame : undefined
-
-    // Positions (0..7) whose bank nibble changed, with the edge kind. The nibble captures both lit-state
-    // and colour, so a single inequality catches off->on, on->off, and a same-position colour swap.
-    const changed: { index: number; edge: 'on' | 'off' | 'color'; color: string }[] = []
-    for (let i = 0; i < 8; i++) {
-      const nowNibble = ledBankNibbleAt(now, i)
-      const prevNibble = ledBankNibbleAt(prev, i)
-      if (nowNibble === prevNibble) continue
-      const edge = prevNibble === 0 ? 'on' : nowNibble === 0 ? 'off' : 'color'
-      changed.push({ index: i, edge, color: ledColorAt(now, i) })
-    }
+    const changed = computeLedChanges(context.cueData)
 
     // Iteration index = LED position, so each cell's effect name is stable across frames.
     this.runFanOut(nodeId, context, changed.length, (i) => {
