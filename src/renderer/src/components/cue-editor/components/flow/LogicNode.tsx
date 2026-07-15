@@ -82,6 +82,13 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
         </>
       )
     }
+    if (logicType === 'frame-gate') {
+      return (
+        <div>
+          Every <Mono>{formatValueSource(logic.divisor)}</Mono> frames
+        </div>
+      )
+    }
     if (logicType === 'conditional') {
       const left = formatValueSource(logic.left)
       const right = formatValueSource(logic.right)
@@ -367,7 +374,8 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
     return logicType
   }
 
-  const isConditional = logicType === 'conditional'
+  // Both the conditional and the frame-gate route flow through `true`/`false` output ports.
+  const isConditional = logicType === 'conditional' || logicType === 'frame-gate'
   const isForEachLight = logicType === 'for-each-light'
   const isDataNode = logicType === 'cue-data' || logicType === 'config-data'
   const isArrayNode =

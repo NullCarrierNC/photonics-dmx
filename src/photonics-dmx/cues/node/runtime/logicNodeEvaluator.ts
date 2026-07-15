@@ -277,6 +277,22 @@ export function evaluateLogicNode(
       return targeted.map((edge) => edge.to)
     }
 
+    case 'frame-gate': {
+      // Fire the `true` port every `divisor`-th time this node is reached, `false` otherwise. The counter
+      // lives in an internal cue-store key (no `__`-prefixed collision with authored names) and is cleared
+      // with the cue-level vars on each activation, so the gate phase restarts per activation without an
+      // authored counter variable.
+      const key = `__framegate_${nodeId}`
+      const count = Number(cueLevelVarStore.get(key)?.value ?? 0) + 1
+      cueLevelVarStore.set(key, { type: 'number', value: count })
+      const divisor = Math.max(
+        1,
+        Math.round(Number(resolveValue('number', logicNode.divisor, context, variableDefinitions))),
+      )
+      const branch = count % divisor === 0 ? 'true' : 'false'
+      return edges.filter((edge) => edge.fromPort === branch).map((edge) => edge.to)
+    }
+
     case 'cue-data': {
       const value = extractCueDataValue(logicNode.dataProperty, context.cueData, cueId)
 

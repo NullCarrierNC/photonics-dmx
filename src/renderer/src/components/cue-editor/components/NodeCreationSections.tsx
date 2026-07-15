@@ -203,6 +203,12 @@ const LogicNodesSection: React.FC<{
         Clamp
       </button>
       <button
+        className={getLogicNodeButtonClasses('frame-gate')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'frame-gate' })}
+        onClick={() => addLogicNode('frame-gate')}>
+        Frame Gate
+      </button>
+      <button
         className={getLogicNodeButtonClasses('select-from-list')}
         {...makeDragHandlers({ kind: 'logic', logicType: 'select-from-list' })}
         onClick={() => addLogicNode('select-from-list')}>

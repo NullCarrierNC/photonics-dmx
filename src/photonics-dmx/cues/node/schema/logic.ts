@@ -15,6 +15,7 @@ import type {
   ConcatColorsLogicNode,
   ConcatLightsLogicNode,
   ConditionalLogicNode,
+  FrameGateLogicNode,
   ConfigDataLogicNode,
   CueDataLogicNode,
   CreatePairsLogicNode,
@@ -196,6 +197,24 @@ const conditionalLogicSchema = {
     right: valueSourceSchema,
   },
 } as unknown as JSONSchemaType<ConditionalLogicNode>
+
+const frameGateLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'divisor'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'frame-gate' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    divisor: valueSourceSchema,
+  },
+} as unknown as JSONSchemaType<FrameGateLogicNode>
 
 const cueDataLogicSchema = {
   type: 'object',
@@ -546,6 +565,7 @@ export const logicNodeSchema = {
     selectFromListLogicSchema,
     pulseLogicSchema,
     conditionalLogicSchema,
+    frameGateLogicSchema,
     cueDataLogicSchema,
     configDataLogicSchema,
     lightsFromIndexLogicSchema,

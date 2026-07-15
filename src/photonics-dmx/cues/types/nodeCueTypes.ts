@@ -139,6 +139,14 @@ export interface ConditionalLogicNode extends BaseLogicNode {
   right: ValueSource
 }
 
+export interface FrameGateLogicNode extends BaseLogicNode {
+  logicType: 'frame-gate'
+  // Fire the `true` port every `divisor`-th time this node is reached, the `false` port otherwise — an
+  // internal per-node counter (reset each activation) replaces the count++ / modulus / conditional trio
+  // authors previously wired for frame-rate strobes and self-driven step gates. divisor is guarded to >= 1.
+  divisor: ValueSource
+}
+
 // YARG Cue Data Properties - derived from shared constants
 export type YargCueDataProperty = (typeof YARG_CUE_DATA_PROPERTIES)[number]
 
@@ -274,6 +282,7 @@ export type LogicNode =
   | SelectFromListLogicNode
   | PulseLogicNode
   | ConditionalLogicNode
+  | FrameGateLogicNode
   | CueDataLogicNode
   | ConfigDataLogicNode
   | LightsFromIndexLogicNode

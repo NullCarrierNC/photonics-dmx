@@ -21,7 +21,9 @@ export type NodeDragPayload =
 const LOGIC_TYPES: ReadonlyArray<LogicNode['logicType']> = [
   'variable',
   'math',
+  'expression',
   'conditional',
+  'frame-gate',
   'cue-data',
   'config-data',
   'lights-from-index',

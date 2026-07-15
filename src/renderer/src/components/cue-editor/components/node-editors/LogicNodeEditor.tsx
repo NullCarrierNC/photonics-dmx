@@ -4,6 +4,7 @@ import type {
   VariableLogicNode,
   MathLogicNode,
   ExpressionLogicNode,
+  FrameGateLogicNode,
   ClampLogicNode,
   SelectFromListLogicNode,
   PulseLogicNode,
@@ -31,6 +32,7 @@ import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nod
 import VariableLogicEditor from './logic/VariableLogicEditor'
 import MathLogicEditor from './logic/MathLogicEditor'
 import ExpressionLogicEditor from './logic/ExpressionLogicEditor'
+import FrameGateLogicEditor from './logic/FrameGateLogicEditor'
 import ClampLogicEditor from './logic/ClampLogicEditor'
 import SelectFromListLogicEditor from './logic/SelectFromListLogicEditor'
 import PulseLogicEditor from './logic/PulseLogicEditor'
@@ -102,6 +104,16 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     return (
       <ExpressionLogicEditor
         node={node as ExpressionLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'frame-gate') {
+    return (
+      <FrameGateLogicEditor
+        node={node as FrameGateLogicNode}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />

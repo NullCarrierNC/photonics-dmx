@@ -6,6 +6,7 @@ import {
   type LogicNode,
   type MathLogicNode,
   type ExpressionLogicNode,
+  type FrameGateLogicNode,
   type ClampLogicNode,
   type SelectFromListLogicNode,
   type PulseLogicNode,
@@ -185,6 +186,15 @@ const useNodeCreation = ({
           expression: '0',
           assignTo: 'result',
         }) satisfies ExpressionLogicNode,
+      'frame-gate': (id) =>
+        ({
+          id,
+          type: 'logic',
+          logicType: 'frame-gate',
+          label: 'frame-gate',
+          outputs: [],
+          divisor: { source: 'literal', value: 4 },
+        }) satisfies FrameGateLogicNode,
       'clamp': (id) =>
         ({
           id,
