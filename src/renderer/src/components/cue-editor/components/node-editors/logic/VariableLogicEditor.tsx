@@ -100,6 +100,20 @@ const VariableLogicEditor: React.FC<VariableLogicEditorProps> = ({
           availableVariables={availableVariables}
         />
       )}
+      {node.assignments && node.assignments.length > 0 && (
+        <div className="rounded border border-amber-300 bg-amber-50 p-2 text-[10px] dark:border-amber-700 dark:bg-amber-900/20">
+          <div className="font-semibold">Multi-set: {node.assignments.length} assignments</div>
+          {node.assignments.map((a, i) => (
+            <div key={i} className="font-mono">
+              {node.mode} {a.varName} ({a.valueType})
+            </div>
+          ))}
+          <div className="mt-1 opacity-80">
+            While assignments are set they drive this node and the single-variable fields above are
+            ignored. Edit the list via the cue generator.
+          </div>
+        </div>
+      )}
     </div>
   )
 }

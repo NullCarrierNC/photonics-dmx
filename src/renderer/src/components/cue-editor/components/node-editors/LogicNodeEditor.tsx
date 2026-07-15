@@ -5,6 +5,9 @@ import type {
   MathLogicNode,
   ExpressionLogicNode,
   FrameGateLogicNode,
+  TempoLogicNode,
+  IndexedVariableLogicNode,
+  LedChangedLogicNode,
   ClampLogicNode,
   SelectFromListLogicNode,
   PulseLogicNode,
@@ -33,6 +36,9 @@ import VariableLogicEditor from './logic/VariableLogicEditor'
 import MathLogicEditor from './logic/MathLogicEditor'
 import ExpressionLogicEditor from './logic/ExpressionLogicEditor'
 import FrameGateLogicEditor from './logic/FrameGateLogicEditor'
+import TempoLogicEditor from './logic/TempoLogicEditor'
+import IndexedVariableLogicEditor from './logic/IndexedVariableLogicEditor'
+import LedChangedLogicEditor from './logic/LedChangedLogicEditor'
 import ClampLogicEditor from './logic/ClampLogicEditor'
 import SelectFromListLogicEditor from './logic/SelectFromListLogicEditor'
 import PulseLogicEditor from './logic/PulseLogicEditor'
@@ -114,6 +120,36 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     return (
       <FrameGateLogicEditor
         node={node as FrameGateLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'tempo') {
+    return (
+      <TempoLogicEditor
+        node={node as TempoLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'indexed-variable') {
+    return (
+      <IndexedVariableLogicEditor
+        node={node as IndexedVariableLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'led-changed') {
+    return (
+      <LedChangedLogicEditor
+        node={node as LedChangedLogicNode}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />

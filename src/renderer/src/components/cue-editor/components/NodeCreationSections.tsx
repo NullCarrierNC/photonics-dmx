@@ -209,6 +209,24 @@ const LogicNodesSection: React.FC<{
         Frame Gate
       </button>
       <button
+        className={getLogicNodeButtonClasses('tempo')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'tempo' })}
+        onClick={() => addLogicNode('tempo')}>
+        Tempo
+      </button>
+      <button
+        className={getLogicNodeButtonClasses('indexed-variable')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'indexed-variable' })}
+        onClick={() => addLogicNode('indexed-variable')}>
+        Indexed Variable
+      </button>
+      <button
+        className={getLogicNodeButtonClasses('led-changed')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'led-changed' })}
+        onClick={() => addLogicNode('led-changed')}>
+        LED Changed
+      </button>
+      <button
         className={getLogicNodeButtonClasses('select-from-list')}
         {...makeDragHandlers({ kind: 'logic', logicType: 'select-from-list' })}
         onClick={() => addLogicNode('select-from-list')}>

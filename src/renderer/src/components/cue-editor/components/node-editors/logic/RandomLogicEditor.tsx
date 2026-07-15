@@ -140,6 +140,20 @@ const RandomLogicEditor: React.FC<RandomLogicEditorProps> = ({
         {mode === 'random-choice' && 'Picks one string from the list at random.'}
         {mode === 'random-light' && 'Picks count lights at random from the source array.'}
       </p>
+      {node.rolls && node.rolls.length > 0 && (
+        <div className="rounded border border-amber-300 bg-amber-50 p-2 text-[10px] dark:border-amber-700 dark:bg-amber-900/20">
+          <div className="font-semibold">Multi-roll: {node.rolls.length} rolls</div>
+          {node.rolls.map((r, i) => (
+            <div key={i} className="font-mono">
+              {r.mode} → {r.assignTo}
+            </div>
+          ))}
+          <div className="mt-1 opacity-80">
+            While rolls are set they drive this node and the single-roll fields above are ignored.
+            Edit the list via the cue generator.
+          </div>
+        </div>
+      )}
     </div>
   )
 }

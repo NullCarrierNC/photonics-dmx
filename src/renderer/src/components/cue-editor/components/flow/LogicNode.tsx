@@ -89,6 +89,72 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
         </div>
       )
     }
+    if (logicType === 'tempo') {
+      return (
+        <>
+          <div>TEMPO</div>
+          <div>
+            beat → <Mono>{logic.assignBeatMs}</Mono>
+          </div>
+          {logic.assignBarMs && (
+            <div>
+              bar → <Mono>{logic.assignBarMs}</Mono>
+            </div>
+          )}
+          {logic.assignPhraseMs && (
+            <div>
+              phrase → <Mono>{logic.assignPhraseMs}</Mono>
+            </div>
+          )}
+          {logic.assignCycles && (
+            <div>
+              cycles → <Mono>{logic.assignCycles}</Mono>
+            </div>
+          )}
+        </>
+      )
+    }
+    if (logicType === 'indexed-variable') {
+      const indexText = formatValueSource(logic.index)
+      return (
+        <>
+          <div>
+            {(logic.mode as string).toUpperCase()} <Mono>{logic.varName || '?'}</Mono>#
+            <Mono>{indexText}</Mono>
+          </div>
+          {logic.mode === 'get' && logic.assignTo && (
+            <div>
+              To Var: <Mono>{logic.assignTo}</Mono>
+            </div>
+          )}
+          {logic.mode === 'set' && (
+            <div>
+              = <Mono>{formatValueSource(logic.value)}</Mono>
+            </div>
+          )}
+        </>
+      )
+    }
+    if (logicType === 'led-changed') {
+      return (
+        <>
+          <div>LED CHANGED</div>
+          <div>
+            index → <Mono>{logic.assignIndex}</Mono>
+          </div>
+          {logic.assignColor && (
+            <div>
+              colour → <Mono>{logic.assignColor}</Mono>
+            </div>
+          )}
+          {logic.assignEdge && (
+            <div>
+              edge → <Mono>{logic.assignEdge}</Mono>
+            </div>
+          )}
+        </>
+      )
+    }
     if (logicType === 'conditional') {
       const left = formatValueSource(logic.left)
       const right = formatValueSource(logic.right)
@@ -376,7 +442,8 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
 
   // Both the conditional and the frame-gate route flow through `true`/`false` output ports.
   const isConditional = logicType === 'conditional' || logicType === 'frame-gate'
-  const isForEachLight = logicType === 'for-each-light'
+  // for-each-light and led-changed both fan out through `each`/`done` output ports.
+  const isForEachLight = logicType === 'for-each-light' || logicType === 'led-changed'
   const isDataNode = logicType === 'cue-data' || logicType === 'config-data'
   const isArrayNode =
     logicType === 'array-length' ||
