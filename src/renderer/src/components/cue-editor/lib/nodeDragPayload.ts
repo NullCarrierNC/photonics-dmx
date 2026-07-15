@@ -18,33 +18,41 @@ export type NodeDragPayload =
   | { kind: 'logic'; logicType: LogicNode['logicType'] }
   | { kind: 'notes'; variant: NotesVariant }
 
-const LOGIC_TYPES: ReadonlyArray<LogicNode['logicType']> = [
-  'variable',
-  'math',
-  'expression',
-  'conditional',
-  'frame-gate',
-  'tempo',
-  'indexed-variable',
-  'led-changed',
-  'cue-data',
-  'config-data',
-  'lights-from-index',
-  'color-from-index',
-  'reverse-colors',
-  'concat-colors',
-  'shuffle-colors',
-  'array-length',
-  'reverse-lights',
-  'create-pairs',
-  'concat-lights',
-  'build-ring',
-  'delay',
-  'debugger',
-  'random',
-  'shuffle-lights',
-  'for-each-light',
-]
+// Exhaustive by construction: this map must list EVERY LogicNode logicType, so adding a new logic node
+// type is a compile error here until it is registered. A missing entry makes parseNodeDrag reject the
+// drop and the dragged node silently vanishes, so the completeness check has to be enforced by the type.
+const LOGIC_TYPE_MEMBERSHIP: Record<LogicNode['logicType'], true> = {
+  'variable': true,
+  'math': true,
+  'clamp': true,
+  'expression': true,
+  'select-from-list': true,
+  'pulse': true,
+  'conditional': true,
+  'frame-gate': true,
+  'tempo': true,
+  'indexed-variable': true,
+  'led-changed': true,
+  'cue-data': true,
+  'config-data': true,
+  'lights-from-index': true,
+  'color-from-index': true,
+  'reverse-colors': true,
+  'concat-colors': true,
+  'shuffle-colors': true,
+  'array-length': true,
+  'reverse-lights': true,
+  'create-pairs': true,
+  'concat-lights': true,
+  'build-ring': true,
+  'delay': true,
+  'debugger': true,
+  'random': true,
+  'shuffle-lights': true,
+  'for-each-light': true,
+}
+
+const LOGIC_TYPES = new Set<string>(Object.keys(LOGIC_TYPE_MEMBERSHIP))
 
 const NOTES_VARIANTS: ReadonlyArray<NotesVariant> = ['notes', 'info', 'important']
 
@@ -82,10 +90,7 @@ export const parseNodeDrag = (raw: string): NodeDragPayload | null => {
     }
     case 'logic': {
       const logicType = (parsed as { logicType?: unknown }).logicType
-      if (
-        typeof logicType !== 'string' ||
-        !(LOGIC_TYPES as readonly string[]).includes(logicType)
-      ) {
+      if (typeof logicType !== 'string' || !LOGIC_TYPES.has(logicType)) {
         return null
       }
       return { kind: 'logic', logicType: logicType as LogicNode['logicType'] }
