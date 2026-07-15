@@ -191,6 +191,12 @@ const LogicNodesSection: React.FC<{
         Math
       </button>
       <button
+        className={getLogicNodeButtonClasses('expression')}
+        {...makeDragHandlers({ kind: 'logic', logicType: 'expression' })}
+        onClick={() => addLogicNode('expression')}>
+        Expression
+      </button>
+      <button
         className={getLogicNodeButtonClasses('clamp')}
         {...makeDragHandlers({ kind: 'logic', logicType: 'clamp' })}
         onClick={() => addLogicNode('clamp')}>

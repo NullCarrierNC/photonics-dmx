@@ -8,6 +8,7 @@ import type {
   ArrayLengthLogicNode,
   BuildRingLogicNode,
   ClampLogicNode,
+  ExpressionLogicNode,
   ColorFromIndexLogicNode,
   SelectFromListLogicNode,
   PulseLogicNode,
@@ -94,6 +95,25 @@ const mathLogicSchema = {
     assignTo: { type: 'string', nullable: true },
   },
 } as unknown as JSONSchemaType<MathLogicNode>
+
+const expressionLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'expression', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'expression' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    expression: { type: 'string', minLength: 1 },
+    assignTo: { type: 'string', minLength: 1 },
+  },
+} as unknown as JSONSchemaType<ExpressionLogicNode>
 
 const clampLogicSchema = {
   type: 'object',
@@ -521,6 +541,7 @@ export const logicNodeSchema = {
   oneOf: [
     variableLogicSchema,
     mathLogicSchema,
+    expressionLogicSchema,
     clampLogicSchema,
     selectFromListLogicSchema,
     pulseLogicSchema,

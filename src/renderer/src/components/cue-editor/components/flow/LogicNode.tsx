@@ -70,6 +70,18 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
         </>
       )
     }
+    if (logicType === 'expression') {
+      return (
+        <>
+          <div>
+            <Mono>{logic.expression}</Mono>
+          </div>
+          <div>
+            To Var: <Mono>{logic.assignTo}</Mono>
+          </div>
+        </>
+      )
+    }
     if (logicType === 'conditional') {
       const left = formatValueSource(logic.left)
       const right = formatValueSource(logic.right)

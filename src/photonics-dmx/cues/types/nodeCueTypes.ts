@@ -105,6 +105,16 @@ export interface ClampLogicNode extends BaseLogicNode {
   assignTo: string
 }
 
+export interface ExpressionLogicNode extends BaseLogicNode {
+  logicType: 'expression'
+  // A single arithmetic formula over variables: numbers, the five operators (+ - * / %), parentheses,
+  // unary minus, and built-in functions (min/max/clamp/wrap/abs/floor/ceil/round/sign/sqrt/pow/sin/cos)
+  // plus the `pi` constant. Any other identifier is a variable resolved from the cue's variable store.
+  // Replaces a chain of math nodes with one readable line. Result is written to `assignTo` (type number).
+  expression: string
+  assignTo: string
+}
+
 export interface SelectFromListLogicNode extends BaseLogicNode {
   logicType: 'select-from-list'
   list: number[] // Inline numeric list to select from
@@ -260,6 +270,7 @@ export type LogicNode =
   | VariableLogicNode
   | MathLogicNode
   | ClampLogicNode
+  | ExpressionLogicNode
   | SelectFromListLogicNode
   | PulseLogicNode
   | ConditionalLogicNode

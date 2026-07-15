@@ -18,6 +18,7 @@ import {
   UninitializedVariableError,
 } from './valueResolver'
 import { extractCueDataValue, extractConfigDataValue } from './dataExtractors'
+import { compileExpression } from './expressionEvaluator'
 import { monotonicNowMs } from '../../../../shared/time'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('logicNodeEvaluator')
@@ -107,6 +108,31 @@ export function evaluateLogicNode(
         varStore.set(logicNode.assignTo, { type: 'number', value: result })
       }
 
+      return edges.map((edge) => edge.to)
+    }
+
+    case 'expression': {
+      // Evaluate the formula, resolving each identifier as a number variable through the SAME resolver
+      // every other node uses (so scope/typing match). An unresolvable (undeclared/uninitialized) variable
+      // reads as 0 rather than throwing — like the math node absorbing a divide-by-zero — so one stray name
+      // can't blank the whole cue. A PARSE error is logged once (cached) and leaves the target unwritten.
+      let result = 0
+      try {
+        result = compileExpression(logicNode.expression).evaluate((name) => {
+          try {
+            return Number(
+              resolveValue('number', { source: 'variable', name }, context, variableDefinitions),
+            )
+          } catch {
+            return 0
+          }
+        })
+      } catch (err) {
+        log.warn(`expression node ${nodeId}: ${err instanceof Error ? err.message : String(err)}`)
+        return edges.map((edge) => edge.to)
+      }
+      const varStore = getVarStore(logicNode.assignTo)
+      varStore.set(logicNode.assignTo, { type: 'number', value: result })
       return edges.map((edge) => edge.to)
     }
 

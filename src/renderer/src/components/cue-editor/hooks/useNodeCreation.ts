@@ -5,6 +5,7 @@ import {
   type EventListenerNode,
   type LogicNode,
   type MathLogicNode,
+  type ExpressionLogicNode,
   type ClampLogicNode,
   type SelectFromListLogicNode,
   type PulseLogicNode,
@@ -174,6 +175,16 @@ const useNodeCreation = ({
           right: { source: 'literal', value: 0 },
           assignTo: 'result',
         }) satisfies MathLogicNode,
+      'expression': (id) =>
+        ({
+          id,
+          type: 'logic',
+          logicType: 'expression',
+          label: 'expression',
+          outputs: [],
+          expression: '0',
+          assignTo: 'result',
+        }) satisfies ExpressionLogicNode,
       'clamp': (id) =>
         ({
           id,
