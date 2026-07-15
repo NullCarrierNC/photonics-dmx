@@ -59,6 +59,7 @@ import {
   getAudioCueDataPropertyMeta,
   getYargCueDataPropertyMeta,
 } from '../../../photonics-dmx/constants/cueDataPropertyMeta'
+import { expressionVariables } from '../../../photonics-dmx/cues/node/runtime/expressionEvaluator'
 import { readEffectFile, showItemInFolder } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('CueEditor')
@@ -585,6 +586,10 @@ const CueEditor: React.FC = () => {
             case 'variable':
               checkVarName(logicNode.varName, nodeType, nodeId, nodeLabel, 'varName')
               checkValueSource(logicNode.value, nodeType, nodeId, nodeLabel, 'value')
+              for (const assignment of logicNode.assignments ?? []) {
+                checkVarName(assignment.varName, nodeType, nodeId, nodeLabel, 'assignments.varName')
+                checkValueSource(assignment.value, nodeType, nodeId, nodeLabel, 'assignments.value')
+              }
               break
             case 'math':
               checkValueSource(logicNode.left, nodeType, nodeId, nodeLabel, 'left')
@@ -642,6 +647,107 @@ const CueEditor: React.FC = () => {
               for (const loggedVar of logicNode.variablesToLog ?? []) {
                 checkVarName(loggedVar, nodeType, nodeId, nodeLabel, 'variablesToLog')
               }
+              break
+            case 'expression':
+              for (const usedVar of expressionVariables(logicNode.expression)) {
+                checkVarName(usedVar, nodeType, nodeId, nodeLabel, 'expression')
+              }
+              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
+              break
+            case 'clamp':
+              checkValueSource(logicNode.value, nodeType, nodeId, nodeLabel, 'value')
+              checkValueSource(logicNode.min, nodeType, nodeId, nodeLabel, 'min')
+              checkValueSource(logicNode.max, nodeType, nodeId, nodeLabel, 'max')
+              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
+              break
+            case 'select-from-list':
+              checkValueSource(logicNode.index, nodeType, nodeId, nodeLabel, 'index')
+              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
+              break
+            case 'pulse':
+              checkValueSource(logicNode.interval, nodeType, nodeId, nodeLabel, 'interval')
+              checkVarName(logicNode.anchorVar, nodeType, nodeId, nodeLabel, 'anchorVar')
+              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
+              checkVarName(logicNode.assignPhase, nodeType, nodeId, nodeLabel, 'assignPhase')
+              break
+            case 'frame-gate':
+              checkValueSource(logicNode.divisor, nodeType, nodeId, nodeLabel, 'divisor')
+              break
+            case 'tempo':
+              checkVarName(logicNode.assignBeatMs, nodeType, nodeId, nodeLabel, 'assignBeatMs')
+              checkVarName(logicNode.assignBarMs, nodeType, nodeId, nodeLabel, 'assignBarMs')
+              checkVarName(logicNode.assignPhraseMs, nodeType, nodeId, nodeLabel, 'assignPhraseMs')
+              checkVarName(logicNode.assignCycles, nodeType, nodeId, nodeLabel, 'assignCycles')
+              checkValueSource(logicNode.beatsPerBar, nodeType, nodeId, nodeLabel, 'beatsPerBar')
+              checkValueSource(
+                logicNode.barsPerPhrase,
+                nodeType,
+                nodeId,
+                nodeLabel,
+                'barsPerPhrase',
+              )
+              checkValueSource(logicNode.minBeatMs, nodeType, nodeId, nodeLabel, 'minBeatMs')
+              checkValueSource(logicNode.maxBeatMs, nodeType, nodeId, nodeLabel, 'maxBeatMs')
+              checkValueSource(
+                logicNode.fallbackBeatMs,
+                nodeType,
+                nodeId,
+                nodeLabel,
+                'fallbackBeatMs',
+              )
+              break
+            case 'indexed-variable':
+              checkVarName(logicNode.varName, nodeType, nodeId, nodeLabel, 'varName')
+              checkValueSource(logicNode.index, nodeType, nodeId, nodeLabel, 'index')
+              checkValueSource(logicNode.value, nodeType, nodeId, nodeLabel, 'value')
+              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
+              break
+            case 'led-changed':
+              checkVarName(logicNode.assignIndex, nodeType, nodeId, nodeLabel, 'assignIndex')
+              checkVarName(logicNode.assignColor, nodeType, nodeId, nodeLabel, 'assignColor')
+              checkVarName(logicNode.assignEdge, nodeType, nodeId, nodeLabel, 'assignEdge')
+              break
+            case 'random':
+              checkVarName(logicNode.sourceVariable, nodeType, nodeId, nodeLabel, 'sourceVariable')
+              checkValueSource(logicNode.min, nodeType, nodeId, nodeLabel, 'min')
+              checkValueSource(logicNode.max, nodeType, nodeId, nodeLabel, 'max')
+              checkValueSource(logicNode.count, nodeType, nodeId, nodeLabel, 'count')
+              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
+              for (const roll of logicNode.rolls ?? []) {
+                checkVarName(
+                  roll.sourceVariable,
+                  nodeType,
+                  nodeId,
+                  nodeLabel,
+                  'rolls.sourceVariable',
+                )
+                checkValueSource(roll.min, nodeType, nodeId, nodeLabel, 'rolls.min')
+                checkValueSource(roll.max, nodeType, nodeId, nodeLabel, 'rolls.max')
+                checkValueSource(roll.count, nodeType, nodeId, nodeLabel, 'rolls.count')
+                checkVarName(roll.assignTo, nodeType, nodeId, nodeLabel, 'rolls.assignTo')
+              }
+              break
+            case 'shuffle-lights':
+              checkVarName(logicNode.sourceVariable, nodeType, nodeId, nodeLabel, 'sourceVariable')
+              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
+              break
+            case 'for-each-light':
+              checkVarName(logicNode.sourceVariable, nodeType, nodeId, nodeLabel, 'sourceVariable')
+              checkVarName(
+                logicNode.currentLightVariable,
+                nodeType,
+                nodeId,
+                nodeLabel,
+                'currentLightVariable',
+              )
+              checkVarName(
+                logicNode.currentIndexVariable,
+                nodeType,
+                nodeId,
+                nodeLabel,
+                'currentIndexVariable',
+              )
+              checkValueSource(logicNode.groupSize, nodeType, nodeId, nodeLabel, 'groupSize')
               break
           }
         }
