@@ -527,20 +527,23 @@ export abstract class BaseNodeExecutionEngine {
     }
 
     context.setForEachLightState(nodeId, { index: 0, length: iterationCount })
-
-    for (let i = 0; i < iterationCount; i++) {
-      const iterationIndex = seedIteration(i)
-      context.setForEachIterationIndex(iterationIndex)
-      for (const bodyId of bodyNodeIds) {
-        context.unmarkVisited(bodyId)
+    try {
+      for (let i = 0; i < iterationCount; i++) {
+        const iterationIndex = seedIteration(i)
+        context.setForEachIterationIndex(iterationIndex)
+        for (const bodyId of bodyNodeIds) {
+          context.unmarkVisited(bodyId)
+        }
+        this.continueExecution(eachTargets, context)
       }
-      this.continueExecution(eachTargets, context)
+    } finally {
+      // Clear the loop bracket even if an iteration throws, so a leaked forEachLightState entry can't wedge
+      // tryComplete off and strand the context alive forever.
+      context.clearForEachLightState(nodeId)
+      context.setForEachIterationIndex(-1)
     }
 
-    context.clearForEachLightState(nodeId)
-    context.setForEachIterationIndex(-1)
     context.markVisited(nodeId)
-
     this.emitNodeExecution('deactivated', nodeId)
     this.continueOrComplete(doneTargets, context)
   }

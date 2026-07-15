@@ -3177,5 +3177,75 @@ describe('NodeExecutionEngine', () => {
       expect(cueLevelVarStore.get('ledColor')?.value).toBe('green')
       expect(cueLevelVarStore.get('ledEdge')?.value).toBe('color')
     })
+
+    it('runs the done branch after the fan-out and reuses the memoized body across frames', () => {
+      const action2: ActionNode = { ...actionNode, id: 'action2' }
+      const compiledCue: CompiledYargCue = {
+        definition: {
+          id: 'test-cue',
+          name: 'Test Cue',
+          kind: 'lighting',
+          cueType: CueType.RB3,
+          style: 'primary',
+          nodes: { events: [eventNode], actions: [actionNode, action2], logic: [ledChangedNode] },
+          connections: [
+            { from: 'event1', to: 'lc1' },
+            { from: 'lc1', to: 'action1', fromPort: 'each' },
+            { from: 'lc1', to: 'action2', fromPort: 'done' },
+          ],
+        },
+        eventMap: new Map([['event1', eventNode]]),
+        actionMap: new Map([
+          ['action1', actionNode],
+          ['action2', action2],
+        ]),
+        logicMap: new Map([['lc1', ledChangedNode]]),
+        eventRaiserMap: new Map(),
+        eventListenerMap: new Map(),
+        effectRaiserMap: new Map(),
+        eventDefinitions: [],
+        adjacency: new Map([
+          ['event1', [{ from: 'event1', to: 'lc1' }]],
+          [
+            'lc1',
+            [
+              { from: 'lc1', to: 'action1', fromPort: 'each' },
+              { from: 'lc1', to: 'action2', fromPort: 'done' },
+            ],
+          ],
+        ]),
+      }
+      const engine = new NodeExecutionEngine(
+        compiledCue,
+        'test-group:test-cue',
+        mockSequencer,
+        mockLightManager,
+        noopRuntimeBroadcaster(),
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+        [
+          { name: 'ledIndex', type: 'number', scope: 'cue', initialValue: 0 },
+          { name: 'ledColor', type: 'string', scope: 'cue', initialValue: 'transparent' },
+          { name: 'ledEdge', type: 'string', scope: 'cue', initialValue: '' },
+        ],
+      )
+      const run = (): string[] => {
+        ;(mockSequencer.addEffect as jest.Mock).mockClear()
+        engine.startExecution(eventNode, frame(banks(bank([0, 2]), 0, 0, 0), banks(0, 0, 0, 0)))
+        return (mockSequencer.addEffect as jest.Mock).mock.calls.map((c) => c[0] as string)
+      }
+
+      // Two changed positions fan out (each :0 / :2), then the done branch runs once with the iteration
+      // index reset (so action2 has no position suffix).
+      const first = run()
+      expect(first).toEqual([
+        'test-group:test-cue:action1:0',
+        'test-group:test-cue:action1:2',
+        'test-group:test-cue:action2',
+      ])
+      // A second frame on the SAME engine reuses the memoized body set and produces the identical fan-out.
+      expect(run()).toEqual(first)
+    })
   })
 })
