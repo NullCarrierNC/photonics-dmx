@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 1,
+  "cueVersion": 2,
   "mode": "rb3",
   "group": {
     "id": "rb3-pulse",
@@ -235,48 +235,10 @@
             "assignTo": "col"
           },
           {
-            "id": "rb3-pulse-frac",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "count"
-            },
-            "right": {
-              "source": "literal",
-              "value": 8
-            },
-            "assignTo": "frac"
-          },
-          {
-            "id": "rb3-pulse-scaled",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "multiply",
-            "left": {
-              "source": "variable",
-              "name": "frac"
-            },
-            "right": {
-              "source": "literal",
-              "value": 0.85
-            },
-            "assignTo": "scaled"
-          },
-          {
             "id": "rb3-pulse-op",
             "type": "logic",
-            "logicType": "math",
-            "operator": "add",
-            "left": {
-              "source": "variable",
-              "name": "scaled"
-            },
-            "right": {
-              "source": "literal",
-              "value": 0.15
-            },
+            "logicType": "expression",
+            "expression": "0.15 + (count / 8) * 0.85",
             "assignTo": "bedOpacity"
           }
         ],
@@ -377,14 +339,6 @@
         },
         {
           "from": "rb3-pulse-cd-col",
-          "to": "rb3-pulse-frac"
-        },
-        {
-          "from": "rb3-pulse-frac",
-          "to": "rb3-pulse-scaled"
-        },
-        {
-          "from": "rb3-pulse-scaled",
           "to": "rb3-pulse-op"
         },
         {
@@ -450,21 +404,13 @@
             "x": 280.0,
             "y": 300.0
           },
-          "rb3-pulse-frac": {
+          "rb3-pulse-op": {
             "x": 280.0,
             "y": 450.0
           },
-          "rb3-pulse-scaled": {
-            "x": 280.0,
-            "y": 600.0
-          },
-          "rb3-pulse-op": {
-            "x": 280.0,
-            "y": 750.0
-          },
           "rb3-pulse-bed": {
             "x": 280.0,
-            "y": 900.0
+            "y": 600.0
           },
           "rb3-pulse-led1": {
             "x": 560.0,
@@ -537,20 +483,6 @@
           "type": "color",
           "scope": "cue",
           "initialValue": "transparent",
-          "isParameter": false
-        },
-        {
-          "name": "frac",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
-          "isParameter": false
-        },
-        {
-          "name": "scaled",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 0,
           "isParameter": false
         },
         {
