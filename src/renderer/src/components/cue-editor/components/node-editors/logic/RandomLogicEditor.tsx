@@ -5,6 +5,7 @@ import type {
 } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
+import MultiItemSummary from './MultiItemSummary'
 
 export interface RandomLogicEditorProps extends LogicEditorCommonProps {
   node: RandomLogicNode
@@ -141,18 +142,11 @@ const RandomLogicEditor: React.FC<RandomLogicEditorProps> = ({
         {mode === 'random-light' && 'Picks count lights at random from the source array.'}
       </p>
       {node.rolls && node.rolls.length > 0 && (
-        <div className="rounded border border-amber-300 bg-amber-50 p-2 text-[10px] dark:border-amber-700 dark:bg-amber-900/20">
-          <div className="font-semibold">Multi-roll: {node.rolls.length} rolls</div>
-          {node.rolls.map((r, i) => (
-            <div key={i} className="font-mono">
-              {r.mode} → {r.assignTo}
-            </div>
-          ))}
-          <div className="mt-1 opacity-80">
-            While rolls are set they drive this node and the single-roll fields above are ignored.
-            Edit the list via the cue generator.
-          </div>
-        </div>
+        <MultiItemSummary
+          header={`Multi-roll: ${node.rolls.length} rolls`}
+          rows={node.rolls.map((r) => `${r.mode} → ${r.assignTo}`)}
+          ignoredFieldsLabel="single-roll"
+        />
       )}
     </div>
   )

@@ -6,6 +6,7 @@ import type {
 } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { VARIABLE_TYPES } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
+import MultiItemSummary from './MultiItemSummary'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
 
 export interface VariableLogicEditorProps extends LogicEditorCommonProps {
@@ -78,18 +79,11 @@ const VariableLogicEditor: React.FC<VariableLogicEditorProps> = ({
         />
       )}
       {node.assignments && node.assignments.length > 0 && (
-        <div className="rounded border border-amber-300 bg-amber-50 p-2 text-[10px] dark:border-amber-700 dark:bg-amber-900/20">
-          <div className="font-semibold">Multi-set: {node.assignments.length} assignments</div>
-          {node.assignments.map((a, i) => (
-            <div key={i} className="font-mono">
-              {node.mode} {a.varName} ({a.valueType})
-            </div>
-          ))}
-          <div className="mt-1 opacity-80">
-            While assignments are set they drive this node and the single-variable fields above are
-            ignored. Edit the list via the cue generator.
-          </div>
-        </div>
+        <MultiItemSummary
+          header={`Multi-set: ${node.assignments.length} assignments`}
+          rows={node.assignments.map((a) => `${node.mode} ${a.varName} (${a.valueType})`)}
+          ignoredFieldsLabel="single-variable"
+        />
       )}
     </div>
   )
