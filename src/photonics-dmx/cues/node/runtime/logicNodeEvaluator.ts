@@ -311,6 +311,59 @@ export function evaluateLogicNode(
       return edges.filter((edge) => edge.fromPort === branch).map((edge) => edge.to)
     }
 
+    case 'tempo': {
+      // Read the song tempo and write the derived timing vars in one node, replacing the per-cue
+      // read/guard/clamp/multiply/band chain. A song reporting no tempo (menus, practice) falls back to
+      // fallbackBeatMs before clamping, so tempo-locked tweens still breathe at a sensible default rate.
+      const numOr = (vs: ValueSource | undefined, dflt: number): number =>
+        vs === undefined ? dflt : Number(resolveValue('number', vs, context, variableDefinitions))
+
+      const beatRaw = Number(extractCueDataValue('beat-duration-ms', context.cueData, cueId))
+      // A missing song reports ~0ms; anything implausibly short means no tempo, so fall back.
+      const guarded = beatRaw < 60 ? numOr(logicNode.fallbackBeatMs, 461) : beatRaw
+      const beatMs = Math.min(
+        Math.max(guarded, numOr(logicNode.minBeatMs, 250)),
+        numOr(logicNode.maxBeatMs, 1000),
+      )
+      const barMs = beatMs * numOr(logicNode.beatsPerBar, 4)
+      const phraseMs = barMs * numOr(logicNode.barsPerPhrase, 2)
+
+      getVarStore(logicNode.assignBeatMs).set(logicNode.assignBeatMs, {
+        type: 'number',
+        value: beatMs,
+      })
+      if (logicNode.assignBarMs) {
+        getVarStore(logicNode.assignBarMs).set(logicNode.assignBarMs, {
+          type: 'number',
+          value: barMs,
+        })
+      }
+      if (logicNode.assignPhraseMs) {
+        getVarStore(logicNode.assignPhraseMs).set(logicNode.assignPhraseMs, {
+          type: 'number',
+          value: phraseMs,
+        })
+      }
+
+      if (logicNode.assignCycles) {
+        const bpm = Number(extractCueDataValue('bpm', context.cueData, cueId))
+        const bands = logicNode.cycleBands ?? [110, 150]
+        const values = logicNode.cycleValues ?? [2, 3, 5]
+        // Start at the base value and override to the next band's value for each ascending threshold met,
+        // mirroring the chain's independent "if bpm >= band" set nodes.
+        let cycles = values[0] ?? 0
+        for (let i = 0; i < bands.length; i++) {
+          if (bpm >= bands[i]) cycles = values[i + 1] ?? cycles
+        }
+        getVarStore(logicNode.assignCycles).set(logicNode.assignCycles, {
+          type: 'number',
+          value: cycles,
+        })
+      }
+
+      return edges.map((edge) => edge.to)
+    }
+
     case 'cue-data': {
       const value = extractCueDataValue(logicNode.dataProperty, context.cueData, cueId)
 

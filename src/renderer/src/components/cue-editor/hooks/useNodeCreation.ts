@@ -7,6 +7,7 @@ import {
   type MathLogicNode,
   type ExpressionLogicNode,
   type FrameGateLogicNode,
+  type TempoLogicNode,
   type ClampLogicNode,
   type SelectFromListLogicNode,
   type PulseLogicNode,
@@ -195,6 +196,17 @@ const useNodeCreation = ({
           outputs: [],
           divisor: { source: 'literal', value: 4 },
         }) satisfies FrameGateLogicNode,
+      'tempo': (id) =>
+        ({
+          id,
+          type: 'logic',
+          logicType: 'tempo',
+          label: 'tempo',
+          outputs: [],
+          assignBeatMs: 'beat_ms',
+          assignBarMs: 'bar_ms',
+          assignPhraseMs: 'phrase_ms',
+        }) satisfies TempoLogicNode,
       'clamp': (id) =>
         ({
           id,

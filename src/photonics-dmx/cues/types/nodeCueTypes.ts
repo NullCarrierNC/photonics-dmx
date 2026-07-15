@@ -157,6 +157,24 @@ export interface FrameGateLogicNode extends BaseLogicNode {
   divisor: ValueSource
 }
 
+export interface TempoLogicNode extends BaseLogicNode {
+  logicType: 'tempo'
+  // Reads the song tempo (beat-duration-ms / bpm cue data) and writes the derived timing variables that
+  // tempo-locked tweens breathe on, replacing the ~12-node read/guard/clamp/multiply/band chain every cue
+  // repeats. A song that reports no tempo (menus, practice) falls back to `fallbackBeatMs` before clamping.
+  assignBeatMs: string // Declared number var written with the clamped beat duration in ms
+  assignBarMs?: string // Optional: beat * beatsPerBar
+  assignPhraseMs?: string // Optional: bar * barsPerPhrase
+  beatsPerBar?: ValueSource // Beats per bar (default 4)
+  barsPerPhrase?: ValueSource // Bars per phrase (default 2)
+  minBeatMs?: ValueSource // Clamp floor for the beat (default 250)
+  maxBeatMs?: ValueSource // Clamp ceil for the beat (default 1000)
+  fallbackBeatMs?: ValueSource // Beat used when the song reports no tempo (default 461, ~130 BPM)
+  assignCycles?: string // Optional: number var written with a BPM-banded cycle count
+  cycleBands?: number[] // Ascending BPM thresholds for the cycle count (default [110, 150])
+  cycleValues?: number[] // Cycle count per band, length = cycleBands.length + 1 (default [2, 3, 5])
+}
+
 // YARG Cue Data Properties - derived from shared constants
 export type YargCueDataProperty = (typeof YARG_CUE_DATA_PROPERTIES)[number]
 
@@ -308,6 +326,7 @@ export type LogicNode =
   | PulseLogicNode
   | ConditionalLogicNode
   | FrameGateLogicNode
+  | TempoLogicNode
   | CueDataLogicNode
   | ConfigDataLogicNode
   | LightsFromIndexLogicNode

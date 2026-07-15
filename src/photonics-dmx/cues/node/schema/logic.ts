@@ -16,6 +16,7 @@ import type {
   ConcatLightsLogicNode,
   ConditionalLogicNode,
   FrameGateLogicNode,
+  TempoLogicNode,
   ConfigDataLogicNode,
   CueDataLogicNode,
   CreatePairsLogicNode,
@@ -241,6 +242,42 @@ const frameGateLogicSchema = {
     divisor: valueSourceSchema,
   },
 } as unknown as JSONSchemaType<FrameGateLogicNode>
+
+const tempoLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'assignBeatMs'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'tempo' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    assignBeatMs: { type: 'string' },
+    assignBarMs: { type: 'string', nullable: true },
+    assignPhraseMs: { type: 'string', nullable: true },
+    beatsPerBar: { ...valueSourceSchema, nullable: true },
+    barsPerPhrase: { ...valueSourceSchema, nullable: true },
+    minBeatMs: { ...valueSourceSchema, nullable: true },
+    maxBeatMs: { ...valueSourceSchema, nullable: true },
+    fallbackBeatMs: { ...valueSourceSchema, nullable: true },
+    assignCycles: { type: 'string', nullable: true },
+    cycleBands: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'number' },
+    },
+    cycleValues: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'number' },
+    },
+  },
+} as unknown as JSONSchemaType<TempoLogicNode>
 
 const cueDataLogicSchema = {
   type: 'object',
@@ -617,6 +654,7 @@ export const logicNodeSchema = {
     pulseLogicSchema,
     conditionalLogicSchema,
     frameGateLogicSchema,
+    tempoLogicSchema,
     cueDataLogicSchema,
     configDataLogicSchema,
     lightsFromIndexLogicSchema,

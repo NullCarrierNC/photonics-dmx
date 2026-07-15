@@ -241,6 +241,88 @@ describe('Node cue validation', () => {
     expect(isValid(badRandom)).toBe(false)
   })
 
+  it('validates a tempo logic node with only its required beat output, and full options', () => {
+    const makeDef = (logic: Record<string, unknown>): YargNodeCueDefinition =>
+      ({
+        id: 'tempo-cue',
+        name: 'Tempo Cue',
+        description: '',
+        kind: 'lighting',
+        cueType: CueType.Chorus,
+        style: 'primary',
+        nodes: {
+          events: [{ id: 'event-1', type: 'event', eventType: 'cue-started' }],
+          actions: [
+            {
+              id: 'action-1',
+              type: 'action',
+              effectType: 'set-color',
+              target: {
+                groups: { source: 'literal', value: 'front' },
+                filter: { source: 'literal', value: 'all' },
+              },
+              color: {
+                name: { source: 'literal', value: 'blue' },
+                brightness: { source: 'literal', value: 'medium' },
+                blendMode: { source: 'literal', value: 'replace' },
+              },
+              timing: {
+                waitForCondition: { source: 'literal', value: 'none' },
+                waitForTime: { source: 'literal', value: 0 },
+                duration: { source: 'literal', value: 200 },
+                waitUntilCondition: { source: 'literal', value: 'none' },
+                waitUntilTime: { source: 'literal', value: 0 },
+                easing: { source: 'literal', value: 'sinInOut' },
+                level: { source: 'literal', value: 1 },
+              },
+            },
+          ],
+          logic: [logic as never],
+        },
+        connections: [
+          { from: 'event-1', to: 'logic-1' },
+          { from: 'logic-1', to: 'action-1' },
+        ],
+        layout: { nodePositions: {} },
+      }) as YargNodeCueDefinition
+
+    const isValid = (logic: Record<string, unknown>): boolean =>
+      validateYargNodeCueFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'g1', name: 'Group' },
+        cues: [makeDef(logic)],
+      }).valid
+
+    // Only assignBeatMs is required.
+    expect(
+      isValid({ id: 'logic-1', type: 'logic', logicType: 'tempo', assignBeatMs: 'beat_ms' }),
+    ).toBe(true)
+
+    // Every optional field populated.
+    expect(
+      isValid({
+        id: 'logic-1',
+        type: 'logic',
+        logicType: 'tempo',
+        assignBeatMs: 'beat_ms',
+        assignBarMs: 'bar_ms',
+        assignPhraseMs: 'phrase_ms',
+        beatsPerBar: { source: 'literal', value: 4 },
+        barsPerPhrase: { source: 'literal', value: 2 },
+        minBeatMs: { source: 'literal', value: 250 },
+        maxBeatMs: { source: 'literal', value: 1000 },
+        fallbackBeatMs: { source: 'literal', value: 461 },
+        assignCycles: 'wave_cycles',
+        cycleBands: [110, 150],
+        cycleValues: [2, 3, 5],
+      }),
+    ).toBe(true)
+
+    // assignBeatMs is required — omitting it fails.
+    expect(isValid({ id: 'logic-1', type: 'logic', logicType: 'tempo' })).toBe(false)
+  })
+
   it('validates a simple RB3 node cue (YARG-shaped, mode rb3)', () => {
     const definition: YargNodeCueDefinition = {
       id: 'rb3-cue',
