@@ -370,6 +370,43 @@ export type LogicNode =
   | IndexedVariableLogicNode
   | LedChangedLogicNode
 
+// Canonical list of every logic node type, the sibling of NODE_EFFECT_TYPES. The Record literal keeps it
+// exhaustive: adding a member to the LogicNode union without listing it here is a compile error, and an
+// unknown key is rejected by excess-property checking. Consumers (the editor palette drag parser, etc.)
+// derive from this so nobody hand-maintains a second copy that can silently drift.
+const LOGIC_TYPE_TABLE: Record<LogicNode['logicType'], true> = {
+  'variable': true,
+  'math': true,
+  'clamp': true,
+  'expression': true,
+  'select-from-list': true,
+  'pulse': true,
+  'conditional': true,
+  'frame-gate': true,
+  'tempo': true,
+  'cue-data': true,
+  'config-data': true,
+  'lights-from-index': true,
+  'color-from-index': true,
+  'reverse-colors': true,
+  'concat-colors': true,
+  'shuffle-colors': true,
+  'array-length': true,
+  'reverse-lights': true,
+  'create-pairs': true,
+  'concat-lights': true,
+  'build-ring': true,
+  'delay': true,
+  'debugger': true,
+  'random': true,
+  'shuffle-lights': true,
+  'for-each-light': true,
+  'indexed-variable': true,
+  'led-changed': true,
+}
+
+export const NODE_LOGIC_TYPES = Object.keys(LOGIC_TYPE_TABLE) as LogicNode['logicType'][]
+
 export interface EventRaiserNode {
   id: string
   type: 'event-raiser'
