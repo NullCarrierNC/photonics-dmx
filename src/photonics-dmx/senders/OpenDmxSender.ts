@@ -11,7 +11,10 @@
 
 import { EnttecOpenDMXUSBDevice } from 'enttec-open-dmx-usb'
 import { createLogger } from '../../shared/logger'
-import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../shared/dmxOutputRefresh'
+import {
+  OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
+  hzToThrottleIntervalMs,
+} from '../../shared/dmxOutputRefresh'
 import { BaseSender, SenderError } from './BaseSender'
 import { usleep } from './usleep'
 
@@ -28,13 +31,11 @@ interface OpenDmxDeviceOptions {
 
 /**
  * Converts dmxSpeed (Hz) to send interval in ms for enttec-open-dmx-usb.
- * interval = 1000 / dmxSpeed; e.g. 20 Hz -> 50 ms.
+ * interval = 1000 / dmxSpeed; e.g. 20 Hz -> 50 ms. Unlike the network senders, OpenDMX always
+ * throttles, so a zero or invalid speed falls back to the default rate instead of "no throttle".
  */
 function dmxSpeedToIntervalMs(dmxSpeed: number): number {
-  if (dmxSpeed <= 0 || !Number.isFinite(dmxSpeed)) {
-    return 1000 / OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
-  }
-  return Math.max(1, Math.round(1000 / dmxSpeed))
+  return hzToThrottleIntervalMs(dmxSpeed) || 1000 / OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
 }
 
 /** Minimal device interface used by OpenDmxSender (and by tests for injection). */

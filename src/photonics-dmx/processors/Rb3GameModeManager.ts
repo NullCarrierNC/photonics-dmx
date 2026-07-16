@@ -1,14 +1,8 @@
 import { monotonicNowMs } from '../../shared/time'
-import { pickRandom } from '../helpers/utils'
+import { pickRandom, randomFloatInRange } from '../helpers/utils'
 
 /** Countdown state pushed to the renderer for the RB3 primary-cue countdown display. */
 export type Rb3GameModeSchedulePayload = { deadlineMs: number | null; pending: boolean }
-
-// Durations are seconds, so this stays an unrounded float (unlike the integer randomInRange in
-// helpers/utils, whose rounding would drop sub-second precision here).
-function randomInRange(minSec: number, maxSec: number): number {
-  return minSec + Math.random() * (maxSec - minSec)
-}
 
 /**
  * Drives RB3 "game mode" primary-cue rotation. RB3E sends no cue-change signal, so — like the audio
@@ -127,7 +121,7 @@ export class Rb3GameModeManager {
     const { min, max } = this.getDurationRangeSec()
     const lo = Math.max(0, min)
     const hi = Math.max(lo, max)
-    const durationMs = Math.round(randomInRange(lo, hi) * 1000)
+    const durationMs = Math.round(randomFloatInRange(lo, hi) * 1000)
     this.switchDeadlineMs = monotonicNowMs() + durationMs
     this.switchDeadlineWallMs = Date.now() + durationMs
   }

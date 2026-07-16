@@ -31,6 +31,14 @@ export function pickRandom<T>(items: T[]): T | undefined {
 }
 
 /**
+ * A uniformly random float in [start, end). Unlike {@link randomInRange} this does NOT round, so
+ * it preserves sub-unit precision (used for second-based game-mode durations).
+ */
+export function randomFloatInRange(start: number, end: number): number {
+  return start + Math.random() * (end - start)
+}
+
+/**
  * Shifts an array by half. For even-length arrays, it splits the array into two equal halves.
  * For odd-length arrays, the first half will have one fewer element than the second half.
  *

@@ -6,14 +6,8 @@ import type {
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import type { AudioCueType } from '../cues/types/audioCueTypes'
 import { monotonicNowMs } from '../../shared/time'
-import { pickRandom } from '../helpers/utils'
+import { pickRandom, randomFloatInRange } from '../helpers/utils'
 import { isStrobeStyleCue } from './audioStrobeHelpers'
-
-// Game-mode durations are seconds, so this stays an unrounded float (unlike the integer
-// randomInRange in helpers/utils, whose rounding would drop sub-second precision here).
-function randomInRange(minSec: number, maxSec: number): number {
-  return minSec + Math.random() * (maxSec - minSec)
-}
 
 /** Cues eligible as Game Mode primary (excludes style strobe). */
 function filterPrimaryRotationPool(
@@ -138,7 +132,7 @@ export class AudioGameModeManager {
 
   private scheduleNextSwitch(): void {
     const { cueDurationMin, cueDurationMax } = this.config
-    const durationSec = randomInRange(cueDurationMin, cueDurationMax)
+    const durationSec = randomFloatInRange(cueDurationMin, cueDurationMax)
     const durationMs = Math.round(durationSec * 1000)
     this.switchDeadlineMs = monotonicNowMs() + durationMs
     this.switchDeadlineWallMs = Date.now() + durationMs
