@@ -280,8 +280,6 @@ Unlike `replace`, the lower layer is blended in rather than discarded, so the co
 
 - **`replace`**: Overwrites lower layer colors (default behavior)
 - **`add`**: Adds to lower layer colors (good for additive blending)
-- **`multiply`**: Multiplies with lower layer colors (good for darkening)
-- **`overlay`**: Combines multiply and screen blending (good for contrast)
 - **`mix`**: Alpha-crossfades between the lower layers and this layer by `opacity` (0.0 = lower layers, 1.0 = this layer). Unlike `replace`, partial opacity blends the two colours rather than scaling this layer down from black, so a colour can be flashed over another without fading through black.
 
 The system uses `opacity` and `blendMode` for color blending:
@@ -293,7 +291,7 @@ export type RGBIO = {
   blue: number; // 0-255
   intensity: number; // 0-255
   opacity: number; // 0.0-1.0, required
-  blendMode: BlendMode; // required, enum: 'replace', 'add', 'multiply', 'overlay', 'mix'
+  blendMode: BlendMode; // required, enum: 'replace', 'add', 'mix'
 
   pan?: number;
   tilt?: number;

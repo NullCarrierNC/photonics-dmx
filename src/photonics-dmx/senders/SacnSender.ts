@@ -1,6 +1,7 @@
 // src/senders/SacnSender.ts
 import { EventEmitter } from 'events'
 import { createLogger } from '../../shared/logger'
+import { hzToThrottleIntervalMs } from '../../shared/dmxOutputRefresh'
 import { BaseSender, SenderError } from './BaseSender'
 import { Sender } from 'sacn'
 import * as os from 'os'
@@ -39,7 +40,7 @@ export class SacnSender extends BaseSender {
       config.maxOutputRate !== undefined && config.maxOutputRate !== null
         ? config.maxOutputRate
         : config.minRefreshRate ?? SACN_DEFAULT_MAX_OUTPUT_RATE
-    this.minIntervalMs = throttleHz > 0 ? 1000 / throttleHz : 0
+    this.minIntervalMs = hzToThrottleIntervalMs(throttleHz)
   }
 
   public async start(): Promise<void> {

@@ -495,12 +495,10 @@ export class YargCueRegistry {
 
           if (activeGroupHasCue) {
             // An active group now has this cue, so we shouldn't use the fallback
-            //      console.log(`[Consistency] Active group now has ${cueType}, clearing fallback consistency`);
             this.clearCueConsistencyTracking(cueType)
             return null
           } else {
             // No active group has this cue, so the fallback is still valid
-            //     console.log(`[Consistency] No active group has ${cueType}, fallback is still valid`);
           }
         } else {
           // Non-fallback: require the cached group to still be active (e.g. not toggled off in DMX preview)
@@ -513,13 +511,11 @@ export class YargCueRegistry {
           }
         }
 
-        //  console.log(`[Consistency] Using consistent selection for ${cueType} (${now - lastExecutionTime}ms since last execution)`);
         // Update the execution time to prevent infinite loops
         this.lastCueExecutionTime.set(cueType, now)
         return lastSelection
       } else {
         // The group or cue is no longer available, clear the tracking
-        //    console.log(`[Consistency] Group ${lastSelection.groupId} no longer available for ${cueType}, clearing tracking`);
         this.clearCueConsistencyTracking(cueType)
         return null
       }
@@ -540,7 +536,6 @@ export class YargCueRegistry {
     const now = monotonicNowMs()
     this.lastCueExecutionTime.set(cueType, now)
     this.lastCueGroupSelection.set(cueType, selection)
-    //  console.log(`[Consistency] Recorded execution of ${cueType} with group ${selection.groupId} at ${now}`);
   }
 
   /**
@@ -963,7 +958,6 @@ export class YargCueRegistry {
   public clearConsistencyTracking(): void {
     this.lastCueExecutionTime.clear()
     this.lastCueGroupSelection.clear()
-    //  console.log('[Consistency] Cleared all consistency tracking data');
   }
 
   /**
@@ -973,7 +967,6 @@ export class YargCueRegistry {
   public clearCueConsistencyTracking(cueType: CueType): void {
     this.lastCueExecutionTime.delete(cueType)
     this.lastCueGroupSelection.delete(cueType)
-    //  console.log(`[Consistency] Cleared tracking for cue: ${cueType}`);
   }
 
   /**

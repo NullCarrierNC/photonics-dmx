@@ -316,7 +316,6 @@ export class YargNetworkListener extends EventEmitter {
 
     this.server.on('message', (msg) => {
       try {
-        // console.log(`Received message of ${msg.length} bytes: ${msg.toString('hex')}`);
         this.deserializePacket(msg)
       } catch (error) {
         log.error('Failed to parse message:', error)
@@ -512,7 +511,6 @@ export class YargNetworkListener extends EventEmitter {
         keyframe: this.getKeyframeDescription(keyframeValue),
         bonusEffect,
       }
-      //console.log("Keyframe:", YargCueData.keyframe);
       this.processCueData(YargCueData)
     } catch (error) {
       log.error('YARG Listener: Error during packet deserialization:', error)

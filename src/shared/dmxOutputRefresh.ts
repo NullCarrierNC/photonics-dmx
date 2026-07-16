@@ -40,3 +40,12 @@ export function dmxOutputRefreshRateHzFromUnknownPayload(data: {
 export function artNetBaseRefreshIntervalMs(refreshRateHz: number): number {
   return Math.round(1000 / refreshRateHz)
 }
+
+/**
+ * Maps a sender's max output rate (Hz) to a minimum send interval (ms) for rate limiting.
+ * A rate of 0 or below means "no throttle" and returns 0. A positive rate is floored to a whole
+ * millisecond (min 1) so the throttle never carries sub-millisecond jitter.
+ */
+export function hzToThrottleIntervalMs(rateHz: number): number {
+  return rateHz > 0 ? Math.max(1, Math.round(1000 / rateHz)) : 0
+}

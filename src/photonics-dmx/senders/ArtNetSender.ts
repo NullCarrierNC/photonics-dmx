@@ -1,6 +1,7 @@
 import { DMX, ArtnetDriver, IUniverseDriver } from 'dmx-ts'
 import { EventEmitter } from 'events'
 import { createLogger } from '../../shared/logger'
+import { hzToThrottleIntervalMs } from '../../shared/dmxOutputRefresh'
 import { BaseSender, SenderError } from './BaseSender'
 
 const log = createLogger('ArtNetSender')
@@ -44,7 +45,7 @@ export class ArtNetSender extends BaseSender {
     super()
     this.eventEmitter = new EventEmitter()
     const rate = this.options.maxOutputRate ?? ARTNET_DEFAULT_MAX_OUTPUT_RATE
-    this.minIntervalMs = rate > 0 ? 1000 / rate : 0
+    this.minIntervalMs = hzToThrottleIntervalMs(rate)
   }
 
   public async start(): Promise<void> {
