@@ -19,7 +19,7 @@ import {
   percentToDmx,
 } from '../helpers/dmxHelpers'
 import { SenderManager } from './SenderManager'
-import { LightStateManager } from './sequencer/LightStateManager'
+import { LightStateManager, type LightStatesListener } from './sequencer/LightStateManager'
 import { getStrobeStateManager, StrobeStateManager } from './StrobeStateManager'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('DmxPublisher')
@@ -140,7 +140,7 @@ interface IpcGovernor {
 interface ChainSubscription {
   rigId: string
   lightStateManager: LightStateManager
-  handler: (lights: Map<string, RGBIO>) => void
+  handler: LightStatesListener
 }
 
 export class DmxPublisher {
@@ -208,7 +208,7 @@ export class DmxPublisher {
 
     this.publish = this.publish.bind(this)
     if (this._lightStateManager) {
-      this._lightStateManager.on('LightStatesUpdated', this.publish)
+      this._lightStateManager.onLightStatesUpdated(this.publish)
     }
 
     // Pre-build blackout buffer
@@ -230,11 +230,11 @@ export class DmxPublisher {
     // Tear down any prior chain subscriptions and the legacy single-source subscription so
     // we can't double-publish.
     for (const sub of this._chainSubscriptions) {
-      sub.lightStateManager.off('LightStatesUpdated', sub.handler)
+      sub.lightStateManager.offLightStatesUpdated(sub.handler)
     }
     this._chainSubscriptions = []
     if (this._lightStateManager) {
-      this._lightStateManager.off('LightStatesUpdated', this.publish)
+      this._lightStateManager.offLightStatesUpdated(this.publish)
       this._lightStateManager = null
     }
     // Clear aggregated state — light ids that belonged to chains we're dropping must not
@@ -242,13 +242,13 @@ export class DmxPublisher {
     this._aggregatedLights.clear()
 
     for (const chain of chains) {
-      const handler = (lights: Map<string, RGBIO>): void => {
+      const handler = (lights: ReadonlyMap<string, Readonly<RGBIO>>): void => {
         for (const [lightId, state] of lights) {
           this._aggregatedLights.set(lightId, state)
         }
         this._schedulePublishFlush()
       }
-      chain.lightStateManager.on('LightStatesUpdated', handler)
+      chain.lightStateManager.onLightStatesUpdated(handler)
       this._chainSubscriptions.push({
         rigId: chain.rigId,
         lightStateManager: chain.lightStateManager,
@@ -271,7 +271,7 @@ export class DmxPublisher {
    * Publishes the provided light states to the DMX senders by
    * mapping the desired channels to each DMX fixture's channels.
    */
-  public publish = (lights: Map<string, RGBIO>): void => {
+  public publish = (lights: ReadonlyMap<string, Readonly<RGBIO>>): void => {
     if (this._manualMode) {
       return
     }
@@ -378,7 +378,7 @@ export class DmxPublisher {
    * `outputs` routing) plus one buffer per active rig for the IPC preview. Wire slots dispatch
    * through their per-slot governor; the IPC payload goes through the separate IPC governor.
    */
-  private publishNow(lights: Map<string, RGBIO>): void {
+  private publishNow(lights: ReadonlyMap<string, Readonly<RGBIO>>): void {
     // 1. Snapshot the set of currently-enabled wire-sender slots and reconcile state.
     const enabledWireSenders = this._sender.getEnabledWireSenders()
     const ipcEnabled = this._sender.isIpcEnabled()
@@ -848,7 +848,7 @@ export class DmxPublisher {
         this._lightStateManager = null
       }
       for (const sub of this._chainSubscriptions) {
-        sub.lightStateManager.off('LightStatesUpdated', sub.handler)
+        sub.lightStateManager.offLightStatesUpdated(sub.handler)
       }
       this._chainSubscriptions = []
       this._aggregatedLights.clear()

@@ -1,6 +1,13 @@
 import { EventEmitter } from 'events'
 import { RGBIO } from '../../types'
 
+/**
+ * Listener for published light states. The map and its values are read-only by contract: they are
+ * the manager's live state shared by reference each frame, so the type stops a consumer from
+ * mutating the map (a .set/.delete would corrupt the next frame) at compile time.
+ */
+export type LightStatesListener = (states: ReadonlyMap<string, Readonly<RGBIO>>) => void
+
 /** Freeze the per-frame published state under test so a listener that mutates it fails loudly. */
 const FREEZE_PUBLISHED_STATES = process.env.NODE_ENV === 'test'
 
@@ -59,6 +66,16 @@ class LightStateManager extends EventEmitter {
       return
     }
     this.emit('LightStatesUpdated', this._finalStates)
+  }
+
+  /** Register a listener for published light states. Typed read-only (see {@link LightStatesListener}). */
+  public onLightStatesUpdated(listener: LightStatesListener): void {
+    this.on('LightStatesUpdated', listener)
+  }
+
+  /** Remove a previously registered light-states listener. */
+  public offLightStatesUpdated(listener: LightStatesListener): void {
+    this.off('LightStatesUpdated', listener)
   }
 
   /**
