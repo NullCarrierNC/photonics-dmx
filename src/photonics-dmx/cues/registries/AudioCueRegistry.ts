@@ -2,6 +2,7 @@ import { AudioCueType, AudioMotionCueRef } from '../types/audioCueTypes'
 import type { MotionGroupSelectionMode } from '../types/nodeCueTypes'
 import { IAudioCue } from '../interfaces/IAudioCue'
 import { MotionSelectionState } from './MotionSelectionState'
+import { DisabledCueStore, releaseSequencersFor } from './cueRegistrySupport'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('AudioCueRegistry')
 
@@ -34,7 +35,7 @@ export class AudioCueRegistry {
   private enabledGroups: Set<string> = new Set()
 
   /** Per-group disabled audio cue type IDs (user preferences) */
-  private disabledCues: Map<string, Set<string>> = new Map()
+  private readonly disabledCues = new DisabledCueStore()
 
   private readonly motionState = new MotionSelectionState<IAudioCue>()
 
@@ -201,16 +202,7 @@ export class AudioCueRegistry {
   public releaseSequencerFromAllCues(
     sequencer: import('../../controllers/sequencer/interfaces').ILightingController,
   ): void {
-    for (const group of this.groups.values()) {
-      for (const cue of group.cues.values()) {
-        cue.releaseSequencer?.(sequencer)
-      }
-      if (group.motionCues) {
-        for (const motionCue of group.motionCues.values()) {
-          motionCue.releaseSequencer?.(sequencer)
-        }
-      }
-    }
+    releaseSequencersFor(this.groups.values(), sequencer)
   }
 
   /**
@@ -287,10 +279,9 @@ export class AudioCueRegistry {
    * Replace per-group disabled cue sets from preferences.
    */
   public setDisabledCues(disabled: Record<string, string[]>): void {
-    this.disabledCues.clear()
-    for (const [groupId, ids] of Object.entries(disabled)) {
-      this.disabledCues.set(groupId, new Set(ids))
-    }
+    this.disabledCues.setAll(disabled)
+    // Audio-specific: the cue-details cache is keyed by group and does not track disabled state, so
+    // clear it here to stay consistent. This is the one line that differs from the Yarg registry.
     this.cueDetailsCache.clear()
   }
 
@@ -298,7 +289,7 @@ export class AudioCueRegistry {
    * Whether this cue type is disabled for the given group in preferences.
    */
   public isCueDisabled(groupId: string, cueType: AudioCueType): boolean {
-    return this.disabledCues.get(groupId)?.has(cueType) ?? false
+    return this.disabledCues.isDisabled(groupId, cueType)
   }
 
   /**

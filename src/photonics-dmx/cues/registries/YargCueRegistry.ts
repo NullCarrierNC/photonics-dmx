@@ -4,6 +4,7 @@ import { ICueGroup } from '../interfaces/INetCueGroup'
 import { INetCue, CueStyle } from '../interfaces/INetCue'
 import { YargMotionNodeCue } from '../node/runtime/YargMotionNodeCue'
 import { MotionSelectionState } from './MotionSelectionState'
+import { DisabledCueStore, releaseSequencersFor } from './cueRegistrySupport'
 import { createLogger } from '../../../shared/logger'
 import { monotonicNowMs } from '../../../shared/time'
 const log = createLogger('YargCueRegistry')
@@ -45,7 +46,7 @@ export class YargCueRegistry {
   private activeGroups: Set<string> = new Set()
 
   /** Per-group disabled cue types (user preferences) */
-  private disabledCues: Map<string, Set<string>> = new Map()
+  private readonly disabledCues = new DisabledCueStore()
 
   private readonly motionState = new MotionSelectionState<INetCue>()
 
@@ -817,17 +818,14 @@ export class YargCueRegistry {
    * Replace per-group disabled cue sets from preferences.
    */
   public setDisabledCues(disabled: Record<string, string[]>): void {
-    this.disabledCues.clear()
-    for (const [groupId, ids] of Object.entries(disabled)) {
-      this.disabledCues.set(groupId, new Set(ids))
-    }
+    this.disabledCues.setAll(disabled)
   }
 
   /**
    * Whether this cue type is disabled for the given group in preferences.
    */
   public isCueDisabled(groupId: string, cueType: CueType): boolean {
-    return this.disabledCues.get(groupId)?.has(cueType) ?? false
+    return this.disabledCues.isDisabled(groupId, cueType)
   }
 
   /**
@@ -1003,16 +1001,7 @@ export class YargCueRegistry {
   public releaseSequencerFromAllCues(
     sequencer: import('../../controllers/sequencer/interfaces').ILightingController,
   ): void {
-    for (const group of this.groups.values()) {
-      for (const cue of group.cues.values()) {
-        cue.releaseSequencer?.(sequencer)
-      }
-      if (group.motionCues) {
-        for (const motionCue of group.motionCues.values()) {
-          motionCue.releaseSequencer?.(sequencer)
-        }
-      }
-    }
+    releaseSequencersFor(this.groups.values(), sequencer)
   }
 
   /**
