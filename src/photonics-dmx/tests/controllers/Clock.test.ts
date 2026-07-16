@@ -70,4 +70,57 @@ describe('Clock', () => {
       expect(clock.isActive()).toBe(false)
     })
   })
+
+  describe('cadence', () => {
+    // The whole sequencer runs off this tick, so a regression in the tick rate would silently
+    // rescale every fade and strobe. These pin the rate under deterministic fake timers.
+    it('ticks about once per interval over a span', () => {
+      const c = new Clock(10)
+      c.start()
+      jest.advanceTimersByTime(100)
+      // ~10 ticks over 100ms at a 10ms interval (drift correction lands the last tick on the edge).
+      expect(c.getTickCount()).toBeGreaterThanOrEqual(9)
+      expect(c.getTickCount()).toBeLessThanOrEqual(10)
+      c.destroy()
+    })
+
+    it('ticks proportionally fewer times with a larger interval', () => {
+      const fast = new Clock(10)
+      const slow = new Clock(25)
+      fast.start()
+      slow.start()
+      jest.advanceTimersByTime(100)
+      expect(slow.getTickCount()).toBeLessThan(fast.getTickCount())
+      expect(slow.getTickCount()).toBeGreaterThanOrEqual(3)
+      expect(slow.getTickCount()).toBeLessThanOrEqual(4)
+      fast.destroy()
+      slow.destroy()
+    })
+
+    it('calls each registered tick callback once per tick', () => {
+      const cb = jest.fn()
+      const c = new Clock(10)
+      c.onTick(cb)
+      c.start()
+      jest.advanceTimersByTime(50)
+      expect(cb.mock.calls.length).toBe(c.getTickCount())
+      expect(cb.mock.calls.length).toBeGreaterThanOrEqual(4)
+      c.destroy()
+    })
+
+    it('clamps the interval to the 1-100ms range and still ticks', () => {
+      // 0 clamps up to 1ms, 1000 clamps down to 100ms. Neither should stall.
+      const tooFast = new Clock(0)
+      const tooSlow = new Clock(1000)
+      tooFast.start()
+      tooSlow.start()
+      jest.advanceTimersByTime(200)
+      expect(tooFast.getTickCount()).toBeGreaterThan(0)
+      expect(tooSlow.getTickCount()).toBeGreaterThan(0)
+      // The 1ms clock ticks far more often than the 100ms clock.
+      expect(tooFast.getTickCount()).toBeGreaterThan(tooSlow.getTickCount())
+      tooFast.destroy()
+      tooSlow.destroy()
+    })
+  })
 })
