@@ -6,7 +6,7 @@
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { TrackedLight, Color } from '../../../types'
-import { randomBetween } from '../../../helpers/utils'
+import { randomBetween, shuffle } from '../../../helpers/utils'
 import {
   LogicNode,
   RandomRoll,
@@ -640,7 +640,7 @@ export function evaluateLogicNode(
       }
 
       const colorsArray = sourceVar.value as Color[]
-      const shuffled = [...colorsArray].sort(() => Math.random() - 0.5)
+      const shuffled = shuffle(colorsArray)
 
       const targetVarStore = getVarStore(logicNode.assignTo)
       targetVarStore.set(logicNode.assignTo, { type: 'color-array', value: shuffled })
@@ -803,7 +803,7 @@ export function evaluateLogicNode(
       }
 
       const lightsArray = sourceVar.value as TrackedLight[]
-      const shuffled = [...lightsArray].sort(() => Math.random() - 0.5)
+      const shuffled = shuffle(lightsArray)
       const targetVarStore = getVarStore(logicNode.assignTo)
       targetVarStore.set(logicNode.assignTo, { type: 'light-array', value: shuffled })
       return edges.map((edge) => edge.to)
@@ -859,7 +859,7 @@ export function evaluateLogicNode(
             ),
           )
           const count = Math.max(0, Math.min(Math.floor(countVal), lightsArray.length))
-          const shuffled = [...lightsArray].sort(() => Math.random() - 0.5)
+          const shuffled = shuffle(lightsArray)
           const picked = shuffled.slice(0, count)
           varStore.set(roll.assignTo, { type: 'light-array', value: picked })
         }
