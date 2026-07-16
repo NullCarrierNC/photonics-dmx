@@ -1,5 +1,4 @@
 import { DMX, ArtnetDriver, IUniverseDriver } from 'dmx-ts'
-import { EventEmitter } from 'events'
 import { createLogger } from '../../shared/logger'
 import { hzToThrottleIntervalMs } from '../../shared/dmxOutputRefresh'
 import { BaseSender, SenderError } from './BaseSender'
@@ -23,7 +22,6 @@ export interface ArtNetSenderOptions {
 export class ArtNetSender extends BaseSender {
   private dmx: DMX = new DMX()
   private universe?: IUniverseDriver
-  private eventEmitter: EventEmitter
   private lastSendTimeMs: number = 0
   private minIntervalMs: number = 0
   /** Latest frame withheld by the rate limiter, flushed by {@link flushTimer}. */
@@ -43,7 +41,6 @@ export class ArtNetSender extends BaseSender {
     },
   ) {
     super()
-    this.eventEmitter = new EventEmitter()
     const rate = this.options.maxOutputRate ?? ARTNET_DEFAULT_MAX_OUTPUT_RATE
     this.minIntervalMs = hzToThrottleIntervalMs(rate)
   }
@@ -62,7 +59,7 @@ export class ArtNetSender extends BaseSender {
       )
     } catch (err) {
       const errorEvent = new SenderError(err, { senderId: 'artnet' })
-      this.eventEmitter.emit('SenderError', errorEvent)
+      this.emitSenderError(errorEvent)
       throw err // Re-throw to allow SenderManager to handle it
     }
   }
@@ -102,7 +99,7 @@ export class ArtNetSender extends BaseSender {
 
       // Clean up all event listeners first
       try {
-        this.eventEmitter.removeAllListeners()
+        this.removeAllSendErrorListeners()
         if (this.dmx) {
           this.dmx.removeAllListeners()
         }
@@ -193,7 +190,7 @@ export class ArtNetSender extends BaseSender {
         shouldDisable: Boolean(isNetworkError),
         code: errObj && 'code' in errObj ? String(errObj.code) : undefined,
       })
-      this.eventEmitter.emit('SenderError', errorEvent)
+      this.emitSenderError(errorEvent)
     }
   }
 
@@ -201,14 +198,6 @@ export class ArtNetSender extends BaseSender {
     if (!this.universe) {
       throw new Error("ArtNetSender isn't started.")
     }
-  }
-
-  public onSendError(listener: (error: SenderError) => void): void {
-    this.eventEmitter.on('SenderError', listener)
-  }
-
-  public removeSendError(listener: (error: SenderError) => void): void {
-    this.eventEmitter.off('SenderError', listener)
   }
 
   public getUniverse(): number {

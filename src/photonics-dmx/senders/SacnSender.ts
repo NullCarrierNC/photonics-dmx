@@ -1,5 +1,4 @@
 // src/senders/SacnSender.ts
-import { EventEmitter } from 'events'
 import { createLogger } from '../../shared/logger'
 import { hzToThrottleIntervalMs } from '../../shared/dmxOutputRefresh'
 import { BaseSender, SenderError } from './BaseSender'
@@ -24,7 +23,6 @@ export interface SacnConfig {
 
 export class SacnSender extends BaseSender {
   private sender: Sender | undefined
-  private eventEmitter: EventEmitter
   private config: SacnConfig
   private lastSendTimeMs: number = 0
   private minIntervalMs: number = 0
@@ -34,7 +32,6 @@ export class SacnSender extends BaseSender {
 
   constructor(config: SacnConfig = {}) {
     super()
-    this.eventEmitter = new EventEmitter()
     this.config = config
     const throttleHz =
       config.maxOutputRate !== undefined && config.maxOutputRate !== null
@@ -197,7 +194,7 @@ export class SacnSender extends BaseSender {
         shouldDisable: Boolean(isNetworkError),
         code: errObj && 'code' in errObj ? String(errObj.code) : undefined,
       })
-      this.eventEmitter.emit('SenderError', errorEvent)
+      this.emitSenderError(errorEvent)
     }
   }
 
@@ -205,14 +202,6 @@ export class SacnSender extends BaseSender {
     if (!this.sender) {
       throw new Error("SacnSender isn't running.")
     }
-  }
-
-  public onSendError(listener: (error: SenderError) => void): void {
-    this.eventEmitter.on('SenderError', listener)
-  }
-
-  public removeSendError(listener: (error: SenderError) => void): void {
-    this.eventEmitter.off('SenderError', listener)
   }
 
   public getUniverse(): number {

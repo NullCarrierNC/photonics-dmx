@@ -9,7 +9,6 @@
  * which avoids flicker on FTDI adapters.
  */
 
-import { EventEmitter } from 'events'
 import { EnttecOpenDMXUSBDevice } from 'enttec-open-dmx-usb'
 import { createLogger } from '../../shared/logger'
 import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../shared/dmxOutputRefresh'
@@ -143,7 +142,6 @@ export class OpenDmxSender extends BaseSender {
   private static readonly MAX_SEND_FAILURES = 3
 
   private device: IOpenDmxDeviceAdapter | undefined
-  private eventEmitter: EventEmitter
   private dmxUniverse: number
   private consecutiveSendFailures = 0
   private readonly deviceFactory?: (
@@ -159,7 +157,6 @@ export class OpenDmxSender extends BaseSender {
     deviceFactory?: (path: string, options: OpenDmxDeviceOptions) => IOpenDmxDeviceAdapter,
   ) {
     super()
-    this.eventEmitter = new EventEmitter()
     this.dmxUniverse = universe
     this.deviceFactory = deviceFactory
   }
@@ -167,7 +164,7 @@ export class OpenDmxSender extends BaseSender {
   public async start(): Promise<void> {
     const onError = (err: Error): void => {
       const errorEvent = new SenderError(err, { senderId: 'opendmx', shouldDisable: true })
-      this.eventEmitter.emit('SenderError', errorEvent)
+      this.emitSenderError(errorEvent)
     }
     const options: OpenDmxDeviceOptions = {
       dmxSpeed: this.options.dmxSpeed,
@@ -203,7 +200,7 @@ export class OpenDmxSender extends BaseSender {
         log.error('Failed to stop OpenDMX device:', err)
       }
 
-      this.eventEmitter.removeAllListeners()
+      this.removeAllSendErrorListeners()
       log.info('Removed all event listeners')
     } catch (outerErr) {
       log.error('Unhandled error during OpenDmxSender stop:', outerErr)
@@ -226,7 +223,7 @@ export class OpenDmxSender extends BaseSender {
       this.consecutiveSendFailures++
       const shouldDisable = this.consecutiveSendFailures >= OpenDmxSender.MAX_SEND_FAILURES
       const errorEvent = new SenderError(err, { senderId: 'opendmx', shouldDisable })
-      this.eventEmitter.emit('SenderError', errorEvent)
+      this.emitSenderError(errorEvent)
     }
   }
 
@@ -234,14 +231,6 @@ export class OpenDmxSender extends BaseSender {
     if (!this.device) {
       throw new Error("OpenDmxSender isn't started.")
     }
-  }
-
-  public onSendError(listener: (error: SenderError) => void): void {
-    this.eventEmitter.on('SenderError', listener)
-  }
-
-  public removeSendError(listener: (error: SenderError) => void): void {
-    this.eventEmitter.off('SenderError', listener)
   }
 
   public getUniverse(): number {
