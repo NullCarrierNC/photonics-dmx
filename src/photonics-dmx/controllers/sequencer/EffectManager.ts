@@ -198,14 +198,14 @@ export class EffectManager implements IEffectManager {
    * @param isPersistent If true, the effect re-queues itself after completing
    */
   public addEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
-    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      log.warn('Add cancelling blackout')
-      this.systemEffects.cancelBlackout()
-    }
-
     if (effect.transitions.length === 0) {
       log.warn(`Effect "${name}" has no transitions. Ignoring.`)
       return
+    }
+
+    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
+      log.warn('Add cancelling blackout')
+      this.systemEffects.cancelBlackout()
     }
 
     const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(
@@ -248,14 +248,14 @@ export class EffectManager implements IEffectManager {
    * transition behind a stale in-flight one would cause desynchronised motion.
    */
   public replaceEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
-    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      log.warn('Replace cancelling blackout')
-      this.systemEffects.cancelBlackout()
-    }
-
     if (effect.transitions.length === 0) {
       log.warn(`Effect "${name}" has no transitions. Ignoring.`)
       return
+    }
+
+    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
+      log.warn('Replace cancelling blackout')
+      this.systemEffects.cancelBlackout()
     }
 
     const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(
@@ -360,13 +360,13 @@ export class EffectManager implements IEffectManager {
     effect: Effect,
     isPersistent: boolean = false,
   ): boolean {
-    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      log.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
+    if (effect.transitions.length === 0) {
+      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
       return false
     }
 
-    if (effect.transitions.length === 0) {
-      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
+    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
+      log.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
       return false
     }
 
@@ -519,13 +519,13 @@ export class EffectManager implements IEffectManager {
     effect: Effect,
     isPersistent: boolean = false,
   ): boolean {
-    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      log.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
+    if (effect.transitions.length === 0) {
+      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
       return false
     }
 
-    if (effect.transitions.length === 0) {
-      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
+    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
+      log.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
       return false
     }
 

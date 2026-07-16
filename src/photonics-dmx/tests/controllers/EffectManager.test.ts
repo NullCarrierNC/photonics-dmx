@@ -290,6 +290,24 @@ describe('EffectManager', () => {
       expect(systemEffects.cancelBlackout).toHaveBeenCalled()
     })
 
+    it('should ignore an effect with no transitions during blackout without throwing', () => {
+      // Blackout active is the case that used to deref transitions[0] before the empty guard.
+      systemEffects.isBlackoutActive.mockReturnValue(true)
+
+      const empty: Effect = {
+        id: 'empty-effect',
+        description: 'Effect with no transitions',
+        transitions: [],
+      }
+
+      expect(() => effectManager.addEffect('empty', empty)).not.toThrow()
+      expect(() => effectManager.replaceEffect('empty', empty)).not.toThrow()
+      expect(() => effectManager.addEffectUnblockedName('empty', empty)).not.toThrow()
+      expect(() => effectManager.setEffectUnblockedName('empty', empty)).not.toThrow()
+      // The empty effect is ignored, so it never cancels the blackout.
+      expect(systemEffects.cancelBlackout).not.toHaveBeenCalled()
+    })
+
     it('should queue effects with the same name on the same layer', () => {
       const layer = 1
       const effectName = 'test-effect'
