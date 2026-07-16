@@ -1,6 +1,9 @@
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('Clock')
 
+/** A tick whose callbacks run longer than this multiple of the interval is flagged as an overrun. */
+const OVERRUN_FACTOR = 2
+
 /**
  * @class Clock
  * @description Centralized timing source for the lighting sequencer system.
@@ -17,6 +20,8 @@ export class Clock {
   private isRunning: boolean = false
   private tickCount: number = 0
   private intervalMs: number
+  /** True while a run of overrunning ticks is in progress, so we warn once per episode not per tick. */
+  private overrunActive: boolean = false
 
   constructor(intervalMs: number = 10) {
     this.intervalMs = Math.max(1, Math.min(100, intervalMs)) // Clamp between 1-100ms
@@ -134,6 +139,11 @@ export class Clock {
     const deltaTime = currentTime - this.lastUpdateTime
     this.lastUpdateTime = currentTime
 
+    // Watchdog: the callbacks run synchronously inside the timer handler, so a slow tick directly
+    // delays the next one and can stutter output. Measure the callback pass and warn once when an
+    // overrun episode starts, staying quiet until a clean tick so a sustained stall logs once.
+    const tickStart = performance.now()
+
     // Notify all registered callbacks
     this.updateCallbacks.forEach((callback) => {
       try {
@@ -142,6 +152,18 @@ export class Clock {
         log.error('Error in timing update callback:', error)
       }
     })
+
+    const tickDurationMs = performance.now() - tickStart
+    if (tickDurationMs > this.intervalMs * OVERRUN_FACTOR) {
+      if (!this.overrunActive) {
+        this.overrunActive = true
+        log.warn(
+          `Tick callbacks took ${tickDurationMs.toFixed(1)}ms, over the ${this.intervalMs}ms interval. Output may stutter.`,
+        )
+      }
+    } else {
+      this.overrunActive = false
+    }
   }
 
   /**

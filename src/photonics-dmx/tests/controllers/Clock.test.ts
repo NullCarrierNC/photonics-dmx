@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, jest } from '@jest/globals'
 import { Clock } from '../../controllers/sequencer/Clock'
+import { setLogSink, resetLogConfiguration, type LogEntry } from '../../../shared/logger'
 
 describe('Clock', () => {
   let clock: Clock
@@ -106,6 +107,34 @@ describe('Clock', () => {
       expect(cb.mock.calls.length).toBe(c.getTickCount())
       expect(cb.mock.calls.length).toBeGreaterThanOrEqual(4)
       c.destroy()
+    })
+
+    it('warns once when the tick callbacks overrun the interval', () => {
+      // Real timers so performance.now() advances for a real busy-wait (fake timers can freeze it).
+      jest.useRealTimers()
+      const entries: LogEntry[] = []
+      setLogSink((e) => entries.push(e))
+      try {
+        const c = new Clock(10) // overrun threshold is 20ms
+        c.onTick(() => {
+          const start = performance.now()
+          while (performance.now() - start < 25) {
+            // busy-wait past the threshold
+          }
+        })
+        const tick = (): void => (c as unknown as { update(): void }).update()
+        const overrunWarns = (): number =>
+          entries.filter((e) => e.level === 'warn' && e.message.includes('over the')).length
+
+        tick()
+        expect(overrunWarns()).toBe(1)
+        // A second overrunning tick in the same episode does not re-warn.
+        tick()
+        expect(overrunWarns()).toBe(1)
+        c.destroy()
+      } finally {
+        resetLogConfiguration()
+      }
     })
 
     it('clamps the interval to the 1-100ms range and still ticks', () => {
