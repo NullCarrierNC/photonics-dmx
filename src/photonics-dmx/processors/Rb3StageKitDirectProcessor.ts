@@ -11,7 +11,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from 'events'
 import { StageKitConfig, DEFAULT_STAGEKIT_CONFIG } from '../listeners/RB3/StageKitTypes'
-import { CueData } from '../cues/types/cueTypes'
+import { CueData, defaultCueData, positionsToMask } from '../cues/types/cueTypes'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import { Rb3StageKitRigProcessor } from './Rb3StageKitRigProcessor'
 import { ChainFanout } from '../controllers/ChainFanout'
@@ -40,6 +40,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
   // Track if we're currently in a song (using direct control)
   private _inSong: boolean = false
+
+  // Accumulated StageKit LED bank masks (bit i = position i lit). The incoming StageKit events are
+  // per-bank, so we accumulate here and emit a full `ledBanks` snapshot each frame, the same shape the
+  // cue-mode processor emits. This keeps the preview a single render path (no per-packet direct mode).
+  // Reset on menu/clear/off.
+  private ledBankMasks = { red: 0, green: 0, blue: 0, yellow: 0 }
 
   // Menu-look pump: no immediate first frame (the first paint lands one interval after Menus),
   // start() restarts the interval, frames gated on the Menus game state.
@@ -165,7 +171,11 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     platform: string,
     rb3ScreenNameOverride?: string,
   ): CueData {
+    // A menu has no StageKit LEDs lit, so the accumulated snapshot resets and defaultCueData's empty
+    // ledBanks is emitted.
+    this.resetLedBanks()
     return {
+      ...defaultCueData,
       datagramVersion: realCueData?.datagramVersion || 1,
       platform: realCueData?.platform || 'RB3E',
       currentScene: 'Menu',
@@ -332,9 +342,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       const previousState = this._currentGameState
       this._currentGameState = gameState
 
+      // Clearing the lights resets the accumulated snapshot, so defaultCueData's empty ledBanks is emitted.
+      this.resetLedBanks()
       const clearCueData: CueData =
         gameState === 'InGame'
           ? {
+              ...defaultCueData,
               datagramVersion: realCueData?.datagramVersion || 1,
               platform: realCueData?.platform || 'RB3E',
               currentScene: 'Gameplay',
@@ -554,10 +567,28 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Create and emit CueData for network debugging
    * @param event The StageKit event data
    */
+  private resetLedBanks(): void {
+    this.ledBankMasks = { red: 0, green: 0, blue: 0, yellow: 0 }
+  }
+
+  /** Fold one per-bank StageKit event into the accumulated snapshot (matches the old preview logic:
+   *  a colour sets that bank to its positions, empty positions clear it, and `off` clears everything). */
+  private updateLedBanks(color: string, positions: number[]): void {
+    if (color === 'off') {
+      this.resetLedBanks()
+      return
+    }
+    if (color === 'red' || color === 'green' || color === 'blue' || color === 'yellow') {
+      this.ledBankMasks[color] = positionsToMask(positions)
+    }
+  }
+
   private emitCueDataForStageKit(event: StageKitData): void {
     const { positions, color, strobeEffect, fog } = event
+    this.updateLedBanks(color, positions)
 
     const cueData: CueData = {
+      ...defaultCueData,
       datagramVersion: 1,
       platform: 'RB3E',
       currentScene: 'Gameplay',
@@ -597,6 +628,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       bonusEffect: false,
       ledColor: color === 'off' ? '' : color,
       ledPositions: positions,
+      ledBanks: { ...this.ledBankMasks },
       rb3Platform: 'RB3E',
       rb3BuildTag: '',
       rb3SongName: '',

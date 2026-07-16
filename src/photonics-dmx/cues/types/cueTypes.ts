@@ -164,6 +164,15 @@ export function ledBankNibbleAt(frame: Partial<CueData> | undefined, index: numb
   )
 }
 
+/** Bitmask (bit i = position i lit) from a list of LED positions 0..7. Inverse of maskToPositions. */
+export function positionsToMask(positions: number[]): number {
+  let mask = 0
+  for (const p of positions) {
+    if (p >= 0 && p < 8) mask |= 1 << p
+  }
+  return mask
+}
+
 /**
  * The colour of LED position `index` (0..7) as a palette name — the per-position analogue of the global
  * `led-color` (which reports only the dominant bank across all positions). Priority red > green > blue >
@@ -402,6 +411,15 @@ export const defaultCueData: CueData = {
     identifyValue: '',
     string: '',
   },
+  // Optional fields the RB3 StageKit direct processor also emits. Defaulted here so both RB3
+  // processors produce the same CueData shape and a new consumer never sees them undefined.
+  trackMode: 'tracked',
+  ledPositions: [],
+  sustainDurationMs: 0,
+  measureOrBeat: 0,
+  totalScore: 0,
+  memberScores: [],
+  stars: 0,
 }
 
 /**

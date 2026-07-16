@@ -33,35 +33,22 @@ const maskToPositions = (mask = 0): number[] =>
   Array.from({ length: 8 }, (_, i) => i).filter((i) => (mask & (1 << i)) !== 0)
 
 /**
- * Derive the four StageKit colour banks (lit positions per colour) for the next render from an
- * incoming cue frame. Pure so it can be unit-tested without mounting the component.
+ * Derive the four StageKit colour banks (lit positions per colour) from an incoming cue frame. Pure
+ * so it can be unit-tested without mounting the component.
  *
- * `ledBanks` (cue mode + simulation) is the authoritative full snapshot: replace all four banks
- * every frame so no bank can get stuck lit. Direct mode omits `ledBanks` and sends one colour per
- * packet, so retain the other banks but honour explicit off frames — `ledColor:''` / `'off'` clears
- * everything, and a colour frame with empty positions clears just that bank. A frame carrying no LED
- * info at all leaves the banks untouched.
+ * Every source (cue mode, simulation, and the direct StageKit processor which now accumulates its
+ * per-packet updates) emits `ledBanks` as the authoritative full snapshot, so this just reads it and
+ * replaces all four banks. On the rare frame with no `ledBanks` the previous banks are retained.
  */
 export function nextColorBanks(prev: ColorBankState, cueData: CueData): ColorBankState {
-  if (cueData.ledBanks) {
-    const b = cueData.ledBanks
-    return {
-      red: maskToPositions(b.red),
-      green: maskToPositions(b.green),
-      blue: maskToPositions(b.blue),
-      yellow: maskToPositions(b.yellow),
-    }
+  const b = cueData.ledBanks
+  if (!b) return prev
+  return {
+    red: maskToPositions(b.red),
+    green: maskToPositions(b.green),
+    blue: maskToPositions(b.blue),
+    yellow: maskToPositions(b.yellow),
   }
-
-  const raw = cueData.ledColor
-  const color = raw?.toLowerCase()
-  if (color === 'red' || color === 'green' || color === 'blue' || color === 'yellow') {
-    return { ...prev, [color]: cueData.ledPositions ?? [] }
-  }
-  if (raw === '' || color === 'off') {
-    return { ...EMPTY_BANKS }
-  }
-  return prev
 }
 
 const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {

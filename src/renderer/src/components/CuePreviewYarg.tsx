@@ -314,8 +314,9 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
         prevBeatRef.current = cueData.beat
       }
 
-      // Measure detection - check if the measure number changed
-      if (cueData.measureOrBeat !== undefined) {
+      // Measure detection - check if the measure number changed. Measures are 1-indexed, so 0 (the
+      // default/unset value) is treated as "no measure" and not shown.
+      if (cueData.measureOrBeat) {
         // Check if it's a new measure (compare with our ref)
         if (cueData.measureOrBeat !== prevMeasureRef.current) {
           setLastMeasureType(`Measure ${cueData.measureOrBeat}`)
@@ -499,7 +500,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
             </div>
 
             {/* Second row - 4 columns */}
-            {currentCueData.measureOrBeat !== undefined && (
+            {!!currentCueData.measureOrBeat && (
               <div>
                 <p className="font-medium">Current Measure:</p>
                 <p>Measure {currentCueData.measureOrBeat}</p>
