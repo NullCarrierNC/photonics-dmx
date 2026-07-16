@@ -34,10 +34,10 @@ module.exports = {
   // tested files, inflating the headline to ~68%). Ratchet upward as coverage improves.
   coverageThreshold: {
     global: {
-      statements: 45,
-      branches: 71,
-      functions: 61,
-      lines: 45,
+      statements: 51,
+      branches: 73,
+      functions: 62,
+      lines: 51,
     },
   },
   setupFilesAfterEnv: ['<rootDir>/src/photonics-dmx/tests/jest.setup.ts'],
