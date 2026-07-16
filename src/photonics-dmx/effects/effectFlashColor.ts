@@ -71,6 +71,9 @@ export const getEffectFlashColor = ({
           easing: easing,
           duration: durationOut,
         },
+        // Hold dark for holdTime after the fade-out. When the effect loops (isPersistent),
+        // this is the gap between flashes, so the flash colour holds bright then holds dark
+        // for equal time rather than re-flashing immediately.
         waitUntilCondition: 'delay',
         waitUntilTime: holdTime,
       },
