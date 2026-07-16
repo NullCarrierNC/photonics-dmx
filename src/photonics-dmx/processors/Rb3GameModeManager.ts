@@ -1,15 +1,13 @@
 import { monotonicNowMs } from '../../shared/time'
+import { pickRandom } from '../helpers/utils'
 
 /** Countdown state pushed to the renderer for the RB3 primary-cue countdown display. */
 export type Rb3GameModeSchedulePayload = { deadlineMs: number | null; pending: boolean }
 
+// Durations are seconds, so this stays an unrounded float (unlike the integer randomInRange in
+// helpers/utils, whose rounding would drop sub-second precision here).
 function randomInRange(minSec: number, maxSec: number): number {
   return minSec + Math.random() * (maxSec - minSec)
-}
-
-function pickRandom<T>(items: T[]): T | undefined {
-  if (items.length === 0) return undefined
-  return items[Math.floor(Math.random() * items.length)]
 }
 
 /**

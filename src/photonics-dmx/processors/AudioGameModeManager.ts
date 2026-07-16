@@ -3,27 +3,16 @@ import type {
   AudioGameModeSchedulePayload,
   AudioLightingData,
 } from '../listeners/Audio/AudioTypes'
-import type { IAudioCue } from '../cues/interfaces/IAudioCue'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import type { AudioCueType } from '../cues/types/audioCueTypes'
 import { monotonicNowMs } from '../../shared/time'
+import { pickRandom } from '../helpers/utils'
+import { isStrobeStyleCue } from './audioStrobeHelpers'
 
+// Game-mode durations are seconds, so this stays an unrounded float (unlike the integer
+// randomInRange in helpers/utils, whose rounding would drop sub-second precision here).
 function randomInRange(minSec: number, maxSec: number): number {
   return minSec + Math.random() * (maxSec - minSec)
-}
-
-function pickRandom<T>(items: T[]): T | undefined {
-  if (items.length === 0) return undefined
-  return items[Math.floor(Math.random() * items.length)]
-}
-
-function getCueStyle(registry: AudioCueRegistry, cueType: AudioCueType): IAudioCue['style'] {
-  const cue = registry.getCueImplementation(cueType)
-  return cue?.style
-}
-
-function isStrobeStyleCue(registry: AudioCueRegistry, cueType: AudioCueType): boolean {
-  return getCueStyle(registry, cueType) === 'strobe'
 }
 
 /** Cues eligible as Game Mode primary (excludes style strobe). */

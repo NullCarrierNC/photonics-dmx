@@ -2,12 +2,12 @@ import type { IAudioCue } from '../cues/interfaces/IAudioCue'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import type { AudioCueType } from '../cues/types/audioCueTypes'
 
-function getCueStyle(registry: AudioCueRegistry, cueType: AudioCueType): IAudioCue['style'] {
+export function getCueStyle(registry: AudioCueRegistry, cueType: AudioCueType): IAudioCue['style'] {
   const cue = registry.getCueImplementation(cueType)
   return cue?.style
 }
 
-function isStrobeStyleCue(registry: AudioCueRegistry, cueType: AudioCueType): boolean {
+export function isStrobeStyleCue(registry: AudioCueRegistry, cueType: AudioCueType): boolean {
   return getCueStyle(registry, cueType) === 'strobe'
 }
 

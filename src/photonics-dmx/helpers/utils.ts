@@ -24,6 +24,12 @@ export function clampTo255(value: number): number {
   return Math.max(0, Math.min(255, value))
 }
 
+/** Picks a uniformly random element, or undefined if the array is empty. */
+export function pickRandom<T>(items: T[]): T | undefined {
+  if (items.length === 0) return undefined
+  return items[Math.floor(Math.random() * items.length)]
+}
+
 /**
  * Shifts an array by half. For even-length arrays, it splits the array into two equal halves.
  * For odd-length arrays, the first half will have one fewer element than the second half.
