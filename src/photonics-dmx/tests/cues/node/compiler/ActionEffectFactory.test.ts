@@ -149,7 +149,9 @@ describe('ActionEffectFactory', () => {
     expect(effect).toBeNull()
   })
 
-  it('preserves a genuine intensityScale of 0 (light off, not floored to 0.01)', () => {
+  it('floors a silent-frame intensityScale of 0 to a faint glow, not full black', () => {
+    // intensityScale carries the audio-reactive level; a silent frame (0) keeps a faint floor so
+    // the rig does not fully extinguish between beats.
     const action: ActionNode = {
       id: 'a1',
       type: 'action',
@@ -165,9 +167,12 @@ describe('ActionEffectFactory', () => {
       },
       timing: createDefaultActionTiming(),
     }
-    const effect = ActionEffectFactory.buildEffect({ action, lights, intensityScale: 0 })
-    expect(effect).not.toBeNull()
-    expect(effect!.transitions[0].transform.color.intensity).toBe(0)
+    const full = ActionEffectFactory.buildEffect({ action, lights, intensityScale: 1 })
+    const silent = ActionEffectFactory.buildEffect({ action, lights, intensityScale: 0 })
+    const fullIntensity = full!.transitions[0].transform.color.intensity
+    const silentIntensity = silent!.transitions[0].transform.color.intensity
+    expect(silentIntensity).toBeGreaterThan(0)
+    expect(silentIntensity).toBeLessThan(fullIntensity)
   })
 
   it('falls back to a finite intensity when intensityScale is NaN', () => {

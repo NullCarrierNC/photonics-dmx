@@ -588,10 +588,10 @@ export class ActionEffectFactory {
         if (!resolvedForColor) {
           return null
         }
-        const baseColor = resolveColor(
-          resolvedForColor,
-          Number.isFinite(intensityScale) ? intensityScale : 0.01,
-        )
+        // Floor at 0.01: intensityScale carries the audio-reactive level here, and a silent frame
+        // (intensity 0) keeps a faint glow rather than the rig going fully black between beats.
+        // clamp above already guarantees a finite value, so this only affects the genuine-zero case.
+        const baseColor = resolveColor(resolvedForColor, intensityScale || 0.01)
         effect = createSingleColorEffect({
           lights,
           layer,
@@ -660,10 +660,8 @@ export class ActionEffectFactory {
       const timingLevel = 1
       const intensityScale = clamp((step.intensityScale ?? 1) * timingLevel, 0, 1)
       const easing = resolveEasing(timing.easing)
-      const color = resolveColor(
-        primaryColor,
-        Number.isFinite(intensityScale) ? intensityScale : 0.01,
-      )
+      // Floor at 0.01 to keep a faint glow on a silent audio frame (see the set-color case above).
+      const color = resolveColor(primaryColor, intensityScale || 0.01)
 
       const { waitFor, waitForTime } = normalizeWaitFor(timing, 0)
 
