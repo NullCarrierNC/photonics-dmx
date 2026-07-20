@@ -24,8 +24,12 @@ const TWO_ROWS_LAYOUT = { id: 'two-rows', label: 'Two Rows (one in front of the 
  *       false). `mirrorHoriz` reverses left/right within each row; `mirrorVert` swaps the
  *       front and back rows. No data transformation needed — the bump is a marker that this
  *       code understands the new fields.
+ *  v6 — rig lights may carry `extraChannels` (user-added channels beyond the archetype map),
+ *       synced from their templates via the master-dimmer offset model. No data transformation —
+ *       the field materialises onto rig snapshots on the first template sync; the bump is a marker
+ *       that this code understands it.
  */
-export const CURRENT_RIGS_SCHEMA_VERSION = 5
+export const CURRENT_RIGS_SCHEMA_VERSION = 6
 
 /**
  * Converts a single fixture/light from the pre-v2 strobe model. Only RGB-family fixtures are

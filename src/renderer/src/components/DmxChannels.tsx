@@ -1,5 +1,6 @@
 import React from 'react'
 import { DmxFixture, normalizeFixtureConfig } from '../../../photonics-dmx/types'
+import { sortBaseChannelEntries } from './lightChannelDisplay'
 
 function fixtureConfigLabel(key: string): string {
   if (key === 'panDirectionCW') {
@@ -41,28 +42,7 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
     title?: string,
     allowZero: boolean = false,
   ) => {
-    // Define the desired order of channel names
-    const channelOrder = [
-      'masterDimmer',
-      'red',
-      'green',
-      'blue',
-      'white',
-      'strobeChannel',
-      'pan',
-      'tilt',
-    ]
-
-    const sortedChannels = Object.entries(channels).sort((a, b) => {
-      const indexA = channelOrder.indexOf(a[0])
-      const indexB = channelOrder.indexOf(b[0])
-
-      // If the channel is not in the predefined order, place it at the end
-      return (
-        (indexA === -1 ? channelOrder.length : indexA) -
-        (indexB === -1 ? channelOrder.length : indexB)
-      )
-    })
+    const sortedChannels = sortBaseChannelEntries(Object.entries(channels))
 
     return (
       <div>

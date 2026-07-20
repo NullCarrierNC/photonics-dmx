@@ -4,6 +4,7 @@ import {
   RgbDmxChannels,
   StrobeDmxChannels,
   MovingHeadDmxChannels,
+  DmxFixture,
   DmxRig,
   FixtureTypes,
   DEFAULT_STROBE_CHANNEL_VALUES,
@@ -18,6 +19,11 @@ import {
   mirrorPercentAroundHome,
   percentToDmx,
 } from '../helpers/dmxHelpers'
+import {
+  applyChannelMixPlan,
+  buildChannelMixPlan,
+  type ChannelMixPlan,
+} from '../helpers/colorChannelMixer'
 import { SenderManager } from './SenderManager'
 import { LightStateManager, type LightStatesListener } from './sequencer/LightStateManager'
 import { getStrobeStateManager, StrobeStateManager } from './StrobeStateManager'
@@ -169,6 +175,14 @@ export class DmxPublisher {
   /** Light ids already reported for out-of-range channel numbers, so the skip logs once per light
    *  rather than every frame. */
   private _reportedBadChannelLights = new Set<string>()
+  /**
+   * Per-fixture colour-mixing plans, keyed by fixture object identity. `syncDmxLightWithTemplate`
+   * replaces a fixture object immutably whenever its channels/extras change and returns the same
+   * reference otherwise, so object identity is a free dirty signal — no explicit invalidation, and
+   * the WeakMap drops entries for dropped rigs when they are garbage-collected. `null` means "no
+   * mixing needed" (legacy path); it is cached too so we don't rebuild it every frame.
+   */
+  private _mixPlans = new WeakMap<DmxFixture, ChannelMixPlan | null>()
   /**
    * Per-light peak colour seen since the current strobe became active. The stock strobe cues
    * modulate opacity, which the blender bakes into rgb/intensity — so the brightest blended
@@ -373,6 +387,17 @@ export class DmxPublisher {
   }
 
   /**
+   * Memoised colour-mixing plan for a fixture (see {@link _mixPlans}). `null` = no mixing needed;
+   * the caller takes the legacy per-channel path (bit-for-bit identical to pre-feature output).
+   */
+  private _getMixPlan(fixture: DmxFixture): ChannelMixPlan | null {
+    if (this._mixPlans.has(fixture)) return this._mixPlans.get(fixture)!
+    const plan = buildChannelMixPlan(fixture)
+    this._mixPlans.set(fixture, plan)
+    return plan
+  }
+
+  /**
    * Contains the logic for converting light states to DMX channels and sending them.
    * Produces one buffer per currently-enabled wire sender (populated according to each rig's
    * `outputs` routing) plus one buffer per active rig for the IPC preview. Wire slots dispatch
@@ -412,6 +437,39 @@ export class DmxPublisher {
     // Sort light IDs for consistent processing order
     const sortedLightIds = Array.from(lights.keys()).sort((a, b) => a.localeCompare(b))
 
+    // Single channel-write closure, reused by both the legacy per-channel switch and the colour
+    // mixer, so the clamp + 1–512 validation + wire-slot fanout + IPC write lives in one place. It
+    // closes over mutable locals re-pointed per rig/light rather than allocating a closure per light.
+    let curWireTargets: WireSenderId[] = []
+    let curIpcBuffer: Record<number, number> | null = null
+    let curLightId = ''
+    const writeChannel = (channelNumber: number, value: number, channelLabel: string): void => {
+      // DMX-addressable channels are 1–512; anything else (0 = unassigned template slot,
+      // NaN/negative/huge from a bad config already on disk) must not become a buffer key the wire
+      // senders index with. Skip and report once per light — not per frame. (Mixer-supplied channel
+      // numbers are pre-validated at plan build, so only the legacy switch reaches this branch.)
+      if (!Number.isInteger(channelNumber) || channelNumber < 1 || channelNumber > 512) {
+        if (!this._reportedBadChannelLights.has(curLightId)) {
+          this._reportedBadChannelLights.add(curLightId)
+          log.warn(
+            `Light ${curLightId}: channel "${channelLabel}" = ${channelNumber} is outside DMX 1-512; skipping`,
+          )
+        }
+        return
+      }
+      const clamped = Math.max(0, Math.min(255, value))
+      for (const wireId of curWireTargets) {
+        // _reconcileSlots ensured every enabled wire sender has slot state.
+        this._slots.get(wireId)!.buffer[channelNumber] = clamped
+      }
+      if (curIpcBuffer !== null) {
+        curIpcBuffer[channelNumber] = clamped
+      }
+    }
+    // Stable adapter for the mixer's (channel, value) => void writer — one allocation per frame.
+    const mixWrite = (channelNumber: number, value: number): void =>
+      writeChannel(channelNumber, value, 'mixed channel')
+
     // 4. For each active rig, resolve its wire targets and write per-light channel values into
     //    each target wire slot's buffer AND into the rig's own IPC buffer.
     for (const [rigId, { manager, rig }] of this._rigManagers) {
@@ -433,12 +491,22 @@ export class DmxPublisher {
         continue
       }
 
+      curWireTargets = wireTargets
+      curIpcBuffer = ipcBuffer
+
+      // Fixtures reached below via the light-states map. Anything left over (a fixture no cue has
+      // addressed, or a strobe-group light excluded from cue targeting) gets its pinned `fixed`
+      // channels emitted in a follow-up pass so mode/macro channels still publish.
+      const visitedLightIds = new Set<string>()
+
       for (const lightId of sortedLightIds) {
         const lightValue = lights.get(lightId)!
         const dmxLight = manager.getDmxLight(lightId)
         if (!dmxLight) {
           continue
         }
+        visitedLightIds.add(lightId)
+        curLightId = lightId
 
         const lightChannels = dmxLight.channels as RgbDmxChannels
         const hasStrobeChannel = typeof lightChannels.strobeChannel === 'number'
@@ -543,18 +611,33 @@ export class DmxPublisher {
           continue
         }
 
+        // Colour mixer owns the colour channels (named red/green/blue/white + any extras) when a
+        // plan exists; it decomposes the post-latch rgb into the fixture's declared emitters and
+        // writes the residual back to the named/extra rgb channels. `null` = no extras → legacy
+        // path below produces bit-for-bit identical output. Runs after the cast so a cast throw
+        // still skips the whole light (above). Fixed channels are emitted every published frame.
+        const mixPlan = this._getMixPlan(dmxLight)
+        if (mixPlan) {
+          if (mixPlan.invalidChannels.length > 0 && !this._reportedBadChannelLights.has(lightId)) {
+            this._reportedBadChannelLights.add(lightId)
+            log.warn(
+              `Light ${lightId}: skipping invalid extra channels: ${mixPlan.invalidChannels.join(', ')}`,
+            )
+          }
+          applyChannelMixPlan(mixPlan, r, g, b, mixWrite)
+          for (const fw of mixPlan.fixedWrites) writeChannel(fw.channel, fw.value, 'fixed channel')
+        }
+
         for (const [channelName, channelNumber] of Object.entries(dmxLight.channels)) {
           let value: number = 0
 
           switch (channelName) {
             case 'red':
-              value = (dmxChannelData as RgbDmxChannels | RgbwDmxChannels).red
-              break
             case 'green':
-              value = (dmxChannelData as RgbDmxChannels | RgbwDmxChannels).green
-              break
             case 'blue':
-              value = (dmxChannelData as RgbDmxChannels | RgbwDmxChannels).blue
+              // Owned by the mixer when a plan exists; otherwise fall through to the legacy write.
+              if (mixPlan) continue
+              value = (dmxChannelData as RgbDmxChannels | RgbwDmxChannels)[channelName]
               break
             case 'masterDimmer':
               value = (dmxChannelData as RgbDmxChannels | RgbwDmxChannels | StrobeDmxChannels)
@@ -578,28 +661,19 @@ export class DmxPublisher {
               continue
           }
 
-          // DMX-addressable channels are 1–512; anything else (0 = unassigned template slot,
-          // NaN/negative/huge from a bad config already on disk) must not become a buffer key the
-          // wire senders index with. Skip and report once per light — not per frame.
-          if (!Number.isInteger(channelNumber) || channelNumber < 1 || channelNumber > 512) {
-            if (!this._reportedBadChannelLights.has(lightId)) {
-              this._reportedBadChannelLights.add(lightId)
-              log.warn(
-                `Light ${lightId}: channel "${channelName}" = ${channelNumber} is outside DMX 1-512; skipping`,
-              )
-            }
-            continue
-          }
-
-          const clamped = Math.max(0, Math.min(255, value))
-          for (const wireId of wireTargets) {
-            // _reconcileSlots ensured every enabled wire sender has slot state.
-            this._slots.get(wireId)!.buffer[channelNumber] = clamped
-          }
-          if (ipcBuffer !== null) {
-            ipcBuffer[channelNumber] = clamped
-          }
+          writeChannel(channelNumber, value, channelName)
         }
+      }
+
+      // Unvisited-fixture pass: emit pinned `fixed` channels for planned fixtures no light state
+      // addressed this frame (pre-first-cue lights, or strobe-group lights excluded from cue
+      // targeting). Colour/mixable channels legitimately need a state, so only fixed writes fire.
+      for (const [lightId, fixture] of manager.getAllDmxLights()) {
+        if (visitedLightIds.has(lightId)) continue
+        const plan = this._getMixPlan(fixture)
+        if (!plan || plan.fixedWrites.length === 0) continue
+        curLightId = lightId
+        for (const fw of plan.fixedWrites) writeChannel(fw.channel, fw.value, 'fixed channel')
       }
     }
 

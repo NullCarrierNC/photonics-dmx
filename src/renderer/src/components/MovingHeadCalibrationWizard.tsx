@@ -87,6 +87,12 @@ function buildInitialConsoleBuffer(light: DmxLight): Record<number, number> {
         buf[addr] = 0
     }
   }
+  // Added channels also run in console manual mode: hold fixed/mode channels at their value so a
+  // moving head that needs a pinned mode channel lights up, and park colour extras dark.
+  for (const extra of light.extraChannels ?? []) {
+    if (typeof extra.channel !== 'number' || extra.channel < 1 || extra.channel > 512) continue
+    buf[extra.channel] = extra.type === 'fixed' ? Math.max(0, Math.min(255, extra.value ?? 0)) : 0
+  }
   return buf
 }
 

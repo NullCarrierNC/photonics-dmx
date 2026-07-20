@@ -102,6 +102,14 @@ export class DmxLightManager {
   }
 
   /**
+   * All fixtures this manager owns, keyed by light id. Used by the publisher to reach fixtures no
+   * cue has addressed (so their pinned "fixed" channels still publish). Live map — do not mutate.
+   */
+  public getAllDmxLights(): ReadonlyMap<string, DmxFixture> {
+    return this._dmxLights
+  }
+
+  /**
    * Retrieves lights based on group(s) and target(s).
    * Results are cached for performance optimization.
    * @param group Single or array of LocationGroup

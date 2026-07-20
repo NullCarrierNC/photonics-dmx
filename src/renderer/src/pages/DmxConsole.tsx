@@ -4,11 +4,14 @@ import {
   DmxFixture,
   DmxLight,
   DmxRig,
+  ExtraChannel,
   LightingConfiguration,
   ConfigStrobeType,
   FixtureTypes,
   IpcSenderConfig,
 } from '../../../photonics-dmx/types'
+import { deriveExtraChannelsForMaster } from '../../../photonics-dmx/helpers/rigTemplateSync'
+import { extraChannelDisplayLabel } from '../components/lightChannelDisplay'
 import {
   getDmxRig,
   getDmxRigs,
@@ -88,6 +91,43 @@ function getTemplateAlignedChannels(
     }
   }
   return out
+}
+
+/**
+ * Offset-aligned extra channels for a console light, derived from its live template the same way
+ * {@link getTemplateAlignedChannels} derives the base channels. Falls back to the light's persisted
+ * extras when no template resolves.
+ */
+function getTemplateAlignedExtraChannels(light: DmxLight, templates: DmxFixture[]): ExtraChannel[] {
+  const template = templates.find((t) => t.id === light.fixtureId)
+  if (!template) {
+    return light.extraChannels ?? []
+  }
+  const templateChannels = channelsAsRecord(template.channels)
+  const templateMaster = templateChannels.masterDimmer ?? 0
+  const lightMaster = channelsAsRecord(light.channels).masterDimmer ?? templateMaster
+  return deriveExtraChannelsForMaster(template.extraChannels, templateMaster, lightMaster) ?? []
+}
+
+/**
+ * DMX buffer seeding pinned "fixed" channels for every light in a rig. Console manual mode bypasses
+ * the publisher's per-frame fixed writes, so without this a fixture whose mode/macro channel must be
+ * held at a constant would go dark for the whole console session.
+ */
+function buildConsoleFixedSeed(
+  config: LightingConfiguration,
+  templates: DmxFixture[],
+): Record<number, number> {
+  const seed: Record<number, number> = {}
+  const allLights = [...config.frontLights, ...config.backLights, ...config.strobeLights]
+  for (const light of allLights) {
+    for (const extra of getTemplateAlignedExtraChannels(light as DmxLight, templates)) {
+      if (extra.type === 'fixed' && extra.channel >= 1 && extra.channel <= 512) {
+        seed[extra.channel] = Math.max(0, Math.min(255, extra.value ?? 0))
+      }
+    }
+  }
+  return seed
 }
 
 function getEffectiveChannelEntries(
@@ -266,11 +306,19 @@ const DmxConsole: React.FC = () => {
       }
       return
     }
+    // The rig config loads asynchronously; enabling before it arrives would seed an empty buffer and
+    // the loader never re-seeds, leaving pinned fixed/mode channels dark for the whole session.
+    if (!selectedRig || selectedRig.id !== selectedRigId) {
+      setActionError('Rig is still loading — try again in a moment')
+      return
+    }
     const result = await enableConsole(selectedRigId)
     if (result.success) {
+      // Seed pinned fixed/mode channels so fixtures that need them light up during the session.
+      const seed = buildConsoleFixedSeed(selectedRig.config, myLights)
       setConsoleEnabled(true)
-      setConsoleBuffer({})
-      sendConsoleDmx({})
+      setConsoleBuffer(seed)
+      sendConsoleDmx(seed)
     } else {
       setActionError(result.error)
     }
@@ -345,6 +393,8 @@ const DmxConsole: React.FC = () => {
     const lightOverrides = light.id ? channelOverrides[light.id] : undefined
     const sorted = getEffectiveChannelEntries(light, myLights, lightOverrides)
     const baseChannels = getTemplateAlignedChannels(light, myLights)
+    const alignedExtras = getTemplateAlignedExtraChannels(light, myLights)
+    const extraLabelFixture = { ...light, extraChannels: alignedExtras }
     const modified = isLightModified(light, myLights, lightOverrides)
     const cardInactive = !consoleEnabled
     return (
@@ -433,6 +483,50 @@ const DmxConsole: React.FC = () => {
               </li>
             )
           })}
+          {/* Added channels — template-owned, so the DMX number is read-only here; the value slider
+              still drives the channel so users can test it. Duplicate types collide by name, hence
+              index keys and no remap input. */}
+          {alignedExtras.map((extra, i) => {
+            const label = extraChannelDisplayLabel(extraLabelFixture, i)
+            return (
+              <li key={`extra-${i}`} className="flex flex-col gap-0.5">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-gray-700 dark:text-gray-300 text-sm">{label}</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    Value: {dmxValues[extra.channel] ?? 0}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-xs text-gray-600 dark:text-gray-400 shrink-0">
+                    DMX ch
+                  </label>
+                  <input
+                    type="number"
+                    value={extra.channel}
+                    disabled
+                    readOnly
+                    className="w-20 p-1 border rounded text-sm border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                  />
+                  <input
+                    type="range"
+                    min={0}
+                    max={255}
+                    value={
+                      consoleEnabled
+                        ? consoleBuffer[extra.channel] ?? 0
+                        : dmxValues[extra.channel] ?? 0
+                    }
+                    disabled={!consoleEnabled || extra.channel < 1}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10)
+                      handleChannelValueChange(extra.channel, v)
+                    }}
+                    className="flex-1 min-w-[120px] slider"
+                  />
+                </div>
+              </li>
+            )
+          })}
         </ul>
       </div>
     )
@@ -490,7 +584,7 @@ const DmxConsole: React.FC = () => {
           <button
             type="button"
             onClick={() => void handleToggleConsole()}
-            disabled={!selectedRigId || (!consoleEnabled && hasNoLights)}
+            disabled={!consoleEnabled && (selectedRigForUi == null || hasNoLights)}
             className={`px-4 py-2 rounded-md font-medium text-white ${
               consoleEnabled
                 ? 'bg-red-600 hover:bg-red-500'

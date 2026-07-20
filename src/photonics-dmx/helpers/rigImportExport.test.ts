@@ -216,6 +216,41 @@ describe('reconcileImportedTemplates (de-dup policy)', () => {
     expect(result.templatesToAdd.map((t) => t.id)).toEqual(['a'])
     expect(result.fixtureIdMap).toEqual({ a: 'a', b: 'a' })
   })
+
+  it('treats an absent and an empty extraChannels array as identical content', () => {
+    const existing = [rgbTemplate] // no extraChannels key
+    const importedEmpty: DmxFixture = { ...rgbTemplate, id: 'tpl-rgb-2', extraChannels: [] }
+    const result = reconcileImportedTemplates([importedEmpty], existing)
+    expect(result.templatesToAdd).toEqual([])
+    expect(result.fixtureIdMap).toEqual({ 'tpl-rgb-2': 'tpl-rgb' })
+  })
+
+  it('keeps templates that differ only in their extra channels as distinct', () => {
+    const withAmber: DmxFixture = {
+      ...rgbTemplate,
+      id: 'tpl-rgb-amber',
+      extraChannels: [{ type: 'amber', channel: 5 }],
+    }
+    const result = reconcileImportedTemplates([withAmber], [rgbTemplate])
+    expect(result.templatesToAdd.map((t) => t.id)).toEqual(['tpl-rgb-amber'])
+    expect(result.reusedCount).toBe(0)
+  })
+
+  it('content-dedups templates with identical extra channels under different ids', () => {
+    const a: DmxFixture = {
+      ...rgbTemplate,
+      id: 'a',
+      extraChannels: [{ type: 'amber', channel: 5 }],
+    }
+    const b: DmxFixture = {
+      ...rgbTemplate,
+      id: 'b',
+      extraChannels: [{ type: 'amber', channel: 5 }],
+    }
+    const result = reconcileImportedTemplates([b], [a])
+    expect(result.templatesToAdd).toEqual([])
+    expect(result.fixtureIdMap).toEqual({ b: 'a' })
+  })
 })
 
 describe('countOrphanLights', () => {

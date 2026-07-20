@@ -8,6 +8,7 @@ import {
   LightingConfiguration,
 } from '../../../../photonics-dmx/types'
 import { castToChannelType } from '../../../../photonics-dmx/helpers/dmxHelpers'
+import { deriveExtraChannelsForMaster } from '../../../../photonics-dmx/helpers/rigTemplateSync'
 
 export const LIGHT_LAYOUTS: ConfigLightLayoutType[] = [
   { id: 'front', label: 'Front only' },
@@ -80,6 +81,11 @@ export function createDmxLightInstance(
     }
   })
   const castChannels = castToChannelType(selectedFixture.fixture, recalculatedChannels)
+  const extraChannels = deriveExtraChannelsForMaster(
+    selectedFixture.extraChannels,
+    templateChannels.masterDimmer,
+    newMasterDimmer,
+  )
 
   return {
     id: crypto.randomUUID(),
@@ -94,6 +100,7 @@ export function createDmxLightInstance(
     config: selectedFixture.config || undefined,
     universe: selectedFixture.universe,
     mount: 'floor' as const,
+    ...(extraChannels ? { extraChannels } : {}),
   }
 }
 

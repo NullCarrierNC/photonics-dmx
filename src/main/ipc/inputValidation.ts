@@ -24,7 +24,7 @@ import {
   type AudioGameModeConfig,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import type { Brightness, Color, DmxFixture } from '../../photonics-dmx/types'
-import { FixtureTypes } from '../../photonics-dmx/types'
+import { EXTRA_CHANNEL_TYPES, FixtureTypes } from '../../photonics-dmx/types'
 import { CueType } from '../../photonics-dmx/cues/types/cueTypes'
 import type { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
@@ -474,6 +474,13 @@ function validateLightArrayChannels(lights: unknown[], fieldName: string): strin
     const channelError = validateFixtureChannelNumbers(el.channels, `${fieldName}[${i}].channels`)
     if (channelError) {
       return channelError
+    }
+    normalizeExtraChannelsKey(el)
+    if (el.extraChannels != null) {
+      const extraError = validateExtraChannels(el.extraChannels, `${fieldName}[${i}].extraChannels`)
+      if (extraError) {
+        return extraError
+      }
     }
   }
   return null
@@ -1249,8 +1256,77 @@ export function validateDmxFixturesArray(
         return { ok: false, error: strobeValuesError }
       }
     }
+    normalizeExtraChannelsKey(el)
+    if (el.extraChannels != null) {
+      const extraError = validateExtraChannels(el.extraChannels, `${fieldName}[${i}].extraChannels`)
+      if (extraError) {
+        return { ok: false, error: extraError }
+      }
+    }
   }
   return { ok: true, value: value as DmxFixture[] }
+}
+
+const EXTRA_CHANNEL_TYPE_VALUES = new Set<string>(EXTRA_CHANNEL_TYPES)
+
+/**
+ * Validates a fixture's `extraChannels` array (user-added channels beyond the archetype map).
+ * Returns null when valid, or an error message string when not. Each entry must have a valid `type`
+ * from the extra-channel vocabulary, an integer `channel` 0–512 (0 = unassigned, same rule as the
+ * base channels), and — only for `fixed` channels — an integer `value` 0–255. A `value` on a
+ * non-fixed row is rejected (it would ride through sync forever and break import dedup).
+ *
+ * Callers must first normalise a nullish or empty array to a missing key (the invariant is "never
+ * persist `[]`"); this validator only runs when `extraChannels` is a non-null array.
+ */
+function validateExtraChannels(value: unknown, fieldName: string): string | null {
+  if (!Array.isArray(value)) {
+    return `${fieldName} must be an array`
+  }
+  for (let i = 0; i < value.length; i++) {
+    const ec = value[i]
+    if (!isPlainObject(ec)) {
+      return `${fieldName}[${i}] must be an object`
+    }
+    if (typeof ec.type !== 'string' || !EXTRA_CHANNEL_TYPE_VALUES.has(ec.type)) {
+      return `${fieldName}[${i}].type must be a valid extra-channel type`
+    }
+    if (
+      typeof ec.channel !== 'number' ||
+      !Number.isInteger(ec.channel) ||
+      ec.channel < 0 ||
+      ec.channel > 512
+    ) {
+      return `${fieldName}[${i}].channel must be an integer DMX channel between 0 and 512`
+    }
+    if (ec.type === 'fixed') {
+      if (
+        typeof ec.value !== 'number' ||
+        !Number.isInteger(ec.value) ||
+        ec.value < 0 ||
+        ec.value > 255
+      ) {
+        return `${fieldName}[${i}].value must be an integer between 0 and 255 for a fixed channel`
+      }
+    } else if (ec.value !== undefined) {
+      // Rejects a present value on a non-fixed row — including a literal `null`, which would
+      // otherwise persist and defeat template dedup against an identical value-less row.
+      return `${fieldName}[${i}].value is only valid on a fixed channel`
+    }
+  }
+  return null
+}
+
+/**
+ * Applies the "never persist `[]`" invariant to a fixture-like object in place: a nullish or empty
+ * `extraChannels` becomes a missing key. Called after {@link validateExtraChannels} passes so the
+ * persisted shape is uniform (only ever absent or a non-empty array). Returns the same object.
+ */
+function normalizeExtraChannelsKey(el: Record<string, unknown>): void {
+  const extras = el.extraChannels
+  if (extras == null || (Array.isArray(extras) && extras.length === 0)) {
+    delete el.extraChannels
+  }
 }
 
 const STROBE_VALUE_KEYS = ['slow', 'medium', 'fast', 'fastest'] as const

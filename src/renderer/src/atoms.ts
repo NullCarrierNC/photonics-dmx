@@ -54,6 +54,13 @@ export const myValidDmxLightsAtom = atom((get) => {
     // Check if all channel values in the channels object are greater than 0
     const areChannelsValid = Object.values(channels).every((value) => value > 0)
 
+    // Added channels count too: an unassigned (channel 0) extra makes the light unusable in a rig,
+    // matching the base-channel rule (a fixed channel's *value* of 0 is fine — only the number).
+    const areExtraChannelsValid = (DmxLight.extraChannels ?? []).every((ec) => ec.channel > 0)
+    if (!areExtraChannelsValid) {
+      return false
+    }
+
     // Include configChannels if they exist and ensure their values are valid
     if (DmxLight.config) {
       const cfg = normalizeFixtureConfig(DmxLight.config)

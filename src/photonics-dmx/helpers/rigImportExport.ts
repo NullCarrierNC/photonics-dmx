@@ -40,6 +40,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function sameTemplateContent(a: DmxFixture, b: DmxFixture): boolean {
   const strip = (t: DmxFixture): Omit<DmxFixture, 'id' | 'position'> => {
     const { id: _id, position: _position, ...rest } = clone(t)
+    // "No extras" is canonically a missing key (never `[]`), but a hand-edited or foreign file may
+    // carry an empty array — normalise so absent and `[]` compare equal and don't defeat dedup.
+    if (!rest.extraChannels?.length) delete rest.extraChannels
     return rest
   }
   return equal(strip(a), strip(b))

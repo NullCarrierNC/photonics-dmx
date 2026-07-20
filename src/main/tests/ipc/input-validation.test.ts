@@ -632,6 +632,93 @@ describe('inputValidation', () => {
       })
     })
 
+    describe('extra channels', () => {
+      const fixtureWith = (extraChannels: unknown): Record<string, unknown> => ({
+        id: 'l1',
+        name: 'L1',
+        label: 'L1',
+        isStrobeEnabled: false,
+        universe: 1,
+        fixture: 'rgb',
+        position: 1,
+        channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
+        extraChannels,
+      })
+
+      it('accepts valid extra channels including duplicates, channel 0, and fixed 0/255', () => {
+        const result = validateDmxFixturesArray([
+          fixtureWith([
+            { type: 'amber', channel: 5 },
+            { type: 'red', channel: 6 },
+            { type: 'red', channel: 7 },
+            { type: 'white', channel: 0 },
+            { type: 'fixed', channel: 8, value: 0 },
+            { type: 'fixed', channel: 9, value: 255 },
+          ]),
+        ])
+        expect(result.ok).toBe(true)
+      })
+
+      it('accepts a fixture with no extraChannels key', () => {
+        const el: Record<string, unknown> = fixtureWith(undefined)
+        delete el.extraChannels
+        expect(validateDmxFixturesArray([el]).ok).toBe(true)
+      })
+
+      it('normalises null and [] extraChannels to a missing key', () => {
+        for (const empty of [null, []]) {
+          const el = fixtureWith(empty)
+          const result = validateDmxFixturesArray([el])
+          expect(result.ok).toBe(true)
+          expect('extraChannels' in el).toBe(false)
+        }
+      })
+
+      it.each([
+        ['unknown type', [{ type: 'infrared', channel: 5 }]],
+        ['channel 513', [{ type: 'amber', channel: 513 }]],
+        ['negative channel', [{ type: 'amber', channel: -1 }]],
+        ['fractional channel', [{ type: 'amber', channel: 1.5 }]],
+        ['fixed without value', [{ type: 'fixed', channel: 5 }]],
+        ['fixed value out of range', [{ type: 'fixed', channel: 5, value: 300 }]],
+        ['value on a non-fixed row', [{ type: 'amber', channel: 5, value: 100 }]],
+        ['null value on a non-fixed row', [{ type: 'amber', channel: 5, value: null }]],
+        ['non-object entry', ['nope']],
+      ])('rejects %s', (_label, extraChannels) => {
+        expect(validateDmxFixturesArray([fixtureWith(extraChannels)]).ok).toBe(false)
+      })
+
+      it('validates extra channels on rig-snapshot lights via the layout path', () => {
+        const rigLight = {
+          id: 'l1',
+          name: 'L1',
+          label: 'L1',
+          isStrobeEnabled: false,
+          universe: 1,
+          fixture: 'rgb',
+          group: 'front',
+          position: 1,
+          fixtureId: 'tpl-1',
+          channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
+          extraChannels: [{ type: 'amber', channel: 5 }],
+        }
+        const config = {
+          numLights: 1,
+          lightLayout: { id: 'two-rows', label: 'Two Rows' },
+          strobeType: 'None',
+          frontLights: [rigLight],
+          backLights: [],
+          strobeLights: [],
+        }
+        expect(validateLightingConfiguration(config).ok).toBe(true)
+
+        const badRigLight = { ...rigLight, extraChannels: [{ type: 'amber', channel: 999 }] }
+        expect(validateLightingConfiguration({ ...config, frontLights: [badRigLight] }).ok).toBe(
+          false,
+        )
+      })
+    })
+
     describe('default roots', () => {
       // Outside a real Electron runtime the packaged check fails closed, so the defaults here are
       // homedir + tmpdir WITHOUT cwd — the same roots a packaged app gets. (A packaged app launched

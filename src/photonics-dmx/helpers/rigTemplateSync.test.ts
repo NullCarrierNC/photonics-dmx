@@ -234,6 +234,75 @@ describe('syncDmxLightWithTemplate', () => {
       fastest: 255,
     })
   })
+
+  it('derives extraChannels onto the rig light by the master-dimmer offset model', () => {
+    const template: DmxFixture = {
+      ...baseRgbTemplate,
+      extraChannels: [
+        { type: 'amber', channel: 5 },
+        { type: 'fixed', channel: 6, value: 200 },
+      ],
+    }
+    const { light, changed } = syncDmxLightWithTemplate(baseRgbLight, template)
+    expect(changed).toBe(true)
+    // rig master 11, template master 1 → offset +10 on each extra channel; type/value verbatim.
+    expect(light.extraChannels).toEqual([
+      { type: 'amber', channel: 15 },
+      { type: 'fixed', channel: 16, value: 200 },
+    ])
+  })
+
+  it('preserves duplicate extra-channel order and copies value verbatim', () => {
+    const template: DmxFixture = {
+      ...baseRgbTemplate,
+      extraChannels: [
+        { type: 'red', channel: 5 },
+        { type: 'red', channel: 6 },
+      ],
+    }
+    const { light } = syncDmxLightWithTemplate(baseRgbLight, template)
+    expect(light.extraChannels).toEqual([
+      { type: 'red', channel: 15 },
+      { type: 'red', channel: 16 },
+    ])
+  })
+
+  it('passes an unassigned (0) extra channel through as 0 and collapses a negative offset to 0', () => {
+    const lowMasterLight: DmxLight = {
+      ...baseRgbLight,
+      channels: { masterDimmer: 2, red: 3, green: 4, blue: 5 },
+    }
+    const template: DmxFixture = {
+      ...baseRgbTemplate,
+      channels: { masterDimmer: 10, red: 11, green: 12, blue: 13 },
+      extraChannels: [
+        { type: 'amber', channel: 0 }, // unassigned → stays 0
+        { type: 'white', channel: 5 }, // 2 + (5 - 10) = -3 → collapses to 0
+      ],
+    }
+    const { light } = syncDmxLightWithTemplate(lowMasterLight, template)
+    expect(light.extraChannels).toEqual([
+      { type: 'amber', channel: 0 },
+      { type: 'white', channel: 0 },
+    ])
+  })
+
+  it('removes rig extraChannels when the template drops them', () => {
+    const rigLight: DmxLight = {
+      ...baseRgbLight,
+      extraChannels: [{ type: 'amber', channel: 15 }],
+    }
+    const { light, changed } = syncDmxLightWithTemplate(rigLight, baseRgbTemplate)
+    expect(changed).toBe(true)
+    expect(light.extraChannels).toBeUndefined()
+    expect('extraChannels' in light).toBe(false)
+  })
+
+  it('is a no-op (same reference) when a template with no extras matches a rig light with none', () => {
+    const { light, changed } = syncDmxLightWithTemplate(baseRgbLight, baseRgbTemplate)
+    expect(changed).toBe(false)
+    expect(light).toBe(baseRgbLight)
+  })
 })
 
 describe('syncLightingConfigurationWithUserLights', () => {

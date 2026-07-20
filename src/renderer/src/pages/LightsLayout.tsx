@@ -28,6 +28,7 @@ import {
   LightingConfiguration,
 } from '../../../photonics-dmx/types'
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
+import { deriveExtraChannelsForMaster } from '../../../photonics-dmx/helpers/rigTemplateSync'
 import {
   activeDmxLightsConfigAtom,
   myValidDmxLightsAtom,
@@ -192,6 +193,11 @@ const LightsLayout = () => {
 
             // Cast the channels to the correct type based on the fixture
             const castChannels = castToChannelType(firstFixture.fixture, recalculatedChannels)
+            const extraChannels = deriveExtraChannelsForMaster(
+              firstFixture.extraChannels,
+              templateChannels.masterDimmer,
+              newMasterDimmer,
+            )
 
             updated.push({
               id: crypto.randomUUID(),
@@ -206,6 +212,7 @@ const LightsLayout = () => {
               config: firstFixture.config || undefined,
               universe: firstFixture.universe,
               mount: 'floor' as const,
+              ...(extraChannels ? { extraChannels } : {}),
             })
           }
         }

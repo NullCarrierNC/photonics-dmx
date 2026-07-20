@@ -3,6 +3,7 @@ import {
   DmxFixture,
   DmxLight,
   DEFAULT_STROBE_CHANNEL_VALUES,
+  ExtraChannel,
   FixtureTypes,
   RgbDmxChannels,
   RgbwDmxChannels,
@@ -14,6 +15,8 @@ import {
 } from '../../../photonics-dmx/types'
 import { LightIcon } from './LightIcon'
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
+import { deriveExtraChannelsForMaster } from '../../../photonics-dmx/helpers/rigTemplateSync'
+import { extraChannelDisplayLabel, sortBaseChannelEntries } from './lightChannelDisplay'
 import { BsArrowsMove, BsLightningFill } from 'react-icons/bs'
 import MovingHeadCalibrationWizard from './MovingHeadCalibrationWizard'
 import { createLogger } from '../../../shared/logger'
@@ -37,8 +40,6 @@ interface LightChannelsConfigProps {
     listeners?: DraggableSyntheticListeners | undefined
   }
 }
-
-const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeChannel']
 
 const STROBE_VALUE_FIELDS: ReadonlyArray<{ key: keyof StrobeChannelValues; label: string }> = [
   { key: 'slow', label: 'Strobe Slow' },
@@ -92,6 +93,8 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
 
   // State for the light's config (if available)
   const [localConfig, setLocalConfig] = useState<FixtureConfig | null>(null)
+  // Added channels, offset-derived from the template like the base channels. Display-only here.
+  const [localExtraChannels, setLocalExtraChannels] = useState<ExtraChannel[] | null>(null)
   const [calibrationOpen, setCalibrationOpen] = useState(false)
 
   useEffect(() => {
@@ -103,6 +106,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
         // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when fixture not found
         setLocalChannels(null)
         setLocalConfig(null)
+        setLocalExtraChannels(null)
         return
       }
 
@@ -128,6 +132,13 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
 
       const castChannels = castToChannelType(fixtureTemplate.fixture, recalculatedChannels)
       setLocalChannels(castChannels)
+      setLocalExtraChannels(
+        deriveExtraChannelsForMaster(
+          fixtureTemplate.extraChannels,
+          templateChannels.masterDimmer,
+          existingMasterDimmer,
+        ) ?? null,
+      )
 
       // Handle Config
       // Copy the config from the light (no master dimmer logic here)
@@ -139,6 +150,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
     } else {
       setLocalChannels(null)
       setLocalConfig(null)
+      setLocalExtraChannels(null)
     }
   }, [light, myLights])
 
@@ -181,10 +193,21 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       const castChannels = castToChannelType(fixtureTemplate.fixture, updatedChannels)
       setLocalChannels({ ...castChannels })
 
+      const extras = deriveExtraChannelsForMaster(
+        fixtureTemplate.extraChannels,
+        templateChannels.masterDimmer,
+        newMasterValue,
+      )
+      setLocalExtraChannels(extras ?? null)
+
       const updatedLight: DmxLight = {
         ...light,
         channels: { ...castChannels },
       }
+      // Set/delete (not omit-on-spread): the spread copies the rig light's existing extraChannels,
+      // so we must explicitly drop them when the template now has none, or a stale key persists.
+      if (extras) updatedLight.extraChannels = extras
+      else delete updatedLight.extraChannels
       onChange(updatedLight)
     }
   }
@@ -271,6 +294,13 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
     const castChannels = castToChannelType(selectedFixture.fixture, recalculatedChannels)
     setLocalChannels({ ...castChannels })
 
+    const extras = deriveExtraChannelsForMaster(
+      selectedFixture.extraChannels,
+      templateChannels.masterDimmer,
+      existingMasterDimmer,
+    )
+    setLocalExtraChannels(extras ?? null)
+
     const updatedLight: DmxLight = {
       ...light,
       fixtureId: selectedFixture.id!,
@@ -280,6 +310,9 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       isStrobeEnabled: selectedFixture.isStrobeEnabled,
       channels: { ...castChannels },
     }
+    // Set/delete so switching to a template with no extras drops the previous template's extras.
+    if (extras) updatedLight.extraChannels = extras
+    else delete updatedLight.extraChannels
 
     // For config, if the new fixture has a config template, use it.
     if (selectedFixture.config) {
@@ -408,29 +441,38 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       {light && localChannels && (
         <div className="mt-2 w-full">
           <ul className="text-sm space-y-1">
-            {Object.entries(localChannels)
-              .sort(([keyA], [keyB]) => {
-                const indexA = channelOrder.indexOf(keyA)
-                const indexB = channelOrder.indexOf(keyB)
-                if (indexA !== -1 && indexB !== -1) return indexA - indexB
-                if (indexA !== -1) return -1
-                if (indexB !== -1) return 1
-                return keyA.localeCompare(keyB)
-              })
-              .map(([channelName, value]) => (
-                <li key={channelName} className="flex justify-between items-center">
-                  <span className="capitalize">{getDisplayName(channelName)}:</span>
-                  {channelName === 'masterDimmer' ? (
-                    <input
-                      type="number"
-                      min={1}
-                      value={value || 1}
-                      onChange={handleMasterDimmerChange}
-                      className="w-16 p-1 border border-gray-300 dark:border-gray-700 rounded text-black dark:text-white dark:bg-gray-700 text-right"
-                    />
-                  ) : (
-                    <span>{value}</span>
-                  )}
+            {sortBaseChannelEntries(Object.entries(localChannels)).map(([channelName, value]) => (
+              <li key={channelName} className="flex justify-between items-center">
+                <span className="capitalize">{getDisplayName(channelName)}:</span>
+                {channelName === 'masterDimmer' ? (
+                  <input
+                    type="number"
+                    min={1}
+                    value={value || 1}
+                    onChange={handleMasterDimmerChange}
+                    className="w-16 p-1 border border-gray-300 dark:border-gray-700 rounded text-black dark:text-white dark:bg-gray-700 text-right"
+                  />
+                ) : (
+                  <span>{value}</span>
+                )}
+              </li>
+            ))}
+            {/* Added channels — read-only here (template-owned, offset-derived from masterDimmer). */}
+            {light &&
+              (localExtraChannels ?? []).map((extra, i) => (
+                <li key={`extra-${i}`} className="flex justify-between items-center">
+                  <span>
+                    {extraChannelDisplayLabel(
+                      { ...light, extraChannels: localExtraChannels ?? [] },
+                      i,
+                    )}
+                    :
+                  </span>
+                  <span>
+                    {extra.type === 'fixed'
+                      ? `${extra.channel} = ${extra.value ?? 0}`
+                      : extra.channel}
+                  </span>
                 </li>
               ))}
           </ul>

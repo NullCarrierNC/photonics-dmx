@@ -1,5 +1,12 @@
 import equal from 'fast-deep-equal'
-import type { DmxFixture, DmxLight, DmxRig, DmxRigsConfig, LightingConfiguration } from '../types'
+import type {
+  DmxFixture,
+  DmxLight,
+  DmxRig,
+  DmxRigsConfig,
+  ExtraChannel,
+  LightingConfiguration,
+} from '../types'
 
 /**
  * Reconciles rig-stored light snapshots with their source fixture templates from MyLights.
@@ -18,6 +25,9 @@ import type { DmxFixture, DmxLight, DmxRig, DmxRigsConfig, LightingConfiguration
  *    {@link createDmxLightInstance} and LightChannelsConfig use. Re-laying-out channel offsets in
  *    a template therefore propagates to every rig light using it.
  *  - Default `strobeValues` (when the rig has no per-light override)
+ *  - `extraChannels` — user-added channels beyond the archetype map. `type`/`value` are copied
+ *    verbatim; each `channel` is offset-derived from the template the same way the base channels
+ *    are (see {@link deriveExtraChannelsForMaster}).
  *  - `config` defaults when the rig has none and the template provides them (e.g. fixture-type
  *    change RGB→RGBMH adds moving-head defaults). Existing rig calibration is preserved.
  *
@@ -37,6 +47,26 @@ type ChannelRecord = Record<string, number>
 
 function channelsAsRecord(channels: DmxFixture['channels']): ChannelRecord {
   return channels as unknown as ChannelRecord
+}
+
+/**
+ * Derives a rig light's `extraChannels` from its template. `type` and `value` are template-owned and
+ * copied verbatim; `channel` follows the same offset model as the base channels —
+ * `master + (templateChannel - templateMaster)`. A template channel of 0 means "unassigned" and
+ * stays 0 (never offset); a derived result below 1 collapses to 0 so it can't fail the 0–512
+ * validators. Returns `undefined` for a nullish *or empty* input — never `[]` — so callers can use
+ * the set/delete pattern and deep-equality never trips on `[]` vs absent.
+ */
+export function deriveExtraChannelsForMaster(
+  templateExtras: ExtraChannel[] | undefined,
+  templateMaster: number,
+  master: number,
+): ExtraChannel[] | undefined {
+  if (!templateExtras?.length) return undefined
+  return templateExtras.map((ec) => ({
+    ...ec,
+    channel: ec.channel === 0 ? 0 : Math.max(0, master + (ec.channel - templateMaster)),
+  }))
 }
 
 /**
@@ -94,6 +124,14 @@ export function syncDmxLightWithTemplate(
     nextConfig = { ...template.config }
   }
 
+  // extraChannels: template-owned. Re-derive the channel numbers from this rig light's master
+  // dimmer every sync, so template edits (add/remove/renumber an extra) propagate to rig snapshots.
+  const nextExtraChannels = deriveExtraChannelsForMaster(
+    template.extraChannels,
+    templateMaster,
+    rigMaster,
+  )
+
   // Build the synced light without explicit `undefined` values for optional fields, so deep
   // equality against the (potentially key-less) input doesn't trip on `{key: undefined}` vs absent.
   const synced: DmxLight = {
@@ -112,6 +150,11 @@ export function syncDmxLightWithTemplate(
     synced.config = nextConfig
   } else {
     delete synced.config
+  }
+  if (nextExtraChannels !== undefined) {
+    synced.extraChannels = nextExtraChannels
+  } else {
+    delete synced.extraChannels
   }
 
   return equal(light, synced) ? { light, changed: false } : { light: synced, changed: true }

@@ -1,10 +1,12 @@
 import React from 'react'
 import LightType from './../components/LightType'
 import DmxChannels from './../components/DmxChannels'
+import ExtraChannelsEditor from './../components/ExtraChannelsEditor'
 import {
   DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
   DEFAULT_STROBE_CHANNEL_VALUES,
   DmxFixture,
+  ExtraChannel,
   FixtureConfig,
   FixtureTypes,
   LightTypes,
@@ -81,13 +83,23 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
         ? currentLight.strobeValues ?? { ...DEFAULT_STROBE_CHANNEL_VALUES }
         : undefined
 
-    setCurrentLight({
+    // Extra channels survive RGB-family switches. A dedicated STROBE fixture is colour-less, so only
+    // fixed (mode) channels carry over; an empty result must become key-absent (never persist []).
+    const prevExtras = currentLight.extraChannels ?? []
+    const nextExtras: ExtraChannel[] | undefined = newIsStrobeFixture
+      ? prevExtras.filter((ec) => ec.type === 'fixed')
+      : prevExtras
+    const nextLight: DmxFixture = {
       ...currentLight,
       fixture: newType,
       channels: nextChannels as unknown as DmxFixture['channels'],
       config: defaultType.config ? normalizeFixtureConfig(defaultType.config) : undefined,
       strobeValues: nextStrobeValues,
-    })
+    }
+    if (nextExtras && nextExtras.length > 0) nextLight.extraChannels = nextExtras
+    else delete nextLight.extraChannels
+
+    setCurrentLight(nextLight)
   }
 
   // Updated handleChannelChange to accept number | boolean
@@ -190,6 +202,17 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
       <div className="max-w-[360px]">
         <DmxChannels light={currentLight} onChannelChange={handleChannelChange} />
       </div>
+
+      {/* Additional user-added channels (colour emitters, duplicate banks, fixed/mode channels) */}
+      <ExtraChannelsEditor
+        light={currentLight}
+        onChange={(extraChannels) => {
+          const next: DmxFixture = { ...currentLight }
+          if (extraChannels && extraChannels.length > 0) next.extraChannels = extraChannels
+          else delete next.extraChannels
+          setCurrentLight(next)
+        }}
+      />
 
       {/* Per-fixture strobe DMX values (only meaningful when strobe channel is enabled) */}
       {showStrobeFields && (

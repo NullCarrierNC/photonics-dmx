@@ -283,6 +283,51 @@ export interface RgbwDmxChannels extends RgbDmxChannels {
   white: number
 }
 
+/**
+ * Colour channel types the substitution mixer can derive from the internal RGB value. Order here
+ * is not the mix order (that lives in the mixer); this is just the vocabulary shared by the picker,
+ * validators and the mixer. Persisted string values — never rename.
+ */
+export const MIXABLE_CHANNEL_TYPES = [
+  'white',
+  'warmWhite',
+  'coolWhite',
+  'amber',
+  'orange',
+  'lime',
+  'uv',
+] as const
+export type MixableChannelType = (typeof MIXABLE_CHANNEL_TYPES)[number]
+
+/**
+ * Everything the "+ Add Channel" picker offers: the mixable colours, plain red/green/blue (so a
+ * fixture with a second red bank is expressible), and `fixed` (a utility channel pinned to a
+ * constant, e.g. a mode/macro channel).
+ */
+export const EXTRA_CHANNEL_TYPES = [
+  'red',
+  'green',
+  'blue',
+  ...MIXABLE_CHANNEL_TYPES,
+  'fixed',
+] as const
+export type ExtraChannelType = (typeof EXTRA_CHANNEL_TYPES)[number]
+
+/**
+ * One user-added channel on a fixture template beyond its archetype's closed channel map. Stored as
+ * an ordered array on {@link DmxFixture.extraChannels}; duplicates of a type are valid (all
+ * duplicates receive the same derived value at publish time). No per-row id: template dedup on
+ * import (see rigImportExport `sameTemplateContent`) deep-equals everything except id/position, so a
+ * random per-row id would break it — the UI keys rows by array index instead.
+ */
+export interface ExtraChannel {
+  type: ExtraChannelType
+  /** DMX channel number 1–512; 0 = unassigned (same "invalid until set" rule as `channels`). */
+  channel: number
+  /** Constant DMX output 0–255. Only meaningful when `type === 'fixed'`. */
+  value?: number
+}
+
 export interface MovingHeadDmxChannels {
   pan: number
   tilt: number
@@ -520,6 +565,14 @@ export interface DmxFixture {
    * dedicated {@link FixtureTypes.STROBE} fixtures don't use this field.
    */
   strobeValues?: StrobeChannelValues
+  /**
+   * User-added channels beyond the archetype's closed {@link channels} map. Ordered; duplicates of a
+   * type are valid. Absent (never `[]`) when the fixture has no additions, so deep-equality and
+   * template dedup treat "no extras" uniformly. On a rig snapshot ({@link DmxLight}) this field is
+   * template-owned exactly like the channel layout: `type`/`value` are copied from the template and
+   * `channel` is re-derived by the master-dimmer offset model on every sync.
+   */
+  extraChannels?: ExtraChannel[]
 }
 
 export interface DmxLight extends DmxFixture {
