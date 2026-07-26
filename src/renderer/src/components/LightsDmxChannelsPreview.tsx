@@ -1,5 +1,6 @@
 import React from 'react'
 import { LightingConfiguration, DmxFixture } from '../../../photonics-dmx/types'
+import { extraChannelDisplayLabel } from './lightChannelDisplay'
 
 interface LightsDmxChannelsPreviewProps {
   lightingConfig: LightingConfiguration // Lighting configuration containing the lights
@@ -47,6 +48,16 @@ const LightsDmxChannelsPreview: React.FC<LightsDmxChannelsPreviewProps> = ({
                 {channelName === 'md' ? 'MasterDimmer' : channelName}:
               </span>
               <span>{dmxValues[channelNumber] || 0}</span>
+            </li>
+          ))}
+          {/* User-added channels, after the base ones. Labels are already display-formatted so no
+              `capitalize` class (it would mangle camelCase types like warmWhite/uv). */}
+          {(light.extraChannels ?? []).map((extra, i) => (
+            <li key={`extra-${i}`} className="flex justify-between">
+              <span className="text-gray-700 dark:text-gray-300">
+                {extraChannelDisplayLabel(light, i)}:
+              </span>
+              <span>{dmxValues[extra.channel] || 0}</span>
             </li>
           ))}
         </ul>
