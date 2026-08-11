@@ -1,6 +1,5 @@
 import {
   RGBIO,
-  RgbwDmxChannels,
   RgbDmxChannels,
   StrobeDmxChannels,
   MovingHeadDmxChannels,
@@ -565,8 +564,7 @@ export class DmxPublisher {
           this._strobePeakColors.delete(lightId)
         }
 
-        const isMovingHead =
-          dmxLight.fixture === FixtureTypes.RGBMH || dmxLight.fixture === FixtureTypes.RGBWMH
+        const isMovingHead = dmxLight.fixture === FixtureTypes.RGBMH
         let panOut: number
         let tiltOut: number
         if (isMovingHead) {
@@ -644,11 +642,10 @@ export class DmxPublisher {
             case 'blue':
               // Owned by the mixer when a plan exists; otherwise fall through to the legacy write.
               if (mixPlan) continue
-              value = (dmxChannelData as RgbDmxChannels | RgbwDmxChannels)[channelName]
+              value = (dmxChannelData as RgbDmxChannels)[channelName]
               break
             case 'masterDimmer':
-              value = (dmxChannelData as RgbDmxChannels | RgbwDmxChannels | StrobeDmxChannels)
-                .masterDimmer
+              value = (dmxChannelData as RgbDmxChannels | StrobeDmxChannels).masterDimmer
               break
             case 'pan':
               value = (dmxChannelData as MovingHeadDmxChannels).pan

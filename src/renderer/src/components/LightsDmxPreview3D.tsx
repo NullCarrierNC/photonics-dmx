@@ -9,7 +9,6 @@ import {
   DmxFixture,
   FixtureTypes,
   RgbMovingHeadDmxChannels,
-  RgbwMovingHeadDmxChannels,
   ConfigStrobeType,
 } from '../../../photonics-dmx/types'
 import { getDmxPreviewLightColor } from './dmxPreviewLightColor'
@@ -24,7 +23,7 @@ export interface LightsDmxPreview3DProps {
   dmxValues: Record<number, number>
 }
 
-const MH_TYPES = new Set([FixtureTypes.RGBMH, FixtureTypes.RGBWMH])
+const MH_TYPES = new Set([FixtureTypes.RGBMH])
 
 function isMovingHead(light: DmxFixture): boolean {
   return MH_TYPES.has(light.fixture)
@@ -459,7 +458,7 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
         const dim = masterDimmer01(it.light, dmxValues)
         let dir: StageVector3
         if (isMovingHead(it.light)) {
-          const ch = it.light.channels as RgbMovingHeadDmxChannels | RgbwMovingHeadDmxChannels
+          const ch = it.light.channels as RgbMovingHeadDmxChannels
           const pan = dmxValues[ch.pan] ?? 0
           const tilt = dmxValues[ch.tilt] ?? 0
           dir = panTiltDmxToStageVector(pan, tilt, it.light.config)

@@ -153,10 +153,10 @@ const MyLights = () => {
         many different physical lights as you want. This is for defining the channel relationships.
       </p>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-        If your fixture has more channels than the base type — a second Red, an Amber, UV, or a
-        mode/macro channel that must be held at a constant value — add them with Additional Channels
-        in the editor. Added colour channels are driven automatically from the light's colour; you
-        never assign cues to them directly.
+        If your fixture has more channels than the base type — a White (an RGBW fixture is RGB plus
+        a White channel), an Amber, UV, a second Red, or a mode/macro channel that must be held at a
+        constant value — add them with Additional Channels in the editor. Added colour channels are
+        driven automatically from the light's colour; you never assign cues to them directly.
       </p>
 
       <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">

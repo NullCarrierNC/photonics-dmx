@@ -238,15 +238,21 @@ export interface EffectTransition {
  */
 export enum FixtureTypes {
   RGB = 'rgb',
-  RGBW = 'rgbw',
   STROBE = 'strobe',
   RGBMH = 'rgb/mh',
-  RGBWMH = 'rgbw/mh',
 }
 
 /** Legacy fixture identifiers replaced by the hasStrobeChannel model; retained for migration only. */
 export const LEGACY_FIXTURE_RGB_STROBE = 'rgb/s'
 export const LEGACY_FIXTURE_RGBW_STROBE = 'rgbw/s'
+
+/**
+ * Legacy fixture identifiers for the discrete RGBW archetypes, replaced by RGB(+MH) carrying a
+ * `white` {@link ExtraChannel}. Retained for migration only — a white emitter is just one more
+ * channel the substitution mixer drives, so a dedicated type earned nothing.
+ */
+export const LEGACY_FIXTURE_RGBW = 'rgbw'
+export const LEGACY_FIXTURE_RGBW_MH = 'rgbw/mh'
 
 /**
  * DMX-related types
@@ -266,8 +272,8 @@ export interface RgbDmxChannels extends BaseDmxFixture {
   green: number
   blue: number
   /**
-   * Optional hardware strobe-speed DMX channel on an RGB-family fixture (RGB / RGBW / RGBMH /
-   * RGBWMH). Present when the fixture template has "Strobe Channel?" enabled — i.e. the user has
+   * Optional hardware strobe-speed DMX channel on an RGB-family fixture (RGB / RGBMH). Present
+   * when the fixture template has "Strobe Channel?" enabled — i.e. the user has
    * declared that this colour fixture also exposes a strobe-speed channel. Stored alongside the
    * other channel offsets so master-dimmer shifts propagate the same way they do for r/g/b.
    *
@@ -277,10 +283,6 @@ export interface RgbDmxChannels extends BaseDmxFixture {
    * for the "Strobe Channel?" feature.
    */
   strobeChannel?: number
-}
-
-export interface RgbwDmxChannels extends RgbDmxChannels {
-  white: number
 }
 
 /**
@@ -499,8 +501,6 @@ export function clampMergeMovingHeadFixtureConfig(
 
 export interface RgbMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbDmxChannels {}
 
-export interface RgbwMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbwDmxChannels {}
-
 /**
  * Channel record for a **dedicated** hardware strobe fixture — a colour-less light whose only
  * outputs are master dimmer + strobe speed. Distinct from {@link RgbDmxChannels.strobeChannel},
@@ -549,12 +549,7 @@ export interface DmxFixture {
   name: string
   isStrobeEnabled: boolean
   group?: string
-  channels:
-    | RgbDmxChannels
-    | RgbwDmxChannels
-    | StrobeDmxChannels
-    | RgbMovingHeadDmxChannels
-    | RgbwMovingHeadDmxChannels
+  channels: RgbDmxChannels | StrobeDmxChannels | RgbMovingHeadDmxChannels
   config?: FixtureConfig
   universe?: number
   /** Floor vs ceiling/truss placement for preview and static wash; default floor when omitted before migration. */
@@ -602,23 +597,6 @@ export const LightTypes: DmxFixture[] = [
   {
     id: null,
     position: 0,
-    fixture: FixtureTypes.RGBW,
-    label: 'RGBW',
-    name: 'RGBW',
-    isStrobeEnabled: false,
-    group: '',
-    channels: {
-      masterDimmer: 0,
-      red: 0,
-      green: 0,
-      blue: 0,
-      white: 0,
-    },
-    universe: 1,
-  },
-  {
-    id: null,
-    position: 0,
     fixture: FixtureTypes.RGBMH,
     label: 'RGB/MH',
     name: 'RGB/MH',
@@ -629,28 +607,6 @@ export const LightTypes: DmxFixture[] = [
       red: 0,
       green: 0,
       blue: 0,
-      pan: 0,
-      tilt: 0,
-    },
-    config: {
-      ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
-    },
-    universe: 1,
-  },
-  {
-    id: null,
-    position: 0,
-    fixture: FixtureTypes.RGBWMH,
-    label: 'RGBW/MH',
-    name: 'RGBW/MH',
-    isStrobeEnabled: false,
-    group: '',
-    channels: {
-      masterDimmer: 0,
-      red: 0,
-      green: 0,
-      blue: 0,
-      white: 0,
       pan: 0,
       tilt: 0,
     },

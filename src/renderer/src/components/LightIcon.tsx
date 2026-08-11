@@ -1,4 +1,4 @@
-import { FaRegLightbulb, FaLightbulb } from 'react-icons/fa'
+import { FaRegLightbulb } from 'react-icons/fa'
 import { GiLightningFrequency } from 'react-icons/gi'
 import { DmxFixture } from '../../../photonics-dmx/types'
 import { IconType } from 'react-icons'
@@ -24,9 +24,6 @@ export const LightIcon = ({ type }: LightIconProps): JSX.Element => {
   switch (type.fixture) {
     case 'rgb':
       IconComponent = FaRegLightbulb // Outline lightbulb icon for RGB
-      break
-    case 'rgbw':
-      IconComponent = FaLightbulb // Solid lightbulb icon for RGBW
       break
     case 'strobe':
       IconComponent = GiLightningFrequency // Lightning frequency icon for Strobe

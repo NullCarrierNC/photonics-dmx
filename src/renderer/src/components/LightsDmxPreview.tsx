@@ -8,7 +8,6 @@ import {
   DmxFixture,
   FixtureTypes,
   RgbMovingHeadDmxChannels,
-  RgbwMovingHeadDmxChannels,
   ConfigStrobeType,
 } from '../../../photonics-dmx/types'
 import { panTiltDmxToSphericalXY } from './lightsDmxPreviewMath'
@@ -104,8 +103,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
 
   const getLightColor = (light: DmxFixture): string => getDmxPreviewLightColorCss(light, dmxValues)
 
-  const isMovingHead = (light: DmxFixture): boolean =>
-    light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH
+  const isMovingHead = (light: DmxFixture): boolean => light.fixture === FixtureTypes.RGBMH
 
   /**
    * Helper function to render individual light circles (moving heads include pan/tilt dot overlay).
@@ -137,7 +135,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
       )
     }
 
-    const channels = light.channels as RgbMovingHeadDmxChannels | RgbwMovingHeadDmxChannels
+    const channels = light.channels as RgbMovingHeadDmxChannels
     const pan = dmxValues[channels.pan] ?? 0
     const tilt = dmxValues[channels.tilt] ?? 0
     const { xPct, yPct } = panTiltDmxToSphericalXY(pan, tilt, light.config)

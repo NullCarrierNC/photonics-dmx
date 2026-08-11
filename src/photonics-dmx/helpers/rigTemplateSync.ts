@@ -13,7 +13,7 @@ import type {
  *
  * Rig lights are stored as snapshot copies of the template they were created from, plus per-light
  * state (DMX position, calibration, etc.). When the user edits a template — adds a strobe channel,
- * switches RGB→RGBW, renames, tunes default strobe values — the rig's snapshot doesn't pick up the
+ * adds an amber channel, renames, tunes default strobe values — the rig's snapshot doesn't pick up the
  * change automatically. This module owns the reconciliation rules.
  *
  * A rig is an *implementation* of its template: a change to the root template propagates down.

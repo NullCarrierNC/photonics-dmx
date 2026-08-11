@@ -85,20 +85,24 @@ describe('getDmxPreviewLightColor with extra channels', () => {
     expect(getDmxPreviewLightColor(f, dmx)).toEqual({ r: 200, g: 0, b: 0 })
   })
 
-  it('counts an added white bank with the named white channel once', () => {
+  it('counts two white banks once', () => {
     // Both sit in the publisher's single white stage, so preview must not add them twice.
-    const RGBW = { masterDimmer: 1, red: 2, green: 3, blue: 4, white: 5 }
-    const f = fixture(FixtureTypes.RGBW, RGBW, [{ type: 'white', channel: 6 }])
+    const f = fixture(FixtureTypes.RGB, RGB, [
+      { type: 'white', channel: 5 },
+      { type: 'white', channel: 6 },
+    ])
     const dmx = { 1: 255, 2: 0, 3: 0, 4: 0, 5: 120, 6: 120 }
     expect(getDmxPreviewLightColor(f, dmx)).toEqual({ r: 120, g: 120, b: 120 })
   })
 })
 
 describe('preview matches the published wire values', () => {
-  const RGBW = { masterDimmer: 1, red: 2, green: 3, blue: 4, white: 5 }
   const SHAPES: Array<{ label: string; light: DmxFixture }> = [
     { label: 'plain RGB', light: fixture(FixtureTypes.RGB, RGB) },
-    { label: 'bare RGBW', light: fixture(FixtureTypes.RGBW, RGBW) },
+    {
+      label: 'RGB + white (the migrated RGBW shape)',
+      light: fixture(FixtureTypes.RGB, RGB, [{ type: 'white', channel: 5 }]),
+    },
     {
       label: 'RGB + amber',
       light: fixture(FixtureTypes.RGB, RGB, [{ type: 'amber', channel: 5 }]),
@@ -111,8 +115,9 @@ describe('preview matches the published wire values', () => {
       ]),
     },
     {
-      label: 'RGBW + amber + uv',
-      light: fixture(FixtureTypes.RGBW, RGBW, [
+      label: 'RGB + white + amber + uv',
+      light: fixture(FixtureTypes.RGB, RGB, [
+        { type: 'white', channel: 5 },
         { type: 'amber', channel: 6 },
         { type: 'uv', channel: 7 },
       ]),

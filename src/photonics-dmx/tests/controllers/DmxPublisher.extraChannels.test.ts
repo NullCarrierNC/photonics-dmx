@@ -119,7 +119,6 @@ function setup(lights: LightSpec[]): {
 }
 
 const RGB = { masterDimmer: 1, red: 2, green: 3, blue: 4 }
-const RGBW = { masterDimmer: 1, red: 2, green: 3, blue: 4, white: 5 }
 
 describe('DmxPublisher extra channels', () => {
   it('leaves a plain RGB fixture bit-for-bit unchanged', () => {
@@ -135,8 +134,16 @@ describe('DmxPublisher extra channels', () => {
     expect(Object.keys(buf).sort()).toEqual(['1', '2', '3', '4'])
   })
 
-  it('drives the built-in RGBW white channel with substitution (sanctioned change)', () => {
-    const ctx = setup([{ id: 'l1', fixture: FixtureTypes.RGBW, channels: RGBW }])
+  it('drives a white channel with substitution (sanctioned change)', () => {
+    // The RGBW shape after the archetype collapse: RGB plus a white extra on channel 5.
+    const ctx = setup([
+      {
+        id: 'l1',
+        fixture: FixtureTypes.RGB,
+        channels: RGB,
+        extraChannels: [{ type: 'white', channel: 5 }],
+      },
+    ])
     ctx.publisher.publish(
       new Map([['l1', rgbio({ red: 255, green: 191, blue: 64, intensity: 255 })]]),
     )

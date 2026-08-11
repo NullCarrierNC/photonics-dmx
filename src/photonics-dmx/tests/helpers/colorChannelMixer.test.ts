@@ -51,7 +51,15 @@ function mix(fixture: DmxFixture, r: number, g: number, b: number): Record<numbe
 }
 
 const RGB_CHANNELS = { masterDimmer: 1, red: 2, green: 3, blue: 4 }
-const RGBW_CHANNELS = { masterDimmer: 1, red: 2, green: 3, blue: 4, white: 5 }
+
+/**
+ * What used to be the discrete RGBW archetype: RGB plus a white extra on the channel the named
+ * white channel occupied. Every RGBW expectation below is unchanged from when the type existed,
+ * which is the point — the mixer treats a white extra exactly as it treated the named channel.
+ */
+function rgbwFixture(extras: ExtraChannel[] = []): DmxFixture {
+  return makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('white', 5), ...extras])
+}
 
 describe('buildChannelMixPlan — when a plan is needed', () => {
   it('returns null for a plain RGB fixture (legacy path, bit-for-bit)', () => {
@@ -73,8 +81,8 @@ describe('buildChannelMixPlan — when a plan is needed', () => {
     expect(buildChannelMixPlan(f)).toBeNull()
   })
 
-  it('returns a plan for a bare RGBW fixture (drives the built-in white channel)', () => {
-    const plan = buildChannelMixPlan(makeFixture(FixtureTypes.RGBW, RGBW_CHANNELS))
+  it('returns a plan for an RGBW-shaped fixture (drives its white channel)', () => {
+    const plan = buildChannelMixPlan(rgbwFixture())
     expect(plan).not.toBeNull()
     expect(plan!.stages.some((s) => s.channels.includes(5))).toBe(true)
   })
@@ -87,17 +95,17 @@ describe('buildChannelMixPlan — when a plan is needed', () => {
 
 describe('applyChannelMixPlan — worked vectors', () => {
   it('1: RGBW (255,191,64) → white=64, red=191, green=127, blue=0', () => {
-    const out = mix(makeFixture(FixtureTypes.RGBW, RGBW_CHANNELS), 255, 191, 64)
+    const out = mix(rgbwFixture(), 255, 191, 64)
     expect(out).toEqual({ 5: 64, 2: 191, 3: 127, 4: 0 })
   })
 
   it('2: RGBW (255,255,255) → white=255, rgb=0', () => {
-    const out = mix(makeFixture(FixtureTypes.RGBW, RGBW_CHANNELS), 255, 255, 255)
+    const out = mix(rgbwFixture(), 255, 255, 255)
     expect(out).toEqual({ 5: 255, 2: 0, 3: 0, 4: 0 })
   })
 
   it('3: RGBW (200,100,50) → white=50, red=150, green=50, blue=0', () => {
-    const out = mix(makeFixture(FixtureTypes.RGBW, RGBW_CHANNELS), 200, 100, 50)
+    const out = mix(rgbwFixture(), 200, 100, 50)
     expect(out).toEqual({ 5: 50, 2: 150, 3: 50, 4: 0 })
   })
 
@@ -120,7 +128,7 @@ describe('applyChannelMixPlan — worked vectors', () => {
   })
 
   it('7: RGBW+amber (255,223,128) → white=128, amber=127, rgb=0', () => {
-    const f = makeFixture(FixtureTypes.RGBW, RGBW_CHANNELS, [extra('amber', 6)])
+    const f = rgbwFixture([extra('amber', 6)])
     expect(mix(f, 255, 223, 128)).toEqual({ 5: 128, 6: 127, 2: 0, 3: 0, 4: 0 })
   })
 
@@ -237,7 +245,7 @@ describe('invalid channels and strobe device class', () => {
 
 describe('input sanitisation', () => {
   it('treats NaN colour components as 0 (never poisons the buffer)', () => {
-    const f = makeFixture(FixtureTypes.RGBW, RGBW_CHANNELS)
+    const f = rgbwFixture()
     const out = mix(f, Number.NaN, 100, 50)
     for (const v of Object.values(out)) {
       expect(Number.isInteger(v)).toBe(true)
@@ -247,48 +255,39 @@ describe('input sanitisation', () => {
   })
 
   it('clamps negative colour components to 0 rather than inflating siblings', () => {
-    const f = makeFixture(FixtureTypes.RGBW, RGBW_CHANNELS)
+    const f = rgbwFixture()
     // Legacy would clamp red to 0; white = min(0,100,200)=0, residual green/blue untouched.
     expect(mix(f, -5, 100, 200)).toEqual({ 5: 0, 2: 0, 3: 100, 4: 200 })
   })
 })
 
-describe('RGBW white=0 matches legacy', () => {
-  it('an RGBW fixture with an unassigned white channel produces no plan (legacy RGB path)', () => {
-    const f = makeFixture(FixtureTypes.RGBW, {
-      masterDimmer: 1,
-      red: 2,
-      green: 3,
-      blue: 4,
-      white: 0,
-    })
-    // No valid white channel → no stage, no extras → null plan → the publisher's legacy path
-    // writes full RGB and never touches white, exactly as before this feature.
+describe('white=0 matches legacy', () => {
+  it('an unassigned white channel produces no plan (legacy RGB path)', () => {
+    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('white', 0)])
+    // No valid white channel → no stage, nothing else to mix → null plan → the publisher's legacy
+    // path writes full RGB and never touches white, exactly as before this feature.
     expect(buildChannelMixPlan(f)).toBeNull()
   })
 })
 
 describe('reconstruction and bounds invariants', () => {
   const LEVELS = [0, 1, 64, 127, 128, 191, 254, 255]
-  const EMITTER_SETS: Array<{ label: string; extras: ExtraChannel[]; fixture: FixtureTypes }> = [
-    { label: 'RGBW', fixture: FixtureTypes.RGBW, extras: [] },
-    { label: 'RGB+amber', fixture: FixtureTypes.RGB, extras: [extra('amber', 5)] },
+  const EMITTER_SETS: Array<{ label: string; extras: ExtraChannel[] }> = [
+    { label: 'RGB+white', extras: [extra('white', 5)] },
+    { label: 'RGB+amber', extras: [extra('amber', 5)] },
     {
       label: 'RGB+WW+CW',
-      fixture: FixtureTypes.RGB,
       extras: [extra('warmWhite', 5), extra('coolWhite', 6)],
     },
     {
       label: 'RGB+white+amber+uv',
-      fixture: FixtureTypes.RGB,
       extras: [extra('white', 5), extra('amber', 6), extra('uv', 7)],
     },
   ]
 
   for (const set of EMITTER_SETS) {
     it(`${set.label}: outputs are ints in 0–255 and reconstruct the input within rounding slack`, () => {
-      const channels = set.fixture === FixtureTypes.RGBW ? RGBW_CHANNELS : RGB_CHANNELS
-      const fixture = makeFixture(set.fixture, channels, set.extras.length ? set.extras : undefined)
+      const fixture = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, set.extras)
       const plan = buildChannelMixPlan(fixture)
       expect(plan).not.toBeNull()
 

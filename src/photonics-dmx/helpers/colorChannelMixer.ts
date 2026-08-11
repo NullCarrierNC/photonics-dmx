@@ -17,6 +17,10 @@ import {
  * fixture with no extra emitters produces no plan at all — the publisher then takes its legacy path
  * and its DMX output is bit-for-bit identical to before this feature existed.
  *
+ * White is not special here: an RGBW fixture is an RGB fixture carrying a `white` extra channel (the
+ * discrete RGBW archetypes were migrated onto that shape), so it flows through the same stage as any
+ * other emitter.
+ *
  * See {@link EMITTER_PRIMARIES} for the RGB approximation of each emitter; the ordering of the
  * extraction stages is fixed (see {@link buildChannelMixPlan}) and never affects chromaticity — it
  * only decides which emitter carries a given part of the load.
@@ -107,8 +111,8 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
   if (isValidChannel(named.green)) greenChannels.push(named.green)
   if (isValidChannel(named.blue)) blueChannels.push(named.blue)
 
-  // Valid channel numbers per mixable type. Named white (RGBW/RGBWMH) seeds the white bucket — this
-  // is what finally drives the built-in RGBW white channel through the same substitution mixer.
+  // Valid channel numbers per mixable type. A white emitter is an ordinary extra channel — the
+  // discrete RGBW archetypes were migrated onto RGB plus a `white` extra, which lands here.
   const mixableChannels: Record<MixableChannelType, number[]> = {
     white: [],
     warmWhite: [],
@@ -118,7 +122,6 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
     lime: [],
     uv: [],
   }
-  if (isValidChannel(named.white)) mixableChannels.white.push(named.white)
 
   let hasRgbExtra = false
   extras.forEach((ec, i) => {

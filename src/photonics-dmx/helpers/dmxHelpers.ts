@@ -6,8 +6,6 @@ import {
   RgbDmxChannels,
   RGBIO,
   RgbMovingHeadDmxChannels,
-  RgbwDmxChannels,
-  RgbwMovingHeadDmxChannels,
   StrobeDmxChannels,
 } from '../types'
 
@@ -279,29 +277,13 @@ export const getColor = (
 export const castToChannelType = (
   fixtureType: FixtureTypes,
   channels: { [key: string]: number },
-):
-  | RgbDmxChannels
-  | RgbwDmxChannels
-  | StrobeDmxChannels
-  | RgbMovingHeadDmxChannels
-  | RgbwMovingHeadDmxChannels => {
+): RgbDmxChannels | StrobeDmxChannels | RgbMovingHeadDmxChannels => {
   switch (fixtureType) {
     case FixtureTypes.RGB: {
       const out: RgbDmxChannels = {
         red: channels.red || 0,
         green: channels.green || 0,
         blue: channels.blue || 0,
-        masterDimmer: channels.masterDimmer || 0,
-      }
-      if (channels.strobeChannel != null) out.strobeChannel = channels.strobeChannel
-      return out
-    }
-    case FixtureTypes.RGBW: {
-      const out: RgbwDmxChannels = {
-        red: channels.red || 0,
-        green: channels.green || 0,
-        blue: channels.blue || 0,
-        white: channels.white || 0,
         masterDimmer: channels.masterDimmer || 0,
       }
       if (channels.strobeChannel != null) out.strobeChannel = channels.strobeChannel
@@ -317,19 +299,6 @@ export const castToChannelType = (
         red: channels.red || 0,
         green: channels.green || 0,
         blue: channels.blue || 0,
-        masterDimmer: channels.masterDimmer || 0,
-        pan: channels.pan || 0,
-        tilt: channels.tilt || 0,
-      }
-      if (channels.strobeChannel != null) out.strobeChannel = channels.strobeChannel
-      return out
-    }
-    case FixtureTypes.RGBWMH: {
-      const out: RgbwMovingHeadDmxChannels = {
-        red: channels.red || 0,
-        green: channels.green || 0,
-        blue: channels.blue || 0,
-        white: channels.white || 0,
         masterDimmer: channels.masterDimmer || 0,
         pan: channels.pan || 0,
         tilt: channels.tilt || 0,

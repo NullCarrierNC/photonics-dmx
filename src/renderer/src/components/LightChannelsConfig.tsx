@@ -6,9 +6,7 @@ import {
   ExtraChannel,
   FixtureTypes,
   RgbDmxChannels,
-  RgbwDmxChannels,
   StrobeChannelValues,
-  StrobeDmxChannels,
   FixtureConfig,
   normalizeFixtureConfig,
   LightingConfiguration,
@@ -87,9 +85,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
   lightingConfig,
   dragHandle,
 }) => {
-  const [localChannels, setLocalChannels] = useState<
-    RgbDmxChannels | RgbwDmxChannels | StrobeDmxChannels | null
-  >(null)
+  const [localChannels, setLocalChannels] = useState<DmxFixture['channels'] | null>(null)
 
   // State for the light's config (if available)
   const [localConfig, setLocalConfig] = useState<FixtureConfig | null>(null)
@@ -357,11 +353,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
 
   const isFixtureInMyLights = myLights.some((fixture) => fixture.id === light?.fixtureId)
 
-  const showCalibrate =
-    !!light &&
-    !!rigId &&
-    !!light.id &&
-    (light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH)
+  const showCalibrate = !!light && !!rigId && !!light.id && light.fixture === FixtureTypes.RGBMH
 
   let dragHandleButton: React.ReactNode = null
   if (dragHandle) {
@@ -483,7 +475,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       {light && localConfig && (
         <div className="mt-2 w-full">
           <h3 className="text-lg font-bold">Config</h3>
-          {(light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH) && (
+          {light.fixture === FixtureTypes.RGBMH && (
             <>
               <p className="text-xs text-gray-600 dark:text-gray-200 mb-2">
                 Use the Calibrate button below to configure these fields interactively.
@@ -555,7 +547,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                 </li>
               )
             })}
-            {(light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH) &&
+            {light.fixture === FixtureTypes.RGBMH &&
               localConfig.invertPan === localConfig.invertTilt && (
                 <li className="flex flex-col items-stretch pt-1">
                   <button
@@ -590,9 +582,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       )}
 
       {/* Separator for moving head fixtures if present */}
-      {light?.fixture === FixtureTypes.RGBMH || light?.fixture === FixtureTypes.RGBWMH ? (
-        <hr />
-      ) : null}
+      {light?.fixture === FixtureTypes.RGBMH ? <hr /> : null}
 
       {/* Strobe Toggle */}
       {light && (

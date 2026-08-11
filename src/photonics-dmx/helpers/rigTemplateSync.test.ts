@@ -128,20 +128,22 @@ describe('syncDmxLightWithTemplate', () => {
     expect(light.strobeValues).toEqual({ slow: 1, medium: 2, fast: 3, fastest: 4 })
   })
 
-  it('upgrades fixture type RGB → RGBW by adding the white channel from the template offset', () => {
-    const rgbwTemplate: DmxFixture = {
+  it('upgrades fixture type RGB → RGBMH by adding pan/tilt from the template offset', () => {
+    const mhTemplate: DmxFixture = {
       ...baseRgbTemplate,
-      fixture: FixtureTypes.RGBW,
-      label: 'RGBW PAR',
-      name: 'RGBW PAR',
-      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, white: 5 },
+      fixture: FixtureTypes.RGBMH,
+      label: 'MH PAR',
+      name: 'MH PAR',
+      channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, pan: 5, tilt: 6 },
     }
-    const { light, changed } = syncDmxLightWithTemplate(baseRgbLight, rgbwTemplate)
+    const { light, changed } = syncDmxLightWithTemplate(baseRgbLight, mhTemplate)
     expect(changed).toBe(true)
-    expect(light.fixture).toBe(FixtureTypes.RGBW)
-    expect(light.label).toBe('RGBW PAR')
-    expect(light.name).toBe('RGBW PAR')
-    expect((light.channels as unknown as Record<string, number>).white).toBe(15) // 11 + (5 - 1)
+    expect(light.fixture).toBe(FixtureTypes.RGBMH)
+    expect(light.label).toBe('MH PAR')
+    expect(light.name).toBe('MH PAR')
+    const channels = light.channels as unknown as Record<string, number>
+    expect(channels.pan).toBe(15) // 11 + (5 - 1)
+    expect(channels.tilt).toBe(16)
   })
 
   it('preserves rig-owned fields: id, fixtureId, position, group, universe, mount, isStrobeEnabled, masterDimmer', () => {

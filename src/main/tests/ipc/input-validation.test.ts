@@ -630,6 +630,15 @@ describe('inputValidation', () => {
         ])
         expect(result.ok).toBe(false)
       })
+
+      it.each([['rgbw'], ['rgbw/mh'], ['rgb/s']])(
+        'rejects the retired fixture type %s (loaded data is migrated before it reaches here)',
+        (fixtureType) => {
+          const el = lightWith({ red: 1, green: 2, blue: 3, masterDimmer: 4 })
+          el.fixture = fixtureType
+          expect(validateDmxFixturesArray([el]).ok).toBe(false)
+        },
+      )
     })
 
     describe('extra channels', () => {
