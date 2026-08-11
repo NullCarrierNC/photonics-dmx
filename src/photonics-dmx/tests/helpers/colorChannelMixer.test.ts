@@ -212,6 +212,16 @@ describe('invalid channels and strobe device class', () => {
     expect(plan.stages.every((s) => s.channels.every((c) => c === 5))).toBe(true)
   })
 
+  it('still returns a plan when every extra is excluded, so the caller can report it', () => {
+    // Otherwise the exclusions are dropped with the plan and the user is never told why their
+    // channel is dead. The plan has no stages, so it mixes to the legacy values.
+    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('amber', 600)])
+    const plan = buildChannelMixPlan(f)!
+    expect(plan.invalidChannels).toHaveLength(1)
+    expect(plan.stages).toHaveLength(0)
+    expect(mix(f, 255, 191, 0)).toEqual({ 2: 255, 3: 191, 4: 0 })
+  })
+
   it('a dedicated strobe fixture honours fixed extras but never colour extras', () => {
     const f = makeFixture(FixtureTypes.STROBE, { masterDimmer: 1, strobeChannel: 2 }, [
       extra('fixed', 3, 200),

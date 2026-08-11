@@ -113,7 +113,7 @@ const ExtraChannelsEditor: React.FC<ExtraChannelsEditorProps> = ({ light, onChan
                 <span className="text-gray-600 dark:text-gray-400">=</span>
                 <input
                   aria-label={`${label} held value`}
-                  title="DMX value 0–255 held on this channel whenever the light is on"
+                  title="DMX value 0–255 held on this channel whenever DMX output is running"
                   type="number"
                   min={0}
                   max={255}

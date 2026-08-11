@@ -398,6 +398,19 @@ export class DmxPublisher {
   }
 
   /**
+   * Reports a plan's excluded extra channels once per light. Shared by the per-light-state pass and
+   * the unvisited-fixture pass, so a fixture no cue addresses still explains its dead mode channel.
+   */
+  private _warnInvalidExtras(lightId: string, plan: ChannelMixPlan): void {
+    if (plan.invalidChannels.length === 0) return
+    if (this._reportedBadChannelLights.has(lightId)) return
+    this._reportedBadChannelLights.add(lightId)
+    log.warn(
+      `Light ${lightId}: skipping invalid extra channels: ${plan.invalidChannels.join(', ')}`,
+    )
+  }
+
+  /**
    * Contains the logic for converting light states to DMX channels and sending them.
    * Produces one buffer per currently-enabled wire sender (populated according to each rig's
    * `outputs` routing) plus one buffer per active rig for the IPC preview. Wire slots dispatch
@@ -615,17 +628,11 @@ export class DmxPublisher {
         // plan exists; it decomposes the post-latch rgb into the fixture's declared emitters and
         // writes the residual back to the named/extra rgb channels. `null` = no extras → legacy
         // path below produces bit-for-bit identical output. Runs after the cast so a cast throw
-        // still skips the whole light (above). Fixed channels are emitted every published frame.
+        // still skips the whole light (above).
         const mixPlan = this._getMixPlan(dmxLight)
         if (mixPlan) {
-          if (mixPlan.invalidChannels.length > 0 && !this._reportedBadChannelLights.has(lightId)) {
-            this._reportedBadChannelLights.add(lightId)
-            log.warn(
-              `Light ${lightId}: skipping invalid extra channels: ${mixPlan.invalidChannels.join(', ')}`,
-            )
-          }
+          this._warnInvalidExtras(lightId, mixPlan)
           applyChannelMixPlan(mixPlan, r, g, b, mixWrite)
-          for (const fw of mixPlan.fixedWrites) writeChannel(fw.channel, fw.value, 'fixed channel')
         }
 
         for (const [channelName, channelNumber] of Object.entries(dmxLight.channels)) {
@@ -663,6 +670,14 @@ export class DmxPublisher {
 
           writeChannel(channelNumber, value, channelName)
         }
+
+        // Fixed channels are emitted every published frame, last: a `fixed` channel that collides
+        // with one of this fixture's own base channels wins, matching the unvisited pass below and
+        // the console/calibration seeds. (The editor warns about duplicate numbers but doesn't
+        // block them, so this state reaches the wire.)
+        if (mixPlan) {
+          for (const fw of mixPlan.fixedWrites) writeChannel(fw.channel, fw.value, 'fixed channel')
+        }
       }
 
       // Unvisited-fixture pass: emit pinned `fixed` channels for planned fixtures no light state
@@ -671,8 +686,9 @@ export class DmxPublisher {
       for (const [lightId, fixture] of manager.getAllDmxLights()) {
         if (visitedLightIds.has(lightId)) continue
         const plan = this._getMixPlan(fixture)
-        if (!plan || plan.fixedWrites.length === 0) continue
+        if (!plan) continue
         curLightId = lightId
+        this._warnInvalidExtras(lightId, plan)
         for (const fw of plan.fixedWrites) writeChannel(fw.channel, fw.value, 'fixed channel')
       }
     }

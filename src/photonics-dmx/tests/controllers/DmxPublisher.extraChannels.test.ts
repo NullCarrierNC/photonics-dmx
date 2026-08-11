@@ -237,7 +237,50 @@ describe('DmxPublisher extra channels', () => {
     // No buffer key outside 1–512.
     expect(Object.keys(buf).every((k) => Number(k) >= 1 && Number(k) <= 512)).toBe(true)
     expect(buf[600]).toBeUndefined()
+    // Colour still reaches the named channels — an unusable extra costs nothing else.
+    expect(buf[2]).toBe(255)
+    expect(buf[3]).toBe(191)
+    const messages = warn.mock.calls.map((c) => c.join(' ')).filter((m) => m.includes('l1'))
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toContain('invalid extra channels')
     warn.mockRestore()
+  })
+
+  it('reports invalid extras on a fixture no cue addressed', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const ctx = setup([
+      { id: 'l1', fixture: FixtureTypes.RGB, channels: RGB },
+      {
+        id: 'sg',
+        fixture: FixtureTypes.RGB,
+        channels: { masterDimmer: 10, red: 11, green: 12, blue: 13 },
+        extraChannels: [{ type: 'fixed', channel: 600, value: 77 }],
+        group: 'strobe',
+      },
+    ])
+    ctx.publisher.publish(new Map([['l1', rgbio({ red: 100, intensity: 100 })]]))
+    ctx.publisher.publish(new Map([['l1', rgbio({ red: 100, intensity: 100 })]]))
+    const buf = ctx.lastWire()
+    expect(buf[600]).toBeUndefined()
+    const messages = warn.mock.calls.map((c) => c.join(' ')).filter((m) => m.includes('sg'))
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toContain('invalid extra channels')
+    warn.mockRestore()
+  })
+
+  it('lets a fixed channel win a collision with its own base channel', () => {
+    // The editor warns about duplicate numbers but does not block them, so this reaches the wire.
+    // Fixed writes land after the base channels, matching the unvisited pass and console seeds.
+    const ctx = setup([
+      {
+        id: 'l1',
+        fixture: FixtureTypes.RGB,
+        channels: RGB,
+        extraChannels: [{ type: 'fixed', channel: 1, value: 42 }],
+      },
+    ])
+    ctx.publisher.publish(new Map([['l1', rgbio({ red: 200, intensity: 180 })]]))
+    expect(ctx.lastWire()[1]).toBe(42)
   })
 
   it('zeroes a fixed channel on shutdown blackout', () => {

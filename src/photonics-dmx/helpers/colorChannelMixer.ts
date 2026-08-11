@@ -73,9 +73,12 @@ function clampByte(value: number): number {
 
 /**
  * Precomputes a fixture's mixing plan from its named channels + `extraChannels`. Returns `null` when
- * no mixing is needed (no mixable emitters, no red/green/blue extras, no fixed channels) — the
- * caller must then take the legacy per-channel path, which is bit-for-bit identical to pre-feature
- * output. Called once per fixture object (memoised by the publisher on object identity).
+ * no mixing is needed (no mixable emitters, no red/green/blue extras, no fixed channels) and nothing
+ * needs reporting — the caller must then take the legacy per-channel path, which is bit-for-bit
+ * identical to pre-feature output. A fixture whose extras are *all* excluded for a real
+ * misconfiguration still gets a plan, so {@link ChannelMixPlan.invalidChannels} reaches the caller's
+ * log instead of being silently dropped; that plan has no stages, so it mixes to the same values the
+ * legacy path would write. Called once per fixture object (memoised by the publisher on identity).
  */
 export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null {
   const named = fixture.channels as unknown as Record<string, number>
@@ -84,6 +87,16 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
 
   const invalidChannels: string[] = []
   const fixedWrites: Array<{ channel: number; value: number }> = []
+
+  // Excluded extras. An unassigned channel (0) is an ordinary in-progress template state — the
+  // fixture can't be placed in a rig at all until it's assigned (see `myValidDmxLightsAtom`) — so it
+  // is reported but never forces a plan into existence on its own. Anything else is a real
+  // misconfiguration the caller must be able to log.
+  let reportableProblems = 0
+  const exclude = (label: string, reportable: boolean): void => {
+    invalidChannels.push(label)
+    if (reportable) reportableProblems += 1
+  }
 
   // Named red/green/blue are owned by the mixer when a plan exists (the publisher skips its own
   // red/green/blue cases), so they must receive the residual too.
@@ -115,19 +128,19 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
       if (isValidChannel(ec.channel)) {
         fixedWrites.push({ channel: ec.channel, value: clampByte(ec.value ?? 0) })
       } else {
-        invalidChannels.push(label)
+        exclude(label, ec.channel !== 0)
       }
       return
     }
 
     // A colour-less strobe has no residual home for a colour channel.
     if (isStrobe) {
-      invalidChannels.push(label)
+      exclude(label, true)
       return
     }
 
     if (!isValidChannel(ec.channel)) {
-      invalidChannels.push(label)
+      exclude(label, ec.channel !== 0)
       return
     }
 
@@ -177,7 +190,7 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
     }
   }
 
-  if (stages.length === 0 && !hasRgbExtra && fixedWrites.length === 0) {
+  if (stages.length === 0 && !hasRgbExtra && fixedWrites.length === 0 && reportableProblems === 0) {
     return null
   }
 
