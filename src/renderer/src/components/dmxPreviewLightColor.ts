@@ -6,6 +6,7 @@ import {
   type MixableChannelType,
 } from '../../../photonics-dmx/types'
 import { EMITTER_PRIMARIES } from '../../../photonics-dmx/helpers/colorChannelMixer'
+import { EXTRA_CHANNEL_TYPE_LABELS, extraChannelDisplayLabel } from './lightChannelDisplay'
 
 const MIXABLE_TYPE_SET = new Set<string>(MIXABLE_CHANNEL_TYPES)
 
@@ -146,4 +147,90 @@ export function getDmxPreviewLightColorCss(
 ): string {
   const { r, g, b } = getDmxPreviewLightColor(light, dmxValues)
   return `rgb(${r}, ${g}, ${b})`
+}
+
+/** One colour channel of a fixture, as its own swatch. */
+export interface ChannelBreakdownEntry {
+  /** Display label, numbered across base + extras ("Red", "Red 2", "Amber"). */
+  label: string
+  /** Raw DMX drive on that channel, 0–255. */
+  value: number
+  /** `rgb(...)` for the emitter at that drive. */
+  css: string
+}
+
+/** Unit primaries for the base channels, so they mix into the swatch table like any emitter. */
+const BASE_PRIMARIES: Readonly<
+  Record<'red' | 'green' | 'blue', readonly [number, number, number]>
+> = {
+  red: [1, 0, 0],
+  green: [0, 1, 0],
+  blue: [0, 0, 1],
+}
+
+function swatchCss(value: number, [er, eg, eb]: readonly [number, number, number]): string {
+  return `rgb(${Math.round(value * er)}, ${Math.round(value * eg)}, ${Math.round(value * eb)})`
+}
+
+/**
+ * Drive on a channel, or 0 when the channel number is outside DMX 1–512. An unassigned channel is
+ * stored as 0, which would otherwise index a `0` key rather than reading as dark.
+ */
+function channelValue(dmxValues: Record<number, number>, channel: number): number {
+  if (!Number.isInteger(channel) || channel < 1 || channel > 512) return 0
+  return dmxValues[channel] || 0
+}
+
+/**
+ * Per-channel swatches for a fixture whose colour comes from more than the base RGB — the component
+ * channels behind the single mixed circle the 2D preview shows. Base red/green/blue come first, then
+ * each colour extra in array order, so a duplicate bank sits beside the primary it doubles ("Red"
+ * next to "Red 2") instead of being invisible in the blend.
+ *
+ * Returns `null` when there is nothing to break down: a fixture with no colour extras (its circle
+ * already tells the whole story) or a colour-less strobe. `fixed` extras are utility/mode channels
+ * and never appear.
+ *
+ * Swatch colours are the raw channel drive against the emitter primary, deliberately NOT scaled by
+ * the master dimmer: these mirror the DMX numbers on the channel list and stay readable while the
+ * dimmer rides, which is the diagnostic the mixed circle can't give.
+ */
+export function getLightColorChannelBreakdown(
+  light: DmxFixture,
+  dmxValues: Record<number, number>,
+): ChannelBreakdownEntry[] | null {
+  if (light.fixture === FixtureTypes.STROBE) return null
+  const extras = light.extraChannels ?? []
+  const colorExtras = extras.filter((ec) => ec.type !== 'fixed')
+  if (colorExtras.length === 0) return null
+
+  const channels = light.channels as RgbDmxChannels
+  const entries: ChannelBreakdownEntry[] = []
+  for (const base of ['red', 'green', 'blue'] as const) {
+    const channel = channels[base]
+    if (typeof channel !== 'number' || channel <= 0) continue
+    const value = channelValue(dmxValues, channel)
+    entries.push({
+      label: EXTRA_CHANNEL_TYPE_LABELS[base],
+      value,
+      css: swatchCss(value, BASE_PRIMARIES[base]),
+    })
+  }
+
+  extras.forEach((ec, i) => {
+    if (ec.type === 'fixed') return
+    const value = channelValue(dmxValues, ec.channel)
+    const primary =
+      ec.type === 'red' || ec.type === 'green' || ec.type === 'blue'
+        ? BASE_PRIMARIES[ec.type]
+        : EMITTER_PRIMARIES[ec.type as MixableChannelType]
+    // Indexed against the full extras array so the numbering matches the channel list exactly.
+    entries.push({
+      label: extraChannelDisplayLabel(light, i),
+      value,
+      css: swatchCss(value, primary),
+    })
+  })
+
+  return entries
 }

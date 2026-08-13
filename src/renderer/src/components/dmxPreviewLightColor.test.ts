@@ -4,7 +4,7 @@ import {
   applyChannelMixPlan,
   buildChannelMixPlan,
 } from '../../../photonics-dmx/helpers/colorChannelMixer'
-import { getDmxPreviewLightColor } from './dmxPreviewLightColor'
+import { getDmxPreviewLightColor, getLightColorChannelBreakdown } from './dmxPreviewLightColor'
 
 function fixture(
   fx: FixtureTypes,
@@ -93,6 +93,54 @@ describe('getDmxPreviewLightColor with extra channels', () => {
     ])
     const dmx = { 1: 255, 2: 0, 3: 0, 4: 0, 5: 120, 6: 120 }
     expect(getDmxPreviewLightColor(f, dmx)).toEqual({ r: 120, g: 120, b: 120 })
+  })
+})
+
+describe('getLightColorChannelBreakdown', () => {
+  it('returns null for a fixture whose colour is only the base RGB', () => {
+    expect(getLightColorChannelBreakdown(fixture(FixtureTypes.RGB, RGB), {})).toBeNull()
+  })
+
+  it('returns null when the only extras are fixed channels', () => {
+    const f = fixture(FixtureTypes.RGB, RGB, [{ type: 'fixed', channel: 5, value: 200 }])
+    expect(getLightColorChannelBreakdown(f, { 5: 200 })).toBeNull()
+  })
+
+  it('returns null for a colour-less strobe', () => {
+    const f = fixture(FixtureTypes.STROBE, { masterDimmer: 1, strobeChannel: 2 }, [
+      { type: 'fixed', channel: 3, value: 10 },
+    ])
+    expect(getLightColorChannelBreakdown(f, {})).toBeNull()
+  })
+
+  it('lists the base primaries then each colour extra, numbered like the channel list', () => {
+    const f = fixture(FixtureTypes.RGB, RGB, [
+      { type: 'amber', channel: 5 },
+      { type: 'red', channel: 6 },
+      { type: 'fixed', channel: 7, value: 255 },
+    ])
+    const dmx = { 1: 255, 2: 100, 3: 0, 4: 0, 5: 200, 6: 40, 7: 255 }
+    const breakdown = getLightColorChannelBreakdown(f, dmx)!
+    // The duplicate bank sits beside the primary it doubles, and the fixed channel is excluded.
+    expect(breakdown.map((e) => e.label)).toEqual(['Red', 'Green', 'Blue', 'Amber', 'Red 2'])
+    expect(breakdown.map((e) => e.value)).toEqual([100, 0, 0, 200, 40])
+    expect(breakdown[0].css).toBe('rgb(100, 0, 0)')
+    expect(breakdown[4].css).toBe('rgb(40, 0, 0)')
+    // Amber's swatch uses the mixer's emitter primary (1, 0.75, 0).
+    expect(breakdown[3].css).toBe('rgb(200, 150, 0)')
+  })
+
+  it('reads an unassigned extra channel as 0 rather than following channel 0', () => {
+    const f = fixture(FixtureTypes.RGB, RGB, [{ type: 'amber', channel: 0 }])
+    const breakdown = getLightColorChannelBreakdown(f, { 0: 255, 2: 10 })!
+    expect(breakdown.at(-1)).toEqual({ label: 'Amber', value: 0, css: 'rgb(0, 0, 0)' })
+  })
+
+  it('is not scaled by the master dimmer, so channels stay readable while it rides', () => {
+    const f = fixture(FixtureTypes.RGB, RGB, [{ type: 'amber', channel: 5 }])
+    const dark = getLightColorChannelBreakdown(f, { 1: 0, 2: 255, 5: 255 })!
+    const lit = getLightColorChannelBreakdown(f, { 1: 255, 2: 255, 5: 255 })!
+    expect(dark).toEqual(lit)
   })
 })
 
