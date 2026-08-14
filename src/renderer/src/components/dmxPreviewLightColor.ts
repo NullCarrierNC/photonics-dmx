@@ -182,14 +182,14 @@ function channelValue(dmxValues: Record<number, number>, channel: number): numbe
 }
 
 /**
- * Per-channel swatches for a fixture whose colour comes from more than the base RGB — the component
- * channels behind the single mixed circle the 2D preview shows. Base red/green/blue come first, then
- * each colour extra in array order, so a duplicate bank sits beside the primary it doubles ("Red"
- * next to "Red 2") instead of being invisible in the blend.
+ * Per-channel swatches for a fixture's colour channels — the components behind the single mixed
+ * circle the 2D preview shows. Base red/green/blue come first, then each colour extra in array
+ * order, so a duplicate bank sits beside the primary it doubles ("Red" next to "Red 2") instead of
+ * being invisible in the blend. Plain RGB fixtures get the row too: reading the primaries out of a
+ * blended circle by eye is guesswork whether or not extras are involved.
  *
- * Returns `null` when there is nothing to break down: a fixture with no colour extras (its circle
- * already tells the whole story) or a colour-less strobe. `fixed` extras are utility/mode channels
- * and never appear.
+ * Returns `null` only when a fixture has no colour channels at all (a dedicated strobe). `fixed`
+ * extras are utility/mode channels and never appear.
  *
  * Swatch colours are the raw channel drive against the emitter primary, deliberately NOT scaled by
  * the master dimmer: these mirror the DMX numbers on the channel list and stay readable while the
@@ -200,10 +200,8 @@ export function getLightColorChannelBreakdown(
   dmxValues: Record<number, number>,
 ): ChannelBreakdownEntry[] | null {
   if (light.fixture === FixtureTypes.STROBE) return null
-  const extras = light.extraChannels ?? []
-  const colorExtras = extras.filter((ec) => ec.type !== 'fixed')
-  if (colorExtras.length === 0) return null
 
+  const extras = light.extraChannels ?? []
   const channels = light.channels as RgbDmxChannels
   const entries: ChannelBreakdownEntry[] = []
   for (const base of ['red', 'green', 'blue'] as const) {
@@ -232,5 +230,6 @@ export function getLightColorChannelBreakdown(
     })
   })
 
-  return entries
+  // A fixture with every colour channel unassigned has nothing to show, so no empty row renders.
+  return entries.length > 0 ? entries : null
 }

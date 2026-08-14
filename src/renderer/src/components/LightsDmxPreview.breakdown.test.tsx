@@ -74,14 +74,17 @@ describe('LightsDmxPreview per-channel swatches', () => {
     )
   })
 
-  it('renders no swatch row for a fixture with only the base RGB', () => {
+  it('shows the three primaries for a plain RGB fixture', () => {
     render(<LightsDmxPreview lightingConfig={config(light())} dmxValues={{ 1: 255, 2: 200 }} />)
-    expect(screen.queryByLabelText(/^Red: /)).toBeNull()
+    expect(screen.getByLabelText('Red: 200')).toBeTruthy()
+    expect(screen.getByLabelText('Green: 0')).toBeTruthy()
+    expect(screen.getByLabelText('Blue: 0')).toBeTruthy()
   })
 
-  it('renders no swatch row when the only extra is a fixed channel', () => {
+  it('leaves fixed channels out of a fixture swatch row', () => {
     const l = light([{ type: 'fixed', channel: 5, value: 200 }])
     render(<LightsDmxPreview lightingConfig={config(l)} dmxValues={{ 1: 255, 5: 200 }} />)
-    expect(screen.queryByLabelText(/^Red: /)).toBeNull()
+    expect(screen.getByLabelText('Red: 0')).toBeTruthy()
+    expect(screen.queryByLabelText(/Fixed/)).toBeNull()
   })
 })

@@ -97,19 +97,40 @@ describe('getDmxPreviewLightColor with extra channels', () => {
 })
 
 describe('getLightColorChannelBreakdown', () => {
-  it('returns null for a fixture whose colour is only the base RGB', () => {
-    expect(getLightColorChannelBreakdown(fixture(FixtureTypes.RGB, RGB), {})).toBeNull()
+  it('breaks a plain RGB fixture into its three primaries', () => {
+    const breakdown = getLightColorChannelBreakdown(fixture(FixtureTypes.RGB, RGB), {
+      2: 200,
+      3: 80,
+      4: 0,
+    })!
+    expect(breakdown).toEqual([
+      { label: 'Red', value: 200, css: 'rgb(200, 0, 0)' },
+      { label: 'Green', value: 80, css: 'rgb(0, 80, 0)' },
+      { label: 'Blue', value: 0, css: 'rgb(0, 0, 0)' },
+    ])
   })
 
-  it('returns null when the only extras are fixed channels', () => {
+  it('breaks down a moving head, whose pan/tilt are not colour channels', () => {
+    const f = fixture(FixtureTypes.RGBMH, { ...RGB, pan: 5, tilt: 6 })
+    const breakdown = getLightColorChannelBreakdown(f, { 2: 10, 5: 255, 6: 255 })!
+    expect(breakdown.map((e) => e.label)).toEqual(['Red', 'Green', 'Blue'])
+  })
+
+  it('lists only the base primaries when the extras are all fixed channels', () => {
     const f = fixture(FixtureTypes.RGB, RGB, [{ type: 'fixed', channel: 5, value: 200 }])
-    expect(getLightColorChannelBreakdown(f, { 5: 200 })).toBeNull()
+    const breakdown = getLightColorChannelBreakdown(f, { 5: 200 })!
+    expect(breakdown.map((e) => e.label)).toEqual(['Red', 'Green', 'Blue'])
   })
 
   it('returns null for a colour-less strobe', () => {
     const f = fixture(FixtureTypes.STROBE, { masterDimmer: 1, strobeChannel: 2 }, [
       { type: 'fixed', channel: 3, value: 10 },
     ])
+    expect(getLightColorChannelBreakdown(f, {})).toBeNull()
+  })
+
+  it('returns null when every colour channel is unassigned, so no empty row renders', () => {
+    const f = fixture(FixtureTypes.RGB, { masterDimmer: 1, red: 0, green: 0, blue: 0 })
     expect(getLightColorChannelBreakdown(f, {})).toBeNull()
   })
 

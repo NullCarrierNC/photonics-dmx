@@ -100,10 +100,10 @@ const DmxPreviewWithStageLegend: React.FC<{
 )
 
 /**
- * Per-channel swatches under a light's circle, for fixtures whose colour comes from more than the
- * base RGB. The circle shows the mixed result, this shows the channels that made it, so a duplicate
- * bank ("Red 2") is distinguishable from the primary it doubles. Each dot keeps a ring so a channel
- * driven to 0 still reads as a swatch rather than vanishing into the card.
+ * Per-channel swatches under a light's circle. The circle shows the mixed result, this shows the
+ * channels that made it, so a duplicate bank ("Red 2") is distinguishable from the primary it
+ * doubles and a plain fixture's primaries are readable without eyeballing the blend. Each dot keeps
+ * a ring so a channel driven to 0 still reads as a swatch rather than vanishing into the card.
  */
 const LightChannelSwatches: React.FC<{ entries: ChannelBreakdownEntry[] }> = ({ entries }) => (
   <div className="flex flex-wrap justify-center gap-1 max-w-[5.5rem] mt-0.5">
@@ -153,8 +153,8 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
               {light.position}
             </div>
           </div>
-          {/* The swatch row takes over the slot the spacer reserves, so rows stay aligned whether
-              or not a light has colour extras. */}
+          {/* The swatch row takes over the slot the spacer reserves. The spacer still covers the
+              fixtures with no colour channels to break down, so rows stay aligned either way. */}
           {breakdown ? (
             <LightChannelSwatches entries={breakdown} />
           ) : (
