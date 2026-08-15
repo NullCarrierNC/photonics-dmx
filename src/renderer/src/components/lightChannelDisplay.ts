@@ -2,9 +2,8 @@ import type { DmxFixture, ExtraChannelType } from '../../../photonics-dmx/types'
 
 /**
  * Shared display helpers for a fixture's channel list — the base (archetype) channels plus any
- * user-added `extraChannels`. Consolidates the channel-order sort that used to be duplicated across
- * DmxChannels, LightChannelsPreview and LightChannelsConfig, and owns the user-facing labels and
- * validity rules for extra channels so they live in exactly one place.
+ * user-added `extraChannels`. DmxChannels, LightChannelsPreview and LightChannelsConfig all sort
+ * and label channels from here, so a fixture reads the same way on every screen it appears on.
  */
 
 /** Canonical display order for the archetype channels. Unknown keys sort after, alphabetically. */

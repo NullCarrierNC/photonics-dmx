@@ -267,6 +267,37 @@ export interface BaseDmxFixture {
   masterDimmer: number
 }
 
+/**
+ * Highest addressable channel in a DMX universe. Channel numbers run 1–512; 0 is the "unassigned"
+ * sentinel every layer shares (see {@link ExtraChannel.channel}).
+ *
+ * Every layer that bounds a channel number — the mixer, the IPC validators, the template and rig
+ * editors — reads it from here, so a fixture can be addressed to the same limit wherever it is
+ * edited and the wire agrees with what the editor allowed.
+ */
+export const DMX_CHANNEL_MAX = 512
+
+/** True for an assigned, addressable channel number. 0 (unassigned) is deliberately not valid. */
+export function isValidDmxChannel(channel: number): boolean {
+  return Number.isInteger(channel) && channel >= 1 && channel <= DMX_CHANNEL_MAX
+}
+
+/**
+ * Normalises an offset-derived channel number to the persisted domain (0, or 1–512).
+ *
+ * Anything outside the universe collapses to 0 — "unassigned" — and deliberately **not** to 512:
+ * saturating at the bound would land two channels of one fixture on a single address and misroute
+ * output, whereas 0 carries the "invalid until set" meaning the rest of the app already acts on.
+ * The mixer excludes and reports the channel ({@link isValidDmxChannel}) and `myValidDmxLightsAtom`
+ * keeps the fixture out of a rig until the user reassigns it. A visibly unusable fixture beats a
+ * quietly wrong one.
+ */
+export function clampDerivedDmxChannel(channel: number): number {
+  if (!Number.isFinite(channel)) return 0
+  const rounded = Math.round(channel)
+  return isValidDmxChannel(rounded) ? rounded : 0
+}
+
 export interface RgbDmxChannels extends BaseDmxFixture {
   red: number
   green: number
@@ -371,6 +402,37 @@ export interface FixtureConfig {
 /** Legacy persisted field; merged in {@link normalizeFixtureConfig} into invertPan/invertTilt. */
 export type LegacyFixtureConfigFields = {
   invert?: boolean
+}
+
+/**
+ * Editable range for a numeric {@link FixtureConfig} field. These are physical/normalised units —
+ * degrees, percentages, raw DMX — and deliberately *not* channel numbers, so they share nothing
+ * with {@link DMX_CHANNEL_MAX}. Shared by every editor that renders these fields so the input's
+ * `min`/`max` and the value it commits can't disagree.
+ *
+ * `panStageDeg`/`tiltStageDeg` are calibration anchors bounded by their own travel range, so their
+ * ceiling comes from the sibling field rather than a constant.
+ */
+export function fixtureConfigFieldBounds(
+  key: keyof FixtureConfig,
+  config: FixtureConfig,
+): { min: number; max: number } {
+  switch (key) {
+    case 'panRangeDeg':
+      return { min: 1, max: 720 }
+    case 'tiltRangeDeg':
+      return { min: 1, max: 360 }
+    case 'panHome':
+    case 'tiltHome':
+      return { min: 0, max: 100 }
+    case 'panStageDeg':
+      return { min: 0, max: config.panRangeDeg }
+    case 'tiltStageDeg':
+      return { min: 0, max: config.tiltRangeDeg }
+    default:
+      // panMin/panMax/tiltMin/tiltMax are raw DMX values.
+      return { min: 0, max: 255 }
+  }
 }
 
 /** Full defaults for moving-head fixture config; use {@link normalizeFixtureConfig} for persisted data. */

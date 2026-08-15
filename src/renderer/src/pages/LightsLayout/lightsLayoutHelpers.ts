@@ -8,7 +8,11 @@ import {
   LightingConfiguration,
 } from '../../../../photonics-dmx/types'
 import { castToChannelType } from '../../../../photonics-dmx/helpers/dmxHelpers'
-import { deriveExtraChannelsForMaster } from '../../../../photonics-dmx/helpers/rigTemplateSync'
+import {
+  deriveBaseChannelsForMaster,
+  deriveExtraChannelsForMaster,
+  maxMasterDimmerForTemplate,
+} from '../../../../photonics-dmx/helpers/rigTemplateSync'
 
 export const LIGHT_LAYOUTS: ConfigLightLayoutType[] = [
   { id: 'front', label: 'Front only' },
@@ -64,22 +68,15 @@ export function createDmxLightInstance(
   }
   const templateIndex = totalExisting % myFixtures.length
   const selectedFixture = myFixtures[templateIndex]
-  const newMasterDimmer = 1 + totalExisting * 10
+  // Auto-addressing walks up the universe 10 channels at a time, so a large rig eventually runs off
+  // the end. Cap at the highest address that still fits this template; the user re-addresses from
+  // there rather than getting a light whose channels the validators reject on save.
+  const newMasterDimmer = Math.min(
+    1 + totalExisting * 10,
+    maxMasterDimmerForTemplate(selectedFixture),
+  )
   const templateChannels = selectedFixture.channels
-  const offsets: { [key: string]: number } = {}
-  Object.entries(templateChannels).forEach(([channelName, value]) => {
-    if (channelName !== 'masterDimmer') {
-      offsets[channelName] = (value as number) - templateChannels.masterDimmer
-    }
-  })
-  const recalculatedChannels: { [key: string]: number } = {}
-  Object.entries(templateChannels).forEach(([channelName, _]) => {
-    if (channelName === 'masterDimmer') {
-      recalculatedChannels[channelName] = newMasterDimmer
-    } else {
-      recalculatedChannels[channelName] = newMasterDimmer + (offsets[channelName] || 0)
-    }
-  })
+  const recalculatedChannels = deriveBaseChannelsForMaster(selectedFixture, newMasterDimmer)
   const castChannels = castToChannelType(selectedFixture.fixture, recalculatedChannels)
   const extraChannels = deriveExtraChannelsForMaster(
     selectedFixture.extraChannels,

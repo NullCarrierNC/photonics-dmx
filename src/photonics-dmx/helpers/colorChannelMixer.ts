@@ -2,6 +2,7 @@ import {
   EXTRA_CHANNEL_TYPES,
   FixtureTypes,
   MIXABLE_CHANNEL_TYPES,
+  isValidDmxChannel,
   type DmxFixture,
   type MixableChannelType,
 } from '../types'
@@ -14,12 +15,11 @@ import {
  * emitters, this module decomposes that RGB into the extra channels the same way a real RGBW/RGBWA
  * fixture would: it moves energy OUT of the RGB channels into the emitter channels (substitution),
  * so total output stays colour-accurate and never exceeds the original per-primary energy. A
- * fixture with no extra emitters produces no plan at all — the publisher then takes its legacy path
- * and its DMX output is bit-for-bit identical to before this feature existed.
+ * fixture with no extra emitters produces no plan at all — the publisher then writes its channels
+ * one by one, so a plain fixture pays nothing for this module existing.
  *
- * White is not special here: an RGBW fixture is an RGB fixture carrying a `white` extra channel (the
- * discrete RGBW archetypes were migrated onto that shape), so it flows through the same stage as any
- * other emitter.
+ * White is not special here: an RGBW fixture is modelled as an RGB fixture carrying a `white` extra
+ * channel, so it flows through the same stage as any other emitter.
  *
  * See {@link EMITTER_PRIMARIES} for the RGB approximation of each emitter; the ordering of the
  * extraction stages is fixed (see {@link buildChannelMixPlan}) and never affects chromaticity — it
@@ -66,10 +66,6 @@ export interface ChannelMixPlan {
   invalidChannels: string[]
 }
 
-function isValidChannel(channel: number): boolean {
-  return Number.isInteger(channel) && channel >= 1 && channel <= 512
-}
-
 function clampByte(value: number): number {
   if (!Number.isFinite(value)) return 0
   return Math.max(0, Math.min(255, Math.round(value)))
@@ -78,11 +74,11 @@ function clampByte(value: number): number {
 /**
  * Precomputes a fixture's mixing plan from its named channels + `extraChannels`. Returns `null` when
  * no mixing is needed (no mixable emitters, no red/green/blue extras, no fixed channels) and nothing
- * needs reporting — the caller must then take the legacy per-channel path, which is bit-for-bit
- * identical to pre-feature output. A fixture whose extras are *all* excluded for a real
- * misconfiguration still gets a plan, so {@link ChannelMixPlan.invalidChannels} reaches the caller's
- * log instead of being silently dropped; that plan has no stages, so it mixes to the same values the
- * legacy path would write. Called once per fixture object (memoised by the publisher on identity).
+ * needs reporting — the caller then takes the per-channel path. A fixture whose extras are *all*
+ * excluded for a real misconfiguration still gets a plan, which is how
+ * {@link ChannelMixPlan.invalidChannels} reaches the caller's log; that plan has no stages, so it
+ * mixes to the same values the per-channel path writes. Called once per fixture object (memoised by
+ * the publisher on identity).
  */
 export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null {
   const named = fixture.channels as unknown as Record<string, number>
@@ -107,12 +103,12 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
   const redChannels: number[] = []
   const greenChannels: number[] = []
   const blueChannels: number[] = []
-  if (isValidChannel(named.red)) redChannels.push(named.red)
-  if (isValidChannel(named.green)) greenChannels.push(named.green)
-  if (isValidChannel(named.blue)) blueChannels.push(named.blue)
+  if (isValidDmxChannel(named.red)) redChannels.push(named.red)
+  if (isValidDmxChannel(named.green)) greenChannels.push(named.green)
+  if (isValidDmxChannel(named.blue)) blueChannels.push(named.blue)
 
-  // Valid channel numbers per mixable type. A white emitter is an ordinary extra channel — the
-  // discrete RGBW archetypes were migrated onto RGB plus a `white` extra, which lands here.
+  // Valid channel numbers per mixable type. A white emitter is an ordinary extra channel: an RGBW
+  // fixture is RGB plus a `white` extra, so its white lands here like any other emitter.
   const mixableChannels: Record<MixableChannelType, number[]> = {
     white: [],
     warmWhite: [],
@@ -128,7 +124,7 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
     const label = `extra channel ${i + 1} (${ec.type})`
 
     if (ec.type === 'fixed') {
-      if (isValidChannel(ec.channel)) {
+      if (isValidDmxChannel(ec.channel)) {
         fixedWrites.push({ channel: ec.channel, value: clampByte(ec.value ?? 0) })
       } else {
         exclude(label, ec.channel !== 0)
@@ -142,7 +138,7 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
       return
     }
 
-    if (!isValidChannel(ec.channel)) {
+    if (!isValidDmxChannel(ec.channel)) {
       exclude(label, ec.channel !== 0)
       return
     }

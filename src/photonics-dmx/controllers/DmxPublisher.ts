@@ -179,7 +179,7 @@ export class DmxPublisher {
    * replaces a fixture object immutably whenever its channels/extras change and returns the same
    * reference otherwise, so object identity is a free dirty signal — no explicit invalidation, and
    * the WeakMap drops entries for dropped rigs when they are garbage-collected. `null` means "no
-   * mixing needed" (legacy path); it is cached too so we don't rebuild it every frame.
+   * mixing needed" (per-channel path); it is cached too so we don't rebuild it every frame.
    */
   private _mixPlans = new WeakMap<DmxFixture, ChannelMixPlan | null>()
   /**
@@ -387,7 +387,7 @@ export class DmxPublisher {
 
   /**
    * Memoised colour-mixing plan for a fixture (see {@link _mixPlans}). `null` = no mixing needed;
-   * the caller takes the legacy per-channel path (bit-for-bit identical to pre-feature output).
+   * the caller writes each named channel directly instead.
    */
   private _getMixPlan(fixture: DmxFixture): ChannelMixPlan | null {
     if (this._mixPlans.has(fixture)) return this._mixPlans.get(fixture)!
