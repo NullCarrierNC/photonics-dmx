@@ -31,7 +31,7 @@ function fixture(fx: FixtureTypes, extraChannels?: ExtraChannel[]): DmxFixture {
 }
 
 describe('LightSettings fixture-type switch with extra channels', () => {
-  it('preserves extra channels across an RGB → RGBW switch', () => {
+  it('preserves extra channels across an RGB → moving-head switch', () => {
     const setCurrentLight = jest.fn()
     render(
       <LightSettings
@@ -39,9 +39,9 @@ describe('LightSettings fixture-type switch with extra channels', () => {
         setCurrentLight={setCurrentLight}
       />,
     )
-    fireEvent.change(fixtureTypeSelect(), { target: { value: FixtureTypes.RGBW } })
+    fireEvent.change(fixtureTypeSelect(), { target: { value: FixtureTypes.RGBMH } })
     const arg = setCurrentLight.mock.calls[0][0] as DmxFixture
-    expect(arg.fixture).toBe(FixtureTypes.RGBW)
+    expect(arg.fixture).toBe(FixtureTypes.RGBMH)
     expect(arg.extraChannels).toEqual([{ type: 'amber', channel: 5 }])
   })
 

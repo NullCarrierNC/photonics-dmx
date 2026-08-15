@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { LightingConfiguration, DmxFixture } from '../../../photonics-dmx/types'
-import { extraChannelDisplayLabel } from './lightChannelDisplay'
+import { extraChannelDisplayLabel, findSharedChannelNumbers } from './lightChannelDisplay'
 
 interface LightsDmxChannelsPreviewProps {
   lightingConfig: LightingConfiguration // Lighting configuration containing the lights
@@ -18,6 +18,41 @@ const LightsDmxChannelsPreview: React.FC<LightsDmxChannelsPreviewProps> = ({
   lightingConfig,
   dmxValues,
 }) => {
+  // Addresses more than one channel in this rig claims. Values are read straight from the rig's DMX
+  // buffer, so a shared address shows the same number on every row pointing at it — which reads as
+  // a channel computing wrongly unless the sharing is called out.
+  const sharedChannels = useMemo(
+    () =>
+      new Set(
+        findSharedChannelNumbers([
+          ...(lightingConfig?.frontLights ?? []),
+          ...(lightingConfig?.backLights ?? []),
+          ...(lightingConfig?.strobeLights ?? []),
+        ]),
+      ),
+    [lightingConfig],
+  )
+
+  /** Channel number plus its live value, flagged when the address is shared. */
+  const renderChannelValue = (channelNumber: number) => {
+    const shared = sharedChannels.has(channelNumber)
+    return (
+      <span className="flex items-baseline gap-2">
+        <span
+          className={
+            shared
+              ? 'text-xs text-amber-600 dark:text-amber-400 font-semibold'
+              : 'text-xs text-gray-500 dark:text-gray-400'
+          }
+          title={shared ? 'Another channel in this rig uses the same address' : undefined}>
+          ch {channelNumber}
+          {shared ? ' ⚠' : ''}
+        </span>
+        <span>{dmxValues[channelNumber] || 0}</span>
+      </span>
+    )
+  }
+
   /**
    * Helper function to render a single light's channels and values.
    */
@@ -42,22 +77,22 @@ const LightsDmxChannelsPreview: React.FC<LightsDmxChannelsPreviewProps> = ({
         </h3>
         <ul className="list-disc list-inside space-y-1">
           {sortedEntries.map(([channelName, channelNumber]) => (
-            <li key={channelName} className="flex justify-between">
+            <li key={channelName} className="flex justify-between gap-2">
               {/* Conditionally render "MasterDimmer" instead of "md" */}
               <span className="capitalize text-gray-700 dark:text-gray-300">
                 {channelName === 'md' ? 'MasterDimmer' : channelName}:
               </span>
-              <span>{dmxValues[channelNumber] || 0}</span>
+              {renderChannelValue(channelNumber)}
             </li>
           ))}
           {/* User-added channels, after the base ones. Labels are already display-formatted so no
-              `capitalize` class (it would mangle camelCase types like warmWhite/uv). */}
+              `capitalize` class (it would mangle an acronym like UV). */}
           {(light.extraChannels ?? []).map((extra, i) => (
-            <li key={`extra-${i}`} className="flex justify-between">
+            <li key={`extra-${i}`} className="flex justify-between gap-2">
               <span className="text-gray-700 dark:text-gray-300">
                 {extraChannelDisplayLabel(light, i)}:
               </span>
-              <span>{dmxValues[extra.channel] || 0}</span>
+              {renderChannelValue(extra.channel)}
             </li>
           ))}
         </ul>

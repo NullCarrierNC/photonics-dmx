@@ -169,7 +169,7 @@ function isPanTiltChannelName(name: string): boolean {
 }
 
 function isMovingHeadFixture(fixture: FixtureTypes): boolean {
-  return fixture === FixtureTypes.RGBMH || fixture === FixtureTypes.RGBWMH
+  return fixture === FixtureTypes.RGBMH
 }
 
 const DmxConsole: React.FC = () => {

@@ -39,8 +39,8 @@ const LightsLayoutIntro: React.FC<LightsLayoutIntroProps> = ({ headerRight }) =>
       configurations. A minimum of 4 lights is recommended.
     </p>
     <p className="mb-8 italic font-bold text-yellow-400">
-      For the most Stage Kit like experience: assign 4 lights to the front. If you have 8, assign
-      the remaining 4 to the back.
+      For the most Stage Kit like experience: assign 4 lights to the front/top. If you have 8,
+      assign the remaining 4 to the back/bottom.
     </p>
   </>
 )

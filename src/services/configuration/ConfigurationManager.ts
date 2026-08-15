@@ -16,7 +16,8 @@ import {
 } from '../../photonics-dmx/types'
 import {
   migrateDmxRigsConfig,
-  migrateUserLightsForStrobeChannel,
+  migrateLightingConfiguration,
+  migrateUserLightsSchema,
 } from '../../photonics-dmx/helpers/lightingConfigMigration'
 import { syncRigsConfigWithUserLights } from '../../photonics-dmx/helpers/rigTemplateSync'
 import equal from 'fast-deep-equal'
@@ -116,32 +117,48 @@ export class ConfigurationManager {
 
     // Handle legacy lights format migration
     this.migrateLegacyLightsFormat()
-    this.migrateUserLightsStrobeChannelSchema()
+    this.migrateUserLightsFixtureSchema()
+    this.migrateLightingLayoutFixtureSchema()
     this.normalizeStraySenderFlatKeys()
     this.migrateToDmxRigs()
   }
 
   /**
-   * One-time strobe-channel schema migration for the user-defined fixture library
-   * (`MyLights`). Converts legacy `rgb/s`/`rgbw/s` to `rgb`/`rgbw` + `channels.strobeChannel`,
-   * renames any stray `channels.strobeSpeed` to `strobeChannel`, and seeds default
-   * `strobeValues` on strobe-capable templates.
+   * One-time fixture-shape migrations for the user-defined fixture library (`MyLights`): the
+   * strobe-channel schema (legacy `rgb/s`/`rgbw/s` onto `channels.strobeChannel` + `strobeValues`,
+   * stray `channels.strobeSpeed` renamed) and the RGBW collapse (`rgbw`/`rgbw/mh` onto `rgb`/`rgb/mh`
+   * with the white channel re-expressed as an extra channel).
    */
-  private migrateUserLightsStrobeChannelSchema(): void {
+  private migrateUserLightsFixtureSchema(): void {
     const current = this.userLights.get()
     if (!current || !Array.isArray(current.lights)) {
       return
     }
-    const { lights, changed } = migrateUserLightsForStrobeChannel(current.lights)
+    const { lights, changed } = migrateUserLightsSchema(current.lights)
     if (!changed) {
       return
     }
-    this.userLights
-      .update({ ...current, lights })
-      .catch((err) =>
-        log.error('[Photonics Config] Failed to persist strobe-channel migrated user lights:', err),
-      )
-    log.info('[Photonics Config] Migrated user lights to strobe-channel schema')
+    this.userLights.applyLoadMigration({ ...current, lights })
+    log.info('[Photonics Config] Migrated user lights to the current fixture schema')
+  }
+
+  /**
+   * Same fixture-shape migrations for the standalone lighting layout. It is still served to the
+   * renderer and seeds the default rig on first run, so it must not keep serving fixture types the
+   * rest of the app no longer knows. The legacy `front-back` rename is deliberately skipped: that
+   * was the rigs' v1 migration, and a layout naming `front-back` today means the current semantic.
+   */
+  private migrateLightingLayoutFixtureSchema(): void {
+    const current = this.lightingLayout.get()
+    if (!current) {
+      return
+    }
+    const { config, changed } = migrateLightingConfiguration(current, { skipLegacyRename: true })
+    if (!changed) {
+      return
+    }
+    this.lightingLayout.applyLoadMigration(config)
+    log.info('[Photonics Config] Migrated lighting layout to the current fixture schema')
   }
 
   /**

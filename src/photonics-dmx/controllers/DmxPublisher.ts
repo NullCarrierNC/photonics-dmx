@@ -1,6 +1,5 @@
 import {
   RGBIO,
-  RgbwDmxChannels,
   RgbDmxChannels,
   StrobeDmxChannels,
   MovingHeadDmxChannels,
@@ -180,7 +179,7 @@ export class DmxPublisher {
    * replaces a fixture object immutably whenever its channels/extras change and returns the same
    * reference otherwise, so object identity is a free dirty signal — no explicit invalidation, and
    * the WeakMap drops entries for dropped rigs when they are garbage-collected. `null` means "no
-   * mixing needed" (legacy path); it is cached too so we don't rebuild it every frame.
+   * mixing needed" (per-channel path); it is cached too so we don't rebuild it every frame.
    */
   private _mixPlans = new WeakMap<DmxFixture, ChannelMixPlan | null>()
   /**
@@ -388,13 +387,26 @@ export class DmxPublisher {
 
   /**
    * Memoised colour-mixing plan for a fixture (see {@link _mixPlans}). `null` = no mixing needed;
-   * the caller takes the legacy per-channel path (bit-for-bit identical to pre-feature output).
+   * the caller writes each named channel directly instead.
    */
   private _getMixPlan(fixture: DmxFixture): ChannelMixPlan | null {
     if (this._mixPlans.has(fixture)) return this._mixPlans.get(fixture)!
     const plan = buildChannelMixPlan(fixture)
     this._mixPlans.set(fixture, plan)
     return plan
+  }
+
+  /**
+   * Reports a plan's excluded extra channels once per light. Shared by the per-light-state pass and
+   * the unvisited-fixture pass, so a fixture no cue addresses still explains its dead mode channel.
+   */
+  private _warnInvalidExtras(lightId: string, plan: ChannelMixPlan): void {
+    if (plan.invalidChannels.length === 0) return
+    if (this._reportedBadChannelLights.has(lightId)) return
+    this._reportedBadChannelLights.add(lightId)
+    log.warn(
+      `Light ${lightId}: skipping invalid extra channels: ${plan.invalidChannels.join(', ')}`,
+    )
   }
 
   /**
@@ -552,8 +564,7 @@ export class DmxPublisher {
           this._strobePeakColors.delete(lightId)
         }
 
-        const isMovingHead =
-          dmxLight.fixture === FixtureTypes.RGBMH || dmxLight.fixture === FixtureTypes.RGBWMH
+        const isMovingHead = dmxLight.fixture === FixtureTypes.RGBMH
         let panOut: number
         let tiltOut: number
         if (isMovingHead) {
@@ -613,19 +624,13 @@ export class DmxPublisher {
 
         // Colour mixer owns the colour channels (named red/green/blue/white + any extras) when a
         // plan exists; it decomposes the post-latch rgb into the fixture's declared emitters and
-        // writes the residual back to the named/extra rgb channels. `null` = no extras → legacy
-        // path below produces bit-for-bit identical output. Runs after the cast so a cast throw
-        // still skips the whole light (above). Fixed channels are emitted every published frame.
+        // writes the residual back to the named/extra rgb channels. `null` = no extras, so the
+        // per-channel switch below writes them directly. Runs after the cast so a cast throw still
+        // skips the whole light (above).
         const mixPlan = this._getMixPlan(dmxLight)
         if (mixPlan) {
-          if (mixPlan.invalidChannels.length > 0 && !this._reportedBadChannelLights.has(lightId)) {
-            this._reportedBadChannelLights.add(lightId)
-            log.warn(
-              `Light ${lightId}: skipping invalid extra channels: ${mixPlan.invalidChannels.join(', ')}`,
-            )
-          }
+          this._warnInvalidExtras(lightId, mixPlan)
           applyChannelMixPlan(mixPlan, r, g, b, mixWrite)
-          for (const fw of mixPlan.fixedWrites) writeChannel(fw.channel, fw.value, 'fixed channel')
         }
 
         for (const [channelName, channelNumber] of Object.entries(dmxLight.channels)) {
@@ -637,11 +642,10 @@ export class DmxPublisher {
             case 'blue':
               // Owned by the mixer when a plan exists; otherwise fall through to the legacy write.
               if (mixPlan) continue
-              value = (dmxChannelData as RgbDmxChannels | RgbwDmxChannels)[channelName]
+              value = (dmxChannelData as RgbDmxChannels)[channelName]
               break
             case 'masterDimmer':
-              value = (dmxChannelData as RgbDmxChannels | RgbwDmxChannels | StrobeDmxChannels)
-                .masterDimmer
+              value = (dmxChannelData as RgbDmxChannels | StrobeDmxChannels).masterDimmer
               break
             case 'pan':
               value = (dmxChannelData as MovingHeadDmxChannels).pan
@@ -663,6 +667,14 @@ export class DmxPublisher {
 
           writeChannel(channelNumber, value, channelName)
         }
+
+        // Fixed channels are emitted every published frame, last: a `fixed` channel that collides
+        // with one of this fixture's own base channels wins, matching the unvisited pass below and
+        // the console/calibration seeds. (The editor warns about duplicate numbers but doesn't
+        // block them, so this state reaches the wire.)
+        if (mixPlan) {
+          for (const fw of mixPlan.fixedWrites) writeChannel(fw.channel, fw.value, 'fixed channel')
+        }
       }
 
       // Unvisited-fixture pass: emit pinned `fixed` channels for planned fixtures no light state
@@ -671,8 +683,9 @@ export class DmxPublisher {
       for (const [lightId, fixture] of manager.getAllDmxLights()) {
         if (visitedLightIds.has(lightId)) continue
         const plan = this._getMixPlan(fixture)
-        if (!plan || plan.fixedWrites.length === 0) continue
+        if (!plan) continue
         curLightId = lightId
+        this._warnInvalidExtras(lightId, plan)
         for (const fw of plan.fixedWrites) writeChannel(fw.channel, fw.value, 'fixed channel')
       }
     }

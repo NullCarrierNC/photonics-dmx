@@ -2,24 +2,28 @@ import {
   EXTRA_CHANNEL_TYPES,
   FixtureTypes,
   MIXABLE_CHANNEL_TYPES,
+  isValidDmxChannel,
   type DmxFixture,
   type MixableChannelType,
 } from '../types'
 
 /**
- * Substitution colour mixer for fixtures with extra colour channels (white / warm+cool white /
- * amber / orange / lime / uv), plus duplicate red/green/blue banks and pinned "fixed" channels.
+ * Substitution colour mixer for fixtures with extra colour channels (white / amber / orange / lime
+ * / uv), plus duplicate red/green/blue banks and pinned "fixed" channels.
  *
  * The engine's internal colour is RGB + intensity only. When a fixture declares extra colour
  * emitters, this module decomposes that RGB into the extra channels the same way a real RGBW/RGBWA
  * fixture would: it moves energy OUT of the RGB channels into the emitter channels (substitution),
  * so total output stays colour-accurate and never exceeds the original per-primary energy. A
- * fixture with no extra emitters produces no plan at all — the publisher then takes its legacy path
- * and its DMX output is bit-for-bit identical to before this feature existed.
+ * fixture with no extra emitters produces no plan at all — the publisher then writes its channels
+ * one by one, so a plain fixture pays nothing for this module existing.
  *
- * See {@link EMITTER_PRIMARIES} for the RGB approximation of each emitter; the ordering of the
- * extraction stages is fixed (see {@link buildChannelMixPlan}) and never affects chromaticity — it
- * only decides which emitter carries a given part of the load.
+ * White is not special here: an RGBW fixture is modelled as an RGB fixture carrying a `white` extra
+ * channel, so it flows through the same stage as any other emitter.
+ *
+ * See {@link EMITTER_PRIMARIES} for the RGB approximation of each emitter and {@link STAGE_ORDER}
+ * for the order they extract in, which never affects chromaticity — it only decides which emitter
+ * carries a given part of the load.
  */
 
 /**
@@ -32,16 +36,22 @@ export const EMITTER_PRIMARIES: Readonly<
   Record<MixableChannelType, readonly [number, number, number]>
 > = {
   white: [1.0, 1.0, 1.0],
-  warmWhite: [1.0, 0.75, 0.5],
-  coolWhite: [0.8, 0.9, 1.0],
   amber: [1.0, 0.75, 0.0],
   orange: [1.0, 0.5, 0.0],
   lime: [0.5, 1.0, 0.0],
   uv: [0.5, 0.0, 1.0],
 }
 
+/**
+ * Extraction order, broadest-spectrum emitter first. Order never changes chromaticity — the
+ * reconstruction is exact either way — it only decides which emitter carries a given part of the
+ * load, and taking white first leaves the narrower emitters to colour the remainder. Held here
+ * rather than reusing {@link MIXABLE_CHANNEL_TYPES}, whose order is vocabulary, not mix order.
+ */
+export const STAGE_ORDER: readonly MixableChannelType[] = ['white', 'amber', 'orange', 'lime', 'uv']
+
 export interface MixStage {
-  /** Emitter triple for this stage (summed when warm + cool white share a stage). */
+  /** This emitter's RGB triple, from {@link EMITTER_PRIMARIES}. */
   er: number
   eg: number
   eb: number
@@ -62,10 +72,6 @@ export interface ChannelMixPlan {
   invalidChannels: string[]
 }
 
-function isValidChannel(channel: number): boolean {
-  return Number.isInteger(channel) && channel >= 1 && channel <= 512
-}
-
 function clampByte(value: number): number {
   if (!Number.isFinite(value)) return 0
   return Math.max(0, Math.min(255, Math.round(value)))
@@ -73,9 +79,12 @@ function clampByte(value: number): number {
 
 /**
  * Precomputes a fixture's mixing plan from its named channels + `extraChannels`. Returns `null` when
- * no mixing is needed (no mixable emitters, no red/green/blue extras, no fixed channels) — the
- * caller must then take the legacy per-channel path, which is bit-for-bit identical to pre-feature
- * output. Called once per fixture object (memoised by the publisher on object identity).
+ * no mixing is needed (no mixable emitters, no red/green/blue extras, no fixed channels) and nothing
+ * needs reporting — the caller then takes the per-channel path. A fixture whose extras are *all*
+ * excluded for a real misconfiguration still gets a plan, which is how
+ * {@link ChannelMixPlan.invalidChannels} reaches the caller's log; that plan has no stages, so it
+ * mixes to the same values the per-channel path writes. Called once per fixture object (memoised by
+ * the publisher on identity).
  */
 export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null {
   const named = fixture.channels as unknown as Record<string, number>
@@ -85,49 +94,56 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
   const invalidChannels: string[] = []
   const fixedWrites: Array<{ channel: number; value: number }> = []
 
+  // Excluded extras. An unassigned channel (0) is an ordinary in-progress template state — the
+  // fixture can't be placed in a rig at all until it's assigned (see `myValidDmxLightsAtom`) — so it
+  // is reported but never forces a plan into existence on its own. Anything else is a real
+  // misconfiguration the caller must be able to log.
+  let reportableProblems = 0
+  const exclude = (label: string, reportable: boolean): void => {
+    invalidChannels.push(label)
+    if (reportable) reportableProblems += 1
+  }
+
   // Named red/green/blue are owned by the mixer when a plan exists (the publisher skips its own
   // red/green/blue cases), so they must receive the residual too.
   const redChannels: number[] = []
   const greenChannels: number[] = []
   const blueChannels: number[] = []
-  if (isValidChannel(named.red)) redChannels.push(named.red)
-  if (isValidChannel(named.green)) greenChannels.push(named.green)
-  if (isValidChannel(named.blue)) blueChannels.push(named.blue)
+  if (isValidDmxChannel(named.red)) redChannels.push(named.red)
+  if (isValidDmxChannel(named.green)) greenChannels.push(named.green)
+  if (isValidDmxChannel(named.blue)) blueChannels.push(named.blue)
 
-  // Valid channel numbers per mixable type. Named white (RGBW/RGBWMH) seeds the white bucket — this
-  // is what finally drives the built-in RGBW white channel through the same substitution mixer.
+  // Valid channel numbers per mixable type. A white emitter is an ordinary extra channel: an RGBW
+  // fixture is RGB plus a `white` extra, so its white lands here like any other emitter.
   const mixableChannels: Record<MixableChannelType, number[]> = {
     white: [],
-    warmWhite: [],
-    coolWhite: [],
     amber: [],
     orange: [],
     lime: [],
     uv: [],
   }
-  if (isValidChannel(named.white)) mixableChannels.white.push(named.white)
 
   let hasRgbExtra = false
   extras.forEach((ec, i) => {
     const label = `extra channel ${i + 1} (${ec.type})`
 
     if (ec.type === 'fixed') {
-      if (isValidChannel(ec.channel)) {
+      if (isValidDmxChannel(ec.channel)) {
         fixedWrites.push({ channel: ec.channel, value: clampByte(ec.value ?? 0) })
       } else {
-        invalidChannels.push(label)
+        exclude(label, ec.channel !== 0)
       }
       return
     }
 
     // A colour-less strobe has no residual home for a colour channel.
     if (isStrobe) {
-      invalidChannels.push(label)
+      exclude(label, true)
       return
     }
 
-    if (!isValidChannel(ec.channel)) {
-      invalidChannels.push(label)
+    if (!isValidDmxChannel(ec.channel)) {
+      exclude(label, ec.channel !== 0)
       return
     }
 
@@ -141,43 +157,27 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
       blueChannels.push(ec.channel)
       hasRgbExtra = true
     } else {
-      mixableChannels[ec.type as MixableChannelType].push(ec.channel)
+      // Extras arrive from persisted JSON, which the config schema validates only loosely, so the
+      // type is not guaranteed to be one this build knows. Report and skip rather than driving the
+      // channel with a guessed primary or indexing a bucket that isn't there.
+      const bucket = mixableChannels[ec.type as MixableChannelType]
+      if (!bucket) {
+        exclude(label, true)
+        return
+      }
+      bucket.push(ec.channel)
     }
   })
 
   const stages: MixStage[] = []
-
-  // Stage order: broadest-spectrum emitters first. white → warm+cool white → amber → orange → lime
-  // → uv. Order never changes chromaticity (reconstruction is exact) — only which emitter carries
-  // the load. Warm and cool white share one stage against their summed triple when both exist, so a
-  // neutral-white cue drives them equally instead of pinning one at full and leaving the other dark.
-  if (mixableChannels.white.length) {
-    const [er, eg, eb] = EMITTER_PRIMARIES.white
-    stages.push({ er, eg, eb, channels: mixableChannels.white })
+  for (const type of STAGE_ORDER) {
+    const channels = mixableChannels[type]
+    if (!channels.length) continue
+    const [er, eg, eb] = EMITTER_PRIMARIES[type]
+    stages.push({ er, eg, eb, channels })
   }
 
-  const ww = mixableChannels.warmWhite
-  const cw = mixableChannels.coolWhite
-  if (ww.length && cw.length) {
-    const w = EMITTER_PRIMARIES.warmWhite
-    const c = EMITTER_PRIMARIES.coolWhite
-    stages.push({ er: w[0] + c[0], eg: w[1] + c[1], eb: w[2] + c[2], channels: [...ww, ...cw] })
-  } else if (ww.length) {
-    const [er, eg, eb] = EMITTER_PRIMARIES.warmWhite
-    stages.push({ er, eg, eb, channels: ww })
-  } else if (cw.length) {
-    const [er, eg, eb] = EMITTER_PRIMARIES.coolWhite
-    stages.push({ er, eg, eb, channels: cw })
-  }
-
-  for (const type of ['amber', 'orange', 'lime', 'uv'] as const) {
-    if (mixableChannels[type].length) {
-      const [er, eg, eb] = EMITTER_PRIMARIES[type]
-      stages.push({ er, eg, eb, channels: mixableChannels[type] })
-    }
-  }
-
-  if (stages.length === 0 && !hasRgbExtra && fixedWrites.length === 0) {
+  if (stages.length === 0 && !hasRgbExtra && fixedWrites.length === 0 && reportableProblems === 0) {
     return null
   }
 

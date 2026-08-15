@@ -1,25 +1,43 @@
 import { useState } from 'react'
 import { useAtom } from 'jotai'
+import equal from 'fast-deep-equal'
 
-import LightSettings from '../components/LightSettings'
+import LightSettingsModal from '../components/LightSettingsModal'
 import LightChannelsPreview from '../components/LightChannelsPreview'
-import ConfirmModal from '../components/ConfirmModal'
 import ToastContainer from '../components/Toast'
 import { DmxFixture, FixtureTypes } from '../../../photonics-dmx/types'
 import { myDmxLightsAtom, sortedMyDmxLightsAtom } from '@renderer/atoms'
 import { saveMyLights } from '../ipcApi'
 import { useToast } from '../hooks/useToast'
+import { useConfirm } from '../hooks/useConfirm'
 
 const MyLights = () => {
   const { toasts, showToast, hideToast } = useToast()
+  const confirm = useConfirm()
   const [myLights, setMyLights] = useAtom(myDmxLightsAtom)
   const [myLightsSorted] = useAtom(sortedMyDmxLightsAtom)
 
   const [currentLight, setCurrentLight] = useState<DmxFixture | null>(null)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  /**
+   * The light as it was when the editor opened. Dismissing a modal is easy enough to do by accident
+   * that discarding a channel map on a stray backdrop click would be a real loss, so this is what
+   * "has anything changed?" is measured against. One baseline serves both a new light (its seed) and
+   * an existing one (its saved state).
+   */
+  const [editorBaseline, setEditorBaseline] = useState<DmxFixture | null>(null)
+
+  const openEditor = (light: DmxFixture) => {
+    setCurrentLight(light)
+    setEditorBaseline(light)
+  }
+
+  const closeEditor = () => {
+    setCurrentLight(null)
+    setEditorBaseline(null)
+  }
 
   const createNewLight = () => {
-    setCurrentLight({
+    openEditor({
       id: null, // Set id to null for new light
       fixture: FixtureTypes.RGB,
       name: 'RGB',
@@ -57,31 +75,42 @@ const MyLights = () => {
       showToast(result.error, 'error', 5000)
       return
     }
-    setCurrentLight(null)
+    closeEditor()
   }
 
   const handleDelete = async () => {
-    if (currentLight && currentLight.id) {
-      const previousLibrary = myLights
-      const updatedMyLights = myLights.filter((light) => light.id !== currentLight.id)
-      setMyLights(updatedMyLights)
-      const result = await saveMyLights(updatedMyLights)
-      if (!result.success) {
-        setMyLights(previousLibrary)
-        showToast(result.error, 'error', 5000)
-        return
-      }
-      setCurrentLight(null)
-      setShowDeleteModal(false)
+    if (!currentLight?.id) return
+    const confirmed = await confirm({
+      title: 'Confirm Delete',
+      message: 'Are you sure you want to delete this light?',
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!confirmed) return
+
+    const previousLibrary = myLights
+    const updatedMyLights = myLights.filter((light) => light.id !== currentLight.id)
+    setMyLights(updatedMyLights)
+    const result = await saveMyLights(updatedMyLights)
+    if (!result.success) {
+      setMyLights(previousLibrary)
+      showToast(result.error, 'error', 5000)
+      return
     }
+    closeEditor()
   }
 
-  const handleCancel = () => {
-    setCurrentLight(null)
-  }
-
-  const handleSelectLight = (light: DmxFixture) => {
-    setCurrentLight(light)
+  const handleCancel = async () => {
+    if (!equal(currentLight, editorBaseline)) {
+      const discard = await confirm({
+        title: 'Discard changes?',
+        message: 'This light has unsaved changes. Closing the editor will lose them.',
+        confirmLabel: 'Discard',
+        danger: true,
+      })
+      if (!discard) return
+    }
+    closeEditor()
   }
 
   const isExistingLight =
@@ -153,10 +182,10 @@ const MyLights = () => {
         many different physical lights as you want. This is for defining the channel relationships.
       </p>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-        If your fixture has more channels than the base type — a second Red, an Amber, UV, or a
-        mode/macro channel that must be held at a constant value — add them with Additional Channels
-        in the editor. Added colour channels are driven automatically from the light's colour; you
-        never assign cues to them directly.
+        If your fixture has more channels than the base type — a White (an RGBW fixture is RGB plus
+        a White channel), an Amber, UV, a second Red, or a mode/macro channel that must be held at a
+        constant value — add them with Additional Channels in the editor. Added colour channels are
+        driven automatically from the light's colour; you never assign cues to them directly.
       </p>
 
       <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">
@@ -169,7 +198,7 @@ const MyLights = () => {
             <LightChannelsPreview
               key={light.id || index}
               light={light}
-              onSelect={() => handleSelectLight(light)}
+              onSelect={() => openEditor(light)}
               isHighlighted={false}
             />
           ))}
@@ -186,49 +215,13 @@ const MyLights = () => {
         + Light
       </button>
 
-      <hr className="border-t border-gray-200 dark:border-gray-600 mt-6 mb-6" />
-
-      {currentLight && (
-        <>
-          <LightSettings currentLight={currentLight} setCurrentLight={setCurrentLight} />
-
-          <div className="flex space-x-4 mt-4">
-            <button
-              type="button"
-              onClick={handleSave}
-              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
-              Save
-            </button>
-
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500">
-              Cancel
-            </button>
-
-            {isExistingLight && (
-              <button
-                type="button"
-                onClick={() => setShowDeleteModal(true)}
-                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                Delete
-              </button>
-            )}
-          </div>
-        </>
-      )}
-
-      <ConfirmModal
-        isOpen={showDeleteModal}
-        title="Confirm Delete"
-        message="Are you sure you want to delete this light?"
-        confirmLabel="Delete"
-        danger
-        onConfirm={() => {
-          void handleDelete()
-        }}
-        onCancel={() => setShowDeleteModal(false)}
+      <LightSettingsModal
+        isOpen={currentLight !== null}
+        light={currentLight}
+        onChange={setCurrentLight}
+        onSave={() => void handleSave()}
+        onCancel={() => void handleCancel()}
+        onDelete={isExistingLight ? () => void handleDelete() : undefined}
       />
     </div>
   )

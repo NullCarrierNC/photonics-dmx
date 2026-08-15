@@ -11,6 +11,7 @@ import {
 } from '../inputValidation'
 import {
   buildRigExportFile,
+  migrateRigExportFixtures,
   validateRigExportFile,
 } from '../../../photonics-dmx/helpers/rigImportExport'
 import { createLogger } from '../../../shared/logger'
@@ -215,11 +216,14 @@ export function registerLightsRigsConfigHandlers(
       if (!envelope.ok) {
         return { success: false, error: envelope.error }
       }
-      const rigValidation = validateDmxRigPayload(envelope.value.rig)
+      // A rig file exported by an older build can name fixture types this build has since collapsed
+      // (`rgbw`, `rgb/s`). Migrate before validation, which checks against the current type list.
+      const migrated = migrateRigExportFixtures(envelope.value)
+      const rigValidation = validateDmxRigPayload(migrated.rig)
       if (!rigValidation.ok) {
         return { success: false, error: `Rig: ${rigValidation.error}` }
       }
-      const templatesValidation = validateDmxFixturesArray(envelope.value.templates, 'templates')
+      const templatesValidation = validateDmxFixturesArray(migrated.templates, 'templates')
       if (!templatesValidation.ok) {
         return { success: false, error: `Templates: ${templatesValidation.error}` }
       }

@@ -1,5 +1,6 @@
 import equal from 'fast-deep-equal'
 import type { DmxFixture, DmxLight, DmxRig } from '../types'
+import { migrateFixtureSchema, migrateLightingConfiguration } from './lightingConfigMigration'
 
 /**
  * Pure, process-agnostic core for exporting, importing, and duplicating rigs. No Electron / IO so
@@ -169,6 +170,40 @@ export function validateRigExportFile(
     }
   }
   return { ok: true, value: parsed as unknown as RigExportFile }
+}
+
+/**
+ * Brings an imported rig file's fixtures onto the current fixture schema, in place of the version
+ * the file was written with. A file exported by an older build can name fixture types this build has
+ * collapsed (`rgbw`/`rgbw/mh`, `rgb/s`/`rgbw/s`), and the import validators check against the
+ * current type list — so without this an old rig file would be rejected as invalid rather than
+ * upgraded. Returns the same references when nothing needed migrating.
+ *
+ * The legacy `front-back` layout rename is skipped for the same reason it is skipped elsewhere: that
+ * was a one-time v1 rig migration, and a file naming `front-back` today means the current semantic.
+ */
+export function migrateRigExportFixtures(file: RigExportFile): RigExportFile {
+  const { config, changed: rigChanged } = migrateLightingConfiguration(file.rig.config, {
+    skipLegacyRename: true,
+  })
+
+  let templatesChanged = false
+  const templates = file.templates.map((t) => {
+    const result = migrateFixtureSchema(t)
+    if (result.changed) {
+      templatesChanged = true
+    }
+    return result.fixture
+  })
+
+  if (!rigChanged && !templatesChanged) {
+    return file
+  }
+  return {
+    ...file,
+    rig: rigChanged ? { ...file.rig, config } : file.rig,
+    templates: templatesChanged ? templates : file.templates,
+  }
 }
 
 /**

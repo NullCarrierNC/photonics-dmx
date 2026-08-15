@@ -371,6 +371,21 @@ export class ConfigFile<T> {
   }
 
   /**
+   * Commits a load-time migration: the new shape becomes readable immediately, and the write to
+   * disk follows. {@link update} deliberately publishes only after a successful save, which is
+   * right for user edits (a failed write must not leave the app showing state it didn't persist)
+   * but wrong for a migration — every reader between startup and the write landing would get the
+   * legacy shape the rest of the app no longer understands. A failed write is logged and left for
+   * the next launch to retry, since the in-memory shape is the correct one either way.
+   */
+  applyLoadMigration(newData: T): void {
+    this.data = newData
+    this.save(newData).catch((err) =>
+      log.error(`Failed to persist migrated configuration to ${this.filePath}:`, err),
+    )
+  }
+
+  /**
    * Gets the file path for debugging
    */
   getFilePath(): string {

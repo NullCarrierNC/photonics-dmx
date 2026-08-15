@@ -8,11 +8,14 @@ import {
   DmxFixture,
   FixtureTypes,
   RgbMovingHeadDmxChannels,
-  RgbwMovingHeadDmxChannels,
   ConfigStrobeType,
 } from '../../../photonics-dmx/types'
 import { panTiltDmxToSphericalXY } from './lightsDmxPreviewMath'
-import { getDmxPreviewLightColorCss } from './dmxPreviewLightColor'
+import {
+  getDmxPreviewLightColorCss,
+  getLightColorChannelBreakdown,
+  type ChannelBreakdownEntry,
+} from './dmxPreviewLightColor'
 import LightsDmxPreview3D from './LightsDmxPreview3D'
 
 interface LightsDmxPreviewProps {
@@ -96,6 +99,26 @@ const DmxPreviewWithStageLegend: React.FC<{
   </div>
 )
 
+/**
+ * Per-channel swatches under a light's circle. The circle shows the mixed result, this shows the
+ * channels that made it, so a duplicate bank ("Red 2") is distinguishable from the primary it
+ * doubles and a plain fixture's primaries are readable without eyeballing the blend. Each dot keeps
+ * a ring so a channel driven to 0 still reads as a swatch rather than vanishing into the card.
+ */
+const LightChannelSwatches: React.FC<{ entries: ChannelBreakdownEntry[] }> = ({ entries }) => (
+  <div className="flex flex-wrap justify-center gap-1 max-w-[5.5rem] mt-0.5">
+    {entries.map((entry) => (
+      <span
+        key={entry.label}
+        aria-label={`${entry.label}: ${entry.value}`}
+        title={`${entry.label}: ${entry.value}`}
+        className="w-3 h-3 rounded-full ring-1 ring-gray-400/70 dark:ring-gray-500/70"
+        style={{ backgroundColor: entry.css }}
+      />
+    ))}
+  </div>
+)
+
 const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmxValues }) => {
   const layoutId = lightingConfig.lightLayout?.id ?? 'front'
   const isStacked = layoutId === 'stacked'
@@ -104,8 +127,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
 
   const getLightColor = (light: DmxFixture): string => getDmxPreviewLightColorCss(light, dmxValues)
 
-  const isMovingHead = (light: DmxFixture): boolean =>
-    light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH
+  const isMovingHead = (light: DmxFixture): boolean => light.fixture === FixtureTypes.RGBMH
 
   /**
    * Helper function to render individual light circles (moving heads include pan/tilt dot overlay).
@@ -115,6 +137,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
       'w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold shadow-md'
 
     const subtitleClass = 'text-[9px] text-gray-500 dark:text-gray-400 mt-0.5 select-none'
+    const breakdown = getLightColorChannelBreakdown(light, dmxValues)
 
     if (!isMovingHead(light)) {
       return (
@@ -130,14 +153,20 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
               {light.position}
             </div>
           </div>
-          <span className={`${subtitleClass} invisible`} aria-hidden>
-            upstage / downstage
-          </span>
+          {/* The swatch row takes over the slot the spacer reserves. The spacer still covers the
+              fixtures with no colour channels to break down, so rows stay aligned either way. */}
+          {breakdown ? (
+            <LightChannelSwatches entries={breakdown} />
+          ) : (
+            <span className={`${subtitleClass} invisible`} aria-hidden>
+              upstage / downstage
+            </span>
+          )}
         </div>
       )
     }
 
-    const channels = light.channels as RgbMovingHeadDmxChannels | RgbwMovingHeadDmxChannels
+    const channels = light.channels as RgbMovingHeadDmxChannels
     const pan = dmxValues[channels.pan] ?? 0
     const tilt = dmxValues[channels.tilt] ?? 0
     const { xPct, yPct } = panTiltDmxToSphericalXY(pan, tilt, light.config)
@@ -177,6 +206,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
             <span className="relative z-0">{light.position}</span>
           </div>
         </div>
+        {breakdown && <LightChannelSwatches entries={breakdown} />}
       </div>
     )
   }

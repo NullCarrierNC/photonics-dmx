@@ -77,9 +77,8 @@ const ExtraChannelsEditor: React.FC<ExtraChannelsEditorProps> = ({ light, onChan
         Additional Channels
       </h3>
       <p className="text-xs text-gray-600 dark:text-gray-400">
-        For fixtures with more channels than the base type: extra colour channels (a second Red,
-        Amber, UV&hellip;) or a channel held at a fixed value (mode/macro channels). Photonics
-        drives added colour channels automatically from the light&apos;s colour.
+        If you light has more than the basic RGB channels, or it has more than one R/G/B channel,
+        you can add additional channels here.
       </p>
 
       {extras.map((extra, i) => {
@@ -113,7 +112,7 @@ const ExtraChannelsEditor: React.FC<ExtraChannelsEditorProps> = ({ light, onChan
                 <span className="text-gray-600 dark:text-gray-400">=</span>
                 <input
                   aria-label={`${label} held value`}
-                  title="DMX value 0–255 held on this channel whenever the light is on"
+                  title="DMX value 0–255 held on this channel whenever DMX output is running"
                   type="number"
                   min={0}
                   max={255}

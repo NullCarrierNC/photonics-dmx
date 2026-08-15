@@ -68,4 +68,29 @@ describe('LightsDmxChannelsPreview extra channels', () => {
     expect(screen.queryByText('Amber:')).toBeNull()
     expect(screen.getByText('red:')).toBeTruthy()
   })
+
+  it('shows the DMX address alongside each value', () => {
+    const l = light(RGB, [{ type: 'amber', channel: 5 }])
+    render(<LightsDmxChannelsPreview lightingConfig={config(l)} dmxValues={{ 5: 200 }} />)
+    const amberRow = screen.getByText('Amber:').closest('li') as HTMLElement
+    expect(within(amberRow).getByText(/ch 5/)).toBeTruthy()
+  })
+
+  it('flags an address two lights in the rig both claim', () => {
+    // Second light's master dimmer sits on the first light's amber, so both rows read one value.
+    const first = light(RGB, [{ type: 'amber', channel: 11 }])
+    const second: DmxLight = {
+      ...light({ masterDimmer: 11, red: 12, green: 13, blue: 14 }),
+      id: 'l2',
+      name: 'PAR 2',
+    }
+    const twoLights: LightingConfiguration = { ...config(first), frontLights: [first, second] }
+    render(<LightsDmxChannelsPreview lightingConfig={twoLights} dmxValues={{ 11: 255 }} />)
+
+    const amberRow = screen.getByText('Amber:').closest('li') as HTMLElement
+    expect(within(amberRow).getByText(/ch 11/).textContent).toContain('⚠')
+    // The unshared channels stay unflagged.
+    const redRow = screen.getAllByText('red:')[0].closest('li') as HTMLElement
+    expect(within(redRow).getByText(/ch 2/).textContent).not.toContain('⚠')
+  })
 })

@@ -238,15 +238,21 @@ export interface EffectTransition {
  */
 export enum FixtureTypes {
   RGB = 'rgb',
-  RGBW = 'rgbw',
   STROBE = 'strobe',
   RGBMH = 'rgb/mh',
-  RGBWMH = 'rgbw/mh',
 }
 
 /** Legacy fixture identifiers replaced by the hasStrobeChannel model; retained for migration only. */
 export const LEGACY_FIXTURE_RGB_STROBE = 'rgb/s'
 export const LEGACY_FIXTURE_RGBW_STROBE = 'rgbw/s'
+
+/**
+ * Legacy fixture identifiers for the discrete RGBW archetypes, replaced by RGB(+MH) carrying a
+ * `white` {@link ExtraChannel}. Retained for migration only — a white emitter is just one more
+ * channel the substitution mixer drives, so a dedicated type earned nothing.
+ */
+export const LEGACY_FIXTURE_RGBW = 'rgbw'
+export const LEGACY_FIXTURE_RGBW_MH = 'rgbw/mh'
 
 /**
  * DMX-related types
@@ -261,13 +267,44 @@ export interface BaseDmxFixture {
   masterDimmer: number
 }
 
+/**
+ * Highest addressable channel in a DMX universe. Channel numbers run 1–512; 0 is the "unassigned"
+ * sentinel every layer shares (see {@link ExtraChannel.channel}).
+ *
+ * Every layer that bounds a channel number — the mixer, the IPC validators, the template and rig
+ * editors — reads it from here, so a fixture can be addressed to the same limit wherever it is
+ * edited and the wire agrees with what the editor allowed.
+ */
+export const DMX_CHANNEL_MAX = 512
+
+/** True for an assigned, addressable channel number. 0 (unassigned) is deliberately not valid. */
+export function isValidDmxChannel(channel: number): boolean {
+  return Number.isInteger(channel) && channel >= 1 && channel <= DMX_CHANNEL_MAX
+}
+
+/**
+ * Normalises an offset-derived channel number to the persisted domain (0, or 1–512).
+ *
+ * Anything outside the universe collapses to 0 — "unassigned" — and deliberately **not** to 512:
+ * saturating at the bound would land two channels of one fixture on a single address and misroute
+ * output, whereas 0 carries the "invalid until set" meaning the rest of the app already acts on.
+ * The mixer excludes and reports the channel ({@link isValidDmxChannel}) and `myValidDmxLightsAtom`
+ * keeps the fixture out of a rig until the user reassigns it. A visibly unusable fixture beats a
+ * quietly wrong one.
+ */
+export function clampDerivedDmxChannel(channel: number): number {
+  if (!Number.isFinite(channel)) return 0
+  const rounded = Math.round(channel)
+  return isValidDmxChannel(rounded) ? rounded : 0
+}
+
 export interface RgbDmxChannels extends BaseDmxFixture {
   red: number
   green: number
   blue: number
   /**
-   * Optional hardware strobe-speed DMX channel on an RGB-family fixture (RGB / RGBW / RGBMH /
-   * RGBWMH). Present when the fixture template has "Strobe Channel?" enabled — i.e. the user has
+   * Optional hardware strobe-speed DMX channel on an RGB-family fixture (RGB / RGBMH). Present
+   * when the fixture template has "Strobe Channel?" enabled — i.e. the user has
    * declared that this colour fixture also exposes a strobe-speed channel. Stored alongside the
    * other channel offsets so master-dimmer shifts propagate the same way they do for r/g/b.
    *
@@ -279,24 +316,18 @@ export interface RgbDmxChannels extends BaseDmxFixture {
   strobeChannel?: number
 }
 
-export interface RgbwDmxChannels extends RgbDmxChannels {
-  white: number
-}
-
 /**
  * Colour channel types the substitution mixer can derive from the internal RGB value. Order here
  * is not the mix order (that lives in the mixer); this is just the vocabulary shared by the picker,
  * validators and the mixer. Persisted string values — never rename.
+ *
+ * Each entry has to be a chromaticity a cue can actually select. Cues carry nothing but an RGB
+ * triple, so amber, orange, lime and UV earn their place — a yellow target drives amber and leaves
+ * white dark. Colour-temperature variants of white do not: every near-neutral emitter answers the
+ * same RGB the same way, so a fixture's warm or cool white is declared as plain `white` and the RGB
+ * residual carries whatever it cannot.
  */
-export const MIXABLE_CHANNEL_TYPES = [
-  'white',
-  'warmWhite',
-  'coolWhite',
-  'amber',
-  'orange',
-  'lime',
-  'uv',
-] as const
+export const MIXABLE_CHANNEL_TYPES = ['white', 'amber', 'orange', 'lime', 'uv'] as const
 export type MixableChannelType = (typeof MIXABLE_CHANNEL_TYPES)[number]
 
 /**
@@ -369,6 +400,37 @@ export interface FixtureConfig {
 /** Legacy persisted field; merged in {@link normalizeFixtureConfig} into invertPan/invertTilt. */
 export type LegacyFixtureConfigFields = {
   invert?: boolean
+}
+
+/**
+ * Editable range for a numeric {@link FixtureConfig} field. These are physical/normalised units —
+ * degrees, percentages, raw DMX — and deliberately *not* channel numbers, so they share nothing
+ * with {@link DMX_CHANNEL_MAX}. Shared by every editor that renders these fields so the input's
+ * `min`/`max` and the value it commits can't disagree.
+ *
+ * `panStageDeg`/`tiltStageDeg` are calibration anchors bounded by their own travel range, so their
+ * ceiling comes from the sibling field rather than a constant.
+ */
+export function fixtureConfigFieldBounds(
+  key: keyof FixtureConfig,
+  config: FixtureConfig,
+): { min: number; max: number } {
+  switch (key) {
+    case 'panRangeDeg':
+      return { min: 1, max: 720 }
+    case 'tiltRangeDeg':
+      return { min: 1, max: 360 }
+    case 'panHome':
+    case 'tiltHome':
+      return { min: 0, max: 100 }
+    case 'panStageDeg':
+      return { min: 0, max: config.panRangeDeg }
+    case 'tiltStageDeg':
+      return { min: 0, max: config.tiltRangeDeg }
+    default:
+      // panMin/panMax/tiltMin/tiltMax are raw DMX values.
+      return { min: 0, max: 255 }
+  }
 }
 
 /** Full defaults for moving-head fixture config; use {@link normalizeFixtureConfig} for persisted data. */
@@ -499,8 +561,6 @@ export function clampMergeMovingHeadFixtureConfig(
 
 export interface RgbMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbDmxChannels {}
 
-export interface RgbwMovingHeadDmxChannels extends MovingHeadDmxChannels, RgbwDmxChannels {}
-
 /**
  * Channel record for a **dedicated** hardware strobe fixture — a colour-less light whose only
  * outputs are master dimmer + strobe speed. Distinct from {@link RgbDmxChannels.strobeChannel},
@@ -549,12 +609,7 @@ export interface DmxFixture {
   name: string
   isStrobeEnabled: boolean
   group?: string
-  channels:
-    | RgbDmxChannels
-    | RgbwDmxChannels
-    | StrobeDmxChannels
-    | RgbMovingHeadDmxChannels
-    | RgbwMovingHeadDmxChannels
+  channels: RgbDmxChannels | StrobeDmxChannels | RgbMovingHeadDmxChannels
   config?: FixtureConfig
   universe?: number
   /** Floor vs ceiling/truss placement for preview and static wash; default floor when omitted before migration. */
@@ -602,23 +657,6 @@ export const LightTypes: DmxFixture[] = [
   {
     id: null,
     position: 0,
-    fixture: FixtureTypes.RGBW,
-    label: 'RGBW',
-    name: 'RGBW',
-    isStrobeEnabled: false,
-    group: '',
-    channels: {
-      masterDimmer: 0,
-      red: 0,
-      green: 0,
-      blue: 0,
-      white: 0,
-    },
-    universe: 1,
-  },
-  {
-    id: null,
-    position: 0,
     fixture: FixtureTypes.RGBMH,
     label: 'RGB/MH',
     name: 'RGB/MH',
@@ -629,28 +667,6 @@ export const LightTypes: DmxFixture[] = [
       red: 0,
       green: 0,
       blue: 0,
-      pan: 0,
-      tilt: 0,
-    },
-    config: {
-      ...DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
-    },
-    universe: 1,
-  },
-  {
-    id: null,
-    position: 0,
-    fixture: FixtureTypes.RGBWMH,
-    label: 'RGBW/MH',
-    name: 'RGBW/MH',
-    isStrobeEnabled: false,
-    group: '',
-    channels: {
-      masterDimmer: 0,
-      red: 0,
-      green: 0,
-      blue: 0,
-      white: 0,
       pan: 0,
       tilt: 0,
     },
