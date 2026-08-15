@@ -60,15 +60,15 @@ describe('getDmxPreviewLightColor with extra channels', () => {
     expect(getDmxPreviewLightColor(f, dmx)).toEqual({ r: 255, g: 191, b: 0 })
   })
 
-  it('sums warm and cool white as distinct emitters', () => {
-    // Different types → both contribute; warm (1,0.75,0.5) + cool (0.8,0.9,1) at 100 each.
+  it('sums distinct emitter types rather than taking the brightest', () => {
+    // Different types → both contribute; white (1,1,1) + amber (1,0.75,0) at 100 each.
     const f = fixture(FixtureTypes.RGB, RGB, [
-      { type: 'warmWhite', channel: 5 },
-      { type: 'coolWhite', channel: 6 },
+      { type: 'white', channel: 5 },
+      { type: 'amber', channel: 6 },
     ])
     const dmx = { 1: 255, 2: 0, 3: 0, 4: 0, 5: 100, 6: 100 }
-    // r = 100*1 + 100*0.8 = 180, g = 100*0.75 + 100*0.9 = 165, b = 100*0.5 + 100*1 = 150.
-    expect(getDmxPreviewLightColor(f, dmx)).toEqual({ r: 180, g: 165, b: 150 })
+    // r = 100*1 + 100*1 = 200, g = 100*1 + 100*0.75 = 175, b = 100*1 + 100*0 = 100.
+    expect(getDmxPreviewLightColor(f, dmx)).toEqual({ r: 200, g: 175, b: 100 })
   })
 
   it('follows a duplicate red bank driven on its own (DMX Console manual mode)', () => {
@@ -177,10 +177,10 @@ describe('preview matches the published wire values', () => {
       light: fixture(FixtureTypes.RGB, RGB, [{ type: 'amber', channel: 5 }]),
     },
     {
-      label: 'RGB + warm/cool white',
+      label: 'RGB + two white banks',
       light: fixture(FixtureTypes.RGB, RGB, [
-        { type: 'warmWhite', channel: 5 },
-        { type: 'coolWhite', channel: 6 },
+        { type: 'white', channel: 5 },
+        { type: 'white', channel: 6 },
       ]),
     },
     {

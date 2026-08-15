@@ -2,10 +2,10 @@
  * Colour channel mixer tests.
  *
  * The mixer decomposes the engine's internal RGB into a fixture's declared extra colour channels
- * (white / warm+cool white / amber / orange / lime / uv), duplicate red/green/blue banks, and
- * pinned "fixed" channels, using substitution (energy moves out of RGB into the emitters). These
- * tests pin the worked vectors used to design it, the reconstruction/bounds invariants, and the
- * "no extras → no plan → legacy path" contract that keeps plain fixtures bit-for-bit unchanged.
+ * (white / amber / orange / lime / uv), duplicate red/green/blue banks, and pinned "fixed"
+ * channels, using substitution (energy moves out of RGB into the emitters). These tests pin the
+ * worked vectors used to design it, the reconstruction/bounds invariants, and the "no extras → no
+ * plan" contract that leaves a plain fixture on the per-channel path.
  */
 import { describe, expect, it } from '@jest/globals'
 import {
@@ -114,25 +114,12 @@ describe('applyChannelMixPlan — worked vectors', () => {
     expect(mix(f, 255, 191, 0)).toEqual({ 5: 255, 2: 0, 3: 0, 4: 0 })
   })
 
-  it('5: RGB+warmWhite (255,255,255) → warmWhite=255, red=0, green=64, blue=128', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('warmWhite', 5)])
-    expect(mix(f, 255, 255, 255)).toEqual({ 5: 255, 2: 0, 3: 64, 4: 128 })
-  })
-
-  it('6: RGB+warmWhite+coolWhite (255,255,255) → WW=142, CW=142, red=0, green=21, blue=43', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [
-      extra('warmWhite', 5),
-      extra('coolWhite', 6),
-    ])
-    expect(mix(f, 255, 255, 255)).toEqual({ 5: 142, 6: 142, 2: 0, 3: 21, 4: 43 })
-  })
-
-  it('7: RGBW+amber (255,223,128) → white=128, amber=127, rgb=0', () => {
+  it('5: RGBW+amber (255,223,128) → white=128, amber=127, rgb=0', () => {
     const f = rgbwFixture([extra('amber', 6)])
     expect(mix(f, 255, 223, 128)).toEqual({ 5: 128, 6: 127, 2: 0, 3: 0, 4: 0 })
   })
 
-  it('8: RGB+uv (128,0,128) → uv=128, red=64, green=0, blue=0', () => {
+  it('6: RGB+uv (128,0,128) → uv=128, red=64, green=0, blue=0', () => {
     const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('uv', 5)])
     expect(mix(f, 128, 0, 128)).toEqual({ 5: 128, 2: 64, 3: 0, 4: 0 })
   })
@@ -169,13 +156,11 @@ describe('applyChannelMixPlan — worked vectors', () => {
 })
 
 describe('applyChannelMixPlan — white precedence and duplicates', () => {
-  it('white + warm + cool: neutral white wins, warm/cool stay dark on neutral input', () => {
-    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [
-      extra('white', 5),
-      extra('warmWhite', 6),
-      extra('coolWhite', 7),
-    ])
-    expect(mix(f, 255, 255, 255)).toEqual({ 5: 255, 6: 0, 7: 0, 2: 0, 3: 0, 4: 0 })
+  it('white extracts before the narrower emitters, which take only what it leaves', () => {
+    // Stage order is white first, so a neutral target is carried entirely by white and amber gets
+    // nothing — the narrower emitter only ever colours the remainder.
+    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('white', 5), extra('amber', 6)])
+    expect(mix(f, 255, 255, 255)).toEqual({ 5: 255, 6: 0, 2: 0, 3: 0, 4: 0 })
   })
 
   it('two amber banks receive the same value and the triple is subtracted once', () => {
@@ -230,6 +215,20 @@ describe('invalid channels and strobe device class', () => {
     expect(mix(f, 255, 191, 0)).toEqual({ 2: 255, 3: 191, 4: 0 })
   })
 
+  it('excludes an extra whose type it does not recognise instead of throwing', () => {
+    // `extraChannels` reaches the mixer straight from persisted JSON, which the config schema only
+    // validates loosely, so an unknown type is reachable and must degrade to a reported exclusion.
+    const f = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [
+      { type: 'chartreuse' as ExtraChannelType, channel: 5 },
+      extra('amber', 6),
+    ])
+    const plan = buildChannelMixPlan(f)!
+    expect(plan.invalidChannels).toHaveLength(1)
+    expect(plan.stages.every((s) => s.channels.every((c) => c === 6))).toBe(true)
+    // Channel 5 is left alone rather than driven with a guessed primary.
+    expect(mix(f, 255, 191, 0)[5]).toBeUndefined()
+  })
+
   it('a dedicated strobe fixture honours fixed extras but never colour extras', () => {
     const f = makeFixture(FixtureTypes.STROBE, { masterDimmer: 1, strobeChannel: 2 }, [
       extra('fixed', 3, 200),
@@ -276,8 +275,8 @@ describe('reconstruction and bounds invariants', () => {
     { label: 'RGB+white', extras: [extra('white', 5)] },
     { label: 'RGB+amber', extras: [extra('amber', 5)] },
     {
-      label: 'RGB+WW+CW',
-      extras: [extra('warmWhite', 5), extra('coolWhite', 6)],
+      label: 'RGB+two white banks',
+      extras: [extra('white', 5), extra('white', 6)],
     },
     {
       label: 'RGB+white+amber+uv',
@@ -301,9 +300,9 @@ describe('reconstruction and bounds invariants', () => {
               expect(value).toBeLessThanOrEqual(255)
             }
 
-            // Reconstruct perceived RGB. Count each stage once (its channels all share the drive
-            // value, and the stage triple already sums warm+cool white), then add the residual
-            // once from a representative red/green/blue channel.
+            // Reconstruct perceived RGB. Count each stage once — its channels all share one drive
+            // value and the triple is subtracted once — then add the residual once from a
+            // representative red/green/blue channel.
             let rr = 0
             let gg = 0
             let bb = 0

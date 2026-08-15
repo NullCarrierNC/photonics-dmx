@@ -17,6 +17,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import LightLayoutPreview from '../components/LightLayoutPreview'
+import { findSharedChannelNumbers } from '../components/lightChannelDisplay'
 import { useAtom, useSetAtom } from 'jotai'
 import ToastContainer from '../components/Toast'
 
@@ -150,12 +151,43 @@ const LightsLayout = () => {
     })
   }, [selectedCount])
 
+  /**
+   * Adds one light addressed clear of `placed`. Callers pass the list they are building, not the
+   * committed state, so several lights added in a single pass each land on their own channels.
+   * Reports back when the universe ran out of room, which the caller surfaces once.
+   */
   const createLightInstance = useCallback(
-    (group: 'front' | 'back' | 'strobe') => {
-      return createDmxLightInstance(group, allPrimaryLights.length, myFixtures)
+    (group: 'front' | 'back' | 'strobe', placed: DmxLight[]) => {
+      return createDmxLightInstance(group, placed, myFixtures)
     },
-    [allPrimaryLights.length, myFixtures],
+    [myFixtures],
   )
+
+  /**
+   * Raised by the light-adding effects when a fixture would not fit before the end of the universe.
+   * A flag rather than a toast at the point of failure: those run inside state updaters, which React
+   * may invoke more than once, and a ref read after the render reports it exactly once.
+   */
+  /**
+   * Addresses claimed by more than one light in the rig being edited. Checked across the whole rig
+   * because that is the scope the publisher shares a channel buffer over, and because a per-fixture
+   * check cannot see two lights overlapping each other.
+   */
+  const sharedRigChannels = useMemo(
+    () => findSharedChannelNumbers(allPrimaryLights),
+    [allPrimaryLights],
+  )
+
+  const universeFullRef = useRef(false)
+  useEffect(() => {
+    if (!universeFullRef.current) return
+    universeFullRef.current = false
+    showToast(
+      'No room left in the universe for another fixture. It shares channels with an existing light until you re-address it.',
+      'error',
+      6000,
+    )
+  })
 
   useEffect(() => {
     setAllPrimaryLights((prev) => {
@@ -220,7 +252,9 @@ const LightsLayout = () => {
         // Adjust the count only for non-strobe lights.
         if (selectedCount) {
           while (updated.length < selectedCount) {
-            updated.push(createLightInstance('front'))
+            const { light, addressCapped } = createLightInstance('front', updated)
+            if (addressCapped) universeFullRef.current = true
+            updated.push(light)
           }
           while (updated.length > selectedCount) {
             updated.pop()
@@ -275,7 +309,8 @@ const LightsLayout = () => {
         // Add the missing strobe lights
         const numToAdd = dedicatedStrobeCount - currentCount
         for (let i = 0; i < numToAdd; i++) {
-          const newStrobe = createLightInstance('strobe')
+          const { light: newStrobe, addressCapped } = createLightInstance('strobe', updated)
+          if (addressCapped) universeFullRef.current = true
           newStrobe.fixture = FixtureTypes.STROBE
           newStrobe.isStrobeEnabled = true
           newStrobe.group = 'strobe'
@@ -680,6 +715,16 @@ const LightsLayout = () => {
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}>
             <div className="mt-8 space-y-8">
+              {sharedRigChannels.length > 0 && (
+                <div
+                  role="status"
+                  className="rounded border border-amber-500 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+                  {sharedRigChannels.length === 1
+                    ? `DMX channel ${sharedRigChannels[0]} is used by more than one light in this rig.`
+                    : `DMX channels ${sharedRigChannels.join(', ')} are each used by more than one light in this rig.`}{' '}
+                  This will cause a conflict between the lights and incorrect lighting output.
+                </div>
+              )}
               <LightChannelAssignmentSection
                 title={
                   selectedLayout === 'stacked'

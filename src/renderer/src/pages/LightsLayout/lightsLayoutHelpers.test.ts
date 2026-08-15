@@ -114,27 +114,61 @@ describe('createDmxLightInstance', () => {
     universe: 0,
   }
 
-  it('auto-addresses ten channels apart', () => {
-    const light = createDmxLightInstance('front', 3, [rgbTemplate])
-    const channels = light.channels as unknown as Record<string, number>
-    expect(channels).toEqual({ masterDimmer: 31, red: 32, green: 33, blue: 34 })
+  /** A template occupying 14 channels: masterDimmer 1 plus base 2-4 plus an extra at 14. */
+  const wideTemplate: DmxFixture = {
+    ...rgbTemplate,
+    id: 'tpl-wide',
+    extraChannels: [{ type: 'amber', channel: 14 }],
+  }
+
+  const place = (existing: DmxLight[], template: DmxFixture): DmxLight => {
+    const { light } = createDmxLightInstance('front', existing, [template])
+    return light
+  }
+
+  const masterOf = (light: DmxLight): number =>
+    (light.channels as unknown as Record<string, number>).masterDimmer
+
+  it('addresses the first light at 1', () => {
+    expect(masterOf(place([], rgbTemplate))).toBe(1)
   })
 
-  it('caps auto-addressing at the last address the template fits in', () => {
-    // 1 + 60*10 = 601, which would derive base channels past the universe
-    const light = createDmxLightInstance('front', 60, [rgbTemplate])
-    const channels = light.channels as unknown as Record<string, number>
-    expect(channels).toEqual({ masterDimmer: 509, red: 510, green: 511, blue: 512 })
+  it('steps a narrow fixture in tens so addressing stays readable', () => {
+    const one = place([], rgbTemplate)
+    const two = place([one], rgbTemplate)
+    const three = place([one, two], rgbTemplate)
+    expect([masterOf(one), masterOf(two), masterOf(three)]).toEqual([1, 11, 21])
+  })
+
+  it('clears a fixture wider than the step instead of landing inside it', () => {
+    const one = place([], wideTemplate)
+    expect(one.extraChannels).toEqual([{ type: 'amber', channel: 14 }])
+    // The next light must clear channel 14, not take 11 and collide with the amber extra.
+    expect(masterOf(place([one], wideTemplate))).toBe(21)
+  })
+
+  it('packs after a hand-edited address rather than under it', () => {
+    const moved = place([], rgbTemplate)
+    ;(moved.channels as unknown as Record<string, number>).masterDimmer = 100
+    ;(moved.channels as unknown as Record<string, number>).blue = 103
+    expect(masterOf(place([moved], rgbTemplate))).toBe(111)
+  })
+
+  it('reports the address as capped when the universe has no room left', () => {
+    const full = place([], rgbTemplate)
+    ;(full.channels as unknown as Record<string, number>).blue = 512
+    const { light, addressCapped } = createDmxLightInstance('front', [full], [rgbTemplate])
+    expect(addressCapped).toBe(true)
+    expect(masterOf(light)).toBe(509)
   })
 
   it('leaves room for added channels when capping', () => {
-    const withExtra: DmxFixture = {
-      ...rgbTemplate,
-      extraChannels: [{ type: 'amber', channel: 9 }], // offset +8
-    }
-    const light = createDmxLightInstance('front', 60, [withExtra])
-    const channels = light.channels as unknown as Record<string, number>
-    expect(channels.masterDimmer).toBe(504)
+    const full = place([], rgbTemplate)
+    ;(full.channels as unknown as Record<string, number>).blue = 512
+    const { light, addressCapped } = createDmxLightInstance('front', [full], [wideTemplate])
+    expect(addressCapped).toBe(true)
+    // Widest offset is +13, so the master must sit at 512 - 13.
+    expect(masterOf(light)).toBe(499)
     expect(light.extraChannels).toEqual([{ type: 'amber', channel: 512 }])
   })
 })

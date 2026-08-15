@@ -36,8 +36,6 @@ export const EXTRA_CHANNEL_TYPE_LABELS: Record<ExtraChannelType, string> = {
   green: 'Green',
   blue: 'Blue',
   white: 'White',
-  warmWhite: 'Warm White',
-  coolWhite: 'Cool White',
   amber: 'Amber',
   orange: 'Orange',
   uv: 'UV',
@@ -95,12 +93,27 @@ export function fixtureHasZeroChannel(fixture: DmxFixture): boolean {
  * ascending. Powers a non-blocking "assigned more than once" warning; 0 (unassigned) is ignored.
  */
 export function findDuplicateChannelNumbers(fixture: DmxFixture): number[] {
+  return findSharedChannelNumbers([fixture])
+}
+
+/**
+ * DMX addresses carried by more than one channel across `fixtures`, counting base and added channels
+ * on every one. Whichever the publisher writes last wins, so a light on a shared address displays a
+ * value that is not its own.
+ *
+ * Pass one rig's lights: the publisher builds a channel buffer per rig, so lights within a rig share
+ * one address space no matter what `universe` each names, and lights in different rigs cannot
+ * collide at all.
+ */
+export function findSharedChannelNumbers(fixtures: DmxFixture[]): number[] {
   const counts = new Map<number, number>()
   const add = (n: number): void => {
     if (typeof n === 'number' && n > 0) counts.set(n, (counts.get(n) ?? 0) + 1)
   }
-  for (const v of Object.values(fixture.channels)) add(v as number)
-  for (const ec of fixture.extraChannels ?? []) add(ec.channel)
+  for (const fixture of fixtures) {
+    for (const v of Object.values(fixture.channels)) add(v as number)
+    for (const ec of fixture.extraChannels ?? []) add(ec.channel)
+  }
   return [...counts.entries()]
     .filter(([, c]) => c > 1)
     .map(([n]) => n)

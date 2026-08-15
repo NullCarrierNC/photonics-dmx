@@ -9,6 +9,7 @@ import {
   BASE_CHANNEL_ORDER,
   extraChannelDisplayLabel,
   findDuplicateChannelNumbers,
+  findSharedChannelNumbers,
   fixtureHasZeroChannel,
   sortBaseChannelEntries,
 } from './lightChannelDisplay'
@@ -126,5 +127,23 @@ describe('findDuplicateChannelNumbers', () => {
   it('is empty when all channel numbers are distinct', () => {
     const f = fixture(FixtureTypes.RGB, { masterDimmer: 1, red: 2, green: 3, blue: 4 })
     expect(findDuplicateChannelNumbers(f)).toEqual([])
+  })
+})
+
+describe('findSharedChannelNumbers', () => {
+  it('catches one light overlapping another, which a per-fixture check cannot see', () => {
+    const wide = fixture(FixtureTypes.RGB, { masterDimmer: 1, red: 2, green: 3, blue: 4 }, [
+      { type: 'amber', channel: 11 },
+    ])
+    const next = fixture(FixtureTypes.RGB, { masterDimmer: 11, red: 12, green: 13, blue: 14 })
+    expect(findDuplicateChannelNumbers(wide)).toEqual([])
+    expect(findDuplicateChannelNumbers(next)).toEqual([])
+    expect(findSharedChannelNumbers([wide, next])).toEqual([11])
+  })
+
+  it('is empty for lights addressed clear of each other', () => {
+    const a = fixture(FixtureTypes.RGB, { masterDimmer: 1, red: 2, green: 3, blue: 4 })
+    const b = fixture(FixtureTypes.RGB, { masterDimmer: 11, red: 12, green: 13, blue: 14 })
+    expect(findSharedChannelNumbers([a, b])).toEqual([])
   })
 })

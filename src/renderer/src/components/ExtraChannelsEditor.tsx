@@ -77,10 +77,8 @@ const ExtraChannelsEditor: React.FC<ExtraChannelsEditorProps> = ({ light, onChan
         Additional Channels
       </h3>
       <p className="text-xs text-gray-600 dark:text-gray-400">
-        For fixtures with more channels than the base type: extra colour channels (White, Amber, UV,
-        a second Red&hellip;) or a channel held at a fixed value (mode/macro channels). An RGBW
-        fixture is RGB plus a White channel. Photonics drives added colour channels automatically
-        from the light&apos;s colour.
+        If you light has more than the basic RGB channels, or it has more than one R/G/B channel,
+        you can add additional channels here.
       </p>
 
       {extras.map((extra, i) => {

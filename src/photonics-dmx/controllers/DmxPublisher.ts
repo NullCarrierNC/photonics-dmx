@@ -624,9 +624,9 @@ export class DmxPublisher {
 
         // Colour mixer owns the colour channels (named red/green/blue/white + any extras) when a
         // plan exists; it decomposes the post-latch rgb into the fixture's declared emitters and
-        // writes the residual back to the named/extra rgb channels. `null` = no extras → legacy
-        // path below produces bit-for-bit identical output. Runs after the cast so a cast throw
-        // still skips the whole light (above).
+        // writes the residual back to the named/extra rgb channels. `null` = no extras, so the
+        // per-channel switch below writes them directly. Runs after the cast so a cast throw still
+        // skips the whole light (above).
         const mixPlan = this._getMixPlan(dmxLight)
         if (mixPlan) {
           this._warnInvalidExtras(lightId, mixPlan)

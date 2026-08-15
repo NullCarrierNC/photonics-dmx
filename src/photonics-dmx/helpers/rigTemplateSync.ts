@@ -91,6 +91,18 @@ export function templateChannelSpan(template: DmxFixture): number {
 }
 
 /**
+ * Highest DMX address a fixture actually occupies, across its base channels and its added channels.
+ * Unassigned (0) channels occupy nothing, so a fixture with none returns 0.
+ */
+export function highestChannelUsed(fixture: DmxFixture): number {
+  const channels = channelsAsRecord(fixture.channels)
+  let highest = 0
+  for (const value of Object.values(channels)) highest = Math.max(highest, value)
+  for (const extra of fixture.extraChannels ?? []) highest = Math.max(highest, extra.channel)
+  return Math.max(0, highest)
+}
+
+/**
  * Highest master dimmer that still leaves room for the whole fixture inside the universe.
  *
  * The master dimmer is the one address a rig owns; every other channel derives from it, so this is

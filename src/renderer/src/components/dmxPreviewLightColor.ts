@@ -222,6 +222,9 @@ export function getLightColorChannelBreakdown(
       ec.type === 'red' || ec.type === 'green' || ec.type === 'blue'
         ? BASE_PRIMARIES[ec.type]
         : EMITTER_PRIMARIES[ec.type as MixableChannelType]
+    // A type this build doesn't know has no primary to draw a swatch from. The publisher skips the
+    // channel for the same reason, so showing nothing keeps the two agreeing.
+    if (!primary) return
     // Indexed against the full extras array so the numbering matches the channel list exactly.
     entries.push({
       label: extraChannelDisplayLabel(light, i),

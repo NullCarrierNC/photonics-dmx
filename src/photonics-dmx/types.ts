@@ -320,16 +320,14 @@ export interface RgbDmxChannels extends BaseDmxFixture {
  * Colour channel types the substitution mixer can derive from the internal RGB value. Order here
  * is not the mix order (that lives in the mixer); this is just the vocabulary shared by the picker,
  * validators and the mixer. Persisted string values — never rename.
+ *
+ * Each entry has to be a chromaticity a cue can actually select. Cues carry nothing but an RGB
+ * triple, so amber, orange, lime and UV earn their place — a yellow target drives amber and leaves
+ * white dark. Colour-temperature variants of white do not: every near-neutral emitter answers the
+ * same RGB the same way, so a fixture's warm or cool white is declared as plain `white` and the RGB
+ * residual carries whatever it cannot.
  */
-export const MIXABLE_CHANNEL_TYPES = [
-  'white',
-  'warmWhite',
-  'coolWhite',
-  'amber',
-  'orange',
-  'lime',
-  'uv',
-] as const
+export const MIXABLE_CHANNEL_TYPES = ['white', 'amber', 'orange', 'lime', 'uv'] as const
 export type MixableChannelType = (typeof MIXABLE_CHANNEL_TYPES)[number]
 
 /**

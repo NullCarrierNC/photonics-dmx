@@ -8,8 +8,8 @@ import {
 } from '../types'
 
 /**
- * Substitution colour mixer for fixtures with extra colour channels (white / warm+cool white /
- * amber / orange / lime / uv), plus duplicate red/green/blue banks and pinned "fixed" channels.
+ * Substitution colour mixer for fixtures with extra colour channels (white / amber / orange / lime
+ * / uv), plus duplicate red/green/blue banks and pinned "fixed" channels.
  *
  * The engine's internal colour is RGB + intensity only. When a fixture declares extra colour
  * emitters, this module decomposes that RGB into the extra channels the same way a real RGBW/RGBWA
@@ -21,9 +21,9 @@ import {
  * White is not special here: an RGBW fixture is modelled as an RGB fixture carrying a `white` extra
  * channel, so it flows through the same stage as any other emitter.
  *
- * See {@link EMITTER_PRIMARIES} for the RGB approximation of each emitter; the ordering of the
- * extraction stages is fixed (see {@link buildChannelMixPlan}) and never affects chromaticity — it
- * only decides which emitter carries a given part of the load.
+ * See {@link EMITTER_PRIMARIES} for the RGB approximation of each emitter and {@link STAGE_ORDER}
+ * for the order they extract in, which never affects chromaticity — it only decides which emitter
+ * carries a given part of the load.
  */
 
 /**
@@ -36,16 +36,22 @@ export const EMITTER_PRIMARIES: Readonly<
   Record<MixableChannelType, readonly [number, number, number]>
 > = {
   white: [1.0, 1.0, 1.0],
-  warmWhite: [1.0, 0.75, 0.5],
-  coolWhite: [0.8, 0.9, 1.0],
   amber: [1.0, 0.75, 0.0],
   orange: [1.0, 0.5, 0.0],
   lime: [0.5, 1.0, 0.0],
   uv: [0.5, 0.0, 1.0],
 }
 
+/**
+ * Extraction order, broadest-spectrum emitter first. Order never changes chromaticity — the
+ * reconstruction is exact either way — it only decides which emitter carries a given part of the
+ * load, and taking white first leaves the narrower emitters to colour the remainder. Held here
+ * rather than reusing {@link MIXABLE_CHANNEL_TYPES}, whose order is vocabulary, not mix order.
+ */
+export const STAGE_ORDER: readonly MixableChannelType[] = ['white', 'amber', 'orange', 'lime', 'uv']
+
 export interface MixStage {
-  /** Emitter triple for this stage (summed when warm + cool white share a stage). */
+  /** This emitter's RGB triple, from {@link EMITTER_PRIMARIES}. */
   er: number
   eg: number
   eb: number
@@ -111,8 +117,6 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
   // fixture is RGB plus a `white` extra, so its white lands here like any other emitter.
   const mixableChannels: Record<MixableChannelType, number[]> = {
     white: [],
-    warmWhite: [],
-    coolWhite: [],
     amber: [],
     orange: [],
     lime: [],
@@ -153,40 +157,24 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
       blueChannels.push(ec.channel)
       hasRgbExtra = true
     } else {
-      mixableChannels[ec.type as MixableChannelType].push(ec.channel)
+      // Extras arrive from persisted JSON, which the config schema validates only loosely, so the
+      // type is not guaranteed to be one this build knows. Report and skip rather than driving the
+      // channel with a guessed primary or indexing a bucket that isn't there.
+      const bucket = mixableChannels[ec.type as MixableChannelType]
+      if (!bucket) {
+        exclude(label, true)
+        return
+      }
+      bucket.push(ec.channel)
     }
   })
 
   const stages: MixStage[] = []
-
-  // Stage order: broadest-spectrum emitters first. white → warm+cool white → amber → orange → lime
-  // → uv. Order never changes chromaticity (reconstruction is exact) — only which emitter carries
-  // the load. Warm and cool white share one stage against their summed triple when both exist, so a
-  // neutral-white cue drives them equally instead of pinning one at full and leaving the other dark.
-  if (mixableChannels.white.length) {
-    const [er, eg, eb] = EMITTER_PRIMARIES.white
-    stages.push({ er, eg, eb, channels: mixableChannels.white })
-  }
-
-  const ww = mixableChannels.warmWhite
-  const cw = mixableChannels.coolWhite
-  if (ww.length && cw.length) {
-    const w = EMITTER_PRIMARIES.warmWhite
-    const c = EMITTER_PRIMARIES.coolWhite
-    stages.push({ er: w[0] + c[0], eg: w[1] + c[1], eb: w[2] + c[2], channels: [...ww, ...cw] })
-  } else if (ww.length) {
-    const [er, eg, eb] = EMITTER_PRIMARIES.warmWhite
-    stages.push({ er, eg, eb, channels: ww })
-  } else if (cw.length) {
-    const [er, eg, eb] = EMITTER_PRIMARIES.coolWhite
-    stages.push({ er, eg, eb, channels: cw })
-  }
-
-  for (const type of ['amber', 'orange', 'lime', 'uv'] as const) {
-    if (mixableChannels[type].length) {
-      const [er, eg, eb] = EMITTER_PRIMARIES[type]
-      stages.push({ er, eg, eb, channels: mixableChannels[type] })
-    }
+  for (const type of STAGE_ORDER) {
+    const channels = mixableChannels[type]
+    if (!channels.length) continue
+    const [er, eg, eb] = EMITTER_PRIMARIES[type]
+    stages.push({ er, eg, eb, channels })
   }
 
   if (stages.length === 0 && !hasRgbExtra && fixedWrites.length === 0 && reportableProblems === 0) {
