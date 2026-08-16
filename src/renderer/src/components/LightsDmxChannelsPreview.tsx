@@ -1,6 +1,10 @@
 import React, { useMemo } from 'react'
 import { LightingConfiguration, DmxFixture } from '../../../photonics-dmx/types'
-import { extraChannelDisplayLabel, findSharedChannelNumbers } from './lightChannelDisplay'
+import {
+  extraChannelDisplayLabel,
+  findSharedChannelNumbersInConfig,
+  sortBaseChannelEntries,
+} from './lightChannelDisplay'
 
 interface LightsDmxChannelsPreviewProps {
   lightingConfig: LightingConfiguration // Lighting configuration containing the lights
@@ -22,51 +26,42 @@ const LightsDmxChannelsPreview: React.FC<LightsDmxChannelsPreviewProps> = ({
   // buffer, so a shared address shows the same number on every row pointing at it — which reads as
   // a channel computing wrongly unless the sharing is called out.
   const sharedChannels = useMemo(
-    () =>
-      new Set(
-        findSharedChannelNumbers([
-          ...(lightingConfig?.frontLights ?? []),
-          ...(lightingConfig?.backLights ?? []),
-          ...(lightingConfig?.strobeLights ?? []),
-        ]),
-      ),
+    () => new Set(findSharedChannelNumbersInConfig(lightingConfig)),
     [lightingConfig],
   )
 
-  /** Channel number plus its live value, flagged when the address is shared. */
-  const renderChannelValue = (channelNumber: number) => {
+  /** Bracketed DMX address in the label; styled smaller so live values do not shift the row. */
+  const renderChannelAddress = (channelNumber: number) => {
     const shared = sharedChannels.has(channelNumber)
     return (
-      <span className="flex items-baseline gap-2">
-        <span
-          className={
-            shared
-              ? 'text-xs text-amber-600 dark:text-amber-400 font-semibold'
-              : 'text-xs text-gray-500 dark:text-gray-400'
-          }
-          title={shared ? 'Another channel in this rig uses the same address' : undefined}>
-          ch {channelNumber}
-          {shared ? ' ⚠' : ''}
-        </span>
-        <span>{dmxValues[channelNumber] || 0}</span>
+      <span
+        className={
+          shared
+            ? 'text-xs text-amber-600 dark:text-amber-400 font-semibold'
+            : 'text-xs text-gray-500 dark:text-gray-400'
+        }
+        title={shared ? 'Another channel in this rig uses the same address' : undefined}>
+        {' '}
+        (#{channelNumber}
+        {shared ? ' ⚠' : ''})
       </span>
     )
+  }
+
+  /** Live DMX value for one channel address. */
+  const renderChannelValue = (channelNumber: number) => <span>{dmxValues[channelNumber] || 0}</span>
+
+  const baseChannelLabel = (channelName: string): string => {
+    if (channelName === 'masterDimmer') return 'Master Dimmer'
+    if (channelName === 'strobeChannel') return 'Strobe Speed'
+    return channelName
   }
 
   /**
    * Helper function to render a single light's channels and values.
    */
   const renderLightChannels = (light: DmxFixture) => {
-    const channelEntries = Object.entries(light.channels)
-
-    // Find the 'md' channel entry, if it exists
-    const mdEntry = channelEntries.find(([channelName]) => channelName === 'md')
-
-    // Filter out the 'md' channel from the other channels
-    const otherEntries = channelEntries.filter(([channelName]) => channelName !== 'md')
-
-    // Combine the other channels with the 'md' channel at the end (if it exists)
-    const sortedEntries = mdEntry ? [...otherEntries, mdEntry] : otherEntries
+    const sortedEntries = sortBaseChannelEntries(Object.entries(light.channels))
 
     return (
       <div
@@ -78,9 +73,9 @@ const LightsDmxChannelsPreview: React.FC<LightsDmxChannelsPreviewProps> = ({
         <ul className="list-disc list-inside space-y-1">
           {sortedEntries.map(([channelName, channelNumber]) => (
             <li key={channelName} className="flex justify-between gap-2">
-              {/* Conditionally render "MasterDimmer" instead of "md" */}
               <span className="capitalize text-gray-700 dark:text-gray-300">
-                {channelName === 'md' ? 'MasterDimmer' : channelName}:
+                {baseChannelLabel(channelName)}
+                {renderChannelAddress(channelNumber)}:
               </span>
               {renderChannelValue(channelNumber)}
             </li>
@@ -90,7 +85,8 @@ const LightsDmxChannelsPreview: React.FC<LightsDmxChannelsPreviewProps> = ({
           {(light.extraChannels ?? []).map((extra, i) => (
             <li key={`extra-${i}`} className="flex justify-between gap-2">
               <span className="text-gray-700 dark:text-gray-300">
-                {extraChannelDisplayLabel(light, i)}:
+                {extraChannelDisplayLabel(light, i)}
+                {renderChannelAddress(extra.channel)}:
               </span>
               {renderChannelValue(extra.channel)}
             </li>

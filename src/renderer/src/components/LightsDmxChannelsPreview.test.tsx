@@ -51,14 +51,16 @@ describe('LightsDmxChannelsPreview extra channels', () => {
     const l = light(RGB, [{ type: 'amber', channel: 5 }])
     render(<LightsDmxChannelsPreview lightingConfig={config(l)} dmxValues={{ 2: 100, 5: 200 }} />)
     const card = screen.getByText(/PAR/).closest('div') as HTMLElement
-    const amberRow = within(card).getByText('Amber:').closest('li') as HTMLElement
+    const amberRow = within(card)
+      .getByText(/^Amber/)
+      .closest('li') as HTMLElement
     expect(within(amberRow).getByText('200')).toBeTruthy()
   })
 
   it('shows a fixed channel with its pinned live value', () => {
     const l = light(RGB, [{ type: 'fixed', channel: 5, value: 42 }])
     render(<LightsDmxChannelsPreview lightingConfig={config(l)} dmxValues={{ 5: 42 }} />)
-    const row = screen.getByText('Fixed value:').closest('li') as HTMLElement
+    const row = screen.getByText(/^Fixed value/).closest('li') as HTMLElement
     expect(within(row).getByText('42')).toBeTruthy()
   })
 
@@ -66,13 +68,29 @@ describe('LightsDmxChannelsPreview extra channels', () => {
     const l = light(RGB)
     render(<LightsDmxChannelsPreview lightingConfig={config(l)} dmxValues={{}} />)
     expect(screen.queryByText('Amber:')).toBeNull()
-    expect(screen.getByText('red:')).toBeTruthy()
+    expect(screen.getByText(/^red/)).toBeTruthy()
+  })
+
+  it('lists Master Dimmer before the other base channels', () => {
+    const rgbmh = light({
+      masterDimmer: 124,
+      red: 126,
+      green: 127,
+      blue: 128,
+      pan: 121,
+      tilt: 122,
+    })
+    render(<LightsDmxChannelsPreview lightingConfig={config(rgbmh)} dmxValues={{}} />)
+    const card = screen.getByText(/PAR/).closest('div') as HTMLElement
+    const rows = within(card).getAllByRole('listitem')
+    expect(rows[0].textContent).toMatch(/Master Dimmer/)
+    expect(rows[1].textContent).toMatch(/red/)
   })
 
   it('shows the DMX address alongside each value', () => {
     const l = light(RGB, [{ type: 'amber', channel: 5 }])
     render(<LightsDmxChannelsPreview lightingConfig={config(l)} dmxValues={{ 5: 200 }} />)
-    const amberRow = screen.getByText('Amber:').closest('li') as HTMLElement
+    const amberRow = screen.getByText(/^Amber/).closest('li') as HTMLElement
     expect(within(amberRow).getByText(/ch 5/)).toBeTruthy()
   })
 
@@ -87,10 +105,62 @@ describe('LightsDmxChannelsPreview extra channels', () => {
     const twoLights: LightingConfiguration = { ...config(first), frontLights: [first, second] }
     render(<LightsDmxChannelsPreview lightingConfig={twoLights} dmxValues={{ 11: 255 }} />)
 
-    const amberRow = screen.getByText('Amber:').closest('li') as HTMLElement
+    const amberRow = screen.getByText(/^Amber/).closest('li') as HTMLElement
     expect(within(amberRow).getByText(/ch 11/).textContent).toContain('⚠')
     // The unshared channels stay unflagged.
-    const redRow = screen.getAllByText('red:')[0].closest('li') as HTMLElement
+    const redRow = screen.getAllByText(/^red/)[0].closest('li') as HTMLElement
     expect(within(redRow).getByText(/ch 2/).textContent).not.toContain('⚠')
+  })
+
+  it('does not flag AllCapable strobe snapshots that duplicate front/back addresses', () => {
+    const primary = light(RGB)
+    const snapshot: DmxLight = { ...primary, id: 'snapshot' }
+    const allCapable: LightingConfiguration = {
+      ...config(primary),
+      strobeType: ConfigStrobeType.AllCapable,
+      strobeLights: [snapshot],
+    }
+    render(<LightsDmxChannelsPreview lightingConfig={allCapable} dmxValues={{}} />)
+
+    const redRow = screen.getByText(/^red/).closest('li') as HTMLElement
+    expect(within(redRow).getByText(/ch 2/).textContent).not.toContain('⚠')
+  })
+
+  it('still flags a real overlap under AllCapable', () => {
+    const first = light(RGB, [{ type: 'amber', channel: 11 }])
+    const second: DmxLight = {
+      ...light({ masterDimmer: 11, red: 12, green: 13, blue: 14 }),
+      id: 'l2',
+      name: 'PAR 2',
+    }
+    const allCapable: LightingConfiguration = {
+      ...config(first),
+      strobeType: ConfigStrobeType.AllCapable,
+      frontLights: [first, second],
+      strobeLights: [{ ...first, id: 'snapshot' }],
+    }
+    render(<LightsDmxChannelsPreview lightingConfig={allCapable} dmxValues={{ 11: 255 }} />)
+
+    const amberRow = screen.getByText(/^Amber/).closest('li') as HTMLElement
+    expect(within(amberRow).getByText(/ch 11/).textContent).toContain('⚠')
+  })
+
+  it('flags dedicated strobe rows that overlap primary lights', () => {
+    const primary = light(RGB)
+    const strobe: DmxLight = {
+      ...light({ masterDimmer: 2, red: 3, green: 4, blue: 5 }),
+      id: 'strobe',
+      name: 'Strobe',
+      group: 'strobe',
+    }
+    const dedicated: LightingConfiguration = {
+      ...config(primary),
+      strobeType: ConfigStrobeType.Dedicated,
+      strobeLights: [strobe],
+    }
+    render(<LightsDmxChannelsPreview lightingConfig={dedicated} dmxValues={{ 2: 255 }} />)
+
+    const redRow = screen.getByText(/^red/).closest('li') as HTMLElement
+    expect(within(redRow).getByText(/ch 2/).textContent).toContain('⚠')
   })
 })
