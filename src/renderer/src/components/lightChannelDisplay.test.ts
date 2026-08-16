@@ -2,14 +2,19 @@ import { describe, expect, it } from '@jest/globals'
 import {
   FixtureTypes,
   LightTypes,
+  ConfigStrobeType,
   type DmxFixture,
+  type DmxLight,
   type ExtraChannel,
+  type LightingConfiguration,
 } from '../../../photonics-dmx/types'
 import {
   BASE_CHANNEL_ORDER,
   extraChannelDisplayLabel,
   findDuplicateChannelNumbers,
   findSharedChannelNumbers,
+  findSharedChannelNumbersInConfig,
+  fixturesForChannelOccupancyCheck,
   fixtureHasZeroChannel,
   sortBaseChannelEntries,
 } from './lightChannelDisplay'
@@ -28,6 +33,20 @@ function fixture(
     isStrobeEnabled: false,
     channels: channels as unknown as DmxFixture['channels'],
     ...(extraChannels ? { extraChannels } : {}),
+  }
+}
+
+function dmxLight(
+  fx: FixtureTypes,
+  channels: Record<string, number>,
+  extraChannels?: ExtraChannel[],
+): DmxLight {
+  return {
+    ...fixture(fx, channels, extraChannels),
+    fixtureId: 't',
+    group: 'front',
+    universe: 1,
+    mount: 'floor',
   }
 }
 
@@ -145,5 +164,37 @@ describe('findSharedChannelNumbers', () => {
     const a = fixture(FixtureTypes.RGB, { masterDimmer: 1, red: 2, green: 3, blue: 4 })
     const b = fixture(FixtureTypes.RGB, { masterDimmer: 11, red: 12, green: 13, blue: 14 })
     expect(findSharedChannelNumbers([a, b])).toEqual([])
+  })
+})
+
+describe('fixturesForChannelOccupancyCheck', () => {
+  const rgb = dmxLight(FixtureTypes.RGB, { masterDimmer: 1, red: 2, green: 3, blue: 4 })
+
+  it('excludes AllCapable strobe snapshots from occupancy checks', () => {
+    const config: Pick<
+      LightingConfiguration,
+      'frontLights' | 'backLights' | 'strobeLights' | 'strobeType'
+    > = {
+      strobeType: ConfigStrobeType.AllCapable,
+      frontLights: [rgb],
+      backLights: [],
+      strobeLights: [{ ...rgb, id: 'snapshot' }],
+    }
+    expect(fixturesForChannelOccupancyCheck(config)).toHaveLength(1)
+    expect(findSharedChannelNumbersInConfig(config)).toEqual([])
+  })
+
+  it('includes dedicated strobe rows in occupancy checks', () => {
+    const strobe = dmxLight(FixtureTypes.STROBE, { masterDimmer: 1, strobeChannel: 1 })
+    const config: Pick<
+      LightingConfiguration,
+      'frontLights' | 'backLights' | 'strobeLights' | 'strobeType'
+    > = {
+      strobeType: ConfigStrobeType.Dedicated,
+      frontLights: [rgb],
+      backLights: [],
+      strobeLights: [strobe],
+    }
+    expect(fixturesForChannelOccupancyCheck(config)).toHaveLength(2)
   })
 })

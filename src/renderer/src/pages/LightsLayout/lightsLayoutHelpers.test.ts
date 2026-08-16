@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals'
 import { ConfigStrobeType, FixtureTypes } from '../../../../photonics-dmx/types'
 import type { DmxFixture, DmxLight, LightingConfiguration } from '../../../../photonics-dmx/types'
+import { findSharedChannelNumbers } from '../../components/lightChannelDisplay'
 import {
   LIGHT_LAYOUTS,
   createDmxLightInstance,
@@ -170,5 +171,20 @@ describe('createDmxLightInstance', () => {
     // Widest offset is +13, so the master must sit at 512 - 13.
     expect(masterOf(light)).toBe(499)
     expect(light.extraChannels).toEqual([{ type: 'amber', channel: 512 }])
+  })
+
+  it('bootstraps an initial sequence from one wide template without overlapping channels', () => {
+    const bootstrap = (count: number): DmxLight[] => {
+      const placed: DmxLight[] = []
+      for (let i = 0; i < count; i++) {
+        const { light } = createDmxLightInstance('front', placed, [wideTemplate])
+        placed.push(light)
+      }
+      return placed
+    }
+
+    const lights = bootstrap(3)
+    expect(lights.map(masterOf)).toEqual([1, 21, 41])
+    expect(findSharedChannelNumbers(lights)).toEqual([])
   })
 })

@@ -1,4 +1,9 @@
-import type { DmxFixture, ExtraChannelType } from '../../../photonics-dmx/types'
+import {
+  ConfigStrobeType,
+  type DmxFixture,
+  type ExtraChannelType,
+  type LightingConfiguration,
+} from '../../../photonics-dmx/types'
 
 /**
  * Shared display helpers for a fixture's channel list — the base (archetype) channels plus any
@@ -105,6 +110,27 @@ export function findDuplicateChannelNumbers(fixture: DmxFixture): number[] {
  * one address space no matter what `universe` each names, and lights in different rigs cannot
  * collide at all.
  */
+/**
+ * Authoritative fixture set for per-rig channel occupancy checks. Front and back lights always
+ * count; dedicated strobe rows count only in `Dedicated` mode because `strobeLights` is a
+ * non-authoritative snapshot in `AllCapable` mode.
+ */
+export function fixturesForChannelOccupancyCheck(
+  config: Pick<LightingConfiguration, 'frontLights' | 'backLights' | 'strobeLights' | 'strobeType'>,
+): DmxFixture[] {
+  const front = config.frontLights ?? []
+  const back = config.backLights ?? []
+  const strobe = config.strobeType === ConfigStrobeType.Dedicated ? config.strobeLights ?? [] : []
+  return [...front, ...back, ...strobe]
+}
+
+/** Shared DMX addresses within one rig's authoritative fixture set. */
+export function findSharedChannelNumbersInConfig(
+  config: Pick<LightingConfiguration, 'frontLights' | 'backLights' | 'strobeLights' | 'strobeType'>,
+): number[] {
+  return findSharedChannelNumbers(fixturesForChannelOccupancyCheck(config))
+}
+
 export function findSharedChannelNumbers(fixtures: DmxFixture[]): number[] {
   const counts = new Map<number, number>()
   const add = (n: number): void => {
