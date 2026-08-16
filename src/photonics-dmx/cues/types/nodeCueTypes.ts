@@ -9,6 +9,12 @@ import {
 
 export type NodeCueMode = 'yarg' | 'audio' | 'rb3'
 
+/**
+ * The modes fed by a game datagram: cueType-keyed cues over `CueData` frames, dispatched by a cue
+ * handler against a registry. Audio is the other family, keyed by its own cue ids over audio frames.
+ */
+export type GameCueMode = Exclude<NodeCueMode, 'audio'>
+
 /** Lighting = colour/intensity cues; motion = pan/tilt / motion-pattern (parallel layer). */
 export type NodeCueKind = 'lighting' | 'motion'
 

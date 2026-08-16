@@ -8,11 +8,11 @@ import { Rb3StageKitDirectProcessor } from './Rb3StageKitDirectProcessor'
 import { Rb3StageKitCueProcessor } from './Rb3StageKitCueProcessor'
 import type { Rb3GameModeSchedulePayload } from './Rb3GameModeManager'
 import { ChainFanout } from '../controllers/ChainFanout'
-import { Rb3ChainRuntime } from '../controllers/Rb3ChainRuntime'
+import { ChainCueRuntime } from '../controllers/ChainCueRuntime'
 import { StageKitConfig } from '../listeners/RB3/StageKitTypes'
 import { CueData } from '../cues/types/cueTypes'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
-import type { YargCueRuntime } from '../listeners/YARG/YargNetworkListener'
+import type { CueRuntime } from '../cueHandlers/CueRuntime'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('ProcessorManager')
 
@@ -32,7 +32,7 @@ export interface ProcessorManagerConfig {
   /** Cue-mode dispatch surface. Defaults to an RB3 chain runtime over the fanout so cue mode
    *  drives the RB3 handler slot; the coordinator passes its own runtime and the laser branch
    *  wraps it with its tee. */
-  cueRuntime?: YargCueRuntime
+  cueRuntime?: CueRuntime
   /** RB3 primary-cue dwell range (seconds) from the rb3Motion prefs; passed through to the cue
    *  processor so it can drive the LED-1-gated primary-cue switch (which also re-rolls motion). */
   getRb3MotionCueDurationRangeSec?: () => { min: number; max: number }
@@ -191,7 +191,7 @@ export class ProcessorManager extends EventEmitter {
 
     if (!this.stageKitCueProcessor) {
       this.stageKitCueProcessor = new Rb3StageKitCueProcessor(
-        this.config.cueRuntime ?? new Rb3ChainRuntime(this.chainFanout),
+        this.config.cueRuntime ?? new ChainCueRuntime(this.chainFanout, 'rb3'),
         {
           menuDispatch: this.chainFanout,
           getMotionSwitchDurationRangeSec: this.config.getRb3MotionCueDurationRangeSec,

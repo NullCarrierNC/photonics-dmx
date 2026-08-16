@@ -2,7 +2,7 @@
  * With the live RB3E listener disabled, START_RB3_TEST_EFFECT validates the cue id and delegates
  * to the interval-driven RB3 test-effect runner (so a held strobe re-fires cue-called
  * continuously). The per-chain dispatch routing is covered by the TestEffectRunner and
- * Rb3ChainRuntime tests.
+ * ChainCueRuntime tests.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
@@ -36,8 +36,7 @@ describe('START_RB3_TEST_EFFECT while RB3E is disabled', () => {
     const controllerManager = {
       setOnConsoleEnter: jest.fn(),
       setOnSimulationPreempt: jest.fn(),
-      ensureChainsHaveYargHandlersForSimulation: jest.fn(),
-      ensureChainsHaveRb3HandlersForSimulation: jest.fn(),
+      ensureChainsHaveHandlersForSimulation: jest.fn(),
       getChainFanout: () => fanout,
       getMotionCueSimulator: () => motionCueSimulator,
       getIsInitialized: () => true,

@@ -7,10 +7,9 @@ import type { Clock } from '../controllers/sequencer/Clock'
 import { ConfigStrobeType, DmxLight, FixtureTypes, LightingConfiguration, RGBIO } from '../types'
 import { NodeCueLoader } from '../cues/node/loader/NodeCueLoader'
 import { EffectLoader } from '../cues/node/loader/EffectLoader'
-import { YargCueRegistry } from '../cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
-import { getRb3CueRegistry } from '../cues/registries/Rb3CueRegistry'
-import { YargCueHandler } from '../cueHandlers/YargCueHandler'
+import { getCueRegistry } from '../cues/registries/cueRegistries'
+import { CueHandler } from '../cueHandlers/CueHandler'
 import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
 import {
   CueType,
@@ -20,7 +19,9 @@ import {
 } from '../cues/types/cueTypes'
 import { VirtualTime } from './VirtualTime'
 import { FrameDriver, FrameState, FrameTransient } from './FrameDriver'
+import type { GameCueMode } from '../cues/types/nodeCueTypes'
 import {
+  LedBanks,
   ScenarioEntry,
   SimLightOrder,
   SimLightSample,
@@ -32,6 +33,8 @@ import {
 export interface CueSimulatorOptions {
   /** Cue library to simulate: a loaded group id (e.g. `yarg-stagekit`) or its filename. */
   library: string
+  /** Which game cue domain the library belongs to. Defaults to YARG. */
+  domain?: GameCueMode
   /** Root of the cue/effect data tree; defaults to the bundled `resources/defaults`. */
   baseDir?: string
   frontCount?: number
@@ -76,7 +79,7 @@ export class CueSimulator {
   private readonly lightStateManager: LightStateManager
   private readonly lightTransitionController: LightTransitionController
   private readonly sequencer: Sequencer
-  private readonly handler: YargCueHandler
+  private readonly handler: CueHandler
   private readonly lightOrder: SimLightOrder
 
   private frameDriver!: FrameDriver
@@ -87,6 +90,8 @@ export class CueSimulator {
   private venue: VenueSize
   private bpm: number
   private vocalActive = false
+  private ledBanks: LedBanks = { red: 0, green: 0, blue: 0, yellow: 0 }
+  private fogState = false
 
   private scenario: ScenarioEntry[] = []
   private samples: SimSample[] = []
@@ -110,7 +115,9 @@ export class CueSimulator {
       this.lightTransitionController,
       this.virtualTime as unknown as Clock,
     )
-    this.handler = new YargCueHandler(this.lightManager, this.sequencer)
+    this.handler = new CueHandler(this.lightManager, this.sequencer, {
+      registry: getCueRegistry(opts.domain),
+    })
 
     this.lightOrder = {
       front: this.lightManager.getLights(['front'], ['all']).map((l) => l.id),
@@ -122,6 +129,7 @@ export class CueSimulator {
   public static async create(options: CueSimulatorOptions): Promise<CueSimulator> {
     const resolved: ResolvedOptions = {
       library: options.library,
+      domain: options.domain ?? 'yarg',
       baseDir: options.baseDir ?? DEFAULT_BASE_DIR,
       frontCount: options.frontCount ?? 4,
       backCount: options.backCount ?? 4,
@@ -146,21 +154,21 @@ export class CueSimulator {
   }
 
   private async init(): Promise<void> {
-    const registry = YargCueRegistry.getInstance()
+    const registry = getCueRegistry(this.opts.domain)
     registry.reset()
 
     const effectLoader = new EffectLoader({ baseDir: this.opts.baseDir })
     const loader = new NodeCueLoader({
       baseDir: this.opts.baseDir,
-      yargRegistry: registry,
+      yargRegistry: getCueRegistry('yarg'),
       audioRegistry: AudioCueRegistry.getInstance(),
-      rb3Registry: getRb3CueRegistry(),
+      rb3Registry: getCueRegistry('rb3'),
       effectLoader,
       runtimeBroadcaster: noopRuntimeBroadcaster(),
     })
     await loader.loadAll()
 
-    const summaries = loader.getSummary().yarg
+    const summaries = loader.getSummary()[this.opts.domain]
     this.loadedGroupIds = summaries.map((s) => s.groupId)
     const fileToGroup = new Map<string, string>()
     for (const summary of summaries) {
@@ -179,7 +187,12 @@ export class CueSimulator {
     }
     this.groupId = resolvedGroupId
 
-    this.frameDriver = new FrameDriver(this.handler, () => this.getFrameState(), this.groupId)
+    this.frameDriver = new FrameDriver(
+      this.handler,
+      () => this.getFrameState(),
+      this.groupId,
+      this.opts.domain,
+    )
   }
 
   private getFrameState(): FrameState {
@@ -191,7 +204,14 @@ export class CueSimulator {
       venue: this.venue,
       bpm: this.bpm,
       vocalActive: this.vocalActive,
+      ledBanks: this.ledBanks,
+      fogState: this.fogState,
     }
+  }
+
+  /** RB3 only: set the StageKit LED bank masks the running cue mirrors. */
+  public setLedBanks(banks: LedBanks): void {
+    this.ledBanks = { ...banks }
   }
 
   /** Select the cue to simulate. Accepts any {@link CueType} value (e.g. `Menu`, `Strobe_Fast`). */
@@ -309,7 +329,7 @@ export class CueSimulator {
     try {
       this.handler.shutdown()
       this.sequencer.shutdown()
-      const registry = YargCueRegistry.getInstance()
+      const registry = getCueRegistry(this.opts.domain)
       registry.releaseSequencerFromAllCues(this.sequencer)
       for (const id of this.loadedGroupIds) {
         registry.unregisterGroup(id)
@@ -334,6 +354,14 @@ export class CueSimulator {
     if (entry.venue !== undefined) {
       this.venue = entry.venue
       this.pendingEvents.push(`venue=${entry.venue}`)
+    }
+    if (entry.ledBanks !== undefined) {
+      this.ledBanks = { ...entry.ledBanks }
+      this.pendingEvents.push(`ledBanks=${JSON.stringify(entry.ledBanks)}`)
+    }
+    if (entry.fog !== undefined) {
+      this.fogState = entry.fog
+      this.pendingEvents.push(`fog=${entry.fog}`)
     }
     if (entry.event !== undefined) {
       await this.applyEvent(entry.event)

@@ -62,7 +62,10 @@ describe('ProcessorManager', () => {
         isPrimary: true,
         dmxLightManager: mockLightManager,
         sequencer: mockSequencer,
-        yargCueHandler: null,
+        cueHandlers: {
+          yarg: null,
+          rb3: null,
+        },
         audioCueHandler: null,
         rb3MenuCueHandler: null,
       } as unknown as RigChain,

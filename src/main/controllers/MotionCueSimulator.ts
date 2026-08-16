@@ -1,7 +1,9 @@
 import type { INetCue } from '../../photonics-dmx/cues/interfaces/INetCue'
 import type { IAudioCue } from '../../photonics-dmx/cues/interfaces/IAudioCue'
 import type { ChainFanout } from './ChainFanout'
+import type { RigChain } from './RigChain'
 import type { CueData } from '../../photonics-dmx/cues/types/cueTypes'
+import type { GameCueMode, NodeCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { createMockAudioCueData } from '../ipc/mockCueData'
 
 interface MotionCueSimulatorDeps {
@@ -9,43 +11,38 @@ interface MotionCueSimulatorDeps {
 }
 
 /**
- * Owns the Cue-Simulation motion-cue state (the active YARG and audio motion cues + the audio
- * execution counter). Held by ControllerManager so it can be reset when the controller graph is
- * rebuilt — the previous module-scope globals survived restartControllers(), leaving a simulated cue
- * "active" against torn-down sequencers.
+ * Owns the Cue-Simulation motion-cue state: one active cue per game domain, the active audio motion
+ * cue, and the audio execution counter. Held by ControllerManager so it can be reset when the
+ * controller graph is rebuilt — the previous module-scope globals survived restartControllers(),
+ * leaving a simulated cue "active" against torn-down sequencers.
  */
 export class MotionCueSimulator {
-  private yargCue: INetCue | null = null
+  private readonly gameCues: Record<GameCueMode, INetCue | null> = { yarg: null, rb3: null }
   private audioCue: IAudioCue | null = null
-  private rb3Cue: INetCue | null = null
   private audioExecutionCount = 0
 
   constructor(private readonly deps: MotionCueSimulatorDeps) {}
 
-  hasYargActive(): boolean {
-    return this.yargCue !== null
+  hasGameCueActive(domain: GameCueMode): boolean {
+    return this.gameCues[domain] !== null
   }
 
-  setYargCue(cue: INetCue): void {
-    this.yargCue = cue
+  setGameCue(domain: GameCueMode, cue: INetCue): void {
+    this.gameCues[domain] = cue
   }
 
   setAudioCue(cue: IAudioCue): void {
     this.audioCue = cue
   }
 
-  setRb3Cue(cue: INetCue): void {
-    this.rb3Cue = cue
-  }
-
   /** Stop and clear every active cue without touching pan/tilt (used by start-paths and restart). */
   clearActive(): void {
-    this.yargCue?.onStop?.()
-    this.yargCue = null
+    for (const domain of Object.keys(this.gameCues) as GameCueMode[]) {
+      this.gameCues[domain]?.onStop?.()
+      this.gameCues[domain] = null
+    }
     this.audioCue?.onStop?.()
     this.audioCue = null
-    this.rb3Cue?.onStop?.()
-    this.rb3Cue = null
     this.audioExecutionCount = 0
   }
 
@@ -55,7 +52,7 @@ export class MotionCueSimulator {
    */
   stop(): void {
     this.clearActive()
-    this.deps.getChainFanout().yargSchedulePanTiltClear()
+    this.deps.getChainFanout().schedulePanTiltClear()
   }
 
   /**
@@ -66,35 +63,43 @@ export class MotionCueSimulator {
     this.clearActive()
   }
 
-  /** Execute the active YARG motion cue once per active rig chain. */
-  async runYarg(mockCueData: CueData): Promise<void> {
-    if (!this.yargCue) return
-    for (const chain of this.deps.getChainFanout().getChains()) {
-      const maybePromise = this.yargCue.execute(mockCueData, chain.sequencer, chain.dmxLightManager)
-      if (maybePromise instanceof Promise) {
-        await maybePromise
-      }
+  /**
+   * Execute one domain's active motion cue once per active rig chain. Game domains run against the
+   * supplied mock cue data; audio builds fresh mock audio each pass from its own execution counter.
+   */
+  async run(domain: NodeCueMode, mockCueData?: CueData): Promise<void> {
+    if (domain === 'audio') {
+      if (!this.audioCue) return
+      this.audioExecutionCount++
+      const mockAudio = createMockAudioCueData(this.audioExecutionCount)
+      const cue = this.audioCue
+      await this.executeOnChains((sequencer, lightManager) =>
+        cue.execute(mockAudio, sequencer, lightManager),
+      )
+      return
     }
+    const cue = this.gameCues[domain]
+    if (!cue || !mockCueData) return
+    await this.executeOnChains((sequencer, lightManager) =>
+      cue.execute(mockCueData, sequencer, lightManager),
+    )
   }
 
-  /** Execute the active RB3 motion cue once per active rig chain. */
-  async runRb3(mockCueData: CueData): Promise<void> {
-    if (!this.rb3Cue) return
-    for (const chain of this.deps.getChainFanout().getChains()) {
-      const maybePromise = this.rb3Cue.execute(mockCueData, chain.sequencer, chain.dmxLightManager)
-      if (maybePromise instanceof Promise) {
-        await maybePromise
-      }
-    }
+  /** Run every domain's active motion cue for one simulation frame. */
+  async runAll(mockCueData: CueData): Promise<void> {
+    await this.run('yarg', mockCueData)
+    await this.run('rb3', mockCueData)
+    await this.run('audio')
   }
 
-  /** Execute the active audio motion cue once per active rig chain with fresh mock audio data. */
-  async runAudio(): Promise<void> {
-    if (!this.audioCue) return
-    this.audioExecutionCount++
-    const mockAudio = createMockAudioCueData(this.audioExecutionCount)
+  private async executeOnChains(
+    execute: (
+      sequencer: RigChain['sequencer'],
+      lightManager: RigChain['dmxLightManager'],
+    ) => void | Promise<void>,
+  ): Promise<void> {
     for (const chain of this.deps.getChainFanout().getChains()) {
-      const maybePromise = this.audioCue.execute(mockAudio, chain.sequencer, chain.dmxLightManager)
+      const maybePromise = execute(chain.sequencer, chain.dmxLightManager)
       if (maybePromise instanceof Promise) {
         await maybePromise
       }

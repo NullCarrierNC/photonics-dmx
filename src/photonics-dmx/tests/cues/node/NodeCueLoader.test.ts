@@ -6,9 +6,9 @@ import * as os from 'os'
 import * as path from 'path'
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
 import { NodeCueLoader } from '../../../cues/node/loader/NodeCueLoader'
-import { YargCueRegistry } from '../../../cues/registries/YargCueRegistry'
+import { CueRegistry } from '../../../cues/registries/CueRegistry'
 import { AudioCueRegistry } from '../../../cues/registries/AudioCueRegistry'
-import { getRb3CueRegistry } from '../../../cues/registries/Rb3CueRegistry'
+import { getCueRegistry } from '../../../cues/registries/cueRegistries'
 import {
   validateAudioNodeCueFile,
   validateRb3NodeCueFile,
@@ -159,32 +159,32 @@ function audioMotionOnlyFile(): AudioNodeCueFile {
 
 describe('NodeCueLoader', () => {
   let tmpDir: string
-  let yargRegistry: YargCueRegistry
+  let yargRegistry: CueRegistry
   let audioRegistry: AudioCueRegistry
   let loader: NodeCueLoader
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'node-cue-loader-'))
-    yargRegistry = YargCueRegistry.getInstance()
+    yargRegistry = CueRegistry.getInstance()
     audioRegistry = AudioCueRegistry.getInstance()
     yargRegistry.reset()
     audioRegistry.reset()
     // The RB3 registry is a module singleton; reset it so rb3 groups don't leak across tests.
-    getRb3CueRegistry().reset()
+    getCueRegistry('rb3').reset()
 
     loader = new NodeCueLoader({
       runtimeBroadcaster: noopRuntimeBroadcaster(),
       baseDir: tmpDir,
       yargRegistry,
       audioRegistry,
-      rb3Registry: getRb3CueRegistry(),
+      rb3Registry: getCueRegistry('rb3'),
     })
   })
 
   afterEach(() => {
     yargRegistry.reset()
     audioRegistry.reset()
-    getRb3CueRegistry().reset()
+    getCueRegistry('rb3').reset()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
@@ -453,7 +453,7 @@ describe('NodeCueLoader', () => {
 
       await loader.loadAll()
 
-      const group = getRb3CueRegistry().getGroup('loader-test-rb3')
+      const group = getCueRegistry('rb3').getGroup('loader-test-rb3')
       expect(group).toBeDefined()
       expect(group!.cues.get(CueType.Strobe_Fast)).toBeDefined()
       // The RB3 domain is isolated from the YARG listener's registry.
@@ -469,7 +469,7 @@ describe('NodeCueLoader', () => {
       writeRb3('rb3.json', rb3LightingFile(CueType.Strobe_Fast))
       await loader.loadAll()
 
-      const rb3 = getRb3CueRegistry()
+      const rb3 = getCueRegistry('rb3')
       // The registered strobe resolves to a cue implementation...
       expect(rb3.getCueImplementation(CueType.Strobe_Fast, 'simulated')).not.toBeNull()
       // ...while the always-active base RB3 cue is unauthored and resolves to a clean no-op.

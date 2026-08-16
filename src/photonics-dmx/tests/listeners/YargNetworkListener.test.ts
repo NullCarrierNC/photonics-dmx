@@ -6,7 +6,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { performance } from 'perf_hooks'
-import { YargNetworkListener, YargCueRuntime } from '../../listeners/YARG/YargNetworkListener'
+import { YargNetworkListener } from '../../listeners/YARG/YargNetworkListener'
+import type { CueRuntime } from '../../cueHandlers/CueRuntime'
 import { CueData, CueType, defaultCueData } from '../../cues/types/cueTypes'
 
 const YARG_PACKET_HEADER_LE = 0x59415247 // 'YARG'
@@ -39,7 +40,7 @@ class YargNetworkListenerMinV2 extends YargNetworkListener {
   }
 }
 
-class MockCueHandler implements YargCueRuntime {
+class MockCueHandler implements CueRuntime {
   public notifySongStart = jest.fn()
   public notifySongEnd = jest.fn()
   public handleBeat = jest.fn()

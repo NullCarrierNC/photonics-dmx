@@ -78,8 +78,8 @@ jest.mock('electron', () => ({
 jest.mock('../../utils/windowUtils', () => ({ sendToAllWindows: mockSendToAllWindows }))
 
 jest.mock('../../../photonics-dmx/cues', () => ({}))
-jest.mock('../../../photonics-dmx/cues/registries/YargCueRegistry', () => ({
-  YargCueRegistry: {
+jest.mock('../../../photonics-dmx/cues/registries/CueRegistry', () => ({
+  CueRegistry: {
     getInstance: jest.fn().mockReturnValue({
       getRegisteredMotionGroupIds: jest.fn().mockReturnValue([]),
       setEnabledMotionGroups: jest.fn(),

@@ -47,7 +47,11 @@ const warnedExpressionParseErrors = new Set<string>()
 
 export interface LogicNodeEvaluatorContext {
   cueId: string
-  lightManager: DmxLightManager
+  /**
+   * Required for light-dependent logic (`config-data`, ring/`all-lights-array`). A graph that drives
+   * no lights passes it undefined; those logic types throw a clear error if used in such a graph.
+   */
+  lightManager?: DmxLightManager
   cueLevelVarStore: Map<string, VariableValue>
   groupLevelVarStore: Map<string, VariableValue>
   variableDefinitions: VariableDefinition[]
@@ -432,6 +436,9 @@ export function evaluateLogicNode(
     }
 
     case 'config-data': {
+      if (!lightManager) {
+        throw new Error('config-data logic is not supported without a light manager')
+      }
       const value = extractConfigDataValue(logicNode.dataProperty, lightManager)
 
       if (logicNode.assignTo) {
@@ -756,6 +763,9 @@ export function evaluateLogicNode(
       //     group size 1.
       // 4/8/16 are byte-identical to the prior special-cased folds (doubled / as-is /
       // front-back interleave); other counts intentionally change to hold the 8-step shape.
+      if (!lightManager) {
+        throw new Error('ring/all-lights logic is not supported without a light manager')
+      }
       const allLights = extractConfigDataValue('all-lights-array', lightManager)
       const lights = Array.isArray(allLights) ? allLights : []
       const n = lights.length

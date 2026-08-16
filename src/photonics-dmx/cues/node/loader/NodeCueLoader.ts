@@ -14,7 +14,7 @@ import {
   YargNodeCueFile,
 } from '../../types/nodeCueTypes'
 import { NodeCueCompilationError, NodeCueCompiler } from '../compiler/NodeCueCompiler'
-import { YargCueRegistry } from '../../registries/YargCueRegistry'
+import { CueRegistry } from '../../registries/CueRegistry'
 import { AudioCueRegistry, AudioCueGroup } from '../../registries/AudioCueRegistry'
 import type { ICueGroup } from '../../interfaces/INetCueGroup'
 import { INetCue } from '../../interfaces/INetCue'
@@ -57,9 +57,9 @@ export type NodeRuntimeCallbacks = import('../runtime/executionTypes').NodeRunti
 
 interface NodeCueLoaderOptions {
   baseDir: string
-  yargRegistry: YargCueRegistry
+  yargRegistry: CueRegistry
   audioRegistry: AudioCueRegistry
-  rb3Registry: YargCueRegistry
+  rb3Registry: CueRegistry
   effectLoader?: EffectLoader
   /** Injected host emit for cue/effect runtime IPC; required for production main. */
   runtimeBroadcaster: RuntimeBroadcaster

@@ -15,7 +15,7 @@ import {
   DrumNoteType,
 } from '../../cues/types/cueTypes'
 import { createLogger } from '../../../shared/logger'
-import type { SongEventCondition } from '../../controllers/sequencer/interfaces'
+import type { CueRuntime } from '../../cueHandlers/CueRuntime'
 import { monotonicNowMs } from '../../../shared/time'
 import {
   PlatformByte,
@@ -31,33 +31,6 @@ import {
 } from './yargTypes'
 
 const log = createLogger('YargNetworkListener')
-
-export interface YargCueRuntime {
-  notifySongStart(): void
-  notifySongEnd(): void
-  handleBeat(): void
-  handleMeasure(): void
-  handleKeyframeFirst(): void
-  handleKeyframeNext(): void
-  handleKeyframePrevious(): void
-  handleCue(cueType: CueType, parameters: CueData): Promise<void>
-  handleDrumNote(noteType: DrumNoteType, data: CueData): void
-  handleGuitarNote(noteType: InstrumentNoteType, data: CueData): void
-  handleBassNote(noteType: InstrumentNoteType, data: CueData): void
-  handleKeysNote(noteType: InstrumentNoteType, data: CueData): void
-  handleVocalNote(data: CueData): void
-  /**
-   * Advance action-timing waits gated on a song event (e.g. an RB3 `led-3` / `fog-on` edge). Optional
-   * so existing YARG-only runtimes need no change; the RB3 cue-mode processor calls it. Typed off the
-   * sequencer union so the two can't drift.
-   */
-  handleSongEvent?(condition: SongEventCondition): void
-  /**
-   * Force a motion-cue re-pick on every chain. Optional; the RB3 cue-mode processor calls it when its
-   * switch-timer has elapsed and Light 1 changes state (RB3 has no beat to key motion selection on).
-   */
-  requestMotionRepick?(): void
-}
 
 const PORT = 36107
 const PACKET_HEADER = 0x59415247 // 'YARG' in hex
@@ -104,7 +77,7 @@ const POST_PROCESSING_MAP: Record<number, PostProcessing> = {
 
 export class YargNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null
-  private cueHandler: YargCueRuntime
+  private cueHandler: CueRuntime
 
   //private logFilePath = path.join(app.getPath('documents'), 'yargLog.json');
   private listening = false
@@ -142,7 +115,7 @@ export class YargNetworkListener extends EventEmitter {
   /** Polls for the fallback condition independently of incoming packets (covers YARG going silent). */
   private fallbackTimer: NodeJS.Timeout | null = null
 
-  constructor(cueHandler: YargCueRuntime, options?: { getFallbackCueTimeMs?: () => number }) {
+  constructor(cueHandler: CueRuntime, options?: { getFallbackCueTimeMs?: () => number }) {
     super() // Initialize EventEmitter
     this.cueHandler = cueHandler
     this.getFallbackCueTimeMs = options?.getFallbackCueTimeMs ?? (() => 20000)

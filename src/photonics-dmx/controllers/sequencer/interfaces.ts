@@ -276,7 +276,7 @@ export interface ISongEventHandler {
 }
 
 /** The condition union accepted by {@link ISongEventHandler.handleEvent} — the single source shared by
- *  every layer that forwards a song event (sequencer, ChainFanout, YargCueRuntime). */
+ *  every layer that forwards a song event (sequencer, ChainFanout, CueRuntime). */
 export type SongEventCondition = Parameters<ISongEventHandler['handleEvent']>[0]
 
 /**

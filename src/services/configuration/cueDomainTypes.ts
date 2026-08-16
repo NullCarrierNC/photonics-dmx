@@ -1,5 +1,6 @@
 /**
- * Shared types for per-domain cue configuration (YARG, audio, and motion layers).
+ * Shared types for per-domain cue configuration: the YARG, RB3 and audio lighting domains plus a
+ * motion domain for each.
  */
 
 export const CUE_DOMAINS = [
@@ -14,9 +15,8 @@ export const CUE_DOMAINS = [
 export type CueDomain = (typeof CUE_DOMAINS)[number]
 
 /**
- * YARG and audio *lighting* use oncePerSong | withinSong.
- * YARG and audio *motion* use oncePerSong | perCueChange | none.
- * Storage uses one union; each domain only reads the subset it supports.
+ * Lighting domains use oncePerSong | withinSong; motion domains use oncePerSong | perCueChange |
+ * none. Storage uses one union; each domain only reads the subset it supports.
  */
 export type CueDomainSelectionMode = 'oncePerSong' | 'perCueChange' | 'withinSong' | 'none'
 
@@ -29,12 +29,12 @@ export interface CueDomainPrefs {
   enabledGroups: string[]
   knownGroups: string[]
   disabledCues: Record<string, string[]>
-  /** Meaning depends on domain (YARG lighting vs motion layers). */
+  /** Meaning depends on the domain (lighting vs motion), see CueDomainSelectionMode. */
   selectionMode?: CueDomainSelectionMode
   activeCueRef?: CueActiveRef | null
-  /** YARG motion and audio motion automatic picks only. */
+  /** Motion domains: chance (0-100) that an automatic pick plays on a new lighting cue. */
   probabilityPercent?: number
-  /** Shared min-hold (ms) for YARG and audio motion automatic picks. */
+  /** Motion domains: minimum time (ms) an automatic pick is held before another can replace it. */
   minimumHoldMs?: number
   /** Motion domains: randomized switch-timer range (seconds). RB3 arms a switch when a countdown
    *  drawn from [min, max] elapses, then fires on the next trigger edge. */

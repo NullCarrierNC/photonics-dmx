@@ -63,3 +63,88 @@ export class DisabledCueStore {
     this.disabled.clear()
   }
 }
+
+/** A group as seen by the motion helpers, read-only for the same covariance reason as above. */
+interface MotionGroupView<TCue> {
+  id: string
+  name: string
+  description?: string
+  motionCues?: ReadonlyMap<string, TCue>
+}
+
+/** One row of the motion-group picker. */
+export interface MotionGroupInfo {
+  id: string
+  name: string
+  description?: string
+  cueCount: number
+}
+
+/** One row of the motion-cue picker, as the renderer displays it. */
+export interface MotionCueDetail {
+  id: string
+  name: string
+  description: string
+}
+
+/** Resolve a motion cue by reference, honouring the enabled-group and disabled-cue gates. */
+export function resolveMotionCue<TCue>(
+  group: MotionGroupView<TCue> | undefined,
+  ref: { groupId: string; cueId: string },
+  isGroupEnabled: (groupId: string) => boolean,
+  isCueDisabled: (groupId: string, cueId: string) => boolean,
+): TCue | null {
+  const motionCues = group?.motionCues
+  if (!motionCues || motionCues.size === 0) {
+    return null
+  }
+  if (!isGroupEnabled(ref.groupId) || isCueDisabled(ref.groupId, ref.cueId)) {
+    return null
+  }
+  return motionCues.get(ref.cueId) ?? null
+}
+
+/** Locate the group and cue ids of a motion cue instance, for UI and IPC metadata. */
+export function findMotionCueRefIn<TCue>(
+  groups: Iterable<MotionGroupView<TCue>>,
+  cue: TCue,
+): { groupId: string; cueId: string } | null {
+  for (const group of groups) {
+    if (!group.motionCues) continue
+    for (const [cueId, impl] of group.motionCues) {
+      if (impl === cue) {
+        return { groupId: group.id, cueId }
+      }
+    }
+  }
+  return null
+}
+
+/** Every group holding at least one motion program, sorted by display name. */
+export function motionGroupsInfoFor(groups: Iterable<MotionGroupView<unknown>>): MotionGroupInfo[] {
+  const rows: MotionGroupInfo[] = []
+  for (const group of groups) {
+    const cueCount = group.motionCues?.size ?? 0
+    if (cueCount === 0) {
+      continue
+    }
+    rows.push({
+      id: group.id,
+      name: group.name,
+      description: group.description,
+      cueCount,
+    })
+  }
+  return rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+}
+
+/** The picker rows for one group's motion programs; `describe` names each cue for its family. */
+export function motionCueDetailsFor<TCue>(
+  motionCues: ReadonlyMap<string, TCue> | undefined,
+  describe: (cue: TCue) => MotionCueDetail,
+): MotionCueDetail[] {
+  if (!motionCues) {
+    return []
+  }
+  return Array.from(motionCues.values()).map(describe)
+}

@@ -278,7 +278,7 @@ export class AudioCueHandler extends EventEmitter {
       if (prev !== motionCue) {
         this.currentMotionCueStartTime = nowMs
       }
-      const ref = this.registry.findAudioMotionCueRef(motionCue)
+      const ref = this.registry.findMotionCueRef(motionCue)
       if (ref) {
         this.emitAudioMotionCueChange(ref, source, manualFallback)
       }

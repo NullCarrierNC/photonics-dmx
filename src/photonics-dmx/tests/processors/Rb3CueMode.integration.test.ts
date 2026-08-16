@@ -8,7 +8,7 @@ import { EventEmitter } from 'events'
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { ProcessorManager } from '../../processors/ProcessorManager'
 import { ChainFanout } from '../../controllers/ChainFanout'
-import { Rb3ChainRuntime } from '../../controllers/Rb3ChainRuntime'
+import { ChainCueRuntime } from '../../controllers/ChainCueRuntime'
 import type { RigChain } from '../../controllers/RigChain'
 import { CueType } from '../../cues/types/cueTypes'
 import type { CueData } from '../../cues/types/cueTypes'
@@ -42,7 +42,10 @@ describe('RB3 cue mode (integration)', () => {
   let manager: ProcessorManager
 
   const startCueMode = (): void => {
-    manager = new ProcessorManager(fanout, { mode: 'cue', cueRuntime: new Rb3ChainRuntime(fanout) })
+    manager = new ProcessorManager(fanout, {
+      mode: 'cue',
+      cueRuntime: new ChainCueRuntime(fanout, 'rb3'),
+    })
     manager.setNetworkListener(listener)
   }
 
@@ -60,8 +63,10 @@ describe('RB3 cue mode (integration)', () => {
       {
         rigId: 'primary',
         isPrimary: true,
-        rb3CueHandler: { handleCue: rb3HandleCue, notifySongStart, notifySongEnd },
-        yargCueHandler: { handleCue: yargHandleCue },
+        cueHandlers: {
+          yarg: { handleCue: yargHandleCue },
+          rb3: { handleCue: rb3HandleCue, notifySongStart, notifySongEnd },
+        },
         sequencer: { handleSongEvent },
         rb3MenuCueHandler: { playMenuFrame, clear },
       } as unknown as RigChain,

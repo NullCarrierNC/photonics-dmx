@@ -1,7 +1,7 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../../controllers/ControllerManager'
 import { sendToAllWindows } from '../../utils/windowUtils'
-import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
+import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
 import { ipcError } from '../ipcResult'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import {
@@ -180,7 +180,7 @@ export function registerAudioMotionConfigHandlers(
         stageKitPrefs: { yargPriority: validation.value },
       })
 
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       registry.setStageKitPriority(validation.value)
       registry.clearConsistencyTracking()
 

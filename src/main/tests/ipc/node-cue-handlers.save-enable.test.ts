@@ -5,7 +5,7 @@ jest.mock('../../utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
 
 import { setupNodeCueHandlers } from '../../ipc/node-cue-handlers'
 import { NODE_CUES } from '../../../shared/ipcChannels'
-import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
+import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
 import { CueType } from '../../../photonics-dmx/cues/types/cueTypes'
 import { CueStyle, INetCue } from '../../../photonics-dmx/cues/interfaces/INetCue'
 import { ICueGroup } from '../../../photonics-dmx/cues/interfaces/INetCueGroup'
@@ -27,7 +27,7 @@ function makeGroup(id: string): ICueGroup {
 
 describe('node-cue save opts the saved group in', () => {
   it('enables a newly-saved yarg group and refreshes the known baseline in one write', async () => {
-    const registry = YargCueRegistry.getInstance()
+    const registry = CueRegistry.getInstance()
     registry.reset()
     registry.registerGroup(makeGroup('groupA'))
     registry.registerGroup(makeGroup('newGroup'))

@@ -1,5 +1,5 @@
-import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
-import { getRb3CueRegistry } from '../../cues/registries/Rb3CueRegistry'
+import { CueRegistry } from '../../cues/registries/CueRegistry'
+import { getCueRegistry } from '../../cues/registries/cueRegistries'
 import { INetCue, CueStyle } from '../../cues/interfaces/INetCue'
 import { ICueGroup } from '../../cues/interfaces/INetCueGroup'
 import { CueData, CueType } from '../../cues/types/cueTypes'
@@ -33,19 +33,19 @@ const groupWith = (id: string, name: string): ICueGroup => ({
 })
 
 describe('Rb3CueRegistry', () => {
-  let yarg: YargCueRegistry
-  let rb3: YargCueRegistry
+  let yarg: CueRegistry
+  let rb3: CueRegistry
 
   beforeEach(() => {
-    yarg = YargCueRegistry.getInstance()
+    yarg = CueRegistry.getInstance()
     yarg.reset()
-    rb3 = getRb3CueRegistry()
+    rb3 = getCueRegistry('rb3')
     rb3.reset()
   })
 
   it('is a distinct instance from the YARG singleton', () => {
     expect(rb3).not.toBe(yarg)
-    expect(getRb3CueRegistry()).toBe(rb3)
+    expect(getCueRegistry('rb3')).toBe(rb3)
   })
 
   it('keeps group registration and enablement isolated from YARG', () => {

@@ -44,7 +44,10 @@ describe('simulation IPC handlers while RB3E is enabled', () => {
         rigId: 'a',
         isPrimary: true,
         sequencer: { onBeat, schedulePanTiltClear: jest.fn() },
-        yargCueHandler: null,
+        cueHandlers: {
+          yarg: null,
+          rb3: null,
+        },
         audioCueHandler: null,
         rb3MenuCueHandler: null,
       } as unknown as RigChain,
@@ -53,8 +56,7 @@ describe('simulation IPC handlers while RB3E is enabled', () => {
     const controllerManager = {
       setOnConsoleEnter: jest.fn(),
       setOnSimulationPreempt: jest.fn(),
-      ensureChainsHaveYargHandlersForSimulation: jest.fn(),
-      ensureChainsHaveRb3HandlersForSimulation: jest.fn(),
+      ensureChainsHaveHandlersForSimulation: jest.fn(),
       getChainFanout: () => fanout,
       getMotionCueSimulator: () => motionCueSimulator,
       getIsInitialized: () => true,

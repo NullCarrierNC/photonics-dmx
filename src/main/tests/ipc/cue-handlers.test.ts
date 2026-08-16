@@ -1,4 +1,4 @@
-import { YargCueRegistry as CueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
+import { CueRegistry as CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
 import { INetCue, CueStyle } from '../../../photonics-dmx/cues/interfaces/INetCue'
 import { ICueGroup } from '../../../photonics-dmx/cues/interfaces/INetCueGroup'
 import { CueData, CueType } from '../../../photonics-dmx/cues/types/cueTypes'
@@ -16,11 +16,11 @@ const mockIpcMain = {
 // override these by replacing the mock function after import.
 const stubChainFanout = {
   handleCue: jest.fn(),
-  yargOnBeat: jest.fn(),
-  yargOnMeasure: jest.fn(),
-  yargOnKeyframe: jest.fn(),
-  yargSchedulePanTiltClear: jest.fn(),
-  yargCancelPanTiltClear: jest.fn(),
+  onBeat: jest.fn(),
+  onMeasure: jest.fn(),
+  onKeyframe: jest.fn(),
+  schedulePanTiltClear: jest.fn(),
+  cancelPanTiltClear: jest.fn(),
   getChains: jest.fn().mockReturnValue([]),
 }
 
@@ -33,17 +33,15 @@ const mockControllerManager = {
   getLightingController: jest.fn(),
   getChainFanout: jest.fn(() => stubChainFanout),
   getMotionCueSimulator: jest.fn(() => ({
-    hasYargActive: () => false,
+    hasGameCueActive: () => false,
     stop: jest.fn(),
     clearActive: jest.fn(),
-    setYargCue: jest.fn(),
+    setGameCue: jest.fn(),
     setAudioCue: jest.fn(),
-    setRb3Cue: jest.fn(),
-    runYarg: jest.fn(() => Promise.resolve()),
-    runRb3: jest.fn(() => Promise.resolve()),
-    runAudio: jest.fn(() => Promise.resolve()),
+    run: jest.fn(() => Promise.resolve()),
+    runAll: jest.fn(() => Promise.resolve()),
   })),
-  ensureChainsHaveYargHandlersForSimulation: jest.fn(),
+  ensureChainsHaveHandlersForSimulation: jest.fn(),
   getIsInitialized: jest.fn().mockReturnValue(true),
   getIsYargEnabled: jest.fn().mockReturnValue(true),
   getIsRb3Enabled: jest.fn().mockReturnValue(false),

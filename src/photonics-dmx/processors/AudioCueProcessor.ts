@@ -7,6 +7,7 @@ import {
 import { DEFAULT_AUDIO_CONFIG, DEFAULT_AUDIO_IDLE_DETECTION } from '../listeners/Audio'
 
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
+import type { AudioSecondaryRuntime } from './AudioSecondaryRuntime'
 import type { ChainFanout } from '../controllers/ChainFanout'
 import { pickStrobeCueType } from './audioStrobeHelpers'
 import { AudioGameModeManager } from './AudioGameModeManager'
@@ -49,6 +50,18 @@ export class AudioCueProcessor {
   private readonly idleController = new AudioIdleController()
   private idleLookActive = false
   private idleSuppressedMotion = false
+  /** Optional second consumer of the frame stream, teed the same frame as the DMX fan-out. */
+  private secondaryRuntime: AudioSecondaryRuntime | null = null
+  /**
+   * True while the secondary runs solo and the audio lighting is suppressed. Tracked so the running
+   * look is cleared once on the way in, rather than every frame.
+   */
+  private lightingSuppressed = false
+
+  /** Attach or detach the secondary consumer; null restores plain lighting-only behaviour. */
+  public setSecondaryRuntime(runtime: AudioSecondaryRuntime | null): void {
+    this.secondaryRuntime = runtime
+  }
 
   constructor(
     chainFanout: ChainFanout,
@@ -131,6 +144,7 @@ export class AudioCueProcessor {
 
     this.tearDownIdleState()
     this.isActive = false
+    this.lightingSuppressed = false
     if (this.strobeActive) {
       this.strobeActive = false
       this.strobeCueType = null
@@ -185,6 +199,9 @@ export class AudioCueProcessor {
     })
     if (idleTransition === 'enter') {
       this.applyIdleLook()
+      this.secondaryRuntime?.blank()
+      // Drop any solo suppression so lighting resumes cleanly when the audio comes back.
+      this.lightingSuppressed = false
     }
     if (idleTransition === 'exit') {
       this.clearIdleLook()
@@ -206,6 +223,31 @@ export class AudioCueProcessor {
     this.evaluateStrobe(processedData)
     const strobe = this.strobeActive && this.strobeCueType ? this.strobeCueType : null
 
+    // Tee the same frame to the secondary consumer, following the same primary (manual pick or Game
+    // Mode rotation) and strobe cue types the lighting side runs.
+    this.secondaryRuntime?.handleFrame(
+      {
+        audioData: processedData,
+        config: this.config,
+        enabledBandCount: this.config.bands.length,
+        timestamp: Date.now(),
+        executionCount: 0,
+      },
+      primary,
+      strobe,
+    )
+
+    // When the secondary's look wants to run solo, clear the running lighting once and skip the
+    // dispatch until the decision flips back.
+    if (this.secondaryRuntime?.getLastDispatchDecision().suppress) {
+      if (!this.lightingSuppressed) {
+        this.lightingSuppressed = true
+        this.suppressLighting()
+      }
+      return
+    }
+    this.lightingSuppressed = false
+
     void this.chainFanout
       .audioHandleData(
         processedData,
@@ -217,6 +259,17 @@ export class AudioCueProcessor {
         gameModeActive,
       )
       .catch((err) => log.error('AudioCueProcessor: handleAudioData error', err))
+  }
+
+  /**
+   * Blank the running audio look so a solo secondary plays over dark lights. Mirrors the effect
+   * teardown in {@link stop}: clear the current cue, then remove the band-layer effects.
+   */
+  private suppressLighting(): void {
+    this.chainFanout.audioClearCurrentCue()
+    for (let layer = 0; layer < 8; layer++) {
+      this.chainFanout.audioRemoveEffectByLayer(layer, true)
+    }
   }
 
   /**

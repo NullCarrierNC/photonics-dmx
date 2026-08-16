@@ -31,8 +31,8 @@ const mockControllerManager = {
 }
 
 jest.mock('electron', () => ({ ipcMain: mockIpcMain }))
-jest.mock('../../../photonics-dmx/cues/registries/YargCueRegistry', () => ({
-  YargCueRegistry: { getInstance: jest.fn().mockReturnValue({}) },
+jest.mock('../../../photonics-dmx/cues/registries/CueRegistry', () => ({
+  CueRegistry: { getInstance: jest.fn().mockReturnValue({}) },
 }))
 
 import { setupCueSelectionPrefsHandlers } from '../../ipc/cue-selection-prefs-handlers'

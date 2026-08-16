@@ -21,7 +21,7 @@ function makeChainStub(rigId: string): RigChain {
   return {
     rigId,
     isPrimary: rigId === 'a',
-    yargCueHandler: null,
+    cueHandlers: { yarg: null, rb3: null },
     sequencer: {
       blackout: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
     },
@@ -32,8 +32,8 @@ function makeFanout(chains: RigChain[]): ChainFanout {
   return {
     getChains: jest.fn(() => chains),
     handleCue: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-    yargStopActiveCue: jest.fn(),
-    yargBlackout: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    stopActiveCue: jest.fn(),
+    blackout: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   } as unknown as ChainFanout
 }
 
@@ -42,7 +42,7 @@ function makeDispatcher(fanout: ChainFanout, ensureHandlers: () => void): TestCu
   return {
     ensureHandlers,
     dispatch: (cue, data) => void fanout.handleCue(cue, data),
-    stopActiveCue: () => fanout.yargStopActiveCue(),
+    stopActiveCue: () => fanout.stopActiveCue(),
   }
 }
 
@@ -52,7 +52,7 @@ describe('TestEffectRunner under multi-rig', () => {
     const fanout = makeFanout(chains)
     const ensureHandlers = jest.fn(() => {
       for (const c of chains) {
-        c.yargCueHandler = {} as unknown as RigChain['yargCueHandler']
+        c.cueHandlers.yarg = {} as unknown as RigChain['cueHandlers']['yarg']
       }
     })
     const ctx: TestEffectRunnerContext = {
@@ -85,8 +85,8 @@ describe('TestEffectRunner under multi-rig', () => {
 
     await runner.stopTestEffect()
 
-    expect(fanout.yargStopActiveCue).toHaveBeenCalledTimes(1)
-    expect(fanout.yargBlackout).toHaveBeenCalledWith(0)
+    expect(fanout.stopActiveCue).toHaveBeenCalledTimes(1)
+    expect(fanout.blackout).toHaveBeenCalledWith(0)
   })
 
   it('re-dispatches the cue continuously on the interval (held strobe keeps flashing)', async () => {
@@ -99,7 +99,8 @@ describe('TestEffectRunner under multi-rig', () => {
         ensureInitialized: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
       }
       const ensureHandlers = jest.fn(() => {
-        for (const c of chains) c.yargCueHandler = {} as unknown as RigChain['yargCueHandler']
+        for (const c of chains)
+          c.cueHandlers.yarg = {} as unknown as RigChain['cueHandlers']['yarg']
       })
       const runner = new TestEffectRunner(ctx, makeDispatcher(fanout, ensureHandlers))
       runner.startTestEffect('Strobe_Fast')
@@ -138,13 +139,13 @@ describe('TestEffectRunner RB3 LED state', () => {
     const chains = [makeChainStub('a')]
     const fanout = makeFanout(chains)
     const ensureHandlers = jest.fn(() => {
-      for (const c of chains) c.yargCueHandler = {} as unknown as RigChain['yargCueHandler']
+      for (const c of chains) c.cueHandlers.yarg = {} as unknown as RigChain['cueHandlers']['yarg']
     })
     const songEvent = jest.fn()
     const dispatcher: TestCueDispatcher = {
       ensureHandlers,
       dispatch: (cue, data) => void fanout.handleCue(cue, data),
-      stopActiveCue: () => fanout.yargStopActiveCue(),
+      stopActiveCue: () => fanout.stopActiveCue(),
       songEvent,
     }
     const ctx: TestEffectRunnerContext = {

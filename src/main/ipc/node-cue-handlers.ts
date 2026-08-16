@@ -6,8 +6,7 @@ import { sendToAllWindows } from '../utils/windowUtils'
 import { NodeCueMode, NodeCueFile, NodeCueKind } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateNodeCueFile } from '../../photonics-dmx/cues/node/schema/validation'
 import { NodeExecutionEngine } from '../../photonics-dmx/cues/node/runtime/NodeExecutionEngine'
-import { reconcileEnabledGroups, persistReconciledGroups } from '../controllers/cueGroupReconcile'
-import { cueDomainBinding } from '../controllers/cueDomainBindings'
+import { cueDomainBinding, reconcileAndApplyGroups } from '../controllers/cueDomainBindings'
 import { ipcError } from './ipcResult'
 import { NODE_CUES, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 
@@ -37,25 +36,11 @@ async function persistGroupEnableAfterNodeCueSave(
 ): Promise<void> {
   const config = controllerManager.getConfig()
   const domain = mode === 'yarg' ? 'yarg' : mode === 'rb3' ? 'rb3' : 'audio'
-  const binding = cueDomainBinding(domain)
-  const domainPrefs = config.getPreference('cueDomains')[domain]
 
   // Saving a group opts it in: seed it into the enabled set, then reconcile against the registry so
   // other newly-registered groups are auto-enabled, deregistered ids are dropped, and the known
-  // baseline is refreshed. Persist as one write (skipped when unchanged) and apply.
-  const reconciled = reconcileEnabledGroups(
-    [...(domainPrefs.enabledGroups ?? []), groupId],
-    domainPrefs.knownGroups,
-    binding.getRegisteredIds(),
-  )
-  await persistReconciledGroups(
-    config,
-    domain,
-    reconciled,
-    domainPrefs.enabledGroups,
-    domainPrefs.knownGroups,
-  )
-  binding.setEnabled(reconciled.enabled)
+  // baseline is refreshed.
+  await reconcileAndApplyGroups(cueDomainBinding(domain), config, [groupId])
 
   if (domain === 'audio') {
     controllerManager.refreshAudioCueSelection()

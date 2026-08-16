@@ -1,4 +1,4 @@
-import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
+import { CueRegistry } from '../../cues/registries/CueRegistry'
 import { INetCue, CueStyle } from '../../cues/interfaces/INetCue'
 import { ICueGroup } from '../../cues/interfaces/INetCueGroup'
 import { CueData, CueType } from '../../cues/types/cueTypes'
@@ -38,13 +38,13 @@ class MockCueImplementation implements INetCue {
   }
 }
 
-describe('YargCueRegistry', () => {
-  let registry: YargCueRegistry
+describe('CueRegistry', () => {
+  let registry: CueRegistry
   let defaultGroup: ICueGroup
   let customGroup: ICueGroup
 
   beforeEach(() => {
-    registry = YargCueRegistry.getInstance()
+    registry = CueRegistry.getInstance()
     registry.reset() // Clear any existing groups
 
     // Create default group
@@ -203,7 +203,7 @@ describe('YargCueRegistry', () => {
 
   describe('Consistency Throttling', () => {
     it('should use consistent group selection within the consistency window', () => {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       registry.reset()
 
       // Set up test groups
@@ -239,7 +239,7 @@ describe('YargCueRegistry', () => {
     })
 
     it('should allow new randomization after consistency window expires', () => {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       registry.reset()
 
       // Set up test groups
@@ -275,7 +275,7 @@ describe('YargCueRegistry', () => {
     })
 
     it('should preserve consistency when setActiveGroups is called twice with the same list', () => {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       registry.reset()
 
       const group1: ICueGroup = {
@@ -308,7 +308,7 @@ describe('YargCueRegistry', () => {
     })
 
     it('should clear consistency when setActiveGroups is called with a different list', () => {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       registry.reset()
 
       const group1: ICueGroup = {
@@ -343,7 +343,7 @@ describe('YargCueRegistry', () => {
     })
 
     it('should provide consistency status information', () => {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       registry.reset()
 
       // Set up test groups
@@ -372,7 +372,7 @@ describe('YargCueRegistry', () => {
     })
 
     it('should properly handle fallback logic with consistency system', () => {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       registry.reset()
 
       // Set up test groups with fallback scenario
@@ -419,7 +419,7 @@ describe('YargCueRegistry', () => {
     })
 
     it('should use default group as fallback even when default is active', () => {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       registry.reset()
 
       // Set up test groups where default is active but other active groups don't have the cue
@@ -457,7 +457,7 @@ describe('YargCueRegistry', () => {
     })
 
     it('should prefer stage kit group when autoGen is false and stageKitPriority is prefer-for-tracked', () => {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       registry.reset()
 
       // Set up test groups including a stage kit group
@@ -495,7 +495,7 @@ describe('YargCueRegistry', () => {
 
   describe('cue group selection mode (once per song)', () => {
     it('with oncePerSong mode, one group is selected for all cues in the song until onSongEnd', () => {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       registry.reset()
 
       const group1: ICueGroup = {
@@ -544,7 +544,7 @@ describe('YargCueRegistry', () => {
     })
 
     it('with oncePerSong mode, uses default group as fallback when locked group does not have the cue', () => {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       registry.reset()
 
       const defaultGroup: ICueGroup = {
@@ -580,7 +580,7 @@ describe('YargCueRegistry', () => {
     })
 
     it('with withinSong mode, onSongStart and onSongEnd do not change time-window behaviour', () => {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       registry.reset()
 
       const group1: ICueGroup = {
