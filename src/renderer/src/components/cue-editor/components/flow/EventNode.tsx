@@ -2,7 +2,7 @@ import React from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import type { EditorNodeData } from '../../lib/types'
 import { FONT_COURIER_NEW } from '../../lib/styles'
-import FlowNodeFrame from './FlowNodeFrame'
+import FlowNodeFrame, { NODE_WIDTH_STYLES } from './FlowNodeFrame'
 import type { AudioTriggerNode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 function isAudioTriggerNode(payload: EditorNodeData['payload']): payload is AudioTriggerNode {
@@ -30,7 +30,7 @@ const EventNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) 
   const selectedStyles = selected
     ? 'shadow-[0_0_18px_16px_rgba(59,130,246,0.8)] ring-[5px] ring-blue-400'
     : ''
-  const baseClasses = 'px-3 py-2 rounded-lg border-2 text-xs shadow-sm min-w-[140px]'
+  const baseClasses = `px-3 py-2 rounded-lg border-2 text-xs shadow-sm min-w-[140px] ${NODE_WIDTH_STYLES}`
   const defaultClasses = trigger ? '' : ' border-blue-400 bg-blue-50 dark:bg-blue-900/40'
   const bgStyle = trigger?.color
     ? { borderColor: trigger.color, backgroundColor: `${trigger.color}18` }

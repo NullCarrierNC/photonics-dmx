@@ -1,7 +1,7 @@
 import React from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import type { EditorNodeData } from '../../lib/types'
-import FlowNodeFrame from './FlowNodeFrame'
+import FlowNodeFrame, { NODE_WIDTH_STYLES } from './FlowNodeFrame'
 
 const EffectListenerNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) => {
   if (data.kind !== 'effect-listener') return null
@@ -11,7 +11,7 @@ const EffectListenerNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
   return (
     <FlowNodeFrame
       id={id}
-      className={`px-3 py-2 rounded-lg border-2 border-cyan-500 bg-cyan-100 dark:bg-cyan-800/60 text-xs shadow-sm min-w-[160px] ${selectedStyles}`}>
+      className={`px-3 py-2 rounded-lg border-2 border-cyan-500 bg-cyan-100 dark:bg-cyan-800/60 text-xs shadow-sm min-w-[160px] ${NODE_WIDTH_STYLES} ${selectedStyles}`}>
       <div className="flex items-center gap-1 font-bold text-cyan-900 dark:text-cyan-50 mb-1">
         <span role="img" aria-label="effect entry">
           🎯

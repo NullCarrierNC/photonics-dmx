@@ -60,7 +60,7 @@ const EffectRaiserNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selec
   return (
     <FlowNodeFrame
       id={id}
-      className={`px-3 py-2 rounded-lg border-2 border-cyan-400 bg-cyan-50 dark:bg-cyan-900/40 text-xs shadow-sm min-w-[140px] max-w-[200px] ${selectedStyles}`}>
+      className={`px-3 py-2 rounded-lg border-2 border-cyan-400 bg-cyan-50 dark:bg-cyan-900/40 text-xs shadow-sm min-w-[140px] max-w-[200px] break-words ${selectedStyles}`}>
       <Handle type="target" position={Position.Top} />
       <div className="flex flex-col gap-1">
         <div className="flex flex-wrap items-center gap-1 font-semibold text-cyan-800 dark:text-cyan-100">

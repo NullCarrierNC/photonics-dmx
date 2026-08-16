@@ -1898,6 +1898,52 @@ describe('Node cue validation', () => {
     }
   })
 
+  // The interpretive RB3 libraries ship only their gameplay cue; the strobes live once, in
+  // rb3-stagekit. Neither the StageKit nor the default slot may be claimed here.
+  for (const groupId of [
+    'rb3-mirror',
+    'rb3-mirror-blended',
+    'rb3-stagekit-reversed',
+    'rb3-stagekit-wash',
+    'rb3-comet',
+    'rb3-bloom',
+    'rb3-glow',
+  ]) {
+    it(`validates bundled ${groupId}.json (RB3 gameplay cue only, compiles, lays out nodes)`, () => {
+      const filePath = path.join(
+        __dirname,
+        `../../../../../resources/defaults/node-data/cues/rb3/${groupId}.json`,
+      )
+      const result = validateRb3NodeCueFile(JSON.parse(fs.readFileSync(filePath, 'utf8')))
+      expect(result.valid).toBe(true)
+      if (result.valid) {
+        expect(result.data.group.id).toBe(groupId)
+        expect(result.data.group.isStageKit).toBeUndefined()
+        expect(result.data.group.isDefault).toBeUndefined()
+        const cueTypes = result.data.cues.map((c) => (c.kind === 'lighting' ? c.cueType : c.id))
+        expect(cueTypes).toEqual([CueType.RB3])
+        const positionsSeen = new Set<string>()
+        for (const cue of result.data.cues) {
+          expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+          const positions = cue.layout?.nodePositions ?? {}
+          const nodeCount = Object.values(cue.nodes ?? {}).reduce(
+            (total, bucket) => total + (Array.isArray(bucket) ? bucket.length : 0),
+            0,
+          )
+          // Every node is placed, and no two share a slot, so the graph opens legibly.
+          expect(Object.keys(positions).length).toBe(nodeCount)
+          if (cue.kind === 'lighting' && cue.cueType === CueType.RB3) {
+            for (const p of Object.values(positions)) {
+              const key = `${p.x},${p.y}`
+              expect(positionsSeen.has(key)).toBe(false)
+              positionsSeen.add(key)
+            }
+          }
+        }
+      }
+    })
+  }
+
   it('validates bundled rb3-motion-default.json (time-driven motion cues, compiles)', () => {
     const filePath = path.join(
       __dirname,

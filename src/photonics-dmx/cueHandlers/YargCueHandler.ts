@@ -348,9 +348,12 @@ class YargCueHandler extends EventEmitter {
     const forcedGroup =
       parameters.preferredCueGroup ??
       (trackMode === 'simulated' ? parameters.simulationCueGroup : undefined)
-    const cue = forcedGroup
+    const forcedCue = forcedGroup
       ? this.registry.getCueImplementationFromGroup(cueType, forcedGroup, trackMode)
-      : this.registry.getCueImplementation(cueType, trackMode)
+      : null
+    // RB3 forces its rotated group on every dispatch, strobes included, but only the Stage Kit group
+    // ships strobes, so a forced group missing the cueType falls through to normal selection.
+    const cue = forcedCue ?? this.registry.getCueImplementation(cueType, trackMode)
 
     if (cue) {
       const incomingIsSecondary = cue.style === CueStyle.Secondary

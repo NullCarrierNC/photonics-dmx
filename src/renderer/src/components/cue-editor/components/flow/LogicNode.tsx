@@ -2,7 +2,7 @@ import React from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import type { EditorNodeData } from '../../lib/types'
 import { FONT_COURIER_NEW } from '../../lib/styles'
-import FlowNodeFrame from './FlowNodeFrame'
+import FlowNodeFrame, { NODE_WIDTH_STYLES } from './FlowNodeFrame'
 import type {
   ForEachLightLogicNode,
   LogicNode,
@@ -451,7 +451,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
   const isDebugNode = meta.category === 'debug'
 
   const nodeStyles = isDebugNode
-    ? 'border-red-400 bg-red-50 dark:bg-red-900/30 text-xs shadow-sm min-w-[150px] max-w-[320px]'
+    ? 'border-red-400 bg-red-50 dark:bg-red-900/30 text-xs shadow-sm min-w-[150px]'
     : isArrayNode
       ? 'border-teal-400 bg-teal-50 dark:bg-teal-900/30 text-xs shadow-sm min-w-[150px]'
       : isDataNode
@@ -469,10 +469,10 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
   const detailStyles = isDebugNode
     ? 'text-[11px] text-red-900 dark:text-red-50 opacity-90 text-center break-words'
     : isArrayNode
-      ? 'text-[11px] text-teal-900 dark:text-teal-50 opacity-90 text-center'
+      ? 'text-[11px] text-teal-900 dark:text-teal-50 opacity-90 text-center break-words'
       : isDataNode
-        ? 'text-[11px] text-orange-900 dark:text-orange-50 opacity-90 text-center'
-        : 'text-[11px] text-amber-900 dark:text-amber-50 opacity-90 text-center'
+        ? 'text-[11px] text-orange-900 dark:text-orange-50 opacity-90 text-center break-words'
+        : 'text-[11px] text-amber-900 dark:text-amber-50 opacity-90 text-center break-words'
 
   const handleStyles = isDebugNode
     ? 'text-red-700 dark:text-red-100'
@@ -489,7 +489,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
   return (
     <FlowNodeFrame
       id={id}
-      className={`px-3 py-2 rounded-lg border-2 ${nodeStyles} ${selectedStyles}`}>
+      className={`px-3 py-2 rounded-lg border-2 ${NODE_WIDTH_STYLES} ${nodeStyles} ${selectedStyles}`}>
       <Handle type="target" position={Position.Top} />
       <div className={titleStyles}>{data.label}</div>
       <div className={detailStyles}>{renderDetails()}</div>
