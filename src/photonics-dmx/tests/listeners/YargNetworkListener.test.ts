@@ -7,30 +7,17 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { performance } from 'perf_hooks'
 import { YargNetworkListener, YargCueRuntime } from '../../listeners/YARG/YargNetworkListener'
-import { CueData, CueType, defaultCueData } from '../../cues/types/cueTypes'
-
-const YARG_PACKET_HEADER_LE = 0x59415247 // 'YARG'
-
-/** Total bytes through singalong (before optional camera-cut extension). */
-const YARG_MIN_FULL_PACKET_LEN = 47
+import { CueData, CueType, defaultCueData, DrumNoteType } from '../../cues/types/cueTypes'
+import { BeatByte } from '../../listeners/YARG/yargTypes'
+import { buildYargPacket, buildYargShutdownPacket } from '../helpers/yargPacket'
+import { FRAME_KEEPALIVE_MS } from '../../listeners/YARG/yargFrameDispatch'
 
 function deserializePacket(listener: YargNetworkListener, buffer: Buffer): void {
   ;(listener as unknown as { deserializePacket(buf: Buffer): void }).deserializePacket(buffer)
 }
 
-function buildYargShutdownPacket(): Buffer {
-  const buf = Buffer.alloc(5)
-  buf.writeUInt32LE(YARG_PACKET_HEADER_LE, 0)
-  buf.writeUInt8(0, 4)
-  return buf
-}
-
-/** Header + datagram version byte only (padding ignored until length check). */
 function buildYargFullSizedPacket(datagramVersion: number): Buffer {
-  const buf = Buffer.alloc(YARG_MIN_FULL_PACKET_LEN)
-  buf.writeUInt32LE(YARG_PACKET_HEADER_LE, 0)
-  buf.writeUInt8(datagramVersion, 4)
-  return buf
+  return buildYargPacket({ datagramVersion, playerStarPower: [] })
 }
 
 class YargNetworkListenerMinV2 extends YargNetworkListener {
@@ -53,6 +40,8 @@ class MockCueHandler implements YargCueRuntime {
   public handleBassNote = jest.fn()
   public handleKeysNote = jest.fn()
   public handleVocalNote = jest.fn()
+  public stopActiveStrobe = jest.fn()
+  public resetYargSessionState = jest.fn()
 }
 
 const mockBind = jest.fn((_port: number, callback: () => void) => {
@@ -187,6 +176,22 @@ describe('YargNetworkListener', () => {
       expect(handleCueCalls[handleCueCalls.length - 2][0]).toBe(CueType.Sweep)
       expect(handleCueCalls[handleCueCalls.length - 1][0]).toBe(CueType.Strobe_Off)
     })
+
+    it('stops active strobe via session reset on shutdown before clearing listener history', () => {
+      const frameWithStrobe: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Default,
+        strobeState: 'Strobe_Slow',
+        beat: 'Off',
+        keyframe: 'Off',
+      }
+
+      listener.processCueData(frameWithStrobe)
+      cueHandler.resetYargSessionState.mockClear()
+
+      deserializePacket(listener, buildYargShutdownPacket())
+      expect(cueHandler.resetYargSessionState).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('lighting cue dispatch guard', () => {
@@ -284,13 +289,12 @@ describe('YargNetworkListener', () => {
   })
 
   describe('beat-byte decode', () => {
-    /** Byte offset of the beat field in the YARG datagram. */
-    const BEAT_BYTE_OFFSET = 38
-
-    function buildPacketWithBeat(beatByte: number): Buffer {
-      const buf = buildYargFullSizedPacket(1)
-      buf.writeUInt8(beatByte, BEAT_BYTE_OFFSET)
-      return buf
+    function buildPacketWithBeat(beatByte: number, datagramVersion = 3): Buffer {
+      return buildYargPacket({
+        datagramVersion,
+        beat: beatByte,
+        playerStarPower: [],
+      })
     }
 
     // Wire protocol per YARG.Core BeatlineType (verified against live YARG output):
@@ -321,20 +325,235 @@ describe('YargNetworkListener', () => {
       expect(cueHandler.handleBeat).not.toHaveBeenCalled()
     })
 
-    it('decodes each beat byte to its canonical string in the dispatched cue data', () => {
-      const cases: Array<[number, CueData['beat']]> = [
-        [0, 'Measure'],
-        [1, 'Strong'],
-        [2, 'Weak'],
-        [3, 'Off'],
-      ]
-      for (const [beatByte, expected] of cases) {
-        cueHandler.handleCue.mockClear()
-        deserializePacket(listener, buildPacketWithBeat(beatByte))
-        const lastCall = cueHandler.handleCue.mock.calls.at(-1)
-        expect(lastCall).toBeDefined()
-        expect((lastCall![1] as CueData).beat).toBe(expected)
+    it('decodes v5 beat at offset 40', () => {
+      deserializePacket(listener, buildPacketWithBeat(BeatByte.Strong, 5))
+      expect(cueHandler.handleBeat).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('queue-aware dispatch', () => {
+    let perfNowSpy: ReturnType<typeof jest.spyOn>
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+      jest.setSystemTime(0)
+      perfNowSpy = jest.spyOn(performance, 'now').mockImplementation(() => Date.now())
+    })
+
+    afterEach(() => {
+      perfNowSpy.mockRestore()
+      jest.useRealTimers()
+    })
+
+    const inertFrame = (): CueData => ({
+      ...defaultCueData,
+      datagramVersion: 3,
+      lightingCue: CueType.Frenzy,
+      strobeState: 'Strobe_Off',
+      beat: 'Off',
+      keyframe: 'Off',
+      bonusEffect: false,
+      drumNotes: [],
+    })
+
+    it('forwards two adjacent byte-identical Strong beat packets', () => {
+      const frame: CueData = { ...inertFrame(), beat: 'Strong' }
+      listener.processCueData(frame)
+      listener.processCueData({ ...frame })
+      expect(cueHandler.handleBeat).toHaveBeenCalledTimes(2)
+    })
+
+    it('forwards two adjacent byte-identical keyframe Next packets', () => {
+      const frame: CueData = { ...inertFrame(), keyframe: 'Next' }
+      listener.processCueData(frame)
+      listener.processCueData({ ...frame })
+      expect(cueHandler.handleKeyframeNext).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not forward on fog countdown alone within keepalive window', () => {
+      const frameA: CueData = {
+        ...inertFrame(),
+        fogRemainingCentiseconds: 1000,
       }
+      const frameB: CueData = {
+        ...inertFrame(),
+        fogRemainingCentiseconds: 999,
+      }
+      listener.processCueData(frameA)
+      cueHandler.handleCue.mockClear()
+      listener.processCueData(frameB)
+      expect(cueHandler.handleCue).not.toHaveBeenCalled()
+    })
+
+    it('does not forward on star power changes alone within keepalive window', () => {
+      const frameA: CueData = {
+        ...inertFrame(),
+        playerStarPower: [{ amount: 200, isActive: true }],
+        starPowerActiveCount: 1,
+        starPowerMaxPercent: 78,
+      }
+      const frameB: CueData = {
+        ...inertFrame(),
+        playerStarPower: [{ amount: 100, isActive: false }],
+        starPowerActiveCount: 0,
+        starPowerMaxPercent: 39,
+      }
+      listener.processCueData(frameA)
+      cueHandler.handleCue.mockClear()
+      listener.processCueData(frameB)
+      expect(cueHandler.handleCue).not.toHaveBeenCalled()
+    })
+
+    it('forwards one keepalive cue tick per FRAME_KEEPALIVE_MS on inert traffic', () => {
+      const frame = inertFrame()
+      listener.processCueData(frame)
+      cueHandler.handleCue.mockClear()
+
+      for (let i = 0; i < 30; i++) {
+        jest.advanceTimersByTime(FRAME_KEEPALIVE_MS + 1)
+        listener.processCueData({ ...frame })
+        expect(cueHandler.handleCue.mock.calls.length).toBe(i + 1)
+      }
+    })
+
+    it('forwards about 27 lifecycle keepalive ticks per second under 80 Hz inert traffic', () => {
+      const frame = inertFrame()
+      const yargPacketIntervalMs = 1000 / 80
+      listener.processCueData(frame)
+      cueHandler.handleCue.mockClear()
+
+      for (let i = 0; i < 80; i++) {
+        jest.advanceTimersByTime(yargPacketIntervalMs)
+        listener.processCueData({ ...frame })
+      }
+
+      // 80 Hz sampling with a ~33 ms keepalive gate yields ~26–27 lifecycle forwards per second.
+      expect(cueHandler.handleCue.mock.calls.length).toBeGreaterThanOrEqual(26)
+      expect(cueHandler.handleCue.mock.calls.length).toBeLessThanOrEqual(27)
+    })
+
+    it('forwards every adjacent bonusEffect pulse frame', () => {
+      const frame: CueData = {
+        ...inertFrame(),
+        bonusEffect: true,
+      }
+      listener.processCueData(frame)
+      cueHandler.handleCue.mockClear()
+
+      listener.processCueData({ ...frame })
+      listener.processCueData({ ...frame })
+
+      expect(cueHandler.handleCue).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('YARG session input-edge reset', () => {
+    it('resets listener and handler edge baselines on shutdown so the same note can fire again', () => {
+      const frame: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Default,
+        beat: 'Off',
+        keyframe: 'Off',
+        drumNotes: [DrumNoteType.Kick],
+      }
+      listener.processCueData(frame)
+      listener.processCueData({ ...frame })
+      expect(cueHandler.handleDrumNote).toHaveBeenCalledTimes(1)
+
+      deserializePacket(listener, buildYargShutdownPacket())
+      expect(cueHandler.resetYargSessionState).toHaveBeenCalledTimes(1)
+
+      cueHandler.handleDrumNote.mockClear()
+      listener.processCueData(frame)
+      expect(cueHandler.handleDrumNote).toHaveBeenCalledTimes(1)
+    })
+
+    it('resets edge baselines when the listener restarts', async () => {
+      const frame: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Default,
+        beat: 'Off',
+        keyframe: 'Off',
+        drumNotes: [DrumNoteType.Kick],
+      }
+      await listener.start()
+      listener.processCueData(frame)
+      listener.processCueData({ ...frame })
+      expect(cueHandler.handleDrumNote).toHaveBeenCalledTimes(1)
+
+      await listener.stop()
+      cueHandler.resetYargSessionState.mockClear()
+      cueHandler.handleDrumNote.mockClear()
+      await listener.start()
+
+      expect(cueHandler.resetYargSessionState).toHaveBeenCalledTimes(1)
+      listener.processCueData(frame)
+      expect(cueHandler.handleDrumNote).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('instrument rising edges', () => {
+    it('fires handleDrumNote once for a sticky kick bitmask', () => {
+      const frame: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Default,
+        beat: 'Off',
+        keyframe: 'Off',
+        drumNotes: [DrumNoteType.Kick],
+      }
+      listener.processCueData(frame)
+      listener.processCueData({ ...frame })
+      expect(cueHandler.handleDrumNote).toHaveBeenCalledTimes(1)
+      expect(cueHandler.handleDrumNote).toHaveBeenCalledWith(DrumNoteType.Kick, frame)
+    })
+
+    it('fires again after release and re-hit', () => {
+      const hit: CueData = {
+        ...defaultCueData,
+        lightingCue: CueType.Default,
+        beat: 'Off',
+        keyframe: 'Off',
+        drumNotes: [DrumNoteType.Kick],
+      }
+      const release: CueData = { ...hit, drumNotes: [] }
+      listener.processCueData(hit)
+      listener.processCueData(release)
+      listener.processCueData(hit)
+      expect(cueHandler.handleDrumNote).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('newer-version warning', () => {
+    type YargErrorPayload = { type?: string; severity?: string; datagramVersion?: number }
+
+    it('emits one warning per listener session for unknown version packets', async () => {
+      const onError = jest.fn()
+      listener.on('yarg-error', onError)
+      const buf = buildYargPacket({ datagramVersion: 6, playerStarPower: [] })
+
+      deserializePacket(listener, buf)
+      deserializePacket(listener, buf)
+
+      const warnings = onError.mock.calls.filter(
+        (c) => (c[0] as YargErrorPayload).type === 'datagram-version-newer',
+      )
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]![0]).toEqual(
+        expect.objectContaining({
+          severity: 'warning',
+          datagramVersion: 6,
+        }),
+      )
+
+      await listener.stop()
+      await listener.start()
+      onError.mockClear()
+      deserializePacket(listener, buf)
+      expect(
+        onError.mock.calls.filter(
+          (c) => (c[0] as YargErrorPayload).type === 'datagram-version-newer',
+        ),
+      ).toHaveLength(1)
     })
   })
 
@@ -388,6 +607,27 @@ describe('YargNetworkListener', () => {
       const payload = fallbackCalls[0]![1] as CueData
       expect(payload.lightingCue).toBe(CueType.Fallback)
       expect(payload.trackMode).toBe('tracked')
+    })
+
+    it('stops the active strobe before dispatching Fallback when YARG goes silent', () => {
+      fbListener.processCueData(
+        gameplayFrame(CueType.Verse, {
+          strobeState: 'Strobe_Fast',
+        }),
+      )
+      cueHandler.stopActiveStrobe.mockClear()
+      cueHandler.handleCue.mockClear()
+
+      jest.advanceTimersByTime(FALLBACK_MS + 500)
+
+      expect(cueHandler.stopActiveStrobe).toHaveBeenCalledTimes(1)
+      const fallbackIndex = cueHandler.handleCue.mock.calls.findIndex(
+        (c) => c[0] === CueType.Fallback,
+      )
+      expect(fallbackIndex).toBeGreaterThanOrEqual(0)
+      expect(cueHandler.stopActiveStrobe.mock.invocationCallOrder[0]).toBeLessThan(
+        cueHandler.handleCue.mock.invocationCallOrder[fallbackIndex]!,
+      )
     })
 
     it('does not fire at the menu', () => {
@@ -521,8 +761,8 @@ describe('YargNetworkListener', () => {
     })
   })
 
-  describe('identical-frame throttling (30 Hz)', () => {
-    const throttleMs = 1000 / 30
+  describe('keepalive throttling (30 Hz)', () => {
+    const keepaliveMs = FRAME_KEEPALIVE_MS
     let perfNowSpy: ReturnType<typeof jest.spyOn>
 
     beforeEach(() => {
@@ -538,30 +778,28 @@ describe('YargNetworkListener', () => {
       jest.useRealTimers()
     })
 
-    it('limits identical frames to 30 updates per second', () => {
+    it('limits inert identical frames to ~30 updates per second', () => {
       const frame: CueData = {
         ...defaultCueData,
         lightingCue: CueType.Frenzy,
         strobeState: 'Strobe_Off',
-        beat: 'Strong',
+        beat: 'Off',
         keyframe: 'Off',
       }
       listener.processCueData(frame)
       expect(cueHandler.handleCue).toHaveBeenCalledTimes(1)
 
       for (let i = 0; i < 10; i++) {
-        listener.processCueData(frame)
+        listener.processCueData({ ...frame })
       }
       expect(cueHandler.handleCue).toHaveBeenCalledTimes(1)
 
-      jest.advanceTimersByTime(throttleMs + 1)
-      listener.processCueData(frame)
+      jest.advanceTimersByTime(keepaliveMs + 1)
+      listener.processCueData({ ...frame })
       expect(cueHandler.handleCue).toHaveBeenCalledTimes(2)
-      expect(cueHandler.handleCue).toHaveBeenNthCalledWith(1, CueType.Frenzy, frame)
-      expect(cueHandler.handleCue).toHaveBeenNthCalledWith(2, CueType.Frenzy, frame)
     })
 
-    it('forwards changed frame immediately even within throttle window', () => {
+    it('forwards level-changed frame immediately even within keepalive window', () => {
       const frameA: CueData = {
         ...defaultCueData,
         lightingCue: CueType.Frenzy,

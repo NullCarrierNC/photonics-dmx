@@ -13,7 +13,7 @@ import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { monotonicNowMs } from '../../../shared/time'
 import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
 import { CueStyle, INetCue } from '../../cues/interfaces/INetCue'
-import { CueData, CueType, defaultCueData } from '../../cues/types/cueTypes'
+import { CueData, CueType, defaultCueData, DrumNoteType } from '../../cues/types/cueTypes'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import {
@@ -258,6 +258,122 @@ describe('YargCueHandler RB3 LED edge history', () => {
     const secondFrame = cue.execute.mock.calls[1][0] as CueData
     expect(secondFrame.previousFrame?.ledBanks).toEqual(banksA)
     expect(secondFrame.previousFrame?.fogState).toBe(true)
+  })
+})
+
+describe('YargCueHandler input edge reset', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('resetInputEdgeState clears previousFrame baseline without resetting executionCount', async () => {
+    const registry = YargCueRegistry.getInstance()
+    const cue = makeFakeCue(CueStyle.Primary, 'frenzy')
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(cue)
+    jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+
+    await handler.handleCue(
+      CueType.Frenzy,
+      gameplayCueData({ lightingCue: CueType.Frenzy, drumNotes: [DrumNoteType.Kick] }),
+    )
+    const firstExecutionCount = (cue.execute.mock.calls[0]![0] as CueData).executionCount
+
+    handler.resetInputEdgeState()
+
+    await handler.handleCue(
+      CueType.Frenzy,
+      gameplayCueData({ lightingCue: CueType.Frenzy, drumNotes: [DrumNoteType.Kick] }),
+    )
+    const secondFrame = cue.execute.mock.calls[1]![0] as CueData
+    expect(secondFrame.previousFrame?.drumNotes ?? []).toEqual([])
+    expect(secondFrame.executionCount).toBe((firstExecutionCount ?? 0) + 1)
+  })
+
+  it('records drum note release in previousFrame for rapid re-hit detection', async () => {
+    const registry = YargCueRegistry.getInstance()
+    const cue = makeFakeCue(CueStyle.Primary, 'frenzy')
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(cue)
+    jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+
+    await handler.handleCue(
+      CueType.Frenzy,
+      gameplayCueData({ lightingCue: CueType.Frenzy, drumNotes: [DrumNoteType.Kick] }),
+    )
+    await handler.handleCue(
+      CueType.Frenzy,
+      gameplayCueData({ lightingCue: CueType.Frenzy, drumNotes: [] }),
+    )
+    await handler.handleCue(
+      CueType.Frenzy,
+      gameplayCueData({ lightingCue: CueType.Frenzy, drumNotes: [DrumNoteType.Kick] }),
+    )
+
+    const rehitFrame = cue.execute.mock.calls[2]![0] as CueData
+    expect(rehitFrame.previousFrame?.drumNotes ?? []).toEqual([])
+  })
+
+  it('resetYargSessionState stops active strobe slot and clears previousFrame', async () => {
+    __resetStrobeStateManagerForTests()
+    const registry = YargCueRegistry.getInstance()
+    const strobe = makeFakeCue(CueStyle.Primary, 'strobe')
+    jest
+      .spyOn(registry, 'getCueImplementation')
+      .mockImplementation((cueType) => (cueType === CueType.Strobe_Fast ? strobe : null))
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+
+    await handler.handleCue(
+      CueType.Strobe_Fast,
+      gameplayCueData({ lightingCue: CueType.Default, strobeState: 'Strobe_Fast' }),
+    )
+    expect(getStrobeStateManager().getActive()).not.toBeNull()
+
+    handler.resetYargSessionState()
+
+    expect(strobe.onStop).toHaveBeenCalledTimes(1)
+    expect(getStrobeStateManager().getActive()).toBeNull()
+    const internals = handler as unknown as {
+      currentStrobeCue: INetCue | null
+      previousCueData?: CueData
+    }
+    expect(internals.currentStrobeCue).toBeNull()
+    expect(internals.previousCueData).toBeUndefined()
+  })
+
+  it('stopActiveStrobe clears the strobe slot without clearing previousFrame baseline', async () => {
+    __resetStrobeStateManagerForTests()
+    const registry = YargCueRegistry.getInstance()
+    const primary = makeFakeCue(CueStyle.Primary, 'frenzy')
+    const strobe = makeFakeCue(CueStyle.Primary, 'strobe')
+    jest
+      .spyOn(registry, 'getCueImplementation')
+      .mockImplementation((cueType) =>
+        cueType === CueType.Frenzy ? primary : cueType === CueType.Strobe_Fast ? strobe : null,
+      )
+    jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+
+    await handler.handleCue(
+      CueType.Frenzy,
+      gameplayCueData({ lightingCue: CueType.Frenzy, drumNotes: [DrumNoteType.Kick] }),
+    )
+    await handler.handleCue(
+      CueType.Strobe_Fast,
+      gameplayCueData({ lightingCue: CueType.Frenzy, strobeState: 'Strobe_Fast' }),
+    )
+    const internals = handler as unknown as {
+      currentStrobeCue: INetCue | null
+      previousCueData?: CueData
+    }
+    expect(internals.previousCueData?.drumNotes).toEqual([DrumNoteType.Kick])
+
+    handler.stopActiveStrobe()
+
+    expect(strobe.onStop).toHaveBeenCalledTimes(1)
+    expect(getStrobeStateManager().getActive()).toBeNull()
+    expect(internals.currentStrobeCue).toBeNull()
+    expect(internals.previousCueData?.drumNotes).toEqual([DrumNoteType.Kick])
   })
 })
 

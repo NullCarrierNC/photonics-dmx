@@ -33,6 +33,7 @@ import { useAppIpcListeners } from './hooks/useAppIpcListeners'
 import { AudioCaptureManager } from './services/AudioCaptureManager'
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { useToast } from './hooks/useToast'
+import { useYargErrorHandler } from './hooks/useYargErrorHandler'
 import ToastContainer from './components/Toast'
 import { ConfirmModalHost } from './components/ConfirmModalHost'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -104,16 +105,7 @@ export const App = (): JSX.Element => {
     [showToast],
   )
 
-  const handleYargError = useCallback(
-    (payload: { type: string; message: string; autoDisabled?: boolean }): void => {
-      log.error('YARG error:', payload)
-      if (payload.autoDisabled) {
-        setYargEnabled(false)
-      }
-      showToast(`YARG: ${payload.message}`, 'error', 5000)
-    },
-    [showToast, setYargEnabled],
-  )
+  const handleYargError = useYargErrorHandler({ showToast, setYargEnabled })
 
   const handleRb3Error = useCallback(
     (payload: { type: string; message: string; autoDisabled?: boolean }): void => {
