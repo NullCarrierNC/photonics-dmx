@@ -81,11 +81,22 @@ export class ListenerCoordinator {
     })
     this.yargListener.on(
       'yarg-error',
-      (errorData: { type: string; message: string; datagramVersion?: number }) => {
-        log.error('YARG Listener Error:', errorData)
+      (errorData: {
+        type: string
+        message: string
+        datagramVersion?: number
+        severity?: 'error' | 'warning'
+      }) => {
+        if (errorData.severity === 'warning') {
+          log.warn('YARG Listener Warning:', errorData)
+        } else {
+          log.error('YARG Listener Error:', errorData)
+        }
         this.deps.sendToAllWindows(RENDERER_RECEIVE.YARG_ERROR, {
           type: errorData.type,
           message: errorData.message,
+          severity: errorData.severity,
+          datagramVersion: errorData.datagramVersion,
         })
       },
     )

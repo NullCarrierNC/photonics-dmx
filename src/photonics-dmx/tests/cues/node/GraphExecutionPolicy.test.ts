@@ -10,7 +10,7 @@ import type {
   YargEventNode,
   ActionNode,
 } from '../../../cues/types/nodeCueTypes'
-import type { CueData } from '../../../cues/types/cueTypes'
+import { DrumNoteType, type CueData } from '../../../cues/types/cueTypes'
 import {
   cueGraphPolicy,
   motionCueGraphPolicy,
@@ -374,6 +374,98 @@ describe('GraphExecutionPolicy LED and fog events (RB3 StageKit)', () => {
     const held = triggered(frame({ fogState: true, previousFrame: { fogState: true } }))
     expect(held).not.toContain('fog-on')
     expect(held).not.toContain('fog-off')
+  })
+})
+
+describe('GraphExecutionPolicy instrument note events', () => {
+  function drumKickCue(): YargMotionNodeCueDefinition {
+    const evKick: YargEventNode = { id: 'ev-kick', type: 'event', eventType: 'drum-kick' }
+    const action: ActionNode = {
+      id: 'a1',
+      type: 'action',
+      effectType: 'set-position',
+      target: {
+        groups: { source: 'literal', value: 'front' },
+        filter: { source: 'literal', value: 'all' },
+      },
+      position: {
+        mode: 'direction',
+        bearing: { source: 'literal', value: 'downstage' },
+        angle: { source: 'literal', value: 10 },
+      },
+      timing: {
+        waitForCondition: { source: 'literal', value: 'none' },
+        waitForTime: { source: 'literal', value: 0 },
+        duration: { source: 'literal', value: 200 },
+        waitUntilCondition: { source: 'literal', value: 'none' },
+        waitUntilTime: { source: 'literal', value: 0 },
+      },
+      layer: { source: 'literal', value: 120 },
+    }
+    return {
+      kind: 'motion',
+      id: 'drum-kick-cue',
+      name: 'Drum Kick',
+      nodes: { events: [evKick], actions: [action], logic: [] },
+      connections: [{ from: 'ev-kick', to: 'a1' }],
+    }
+  }
+
+  const triggered = (params: CueData): string[] => {
+    const compiled = NodeCueCompiler.compileYargCue(drumKickCue())
+    const policy = cueGraphPolicy('g', 'c')
+    const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: true })
+    return nodes.map((n) => (n as YargEventNode).eventType)
+  }
+
+  const frame = (over: Partial<CueData>): CueData => ({ ...minimalParams(), ...over })
+
+  it('fires drum-kick on a rising edge only', () => {
+    const kick = triggered(
+      frame({
+        drumNotes: [DrumNoteType.Kick],
+        previousFrame: { drumNotes: [] },
+      }),
+    )
+    expect(kick).toContain('drum-kick')
+  })
+
+  it('does not fire drum-kick while the note is held across keepalive frames', () => {
+    const held = triggered(
+      frame({
+        drumNotes: [DrumNoteType.Kick],
+        previousFrame: { drumNotes: [DrumNoteType.Kick] },
+      }),
+    )
+    expect(held).not.toContain('drum-kick')
+  })
+
+  it('fires again after release and re-hit', () => {
+    const release = triggered(
+      frame({
+        drumNotes: [],
+        previousFrame: { drumNotes: [DrumNoteType.Kick] },
+      }),
+    )
+    expect(release).not.toContain('drum-kick')
+
+    const rehit = triggered(
+      frame({
+        drumNotes: [DrumNoteType.Kick],
+        previousFrame: { drumNotes: [] },
+      }),
+    )
+    expect(rehit).toContain('drum-kick')
+  })
+
+  it('treats a missing previousFrame as empty (first-frame rising edge)', () => {
+    const first = triggered(
+      frame({
+        drumNotes: [DrumNoteType.Kick],
+        previousFrame: undefined,
+      }),
+    )
+    expect(first).toContain('drum-kick')
   })
 })
 

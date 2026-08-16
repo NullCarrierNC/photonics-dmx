@@ -141,6 +141,7 @@ function cueLikeGraphPolicy(
           cueData.bassNotes,
           cueData.keysNotes,
           cueData.drumNotes,
+          cueData.previousFrame,
         )
         if (instrumentResult !== null) {
           return instrumentResult

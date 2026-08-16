@@ -17,7 +17,13 @@ export interface UseAppIpcListenersParams {
   setOpenDmxComPort: (port: string) => void
   setIsLeftMenuCollapsed: (collapsed: boolean) => void
   handleSenderError: (msg: string) => void
-  handleYargError: (payload: { type: string; message: string; autoDisabled?: boolean }) => void
+  handleYargError: (payload: {
+    type: string
+    message: string
+    autoDisabled?: boolean
+    severity?: 'error' | 'warning'
+    datagramVersion?: number
+  }) => void
   handleRb3Error: (payload: { type: string; message: string; autoDisabled?: boolean }) => void
   handleNodeCueRuntimeError: (payload: NodeCueRuntimeErrorPayload) => void
   handleSenderNetworkError: (data: { sender: string; error: string; autoDisabled: boolean }) => void
