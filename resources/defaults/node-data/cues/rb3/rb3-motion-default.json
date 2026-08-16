@@ -114,17 +114,17 @@
       "layout": {
         "nodePositions": {
           "rb3-motion-wave-start": {
-            "x": 0.0,
-            "y": 0.0
+            "x": 0,
+            "y": 0
           },
           "rb3-motion-wave-motion": {
-            "x": 0.0,
-            "y": 150.0
+            "x": 0,
+            "y": 150
           }
         },
         "viewport": {
-          "x": 80.0,
-          "y": 60.0,
+          "x": 80,
+          "y": 60,
           "zoom": 0.5
         }
       }
@@ -202,7 +202,7 @@
               },
               "speed": {
                 "source": "literal",
-                "value": 1.0
+                "value": 1
               },
               "size": {
                 "source": "literal",
@@ -234,17 +234,17 @@
       "layout": {
         "nodePositions": {
           "rb3-motion-nod-start": {
-            "x": 0.0,
-            "y": 0.0
+            "x": 0,
+            "y": 0
           },
           "rb3-motion-nod-motion": {
-            "x": 0.0,
-            "y": 150.0
+            "x": 0,
+            "y": 150
           }
         },
         "viewport": {
-          "x": 80.0,
-          "y": 60.0,
+          "x": 80,
+          "y": 60,
           "zoom": 0.5
         }
       }
@@ -354,17 +354,17 @@
       "layout": {
         "nodePositions": {
           "rb3-motion-cw-sync-start": {
-            "x": 0.0,
-            "y": 0.0
+            "x": 0,
+            "y": 0
           },
           "rb3-motion-cw-sync-motion": {
-            "x": 0.0,
-            "y": 150.0
+            "x": 0,
+            "y": 150
           }
         },
         "viewport": {
-          "x": 80.0,
-          "y": 60.0,
+          "x": 80,
+          "y": 60,
           "zoom": 0.5
         }
       }
@@ -474,17 +474,17 @@
       "layout": {
         "nodePositions": {
           "rb3-motion-ccw-sync-start": {
-            "x": 0.0,
-            "y": 0.0
+            "x": 0,
+            "y": 0
           },
           "rb3-motion-ccw-sync-motion": {
-            "x": 0.0,
-            "y": 150.0
+            "x": 0,
+            "y": 150
           }
         },
         "viewport": {
-          "x": 80.0,
-          "y": 60.0,
+          "x": 80,
+          "y": 60,
           "zoom": 0.5
         }
       }
@@ -594,17 +594,17 @@
       "layout": {
         "nodePositions": {
           "rb3-motion-cw-fan-start": {
-            "x": 0.0,
-            "y": 0.0
+            "x": 0,
+            "y": 0
           },
           "rb3-motion-cw-fan-motion": {
-            "x": 0.0,
-            "y": 150.0
+            "x": 0,
+            "y": 150
           }
         },
         "viewport": {
-          "x": 80.0,
-          "y": 60.0,
+          "x": 80,
+          "y": 60,
           "zoom": 0.5
         }
       }
@@ -714,17 +714,17 @@
       "layout": {
         "nodePositions": {
           "rb3-motion-ccw-fan-start": {
-            "x": 0.0,
-            "y": 0.0
+            "x": 0,
+            "y": 0
           },
           "rb3-motion-ccw-fan-motion": {
-            "x": 0.0,
-            "y": 150.0
+            "x": 0,
+            "y": 150
           }
         },
         "viewport": {
-          "x": 80.0,
-          "y": 60.0,
+          "x": 80,
+          "y": 60,
           "zoom": 0.5
         }
       }
@@ -830,17 +830,17 @@
       "layout": {
         "nodePositions": {
           "rb3-motion-pendulum-start": {
-            "x": 0.0,
-            "y": 0.0
+            "x": 0,
+            "y": 0
           },
           "rb3-motion-pendulum-motion": {
-            "x": 0.0,
-            "y": 150.0
+            "x": 0,
+            "y": 150
           }
         },
         "viewport": {
-          "x": 80.0,
-          "y": 60.0,
+          "x": 80,
+          "y": 60,
           "zoom": 0.5
         }
       }
@@ -946,17 +946,17 @@
       "layout": {
         "nodePositions": {
           "rb3-motion-figure8-start": {
-            "x": 0.0,
-            "y": 0.0
+            "x": 0,
+            "y": 0
           },
           "rb3-motion-figure8-motion": {
-            "x": 0.0,
-            "y": 150.0
+            "x": 0,
+            "y": 150
           }
         },
         "viewport": {
-          "x": 80.0,
-          "y": 60.0,
+          "x": 80,
+          "y": 60,
           "zoom": 0.5
         }
       }
@@ -1051,17 +1051,17 @@
       "layout": {
         "nodePositions": {
           "rb3-motion-still-start": {
-            "x": 0.0,
-            "y": 0.0
+            "x": 0,
+            "y": 0
           },
           "rb3-motion-still-motion": {
-            "x": 0.0,
-            "y": 150.0
+            "x": 0,
+            "y": 150
           }
         },
         "viewport": {
-          "x": 80.0,
-          "y": 60.0,
+          "x": 80,
+          "y": 60,
           "zoom": 0.5
         }
       }

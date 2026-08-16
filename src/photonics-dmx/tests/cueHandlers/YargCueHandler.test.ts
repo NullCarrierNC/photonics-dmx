@@ -432,11 +432,29 @@ describe('YargCueHandler forced primary group (RB3 game-mode rotation)', () => {
     const handler = new YargCueHandler(makeLightManager(), makeSequencer(), { registry })
     await handler.handleCue(
       CueType.RB3,
-      gameplayCueData({ lightingCue: CueType.RB3, preferredCueGroup: 'rb3-pulse' }),
+      gameplayCueData({ lightingCue: CueType.RB3, preferredCueGroup: 'rb3-mirror' }),
     )
 
-    expect(fromGroup).toHaveBeenCalledWith(CueType.RB3, 'rb3-pulse', 'tracked')
+    expect(fromGroup).toHaveBeenCalledWith(CueType.RB3, 'rb3-mirror', 'tracked')
     expect(normal).not.toHaveBeenCalled()
     expect(cue.execute).toHaveBeenCalled()
+  })
+
+  it('falls back to normal selection when the forced group lacks the cueType', async () => {
+    // Strobes carry RB3's rotated group, but only the Stage Kit group ships them.
+    const registry = YargCueRegistry.create()
+    const strobe = makeFakeCue(CueStyle.Secondary, 'stagekit-strobe')
+    const fromGroup = jest.spyOn(registry, 'getCueImplementationFromGroup').mockReturnValue(null)
+    const normal = jest.spyOn(registry, 'getCueImplementation').mockReturnValue(strobe)
+
+    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), { registry })
+    await handler.handleCue(
+      CueType.Strobe_Fast,
+      gameplayCueData({ lightingCue: CueType.RB3, preferredCueGroup: 'rb3-mirror' }),
+    )
+
+    expect(fromGroup).toHaveBeenCalledWith(CueType.Strobe_Fast, 'rb3-mirror', 'tracked')
+    expect(normal).toHaveBeenCalledWith(CueType.Strobe_Fast, 'tracked')
+    expect(strobe.execute).toHaveBeenCalled()
   })
 })

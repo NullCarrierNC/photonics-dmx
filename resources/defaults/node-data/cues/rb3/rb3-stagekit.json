@@ -5,7 +5,7 @@
   "group": {
     "id": "rb3-stagekit",
     "name": "RB3 Stage Kit",
-    "description": "RB3 cue-mode strobes, rendered on a DMX light array from the live RB3E StageKit stream: the four Slow/Medium/Fast/Fastest white strobe rates driven by the game's beat clock. The always-active RB3 gameplay look is authored separately.",
+    "description": "Replicates the traditional Stage Kit look. Includes the strobes cues.",
     "isStageKit": true
   },
   "cues": [
@@ -1031,8 +1031,8 @@
     },
     {
       "id": "cue-rb3-base",
-      "name": "StageKit Mirror",
-      "description": "The always-active RB3 gameplay look: mirrors the StageKit LED banks onto the DMX rig, additively blending overlapping colours, folded to any rig size via the virtual 8-step ring.",
+      "name": "StageKit",
+      "description": "Replicates the traditional Stage Kit look. Includes the strobes cues.",
       "cueType": "RB3",
       "style": "primary",
       "kind": "lighting",
@@ -1852,146 +1852,146 @@
       "layout": {
         "nodePositions": {
           "rb3-base-start": {
-            "x": 0.0,
-            "y": 0.0
-          },
-          "rb3-base-ring": {
-            "x": 0.0,
-            "y": 150.0
-          },
-          "rb3-base-black": {
-            "x": 0.0,
-            "y": 300.0
+            "x": 0,
+            "y": 0
           },
           "rb3-base-called": {
-            "x": 280.0,
-            "y": 0.0
+            "x": 280,
+            "y": 0
           },
-          "rb3-base-cd-red": {
-            "x": 280.0,
-            "y": 150.0
-          },
-          "rb3-base-cd-green": {
-            "x": 280.0,
-            "y": 300.0
-          },
-          "rb3-base-cd-blue": {
-            "x": 280.0,
-            "y": 450.0
-          },
-          "rb3-base-cd-yellow": {
-            "x": 280.0,
-            "y": 600.0
-          },
-          "rb3-base-each": {
-            "x": 280.0,
-            "y": 750.0
-          },
-          "rb3-base-jg": {
-            "x": 280.0,
-            "y": 900.0
-          },
-          "rb3-base-cell": {
-            "x": 280.0,
-            "y": 1050.0
-          },
-          "rb3-base-pw": {
-            "x": 280.0,
-            "y": 1200.0
-          },
-          "rb3-base-red-q": {
-            "x": 280.0,
-            "y": 1350.0
-          },
-          "rb3-base-red-bit": {
-            "x": 280.0,
-            "y": 1500.0
-          },
-          "rb3-base-red-col": {
-            "x": 280.0,
-            "y": 1650.0
-          },
-          "rb3-base-red-lay": {
-            "x": 280.0,
-            "y": 1800.0
+          "rb3-base-black": {
+            "x": 0,
+            "y": 300
           },
           "rb3-base-red-act": {
-            "x": 280.0,
-            "y": 1950.0
-          },
-          "rb3-base-green-q": {
-            "x": 280.0,
-            "y": 2100.0
-          },
-          "rb3-base-green-bit": {
-            "x": 280.0,
-            "y": 2250.0
-          },
-          "rb3-base-green-col": {
-            "x": 280.0,
-            "y": 2400.0
-          },
-          "rb3-base-green-lay": {
-            "x": 280.0,
-            "y": 2550.0
+            "x": 280,
+            "y": 1950
           },
           "rb3-base-green-act": {
-            "x": 280.0,
-            "y": 2700.0
-          },
-          "rb3-base-blue-q": {
-            "x": 280.0,
-            "y": 2850.0
-          },
-          "rb3-base-blue-bit": {
-            "x": 280.0,
-            "y": 3000.0
-          },
-          "rb3-base-blue-col": {
-            "x": 280.0,
-            "y": 3150.0
-          },
-          "rb3-base-blue-lay": {
-            "x": 280.0,
-            "y": 3300.0
+            "x": 280,
+            "y": 2700
           },
           "rb3-base-blue-act": {
-            "x": 280.0,
-            "y": 3450.0
-          },
-          "rb3-base-yellow-q": {
-            "x": 280.0,
-            "y": 3600.0
-          },
-          "rb3-base-yellow-bit": {
-            "x": 280.0,
-            "y": 3750.0
-          },
-          "rb3-base-yellow-col": {
-            "x": 280.0,
-            "y": 3900.0
-          },
-          "rb3-base-yellow-lay": {
-            "x": 280.0,
-            "y": 4050.0
+            "x": 280,
+            "y": 3450
           },
           "rb3-base-yellow-act": {
-            "x": 280.0,
-            "y": 4200.0
+            "x": 280,
+            "y": 4200
+          },
+          "rb3-base-ring": {
+            "x": 0,
+            "y": 150
+          },
+          "rb3-base-cd-red": {
+            "x": 280,
+            "y": 150
+          },
+          "rb3-base-cd-green": {
+            "x": 280,
+            "y": 300
+          },
+          "rb3-base-cd-blue": {
+            "x": 280,
+            "y": 450
+          },
+          "rb3-base-cd-yellow": {
+            "x": 280,
+            "y": 600
+          },
+          "rb3-base-each": {
+            "x": 280,
+            "y": 750
+          },
+          "rb3-base-jg": {
+            "x": 280,
+            "y": 900
+          },
+          "rb3-base-cell": {
+            "x": 280,
+            "y": 1050
+          },
+          "rb3-base-pw": {
+            "x": 280,
+            "y": 1200
+          },
+          "rb3-base-red-q": {
+            "x": 280,
+            "y": 1350
+          },
+          "rb3-base-red-bit": {
+            "x": 280,
+            "y": 1500
+          },
+          "rb3-base-red-col": {
+            "x": 280,
+            "y": 1650
+          },
+          "rb3-base-red-lay": {
+            "x": 280,
+            "y": 1800
+          },
+          "rb3-base-green-q": {
+            "x": 280,
+            "y": 2100
+          },
+          "rb3-base-green-bit": {
+            "x": 280,
+            "y": 2250
+          },
+          "rb3-base-green-col": {
+            "x": 280,
+            "y": 2400
+          },
+          "rb3-base-green-lay": {
+            "x": 280,
+            "y": 2550
+          },
+          "rb3-base-blue-q": {
+            "x": 280,
+            "y": 2850
+          },
+          "rb3-base-blue-bit": {
+            "x": 280,
+            "y": 3000
+          },
+          "rb3-base-blue-col": {
+            "x": 280,
+            "y": 3150
+          },
+          "rb3-base-blue-lay": {
+            "x": 280,
+            "y": 3300
+          },
+          "rb3-base-yellow-q": {
+            "x": 280,
+            "y": 3600
+          },
+          "rb3-base-yellow-bit": {
+            "x": 280,
+            "y": 3750
+          },
+          "rb3-base-yellow-col": {
+            "x": 280,
+            "y": 3900
+          },
+          "rb3-base-yellow-lay": {
+            "x": 280,
+            "y": 4050
           },
           "rb3-base-note-1": {
-            "x": 560.0,
-            "y": 150.0
+            "x": 560,
+            "y": 150
           },
           "rb3-base-note-2": {
-            "x": 560.0,
-            "y": 300.0
+            "x": 560,
+            "y": 300
           }
         },
         "viewport": {
-          "x": 80.0,
-          "y": 60.0,
-          "zoom": 0.5
+          "x": 76.2929407082703,
+          "y": 190.2376196100049,
+          "zoom": 0.6399783709725961
         }
       },
       "variables": [

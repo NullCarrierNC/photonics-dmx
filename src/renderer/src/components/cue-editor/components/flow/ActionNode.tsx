@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps } from 'reactflow'
 import type { EditorNodeData } from '../../lib/types'
 import { getConditionLabel, getTextColorForBg, displayValueSource } from '../../lib/cueUtils'
 import { FONT_COURIER_NEW } from '../../lib/styles'
-import FlowNodeFrame from './FlowNodeFrame'
+import FlowNodeFrame, { NODE_WIDTH_STYLES } from './FlowNodeFrame'
 import type {
   ActionNode as ActionPayload,
   ValueSource,
@@ -88,7 +88,7 @@ const ActionNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected })
   return (
     <FlowNodeFrame
       id={id}
-      className={`px-3 py-2 rounded-lg border text-xs shadow-sm min-w-[160px] relative ${selectedStyles}`}
+      className={`px-3 py-2 rounded-lg border text-xs shadow-sm min-w-[160px] relative ${NODE_WIDTH_STYLES} ${selectedStyles}`}
       style={{
         borderColor: isColorVariable ? '#666' : 'rgba(0,0,0,0.15)',
         borderStyle: isColorVariable ? 'dashed' : 'solid',

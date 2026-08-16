@@ -2,7 +2,7 @@ import React from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import type { EditorNodeData } from '../../lib/types'
 import { FONT_COURIER_NEW } from '../../lib/styles'
-import FlowNodeFrame from './FlowNodeFrame'
+import FlowNodeFrame, { NODE_WIDTH_STYLES } from './FlowNodeFrame'
 
 const EventListenerNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, selected }) => {
   if (data.kind !== 'event-listener') return null
@@ -14,7 +14,7 @@ const EventListenerNode: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sele
   return (
     <FlowNodeFrame
       id={id}
-      className={`px-3 py-2 rounded-lg border-2 border-purple-400 bg-purple-50 dark:bg-purple-900/40 text-xs shadow-sm min-w-[140px] ${selectedStyles}`}>
+      className={`px-3 py-2 rounded-lg border-2 border-purple-400 bg-purple-50 dark:bg-purple-900/40 text-xs shadow-sm min-w-[140px] ${NODE_WIDTH_STYLES} ${selectedStyles}`}>
       <div className="flex items-center gap-1 font-semibold text-purple-800 dark:text-purple-100">
         <span role="img" aria-label="listen event">
           👂

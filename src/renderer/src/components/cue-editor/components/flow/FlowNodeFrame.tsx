@@ -20,6 +20,10 @@ const WARNING_STYLES =
   'shadow-[0_0_18px_10px_rgba(245,158,11,0.55)] ring-[4px] ring-amber-400 brightness-105 transition-shadow duration-150'
 const INACTIVE_STYLES = 'transition-shadow duration-300'
 
+/** Width cap for flow nodes; `break-words` also breaks a token longer than the line. Notes nodes and
+ *  effect raisers set their own caps. */
+export const NODE_WIDTH_STYLES = 'max-w-[320px] break-words'
+
 /**
  * Shared wrapper for flow node views. When showNodeIds is enabled, renders the node ID
  * at the top in small print; applies error (red), warning (amber), or active (green) highlight
