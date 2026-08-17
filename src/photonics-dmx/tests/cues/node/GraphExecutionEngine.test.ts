@@ -7,8 +7,8 @@
 import { beforeEach, describe, expect, it } from '@jest/globals'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import type {
-  YargNodeCueDefinition,
-  YargEventNode,
+  NetNodeCueDefinition,
+  NetEventNode,
   ActionNode,
   LogicNode,
   VariableDefinition,
@@ -27,8 +27,8 @@ import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
 const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
 
-function minimalCueDefinition(): YargNodeCueDefinition {
-  const eventNode: YargEventNode = {
+function minimalCueDefinition(): NetNodeCueDefinition {
+  const eventNode: NetEventNode = {
     id: 'event1',
     type: 'event',
     eventType: 'cue-started',
@@ -68,9 +68,9 @@ function minimalCueDefinition(): YargNodeCueDefinition {
 }
 
 /** Cue with cue-started (setup) and cue-called (action): setup runs once, cue-called runs every execute (sustain pattern). */
-function sustainPatternCueDefinition(): YargNodeCueDefinition {
-  const eventStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
-  const eventCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+function sustainPatternCueDefinition(): NetNodeCueDefinition {
+  const eventStart: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+  const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   const actionNode: ActionNode = {
     id: 'action1',
     type: 'action',
@@ -113,10 +113,10 @@ function sustainPatternCueDefinition(): YargNodeCueDefinition {
 }
 
 /** cue-started + cue-called + beat on same tick: beat must consume setEffect before lifecycle submissions. */
-function firstTickClearPolicyOrderingCueDefinition(): YargNodeCueDefinition {
-  const eventStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
-  const eventCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
-  const eventBeat: YargEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
+function firstTickClearPolicyOrderingCueDefinition(): NetNodeCueDefinition {
+  const eventStart: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+  const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+  const eventBeat: NetEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
   const timing: ActionNode['timing'] = {
     waitForCondition: { source: 'literal', value: 'none' },
     waitForTime: { source: 'literal', value: 0 },
@@ -333,7 +333,7 @@ describe('GraphExecutionEngine', () => {
     it('when run is active, second startCueRun queues and replaces previous queue', async () => {
       jest.useFakeTimers()
       const def = sustainPatternCueDefinition()
-      const blockingDef: YargNodeCueDefinition = {
+      const blockingDef: NetNodeCueDefinition = {
         ...def,
         nodes: {
           ...def.nodes,
@@ -378,9 +378,9 @@ describe('GraphExecutionEngine', () => {
 
     it('dispatches instrument entry events inline while lifecycle is blocking (plain tick still replaces queue)', async () => {
       jest.useFakeTimers()
-      const eventStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
-      const eventCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
-      const eventDrumRed: YargEventNode = {
+      const eventStart: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+      const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+      const eventDrumRed: NetEventNode = {
         id: 'ev-drum-red',
         type: 'event',
         eventType: 'drum-red',
@@ -431,7 +431,7 @@ describe('GraphExecutionEngine', () => {
           easing: { source: 'literal', value: 'linear' },
         },
       }
-      const def: YargNodeCueDefinition = {
+      const def: NetNodeCueDefinition = {
         id: 'drum-cue',
         name: 'Drum Cue',
         kind: 'lighting',
@@ -496,8 +496,8 @@ describe('GraphExecutionEngine', () => {
 
     it('dispatches beat entry events while a blocking cue-called chain is in flight', async () => {
       jest.useFakeTimers()
-      const eventCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
-      const eventBeat: YargEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
+      const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+      const eventBeat: NetEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
       const actionBlocking: ActionNode = {
         id: 'action-blocking',
         type: 'action',
@@ -544,7 +544,7 @@ describe('GraphExecutionEngine', () => {
           easing: { source: 'literal', value: 'linear' },
         },
       }
-      const def: YargNodeCueDefinition = {
+      const def: NetNodeCueDefinition = {
         id: 'beat-during-called',
         name: 'Beat during cue-called',
         kind: 'lighting',
@@ -603,8 +603,8 @@ describe('GraphExecutionEngine', () => {
 
     it('preserves instrument pulse frames while a blocking cue-called chain is in flight', async () => {
       jest.useFakeTimers()
-      const eventCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
-      const eventDrumRed: YargEventNode = {
+      const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+      const eventDrumRed: NetEventNode = {
         id: 'ev-drum-red',
         type: 'event',
         eventType: 'drum-red',
@@ -655,7 +655,7 @@ describe('GraphExecutionEngine', () => {
           easing: { source: 'literal', value: 'linear' },
         },
       }
-      const def: YargNodeCueDefinition = {
+      const def: NetNodeCueDefinition = {
         id: 'drum-pulses-during-called',
         name: 'Drum pulses during cue-called',
         kind: 'lighting',
@@ -734,8 +734,8 @@ describe('GraphExecutionEngine', () => {
 
     it('preserves every adjacent duplicate Strong beat pulse while lifecycle work blocks', async () => {
       jest.useFakeTimers()
-      const eventCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
-      const eventBeat: YargEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
+      const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+      const eventBeat: NetEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
       const actionBlocking: ActionNode = {
         id: 'action-blocking',
         type: 'action',
@@ -782,7 +782,7 @@ describe('GraphExecutionEngine', () => {
           easing: { source: 'literal', value: 'linear' },
         },
       }
-      const def: YargNodeCueDefinition = {
+      const def: NetNodeCueDefinition = {
         id: 'duplicate-beats-during-called',
         name: 'Duplicate beats during cue-called',
         kind: 'lighting',
@@ -836,8 +836,8 @@ describe('GraphExecutionEngine', () => {
 
     it('preserves every adjacent duplicate keyframe-next pulse while lifecycle work blocks', async () => {
       jest.useFakeTimers()
-      const eventCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
-      const eventKeyframeNext: YargEventNode = {
+      const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+      const eventKeyframeNext: NetEventNode = {
         id: 'ev-keyframe-next',
         type: 'event',
         eventType: 'keyframe-next',
@@ -888,7 +888,7 @@ describe('GraphExecutionEngine', () => {
           easing: { source: 'literal', value: 'linear' },
         },
       }
-      const def: YargNodeCueDefinition = {
+      const def: NetNodeCueDefinition = {
         id: 'duplicate-keyframes-during-called',
         name: 'Duplicate keyframes during cue-called',
         kind: 'lighting',
@@ -962,8 +962,8 @@ describe('GraphExecutionEngine', () => {
         waitUntilTime: { source: 'literal', value: 0 },
         easing: { source: 'literal', value: 'linear' },
       }
-      const eventStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
-      const eventCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+      const eventStart: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+      const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
       const actionBlocking: ActionNode = {
         id: 'action-blocking',
         type: 'action',
@@ -1035,7 +1035,7 @@ describe('GraphExecutionEngine', () => {
         left: { source: 'variable', name: 'tickBpm' },
         right: { source: 'literal', value: 300 },
       }
-      const def: YargNodeCueDefinition = {
+      const def: NetNodeCueDefinition = {
         id: 'lifecycle-latest-wins',
         name: 'Lifecycle latest wins',
         kind: 'lighting',

@@ -13,9 +13,9 @@ import { AudioNodeCue } from '../../../../cues/node/runtime/AudioNodeCue'
 import type {
   ActionNode,
   AudioLightingNodeCueDefinition,
-  YargEventNode,
-  YargLightingNodeCueDefinition,
-  YargMotionNodeCueDefinition,
+  NetEventNode,
+  NetLightingNodeCueDefinition,
+  NetMotionNodeCueDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
@@ -146,8 +146,8 @@ function motionPatternAction(id: string): ActionNode {
   } as unknown as ActionNode
 }
 
-function trivialYargLightingCueDef(): YargLightingNodeCueDefinition {
-  const ev: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+function trivialYargLightingCueDef(): NetLightingNodeCueDefinition {
+  const ev: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   return {
     kind: 'lighting',
     id: 'trivial-yarg',
@@ -158,11 +158,11 @@ function trivialYargLightingCueDef(): YargLightingNodeCueDefinition {
     nodes: { events: [ev], actions: [setColorAction('sc1')], logic: [] },
     connections: [{ from: 'ev-called', to: 'sc1' }],
     layout: { nodePositions: {} },
-  } as unknown as YargLightingNodeCueDefinition
+  } as unknown as NetLightingNodeCueDefinition
 }
 
-function trivialYargMotionCueDef(): YargMotionNodeCueDefinition {
-  const ev: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+function trivialYargMotionCueDef(): NetMotionNodeCueDefinition {
+  const ev: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   return {
     kind: 'motion',
     id: 'trivial-motion',
@@ -171,7 +171,7 @@ function trivialYargMotionCueDef(): YargMotionNodeCueDefinition {
     nodes: { events: [ev], actions: [motionPatternAction('mp1')], logic: [] },
     connections: [{ from: 'ev-called', to: 'mp1' }],
     layout: { nodePositions: {} },
-  } as YargMotionNodeCueDefinition
+  } as NetMotionNodeCueDefinition
 }
 
 function trivialAudioLightingCueDef(): AudioLightingNodeCueDefinition {

@@ -8,7 +8,7 @@ import type { NodeRuntimeCallbacks } from './executionTypes'
 import { CueSession } from './CueSession'
 import { GraphExecutionEngine } from './GraphExecutionEngine'
 import { motionCueGraphPolicy } from './GraphExecutionPolicy'
-import type { YargMotionNodeCueDefinition } from '../../types/nodeCueTypes'
+import type { NetMotionNodeCueDefinition } from '../../types/nodeCueTypes'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
@@ -53,14 +53,14 @@ export class YargMotionNodeCue implements INetCue {
   ): YargMotionRunState {
     let state = this.states.get(sequencer)
     if (!state) {
-      const definition = this.compiledCue.definition as YargMotionNodeCueDefinition
+      const definition = this.compiledCue.definition as NetMotionNodeCueDefinition
       const session = new CueSession()
       session.initializeVariables(definition.variables ?? [], this.compiledCue.groupVariables ?? [])
       state = { engine: null, session }
       this.states.set(sequencer, state)
     }
     if (!state.engine) {
-      const definition = this.compiledCue.definition as YargMotionNodeCueDefinition
+      const definition = this.compiledCue.definition as NetMotionNodeCueDefinition
       const cueId = this.id
       const policy = motionCueGraphPolicy(this.groupId, cueId)
       state.engine = GraphExecutionEngine.forCue(
@@ -80,19 +80,19 @@ export class YargMotionNodeCue implements INetCue {
   }
 
   get cueId(): string {
-    return (this.compiledCue.definition as YargMotionNodeCueDefinition).id
+    return (this.compiledCue.definition as NetMotionNodeCueDefinition).id
   }
 
   get name(): string {
-    return (this.compiledCue.definition as YargMotionNodeCueDefinition).name
+    return (this.compiledCue.definition as NetMotionNodeCueDefinition).name
   }
 
   get id(): string {
-    return `${this.groupId}:${(this.compiledCue.definition as YargMotionNodeCueDefinition).id}`
+    return `${this.groupId}:${(this.compiledCue.definition as NetMotionNodeCueDefinition).id}`
   }
 
   get description(): string | undefined {
-    return (this.compiledCue.definition as YargMotionNodeCueDefinition).description
+    return (this.compiledCue.definition as NetMotionNodeCueDefinition).description
   }
 
   get style(): CueStyle {

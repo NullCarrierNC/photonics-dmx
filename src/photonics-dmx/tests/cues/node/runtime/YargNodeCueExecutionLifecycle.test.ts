@@ -2,8 +2,8 @@ import { describe, expect, it } from '@jest/globals'
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import type {
   ActionNode,
-  YargEventNode,
-  YargNodeCueDefinition,
+  NetEventNode,
+  NetNodeCueDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import { CueData, CueType } from '../../../../cues/types/cueTypes'
 import { YargNodeCue } from '../../../../cues/node/runtime/YargNodeCue'
@@ -85,7 +85,7 @@ function createSetColorAction(duration: number): ActionNode {
   }
 }
 
-function createCueDefinition(events: YargEventNode[], duration: number): YargNodeCueDefinition {
+function createCueDefinition(events: NetEventNode[], duration: number): NetNodeCueDefinition {
   return {
     id: 'execution-lifecycle',
     name: 'Execution Lifecycle',

@@ -7,7 +7,7 @@ import type {
   LogicNode,
   NodeCueFile,
   VariableDefinition,
-  YargEventNode,
+  NetEventNode,
   EffectRaiserNode,
   EffectEventListenerNode,
   NotesNode,
@@ -27,7 +27,7 @@ export type EditorNodeData = {
     | 'effect-listener'
     | 'notes'
   payload:
-    | YargEventNode
+    | NetEventNode
     | AudioEventNodeUnion
     | ActionNode
     | LogicNode

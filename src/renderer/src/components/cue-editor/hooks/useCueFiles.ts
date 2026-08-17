@@ -5,7 +5,7 @@ import type {
   NodeCueFile,
   NodeCueKind,
   NodeCueMode,
-  YargNodeCueDefinition,
+  NetNodeCueDefinition,
   EffectFile,
   EffectMode,
   YargEffectDefinition,
@@ -63,7 +63,7 @@ export type PendingCueEditorImport =
 type UseCueFilesParams = {
   loadCueIntoFlow: (
     cue:
-      | YargNodeCueDefinition
+      | NetNodeCueDefinition
       | AudioNodeCueDefinition
       | YargEffectDefinition
       | AudioEffectDefinition

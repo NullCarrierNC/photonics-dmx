@@ -10,8 +10,7 @@ import {
   AudioNodeCueFile,
   NodeCueFile,
   NodeCueMode,
-  Rb3NodeCueFile,
-  YargNodeCueFile,
+  NetNodeCueFile,
 } from '../../types/nodeCueTypes'
 import { NodeCueCompilationError, NodeCueCompiler } from '../compiler/NodeCueCompiler'
 import { CueRegistry } from '../../registries/CueRegistry'
@@ -244,7 +243,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     this.unregisterFile(filePath)
 
     if (mode === 'yarg') {
-      const group = await this.buildYargGroup(file as YargNodeCueFile, compileErrors)
+      const group = await this.buildYargGroup(file as NetNodeCueFile, compileErrors)
       this.options.yargRegistry.registerGroup(group)
       const groupMeta = file.group
       if (groupMeta.isDefault) {
@@ -255,7 +254,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       }
     } else if (mode === 'rb3') {
       // RB3 cue mode compiles through the YARG path but registers into its own registry instance.
-      const group = await this.buildYargGroup(file as Rb3NodeCueFile, compileErrors)
+      const group = await this.buildYargGroup(file as NetNodeCueFile, compileErrors)
       this.options.rb3Registry.registerGroup(group)
       const groupMeta = file.group
       if (groupMeta.isDefault) {
@@ -300,10 +299,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     this.fileRegistrations.delete(filePath)
   }
 
-  private async buildYargGroup(
-    file: YargNodeCueFile | Rb3NodeCueFile,
-    compileErrors: string[],
-  ): Promise<ICueGroup> {
+  private async buildYargGroup(file: NetNodeCueFile, compileErrors: string[]): Promise<ICueGroup> {
     const cueMap = new Map<CueType, INetCue>()
     const motionMap = new Map<string, INetCue>()
 

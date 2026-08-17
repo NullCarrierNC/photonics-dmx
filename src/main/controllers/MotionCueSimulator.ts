@@ -3,7 +3,7 @@ import type { IAudioCue } from '../../photonics-dmx/cues/interfaces/IAudioCue'
 import type { ChainFanout } from './ChainFanout'
 import type { RigChain } from './RigChain'
 import type { CueData } from '../../photonics-dmx/cues/types/cueTypes'
-import type { GameCueMode, NodeCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
+import type { NetCueMode, NodeCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { createMockAudioCueData } from '../ipc/mockCueData'
 
 interface MotionCueSimulatorDeps {
@@ -11,24 +11,24 @@ interface MotionCueSimulatorDeps {
 }
 
 /**
- * Owns the Cue-Simulation motion-cue state: one active cue per game domain, the active audio motion
+ * Owns the Cue-Simulation motion-cue state: one active cue per net domain, the active audio motion
  * cue, and the audio execution counter. Held by ControllerManager so it can be reset when the
  * controller graph is rebuilt — the previous module-scope globals survived restartControllers(),
  * leaving a simulated cue "active" against torn-down sequencers.
  */
 export class MotionCueSimulator {
-  private readonly gameCues: Record<GameCueMode, INetCue | null> = { yarg: null, rb3: null }
+  private readonly netCues: Record<NetCueMode, INetCue | null> = { yarg: null, rb3: null }
   private audioCue: IAudioCue | null = null
   private audioExecutionCount = 0
 
   constructor(private readonly deps: MotionCueSimulatorDeps) {}
 
-  hasGameCueActive(domain: GameCueMode): boolean {
-    return this.gameCues[domain] !== null
+  hasNetCueActive(domain: NetCueMode): boolean {
+    return this.netCues[domain] !== null
   }
 
-  setGameCue(domain: GameCueMode, cue: INetCue): void {
-    this.gameCues[domain] = cue
+  setNetCue(domain: NetCueMode, cue: INetCue): void {
+    this.netCues[domain] = cue
   }
 
   setAudioCue(cue: IAudioCue): void {
@@ -37,9 +37,9 @@ export class MotionCueSimulator {
 
   /** Stop and clear every active cue without touching pan/tilt (used by start-paths and restart). */
   clearActive(): void {
-    for (const domain of Object.keys(this.gameCues) as GameCueMode[]) {
-      this.gameCues[domain]?.onStop?.()
-      this.gameCues[domain] = null
+    for (const domain of Object.keys(this.netCues) as NetCueMode[]) {
+      this.netCues[domain]?.onStop?.()
+      this.netCues[domain] = null
     }
     this.audioCue?.onStop?.()
     this.audioCue = null
@@ -78,7 +78,7 @@ export class MotionCueSimulator {
       )
       return
     }
-    const cue = this.gameCues[domain]
+    const cue = this.netCues[domain]
     if (!cue || !mockCueData) return
     await this.executeOnChains((sequencer, lightManager) =>
       cue.execute(mockCueData, sequencer, lightManager),

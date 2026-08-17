@@ -1,6 +1,6 @@
 import React from 'react'
 import type {
-  YargEventNode,
+  NetEventNode,
   AudioEventNode,
   AudioEventType,
   AudioEventNodeUnion,
@@ -9,7 +9,7 @@ import type {
   SpectralGateRange,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import type { YargEventType } from '../../../../../../photonics-dmx/types'
+import type { NetEventType } from '../../../../../../photonics-dmx/types'
 import {
   YARG_EVENT_OPTIONS_CATEGORIZED,
   RB3_EVENT_OPTIONS_CATEGORIZED,
@@ -214,9 +214,9 @@ function mergeSpectralGates(
 }
 
 interface EventNodeEditorProps {
-  node: YargEventNode | AudioEventNodeUnion
+  node: NetEventNode | AudioEventNodeUnion
   activeMode: NodeCueMode
-  updateYargNode: (updates: Partial<YargEventNode>) => void
+  updateYargNode: (updates: Partial<NetEventNode>) => void
   updateAudioNode: (updates: Partial<AudioEventNode | AudioTriggerNode>) => void
 }
 
@@ -230,7 +230,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
   const eventType =
     activeMode === 'audio'
       ? (node as AudioEventNodeUnion).eventType
-      : (node as YargEventNode).eventType
+      : (node as NetEventNode).eventType
   const isTrigger = activeMode === 'audio' && eventType === 'audio-trigger'
   const trigger = isTrigger ? (node as AudioTriggerNode) : null
 
@@ -260,7 +260,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
           value={eventType}
           onChange={(event) => {
             if (activeMode !== 'audio') {
-              updateYargNode({ eventType: event.target.value as YargEventType })
+              updateYargNode({ eventType: event.target.value as NetEventType })
             } else {
               const newType = event.target.value as AudioEventType
               if (newType === 'audio-trigger') {
@@ -314,7 +314,7 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
           <label className="flex items-center gap-2 font-medium cursor-pointer">
             <input
               type="checkbox"
-              checked={(node as YargEventNode).triggerOnColorChange ?? false}
+              checked={(node as NetEventNode).triggerOnColorChange ?? false}
               onChange={(e) => updateYargNode({ triggerOnColorChange: e.target.checked })}
               className="rounded"
             />

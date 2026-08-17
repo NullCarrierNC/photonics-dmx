@@ -2,7 +2,7 @@
  * Policy that parameterizes GraphExecutionEngine behaviour for cue graphs vs effect graphs.
  */
 
-import type { BaseEventNode, YargEventNode } from '../../types/nodeCueTypes'
+import type { BaseEventNode, NetEventNode } from '../../types/nodeCueTypes'
 import type { CompiledYargCue } from '../compiler/NodeCueCompiler'
 import type { CompiledEffect } from '../compiler/EffectCompiler'
 import type { CueData } from '../../types/cueTypes'
@@ -153,7 +153,7 @@ function cueLikeGraphPolicy(
       const hasCueStartedFired = entryContext?.hasCueStartedFired ?? false
       const cueData = parameters as CueData
 
-      const isEventTriggered = (event: YargEventNode): boolean => {
+      const isEventTriggered = (event: NetEventNode): boolean => {
         const eventType = event.eventType
         if (eventType === 'cue-started') {
           return !hasCueStartedFired
@@ -166,7 +166,7 @@ function cueLikeGraphPolicy(
 
       const events = Array.from(cue.eventMap.values())
       const triggeredEvents = events.filter((e) => {
-        const event = e as YargEventNode
+        const event = e as NetEventNode
         return event.eventType ? isEventTriggered(event) : false
       })
 

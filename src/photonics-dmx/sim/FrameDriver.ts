@@ -9,7 +9,7 @@ import {
   ledAggregateMask,
 } from '../cues/types/cueTypes'
 import type { CueHandler } from '../cueHandlers/CueHandler'
-import type { GameCueMode } from '../cues/types/nodeCueTypes'
+import type { NetCueMode } from '../cues/types/nodeCueTypes'
 import type { LedBanks, VenueSize } from './types'
 
 /** Live, persistent frame state shared across dispatched frames. */
@@ -58,7 +58,7 @@ export class FrameDriver {
     private readonly handler: CueHandler,
     private readonly getState: () => FrameState,
     private readonly simulationCueGroup: string,
-    private readonly domain: GameCueMode = 'yarg',
+    private readonly domain: NetCueMode = 'yarg',
   ) {}
 
   public async dispatch(transient: FrameTransient = {}): Promise<void> {

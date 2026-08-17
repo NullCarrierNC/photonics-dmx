@@ -50,14 +50,14 @@ import type {
   LogicNode,
   EffectRaiserNode,
   ValueSource,
-  YargNodeCueDefinition,
+  NetNodeCueDefinition,
   AudioNodeCueDefinition,
   NodeCueMode,
   NodeCueKind,
 } from '../../../photonics-dmx/cues/types/nodeCueTypes'
 import {
   getAudioCueDataPropertyMeta,
-  getYargCueDataPropertyMeta,
+  getNetCueDataPropertyMeta,
 } from '../../../photonics-dmx/constants/cueDataPropertyMeta'
 import { expressionVariables } from '../../../photonics-dmx/cues/node/runtime/expressionEvaluator'
 import { readEffectFile, showItemInFolder } from '../ipcApi'
@@ -65,7 +65,7 @@ import { createLogger } from '../../../shared/logger'
 const log = createLogger('CueEditor')
 
 type EditorCueOrEffect =
-  | YargNodeCueDefinition
+  | NetNodeCueDefinition
   | AudioNodeCueDefinition
   | YargEffectDefinition
   | AudioEffectDefinition
@@ -94,7 +94,7 @@ function deriveCueDataValidValues(
     const meta =
       mode === 'audio'
         ? getAudioCueDataPropertyMeta(node.dataProperty)
-        : getYargCueDataPropertyMeta(node.dataProperty)
+        : getNetCueDataPropertyMeta(node.dataProperty)
 
     if (!meta?.validValues?.length) continue
     derivedValidValues.set(node.assignTo, [...meta.validValues])
@@ -398,7 +398,7 @@ const CueEditor: React.FC = () => {
           // rb3 is YARG-shaped (keyed by cueType); only audio cues are keyed by cueTypeId.
           cueFile.mode === 'audio'
             ? (cue as AudioNodeCueDefinition & { kind: 'lighting' }).cueTypeId
-            : (cue as YargNodeCueDefinition & { kind: 'lighting' }).cueType,
+            : (cue as NetNodeCueDefinition & { kind: 'lighting' }).cueType,
         )
         .filter(Boolean),
     )
@@ -894,7 +894,7 @@ const CueEditor: React.FC = () => {
   }, [editorDoc, selectedCueId, mode, groupedEffectFiles])
 
   const handleJsonEditorSave = useCallback(
-    (updatedCue: YargNodeCueDefinition | AudioNodeCueDefinition) => {
+    (updatedCue: NetNodeCueDefinition | AudioNodeCueDefinition) => {
       if (!editorDoc || editorDoc.mode !== 'cue' || !selectedCueId) return
       const file = editorDoc.file as NodeCueFile
       const updatedFile: NodeCueFile = {

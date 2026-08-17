@@ -10,7 +10,7 @@ import {
 } from '../../../../cues/node/compiler/EffectCompiler'
 import type {
   ActionNode,
-  YargLightingNodeCueDefinition,
+  NetLightingNodeCueDefinition,
   YargEffectDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import { createDefaultActionTiming } from '../../../../cues/types/nodeCueTypes'
@@ -41,7 +41,7 @@ function baseValidAction(): ActionNode {
   }
 }
 
-function buildCue(action: ActionNode): YargLightingNodeCueDefinition {
+function buildCue(action: ActionNode): NetLightingNodeCueDefinition {
   return {
     id: 'cue-1',
     name: 'Test Cue',
@@ -53,7 +53,7 @@ function buildCue(action: ActionNode): YargLightingNodeCueDefinition {
       actions: [action],
     },
     connections: [{ from: 'e1', to: action.id }],
-  } as YargLightingNodeCueDefinition
+  } as NetLightingNodeCueDefinition
 }
 
 function buildEffect(action: ActionNode): YargEffectDefinition {

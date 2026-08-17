@@ -15,8 +15,8 @@ import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import { EffectRegistry } from '../../../../cues/node/runtime/EffectRegistry'
 import type {
   ActionNode,
-  YargEventNode,
-  YargNodeCueDefinition,
+  NetEventNode,
+  NetNodeCueDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import type { RevisitPolicy } from '../../../../cues/node/runtime/GraphExecutionPolicy'
 import { CueType, defaultCueData, type CueData } from '../../../../cues'
@@ -76,14 +76,14 @@ const makeMockLightManager = (): jest.Mocked<DmxLightManager> =>
 
 const cueData = (): CueData => ({ ...defaultCueData, lightingCue: CueType.Default })
 
-const diamondCue: YargNodeCueDefinition = {
+const diamondCue: NetNodeCueDefinition = {
   id: 'revisit-cue',
   name: 'Revisit Cue',
   kind: 'lighting',
   cueType: CueType.Default,
   style: 'primary',
   nodes: {
-    events: [{ id: 'event-1', type: 'event', eventType: 'beat' } as YargEventNode],
+    events: [{ id: 'event-1', type: 'event', eventType: 'beat' } as NetEventNode],
     actions: [
       makeAction('A'),
       makeAction('B'),

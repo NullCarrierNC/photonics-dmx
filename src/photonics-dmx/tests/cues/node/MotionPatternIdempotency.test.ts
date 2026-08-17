@@ -5,8 +5,8 @@
 import { beforeEach, describe, expect, it } from '@jest/globals'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import type {
-  YargMotionNodeCueDefinition,
-  YargEventNode,
+  NetMotionNodeCueDefinition,
+  NetEventNode,
   ActionNode,
 } from '../../../cues/types/nodeCueTypes'
 import type { CueData } from '../../../cues/types/cueTypes'
@@ -31,8 +31,8 @@ const minimalParams = (): CueData =>
     strobeState: 'Strobe_Off',
   }) as CueData
 
-function motionPatternOnlyCue(): YargMotionNodeCueDefinition {
-  const ev: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+function motionPatternOnlyCue(): NetMotionNodeCueDefinition {
+  const ev: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   const action: ActionNode = {
     id: 'mp1',
     type: 'action',
@@ -189,7 +189,7 @@ describe('motion-pattern idempotency (cue-called)', () => {
   })
 
   it('updates bearing via updateMotionPatternConfig without restarting when other fields match', () => {
-    const def: YargMotionNodeCueDefinition = {
+    const def: NetMotionNodeCueDefinition = {
       ...motionPatternOnlyCue(),
       variables: [
         {

@@ -2,9 +2,9 @@ import type {
   AudioEventNode,
   AudioNodeCueDefinition,
   ValueSource,
-  YargNodeCueDefinition,
+  NetNodeCueDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import type { YargEventType } from '../../../../../photonics-dmx/types'
+import type { NetEventType } from '../../../../../photonics-dmx/types'
 import { AUDIO_EVENT_OPTIONS, YARG_EVENT_OPTIONS } from './options'
 import { createId } from './cueDefaults'
 
@@ -17,7 +17,7 @@ const displayValueSource = (vs: ValueSource | undefined, defaultValue: string = 
   return `$${vs.name}`
 }
 
-const getYargEventLabel = (eventType: YargEventType): string =>
+const getYargEventLabel = (eventType: NetEventType): string =>
   YARG_EVENT_OPTIONS.find((option) => option.value === eventType)?.label ?? eventType
 
 const getAudioEventLabel = (eventType: AudioEventNode['eventType']): string =>
@@ -76,12 +76,12 @@ function suggestNonConflictingGroupId(
   return candidate
 }
 
-type AnyNodeCue = YargNodeCueDefinition | AudioNodeCueDefinition
+type AnyNodeCue = NetNodeCueDefinition | AudioNodeCueDefinition
 
 /** Reads the cue-type identifier for a lighting cue: `cueType` (YARG) or `cueTypeId` (audio). */
 function getCueTypeId(cue: AnyNodeCue): string | null {
   if (cue.kind !== 'lighting') return null
-  if ('cueType' in cue) return (cue as YargNodeCueDefinition & { kind: 'lighting' }).cueType
+  if ('cueType' in cue) return (cue as NetNodeCueDefinition & { kind: 'lighting' }).cueType
   return (cue as AudioNodeCueDefinition & { kind: 'lighting' }).cueTypeId
 }
 
@@ -89,7 +89,7 @@ function getCueTypeId(cue: AnyNodeCue): string | null {
 function setCueTypeId(cue: AnyNodeCue, value: string): void {
   if (cue.kind !== 'lighting') return
   if ('cueType' in cue) {
-    ;(cue as YargNodeCueDefinition & { kind: 'lighting' }).cueType = value as never
+    ;(cue as NetNodeCueDefinition & { kind: 'lighting' }).cueType = value as never
   } else {
     ;(cue as AudioNodeCueDefinition & { kind: 'lighting' }).cueTypeId = value
   }

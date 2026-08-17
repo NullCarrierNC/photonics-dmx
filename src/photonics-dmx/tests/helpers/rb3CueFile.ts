@@ -7,14 +7,14 @@ import { EffectRegistry } from '../../cues/node/runtime/EffectRegistry'
 import { createMockCueData } from '../../../main/ipc/mockCueData'
 import { CueType } from '../../cues/types/cueTypes'
 import type { CueData } from '../../cues/types/cueTypes'
-import type { Rb3NodeCueFile } from '../../cues/types/nodeCueTypes'
+import type { NetNodeCueFile } from '../../cues/types/nodeCueTypes'
 import type { NodeRuntimeCallbacks } from '../../cues/node/runtime/executionTypes'
 import type { SequencerHarness } from './sequencerHarness'
 
 const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
 
 /** Load and validate a bundled RB3 library. Tests drive the shipped JSON, not a fixture. */
-export function loadRb3CueFile(groupId: string): Rb3NodeCueFile {
+export function loadRb3CueFile(groupId: string): NetNodeCueFile {
   const filePath = path.join(
     __dirname,
     `../../../../resources/defaults/node-data/cues/rb3/${groupId}.json`,

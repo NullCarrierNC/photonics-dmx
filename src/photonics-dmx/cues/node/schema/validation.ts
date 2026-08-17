@@ -19,10 +19,9 @@ import type {
   EffectFile,
   NodeCueFile,
   NodeCueMode,
-  Rb3NodeCueFile,
+  NetNodeCueFile,
   VariableDefinition,
   YargEffectFile,
-  YargNodeCueFile,
 } from '../../types/nodeCueTypes'
 import type { EffectMode } from '../../types/nodeCueTypes'
 import type { StructuredValidationError } from './helpers'
@@ -51,7 +50,7 @@ export type NodeCueValidationResult<T extends NodeCueFile = NodeCueFile> =
 
 export const validateYargNodeCueFile = (
   value: unknown,
-): NodeCueValidationResult<YargNodeCueFile> => {
+): NodeCueValidationResult<NetNodeCueFile> => {
   const migrated = migrateEasingInNodeCueFile(value)
   if (!validateYargSchema(migrated)) {
     return {
@@ -62,7 +61,7 @@ export const validateYargNodeCueFile = (
   }
 
   const semanticErrors: string[] = []
-  const fileData = migrated as YargNodeCueFile
+  const fileData = migrated as NetNodeCueFile
 
   // Check for duplicate group-level variable names
   const groupVariables = fileData.group.variables ?? []
@@ -132,7 +131,7 @@ export const validateYargNodeCueFile = (
   }
 }
 
-export const validateRb3NodeCueFile = (value: unknown): NodeCueValidationResult<Rb3NodeCueFile> => {
+export const validateRb3NodeCueFile = (value: unknown): NodeCueValidationResult<NetNodeCueFile> => {
   const migrated = migrateEasingInNodeCueFile(value)
   if (!validateRb3Schema(migrated)) {
     return {
@@ -143,7 +142,7 @@ export const validateRb3NodeCueFile = (value: unknown): NodeCueValidationResult<
   }
 
   const semanticErrors: string[] = []
-  const fileData = migrated as Rb3NodeCueFile
+  const fileData = migrated as NetNodeCueFile
 
   // Check for duplicate group-level variable names
   const groupVariables = fileData.group.variables ?? []

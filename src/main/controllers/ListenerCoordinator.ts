@@ -7,7 +7,7 @@ import { CueHandler } from '../../photonics-dmx/cueHandlers/CueHandler'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import { CueType } from '../../photonics-dmx/cues/types/cueTypes'
 import type { CueRuntime } from '../../photonics-dmx/cueHandlers/CueRuntime'
-import type { GameCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
+import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
 import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
@@ -42,7 +42,7 @@ export interface ListenerCoordinatorDeps {
    * Wrap a domain's runtime before the listener or processor consumes it, so an additional
    * consumer can be teed onto the same cue stream. Returns the base runtime when absent.
    */
-  decorateCueRuntime?: (domain: GameCueMode, base: CueRuntime) => CueRuntime
+  decorateCueRuntime?: (domain: NetCueMode, base: CueRuntime) => CueRuntime
 }
 
 export class ListenerCoordinator {
@@ -53,7 +53,7 @@ export class ListenerCoordinator {
   private rb3CueHandler: CueHandler | null = null
   private isYargEnabled = false
   private isRb3Enabled = false
-  private readonly domainRuntimes: Partial<Record<GameCueMode, CueRuntime>> = {}
+  private readonly domainRuntimes: Partial<Record<NetCueMode, CueRuntime>> = {}
 
   constructor(private readonly deps: ListenerCoordinatorDeps) {}
 
@@ -154,12 +154,12 @@ export class ListenerCoordinator {
   }
 
   /** Apply the optional runtime decorator for a domain, or pass the base runtime through. */
-  private decorate(domain: GameCueMode, base: CueRuntime): CueRuntime {
+  private decorate(domain: NetCueMode, base: CueRuntime): CueRuntime {
     return this.deps.decorateCueRuntime?.(domain, base) ?? base
   }
 
   /** Tell a domain's runtime the listener is going away, so a decorator can clear its own state. */
-  private notifyRuntimeDisabled(domain: GameCueMode): void {
+  private notifyRuntimeDisabled(domain: NetCueMode): void {
     this.domainRuntimes[domain]?.onDisable?.()
     delete this.domainRuntimes[domain]
   }
@@ -169,7 +169,7 @@ export class ListenerCoordinator {
    * as that domain's shared reference. Each domain resolves against its own registry, so RB3 cue
    * mode's group, lock, consistency and motion state stay isolated from the YARG listener's.
    */
-  private buildChainHandlers(chains: RigChain[], domain: GameCueMode): void {
+  private buildChainHandlers(chains: RigChain[], domain: NetCueMode): void {
     const motion =
       domain === 'yarg'
         ? {
@@ -202,7 +202,7 @@ export class ListenerCoordinator {
    * shutdown ends any open song, so the registry's once-per-song and motion locks don't survive the
    * session. Safe to call when no handlers exist.
    */
-  private clearChainHandlers(domain: GameCueMode): void {
+  private clearChainHandlers(domain: NetCueMode): void {
     for (const chain of this.deps.getRigChains()) {
       const handler = chain.cueHandlers[domain]
       if (handler) {

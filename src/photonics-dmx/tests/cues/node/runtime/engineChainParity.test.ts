@@ -6,8 +6,8 @@ import { EffectCompiler } from '../../../../cues/node/compiler/EffectCompiler'
 import { EffectRegistry } from '../../../../cues/node/runtime/EffectRegistry'
 import type {
   ActionNode,
-  YargEventNode,
-  YargNodeCueDefinition,
+  NetEventNode,
+  NetNodeCueDefinition,
   YargEffectDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import { CueType, defaultCueData, type CueData } from '../../../../cues'
@@ -83,7 +83,7 @@ describe('Chain extraction parity between cue and effect engines', () => {
     const action2 = makeAction('action-2', 'blue', 30, 2)
     const action3 = makeAction('action-3', 'green', 30, 2)
 
-    const cueDefinition: YargNodeCueDefinition = {
+    const cueDefinition: NetNodeCueDefinition = {
       id: 'parity-cue',
       name: 'Parity Cue',
       kind: 'lighting',
@@ -95,7 +95,7 @@ describe('Chain extraction parity between cue and effect engines', () => {
             id: 'event-1',
             type: 'event',
             eventType: 'beat',
-          } as YargEventNode,
+          } as NetEventNode,
         ],
         actions: [action1, action2, action3],
         logic: [],

@@ -1,7 +1,7 @@
 /**
  * Verifies the simulation helper that ensures every active rig chain has a cue handler in a
  * domain's slot. The simulation IPC path and TestEffectRunner depend on this being idempotent and
- * safe to call before or after the real network listener runs, for either game domain.
+ * safe to call before or after the real network listener runs, for either net domain.
  */
 import { describe, expect, it, jest } from '@jest/globals'
 
@@ -14,7 +14,7 @@ jest.mock('../../utils/windowUtils', () => ({
 import { ControllerManager } from '../../controllers/ControllerManager'
 import { CueHandler } from '../../../photonics-dmx/cueHandlers/CueHandler'
 import { RigChain } from '../../../photonics-dmx/controllers/RigChain'
-import type { GameCueMode } from '../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { NetCueMode } from '../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { DmxLightManager } from '../../../photonics-dmx/controllers/DmxLightManager'
 import type { Sequencer } from '../../../photonics-dmx/controllers/sequencer/Sequencer'
 
@@ -71,10 +71,10 @@ function makeStubController(
   return stub as unknown as ControllerManager
 }
 
-describe.each<GameCueMode>(['yarg', 'rb3'])(
+describe.each<NetCueMode>(['yarg', 'rb3'])(
   'ControllerManager.ensureChainsHaveHandlersForSimulation (%s)',
   (domain) => {
-    const other: GameCueMode = domain === 'yarg' ? 'rb3' : 'yarg'
+    const other: NetCueMode = domain === 'yarg' ? 'rb3' : 'yarg'
 
     it('installs a cue handler on every chain that has none', () => {
       const a = makeChainStub('a', true)

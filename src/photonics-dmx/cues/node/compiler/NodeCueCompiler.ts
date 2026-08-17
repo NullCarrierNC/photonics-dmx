@@ -7,8 +7,8 @@ import {
   createDefaultActionTiming,
   EffectRaiserNode,
   VariableDefinition,
-  YargEventNode,
-  YargNodeCueDefinition,
+  NetEventNode,
+  NetNodeCueDefinition,
   ValueSource,
 } from '../../types/nodeCueTypes'
 import { AbstractGraphBuilder, CompiledGraphBase } from './AbstractGraphBuilder'
@@ -27,13 +27,13 @@ export class NodeCueCompilationError extends CompilationError {
 }
 
 export interface CompiledNodeCue<TEvent extends BaseEventNode> extends CompiledGraphBase<TEvent> {
-  definition: YargNodeCueDefinition | AudioNodeCueDefinition
+  definition: NetNodeCueDefinition | AudioNodeCueDefinition
   effectRaiserMap: Map<string, EffectRaiserNode>
   /** Group-level variable definitions; set by loader from file.group.variables */
   groupVariables?: VariableDefinition[]
 }
 
-export type CompiledYargCue = CompiledNodeCue<YargEventNode>
+export type CompiledYargCue = CompiledNodeCue<NetEventNode>
 export type CompiledAudioCue = CompiledNodeCue<AudioEventNodeUnion>
 
 const getActionTiming = (action: ActionNode): ActionTimingConfig => ({
@@ -62,7 +62,7 @@ export const calculateActionDuration = (action: ActionNode): number => {
 }
 
 export class NodeCueCompiler extends AbstractGraphBuilder {
-  public static compileYargCue(definition: YargNodeCueDefinition): CompiledYargCue {
+  public static compileYargCue(definition: NetNodeCueDefinition): CompiledYargCue {
     return this.buildCompiled(definition)
   }
 
@@ -71,7 +71,7 @@ export class NodeCueCompiler extends AbstractGraphBuilder {
   }
 
   private static buildCompiled<TEvent extends BaseEventNode>(
-    definition: YargNodeCueDefinition | AudioNodeCueDefinition,
+    definition: NetNodeCueDefinition | AudioNodeCueDefinition,
   ): CompiledNodeCue<TEvent> {
     const events = definition.nodes.events as unknown as TEvent[]
     const actions = (definition.nodes.actions ?? []) as ActionNode[]

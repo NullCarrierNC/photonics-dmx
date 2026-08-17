@@ -8,8 +8,8 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import type {
-  YargNodeCueDefinition,
-  YargEventNode,
+  NetNodeCueDefinition,
+  NetEventNode,
   ActionNode,
 } from '../../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../../cues/types/cueTypes'
@@ -20,8 +20,8 @@ import { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { createMockLightingConfig } from '../../../helpers/testFixtures'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 
-function cueWithSharedGroupVar(id: string, cueType: CueType): YargNodeCueDefinition {
-  const event: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+function cueWithSharedGroupVar(id: string, cueType: CueType): NetNodeCueDefinition {
+  const event: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
   const action: ActionNode = {
     id: 'action1',
     type: 'action',

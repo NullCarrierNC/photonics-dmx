@@ -13,7 +13,7 @@ import type {
   NodeCueKind,
   NodeCueMode,
   NodeEffectType,
-  YargEventNode,
+  NetEventNode,
   YargEffectDefinition,
   AudioEffectDefinition,
   NotesNode,
@@ -53,7 +53,7 @@ type Props = {
     validValues: string[],
   ) => void
   addEventNode: (
-    option: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
+    option: EventOption<NetEventNode['eventType'] | AudioEventNode['eventType']>,
   ) => void
   addActionNode: (effect: NodeEffectType) => void
   addLogicNode: (logicType: LogicNode['logicType']) => void
@@ -64,7 +64,7 @@ type Props = {
   addNotesNode?: (variant: NotesVariant) => void
   updateSelectedNode: <
     T extends
-      | YargEventNode
+      | NetEventNode
       | AudioEventNodeUnion
       | ActionNode
       | LogicNode
@@ -204,9 +204,9 @@ const NodeSidebar: React.FC<Props> = ({
             )}
             {selectedNode.data.kind === 'event' && (
               <EventNodeEditor
-                node={selectedNode.data.payload as YargEventNode | AudioEventNodeUnion}
+                node={selectedNode.data.payload as NetEventNode | AudioEventNodeUnion}
                 activeMode={activeMode}
-                updateYargNode={(updates) => updateSelectedNode<YargEventNode>(updates)}
+                updateYargNode={(updates) => updateSelectedNode<NetEventNode>(updates)}
                 updateAudioNode={(updates) => updateSelectedNode<AudioEventNodeUnion>(updates)}
               />
             )}

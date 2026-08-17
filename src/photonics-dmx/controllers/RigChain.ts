@@ -5,7 +5,7 @@ import { Sequencer } from './sequencer/Sequencer'
 import { Clock } from './sequencer/Clock'
 import { LightingConfiguration } from '../types'
 import { CueHandler } from '../cueHandlers/CueHandler'
-import type { GameCueMode } from '../cues/types/nodeCueTypes'
+import type { NetCueMode } from '../cues/types/nodeCueTypes'
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
 import { Rb3MenuCueHandler } from '../cueHandlers/Rb3MenuCueHandler'
 import { CueRegistry } from '../cues/registries/CueRegistry'
@@ -56,9 +56,9 @@ export class RigChain {
    * Per-rig cue handler slots. Populated lazily by the listener controllers when each
    * listener enables (YARG / RB3 / audio), cleared on disable. Each handler is bound to
    * this chain's sequencer + light manager so events resolve against this rig's lights.
-   * The game domains keep one slot each so their cue state stays separate.
+   * The net domains keep one slot each so their cue state stays separate.
    */
-  public readonly cueHandlers: Record<GameCueMode, CueHandler | null> = {
+  public readonly cueHandlers: Record<NetCueMode, CueHandler | null> = {
     yarg: null,
     rb3: null,
   }
@@ -83,7 +83,7 @@ export class RigChain {
    * one chain's teardown stopping ticks for the others.
    */
   public async dispose(): Promise<void> {
-    for (const domain of Object.keys(this.cueHandlers) as GameCueMode[]) {
+    for (const domain of Object.keys(this.cueHandlers) as NetCueMode[]) {
       const handler = this.cueHandlers[domain]
       if (!handler) continue
       try {

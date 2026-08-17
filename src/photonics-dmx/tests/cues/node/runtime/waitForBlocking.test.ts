@@ -14,8 +14,8 @@ import { EffectRegistry } from '../../../../cues/node/runtime/EffectRegistry'
 import type {
   ActionNode,
   Connection,
-  YargEventNode,
-  YargNodeCueDefinition,
+  NetEventNode,
+  NetNodeCueDefinition,
   YargEffectDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import { CueType, defaultCueData, type CueData } from '../../../../cues'
@@ -119,9 +119,9 @@ function makeCueEngine(
   actions: ActionNode[],
   connections: Connection[],
   sequencer: jest.Mocked<ILightingController>,
-): { engine: NodeExecutionEngine; event: YargEventNode } {
-  const event = { id: 'event-1', type: 'event', eventType: 'beat' } as YargEventNode
-  const def: YargNodeCueDefinition = {
+): { engine: NodeExecutionEngine; event: NetEventNode } {
+  const event = { id: 'event-1', type: 'event', eventType: 'beat' } as NetEventNode
+  const def: NetNodeCueDefinition = {
     id: 'wf-cue',
     name: 'WaitFor Cue',
     kind: 'lighting',

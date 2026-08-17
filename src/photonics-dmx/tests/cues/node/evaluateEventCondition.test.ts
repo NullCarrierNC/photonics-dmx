@@ -115,6 +115,30 @@ describe('evaluateEventCondition', () => {
     ).toBe(true)
   })
 
+  it('fires an instrument note on its rising edge only', () => {
+    const hit = { drumNotes: [DrumNoteType.RedDrum] }
+
+    // Held across keepalive frames: the note is still present but already was, so no re-fire.
+    expect(evaluateEventCondition('drum-red', frame({ ...hit, previousFrame: hit }))).toBe(false)
+    // Arriving against a baseline without it, and again after a release.
+    expect(
+      evaluateEventCondition('drum-red', frame({ ...hit, previousFrame: { drumNotes: [] } })),
+    ).toBe(true)
+    expect(
+      evaluateEventCondition('guitar-red', {
+        ...frame({ guitarNotes: [InstrumentNoteType.Red] }),
+        previousFrame: { guitarNotes: [InstrumentNoteType.Red] },
+      } as CueData),
+    ).toBe(false)
+  })
+
+  it('treats an absent previousFrame as an empty baseline', () => {
+    // The first frame of a cue has no baseline, so a note present on it counts as arriving.
+    expect(evaluateEventCondition('drum-red', frame({ drumNotes: [DrumNoteType.RedDrum] }))).toBe(
+      true,
+    )
+  })
+
   it('returns false for the entry-only and unknown conditions', () => {
     // cue-started / cue-called depend on session state, not cueData, so the gate never claims them.
     expect(evaluateEventCondition('cue-started', frame())).toBe(false)

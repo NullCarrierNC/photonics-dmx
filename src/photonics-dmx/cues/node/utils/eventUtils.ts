@@ -90,7 +90,7 @@ export function getYargEventCategories(): EventCategory[] {
   ]
 }
 
-/** RB3 StageKit LED-on/off and fog edge events (values are valid YargEventType wait conditions). */
+/** RB3 StageKit LED-on/off and fog edge events (values are valid NetEventType wait conditions). */
 function rb3StageKitEvents(): { value: string; label: string }[] {
   return [
     ...Array.from({ length: 8 }, (_, i) => ({

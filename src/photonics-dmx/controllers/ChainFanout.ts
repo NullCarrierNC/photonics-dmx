@@ -8,7 +8,7 @@ import type { RGBIO } from '../types'
 import { getEffectSingleColor } from '../effects/effectSingleColor'
 import { RigChain } from './RigChain'
 import { ChainCueRuntime } from './ChainCueRuntime'
-import type { GameCueMode } from '../cues/types/nodeCueTypes'
+import type { NetCueMode } from '../cues/types/nodeCueTypes'
 
 /** Top layer (above every cue layer) the lighting-mute overlay occupies, and its effect name. */
 const LIGHTING_MUTE_LAYER = 255
@@ -41,17 +41,17 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
 
   // ── Game domains (CueRuntime) ────────────────────────────────────────────────────────
   //
-  // One runtime per game domain, each fanning to that domain's handler slot on every chain.
+  // One runtime per net domain, each fanning to that domain's handler slot on every chain.
   // The fanout itself implements CueRuntime for the YARG domain, which is what the YARG
   // network listener and the simulation paths consume.
 
-  private readonly runtimes: Record<GameCueMode, ChainCueRuntime> = {
+  private readonly runtimes: Record<NetCueMode, ChainCueRuntime> = {
     yarg: new ChainCueRuntime(this, 'yarg'),
     rb3: new ChainCueRuntime(this, 'rb3'),
   }
 
-  /** The dispatch surface for one game domain. */
-  public cueRuntime(domain: GameCueMode): ChainCueRuntime {
+  /** The dispatch surface for one net domain. */
+  public cueRuntime(domain: NetCueMode): ChainCueRuntime {
     return this.runtimes[domain]
   }
 
@@ -236,7 +236,7 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
 
   /** Stop the currently-active cue for one domain on every chain's handler (no-op for chains
    *  without a handler attached). Mirrors `CueHandler.stopActiveCue`. */
-  public stopActiveCue(domain: GameCueMode = 'yarg'): void {
+  public stopActiveCue(domain: NetCueMode = 'yarg'): void {
     for (const c of this.chains) c.cueHandlers[domain]?.stopActiveCue()
   }
 

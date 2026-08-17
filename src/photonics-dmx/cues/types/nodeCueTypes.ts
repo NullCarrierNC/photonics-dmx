@@ -1,19 +1,22 @@
 import { CueType } from './cueTypes'
 
-import type { YargEventType, TrackedLight, Color } from '../../types'
+import type { NetEventType, TrackedLight, Color } from '../../types'
 import {
   ALL_CONFIG_DATA_PROPERTIES,
-  YARG_CUE_DATA_PROPERTIES,
+  NET_CUE_DATA_PROPERTIES,
   AUDIO_CUE_DATA_PROPERTIES,
 } from '../../constants/nodeConstants'
 
 export type NodeCueMode = 'yarg' | 'audio' | 'rb3'
 
 /**
- * The modes fed by a game datagram: cueType-keyed cues over `CueData` frames, dispatched by a cue
- * handler against a registry. Audio is the other family, keyed by its own cue ids over audio frames.
+ * The modes whose cue identity arrives from outside, keyed by `CueType` over a `CueData` frame and
+ * dispatched by a cue handler against a registry, as {@link INetCue} cues. Membership is the frame
+ * contract rather than the transport, so the cue simulator qualifies by synthesising the same frames
+ * and any future network trigger joins without widening anything. Audio is the other family, deriving
+ * its cue from signal analysis over audio frames.
  */
-export type GameCueMode = Exclude<NodeCueMode, 'audio'>
+export type NetCueMode = Exclude<NodeCueMode, 'audio'>
 
 /** Lighting = colour/intensity cues; motion = pan/tilt / motion-pattern (parallel layer). */
 export type NodeCueKind = 'lighting' | 'motion'
@@ -200,7 +203,7 @@ export const TEMPO_DEFAULTS = {
 } as const
 
 // YARG Cue Data Properties - derived from shared constants
-export type YargCueDataProperty = (typeof YARG_CUE_DATA_PROPERTIES)[number]
+export type YargCueDataProperty = (typeof NET_CUE_DATA_PROPERTIES)[number]
 
 // Audio Cue Data Properties - derived from shared constants
 export type AudioCueDataProperty = (typeof AUDIO_CUE_DATA_PROPERTIES)[number]
@@ -537,20 +540,20 @@ export interface EffectReference {
   name: string // Display name (cached for UI)
 }
 
-export interface YargLightingNodeCueDefinition extends BaseCueDefinition {
+export interface NetLightingNodeCueDefinition extends BaseCueDefinition {
   kind: 'lighting'
   cueType: CueType
   style: 'primary' | 'secondary'
-  nodes: NodeGraph<YargEventNode, ActionNode>
+  nodes: NodeGraph<NetEventNode, ActionNode>
 }
 
 /** YARG motion program: same event model as lighting; runs in parallel (random selection). */
-export interface YargMotionNodeCueDefinition extends BaseCueDefinition {
+export interface NetMotionNodeCueDefinition extends BaseCueDefinition {
   kind: 'motion'
-  nodes: NodeGraph<YargEventNode, ActionNode>
+  nodes: NodeGraph<NetEventNode, ActionNode>
 }
 
-export type YargNodeCueDefinition = YargLightingNodeCueDefinition | YargMotionNodeCueDefinition
+export type NetNodeCueDefinition = NetLightingNodeCueDefinition | NetMotionNodeCueDefinition
 
 /** Layering for audio node cues: primary = base look; secondary/strobe = overlay (addEffect). Strobe is excluded from Game Mode primary rotation. */
 export type AudioCueLayerStyle = 'primary' | 'secondary' | 'strobe'
@@ -571,14 +574,19 @@ export interface AudioMotionNodeCueDefinition extends BaseCueDefinition {
 
 export type AudioNodeCueDefinition = AudioLightingNodeCueDefinition | AudioMotionNodeCueDefinition
 
-export interface YargNodeCueFile {
+/**
+ * A cue file for either mode of the net family. The two differ only by the `mode` discriminant,
+ * so they share one interface: the file's directory is what pins the mode, and the vocabulary a mode
+ * may author lives in its domain descriptor rather than in the file shape.
+ */
+export interface NetNodeCueFile {
   /** Schema version. */
   version: 1
   /** Bundled content revision; used at startup to refresh defaults from the app bundle. */
   cueVersion?: number
-  mode: 'yarg'
+  mode: NetCueMode
   group: NodeCueGroupMeta
-  cues: YargNodeCueDefinition[]
+  cues: NetNodeCueDefinition[]
   bundled?: boolean
 }
 
@@ -598,18 +606,7 @@ export interface AudioNodeCueFile {
  * cue-selection machinery against its own registry instance), so `cues` are YARG cue
  * definitions; only the `mode` discriminant and the target registry differ.
  */
-export interface Rb3NodeCueFile {
-  /** Schema version. */
-  version: 1
-  /** Bundled content revision; used at startup to refresh defaults from the app bundle. */
-  cueVersion?: number
-  mode: 'rb3'
-  group: NodeCueGroupMeta
-  cues: YargNodeCueDefinition[]
-  bundled?: boolean
-}
-
-export type NodeCueFile = YargNodeCueFile | AudioNodeCueFile | Rb3NodeCueFile
+export type NodeCueFile = NetNodeCueFile | AudioNodeCueFile
 
 export interface BaseEventNode {
   id: string
@@ -618,8 +615,8 @@ export interface BaseEventNode {
   outputs?: string[]
 }
 
-export interface YargEventNode extends BaseEventNode {
-  eventType: YargEventType
+export interface NetEventNode extends BaseEventNode {
+  eventType: NetEventType
   /**
    * RB3 led-N gates only: when true, the ON gate also fires while the position stays lit but the set
    * of banks lighting it changes (a colour change), not just on the off→on edge. Ignored by led-N-off
@@ -875,7 +872,7 @@ export interface BaseEffectDefinition {
 
 export interface YargEffectDefinition extends BaseEffectDefinition {
   mode: 'yarg'
-  nodes: NodeGraph<YargEventNode, ActionNode>
+  nodes: NodeGraph<NetEventNode, ActionNode>
 }
 
 export interface AudioEffectDefinition extends BaseEffectDefinition {

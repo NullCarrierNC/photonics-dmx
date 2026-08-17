@@ -1,7 +1,7 @@
 import { CueHandler } from '../../photonics-dmx/cueHandlers/CueHandler'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import type { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
-import type { GameCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
+import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import type { MotionCueRef } from '../../photonics-dmx/cues/types/cueTypes'
 import {
   noopRuntimeBroadcaster,
@@ -19,7 +19,7 @@ import type { RigChain } from './RigChain'
  * top-up, motion preference reads) is identical, so it is written once against this row.
  */
 export interface CueRuntimeDomain {
-  domain: GameCueMode
+  domain: NetCueMode
   /** Preference domain holding this runtime's lighting cue selection. */
   lightingPrefs: CueDomain
   /** Preference domain holding its motion cue selection and motion tunables. */
@@ -31,7 +31,7 @@ export interface CueRuntimeDomain {
   registry: () => CueRegistry
 }
 
-export const CUE_RUNTIME_DOMAINS: Record<GameCueMode, CueRuntimeDomain> = {
+export const CUE_RUNTIME_DOMAINS: Record<NetCueMode, CueRuntimeDomain> = {
   yarg: {
     domain: 'yarg',
     lightingPrefs: 'yarg',
@@ -48,7 +48,7 @@ export const CUE_RUNTIME_DOMAINS: Record<GameCueMode, CueRuntimeDomain> = {
   },
 }
 
-export function cueRuntimeDomain(domain: GameCueMode): CueRuntimeDomain {
+export function cueRuntimeDomain(domain: NetCueMode): CueRuntimeDomain {
   return CUE_RUNTIME_DOMAINS[domain]
 }
 
@@ -63,7 +63,7 @@ export interface MotionPrefsSnapshot {
 
 export function readMotionPrefs(
   config: ConfigurationManager,
-  domain: GameCueMode,
+  domain: NetCueMode,
 ): MotionPrefsSnapshot {
   const prefs = config.getPreference('cueDomains')[cueRuntimeDomain(domain).motionPrefs]
   return {
@@ -95,7 +95,7 @@ export interface DomainChainHandlerOptions {
  * rig. Returns that primary handler.
  */
 export function buildDomainChainHandlers(
-  domain: GameCueMode,
+  domain: NetCueMode,
   chains: RigChain[],
   options: DomainChainHandlerOptions,
 ): CueHandler | null {

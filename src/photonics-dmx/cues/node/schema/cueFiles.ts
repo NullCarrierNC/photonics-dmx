@@ -4,9 +4,8 @@ import type {
   AudioNodeCueFile,
   AudioEventNodeUnion,
   NodeCueGroupMeta,
-  Rb3NodeCueFile,
-  YargNodeCueDefinition,
-  YargNodeCueFile,
+  NetNodeCueFile,
+  NetNodeCueDefinition,
 } from '../../types/nodeCueTypes'
 import { ajv } from './helpers'
 import { logicNodeSchema } from './logic'
@@ -21,7 +20,7 @@ import {
   eventRaiserNodeSchema,
   layoutSchema,
   notesNodeSchema,
-  yargEventSchema,
+  netEventSchema,
 } from './nodes'
 import {
   effectReferenceSchema,
@@ -49,7 +48,7 @@ const yargLightingCueSchema = {
         events: {
           type: 'array',
           minItems: 1,
-          items: yargEventSchema,
+          items: netEventSchema,
         },
         actions: {
           type: 'array',
@@ -136,7 +135,7 @@ const yargMotionCueSchema = {
         events: {
           type: 'array',
           minItems: 1,
-          items: yargEventSchema,
+          items: netEventSchema,
         },
         actions: {
           type: 'array',
@@ -210,7 +209,7 @@ const yargMotionCueSchema = {
 
 const yargCueSchema = {
   oneOf: [yargLightingCueSchema, yargMotionCueSchema],
-} as unknown as JSONSchemaType<YargNodeCueDefinition>
+} as unknown as JSONSchemaType<NetNodeCueDefinition>
 
 const audioLightingCueSchema = {
   type: 'object',
@@ -416,7 +415,7 @@ const groupSchema: JSONSchemaType<NodeCueGroupMeta> = {
   },
 }
 
-const yargFileSchema: JSONSchemaType<YargNodeCueFile> = {
+const yargFileSchema: JSONSchemaType<NetNodeCueFile> = {
   type: 'object',
   required: ['version', 'mode', 'group', 'cues'],
   additionalProperties: false,
@@ -456,7 +455,7 @@ const audioFileSchema: JSONSchemaType<AudioNodeCueFile> = {
  * RB3 cue-mode file: identical to the YARG file shape (same YARG cue definitions) apart from the
  * `mode` discriminant, since RB3 cue mode compiles through the YARG path into its own registry.
  */
-const rb3FileSchema: JSONSchemaType<Rb3NodeCueFile> = {
+const rb3FileSchema: JSONSchemaType<NetNodeCueFile> = {
   type: 'object',
   required: ['version', 'mode', 'group', 'cues'],
   additionalProperties: false,
@@ -474,8 +473,8 @@ const rb3FileSchema: JSONSchemaType<Rb3NodeCueFile> = {
   },
 }
 
-export const validateYargSchema = ajv.compile<YargNodeCueFile>(yargFileSchema)
+export const validateYargSchema = ajv.compile<NetNodeCueFile>(yargFileSchema)
 
 export const validateAudioSchema = ajv.compile<AudioNodeCueFile>(audioFileSchema)
 
-export const validateRb3Schema = ajv.compile<Rb3NodeCueFile>(rb3FileSchema)
+export const validateRb3Schema = ajv.compile<NetNodeCueFile>(rb3FileSchema)

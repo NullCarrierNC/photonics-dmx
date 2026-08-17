@@ -19,11 +19,10 @@ import type {
   AudioEventNodeUnion,
   AudioMotionNodeCueDefinition,
   AudioNodeCueFile,
-  Rb3NodeCueFile,
-  YargEventNode,
-  YargLightingNodeCueDefinition,
-  YargMotionNodeCueDefinition,
-  YargNodeCueFile,
+  NetNodeCueFile,
+  NetEventNode,
+  NetLightingNodeCueDefinition,
+  NetMotionNodeCueDefinition,
 } from '../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../cues/types/cueTypes'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
@@ -32,8 +31,8 @@ import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 function rb3LightingFile(
   cueType: CueType = CueType.Strobe_Fast,
   groupId = 'loader-test-rb3',
-): Rb3NodeCueFile {
-  const ev: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+): NetNodeCueFile {
+  const ev: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   const action: ActionNode = {
     id: 'a1',
     type: 'action',
@@ -55,7 +54,7 @@ function rb3LightingFile(
     },
     layer: { source: 'literal', value: 100 },
   }
-  const cue: YargLightingNodeCueDefinition = {
+  const cue: NetLightingNodeCueDefinition = {
     kind: 'lighting',
     id: 'c1',
     name: 'RB3 light',
@@ -72,8 +71,8 @@ function rb3LightingFile(
   }
 }
 
-function yargMotionOnlyFile(): YargNodeCueFile {
-  const ev: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+function yargMotionOnlyFile(): NetNodeCueFile {
+  const ev: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   const action: ActionNode = {
     id: 'mp1',
     type: 'action',
@@ -96,7 +95,7 @@ function yargMotionOnlyFile(): YargNodeCueFile {
     },
     layer: { source: 'literal', value: 120 },
   }
-  const cue: YargMotionNodeCueDefinition = {
+  const cue: NetMotionNodeCueDefinition = {
     kind: 'motion',
     id: 'm1',
     name: 'Motion',
@@ -228,8 +227,8 @@ describe('NodeCueLoader', () => {
     const file = yargMotionOnlyFile()
     // Second motion cue whose action has no incoming connection: schema-valid but fails
     // compilation (unreachable action). Reachability is a compile-time, not schema, check.
-    const goodAction = (file.cues[0] as YargMotionNodeCueDefinition).nodes.actions[0]
-    const brokenCue: YargMotionNodeCueDefinition = {
+    const goodAction = (file.cues[0] as NetMotionNodeCueDefinition).nodes.actions[0]
+    const brokenCue: NetMotionNodeCueDefinition = {
       kind: 'motion',
       id: 'm-broken',
       name: 'Broken',
@@ -278,7 +277,7 @@ describe('NodeCueLoader', () => {
 
   it('migrates legacy compass bearing literals when loading from disk', async () => {
     const file = yargMotionOnlyFile()
-    const cue = file.cues[0] as YargMotionNodeCueDefinition
+    const cue = file.cues[0] as NetMotionNodeCueDefinition
     const motionAction = cue.nodes.actions[0]
     motionAction.motionPattern = {
       pattern: { source: 'literal', value: 'circle' },
@@ -296,7 +295,7 @@ describe('NodeCueLoader', () => {
     const rel = path.join('node-data', 'cues', 'yarg', 'legacy-bearing.json')
     const read = await loader.readFile(rel)
     expect(read.mode).toBe('yarg')
-    const motionCue = read.cues[0] as YargMotionNodeCueDefinition
+    const motionCue = read.cues[0] as NetMotionNodeCueDefinition
     const bearingLit = motionCue.nodes.actions[0].motionPattern?.bearing
     expect(bearingLit?.source).toBe('literal')
     if (bearingLit?.source === 'literal') {
@@ -440,7 +439,7 @@ describe('NodeCueLoader', () => {
   })
 
   describe('RB3 cue mode', () => {
-    const writeRb3 = (filename: string, file: Rb3NodeCueFile): void => {
+    const writeRb3 = (filename: string, file: NetNodeCueFile): void => {
       const rb3Dir = path.join(tmpDir, 'node-data', 'cues', 'rb3')
       fs.mkdirSync(rb3Dir, { recursive: true })
       fs.writeFileSync(path.join(rb3Dir, filename), JSON.stringify(file), 'utf-8')

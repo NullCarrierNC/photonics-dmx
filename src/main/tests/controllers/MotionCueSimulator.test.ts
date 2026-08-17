@@ -25,7 +25,7 @@ describe('MotionCueSimulator', () => {
     ]
     const sim = new MotionCueSimulator({ getChainFanout: () => fanoutStub(chains) })
     const cue = cueStub()
-    sim.setGameCue('yarg', cue)
+    sim.setNetCue('yarg', cue)
     await sim.run('yarg', {} as never)
     expect(cue.execute).toHaveBeenCalledTimes(2)
   })
@@ -37,7 +37,7 @@ describe('MotionCueSimulator', () => {
     ]
     const sim = new MotionCueSimulator({ getChainFanout: () => fanoutStub(chains) })
     const cue = cueStub()
-    sim.setGameCue('rb3', cue)
+    sim.setNetCue('rb3', cue)
     await sim.run('rb3', {} as never)
     expect(cue.execute).toHaveBeenCalledTimes(2)
 
@@ -50,13 +50,13 @@ describe('MotionCueSimulator', () => {
   it('reset() stops the active cue so it no longer runs (the restart fix)', async () => {
     const sim = new MotionCueSimulator({ getChainFanout: () => fanoutStub([{ sequencer: 's' }]) })
     const cue = cueStub()
-    sim.setGameCue('yarg', cue)
-    expect(sim.hasGameCueActive('yarg')).toBe(true)
+    sim.setNetCue('yarg', cue)
+    expect(sim.hasNetCueActive('yarg')).toBe(true)
 
     sim.reset()
 
     expect(cue.onStop).toHaveBeenCalledTimes(1)
-    expect(sim.hasGameCueActive('yarg')).toBe(false)
+    expect(sim.hasNetCueActive('yarg')).toBe(false)
     await sim.run('yarg', {} as never)
     expect(cue.execute).not.toHaveBeenCalled() // nothing runs against the torn-down chains
   })
@@ -64,9 +64,9 @@ describe('MotionCueSimulator', () => {
   it('stop() clears state AND schedules a pan/tilt clear (unlike reset)', () => {
     const fanout = fanoutStub()
     const sim = new MotionCueSimulator({ getChainFanout: () => fanout })
-    sim.setGameCue('yarg', cueStub())
+    sim.setNetCue('yarg', cueStub())
     sim.stop()
-    expect(sim.hasGameCueActive('yarg')).toBe(false)
+    expect(sim.hasNetCueActive('yarg')).toBe(false)
     expect(fanout.schedulePanTiltClear as jest.Mock).toHaveBeenCalledTimes(1)
   })
 })

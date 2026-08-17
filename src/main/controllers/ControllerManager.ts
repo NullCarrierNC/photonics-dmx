@@ -41,7 +41,7 @@ import {
   type CueDomainRegistryBinding,
 } from './cueDomainBindings'
 import { buildDomainChainHandlers, readMotionPrefs } from './cueRuntimeDomains'
-import type { GameCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
+import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { AudioCueType, AudioMotionCueRef } from '../../photonics-dmx/cues/types/audioCueTypes'
 import type { MotionCueRef } from '../../photonics-dmx/cues/types/cueTypes'
 import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
@@ -817,7 +817,7 @@ export class ControllerManager {
    * Safe to call after a listener has enabled (no-op for chains that already have handlers) and
    * after it is disabled (rebuilds the chain slots from scratch).
    */
-  public ensureChainsHaveHandlersForSimulation(domain: GameCueMode): void {
+  public ensureChainsHaveHandlersForSimulation(domain: NetCueMode): void {
     buildDomainChainHandlers(domain, this.rigChains, {
       getMotionEnabled: () => this.config.getPreference('motionEnabled') ?? true,
       getMotionCueMinimumHoldMs: () => readMotionPrefs(this.config, domain).minimumHoldMs,

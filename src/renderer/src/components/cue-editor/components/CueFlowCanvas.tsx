@@ -24,7 +24,7 @@ import {
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type {
   AudioEventNode,
-  YargEventNode,
+  NetEventNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { getDefaultEventOption } from '../lib/options'
 import { NODE_DRAG_MIME, parseNodeDrag, type NodeDragPayload } from '../lib/nodeDragPayload'
@@ -53,7 +53,7 @@ type Props = {
   activeCueKind?: NodeCueKind
   editorMode: 'cue' | 'effect'
   addEventNode: (
-    option?: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
+    option?: EventOption<NetEventNode['eventType'] | AudioEventNode['eventType']>,
     position?: { x: number; y: number },
   ) => void
   addActionNode: (effectType: NodeEffectType, position?: { x: number; y: number }) => void

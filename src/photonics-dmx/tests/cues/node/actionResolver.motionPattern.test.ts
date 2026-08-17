@@ -6,10 +6,10 @@ import {
 import { resolveMotionPattern } from '../../../cues/node/runtime/actionResolver'
 import { ExecutionContext } from '../../../cues/node/runtime/ExecutionContext'
 import type { CueData } from '../../../cues/types/cueTypes'
-import type { NodeMotionPatternSetting, YargEventNode } from '../../../cues/types/nodeCueTypes'
+import type { NodeMotionPatternSetting, NetEventNode } from '../../../cues/types/nodeCueTypes'
 
 function makeContext(): ExecutionContext {
-  const ev: YargEventNode = { id: 'ev', type: 'event', eventType: 'cue-started' }
+  const ev: NetEventNode = { id: 'ev', type: 'event', eventType: 'cue-started' }
   return new ExecutionContext(ev, {} as CueData, new Map(), new Map())
 }
 

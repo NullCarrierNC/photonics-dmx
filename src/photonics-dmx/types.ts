@@ -122,12 +122,10 @@ export const NODE_SYSTEM_EVENTS = [
 export type NodeSystemEvent = (typeof NODE_SYSTEM_EVENTS)[number]
 
 /**
- * Song wait conditions - events from YARG song data, handled by the sequencer.
- * Used for action timing (waitForCondition, waitUntilCondition).
+ * Song events carried by a YARG datagram: the tempo grid, keyframe advances, and the notes played on
+ * each instrument. An RB3 cue can never receive these, so they are not in the RB3 vocabulary.
  */
-export const WAIT_CONDITIONS = [
-  'none',
-  'delay',
+export const YARG_SONG_EVENTS = [
   'beat',
   'measure',
   'half-beat',
@@ -168,9 +166,16 @@ export const WAIT_CONDITIONS = [
   // Vocal events (note-on/note-off edges from any vocal or harmony part)
   'vocal-note',
   'vocal-note-off',
-  // RB3 StageKit LED position edges (aggregate across colour banks). led-N fires when position N
-  // lights up; led-N-off when it clears. LED bank state persists between packets, so these are
-  // edge-triggered against the previous frame (like vocal events), not level-triggered.
+] as const
+
+/**
+ * Song events carried by the RB3 StageKit packet stream, which a YARG cue can never receive.
+ *
+ * The LED edges are aggregates across colour banks: led-N fires when position N lights up, led-N-off
+ * when it clears. Bank state persists between packets, so these are edge-triggered against the
+ * previous frame (like vocal events), not level-triggered.
+ */
+export const RB3_SONG_EVENTS = [
   'led-1',
   'led-2',
   'led-3',
@@ -187,10 +192,16 @@ export const WAIT_CONDITIONS = [
   'led-6-off',
   'led-7-off',
   'led-8-off',
-  // RB3 StageKit fog on/off edges.
   'fog-on',
   'fog-off',
 ] as const
+
+/**
+ * Everything an action's `waitForCondition` / `waitUntilCondition` may name: the two timing
+ * primitives followed by every song event of either mode. Per-mode authoring vocabularies are built
+ * from the two song-event lists above, so this superset stays the union.
+ */
+export const WAIT_CONDITIONS = ['none', 'delay', ...YARG_SONG_EVENTS, ...RB3_SONG_EVENTS] as const
 
 /**
  * Represents song-based wait conditions for action timing - derived from WAIT_CONDITIONS
@@ -201,12 +212,12 @@ export type WaitCondition = (typeof WAIT_CONDITIONS)[number]
  * Combined event types for YARG event nodes.
  * Includes both system events and song events.
  */
-export const YARG_EVENT_TYPES = [...NODE_SYSTEM_EVENTS, ...WAIT_CONDITIONS] as const
+export const NET_EVENT_TYPES = [...NODE_SYSTEM_EVENTS, ...WAIT_CONDITIONS] as const
 
 /**
  * Represents all valid event types for YARG event nodes
  */
-export type YargEventType = (typeof YARG_EVENT_TYPES)[number]
+export type NetEventType = (typeof NET_EVENT_TYPES)[number]
 
 /**
  * Interface defining a transition within an effect

@@ -1,7 +1,7 @@
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
 import { ActionEffectFactory } from '../../../cues/node/compiler/ActionEffectFactory'
-import { YargNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
+import { NetNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { CueType } from '../../../cues/types/cueTypes'
 import { Effect, TrackedLight } from '../../../types'
@@ -12,7 +12,7 @@ describe('Node cue chaining', () => {
   })
 
   it('executes actions sequentially with execution engine', async () => {
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'test-cue',
       name: 'Chained Beat',
       description: '',

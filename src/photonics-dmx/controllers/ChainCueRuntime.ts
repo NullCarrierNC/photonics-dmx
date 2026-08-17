@@ -1,12 +1,12 @@
 import { CueData, CueType, DrumNoteType, InstrumentNoteType } from '../cues/types/cueTypes'
-import type { GameCueMode } from '../cues/types/nodeCueTypes'
+import type { NetCueMode } from '../cues/types/nodeCueTypes'
 import type { CueRuntime } from '../cueHandlers/CueRuntime'
 import type { CueHandler } from '../cueHandlers/CueHandler'
 import type { SongEventCondition } from './sequencer/interfaces'
 import { ChainFanout } from './ChainFanout'
 
 /**
- * Dispatch surface for one game domain, fanning each event to that domain's cue handler on every
+ * Dispatch surface for one net domain, fanning each event to that domain's cue handler on every
  * rig chain. Each domain keeps its own handler slot, so a YARG runtime and an RB3 runtime drive the
  * same rigs without sharing cue state. Song-event edges go straight to each sequencer, since the
  * condition is already resolved and needs no handler.
@@ -16,7 +16,7 @@ import { ChainFanout } from './ChainFanout'
 export class ChainCueRuntime implements CueRuntime {
   constructor(
     private readonly fanout: ChainFanout,
-    private readonly domain: GameCueMode,
+    private readonly domain: NetCueMode,
   ) {}
 
   /** This domain's handler on every chain that has one. */

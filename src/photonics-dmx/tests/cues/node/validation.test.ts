@@ -11,12 +11,12 @@ import {
   validateAudioEffectFile,
   validateEffectFile,
 } from '../../../cues/node/schema/validation'
-import { YargNodeCueDefinition, AudioNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
+import { NetNodeCueDefinition, AudioNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../cues/types/cueTypes'
 
 describe('Node cue validation', () => {
   it('validates a simple YARG node cue', () => {
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'test-cue',
       name: 'Test Cue',
       description: '',
@@ -71,7 +71,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates a YARG node cue containing a pulse logic node, and rejects one missing anchorVar', () => {
-    const makeDef = (pulse: Record<string, unknown>): YargNodeCueDefinition =>
+    const makeDef = (pulse: Record<string, unknown>): NetNodeCueDefinition =>
       ({
         id: 'pulse-cue',
         name: 'Pulse Cue',
@@ -113,7 +113,7 @@ describe('Node cue validation', () => {
           { from: 'logic-1', to: 'action-1' },
         ],
         layout: { nodePositions: {} },
-      }) as YargNodeCueDefinition
+      }) as NetNodeCueDefinition
 
     const validPulse = {
       id: 'logic-1',
@@ -146,7 +146,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates multi-set variable and multi-roll random logic nodes, and rejects a roll missing assignTo', () => {
-    const makeDef = (logic: Record<string, unknown>): YargNodeCueDefinition =>
+    const makeDef = (logic: Record<string, unknown>): NetNodeCueDefinition =>
       ({
         id: 'logic-cue',
         name: 'Logic Cue',
@@ -188,7 +188,7 @@ describe('Node cue validation', () => {
           { from: 'logic-1', to: 'action-1' },
         ],
         layout: { nodePositions: {} },
-      }) as YargNodeCueDefinition
+      }) as NetNodeCueDefinition
 
     const isValid = (logic: Record<string, unknown>): boolean =>
       validateYargNodeCueFile({
@@ -242,7 +242,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates a tempo logic node with only its required beat output, and full options', () => {
-    const makeDef = (logic: Record<string, unknown>): YargNodeCueDefinition =>
+    const makeDef = (logic: Record<string, unknown>): NetNodeCueDefinition =>
       ({
         id: 'tempo-cue',
         name: 'Tempo Cue',
@@ -284,7 +284,7 @@ describe('Node cue validation', () => {
           { from: 'logic-1', to: 'action-1' },
         ],
         layout: { nodePositions: {} },
-      }) as YargNodeCueDefinition
+      }) as NetNodeCueDefinition
 
     const isValid = (logic: Record<string, unknown>): boolean =>
       validateYargNodeCueFile({
@@ -324,7 +324,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates indexed-variable and led-changed logic nodes, rejecting missing required fields', () => {
-    const makeDef = (logic: Record<string, unknown>): YargNodeCueDefinition =>
+    const makeDef = (logic: Record<string, unknown>): NetNodeCueDefinition =>
       ({
         id: 'logic-cue',
         name: 'Logic Cue',
@@ -366,7 +366,7 @@ describe('Node cue validation', () => {
           { from: 'logic-1', to: 'action-1', fromPort: 'each' },
         ],
         layout: { nodePositions: {} },
-      }) as YargNodeCueDefinition
+      }) as NetNodeCueDefinition
 
     const isValid = (logic: Record<string, unknown>): boolean =>
       validateYargNodeCueFile({
@@ -442,7 +442,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates a simple RB3 node cue (YARG-shaped, mode rb3)', () => {
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'rb3-cue',
       name: 'RB3 Cue',
       kind: 'lighting',
@@ -1199,7 +1199,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates logic nodes and detects cycles across logic/actions', () => {
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'logic-validate',
       name: 'Logic Validate',
       kind: 'lighting',
@@ -1277,7 +1277,7 @@ describe('Node cue validation', () => {
   })
 
   describe('schema rejections', () => {
-    const validCue = (): YargNodeCueDefinition => ({
+    const validCue = (): NetNodeCueDefinition => ({
       id: 'test-cue',
       name: 'Test Cue',
       description: '',
@@ -1328,7 +1328,7 @@ describe('Node cue validation', () => {
       const { id: _id, ...cueWithoutId } = cue
       const result = validateYargNodeCueFile({
         ...validFile(),
-        cues: [cueWithoutId as YargNodeCueDefinition],
+        cues: [cueWithoutId as NetNodeCueDefinition],
       })
       expect(result.valid).toBe(false)
       expect(result.errors.length).toBeGreaterThan(0)
@@ -1339,7 +1339,7 @@ describe('Node cue validation', () => {
       const { name: _n, ...cueWithoutName } = cue
       const result = validateYargNodeCueFile({
         ...validFile(),
-        cues: [{ ...cueWithoutName, name: undefined } as unknown as YargNodeCueDefinition],
+        cues: [{ ...cueWithoutName, name: undefined } as unknown as NetNodeCueDefinition],
       })
       expect(result.valid).toBe(false)
       expect(result.errors.length).toBeGreaterThan(0)
@@ -1548,7 +1548,7 @@ describe('Node cue validation', () => {
 
   describe('node variety coverage', () => {
     it('validates cue with effectRaiser and effectListener nodes', () => {
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'effect-cue',
         name: 'Effect Cue',
         kind: 'lighting',
@@ -1600,7 +1600,7 @@ describe('Node cue validation', () => {
     })
 
     it('validates cue with eventRaiser and eventListener nodes', () => {
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'event-cue',
         name: 'Event Cue',
         kind: 'lighting',
@@ -1653,7 +1653,7 @@ describe('Node cue validation', () => {
     })
 
     it('validates cue containing array-manipulation logic node types', () => {
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'array-cue',
         name: 'Array Cue',
         kind: 'lighting',

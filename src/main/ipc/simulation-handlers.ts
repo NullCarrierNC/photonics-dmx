@@ -32,7 +32,7 @@ export function setupSimulationHandlers(
   const sim = controllerManager.getMotionCueSimulator()
 
   const stopMotionSimAndNotify = (): void => {
-    const hadYargSim = sim.hasGameCueActive('yarg')
+    const hadYargSim = sim.hasNetCueActive('yarg')
     sim.stop()
     if (hadYargSim) {
       sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
@@ -490,7 +490,7 @@ export function setupSimulationHandlers(
           await maybePromise
         }
       }
-      sim.setGameCue('yarg', cue)
+      sim.setNetCue('yarg', cue)
       sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
         ref: { groupId, cueId },
         source: 'auto',
@@ -545,7 +545,7 @@ export function setupSimulationHandlers(
           await maybePromise
         }
       }
-      sim.setGameCue('rb3', cue)
+      sim.setNetCue('rb3', cue)
       sendToAllWindows(RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE, {
         ref: { groupId, cueId },
         source: 'auto',
@@ -605,7 +605,7 @@ export function setupSimulationHandlers(
 
   ipcMain.handle(LIGHT.STOP_MOTION_CUE_SIMULATION, async () => {
     try {
-      const hadYargSim = sim.hasGameCueActive('yarg')
+      const hadYargSim = sim.hasNetCueActive('yarg')
       sim.stop()
       if (hadYargSim) {
         sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {

@@ -8,7 +8,7 @@ import {
   YARG_CUE_DATA_PROPERTY_META,
   RB3_CUE_DATA_PROPERTY_META,
   AUDIO_CUE_DATA_PROPERTY_META,
-  getYargCueDataPropertyMeta,
+  getNetCueDataPropertyMeta,
   getAudioCueDataPropertyMeta,
 } from '../../../../../../../photonics-dmx/constants/cueDataPropertyMeta'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
@@ -44,7 +44,7 @@ const CueDataLogicEditor: React.FC<CueDataLogicEditorProps> = ({
     const meta =
       activeMode === 'audio'
         ? getAudioCueDataPropertyMeta(node.dataProperty)
-        : getYargCueDataPropertyMeta(node.dataProperty)
+        : getNetCueDataPropertyMeta(node.dataProperty)
     if (!meta?.validValues?.length) return
     const varDef = availableVariables.find((v) => v.name === node.assignTo)
     if (!varDef) return

@@ -15,8 +15,8 @@ import type {
   NodeCueFile,
   NodeCueMode,
   LogicNode,
-  YargEventNode,
-  YargNodeCueDefinition,
+  NetEventNode,
+  NetNodeCueDefinition,
   YargEffectDefinition,
   NotesNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -28,7 +28,7 @@ import type { EditorMode } from './edgeValidation'
 /** Edge data for editor edges (port info for logic/conditional nodes). */
 export type EditorEdgeData = { fromPort?: string | null; toPort?: string | null }
 
-type CueDefinition = YargNodeCueDefinition | AudioNodeCueDefinition
+type CueDefinition = NetNodeCueDefinition | AudioNodeCueDefinition
 type EffectDefinition = YargEffectDefinition | AudioEffectDefinition
 
 const DEFAULT_POS = {
@@ -53,8 +53,8 @@ const AUDIO_TRIGGER_SAVE_DEFAULTS = {
 }
 
 function normalizeAudioEventForSave(
-  event: YargEventNode | AudioEventNodeUnion,
-): YargEventNode | AudioEventNodeUnion {
+  event: NetEventNode | AudioEventNodeUnion,
+): NetEventNode | AudioEventNodeUnion {
   if ('frequencyRange' in event && event.eventType === 'audio-trigger') {
     const t = event as AudioTriggerNode & { sensitivity?: number }
     const threshold =
@@ -112,7 +112,7 @@ function normalizeAudioEventForSave(
 }
 
 function buildEventNodes(
-  events: (YargEventNode | AudioEventNodeUnion)[],
+  events: (NetEventNode | AudioEventNodeUnion)[],
   nodePositions: NodePositions,
   mode: NodeCueMode,
 ): EditorNode[] {
@@ -124,7 +124,7 @@ function buildEventNodes(
       kind: 'event' as const,
       label:
         mode === 'yarg'
-          ? getYargEventLabel((event as YargEventNode).eventType)
+          ? getYargEventLabel((event as NetEventNode).eventType)
           : event.eventType === 'audio-trigger'
             ? (event as AudioTriggerNode).nodeLabel
             : getAudioEventLabel((event as AudioEventNode).eventType),
@@ -263,7 +263,7 @@ function connectionsToEdges(connections: ConnectionInput[]): Edge[] {
 
 /** Payloads extracted from flow nodes/edges for cue or effect document. */
 export type NodeGraphPayloads = {
-  events: (YargEventNode | AudioEventNodeUnion)[]
+  events: (NetEventNode | AudioEventNodeUnion)[]
   actions: ActionNode[]
   logic: LogicNode[]
   eventRaisers: EventRaiserNode[]
@@ -315,8 +315,8 @@ function flowToNodesAndConnections(
 
   const payload: NodeGraphPayloads = {
     events: eventNodes.map((n) =>
-      normalizeAudioEventForSave(n.data.payload as YargEventNode | AudioEventNodeUnion),
-    ) as (YargEventNode | AudioEventNodeUnion)[],
+      normalizeAudioEventForSave(n.data.payload as NetEventNode | AudioEventNodeUnion),
+    ) as (NetEventNode | AudioEventNodeUnion)[],
     actions: actionNodes.map((n) => n.data.payload as ActionNode),
     logic: logicNodes.map((n) => n.data.payload as LogicNode),
     eventRaisers: eventRaiserNodes.map((n) => n.data.payload as EventRaiserNode),

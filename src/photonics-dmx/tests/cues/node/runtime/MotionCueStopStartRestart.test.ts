@@ -12,8 +12,8 @@ import type {
   ActionNode,
   AudioMotionNodeCueDefinition,
   LogicNode,
-  YargEventNode,
-  YargMotionNodeCueDefinition,
+  NetEventNode,
+  NetMotionNodeCueDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
@@ -81,9 +81,9 @@ function motionPatternActionUsingTickVar(): ActionNode {
   }
 }
 
-function yargMotionWithCueStarted(): YargMotionNodeCueDefinition {
-  const evStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
-  const evCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+function yargMotionWithCueStarted(): NetMotionNodeCueDefinition {
+  const evStart: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+  const evCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   const initTick: LogicNode = {
     id: 'init-tick',
     type: 'logic',
@@ -122,7 +122,7 @@ function yargMotionWithCueStarted(): YargMotionNodeCueDefinition {
   }
 }
 
-function yargMotionWithoutCueStarted(): YargMotionNodeCueDefinition {
+function yargMotionWithoutCueStarted(): NetMotionNodeCueDefinition {
   const def = yargMotionWithCueStarted()
   return {
     ...def,

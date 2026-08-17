@@ -6,8 +6,8 @@
 import { describe, expect, it } from '@jest/globals'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import type {
-  YargMotionNodeCueDefinition,
-  YargEventNode,
+  NetMotionNodeCueDefinition,
+  NetEventNode,
   ActionNode,
 } from '../../../cues/types/nodeCueTypes'
 import { DrumNoteType, type CueData } from '../../../cues/types/cueTypes'
@@ -48,9 +48,9 @@ const minimalParams = (): CueData => ({
   timeSinceLastCue: 0,
 })
 
-function dualLifecycleCue(): YargMotionNodeCueDefinition {
-  const evStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
-  const evCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+function dualLifecycleCue(): NetMotionNodeCueDefinition {
+  const evStart: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+  const evCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   const action: ActionNode = {
     id: 'a1',
     type: 'action',
@@ -90,7 +90,7 @@ describe('GraphExecutionPolicy motion vs visual', () => {
     const compiled = NodeCueCompiler.compileYargCue(dualLifecycleCue())
     const policy = cueGraphPolicy('g', 'c')
     const nodes = policy.getEntryNodes(compiled, minimalParams(), { hasCueStartedFired: true })
-    const types = nodes.map((n) => (n as YargEventNode).eventType)
+    const types = nodes.map((n) => (n as NetEventNode).eventType)
     expect(types).toContain('cue-called')
     expect(types).not.toContain('cue-started')
   })
@@ -99,7 +99,7 @@ describe('GraphExecutionPolicy motion vs visual', () => {
     const compiled = NodeCueCompiler.compileYargCue(dualLifecycleCue())
     const policy = motionCueGraphPolicy('g', 'c')
     const nodes = policy.getEntryNodes(compiled, minimalParams(), { hasCueStartedFired: true })
-    const types = nodes.map((n) => (n as YargEventNode).eventType)
+    const types = nodes.map((n) => (n as NetEventNode).eventType)
     expect(types).toContain('cue-called')
     expect(types).not.toContain('cue-started')
   })
@@ -111,9 +111,9 @@ describe('GraphExecutionPolicy motion vs visual', () => {
   })
 
   it('getEntryNodes orders cue-started, then cue-called, then other triggered events', () => {
-    const evStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
-    const evCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
-    const evBeat: YargEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
+    const evStart: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+    const evCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+    const evBeat: NetEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
     const action: ActionNode = {
       id: 'a1',
       type: 'action',
@@ -136,7 +136,7 @@ describe('GraphExecutionPolicy motion vs visual', () => {
       },
       layer: { source: 'literal', value: 0 },
     }
-    const def: YargMotionNodeCueDefinition = {
+    const def: NetMotionNodeCueDefinition = {
       kind: 'motion',
       id: 'm-order',
       name: 'Motion order',
@@ -151,16 +151,16 @@ describe('GraphExecutionPolicy motion vs visual', () => {
     const policy = cueGraphPolicy('g', 'c')
     const params = minimalParams()
     const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: false })
-    const types = nodes.map((n) => (n as YargEventNode).eventType)
+    const types = nodes.map((n) => (n as NetEventNode).eventType)
     expect(types).toEqual(['cue-started', 'cue-called', 'beat'])
   })
 })
 
 /** Motion cue carrying only vocal event nodes (plus a held cue-started, used as a noise check). */
-function vocalEventCue(): YargMotionNodeCueDefinition {
-  const evStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
-  const evOn: YargEventNode = { id: 'ev-on', type: 'event', eventType: 'vocal-note' }
-  const evOff: YargEventNode = { id: 'ev-off', type: 'event', eventType: 'vocal-note-off' }
+function vocalEventCue(): NetMotionNodeCueDefinition {
+  const evStart: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+  const evOn: NetEventNode = { id: 'ev-on', type: 'event', eventType: 'vocal-note' }
+  const evOff: NetEventNode = { id: 'ev-off', type: 'event', eventType: 'vocal-note-off' }
   const action: ActionNode = {
     id: 'a1',
     type: 'action',
@@ -202,7 +202,7 @@ describe('GraphExecutionPolicy vocal events', () => {
     const policy = cueGraphPolicy('g', 'c')
     // cue-started has already fired, so only the vocal edges can appear.
     const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: true })
-    return nodes.map((n) => (n as YargEventNode).eventType)
+    return nodes.map((n) => (n as NetEventNode).eventType)
   }
 
   const frame = (vocalNote: number, previousFrame?: Partial<CueData>): CueData => ({
@@ -254,12 +254,12 @@ describe('GraphExecutionPolicy vocal events', () => {
 
 /** Motion cue carrying RB3 LED (position 3) and fog event nodes. When `colorChange` is set, the
  *  led-3 / led-3-off nodes carry `triggerOnColorChange`. */
-function ledFogEventCue(colorChange = false): YargMotionNodeCueDefinition {
+function ledFogEventCue(colorChange = false): NetMotionNodeCueDefinition {
   const ev = (
     id: string,
-    eventType: YargEventNode['eventType'],
+    eventType: NetEventNode['eventType'],
     onColorChange = false,
-  ): YargEventNode => ({
+  ): NetEventNode => ({
     id,
     type: 'event',
     eventType,
@@ -310,7 +310,7 @@ describe('GraphExecutionPolicy LED and fog events (RB3 StageKit)', () => {
     const compiled = NodeCueCompiler.compileYargCue(ledFogEventCue())
     const policy = cueGraphPolicy('g', 'c')
     const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: true })
-    return nodes.map((n) => (n as YargEventNode).eventType)
+    return nodes.map((n) => (n as NetEventNode).eventType)
   }
 
   const bank = (mask: number): { red: number; green: number; blue: number; yellow: number } => ({
@@ -378,8 +378,8 @@ describe('GraphExecutionPolicy LED and fog events (RB3 StageKit)', () => {
 })
 
 describe('GraphExecutionPolicy instrument note events', () => {
-  function drumKickCue(): YargMotionNodeCueDefinition {
-    const evKick: YargEventNode = { id: 'ev-kick', type: 'event', eventType: 'drum-kick' }
+  function drumKickCue(): NetMotionNodeCueDefinition {
+    const evKick: NetEventNode = { id: 'ev-kick', type: 'event', eventType: 'drum-kick' }
     const action: ActionNode = {
       id: 'a1',
       type: 'action',
@@ -415,7 +415,7 @@ describe('GraphExecutionPolicy instrument note events', () => {
     const compiled = NodeCueCompiler.compileYargCue(drumKickCue())
     const policy = cueGraphPolicy('g', 'c')
     const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: true })
-    return nodes.map((n) => (n as YargEventNode).eventType)
+    return nodes.map((n) => (n as NetEventNode).eventType)
   }
 
   const frame = (over: Partial<CueData>): CueData => ({ ...minimalParams(), ...over })
@@ -476,7 +476,7 @@ describe('GraphExecutionPolicy led-N triggerOnColorChange', () => {
     const compiled = NodeCueCompiler.compileYargCue(ledFogEventCue(true))
     const policy = cueGraphPolicy('g', 'c')
     const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: true })
-    return nodes.map((n) => (n as YargEventNode).eventType)
+    return nodes.map((n) => (n as NetEventNode).eventType)
   }
   const frame = (over: Partial<CueData>): CueData => ({ ...minimalParams(), ...over })
   const inBank = (
@@ -534,6 +534,6 @@ describe('GraphExecutionPolicy led-N triggerOnColorChange', () => {
       frame({ ledBanks: inBank('blue', LED3), previousFrame: { ledBanks: inBank('green', LED3) } }),
       { hasCueStartedFired: true },
     )
-    expect(nodes.map((n) => (n as YargEventNode).eventType)).not.toContain('led-3')
+    expect(nodes.map((n) => (n as NetEventNode).eventType)).not.toContain('led-3')
   })
 })

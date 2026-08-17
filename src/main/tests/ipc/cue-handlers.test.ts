@@ -33,10 +33,10 @@ const mockControllerManager = {
   getLightingController: jest.fn(),
   getChainFanout: jest.fn(() => stubChainFanout),
   getMotionCueSimulator: jest.fn(() => ({
-    hasGameCueActive: () => false,
+    hasNetCueActive: () => false,
     stop: jest.fn(),
     clearActive: jest.fn(),
-    setGameCue: jest.fn(),
+    setNetCue: jest.fn(),
     setAudioCue: jest.fn(),
     run: jest.fn(() => Promise.resolve()),
     runAll: jest.fn(() => Promise.resolve()),

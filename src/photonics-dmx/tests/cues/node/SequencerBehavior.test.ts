@@ -5,8 +5,8 @@
 import { beforeEach, describe, expect, it } from '@jest/globals'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import type {
-  YargNodeCueDefinition,
-  YargEventNode,
+  NetNodeCueDefinition,
+  NetEventNode,
   ActionNode,
 } from '../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../cues/types/cueTypes'
@@ -70,19 +70,17 @@ function createRecordingSequencer(): { sequencer: ILightingController; recorded:
   return { sequencer: sequencer as unknown as ILightingController, recorded }
 }
 
-function minimalCueDefinition(): YargNodeCueDefinition {
+function minimalCueDefinition(): NetNodeCueDefinition {
   return cueDefinitionWithEventType('cue-started')
 }
 
 /** Cue with cue-called as entry (no cue-started); used to extend verification coverage. */
-function cueCalledOnlyDefinition(): YargNodeCueDefinition {
+function cueCalledOnlyDefinition(): NetNodeCueDefinition {
   return cueDefinitionWithEventType('cue-called')
 }
 
-function cueDefinitionWithEventType(
-  eventType: 'cue-started' | 'cue-called',
-): YargNodeCueDefinition {
-  const eventNode: YargEventNode = {
+function cueDefinitionWithEventType(eventType: 'cue-started' | 'cue-called'): NetNodeCueDefinition {
+  const eventNode: NetEventNode = {
     id: 'event1',
     type: 'event',
     eventType,
@@ -123,7 +121,7 @@ function cueDefinitionWithEventType(
 
 describe('Sequencer behavior', () => {
   let lightManager: DmxLightManager
-  let cueDefinition: YargNodeCueDefinition
+  let cueDefinition: NetNodeCueDefinition
   let compiledCue: ReturnType<typeof NodeCueCompiler.compileYargCue>
 
   beforeEach(() => {

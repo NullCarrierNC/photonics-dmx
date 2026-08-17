@@ -2,16 +2,16 @@
 import { describe, expect, it, jest } from '@jest/globals'
 import { fireEvent, render, screen } from '@testing-library/react'
 import EventNodeEditor from './EventNodeEditor'
-import type { YargEventNode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { NetEventNode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
-const ledNode = (over: Partial<YargEventNode> = {}): YargEventNode => ({
+const ledNode = (over: Partial<NetEventNode> = {}): NetEventNode => ({
   id: 'ev',
   type: 'event',
   eventType: 'led-1',
   ...over,
 })
 
-function renderEditor(node: YargEventNode) {
+function renderEditor(node: NetEventNode) {
   const updateYargNode = jest.fn()
   render(
     <EventNodeEditor

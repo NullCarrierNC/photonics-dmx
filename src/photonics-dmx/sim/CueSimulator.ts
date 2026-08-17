@@ -19,7 +19,7 @@ import {
 } from '../cues/types/cueTypes'
 import { VirtualTime } from './VirtualTime'
 import { FrameDriver, FrameState, FrameTransient } from './FrameDriver'
-import type { GameCueMode } from '../cues/types/nodeCueTypes'
+import type { NetCueMode } from '../cues/types/nodeCueTypes'
 import {
   LedBanks,
   ScenarioEntry,
@@ -34,7 +34,7 @@ export interface CueSimulatorOptions {
   /** Cue library to simulate: a loaded group id (e.g. `yarg-stagekit`) or its filename. */
   library: string
   /** Which game cue domain the library belongs to. Defaults to YARG. */
-  domain?: GameCueMode
+  domain?: NetCueMode
   /** Root of the cue/effect data tree; defaults to the bundled `resources/defaults`. */
   baseDir?: string
   frontCount?: number

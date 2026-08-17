@@ -8,7 +8,7 @@ import type { NodeRuntimeCallbacks, VariableValue } from './executionTypes'
 import { CueSession } from './CueSession'
 import { GraphExecutionEngine } from './GraphExecutionEngine'
 import { cueGraphPolicy } from './GraphExecutionPolicy'
-import type { YargLightingNodeCueDefinition } from '../../types/nodeCueTypes'
+import type { NetLightingNodeCueDefinition } from '../../types/nodeCueTypes'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
@@ -85,14 +85,14 @@ export class YargNodeCue implements INetCue {
   ): YargCueRunState {
     let state = this.states.get(sequencer)
     if (!state) {
-      const definition = this.compiledCue.definition as YargLightingNodeCueDefinition
+      const definition = this.compiledCue.definition as NetLightingNodeCueDefinition
       const session = new CueSession(YargNodeCue.getSharedGroupStore(sequencer, this.groupId))
       session.initializeVariables(definition.variables ?? [], this.compiledCue.groupVariables ?? [])
       state = { engine: null, session }
       this.states.set(sequencer, state)
     }
     if (!state.engine) {
-      const definition = this.compiledCue.definition as YargLightingNodeCueDefinition
+      const definition = this.compiledCue.definition as NetLightingNodeCueDefinition
       const cueId = this.id
       const policy = cueGraphPolicy(this.groupId, cueId)
       state.engine = GraphExecutionEngine.forCue(
@@ -112,19 +112,19 @@ export class YargNodeCue implements INetCue {
   }
 
   get cueId(): string {
-    return (this.compiledCue.definition as YargLightingNodeCueDefinition).cueType
+    return (this.compiledCue.definition as NetLightingNodeCueDefinition).cueType
   }
 
   get id(): string {
-    return `${this.groupId}:${(this.compiledCue.definition as YargLightingNodeCueDefinition).id}`
+    return `${this.groupId}:${(this.compiledCue.definition as NetLightingNodeCueDefinition).id}`
   }
 
   get description(): string | undefined {
-    return (this.compiledCue.definition as YargLightingNodeCueDefinition).description
+    return (this.compiledCue.definition as NetLightingNodeCueDefinition).description
   }
 
   get style(): CueStyle {
-    const s = (this.compiledCue.definition as YargLightingNodeCueDefinition).style
+    const s = (this.compiledCue.definition as NetLightingNodeCueDefinition).style
     return s === 'secondary' ? CueStyle.Secondary : CueStyle.Primary
   }
 
