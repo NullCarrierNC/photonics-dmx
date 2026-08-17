@@ -107,6 +107,14 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
     this.runtimes.yarg.handleVocalNote(data)
   }
 
+  public stopActiveStrobe(): void {
+    this.runtimes.yarg.stopActiveStrobe()
+  }
+
+  public resetSessionState(): void {
+    this.runtimes.yarg.resetSessionState()
+  }
+
   /** Advance every chain's action-timing waits gated on a song-event condition (RB3 led/fog edges).
    *  Goes straight to each sequencer - the condition is already resolved, so no cue handler is needed. */
   public handleSongEvent(condition: SongEventCondition): void {

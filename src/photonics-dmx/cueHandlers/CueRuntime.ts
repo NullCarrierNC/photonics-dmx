@@ -23,6 +23,15 @@ export interface CueRuntime {
   handleBassNote(noteType: InstrumentNoteType, data: CueData): void
   handleKeysNote(noteType: InstrumentNoteType, data: CueData): void
   handleVocalNote(data: CueData): void
+  /** Stop the active strobe slot, leaving per-frame edge baselines intact. */
+  stopActiveStrobe(): void
+  /**
+   * Stop any active strobe and clear per-frame edge baselines at a session boundary, so the next
+   * session's first frame compares against a clean baseline rather than a stale one. Required rather
+   * than optional: a runtime that wraps another (see CompositeCueRuntime) has to forward both of
+   * these, and as optional members a missing forward is a silent no-op instead of a type error.
+   */
+  resetSessionState(): void
   /**
    * Advance action-timing waits gated on a song event (e.g. an RB3 `led-3` / `fog-on` edge). Typed
    * off the sequencer union so the two can't drift.

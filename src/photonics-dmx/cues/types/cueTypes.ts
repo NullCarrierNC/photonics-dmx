@@ -71,26 +71,32 @@ export function isInstrumentEventTriggered(
   bassNotes: InstrumentNoteType[],
   keysNotes: InstrumentNoteType[],
   drumNotes: DrumNoteType[],
+  previousFrame?: Partial<CueData>,
 ): boolean | null {
+  const prevGuitar = previousFrame?.guitarNotes ?? []
+  const prevBass = previousFrame?.bassNotes ?? []
+  const prevKeys = previousFrame?.keysNotes ?? []
+  const prevDrums = previousFrame?.drumNotes ?? []
+
   // Guitar events
   if (eventType.startsWith('guitar-')) {
     const note = INSTRUMENT_NOTE_MAP[eventType.slice(7)]
-    return note ? guitarNotes.includes(note) : null
+    return note ? guitarNotes.includes(note) && !prevGuitar.includes(note) : null
   }
   // Bass events
   if (eventType.startsWith('bass-')) {
     const note = INSTRUMENT_NOTE_MAP[eventType.slice(5)]
-    return note ? bassNotes.includes(note) : null
+    return note ? bassNotes.includes(note) && !prevBass.includes(note) : null
   }
   // Keys events
   if (eventType.startsWith('keys-')) {
     const note = INSTRUMENT_NOTE_MAP[eventType.slice(5)]
-    return note ? keysNotes.includes(note) : null
+    return note ? keysNotes.includes(note) && !prevKeys.includes(note) : null
   }
   // Drum events
   if (eventType.startsWith('drum-')) {
     const note = DRUM_NOTE_MAP[eventType.slice(5)]
-    return note ? drumNotes.includes(note) : null
+    return note ? drumNotes.includes(note) && !prevDrums.includes(note) : null
   }
   // Not an instrument event
   return null
@@ -298,6 +304,12 @@ export type CueData = {
   beat: Beat
   keyframe: 'Off' | 'First' | 'Next' | 'Previous' | 'Unknown'
   bonusEffect: boolean
+  /** YARG v5+: fog time remaining in centiseconds; 0xffff = until an explicit fog-off. */
+  fogRemainingCentiseconds?: number
+  /** YARG v4+: per-player star power. amount 0-255 maps to 0-100%. */
+  playerStarPower?: ReadonlyArray<{ amount: number; isActive: boolean }>
+  starPowerActiveCount?: number
+  starPowerMaxPercent?: number
 
   // Cue history and context
   previousCue?: CueType
@@ -368,6 +380,10 @@ export const defaultCueData: CueData = {
   beat: 'Unknown',
   keyframe: 'Off',
   bonusEffect: false,
+  fogRemainingCentiseconds: 0xffff,
+  playerStarPower: [],
+  starPowerActiveCount: 0,
+  starPowerMaxPercent: 0,
 
   // Cue history defaults
   cueHistory: [],

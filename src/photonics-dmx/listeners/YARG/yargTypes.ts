@@ -94,8 +94,8 @@ export enum KeyFrameByte {
   KeyframePrevious = 29,
 }
 
-/** Beat type (byte 38).
- * Doesn't match YALCY's BeatByte enum, but this appears to be the correct mapping.
+/** Beat type at the versioned beat offset (v3/v4: 38, v5: 40).
+ * Does not match YALCY's BeatByte enum; this mapping matches live YARG wire data.
  */
 export enum BeatByte {
   Measure = 0,
@@ -103,6 +103,29 @@ export enum BeatByte {
   Weak = 2,
   Off = 3,
 }
+
+/** Strobe cue bytes at the versioned strobe offset (v3/v4: 37, v5: 39). */
+export enum StrobeByte {
+  Strobe_Fastest = 20,
+  Strobe_Fast = 21,
+  Strobe_Medium = 22,
+  Strobe_Slow = 23,
+  Strobe_Off = 24,
+}
+
+export enum DatagramVersionByte {
+  Shutdown = 0,
+  CameraCut = 3,
+  PlayerStarPower = 4,
+  FogRemainingDuration = 5,
+}
+
+export const YARG_PACKET_HEADER = 0x59415247
+export const LEGACY_PACKET_SIZE = 47
+export const V4_FIXED_PACKET_SIZE = LEGACY_PACKET_SIZE + 2
+export const V5_FIXED_PACKET_SIZE = 51
+export const MAX_KNOWN_DATAGRAM_VERSION = DatagramVersionByte.FogRemainingDuration
+export const MIN_SUPPORTED_DATAGRAM_VERSION = DatagramVersionByte.CameraCut
 
 /** Performer bitmask for Spotlight and Singalong bytes (Guitar=1, Bass=2, Drums=4, Vocals=8, Keyboard=16). */
 export enum PerformerByte {

@@ -18,8 +18,8 @@ export type ExecutionParameters = CueData | Record<string, unknown>
 
 /**
  * Whether a per-frame `cueData`-derived condition fires this frame: beat / half-beat / measure,
- * keyframe (any) and directional keyframe-first/next/previous, vocal-note edges, RB3 LED and fog
- * edges, and instrument notes. Excludes the entry-only `cue-started`/`cue-called`, which depend on
+ * keyframe (any) and directional keyframe-first/next/previous, and the vocal-note, RB3 LED, fog and
+ * instrument-note edges. Excludes the entry-only `cue-started`/`cue-called`, which depend on
  * session state rather than cueData. Shared by cue entry-node selection and by condition-based
  * action waits, so an event node and a `waitUntil` on the same condition mean the identical thing.
  * `triggerOnColorChange` is the per-node opt-in for led-N edges to also fire on a same-position
@@ -81,12 +81,15 @@ export function evaluateEventCondition(
   if (eventType === 'fog-off') {
     return cueData.fogState === false && (cueData.previousFrame?.fogState ?? false) === true
   }
+  // Instrument note events are edge-triggered against the previous frame like the vocal and LED
+  // edges above: a note held across keepalive frames fires once, on the frame it arrives.
   const instrumentResult = isInstrumentEventTriggered(
     eventType,
     cueData.guitarNotes,
     cueData.bassNotes,
     cueData.keysNotes,
     cueData.drumNotes,
+    cueData.previousFrame,
   )
   if (instrumentResult !== null) {
     return instrumentResult

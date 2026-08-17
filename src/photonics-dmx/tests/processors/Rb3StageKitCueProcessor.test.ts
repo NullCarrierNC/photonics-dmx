@@ -34,6 +34,8 @@ function mockRuntime(): {
     handleBassNote: jest.fn(),
     handleKeysNote: jest.fn(),
     handleVocalNote: jest.fn(),
+    stopActiveStrobe: jest.fn(),
+    resetSessionState: jest.fn(),
     handleSongEvent: jest.fn((condition: string) => {
       events.push(condition)
     }) as CueRuntime['handleSongEvent'],

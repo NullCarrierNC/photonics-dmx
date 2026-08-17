@@ -81,6 +81,16 @@ export class CompositeCueRuntime implements CueRuntime {
     private readonly hooks: CompositeCueRuntimeHooks = {},
   ) {}
 
+  /** Whether the occluding overlay is currently held over the primary for a secondary strobe. */
+  private mutedForStrobe = false
+
+  /** Hold or release the overlay, skipping the work when it is already in that state. */
+  private setMuted(on: boolean): void {
+    if (!this.hooks.mutePrimary || this.mutedForStrobe === on) return
+    this.mutedForStrobe = on
+    this.hooks.mutePrimary(on)
+  }
+
   public notifySongStart(): void {
     this.primary.notifySongStart()
     this.secondary.notifySongStart?.()
@@ -109,6 +119,23 @@ export class CompositeCueRuntime implements CueRuntime {
   public stopActiveCue(): void {
     this.primary.stopActiveCue?.()
     this.secondary.stopActiveCue()
+  }
+
+  /**
+   * Both strobe paths drop together and the overlay is lifted with them. `handleCue` only releases it
+   * on Strobe_Off / blackout / NoCue, so a strobe stopped here (a fallback cue, a session boundary)
+   * would otherwise leave the primary held black with no cue coming to clear it.
+   */
+  public stopActiveStrobe(): void {
+    this.primary.stopActiveStrobe()
+    this.secondary.stopActiveCue()
+    this.setMuted(false)
+  }
+
+  public resetSessionState(): void {
+    this.primary.resetSessionState()
+    this.secondary.stopActiveCue()
+    this.setMuted(false)
   }
 
   public onDisable(): void {
@@ -146,14 +173,13 @@ export class CompositeCueRuntime implements CueRuntime {
     // A secondary strobe ends on Strobe_Off or a blackout/NoCue, so lift any held overlay and let
     // the primary show again from its natural state.
     if (
-      this.hooks.mutePrimary &&
-      (cueType === CueType.Strobe_Off ||
-        cueType === CueType.Blackout_Fast ||
-        cueType === CueType.Blackout_Slow ||
-        cueType === CueType.Blackout_Spotlight ||
-        cueType === CueType.NoCue)
+      cueType === CueType.Strobe_Off ||
+      cueType === CueType.Blackout_Fast ||
+      cueType === CueType.Blackout_Slow ||
+      cueType === CueType.Blackout_Spotlight ||
+      cueType === CueType.NoCue
     ) {
-      this.hooks.mutePrimary(false)
+      this.setMuted(false)
     }
 
     if (activeStrobe) {
@@ -165,8 +191,8 @@ export class CompositeCueRuntime implements CueRuntime {
       } catch (err) {
         log.error(`Primary cue runtime failed handling '${cueType}':`, err)
       }
-      if (this.hooks.mutePrimary && (this.hooks.shouldMuteForSecondaryStrobe?.() ?? false)) {
-        this.hooks.mutePrimary(true)
+      if (this.hooks.shouldMuteForSecondaryStrobe?.() ?? false) {
+        this.setMuted(true)
       }
       return
     }

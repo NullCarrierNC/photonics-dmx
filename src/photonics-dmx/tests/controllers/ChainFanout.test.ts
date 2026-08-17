@@ -33,6 +33,9 @@ function makeChainStub(rigId: string, isPrimary: boolean): RigChain {
     handleGuitarNote: jest.fn(),
     handleBassNote: jest.fn(),
     handleKeysNote: jest.fn(),
+    handleVocalNote: jest.fn(),
+    resetSessionState: jest.fn(),
+    stopActiveStrobe: jest.fn(),
     stopActiveCue: jest.fn(),
   } as unknown as CueHandler
   const audio = {
@@ -82,6 +85,26 @@ describe('ChainFanout', () => {
     fanout.setChains([a, b])
     fanout.handleBeat()
     expect(a.cueHandlers.yarg!.handleBeat).toHaveBeenCalledTimes(1)
+  })
+
+  it('stopActiveStrobe reaches every chain YARG handler', () => {
+    const a = makeChainStub('a', true)
+    const b = makeChainStub('b', false)
+    const fanout = new ChainFanout()
+    fanout.setChains([a, b])
+    fanout.stopActiveStrobe()
+    expect(a.cueHandlers.yarg!.stopActiveStrobe).toHaveBeenCalledTimes(1)
+    expect(b.cueHandlers.yarg!.stopActiveStrobe).toHaveBeenCalledTimes(1)
+  })
+
+  it('resetSessionState reaches every chain YARG handler', () => {
+    const a = makeChainStub('a', true)
+    const b = makeChainStub('b', false)
+    const fanout = new ChainFanout()
+    fanout.setChains([a, b])
+    fanout.resetSessionState()
+    expect(a.cueHandlers.yarg!.resetSessionState).toHaveBeenCalledTimes(1)
+    expect(b.cueHandlers.yarg!.resetSessionState).toHaveBeenCalledTimes(1)
   })
 
   it('handleCue awaits every chain (Promise.allSettled)', async () => {

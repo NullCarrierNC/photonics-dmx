@@ -31,6 +31,8 @@ function makePrimary(): CueRuntime & { handleCue: jest.Mock } {
     handleSongEvent: jest.fn(),
     requestMotionRepick: jest.fn(),
     stopActiveCue: jest.fn(),
+    stopActiveStrobe: jest.fn(),
+    resetSessionState: jest.fn(),
   } as unknown as CueRuntime & { handleCue: jest.Mock }
 }
 
@@ -127,6 +129,36 @@ describe('CompositeCueRuntime', () => {
     expect(mutePrimary).toHaveBeenLastCalledWith(true)
 
     await composite.handleCue(CueType.Strobe_Off, defaultCueData)
+    expect(mutePrimary).toHaveBeenLastCalledWith(false)
+  })
+
+  it('forwards the session-boundary methods to both consumers', () => {
+    // The listener calls these on a fallback cue and at session boundaries. They are required on
+    // CueRuntime precisely so a composite cannot drop them: as optional members a missing forward
+    // compiles clean and silently stops nothing.
+    const composite = new CompositeCueRuntime(primary, secondary)
+
+    composite.stopActiveStrobe()
+    expect(primary.stopActiveStrobe).toHaveBeenCalledTimes(1)
+    expect(secondary.stopActiveCue).toHaveBeenCalledTimes(1)
+
+    composite.resetSessionState()
+    expect(primary.resetSessionState).toHaveBeenCalledTimes(1)
+    expect(secondary.stopActiveCue).toHaveBeenCalledTimes(2)
+  })
+
+  it('lifts the mute overlay when the strobe is stopped outside handleCue', async () => {
+    // Nothing dispatches Strobe_Off on this path, so without the lift the primary stays held black.
+    const mutePrimary = jest.fn()
+    const composite = new CompositeCueRuntime(primary, secondary, {
+      mutePrimary,
+      shouldMuteForSecondaryStrobe: () => true,
+    })
+
+    await composite.handleCue(CueType.Strobe_Fast, defaultCueData)
+    expect(mutePrimary).toHaveBeenLastCalledWith(true)
+
+    composite.stopActiveStrobe()
     expect(mutePrimary).toHaveBeenLastCalledWith(false)
   })
 

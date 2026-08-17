@@ -67,6 +67,14 @@ export class ChainCueRuntime implements CueRuntime {
     for (const h of this.handlers()) h.stopActiveCue()
   }
 
+  public stopActiveStrobe(): void {
+    for (const h of this.handlers()) h.stopActiveStrobe()
+  }
+
+  public resetSessionState(): void {
+    for (const h of this.handlers()) h.resetSessionState()
+  }
+
   public handleDrumNote(noteType: DrumNoteType, data: CueData): void {
     for (const h of this.handlers()) h.handleDrumNote(noteType, data)
   }

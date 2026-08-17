@@ -159,8 +159,28 @@ class CueHandler extends EventEmitter {
     this.executionCount = 0
     this.cueStartTime = 0
     this.lastCueChangeTime = 0
+    this.resetInputEdgeState()
+  }
+
+  /** Clears per-frame edge baselines without disturbing primary cue history or registry state. */
+  public resetInputEdgeState(): void {
     this.previousCueData = undefined
     this.wasVocalActive = false
+  }
+
+  /** Stops the active strobe slot without disturbing per-frame edge baselines. */
+  public stopActiveStrobe(): void {
+    if (this.currentStrobeCue) {
+      this.currentStrobeCue.onStop?.()
+      this.currentStrobeCue = null
+    }
+    getStrobeStateManager().setActive(null)
+  }
+
+  /** Stops any active strobe slot and clears per-frame edge baselines at session boundaries. */
+  public resetSessionState(): void {
+    this.stopActiveStrobe()
+    this.resetInputEdgeState()
   }
 
   private addHistoryToCueData(cueType: CueType, parameters: CueData): CueData {
@@ -219,10 +239,12 @@ class CueHandler extends EventEmitter {
       harmony2Note: parameters.harmony2Note,
       beat: parameters.beat,
       keyframe: parameters.keyframe,
-      // RB3 cue mode: carry LED/fog state so led-N / fog edges fire against the previous frame,
-      // exactly like the vocal edges above.
       fogState: parameters.fogState,
       ledBanks: parameters.ledBanks,
+      guitarNotes: parameters.guitarNotes,
+      bassNotes: parameters.bassNotes,
+      keysNotes: parameters.keysNotes,
+      drumNotes: parameters.drumNotes,
     }
 
     return historicCueData
@@ -317,11 +339,7 @@ class CueHandler extends EventEmitter {
         this.emit('cueHandled', historicCueData)
         return
       case CueType.Strobe_Off:
-        if (this.currentStrobeCue) {
-          this.currentStrobeCue.onStop?.()
-          this.currentStrobeCue = null
-        }
-        getStrobeStateManager().setActive(null)
+        this.stopActiveStrobe()
         this.emit('cueHandled', historicCueData)
         return
       case CueType.Keyframe_First:
@@ -517,13 +535,7 @@ class CueHandler extends EventEmitter {
       this.currentSecondaryCue.onStop?.()
       this.currentSecondaryCue = null
     }
-    if (this.currentStrobeCue) {
-      this.currentStrobeCue.onStop?.()
-      this.currentStrobeCue = null
-    }
-    // Unconditional: clearing a primary/blackout must also drop any shared strobe slot even if
-    // this handler didn't think a strobe cue was active (defensive against state drift).
-    getStrobeStateManager().setActive(null)
+    this.stopActiveStrobe()
     if (this.currentMotionCue) {
       this.currentMotionCue.onStop?.()
       this.currentMotionCue = null
@@ -570,12 +582,7 @@ class CueHandler extends EventEmitter {
       this.currentSecondaryCue.onStop?.()
       this.currentSecondaryCue = null
     }
-    if (this.currentStrobeCue) {
-      this.currentStrobeCue.onStop?.()
-      this.currentStrobeCue = null
-    }
-    // Unconditional: a handler teardown must never leave the shared StrobeStateManager stuck.
-    getStrobeStateManager().setActive(null)
+    this.stopActiveStrobe()
     if (this.currentMotionCue) {
       this.currentMotionCue.onStop?.()
       this.currentMotionCue = null
