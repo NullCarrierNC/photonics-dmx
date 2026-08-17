@@ -5,6 +5,7 @@
  */
 
 import { beforeEach, describe, expect, it } from '@jest/globals'
+import type { CompiledYargCue } from '../../../cues/node/compiler/NodeCueCompiler'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import type {
   NetNodeCueDefinition,
@@ -196,7 +197,7 @@ describe('GraphExecutionEngine', () => {
   let lightManager: DmxLightManager
   let sequencer: ILightingController
   let session: CueSession
-  let compiledCue: ReturnType<typeof NodeCueCompiler.compileYargCue>
+  let compiledCue: CompiledYargCue
   const cueId = 'group1:test-cue'
   const groupId = 'group1'
 
@@ -230,7 +231,7 @@ describe('GraphExecutionEngine', () => {
     session = new CueSession()
     const def = minimalCueDefinition()
     session.initializeVariables(def.variables ?? [], [])
-    compiledCue = NodeCueCompiler.compileYargCue(def)
+    compiledCue = NodeCueCompiler.compileCue(def, 'yarg')
   })
 
   describe('cue-graph policy', () => {
@@ -304,7 +305,7 @@ describe('GraphExecutionEngine', () => {
   describe('sustain behaviour (repeated same-cue)', () => {
     it('first run runs cue-started then cue-called; second run with hasCueStartedFired runs only cue-called', () => {
       const def = sustainPatternCueDefinition()
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, 'group1:sustain-cue')
       const engine = GraphExecutionEngine.forCue(
@@ -349,7 +350,7 @@ describe('GraphExecutionEngine', () => {
           ],
         },
       }
-      const compiled = NodeCueCompiler.compileYargCue(blockingDef)
+      const compiled = NodeCueCompiler.compileCue(blockingDef, 'yarg')
       session.initializeVariables(blockingDef.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, 'group1:sustain-cue')
       const engine = GraphExecutionEngine.forCue(
@@ -448,7 +449,7 @@ describe('GraphExecutionEngine', () => {
           { from: 'ev-drum-red', to: 'action2' },
         ],
       }
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, 'group1:drum-cue')
       const engine = GraphExecutionEngine.forCue(
@@ -560,7 +561,7 @@ describe('GraphExecutionEngine', () => {
           { from: 'ev-beat', to: 'action-beat' },
         ],
       }
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, 'group1:beat-during-called')
       const engine = GraphExecutionEngine.forCue(
@@ -671,7 +672,7 @@ describe('GraphExecutionEngine', () => {
           { from: 'ev-drum-red', to: 'action-drum' },
         ],
       }
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, 'group1:drum-pulses-during-called')
       const engine = GraphExecutionEngine.forCue(
@@ -798,7 +799,7 @@ describe('GraphExecutionEngine', () => {
           { from: 'ev-beat', to: 'action-beat' },
         ],
       }
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, 'group1:duplicate-beats-during-called')
       const engine = GraphExecutionEngine.forCue(
@@ -904,7 +905,7 @@ describe('GraphExecutionEngine', () => {
           { from: 'ev-keyframe-next', to: 'action-keyframe' },
         ],
       }
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, 'group1:duplicate-keyframes-during-called')
       const engine = GraphExecutionEngine.forCue(
@@ -1057,7 +1058,7 @@ describe('GraphExecutionEngine', () => {
         ],
         variables: [{ name: 'tickBpm', type: 'number', scope: 'cue', initialValue: 0 }],
       }
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, lifecycleCueId)
       const engine = GraphExecutionEngine.forCue(
@@ -1118,7 +1119,7 @@ describe('GraphExecutionEngine', () => {
 
     it('non-lifecycle entry event survives setEffect when triggered alongside cue-started on the first activation tick', () => {
       const def = firstTickClearPolicyOrderingCueDefinition()
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, orderingCueId)
       const engine = GraphExecutionEngine.forCue(
@@ -1148,7 +1149,7 @@ describe('GraphExecutionEngine', () => {
 
     it('subsequent ticks do not re-trigger setEffect after the first activation tick', () => {
       const def = firstTickClearPolicyOrderingCueDefinition()
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, orderingCueId)
       const engine = GraphExecutionEngine.forCue(

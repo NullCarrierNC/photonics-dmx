@@ -54,7 +54,7 @@ describe('RB3 motion animates alongside the base cue', () => {
     const h = createSequencerHarness({ frontCount: 4, backCount: 4, movingHead: true })
     const motion = new YargMotionNodeCue(
       'rb3-motion-default',
-      NodeCueCompiler.compileYargCue(loadMotionCue('rb3-motion-wave')),
+      NodeCueCompiler.compileCue(loadMotionCue('rb3-motion-wave'), 'rb3'),
     )
     motion.execute(createMockCueData({}), h.sequencer, h.lightManager)
 
@@ -72,13 +72,13 @@ describe('RB3 motion animates alongside the base cue', () => {
     const h = createSequencerHarness({ frontCount: 4, backCount: 4, movingHead: true })
     const base = new YargNodeCue(
       'rb3-stagekit',
-      NodeCueCompiler.compileYargCue(loadBaseCueDefinition()),
+      NodeCueCompiler.compileCue(loadBaseCueDefinition(), 'rb3'),
       new EffectRegistry(),
       noopCallbacks,
     )
     const motion = new YargMotionNodeCue(
       'rb3-motion-default',
-      NodeCueCompiler.compileYargCue(loadMotionCue('rb3-motion-wave')),
+      NodeCueCompiler.compileCue(loadMotionCue('rb3-motion-wave'), 'rb3'),
     )
 
     // Base cue first (its initial submission clears), then the motion cue — the sim order.

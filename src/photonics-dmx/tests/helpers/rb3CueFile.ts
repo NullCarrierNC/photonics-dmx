@@ -34,7 +34,7 @@ export function createRb3Cue(groupId: string): YargNodeCue {
   if (!def) throw new Error(`${groupId}: no CueType.RB3 lighting cue`)
   return new YargNodeCue(
     groupId,
-    NodeCueCompiler.compileYargCue(def),
+    NodeCueCompiler.compileCue(def, 'rb3'),
     new EffectRegistry(),
     noopCallbacks,
   )

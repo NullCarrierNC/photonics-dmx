@@ -92,12 +92,13 @@ describe('YARG group-level variable sharing', () => {
   it('cues in the same group on the same sequencer share one group store', () => {
     const stomp = new YargNodeCue(
       'g1',
-      NodeCueCompiler.compileYargCue(cueWithSharedGroupVar('cue-stomp', CueType.Stomp)),
+      NodeCueCompiler.compileCue(cueWithSharedGroupVar('cue-stomp', CueType.Stomp), 'yarg'),
     )
     const spot = new YargNodeCue(
       'g1',
-      NodeCueCompiler.compileYargCue(
+      NodeCueCompiler.compileCue(
         cueWithSharedGroupVar('cue-spot', CueType.Silhouettes_Spotlight),
+        'yarg',
       ),
     )
     const seq = makeSequencer()
@@ -119,11 +120,11 @@ describe('YARG group-level variable sharing', () => {
   it('different cue groups do not share state', () => {
     const a = new YargNodeCue(
       'groupA',
-      NodeCueCompiler.compileYargCue(cueWithSharedGroupVar('cue-a', CueType.Stomp)),
+      NodeCueCompiler.compileCue(cueWithSharedGroupVar('cue-a', CueType.Stomp), 'yarg'),
     )
     const b = new YargNodeCue(
       'groupB',
-      NodeCueCompiler.compileYargCue(cueWithSharedGroupVar('cue-b', CueType.Stomp)),
+      NodeCueCompiler.compileCue(cueWithSharedGroupVar('cue-b', CueType.Stomp), 'yarg'),
     )
     const seq = makeSequencer()
 
@@ -136,7 +137,7 @@ describe('YARG group-level variable sharing', () => {
   it('the same group on different sequencers stays isolated (multi-rig)', () => {
     const cue = new YargNodeCue(
       'g1',
-      NodeCueCompiler.compileYargCue(cueWithSharedGroupVar('cue-stomp', CueType.Stomp)),
+      NodeCueCompiler.compileCue(cueWithSharedGroupVar('cue-stomp', CueType.Stomp), 'yarg'),
     )
     const seqA = makeSequencer()
     const seqB = makeSequencer()
@@ -150,7 +151,7 @@ describe('YARG group-level variable sharing', () => {
   it('group state survives a cue restart (onStop preserves group store)', () => {
     const cue = new YargNodeCue(
       'g1',
-      NodeCueCompiler.compileYargCue(cueWithSharedGroupVar('cue-stomp', CueType.Stomp)),
+      NodeCueCompiler.compileCue(cueWithSharedGroupVar('cue-stomp', CueType.Stomp), 'yarg'),
     )
     const seq = makeSequencer()
 

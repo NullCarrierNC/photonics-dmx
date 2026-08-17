@@ -87,7 +87,7 @@ function dualLifecycleCue(): NetMotionNodeCueDefinition {
 
 describe('GraphExecutionPolicy motion vs visual', () => {
   it('visual cue policy includes cue-called when cue-started has already fired', () => {
-    const compiled = NodeCueCompiler.compileYargCue(dualLifecycleCue())
+    const compiled = NodeCueCompiler.compileCue(dualLifecycleCue(), 'yarg')
     const policy = cueGraphPolicy('g', 'c')
     const nodes = policy.getEntryNodes(compiled, minimalParams(), { hasCueStartedFired: true })
     const types = nodes.map((n) => (n as NetEventNode).eventType)
@@ -96,7 +96,7 @@ describe('GraphExecutionPolicy motion vs visual', () => {
   })
 
   it('motion cue policy includes cue-called when cue-started has already fired (same as visual)', () => {
-    const compiled = NodeCueCompiler.compileYargCue(dualLifecycleCue())
+    const compiled = NodeCueCompiler.compileCue(dualLifecycleCue(), 'yarg')
     const policy = motionCueGraphPolicy('g', 'c')
     const nodes = policy.getEntryNodes(compiled, minimalParams(), { hasCueStartedFired: true })
     const types = nodes.map((n) => (n as NetEventNode).eventType)
@@ -147,7 +147,7 @@ describe('GraphExecutionPolicy motion vs visual', () => {
         { from: 'ev-beat', to: 'a1' },
       ],
     }
-    const compiled = NodeCueCompiler.compileYargCue(def)
+    const compiled = NodeCueCompiler.compileCue(def, 'yarg')
     const policy = cueGraphPolicy('g', 'c')
     const params = minimalParams()
     const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: false })
@@ -198,7 +198,7 @@ function vocalEventCue(): NetMotionNodeCueDefinition {
 
 describe('GraphExecutionPolicy vocal events', () => {
   const triggeredVocalTypes = (params: CueData): string[] => {
-    const compiled = NodeCueCompiler.compileYargCue(vocalEventCue())
+    const compiled = NodeCueCompiler.compileCue(vocalEventCue(), 'yarg')
     const policy = cueGraphPolicy('g', 'c')
     // cue-started has already fired, so only the vocal edges can appear.
     const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: true })
@@ -307,7 +307,7 @@ describe('GraphExecutionPolicy LED and fog events (RB3 StageKit)', () => {
   const LED1 = 1 << 0
 
   const triggered = (params: CueData): string[] => {
-    const compiled = NodeCueCompiler.compileYargCue(ledFogEventCue())
+    const compiled = NodeCueCompiler.compileCue(ledFogEventCue(), 'yarg')
     const policy = cueGraphPolicy('g', 'c')
     const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: true })
     return nodes.map((n) => (n as NetEventNode).eventType)
@@ -412,7 +412,7 @@ describe('GraphExecutionPolicy instrument note events', () => {
   }
 
   const triggered = (params: CueData): string[] => {
-    const compiled = NodeCueCompiler.compileYargCue(drumKickCue())
+    const compiled = NodeCueCompiler.compileCue(drumKickCue(), 'yarg')
     const policy = cueGraphPolicy('g', 'c')
     const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: true })
     return nodes.map((n) => (n as NetEventNode).eventType)
@@ -473,7 +473,7 @@ describe('GraphExecutionPolicy led-N triggerOnColorChange', () => {
   const LED3 = 1 << 2 // position 3 → bit index 2
 
   const triggeredCC = (params: CueData): string[] => {
-    const compiled = NodeCueCompiler.compileYargCue(ledFogEventCue(true))
+    const compiled = NodeCueCompiler.compileCue(ledFogEventCue(true), 'yarg')
     const policy = cueGraphPolicy('g', 'c')
     const nodes = policy.getEntryNodes(compiled, params, { hasCueStartedFired: true })
     return nodes.map((n) => (n as NetEventNode).eventType)
@@ -528,7 +528,7 @@ describe('GraphExecutionPolicy led-N triggerOnColorChange', () => {
   })
 
   it('without the flag, a colour change while lit does NOT fire (default behaviour)', () => {
-    const compiled = NodeCueCompiler.compileYargCue(ledFogEventCue(false))
+    const compiled = NodeCueCompiler.compileCue(ledFogEventCue(false), 'yarg')
     const nodes = cueGraphPolicy('g', 'c').getEntryNodes(
       compiled,
       frame({ ledBanks: inBank('blue', LED3), previousFrame: { ledBanks: inBank('green', LED3) } }),

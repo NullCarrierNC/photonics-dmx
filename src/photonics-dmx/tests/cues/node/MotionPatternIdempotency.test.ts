@@ -134,7 +134,7 @@ describe('motion-pattern idempotency (cue-called)', () => {
   it('does not call addMotionPattern again when config, layer, ramp, and lights match', () => {
     const def = motionPatternOnlyCue()
     session.initializeVariables(def.variables ?? [], [])
-    const compiled = NodeCueCompiler.compileYargCue(def)
+    const compiled = NodeCueCompiler.compileCue(def, 'yarg')
     const engine = GraphExecutionEngine.forCue(
       compiled,
       cueId,
@@ -157,7 +157,7 @@ describe('motion-pattern idempotency (cue-called)', () => {
   it('calls addMotionPattern again when an existing pattern has a different resolved config', () => {
     const def = motionPatternOnlyCue()
     session.initializeVariables(def.variables ?? [], [])
-    const compiled = NodeCueCompiler.compileYargCue(def)
+    const compiled = NodeCueCompiler.compileCue(def, 'yarg')
     const engine = GraphExecutionEngine.forCue(
       compiled,
       cueId,
@@ -210,7 +210,7 @@ describe('motion-pattern idempotency (cue-called)', () => {
       },
     }
     session.initializeVariables(def.variables ?? [], [])
-    const compiled = NodeCueCompiler.compileYargCue(def)
+    const compiled = NodeCueCompiler.compileCue(def, 'yarg')
     const engine = GraphExecutionEngine.forCue(
       compiled,
       cueId,

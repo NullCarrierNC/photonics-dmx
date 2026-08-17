@@ -13,6 +13,7 @@ import {
 } from '../../../cues/node/schema/validation'
 import { NetNodeCueDefinition, AudioNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../cues/types/cueTypes'
+import type { AudioEventNodeUnion } from '../../../cues/types/nodeCueTypes'
 
 describe('Node cue validation', () => {
   it('validates a simple YARG node cue', () => {
@@ -1784,7 +1785,7 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
     if (result.valid) {
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
       }
     }
   })
@@ -1799,7 +1800,7 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
     if (result.valid) {
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
       }
     }
   })
@@ -1814,7 +1815,7 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
     if (result.valid) {
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
       }
     }
   })
@@ -1829,7 +1830,7 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
     if (result.valid) {
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
       }
     }
   })
@@ -1844,7 +1845,7 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
     if (result.valid) {
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
       }
     }
   })
@@ -1860,7 +1861,7 @@ describe('Node cue validation', () => {
     if (result.valid) {
       expect(result.data.group.id).toBe('yarg-stagekit')
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue(cue, 'yarg')).not.toThrow()
       }
       // every cue must lay its nodes out (no stacking at the origin in the editor)
       for (const cue of result.data.cues) {
@@ -1891,7 +1892,7 @@ describe('Node cue validation', () => {
         CueType.RB3,
       ])
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue(cue, 'yarg')).not.toThrow()
         const positions = cue.layout?.nodePositions ?? {}
         expect(Object.keys(positions).length).toBeGreaterThan(0)
       }
@@ -1924,7 +1925,7 @@ describe('Node cue validation', () => {
         expect(cueTypes).toEqual([CueType.RB3])
         const positionsSeen = new Set<string>()
         for (const cue of result.data.cues) {
-          expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+          expect(() => NodeCueCompiler.compileCue(cue, 'yarg')).not.toThrow()
           const positions = cue.layout?.nodePositions ?? {}
           const nodeCount = Object.values(cue.nodes ?? {}).reduce(
             (total, bucket) => total + (Array.isArray(bucket) ? bucket.length : 0),
@@ -1957,7 +1958,7 @@ describe('Node cue validation', () => {
       expect(result.data.cues.length).toBe(9)
       for (const cue of result.data.cues) {
         expect(cue.kind).toBe('motion')
-        expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue(cue, 'yarg')).not.toThrow()
         const eventTypes = (cue.nodes?.events ?? []).map((e) => e.eventType)
         expect(eventTypes).toEqual(['cue-started'])
       }
@@ -1975,7 +1976,7 @@ describe('Node cue validation', () => {
       expect(result.valid).toBe(true)
       if (result.valid) {
         for (const cue of result.data.cues) {
-          expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+          expect(() => NodeCueCompiler.compileCue(cue, 'yarg')).not.toThrow()
         }
       }
       // max/linear brightness is reserved for strobes; these libraries must not use it

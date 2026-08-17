@@ -170,7 +170,7 @@ describe('Runtime Event System', () => {
         events: [eventDef],
       }
 
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         'cue1',
@@ -273,7 +273,7 @@ describe('Runtime Event System', () => {
         events: [eventDef],
       }
 
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         'cue1',
@@ -384,7 +384,7 @@ describe('Runtime Event System', () => {
         events: [eventDef],
       }
 
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         'cue1',
@@ -494,7 +494,7 @@ describe('Runtime Event System', () => {
         events: [event1Def, event2Def],
       }
 
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         'cue1',
@@ -566,7 +566,7 @@ describe('Runtime Event System', () => {
       }
 
       expect(() => {
-        NodeCueCompiler.compileYargCue(cueDefinition)
+        NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       }).toThrow(/references undefined event/)
     })
 
@@ -621,7 +621,7 @@ describe('Runtime Event System', () => {
       }
 
       expect(() => {
-        NodeCueCompiler.compileYargCue(cueDefinition)
+        NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       }).toThrow(/references undefined event/)
     })
   })
@@ -667,7 +667,7 @@ describe('Runtime Event System', () => {
         connections: [{ from: 'e-start', to: 'action1' }],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const firstSubmissionRef = { use: true }
       const engine = new NodeExecutionEngine(
         compiled,
@@ -729,7 +729,7 @@ describe('Runtime Event System', () => {
         connections: [{ from: 'e-start', to: 'action1' }],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         'cue-no-ref',
@@ -793,7 +793,7 @@ describe('Runtime Event System', () => {
         ],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const cue = new YargNodeCue('group1', compiled)
       const cueData = createCueData()
 
@@ -854,7 +854,7 @@ describe('Runtime Event System', () => {
         connections: [{ from: 'e-start', to: 'action1' }],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const cue = new YargNodeCue('group1', compiled)
       const cueData = createCueData()
 
@@ -907,7 +907,7 @@ describe('Runtime Event System', () => {
         connections: [{ from: 'e-start', to: 'action1' }],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const cue = new YargNodeCue('group1', compiled)
       const cueData = createCueData()
 
@@ -957,7 +957,7 @@ describe('Runtime Event System', () => {
         connections: [{ from: 'e-called', to: 'action1' }],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const cue = new YargNodeCue('group1', compiled)
       const cueData = createCueData()
 
@@ -1012,7 +1012,7 @@ describe('Runtime Event System', () => {
         connections: [{ from: 'e-beat', to: 'raiser1' }],
         layout: { nodePositions: {} },
       }
-      const compiledCue = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiledCue = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
 
       const effectDef: YargEffectDefinition = {
         id: 'blocking-effect',

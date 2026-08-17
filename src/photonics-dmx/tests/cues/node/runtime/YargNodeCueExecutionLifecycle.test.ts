@@ -122,7 +122,7 @@ describe('YargNodeCue execution lifecycle', () => {
     )
     const nodeCue = new YargNodeCue(
       'group1',
-      NodeCueCompiler.compileYargCue(def),
+      NodeCueCompiler.compileCue(def, 'yarg'),
       new EffectRegistry(),
       noopCallbacks,
     )
@@ -143,7 +143,7 @@ describe('YargNodeCue execution lifecycle', () => {
     )
     const nodeCue = new YargNodeCue(
       'group1',
-      NodeCueCompiler.compileYargCue(def),
+      NodeCueCompiler.compileCue(def, 'yarg'),
       new EffectRegistry(),
       noopCallbacks,
     )

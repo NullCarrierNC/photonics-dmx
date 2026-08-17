@@ -44,6 +44,7 @@ const buildAdjacency = (connections: Connection[]): Map<string, Connection[]> =>
 const compileCue = (definition: NetNodeCueDefinition): CompiledYargCue => {
   return {
     definition,
+    mode: 'yarg',
     eventMap: new Map(definition.nodes.events.map((node) => [node.id, node])),
     actionMap: new Map(definition.nodes.actions.map((node) => [node.id, node])),
     logicMap: new Map((definition.nodes.logic ?? []).map((node) => [node.id, node])),

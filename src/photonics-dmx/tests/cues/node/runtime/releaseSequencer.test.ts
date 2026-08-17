@@ -23,6 +23,7 @@ import { createMockLightingConfig } from '../../../helpers/testFixtures'
 import type { CueData } from '../../../../cues/types/cueTypes'
 import type { AudioCueData } from '../../../../cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
+import type { AudioEventNodeUnion } from '../../../../cues/types/nodeCueTypes'
 
 function makeSequencerStub(): ILightingController {
   return {
@@ -196,7 +197,7 @@ describe('releaseSequencer drops per-sequencer state', () => {
   const lightManager = new DmxLightManager(createMockLightingConfig())
 
   it('YargNodeCue: execute populates state, releaseSequencer drops it', () => {
-    const compiled = NodeCueCompiler.compileYargCue(trivialYargLightingCueDef())
+    const compiled = NodeCueCompiler.compileCue(trivialYargLightingCueDef(), 'yarg')
     const cue = new YargNodeCue('g1', compiled)
     const seqA = makeSequencerStub()
     const seqB = makeSequencerStub()
@@ -217,7 +218,7 @@ describe('releaseSequencer drops per-sequencer state', () => {
   })
 
   it('YargMotionNodeCue: releaseSequencer drops per-sequencer state', () => {
-    const compiled = NodeCueCompiler.compileYargCue(trivialYargMotionCueDef())
+    const compiled = NodeCueCompiler.compileCue(trivialYargMotionCueDef(), 'yarg')
     const cue = new YargMotionNodeCue('g1', compiled)
     const seqA = makeSequencerStub()
     cue.execute(minimalYargCueData(), seqA, lightManager)
@@ -228,7 +229,10 @@ describe('releaseSequencer drops per-sequencer state', () => {
   })
 
   it('AudioNodeCue: releaseSequencer drops per-sequencer state and per-sequencer group store', async () => {
-    const compiled = NodeCueCompiler.compileAudioCue(trivialAudioLightingCueDef())
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(
+      trivialAudioLightingCueDef(),
+      'audio',
+    )
     const cue = new AudioNodeCue('g1', compiled)
     const seqA = makeSequencerStub()
     await cue.execute(minimalAudioCueData(), seqA, lightManager)
@@ -247,14 +251,17 @@ describe('releaseSequencer drops per-sequencer state', () => {
   })
 
   it('releaseSequencer for an unknown sequencer is a safe no-op', () => {
-    const compiled = NodeCueCompiler.compileYargCue(trivialYargLightingCueDef())
+    const compiled = NodeCueCompiler.compileCue(trivialYargLightingCueDef(), 'yarg')
     const cue = new YargNodeCue('g1', compiled)
     const unrelated = makeSequencerStub()
     expect(() => cue.releaseSequencer(unrelated)).not.toThrow()
   })
 
   it('Audio group-var stores are per-sequencer, not shared across rigs', async () => {
-    const compiled = NodeCueCompiler.compileAudioCue(trivialAudioLightingCueDef())
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(
+      trivialAudioLightingCueDef(),
+      'audio',
+    )
     const cue = new AudioNodeCue('g1', compiled)
     const seqA = makeSequencerStub()
     const seqB = makeSequencerStub()

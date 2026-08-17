@@ -88,8 +88,8 @@ describe('NodeCueCompiler', () => {
         layout: { nodePositions: {} },
       }
 
-      expect(() => NodeCueCompiler.compileYargCue(definition)).toThrow(NodeCueCompilationError)
-      expect(() => NodeCueCompiler.compileYargCue(definition)).toThrow(/not reachable/i)
+      expect(() => NodeCueCompiler.compileCue(definition, 'yarg')).toThrow(NodeCueCompilationError)
+      expect(() => NodeCueCompiler.compileCue(definition, 'yarg')).toThrow(/not reachable/i)
     })
 
     it('compiles cue with only effectRaisers and no actions', () => {
@@ -108,7 +108,7 @@ describe('NodeCueCompiler', () => {
         layout: { nodePositions: {} },
       }
 
-      const compiled = NodeCueCompiler.compileYargCue(definition)
+      const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
       expect(compiled).toBeDefined()
       expect(compiled.actionMap.size).toBe(0)
       expect(compiled.effectRaiserMap.size).toBe(1)

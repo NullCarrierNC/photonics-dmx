@@ -203,12 +203,12 @@ export const TEMPO_DEFAULTS = {
 } as const
 
 // YARG Cue Data Properties - derived from shared constants
-export type YargCueDataProperty = (typeof NET_CUE_DATA_PROPERTIES)[number]
+export type NetCueDataProperty = (typeof NET_CUE_DATA_PROPERTIES)[number]
 
 // Audio Cue Data Properties - derived from shared constants
 export type AudioCueDataProperty = (typeof AUDIO_CUE_DATA_PROPERTIES)[number]
 
-export type CueDataProperty = YargCueDataProperty | AudioCueDataProperty
+export type CueDataProperty = NetCueDataProperty | AudioCueDataProperty
 
 // Config Data Properties - derived from shared constants
 export type ConfigDataProperty = (typeof ALL_CONFIG_DATA_PROPERTIES)[number]

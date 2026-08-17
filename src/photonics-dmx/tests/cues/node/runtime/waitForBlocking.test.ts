@@ -138,7 +138,7 @@ function makeCueEngine(
     connections,
   }
   const engine = new NodeExecutionEngine(
-    NodeCueCompiler.compileYargCue(def),
+    NodeCueCompiler.compileCue<NetEventNode>(def, 'yarg'),
     'group:wf-cue',
     sequencer,
     makeMockLightManager(),
@@ -186,6 +186,7 @@ function makeEffectEngine(
     noopRuntimeBroadcaster(),
     {},
     cueData(),
+    { callerMode: 'yarg' },
   )
 }
 

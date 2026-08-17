@@ -49,7 +49,7 @@ const cueData: CueData = { ...defaultCueData, currentScene: 'Gameplay', trackMod
 describe('bundled RB3 motion cues execute', () => {
   it('the Wave pattern cue adds a motion pattern on cue-started', () => {
     const wave = loadRb3MotionCues().find((c) => c.id === 'rb3-motion-wave')!
-    const cue = new YargMotionNodeCue('rb3-motion-default', NodeCueCompiler.compileYargCue(wave))
+    const cue = new YargMotionNodeCue('rb3-motion-default', NodeCueCompiler.compileCue(wave, 'rb3'))
     const lightManager = new DmxLightManager(createMockLightingConfig())
     const sequencer = mockSequencer()
 
@@ -60,7 +60,10 @@ describe('bundled RB3 motion cues execute', () => {
 
   it('the Still cue executes without error (a static set-position hold, not a pattern)', () => {
     const still = loadRb3MotionCues().find((c) => c.id === 'rb3-motion-still')!
-    const cue = new YargMotionNodeCue('rb3-motion-default', NodeCueCompiler.compileYargCue(still))
+    const cue = new YargMotionNodeCue(
+      'rb3-motion-default',
+      NodeCueCompiler.compileCue(still, 'rb3'),
+    )
     const lightManager = new DmxLightManager(createMockLightingConfig())
     const sequencer = mockSequencer()
 
@@ -72,7 +75,10 @@ describe('bundled RB3 motion cues execute', () => {
     const lightManager = new DmxLightManager(createMockLightingConfig())
     for (const def of loadRb3MotionCues()) {
       if (def.id === 'rb3-motion-still') continue
-      const cue = new YargMotionNodeCue('rb3-motion-default', NodeCueCompiler.compileYargCue(def))
+      const cue = new YargMotionNodeCue(
+        'rb3-motion-default',
+        NodeCueCompiler.compileCue(def, 'rb3'),
+      )
       const sequencer = mockSequencer()
       cue.execute(cueData, sequencer, lightManager)
       expect(sequencer.addMotionPattern).toHaveBeenCalledTimes(1)

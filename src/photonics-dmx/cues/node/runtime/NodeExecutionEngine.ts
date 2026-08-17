@@ -30,6 +30,7 @@ import {
   VariableDefinition,
   ValueSource,
   VariableType,
+  NodeCueMode,
 } from '../../types/nodeCueTypes'
 import { TrackedLight, Color } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
@@ -145,6 +146,11 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
 
   protected get compiled(): CompiledGraph {
     return this.compiledCue
+  }
+
+  /** A cue's domain is its own, set from the directory its file was loaded from. */
+  protected get mode(): NodeCueMode {
+    return this.compiledCue.mode
   }
 
   protected get revisitPolicy(): RevisitPolicy {
@@ -562,6 +568,8 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
           firstSubmissionUsesSetEffectRef: this.firstSubmissionUsesSetEffectRef,
           runtimeCallbacks: this.runtimeCallbacks,
           consumeInitialClearPolicy: this.consumeInitialClearPolicy,
+          // The raising cue's mode, so cue-data inside the effect reads the frame that raised it.
+          callerMode: this.mode,
         },
       )
 

@@ -436,6 +436,8 @@ export abstract class BaseAudioNodeCue {
     )
     const evaluatorContext: LogicNodeEvaluatorContext = {
       cueId: this.id,
+      // Audio cues are always the audio family; they never route through the net extractor.
+      mode: 'audio',
       lightManager,
       cueLevelVarStore: runState.cueLevelVarStore,
       groupLevelVarStore: runState.groupLevelVarStore,

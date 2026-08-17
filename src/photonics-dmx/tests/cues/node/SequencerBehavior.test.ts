@@ -3,6 +3,7 @@
  */
 
 import { beforeEach, describe, expect, it } from '@jest/globals'
+import type { CompiledYargCue } from '../../../cues/node/compiler/NodeCueCompiler'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import type {
   NetNodeCueDefinition,
@@ -122,12 +123,12 @@ function cueDefinitionWithEventType(eventType: 'cue-started' | 'cue-called'): Ne
 describe('Sequencer behavior', () => {
   let lightManager: DmxLightManager
   let cueDefinition: NetNodeCueDefinition
-  let compiledCue: ReturnType<typeof NodeCueCompiler.compileYargCue>
+  let compiledCue: CompiledYargCue
 
   beforeEach(() => {
     lightManager = new DmxLightManager(createMockLightingConfig())
     cueDefinition = minimalCueDefinition()
-    compiledCue = NodeCueCompiler.compileYargCue(cueDefinition)
+    compiledCue = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
   })
 
   it('cue produces expected sequencer call sequence', async () => {
@@ -146,7 +147,7 @@ describe('Sequencer behavior', () => {
 
   it('cue-called-only cue produces expected sequencer call sequence', async () => {
     const def = cueCalledOnlyDefinition()
-    const compiled = NodeCueCompiler.compileYargCue(def)
+    const compiled = NodeCueCompiler.compileCue(def, 'yarg')
     const { sequencer, recorded } = createRecordingSequencer()
     const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
     const cue = new YargNodeCue('group1', compiled, new EffectRegistry(), noopCallbacks)

@@ -17,6 +17,7 @@ function harness() {
   } as unknown as ExecutionContext
   const evalCtx: LogicNodeEvaluatorContext = {
     cueId: 'g:c',
+    mode: 'yarg',
     lightManager: {} as never,
     cueLevelVarStore: cueStore,
     groupLevelVarStore: new Map(),
@@ -74,6 +75,7 @@ describe('frame-gate logic node', () => {
     } as unknown as ExecutionContext
     const evalCtx: LogicNodeEvaluatorContext = {
       cueId: 'g:c',
+      mode: 'yarg',
       lightManager: {} as never,
       cueLevelVarStore: cueStore,
       groupLevelVarStore: new Map(),

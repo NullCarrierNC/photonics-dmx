@@ -206,7 +206,7 @@ const PARITY_CASES: ParityCase[] = [
 
 describe('Cross-compiler action validation parity', () => {
   it('compiles the smallest valid cue + effect happily (sanity check)', () => {
-    expect(() => NodeCueCompiler.compileYargCue(buildCue(baseValidAction()))).not.toThrow()
+    expect(() => NodeCueCompiler.compileCue(buildCue(baseValidAction()), 'yarg')).not.toThrow()
     expect(() => EffectCompiler.compileYargEffect(buildEffect(baseValidAction()))).not.toThrow()
   })
 
@@ -218,7 +218,7 @@ describe('Cross-compiler action validation parity', () => {
       let cueError: Error | null = null
       let effectError: Error | null = null
       try {
-        NodeCueCompiler.compileYargCue(cue)
+        NodeCueCompiler.compileCue(cue, 'yarg')
       } catch (e) {
         cueError = e as Error
       }

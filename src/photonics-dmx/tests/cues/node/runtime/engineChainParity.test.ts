@@ -151,7 +151,7 @@ describe('Chain extraction parity between cue and effect engines', () => {
       return true
     })
 
-    const compiledCue = NodeCueCompiler.compileYargCue(cueDefinition)
+    const compiledCue = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
     const cueEngine = new NodeExecutionEngine(
       compiledCue,
       'group:parity-cue',
@@ -185,6 +185,7 @@ describe('Chain extraction parity between cue and effect engines', () => {
       noopRuntimeBroadcaster(),
       {},
       cueData(),
+      { callerMode: 'yarg' },
     )
 
     await effectEngine.triggerEffect(cueData())

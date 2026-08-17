@@ -9,6 +9,7 @@ import {
   VariableDefinition,
   NetEventNode,
   NetNodeCueDefinition,
+  NodeCueMode,
   ValueSource,
 } from '../../types/nodeCueTypes'
 import { AbstractGraphBuilder, CompiledGraphBase } from './AbstractGraphBuilder'
@@ -31,6 +32,12 @@ export interface CompiledNodeCue<TEvent extends BaseEventNode> extends CompiledG
   effectRaiserMap: Map<string, EffectRaiserNode>
   /** Group-level variable definitions; set by loader from file.group.variables */
   groupVariables?: VariableDefinition[]
+  /**
+   * Which domain authored this cue, carried from the file's directory through compilation so the
+   * runtime can resolve its event gate and cue-data extractor. Definitions carry no mode of their
+   * own, only files do, so the compiler is told.
+   */
+  mode: NodeCueMode
 }
 
 export type CompiledYargCue = CompiledNodeCue<NetEventNode>
@@ -62,16 +69,21 @@ export const calculateActionDuration = (action: ActionNode): number => {
 }
 
 export class NodeCueCompiler extends AbstractGraphBuilder {
-  public static compileYargCue(definition: NetNodeCueDefinition): CompiledYargCue {
-    return this.buildCompiled(definition)
-  }
-
-  public static compileAudioCue(definition: AudioNodeCueDefinition): CompiledAudioCue {
-    return this.buildCompiled(definition)
+  /**
+   * Compile a cue for a known mode. `mode` is required because a definition carries no mode of its
+   * own: yarg and rb3 share one definition shape and are told apart only by the directory the file
+   * came from, which the loader passes through.
+   */
+  public static compileCue<TEvent extends BaseEventNode = NetEventNode>(
+    definition: NetNodeCueDefinition | AudioNodeCueDefinition,
+    mode: NodeCueMode,
+  ): CompiledNodeCue<TEvent> {
+    return this.buildCompiled<TEvent>(definition, mode)
   }
 
   private static buildCompiled<TEvent extends BaseEventNode>(
     definition: NetNodeCueDefinition | AudioNodeCueDefinition,
+    mode: NodeCueMode,
   ): CompiledNodeCue<TEvent> {
     const events = definition.nodes.events as unknown as TEvent[]
     const actions = (definition.nodes.actions ?? []) as ActionNode[]
@@ -126,6 +138,7 @@ export class NodeCueCompiler extends AbstractGraphBuilder {
 
     return {
       definition,
+      mode,
       eventMap: core.eventMap,
       actionMap: core.actionMap,
       logicMap: core.logicMap,

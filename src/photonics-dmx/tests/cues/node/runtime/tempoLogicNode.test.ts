@@ -27,6 +27,7 @@ function harness(bpm: number, declared: string[]) {
   } as unknown as ExecutionContext
   const evalCtx: LogicNodeEvaluatorContext = {
     cueId: 'g:c',
+    mode: 'yarg',
     lightManager: {} as never,
     cueLevelVarStore: cueStore,
     groupLevelVarStore: groupStore,

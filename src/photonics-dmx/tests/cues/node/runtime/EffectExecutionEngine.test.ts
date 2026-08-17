@@ -142,6 +142,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -206,6 +207,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       // Should not throw
@@ -320,6 +322,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -414,6 +417,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -538,6 +542,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -705,6 +710,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -815,6 +821,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -912,6 +919,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -1010,6 +1018,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -1082,6 +1091,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       const startTime = Date.now()
@@ -1155,6 +1165,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
       const cueData = createCueData()
       const onIdle = jest.fn(() => {
@@ -1258,6 +1269,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
       const onIdle = jest.fn()
       engine.setOnIdle(onIdle)
@@ -1290,6 +1302,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
       const onIdle = jest.fn()
       engine.setOnIdle(onIdle)
@@ -1331,6 +1344,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       engine.triggerEffect(createCueData())
@@ -1414,6 +1428,7 @@ describe('EffectExecutionEngine', () => {
         broadcaster,
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())

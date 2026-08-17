@@ -43,7 +43,7 @@ describe('RB3 base cue lighting', () => {
     const h = createSequencerHarness({ frontCount: 4, backCount: 4 })
     const cue = new YargNodeCue(
       'rb3-stagekit',
-      NodeCueCompiler.compileYargCue(loadBaseCueDefinition()),
+      NodeCueCompiler.compileCue(loadBaseCueDefinition(), 'rb3'),
       new EffectRegistry(),
       noopCallbacks,
     )
@@ -75,7 +75,7 @@ describe('RB3 base cue lighting', () => {
     const h = createSequencerHarness({ frontCount: 4, backCount: 4 })
     const cue = new YargNodeCue(
       'rb3-stagekit',
-      NodeCueCompiler.compileYargCue(loadBaseCueDefinition()),
+      NodeCueCompiler.compileCue(loadBaseCueDefinition(), 'rb3'),
       new EffectRegistry(),
       noopCallbacks,
     )
@@ -103,7 +103,7 @@ describe('RB3 base cue lighting', () => {
     const h = createSequencerHarness({ frontCount: 4, backCount: 4 })
     const cue = new YargNodeCue(
       'rb3-stagekit',
-      NodeCueCompiler.compileYargCue(loadBaseCueDefinition()),
+      NodeCueCompiler.compileCue(loadBaseCueDefinition(), 'rb3'),
       new EffectRegistry(),
       noopCallbacks,
     )
@@ -129,7 +129,7 @@ describe('RB3 base cue lighting', () => {
     const h = createSequencerHarness({ frontCount: 2, backCount: 2 })
     const cue = new YargNodeCue(
       'rb3-stagekit',
-      NodeCueCompiler.compileYargCue(loadBaseCueDefinition()),
+      NodeCueCompiler.compileCue(loadBaseCueDefinition(), 'rb3'),
       new EffectRegistry(),
       noopCallbacks,
     )
@@ -149,7 +149,7 @@ describe('RB3 base cue lighting', () => {
     const h = createSequencerHarness({ frontCount: 4, backCount: 4 })
     const cue = new YargNodeCue(
       'rb3-stagekit',
-      NodeCueCompiler.compileYargCue(loadBaseCueDefinition()),
+      NodeCueCompiler.compileCue(loadBaseCueDefinition(), 'rb3'),
       new EffectRegistry(),
       noopCallbacks,
     )

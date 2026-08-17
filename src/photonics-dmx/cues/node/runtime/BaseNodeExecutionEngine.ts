@@ -28,6 +28,7 @@ import {
   LogicNode,
   ValueSource,
   VariableDefinition,
+  NodeCueMode,
 } from '../../types/nodeCueTypes'
 import type { Connection } from '../../types/nodeCueTypes'
 import type { CueData } from '../../types/cueTypes'
@@ -130,6 +131,13 @@ export abstract class BaseNodeExecutionEngine {
 
   /** The concrete compiled graph (cue or effect), viewed structurally. */
   protected abstract get compiled(): CompiledGraph
+
+  /**
+   * The domain this run resolves cue data against. A property of the execution rather than of the
+   * graph: a cue's is its own, intrinsic from the file it was loaded from, while an effect is
+   * family-agnostic and borrows the mode of whichever cue raised it.
+   */
+  protected abstract get mode(): NodeCueMode
 
   /** Re-entry policy: 'strict' (cues) skips any visited node; 'relaxed' (effects) lets actions/event-raisers re-enter. */
   protected abstract get revisitPolicy(): RevisitPolicy
@@ -633,6 +641,7 @@ export abstract class BaseNodeExecutionEngine {
 
       const evaluatorContext: LogicNodeEvaluatorContext = {
         cueId: this.getEmitCueId(),
+        mode: this.mode,
         lightManager: this.lightManager,
         cueLevelVarStore: context.cueLevelVarStore,
         groupLevelVarStore: context.groupLevelVarStore,

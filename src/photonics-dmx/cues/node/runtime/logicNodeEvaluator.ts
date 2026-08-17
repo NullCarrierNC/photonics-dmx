@@ -14,6 +14,7 @@ import {
   ValueSource,
   VariableDefinition,
   VariableType,
+  NodeCueMode,
 } from '../../types/nodeCueTypes'
 import { ExecutionContext } from './ExecutionContext'
 import { VariableValue } from './executionTypes'
@@ -48,6 +49,12 @@ const warnedExpressionParseErrors = new Set<string>()
 export interface LogicNodeEvaluatorContext {
   cueId: string
   /**
+   * Which domain the running cue belongs to, so `cue-data` resolves against the right family's
+   * extractor. Required, because a default would quietly resolve one family's frame through the
+   * other's extractor.
+   */
+  mode: NodeCueMode
+  /**
    * Required for light-dependent logic (`config-data`, ring/`all-lights-array`). A graph that drives
    * no lights passes it undefined; those logic types throw a clear error if used in such a graph.
    */
@@ -71,7 +78,7 @@ export function evaluateLogicNode(
   context: ExecutionContext,
   evaluatorContext: LogicNodeEvaluatorContext,
 ): string[] {
-  const { cueId, lightManager, cueLevelVarStore, groupLevelVarStore, variableDefinitions } =
+  const { cueId, mode, lightManager, cueLevelVarStore, groupLevelVarStore, variableDefinitions } =
     evaluatorContext
 
   const getVarStore = (varName: string) =>
@@ -376,7 +383,7 @@ export function evaluateLogicNode(
         return Number.isFinite(n) ? n : dflt
       }
 
-      const bpm = Number(extractCueDataValue('bpm', context.cueData, cueId))
+      const bpm = Number(extractCueDataValue('bpm', context.cueData, cueId, mode))
       const beatMsRaw =
         bpm > 0
           ? Math.round(60000 / bpm)
@@ -424,7 +431,7 @@ export function evaluateLogicNode(
     }
 
     case 'cue-data': {
-      const value = extractCueDataValue(logicNode.dataProperty, context.cueData, cueId)
+      const value = extractCueDataValue(logicNode.dataProperty, context.cueData, cueId, mode)
 
       if (logicNode.assignTo) {
         const varStore = getVarStore(logicNode.assignTo)

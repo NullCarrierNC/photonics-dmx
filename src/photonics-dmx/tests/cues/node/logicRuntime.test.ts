@@ -191,7 +191,7 @@ describe('Node cue logic runtime', () => {
       layout: { nodePositions: {} },
     }
 
-    const compiled = NodeCueCompiler.compileYargCue(definition)
+    const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
     const cue = new YargNodeCue('group-1', compiled)
 
     const addEffect = jest.fn()
@@ -317,7 +317,7 @@ describe('Node cue logic runtime', () => {
       layout: { nodePositions: {} },
     }
 
-    const compiled = NodeCueCompiler.compileYargCue(definition)
+    const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
     const cue = new YargNodeCue('group-1', compiled)
     const { sequencer, lightManager, buildEffectSpy } = setupEffectMocks()
 
@@ -393,7 +393,7 @@ describe('Node cue logic runtime', () => {
           { name: 'out', type: 'light-array', scope: 'cue', initialValue: [] },
         ],
       }
-      const compiled = NodeCueCompiler.compileYargCue(definition)
+      const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         definition.id,
@@ -471,7 +471,7 @@ describe('Node cue logic runtime', () => {
           { name: 'out', type: 'light-array', scope: 'cue', initialValue: [] },
         ],
       }
-      const compiled = NodeCueCompiler.compileYargCue(definition)
+      const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         definition.id,
@@ -547,7 +547,7 @@ describe('Node cue logic runtime', () => {
           { name: 'ringGroupSize', type: 'number', scope: 'cue', initialValue: 1 },
         ],
       }
-      const compiled = NodeCueCompiler.compileYargCue(definition)
+      const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         definition.id,
@@ -713,7 +713,7 @@ describe('Node cue logic runtime', () => {
         ],
         variables: [{ name: 'r', type: 'number', scope: 'cue', initialValue: 0 }],
       }
-      const compiled = NodeCueCompiler.compileYargCue(definition)
+      const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         definition.id,
@@ -780,7 +780,7 @@ describe('Node cue logic runtime', () => {
         ],
         variables: [{ name: 'r', type: 'number', scope: 'cue', initialValue: 0 }],
       }
-      const compiled = NodeCueCompiler.compileYargCue(definition)
+      const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         definition.id,
@@ -840,7 +840,7 @@ describe('Node cue logic runtime', () => {
         ],
         variables: [{ name: 'r', type: 'string', scope: 'cue', initialValue: '' }],
       }
-      const compiled = NodeCueCompiler.compileYargCue(definition)
+      const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         definition.id,
@@ -920,7 +920,7 @@ describe('Node cue logic runtime', () => {
           { name: 'picked', type: 'light-array', scope: 'cue', initialValue: [] },
         ],
       }
-      const compiled = NodeCueCompiler.compileYargCue(definition)
+      const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         definition.id,
@@ -986,7 +986,7 @@ describe('Node cue logic runtime', () => {
           { from: 'dbg1', to: 'action1' },
         ],
       }
-      const compiled = NodeCueCompiler.compileYargCue(definition)
+      const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         definition.id,

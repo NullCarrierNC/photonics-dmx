@@ -2,16 +2,11 @@
  * Policy that parameterizes GraphExecutionEngine behaviour for cue graphs vs effect graphs.
  */
 
-import type { BaseEventNode, NetEventNode } from '../../types/nodeCueTypes'
+import type { BaseEventNode, NetEventNode, NodeCueMode } from '../../types/nodeCueTypes'
 import type { CompiledYargCue } from '../compiler/NodeCueCompiler'
 import type { CompiledEffect } from '../compiler/EffectCompiler'
 import type { CueData } from '../../types/cueTypes'
-import {
-  isInstrumentEventTriggered,
-  isVocalActive,
-  isLedOn,
-  ledBankNibbleAt,
-} from '../../types/cueTypes'
+import { getCueDomain } from '../../domains'
 
 /** Cue data or effect parameter payload. */
 export type ExecutionParameters = CueData | Record<string, unknown>
@@ -26,75 +21,17 @@ export type ExecutionParameters = CueData | Record<string, unknown>
  * bank-colour change; it defaults off, so a caller with no node keeps plain on/off edge semantics.
  */
 export function evaluateEventCondition(
+  mode: NodeCueMode,
   eventType: string,
   cueData: CueData,
   triggerOnColorChange = false,
 ): boolean {
-  if (eventType === 'measure') {
-    return cueData.beat === 'Measure'
-  }
-  if (eventType === 'beat') {
-    return cueData.beat === 'Strong' || cueData.beat === 'Weak' || cueData.beat === 'Measure'
-  }
-  if (eventType === 'half-beat') {
-    return cueData.beat === 'Strong' || cueData.beat === 'Weak'
-  }
-  if (eventType === 'keyframe') {
-    return (
-      cueData.keyframe === 'First' || cueData.keyframe === 'Next' || cueData.keyframe === 'Previous'
-    )
-  }
-  if (eventType === 'keyframe-first') return cueData.keyframe === 'First'
-  if (eventType === 'keyframe-next') return cueData.keyframe === 'Next'
-  if (eventType === 'keyframe-previous') return cueData.keyframe === 'Previous'
-  // Vocal events are edge-triggered: compare singing state against the previous frame
-  // (stamped by CueHandler.addHistoryToCueData) so each node fires once per edge.
-  // A missing previousFrame (first frame of the cue) counts as not-singing. When a strobe
-  // is active these edges fire only in the primary cue's graph: handleCue updates the
-  // previous-frame snapshot on the primary call, so the strobe slot sees prev == current.
-  if (eventType === 'vocal-note') {
-    return isVocalActive(cueData) && !isVocalActive(cueData.previousFrame ?? {})
-  }
-  if (eventType === 'vocal-note-off') {
-    return !isVocalActive(cueData) && isVocalActive(cueData.previousFrame ?? {})
-  }
-  // RB3 StageKit LED position edges, matched like vocal events against the previous frame.
-  // LED bank state persists between packets, so a level trigger would re-fire every frame; the
-  // edge fires once when the aggregate (any-bank) position lights up (led-N) or clears (led-N-off).
-  const ledMatch = /^led-([1-8])(-off)?$/.exec(eventType)
-  if (ledMatch) {
-    const idx = Number(ledMatch[1]) - 1
-    const now = isLedOn(cueData, idx)
-    const prev = isLedOn(cueData.previousFrame ?? {}, idx)
-    if (ledMatch[2]) return !now && prev // led-N-off: clears the aggregate position
-    if (now && !prev) return true // on-edge: the position just lit up
-    // Opt-in colour change: the position stays lit but the banks lighting it changed. Lets
-    // sweeps/flashes fire on lighting that holds all LEDs on and only swaps colours.
-    if (now && prev && triggerOnColorChange) {
-      return ledBankNibbleAt(cueData, idx) !== ledBankNibbleAt(cueData.previousFrame ?? {}, idx)
-    }
+  // The entry-only events depend on session state rather than cueData, so they are answered here
+  // rather than by a domain: no family gate can decide them from a frame alone.
+  if (eventType === 'cue-started' || eventType === 'cue-called') {
     return false
   }
-  if (eventType === 'fog-on') {
-    return cueData.fogState === true && (cueData.previousFrame?.fogState ?? false) === false
-  }
-  if (eventType === 'fog-off') {
-    return cueData.fogState === false && (cueData.previousFrame?.fogState ?? false) === true
-  }
-  // Instrument note events are edge-triggered against the previous frame like the vocal and LED
-  // edges above: a note held across keepalive frames fires once, on the frame it arrives.
-  const instrumentResult = isInstrumentEventTriggered(
-    eventType,
-    cueData.guitarNotes,
-    cueData.bassNotes,
-    cueData.keysNotes,
-    cueData.drumNotes,
-    cueData.previousFrame,
-  )
-  if (instrumentResult !== null) {
-    return instrumentResult
-  }
-  return false
+  return getCueDomain(mode).isEventTriggered(eventType, cueData, triggerOnColorChange)
 }
 
 /**
@@ -161,7 +98,7 @@ function cueLikeGraphPolicy(
         if (eventType === 'cue-called') {
           return true
         }
-        return evaluateEventCondition(eventType, cueData, event.triggerOnColorChange)
+        return evaluateEventCondition(cue.mode, eventType, cueData, event.triggerOnColorChange)
       }
 
       const events = Array.from(cue.eventMap.values())

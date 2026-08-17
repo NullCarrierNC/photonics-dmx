@@ -14,6 +14,7 @@ import type {
   AudioEventNode,
   AudioLightingNodeCueDefinition,
   LogicNode,
+  AudioEventNodeUnion,
 } from '../../../../cues/types/nodeCueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
@@ -154,7 +155,7 @@ describe('AudioNodeCue level mode', () => {
       layout: { nodePositions: {} },
     } as unknown as AudioLightingNodeCueDefinition
 
-    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
     const cue = new AudioNodeCue('g1', compiled)
     const buildEffectSpy = jest.spyOn(ActionEffectFactory, 'buildEffect')
 
@@ -186,7 +187,7 @@ describe('AudioNodeCue level mode', () => {
       layout: { nodePositions: {} },
     } as unknown as AudioLightingNodeCueDefinition
 
-    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
     const cue = new AudioNodeCue('g1', compiled)
 
     await cue.execute(audioCueData(0.5), sequencer, lightManager)
@@ -237,7 +238,7 @@ describe('AudioNodeCue level mode', () => {
       layout: { nodePositions: {} },
     } as unknown as AudioLightingNodeCueDefinition
 
-    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
     const cue = new AudioNodeCue('g1', compiled)
 
     await cue.execute(audioCueData(0.5), sequencer, lightManager)
@@ -277,7 +278,7 @@ describe('AudioNodeCue level mode', () => {
       layout: { nodePositions: {} },
     } as unknown as AudioLightingNodeCueDefinition
 
-    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
     const cue = new AudioNodeCue('g1', compiled, undefined, broadcaster)
 
     await expect(cue.execute(audioCueData(0.5), sequencer, lightManager)).resolves.toBeUndefined()

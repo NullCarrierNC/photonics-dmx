@@ -108,7 +108,7 @@ const diamondCue: NetNodeCueDefinition = {
 
 function countSubmissionsForNodeC(revisitPolicy: RevisitPolicy): number {
   const sequencer = makeMockSequencer()
-  const compiled = NodeCueCompiler.compileYargCue(diamondCue)
+  const compiled = NodeCueCompiler.compileCue(diamondCue, 'yarg')
   const engine = new NodeExecutionEngine(
     compiled,
     'group:revisit-cue',

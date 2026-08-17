@@ -11,6 +11,8 @@ import {
   NodeCueFile,
   NodeCueMode,
   NetNodeCueFile,
+  NetEventNode,
+  AudioEventNodeUnion,
 } from '../../types/nodeCueTypes'
 import { NodeCueCompilationError, NodeCueCompiler } from '../compiler/NodeCueCompiler'
 import { CueRegistry } from '../../registries/CueRegistry'
@@ -311,7 +313,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
           )
         }
         try {
-          const compiled = NodeCueCompiler.compileYargCue(cue)
+          const compiled = NodeCueCompiler.compileCue<NetEventNode>(cue, file.mode)
           compiled.groupVariables = file.group.variables ?? []
           const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg')
           const callbacks = this.options.getNodeRuntimeCallbacks?.()
@@ -338,7 +340,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
           )
         }
         try {
-          const compiled = NodeCueCompiler.compileYargCue(cue)
+          const compiled = NodeCueCompiler.compileCue<NetEventNode>(cue, file.mode)
           compiled.groupVariables = file.group.variables ?? []
           const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg')
           const callbacks = this.options.getNodeRuntimeCallbacks?.()
@@ -394,7 +396,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
           )
         }
         try {
-          const compiled = NodeCueCompiler.compileAudioCue(cue)
+          const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')
           compiled.groupVariables = file.group.variables ?? []
           const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio')
           cueMap.set(
@@ -419,7 +421,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
           )
         }
         try {
-          const compiled = NodeCueCompiler.compileAudioCue(cue)
+          const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')
           compiled.groupVariables = file.group.variables ?? []
           const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio')
           motionMap.set(

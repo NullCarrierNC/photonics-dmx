@@ -87,6 +87,7 @@ describe('Effect runtime with real Sequencer', () => {
       noopRuntimeBroadcaster(),
       { colorParam: 'green' },
       createCueData(),
+      { callerMode: 'yarg' },
     )
 
     engine.triggerEffect(createCueData())
@@ -160,6 +161,7 @@ describe('Effect runtime with real Sequencer', () => {
       noopRuntimeBroadcaster(),
       { startDelay: 30 },
       createCueData(),
+      { callerMode: 'yarg' },
     )
 
     engine.triggerEffect(createCueData())
@@ -238,6 +240,7 @@ describe('Effect runtime with real Sequencer', () => {
       noopRuntimeBroadcaster(),
       { fadeDuration: 40 },
       createCueData(),
+      { callerMode: 'yarg' },
     )
 
     engine.triggerEffect(createCueData())
@@ -327,6 +330,7 @@ describe('Effect runtime with real Sequencer', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       engine.triggerEffect(createCueData())
@@ -428,6 +432,7 @@ describe('Effect runtime with real Sequencer', () => {
       noopRuntimeBroadcaster(),
       {},
       createCueData(),
+      { callerMode: 'yarg' },
     )
 
     engine.triggerEffect(createCueData())
@@ -510,6 +515,7 @@ describe('Effect runtime with real Sequencer', () => {
       noopRuntimeBroadcaster(),
       { targetLights: selectedLights },
       createCueData(),
+      { callerMode: 'yarg' },
     )
 
     engine.triggerEffect(createCueData())
@@ -603,6 +609,7 @@ describe('Effect runtime with real Sequencer', () => {
       noopRuntimeBroadcaster(),
       { colorName: 'red', brightness: 'max', blendMode: 'add' },
       createCueData(),
+      { callerMode: 'yarg' },
     )
 
     engine.triggerEffect(createCueData())
@@ -673,6 +680,7 @@ describe('Effect runtime with real Sequencer', () => {
       noopRuntimeBroadcaster(),
       {},
       createCueData(),
+      { callerMode: 'yarg' },
     )
 
     engine.triggerEffect(createCueData())

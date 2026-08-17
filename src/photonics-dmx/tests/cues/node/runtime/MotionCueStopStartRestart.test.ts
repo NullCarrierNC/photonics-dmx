@@ -21,6 +21,7 @@ import { createMockLightingConfig } from '../../../helpers/testFixtures'
 import type { CueData } from '../../../../cues/types/cueTypes'
 import type { AudioCueData } from '../../../../cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
+import type { AudioEventNodeUnion } from '../../../../cues/types/nodeCueTypes'
 
 function minimalYargCueData(overrides?: Partial<CueData>): CueData {
   return {
@@ -163,7 +164,7 @@ describe('YargMotionNodeCue stop/start variable lifecycle', () => {
   it('second activation after onStop does not reach motion-pattern when cue-started is missing (tick uninitialized)', () => {
     const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
     try {
-      const compiled = NodeCueCompiler.compileYargCue(yargMotionWithoutCueStarted())
+      const compiled = NodeCueCompiler.compileCue(yargMotionWithoutCueStarted(), 'yarg')
       const cue = new YargMotionNodeCue('g1', compiled)
       const data = minimalYargCueData()
       cue.execute(data, sequencer, lightManager)
@@ -177,7 +178,7 @@ describe('YargMotionNodeCue stop/start variable lifecycle', () => {
   })
 
   it('second activation after onStop runs motion-pattern when cue-started re-inits tick', () => {
-    const compiled = NodeCueCompiler.compileYargCue(yargMotionWithCueStarted())
+    const compiled = NodeCueCompiler.compileCue(yargMotionWithCueStarted(), 'yarg')
     const cue = new YargMotionNodeCue('g1', compiled)
     const data = minimalYargCueData()
     cue.execute(data, sequencer, lightManager)
@@ -266,7 +267,10 @@ describe('AudioMotionNodeCue stop/start variable lifecycle', () => {
   })
 
   it('second activation after onStop runs cue-started then cue-called (motion-pattern twice)', async () => {
-    const compiled = NodeCueCompiler.compileAudioCue(audioMotionWithCueStarted())
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(
+      audioMotionWithCueStarted(),
+      'audio',
+    )
     const cue = new AudioMotionNodeCue('g1', compiled)
     const data: AudioCueData = {
       timestamp: 0,

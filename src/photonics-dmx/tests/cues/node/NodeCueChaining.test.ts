@@ -78,7 +78,7 @@ describe('Node cue chaining', () => {
       ],
     }
 
-    const compiled = NodeCueCompiler.compileYargCue(definition)
+    const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
     const cue = new YargNodeCue('group-1', compiled)
 
     const frontLight: TrackedLight = { id: 'front-1', position: 0 }
