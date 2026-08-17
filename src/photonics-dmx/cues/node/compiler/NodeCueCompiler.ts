@@ -40,6 +40,15 @@ export interface CompiledNodeCue<TEvent extends BaseEventNode> extends CompiledG
   mode: NodeCueMode
 }
 
+/**
+ * How a cue definition is addressed: a lighting cue by whichever key its family uses, a motion cue by
+ * its own id. Used where a cue has to be named without knowing which family it came from.
+ */
+export function cueKeyOf(definition: NetNodeCueDefinition | AudioNodeCueDefinition): string {
+  if (definition.kind !== 'lighting') return definition.id
+  return 'cueType' in definition ? definition.cueType : definition.cueTypeId
+}
+
 export type CompiledYargCue = CompiledNodeCue<NetEventNode>
 export type CompiledAudioCue = CompiledNodeCue<AudioEventNodeUnion>
 
@@ -105,14 +114,8 @@ export class NodeCueCompiler extends AbstractGraphBuilder {
       !eventListeners.length &&
       !effectRaisers.length
     ) {
-      const cueId =
-        definition.kind === 'lighting'
-          ? 'cueType' in definition
-            ? definition.cueType
-            : definition.cueTypeId
-          : definition.id
       throw new NodeCueCompilationError(
-        `At least one action, event raiser, event listener, or effect raiser node is required. Cue '${definition.name}' (${cueId}) has none.`,
+        `At least one action, event raiser, event listener, or effect raiser node is required. Cue '${definition.name}' (${cueKeyOf(definition)}) has none.`,
       )
     }
 

@@ -1,4 +1,4 @@
-import { DefinedError } from 'ajv'
+import type { DefinedError, ValidateFunction } from 'ajv'
 import { validateAudioSchema, validateRb3Schema, validateYargSchema } from './cueFiles'
 import { validateAudioEffectSchema, validateYargEffectSchema } from './effectFiles'
 import {
@@ -26,9 +26,6 @@ import type {
 import type { EffectMode } from '../../types/nodeCueTypes'
 import type { StructuredValidationError } from './helpers'
 
-// Re-export public schema surface for call sites that need compiled validators
-export { validateYargSchema, validateAudioSchema, validateRb3Schema } from './cueFiles'
-export { validateYargEffectSchema, validateAudioEffectSchema } from './effectFiles'
 export type { StructuredValidationError } from './helpers'
 
 export interface NodeCueValidationSuccess<T extends NodeCueFile> {
@@ -48,20 +45,45 @@ export type NodeCueValidationResult<T extends NodeCueFile = NodeCueFile> =
   | NodeCueValidationSuccess<T>
   | NodeCueValidationFailure
 
-export const validateYargNodeCueFile = (
+/**
+ * The per-mode parts of cue-file validation. Everything else (group and cue variable names, cycle
+ * detection, conditional valid-values, duplicate keys) is identical across modes and lives in
+ * {@link validateCueFileForMode}.
+ */
+interface CueFileValidationSpec<T extends NodeCueFile> {
+  mode: NodeCueMode
+  /** Migrations and defaulting applied before the envelope is checked. */
+  prepare: (value: unknown) => unknown
+  validate: ValidateFunction
+  /** How a lighting cue of this mode is keyed, and how a clash reads. */
+  lightingKey: (cue: T['cues'][number]) => string
+  duplicateLightingMessage: (key: string, groupName: string) => string
+  duplicateMotionMessage: (id: string, groupName: string) => string
+}
+
+/** Semantic checks registered by a build that ships its own cue kind. */
+type CueSemanticCheck = (file: NodeCueFile, errors: string[]) => void
+const semanticChecks: CueSemanticCheck[] = []
+
+export function registerCueSemanticCheck(check: CueSemanticCheck): void {
+  semanticChecks.push(check)
+}
+
+function validateCueFileForMode<T extends NodeCueFile>(
+  spec: CueFileValidationSpec<T>,
   value: unknown,
-): NodeCueValidationResult<NetNodeCueFile> => {
-  const migrated = migrateEasingInNodeCueFile(value)
-  if (!validateYargSchema(migrated)) {
+): NodeCueValidationResult<T> {
+  const migrated = spec.prepare(value)
+  if (!spec.validate(migrated)) {
     return {
       valid: false,
-      errors: formatErrors(validateYargSchema.errors as DefinedError[]),
-      structuredErrors: extractStructuredErrors(validateYargSchema.errors as DefinedError[]),
+      errors: formatErrors(spec.validate.errors as DefinedError[]),
+      structuredErrors: extractStructuredErrors(spec.validate.errors as DefinedError[]),
     }
   }
 
   const semanticErrors: string[] = []
-  const fileData = migrated as NetNodeCueFile
+  const fileData = migrated as T
 
   // Check for duplicate group-level variable names
   const groupVariables = fileData.group.variables ?? []
@@ -73,19 +95,18 @@ export const validateYargNodeCueFile = (
     groupVarNames.add(varDef.name)
   }
 
-  const seenLightingCueTypes = new Set<string>()
+  const seenLightingKeys = new Set<string>()
   const seenMotionCueIds = new Set<string>()
   for (const cue of fileData.cues) {
     if (cue.kind === 'lighting') {
-      if (seenLightingCueTypes.has(cue.cueType)) {
-        semanticErrors.push(`Duplicate cueType '${cue.cueType}' in group '${fileData.group.name}'.`)
+      const key = spec.lightingKey(cue as T['cues'][number])
+      if (seenLightingKeys.has(key)) {
+        semanticErrors.push(spec.duplicateLightingMessage(key, fileData.group.name))
       }
-      seenLightingCueTypes.add(cue.cueType)
+      seenLightingKeys.add(key)
     } else {
       if (seenMotionCueIds.has(cue.id)) {
-        semanticErrors.push(
-          `Duplicate motion cue id '${cue.id}' in motion group '${fileData.group.name}'.`,
-        )
+        semanticErrors.push(spec.duplicateMotionMessage(cue.id, fileData.group.name))
       }
       seenMotionCueIds.add(cue.id)
     }
@@ -116,85 +137,8 @@ export const validateYargNodeCueFile = (
     checkConditionalValidValues(cue.name, 'cue', cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
   }
 
-  if (semanticErrors.length > 0) {
-    return {
-      valid: false,
-      errors: semanticErrors,
-    }
-  }
-
-  return {
-    valid: true,
-    data: fileData,
-    errors: [],
-    mode: 'yarg',
-  }
-}
-
-export const validateRb3NodeCueFile = (value: unknown): NodeCueValidationResult<NetNodeCueFile> => {
-  const migrated = migrateEasingInNodeCueFile(value)
-  if (!validateRb3Schema(migrated)) {
-    return {
-      valid: false,
-      errors: formatErrors(validateRb3Schema.errors as DefinedError[]),
-      structuredErrors: extractStructuredErrors(validateRb3Schema.errors as DefinedError[]),
-    }
-  }
-
-  const semanticErrors: string[] = []
-  const fileData = migrated as NetNodeCueFile
-
-  // Check for duplicate group-level variable names
-  const groupVariables = fileData.group.variables ?? []
-  const groupVarNames = new Set<string>()
-  for (const varDef of groupVariables) {
-    if (groupVarNames.has(varDef.name)) {
-      semanticErrors.push(`Duplicate group-level variable name: '${varDef.name}'`)
-    }
-    groupVarNames.add(varDef.name)
-  }
-
-  const seenLightingCueTypes = new Set<string>()
-  const seenMotionCueIds = new Set<string>()
-  for (const cue of fileData.cues) {
-    if (cue.kind === 'lighting') {
-      if (seenLightingCueTypes.has(cue.cueType)) {
-        semanticErrors.push(`Duplicate cueType '${cue.cueType}' in group '${fileData.group.name}'.`)
-      }
-      seenLightingCueTypes.add(cue.cueType)
-    } else {
-      if (seenMotionCueIds.has(cue.id)) {
-        semanticErrors.push(
-          `Duplicate motion cue id '${cue.id}' in motion group '${fileData.group.name}'.`,
-        )
-      }
-      seenMotionCueIds.add(cue.id)
-    }
-  }
-
-  for (const cue of fileData.cues) {
-    // Check for duplicate cue-level variable names
-    const cueVariables = cue.variables ?? []
-    const cueVarNames = new Set<string>()
-    for (const varDef of cueVariables) {
-      if (cueVarNames.has(varDef.name)) {
-        semanticErrors.push(
-          `cue '${cue.name}': Duplicate cue-level variable name: '${varDef.name}'`,
-        )
-      }
-      cueVarNames.add(varDef.name)
-    }
-
-    // Check for circular dependencies (only logic-only cycles are invalid)
-    const logicIds = new Set((cue.nodes.logic ?? []).map((node) => node.id))
-    const actionIds = new Set(cue.nodes.actions.map((a) => a.id))
-    const nonEventIds = new Set<string>([...logicIds, ...actionIds])
-    const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds)
-    semanticErrors.push(...cycleErrors.map((e) => `cue '${cue.name}': ${e}`))
-
-    // Check conditional nodes: literal vs variable validValues
-    const cueVarDefs: VariableDefinition[] = [...groupVariables, ...cueVariables]
-    checkConditionalValidValues(cue.name, 'cue', cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
+  for (const check of semanticChecks) {
+    check(fileData, semanticErrors)
   }
 
   if (semanticErrors.length > 0) {
@@ -208,92 +152,59 @@ export const validateRb3NodeCueFile = (value: unknown): NodeCueValidationResult<
     valid: true,
     data: fileData,
     errors: [],
-    mode: 'rb3',
+    mode: spec.mode,
   }
 }
+
+/** A net lighting cue is keyed by its CueType, an audio one by its own cue-type id. */
+const netLightingKey = (cue: NetNodeCueFile['cues'][number]): string =>
+  cue.kind === 'lighting' ? cue.cueType : cue.id
+const audioLightingKey = (cue: AudioNodeCueFile['cues'][number]): string =>
+  cue.kind === 'lighting' ? cue.cueTypeId : cue.id
+
+export const validateYargNodeCueFile = (value: unknown): NodeCueValidationResult<NetNodeCueFile> =>
+  validateCueFileForMode<NetNodeCueFile>(
+    {
+      mode: 'yarg',
+      prepare: migrateEasingInNodeCueFile,
+      validate: validateYargSchema,
+      lightingKey: netLightingKey,
+      duplicateLightingMessage: (key, group) => `Duplicate cueType '${key}' in group '${group}'.`,
+      duplicateMotionMessage: (id, group) =>
+        `Duplicate motion cue id '${id}' in motion group '${group}'.`,
+    },
+    value,
+  )
+
+export const validateRb3NodeCueFile = (value: unknown): NodeCueValidationResult<NetNodeCueFile> =>
+  validateCueFileForMode<NetNodeCueFile>(
+    {
+      mode: 'rb3',
+      prepare: migrateEasingInNodeCueFile,
+      validate: validateRb3Schema,
+      lightingKey: netLightingKey,
+      duplicateLightingMessage: (key, group) => `Duplicate cueType '${key}' in group '${group}'.`,
+      duplicateMotionMessage: (id, group) =>
+        `Duplicate motion cue id '${id}' in motion group '${group}'.`,
+    },
+    value,
+  )
 
 export const validateAudioNodeCueFile = (
   value: unknown,
-): NodeCueValidationResult<AudioNodeCueFile> => {
-  const migrated = prepareAudioNodeCueFileForValidation(value)
-  if (!validateAudioSchema(migrated)) {
-    return {
-      valid: false,
-      errors: formatErrors(validateAudioSchema.errors as DefinedError[]),
-      structuredErrors: extractStructuredErrors(validateAudioSchema.errors as DefinedError[]),
-    }
-  }
-
-  const semanticErrors: string[] = []
-  const data = migrated as AudioNodeCueFile
-
-  // Check for duplicate group-level variable names
-  const groupVariables = data.group.variables ?? []
-  const groupVarNames = new Set<string>()
-  for (const varDef of groupVariables) {
-    if (groupVarNames.has(varDef.name)) {
-      semanticErrors.push(`Duplicate group-level variable name: '${varDef.name}'`)
-    }
-    groupVarNames.add(varDef.name)
-  }
-
-  const seenAudioCueTypeIds = new Set<string>()
-  const seenAudioMotionIds = new Set<string>()
-  for (const cue of data.cues) {
-    if (cue.kind === 'lighting') {
-      if (seenAudioCueTypeIds.has(cue.cueTypeId)) {
-        semanticErrors.push(
-          `Duplicate audio cue id '${cue.cueTypeId}' in group '${data.group.name}'.`,
-        )
-      }
-      seenAudioCueTypeIds.add(cue.cueTypeId)
-    } else {
-      if (seenAudioMotionIds.has(cue.id)) {
-        semanticErrors.push(`Duplicate motion cue id '${cue.id}' in group '${data.group.name}'.`)
-      }
-      seenAudioMotionIds.add(cue.id)
-    }
-  }
-
-  for (const cue of data.cues) {
-    // Check for duplicate cue-level variable names
-    const cueVariables = cue.variables ?? []
-    const cueVarNames = new Set<string>()
-    for (const varDef of cueVariables) {
-      if (cueVarNames.has(varDef.name)) {
-        semanticErrors.push(
-          `cue '${cue.name}': Duplicate cue-level variable name: '${varDef.name}'`,
-        )
-      }
-      cueVarNames.add(varDef.name)
-    }
-
-    // Check for circular dependencies (only logic-only cycles are invalid)
-    const logicIds = new Set((cue.nodes.logic ?? []).map((node) => node.id))
-    const actionIds = new Set(cue.nodes.actions.map((a) => a.id))
-    const nonEventIds = new Set<string>([...logicIds, ...actionIds])
-    const cycleErrors = detectCycles(cue.connections, nonEventIds, actionIds)
-    semanticErrors.push(...cycleErrors.map((e) => `cue '${cue.name}': ${e}`))
-
-    // Check conditional nodes: literal vs variable validValues
-    const cueVarDefs: VariableDefinition[] = [...groupVariables, ...cueVariables]
-    checkConditionalValidValues(cue.name, 'cue', cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
-  }
-
-  if (semanticErrors.length > 0) {
-    return {
-      valid: false,
-      errors: semanticErrors,
-    }
-  }
-
-  return {
-    valid: true,
-    data,
-    errors: [],
-    mode: 'audio',
-  }
-}
+): NodeCueValidationResult<AudioNodeCueFile> =>
+  validateCueFileForMode<AudioNodeCueFile>(
+    {
+      mode: 'audio',
+      prepare: prepareAudioNodeCueFileForValidation,
+      validate: validateAudioSchema,
+      lightingKey: audioLightingKey,
+      duplicateLightingMessage: (key, group) =>
+        `Duplicate audio cue id '${key}' in group '${group}'.`,
+      duplicateMotionMessage: (id, group) => `Duplicate motion cue id '${id}' in group '${group}'.`,
+    },
+    value,
+  )
 
 export const validateNodeCueFile = (value: unknown): NodeCueValidationResult => {
   if (!value || typeof value !== 'object') {
@@ -362,60 +273,15 @@ const checkEffectSemantics = (effect: EffectDefinition, semanticErrors: string[]
 /**
  * Validate YARG Effect File (schema + semantic, parity with cue validation).
  */
-export const validateYargEffectFile = (value: unknown): EffectValidationResult<YargEffectFile> => {
-  if (!value || typeof value !== 'object') {
-    return {
-      valid: false,
-      errors: ['Effect file must be a JSON object'],
-    }
-  }
-
-  const migrated = migrateEasingInEffectFile(value)
-  if (!validateYargEffectSchema(migrated)) {
-    return {
-      valid: false,
-      errors: formatErrors(validateYargEffectSchema.errors as DefinedError[]),
-      mode: 'yarg',
-    }
-  }
-
-  const file = migrated as YargEffectFile
-  const semanticErrors: string[] = []
-
-  const effectIds = new Set<string>()
-  for (const effect of file.effects) {
-    if (effectIds.has(effect.id)) {
-      semanticErrors.push(`Duplicate effect id: '${effect.id}'`)
-    }
-    effectIds.add(effect.id)
-  }
-
-  for (const effect of file.effects) {
-    checkEffectSemantics(effect, semanticErrors)
-  }
-
-  if (semanticErrors.length > 0) {
-    return {
-      valid: false,
-      errors: semanticErrors,
-      mode: 'yarg',
-    }
-  }
-
-  return {
-    valid: true,
-    data: file,
-    errors: [],
-    mode: 'yarg',
-  }
-}
-
 /**
- * Validate Audio Effect File (schema + semantic, parity with YARG effect validation).
+ * Effect-file validation, shared by the two effect trees. They differ only by which schema checks the
+ * envelope and which mode the result reports.
  */
-export const validateAudioEffectFile = (
+function validateEffectFileForMode<T extends EffectFile>(
+  mode: EffectMode,
+  validate: ValidateFunction,
   value: unknown,
-): EffectValidationResult<AudioEffectFile> => {
+): EffectValidationResult<T> {
   if (!value || typeof value !== 'object') {
     return {
       valid: false,
@@ -424,15 +290,15 @@ export const validateAudioEffectFile = (
   }
 
   const migrated = migrateEasingInEffectFile(value)
-  if (!validateAudioEffectSchema(migrated)) {
+  if (!validate(migrated)) {
     return {
       valid: false,
-      errors: formatErrors(validateAudioEffectSchema.errors as DefinedError[]),
-      mode: 'audio',
+      errors: formatErrors(validate.errors as DefinedError[]),
+      mode,
     }
   }
 
-  const file = migrated as AudioEffectFile
+  const file = migrated as T
   const semanticErrors: string[] = []
 
   const effectIds = new Set<string>()
@@ -451,7 +317,7 @@ export const validateAudioEffectFile = (
     return {
       valid: false,
       errors: semanticErrors,
-      mode: 'audio',
+      mode,
     }
   }
 
@@ -459,13 +325,16 @@ export const validateAudioEffectFile = (
     valid: true,
     data: file,
     errors: [],
-    mode: 'audio',
+    mode,
   }
 }
 
-/**
- * Validate Effect File (auto-detects mode)
- */
+export const validateYargEffectFile = (value: unknown): EffectValidationResult<YargEffectFile> =>
+  validateEffectFileForMode<YargEffectFile>('yarg', validateYargEffectSchema, value)
+
+export const validateAudioEffectFile = (value: unknown): EffectValidationResult<AudioEffectFile> =>
+  validateEffectFileForMode<AudioEffectFile>('audio', validateAudioEffectSchema, value)
+
 export const validateEffectFile = (value: unknown): EffectValidationResult => {
   if (!value || typeof value !== 'object') {
     return {
