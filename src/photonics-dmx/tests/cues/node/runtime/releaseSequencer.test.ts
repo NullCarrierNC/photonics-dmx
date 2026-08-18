@@ -7,8 +7,8 @@ import { describe, expect, it, jest } from '@jest/globals'
 
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import { monotonicNowMs } from '../../../../../shared/time'
-import { YargNodeCue } from '../../../../cues/node/runtime/YargNodeCue'
-import { YargMotionNodeCue } from '../../../../cues/node/runtime/YargMotionNodeCue'
+import { LightingNodeCue } from '../../../../cues/node/runtime/LightingNodeCue'
+import { MotionNodeCue } from '../../../../cues/node/runtime/MotionNodeCue'
 import { AudioNodeCue } from '../../../../cues/node/runtime/AudioNodeCue'
 import type {
   ActionNode,
@@ -196,9 +196,9 @@ function trivialAudioLightingCueDef(): AudioLightingNodeCueDefinition {
 describe('releaseSequencer drops per-sequencer state', () => {
   const lightManager = new DmxLightManager(createMockLightingConfig())
 
-  it('YargNodeCue: execute populates state, releaseSequencer drops it', () => {
+  it('LightingNodeCue: execute populates state, releaseSequencer drops it', () => {
     const compiled = NodeCueCompiler.compileCue(trivialYargLightingCueDef(), 'yarg')
-    const cue = new YargNodeCue('g1', compiled)
+    const cue = new LightingNodeCue('g1', compiled)
     const seqA = makeSequencerStub()
     const seqB = makeSequencerStub()
     cue.execute(minimalYargCueData(), seqA, lightManager)
@@ -217,9 +217,9 @@ describe('releaseSequencer drops per-sequencer state', () => {
     expect(states.size).toBe(0)
   })
 
-  it('YargMotionNodeCue: releaseSequencer drops per-sequencer state', () => {
+  it('MotionNodeCue: releaseSequencer drops per-sequencer state', () => {
     const compiled = NodeCueCompiler.compileCue(trivialYargMotionCueDef(), 'yarg')
-    const cue = new YargMotionNodeCue('g1', compiled)
+    const cue = new MotionNodeCue('g1', compiled)
     const seqA = makeSequencerStub()
     cue.execute(minimalYargCueData(), seqA, lightManager)
     const states = (cue as unknown as { states: Map<ILightingController, unknown> }).states
@@ -252,7 +252,7 @@ describe('releaseSequencer drops per-sequencer state', () => {
 
   it('releaseSequencer for an unknown sequencer is a safe no-op', () => {
     const compiled = NodeCueCompiler.compileCue(trivialYargLightingCueDef(), 'yarg')
-    const cue = new YargNodeCue('g1', compiled)
+    const cue = new LightingNodeCue('g1', compiled)
     const unrelated = makeSequencerStub()
     expect(() => cue.releaseSequencer(unrelated)).not.toThrow()
   })

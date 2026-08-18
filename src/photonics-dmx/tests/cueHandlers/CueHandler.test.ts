@@ -1,7 +1,7 @@
 /**
  * Regression: re-enabling YARG mid-song must replay the current cue.
  *
- * `YargNodeCue` instances are singletons in `CueRegistry`, so their
+ * `LightingNodeCue` instances are singletons in `CueRegistry`, so their
  * `CueSession` (which gates `cue-started`) survives a YARG disable. The handler's
  * shutdown must call `onStop()` on each tracked slot so the next activation can
  * fire `cue-started` from a clean state.

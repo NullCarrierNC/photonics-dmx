@@ -1,4 +1,4 @@
-import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
+import { LightingNodeCue } from '../../../cues/node/runtime/LightingNodeCue'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import { NodeExecutionEngine } from '../../../cues/node/runtime/NodeExecutionEngine'
 import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
@@ -192,7 +192,7 @@ describe('Node cue logic runtime', () => {
     }
 
     const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
-    const cue = new YargNodeCue('group-1', compiled)
+    const cue = new LightingNodeCue('group-1', compiled)
 
     const addEffect = jest.fn()
 
@@ -318,7 +318,7 @@ describe('Node cue logic runtime', () => {
     }
 
     const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
-    const cue = new YargNodeCue('group-1', compiled)
+    const cue = new LightingNodeCue('group-1', compiled)
     const { sequencer, lightManager, buildEffectSpy } = setupEffectMocks()
 
     await cue.execute({ beat: 'Strong' } as any, sequencer, lightManager)

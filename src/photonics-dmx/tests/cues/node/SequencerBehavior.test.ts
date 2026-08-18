@@ -11,7 +11,7 @@ import type {
   ActionNode,
 } from '../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../cues/types/cueTypes'
-import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
+import { LightingNodeCue } from '../../../cues/node/runtime/LightingNodeCue'
 import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
 import type { NodeRuntimeCallbacks } from '../../../cues/node/runtime/executionTypes'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
@@ -134,7 +134,7 @@ describe('Sequencer behavior', () => {
   it('cue produces expected sequencer call sequence', async () => {
     const { sequencer, recorded } = createRecordingSequencer()
     const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
-    const cue = new YargNodeCue('group1', compiledCue, new EffectRegistry(), noopCallbacks)
+    const cue = new LightingNodeCue('group1', compiledCue, new EffectRegistry(), noopCallbacks)
     const params: CueData = {
       beat: 'Strong',
       strobeState: 'Strobe_Off',
@@ -150,7 +150,7 @@ describe('Sequencer behavior', () => {
     const compiled = NodeCueCompiler.compileCue(def, 'yarg')
     const { sequencer, recorded } = createRecordingSequencer()
     const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
-    const cue = new YargNodeCue('group1', compiled, new EffectRegistry(), noopCallbacks)
+    const cue = new LightingNodeCue('group1', compiled, new EffectRegistry(), noopCallbacks)
     const params: CueData = { beat: 'Strong', strobeState: 'Strobe_Off' } as CueData
     await cue.execute(params, sequencer, lightManager)
     expect(recorded.length).toBeGreaterThan(0)

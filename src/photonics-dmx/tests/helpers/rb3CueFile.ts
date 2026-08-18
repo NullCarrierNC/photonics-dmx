@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { validateRb3NodeCueFile } from '../../cues/node/schema/validation'
 import { NodeCueCompiler } from '../../cues/node/compiler/NodeCueCompiler'
-import { YargNodeCue } from '../../cues/node/runtime/YargNodeCue'
+import { LightingNodeCue } from '../../cues/node/runtime/LightingNodeCue'
 import { EffectRegistry } from '../../cues/node/runtime/EffectRegistry'
 import { createMockCueData } from '../../../main/ipc/mockCueData'
 import { CueType } from '../../cues/types/cueTypes'
@@ -27,12 +27,12 @@ export function loadRb3CueFile(groupId: string): NetNodeCueFile {
 }
 
 /** The group's always-active gameplay cue, compiled and ready to execute. */
-export function createRb3Cue(groupId: string): YargNodeCue {
+export function createRb3Cue(groupId: string): LightingNodeCue {
   const def = loadRb3CueFile(groupId).cues.find(
     (c) => c.kind === 'lighting' && c.cueType === CueType.RB3,
   )
   if (!def) throw new Error(`${groupId}: no CueType.RB3 lighting cue`)
-  return new YargNodeCue(
+  return new LightingNodeCue(
     groupId,
     NodeCueCompiler.compileCue(def, 'rb3'),
     new EffectRegistry(),
@@ -58,7 +58,7 @@ export function rb3Frame(
  *  behind the running transition, so levels need a few frames to settle before comparing. */
 export function renderFrames(
   h: SequencerHarness,
-  cue: YargNodeCue,
+  cue: LightingNodeCue,
   banks: Partial<{ red: number; green: number; blue: number; yellow: number }>,
   frames = 6,
 ): void {

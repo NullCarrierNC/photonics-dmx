@@ -3,7 +3,7 @@ import { ExecutionContext } from '../../../cues/node/runtime/ExecutionContext'
 import { NodeCueCompiler, CompiledYargCue } from '../../../cues/node/compiler/NodeCueCompiler'
 import { EffectCompiler } from '../../../cues/node/compiler/EffectCompiler'
 import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
-import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
+import { LightingNodeCue } from '../../../cues/node/runtime/LightingNodeCue'
 import {
   NetNodeCueDefinition,
   NetEventNode,
@@ -3054,8 +3054,8 @@ describe('NodeExecutionEngine', () => {
       const compiled1 = NodeCueCompiler.compileCue(definition1, 'yarg')
       const compiled2 = NodeCueCompiler.compileCue(definition2, 'yarg')
       const registry = new EffectRegistry()
-      const cue1 = new YargNodeCue(groupId, compiled1, registry)
-      const cue2 = new YargNodeCue(groupId, compiled2, registry)
+      const cue1 = new LightingNodeCue(groupId, compiled1, registry)
+      const cue2 = new LightingNodeCue(groupId, compiled2, registry)
       const params = createCueData('Strong')
 
       await cue1.execute(params, mockSequencer, mockLightManager)

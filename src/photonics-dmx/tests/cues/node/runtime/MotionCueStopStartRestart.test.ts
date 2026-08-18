@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import { monotonicNowMs } from '../../../../../shared/time'
-import { YargMotionNodeCue } from '../../../../cues/node/runtime/YargMotionNodeCue'
+import { MotionNodeCue } from '../../../../cues/node/runtime/MotionNodeCue'
 import { AudioMotionNodeCue } from '../../../../cues/node/runtime/AudioMotionNodeCue'
 import type {
   ActionNode,
@@ -137,7 +137,7 @@ function yargMotionWithoutCueStarted(): NetMotionNodeCueDefinition {
   }
 }
 
-describe('YargMotionNodeCue stop/start variable lifecycle', () => {
+describe('MotionNodeCue stop/start variable lifecycle', () => {
   let lightManager: DmxLightManager
   let sequencer: ILightingController
 
@@ -165,7 +165,7 @@ describe('YargMotionNodeCue stop/start variable lifecycle', () => {
     const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
     try {
       const compiled = NodeCueCompiler.compileCue(yargMotionWithoutCueStarted(), 'yarg')
-      const cue = new YargMotionNodeCue('g1', compiled)
+      const cue = new MotionNodeCue('g1', compiled)
       const data = minimalYargCueData()
       cue.execute(data, sequencer, lightManager)
       expect(sequencer.addMotionPattern).toHaveBeenCalledTimes(1)
@@ -179,7 +179,7 @@ describe('YargMotionNodeCue stop/start variable lifecycle', () => {
 
   it('second activation after onStop runs motion-pattern when cue-started re-inits tick', () => {
     const compiled = NodeCueCompiler.compileCue(yargMotionWithCueStarted(), 'yarg')
-    const cue = new YargMotionNodeCue('g1', compiled)
+    const cue = new MotionNodeCue('g1', compiled)
     const data = minimalYargCueData()
     cue.execute(data, sequencer, lightManager)
     expect(sequencer.addMotionPattern).toHaveBeenCalledTimes(1)

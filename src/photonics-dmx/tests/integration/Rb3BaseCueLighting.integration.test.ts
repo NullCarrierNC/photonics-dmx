@@ -7,7 +7,7 @@
 import fs from 'fs'
 import path from 'path'
 import { createSequencerHarness } from '../helpers/sequencerHarness'
-import { YargNodeCue } from '../../cues/node/runtime/YargNodeCue'
+import { LightingNodeCue } from '../../cues/node/runtime/LightingNodeCue'
 import { EffectRegistry } from '../../cues/node/runtime/EffectRegistry'
 import { NodeCueCompiler } from '../../cues/node/compiler/NodeCueCompiler'
 import { validateRb3NodeCueFile } from '../../cues/node/schema/validation'
@@ -41,7 +41,7 @@ const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
 describe('RB3 base cue lighting', () => {
   it('renders single-bank LED masks onto the matching lights (8-light rig)', () => {
     const h = createSequencerHarness({ frontCount: 4, backCount: 4 })
-    const cue = new YargNodeCue(
+    const cue = new LightingNodeCue(
       'rb3-stagekit',
       NodeCueCompiler.compileCue(loadBaseCueDefinition(), 'rb3'),
       new EffectRegistry(),
@@ -73,7 +73,7 @@ describe('RB3 base cue lighting', () => {
 
   it('additively blends overlapping colour banks on a shared light (8-light rig)', () => {
     const h = createSequencerHarness({ frontCount: 4, backCount: 4 })
-    const cue = new YargNodeCue(
+    const cue = new LightingNodeCue(
       'rb3-stagekit',
       NodeCueCompiler.compileCue(loadBaseCueDefinition(), 'rb3'),
       new EffectRegistry(),
@@ -101,7 +101,7 @@ describe('RB3 base cue lighting', () => {
 
   it('clears a cell when its LED turns off', () => {
     const h = createSequencerHarness({ frontCount: 4, backCount: 4 })
-    const cue = new YargNodeCue(
+    const cue = new LightingNodeCue(
       'rb3-stagekit',
       NodeCueCompiler.compileCue(loadBaseCueDefinition(), 'rb3'),
       new EffectRegistry(),
@@ -127,7 +127,7 @@ describe('RB3 base cue lighting', () => {
 
   it('folds an 8-LED mask onto a 4-light rig (LED i -> light i&3)', () => {
     const h = createSequencerHarness({ frontCount: 2, backCount: 2 })
-    const cue = new YargNodeCue(
+    const cue = new LightingNodeCue(
       'rb3-stagekit',
       NodeCueCompiler.compileCue(loadBaseCueDefinition(), 'rb3'),
       new EffectRegistry(),
@@ -147,7 +147,7 @@ describe('RB3 base cue lighting', () => {
 
   it('holds a lit cell continuously across keepalive frames (no dark gap)', () => {
     const h = createSequencerHarness({ frontCount: 4, backCount: 4 })
-    const cue = new YargNodeCue(
+    const cue = new LightingNodeCue(
       'rb3-stagekit',
       NodeCueCompiler.compileCue(loadBaseCueDefinition(), 'rb3'),
       new EffectRegistry(),

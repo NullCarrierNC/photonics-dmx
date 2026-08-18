@@ -1,5 +1,5 @@
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
-import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
+import { LightingNodeCue } from '../../../cues/node/runtime/LightingNodeCue'
 import { ActionEffectFactory } from '../../../cues/node/compiler/ActionEffectFactory'
 import { NetNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
@@ -79,7 +79,7 @@ describe('Node cue chaining', () => {
     }
 
     const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
-    const cue = new YargNodeCue('group-1', compiled)
+    const cue = new LightingNodeCue('group-1', compiled)
 
     const frontLight: TrackedLight = { id: 'front-1', position: 0 }
     const backLight: TrackedLight = { id: 'back-1', position: 1 }

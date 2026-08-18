@@ -2,7 +2,7 @@ import { CueType, type MotionCueRef } from '../types/cueTypes'
 import type { MotionGroupSelectionMode } from '../types/nodeCueTypes'
 import { ICueGroup } from '../interfaces/INetCueGroup'
 import { INetCue, CueStyle } from '../interfaces/INetCue'
-import { YargMotionNodeCue } from '../node/runtime/YargMotionNodeCue'
+import { MotionNodeCue } from '../node/runtime/MotionNodeCue'
 import { MotionSelectionState } from './MotionSelectionState'
 import {
   DisabledCueStore,
@@ -1318,7 +1318,7 @@ export class CueRegistry {
   public getMotionCueDetails(groupId: string): MotionCueDetail[] {
     return motionCueDetailsFor(this.groups.get(groupId)?.motionCues, (cue) => ({
       id: cue.cueId,
-      name: cue instanceof YargMotionNodeCue ? cue.name : cue.cueId,
+      name: cue instanceof MotionNodeCue ? cue.name : cue.cueId,
       description: cue.description ?? '',
     }))
   }

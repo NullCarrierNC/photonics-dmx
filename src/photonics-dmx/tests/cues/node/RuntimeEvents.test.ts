@@ -1,7 +1,7 @@
 import { NodeExecutionEngine } from '../../../cues/node/runtime/NodeExecutionEngine'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
-import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
+import { LightingNodeCue } from '../../../cues/node/runtime/LightingNodeCue'
 import {
   NetNodeCueDefinition,
   NetEventNode,
@@ -745,7 +745,7 @@ describe('Runtime Event System', () => {
       expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
     })
 
-    it('YargNodeCue (Primary): first execute uses setEffect, second uses addEffect, after onStop first again uses setEffect', async () => {
+    it('LightingNodeCue (Primary): first execute uses setEffect, second uses addEffect, after onStop first again uses setEffect', async () => {
       const cueStartedEvent: NetEventNode = {
         id: 'e-start',
         type: 'event',
@@ -794,7 +794,7 @@ describe('Runtime Event System', () => {
         layout: { nodePositions: {} },
       }
       const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
-      const cue = new YargNodeCue('group1', compiled)
+      const cue = new LightingNodeCue('group1', compiled)
       const cueData = createCueData()
 
       await cue.execute(cueData, mockSequencer, mockLightManager)
@@ -814,7 +814,7 @@ describe('Runtime Event System', () => {
       expect(mockSequencer.setEffectUnblockedName).toHaveBeenCalledTimes(2)
     })
 
-    it('YargNodeCue onStop does not remove effects from sequencer so lights stay lit during cue transition', async () => {
+    it('LightingNodeCue onStop does not remove effects from sequencer so lights stay lit during cue transition', async () => {
       const cueStartedEvent: NetEventNode = {
         id: 'e-start',
         type: 'event',
@@ -855,7 +855,7 @@ describe('Runtime Event System', () => {
         layout: { nodePositions: {} },
       }
       const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
-      const cue = new YargNodeCue('group1', compiled)
+      const cue = new LightingNodeCue('group1', compiled)
       const cueData = createCueData()
 
       await cue.execute(cueData, mockSequencer, mockLightManager)
@@ -867,7 +867,7 @@ describe('Runtime Event System', () => {
       expect(mockSequencer.removeEffect).toHaveBeenCalledTimes(removeEffectCallsBefore)
     })
 
-    it('YargNodeCue (Secondary): execute submits effect via addEffect', async () => {
+    it('LightingNodeCue (Secondary): execute submits effect via addEffect', async () => {
       const cueStartedEvent: NetEventNode = {
         id: 'e-start',
         type: 'event',
@@ -908,7 +908,7 @@ describe('Runtime Event System', () => {
         layout: { nodePositions: {} },
       }
       const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
-      const cue = new YargNodeCue('group1', compiled)
+      const cue = new LightingNodeCue('group1', compiled)
       const cueData = createCueData()
 
       await cue.execute(cueData, mockSequencer, mockLightManager)
@@ -917,7 +917,7 @@ describe('Runtime Event System', () => {
       expect(setCalls + addCalls).toBeGreaterThanOrEqual(1)
     })
 
-    it('YargNodeCue (Primary, no cue-started node): first execute uses setEffect', async () => {
+    it('LightingNodeCue (Primary, no cue-started node): first execute uses setEffect', async () => {
       const cueCalledEvent: NetEventNode = {
         id: 'e-called',
         type: 'event',
@@ -958,7 +958,7 @@ describe('Runtime Event System', () => {
         layout: { nodePositions: {} },
       }
       const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
-      const cue = new YargNodeCue('group1', compiled)
+      const cue = new LightingNodeCue('group1', compiled)
       const cueData = createCueData()
 
       await cue.execute(cueData, mockSequencer, mockLightManager)

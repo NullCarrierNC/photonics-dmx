@@ -6,7 +6,7 @@ import fs from 'fs'
 import path from 'path'
 import { describe, expect, it, jest } from '@jest/globals'
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
-import { YargMotionNodeCue } from '../../../../cues/node/runtime/YargMotionNodeCue'
+import { MotionNodeCue } from '../../../../cues/node/runtime/MotionNodeCue'
 import { validateRb3NodeCueFile } from '../../../../cues/node/schema/validation'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { createMockLightingConfig } from '../../../helpers/testFixtures'
@@ -49,7 +49,7 @@ const cueData: CueData = { ...defaultCueData, currentScene: 'Gameplay', trackMod
 describe('bundled RB3 motion cues execute', () => {
   it('the Wave pattern cue adds a motion pattern on cue-started', () => {
     const wave = loadRb3MotionCues().find((c) => c.id === 'rb3-motion-wave')!
-    const cue = new YargMotionNodeCue('rb3-motion-default', NodeCueCompiler.compileCue(wave, 'rb3'))
+    const cue = new MotionNodeCue('rb3-motion-default', NodeCueCompiler.compileCue(wave, 'rb3'))
     const lightManager = new DmxLightManager(createMockLightingConfig())
     const sequencer = mockSequencer()
 
@@ -60,10 +60,7 @@ describe('bundled RB3 motion cues execute', () => {
 
   it('the Still cue executes without error (a static set-position hold, not a pattern)', () => {
     const still = loadRb3MotionCues().find((c) => c.id === 'rb3-motion-still')!
-    const cue = new YargMotionNodeCue(
-      'rb3-motion-default',
-      NodeCueCompiler.compileCue(still, 'rb3'),
-    )
+    const cue = new MotionNodeCue('rb3-motion-default', NodeCueCompiler.compileCue(still, 'rb3'))
     const lightManager = new DmxLightManager(createMockLightingConfig())
     const sequencer = mockSequencer()
 
@@ -75,10 +72,7 @@ describe('bundled RB3 motion cues execute', () => {
     const lightManager = new DmxLightManager(createMockLightingConfig())
     for (const def of loadRb3MotionCues()) {
       if (def.id === 'rb3-motion-still') continue
-      const cue = new YargMotionNodeCue(
-        'rb3-motion-default',
-        NodeCueCompiler.compileCue(def, 'rb3'),
-      )
+      const cue = new MotionNodeCue('rb3-motion-default', NodeCueCompiler.compileCue(def, 'rb3'))
       const sequencer = mockSequencer()
       cue.execute(cueData, sequencer, lightManager)
       expect(sequencer.addMotionPattern).toHaveBeenCalledTimes(1)

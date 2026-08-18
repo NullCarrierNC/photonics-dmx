@@ -16,8 +16,8 @@ import { CueRegistry } from '../../registries/CueRegistry'
 import { AudioCueRegistry, AudioCueGroup } from '../../registries/AudioCueRegistry'
 import type { ICueGroup } from '../../interfaces/INetCueGroup'
 import { INetCue } from '../../interfaces/INetCue'
-import { YargNodeCue } from '../runtime/YargNodeCue'
-import { YargMotionNodeCue } from '../runtime/YargMotionNodeCue'
+import { LightingNodeCue } from '../runtime/LightingNodeCue'
+import { MotionNodeCue } from '../runtime/MotionNodeCue'
 import { AudioNodeCue } from '../runtime/AudioNodeCue'
 import { AudioMotionNodeCue } from '../runtime/AudioMotionNodeCue'
 import { CueType } from '../../types/cueTypes'
@@ -71,7 +71,7 @@ interface NodeCueLoaderOptions {
   effectLoader?: EffectLoader
   /** Injected host emit for cue/effect runtime IPC; required for production main. */
   runtimeBroadcaster: RuntimeBroadcaster
-  /** When provided, passed to YargNodeCue for debug/error emission. */
+  /** When provided, passed to LightingNodeCue for debug/error emission. */
   getNodeRuntimeCallbacks?: () => NodeRuntimeCallbacks | undefined
 }
 
@@ -355,7 +355,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
           const callbacks = this.options.getNodeRuntimeCallbacks?.()
           cueMap.set(
             cue.cueType,
-            new YargNodeCue(
+            new LightingNodeCue(
               file.group.id,
               compiled,
               effectRegistry,
@@ -382,7 +382,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
           const callbacks = this.options.getNodeRuntimeCallbacks?.()
           motionMap.set(
             cue.id,
-            new YargMotionNodeCue(
+            new MotionNodeCue(
               file.group.id,
               compiled,
               effectRegistry,
