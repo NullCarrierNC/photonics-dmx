@@ -49,7 +49,7 @@ export function cueKeyOf(definition: NetNodeCueDefinition | AudioNodeCueDefiniti
   return 'cueType' in definition ? definition.cueType : definition.cueTypeId
 }
 
-export type CompiledYargCue = CompiledNodeCue<NetEventNode>
+export type CompiledNetCue = CompiledNodeCue<NetEventNode>
 export type CompiledAudioCue = CompiledNodeCue<AudioEventNodeUnion>
 
 const getActionTiming = (action: ActionNode): ActionTimingConfig => ({

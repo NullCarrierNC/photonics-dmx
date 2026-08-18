@@ -6,7 +6,7 @@
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../types/cueTypes'
-import type { CompiledYargCue } from '../compiler/NodeCueCompiler'
+import type { CompiledNetCue } from '../compiler/NodeCueCompiler'
 import type { BaseEventNode } from '../../types/nodeCueTypes'
 import type { VariableDefinition } from '../../types/nodeCueTypes'
 import type { VariableValue } from './executionTypes'
@@ -50,7 +50,7 @@ export class GraphExecutionEngine {
   private readonly variableDefinitions: VariableDefinition[]
   private readonly runtimeBroadcaster: RuntimeBroadcaster
   private effectRegistry?: EffectRegistry
-  private compiledCue?: CompiledYargCue
+  private compiledCue?: CompiledNetCue
   private readonly cueId: string
   private nodeEngine: NodeExecutionEngine | null = null
   /** Per-context state-machine tracking (cue graph only, when delegating to nodeEngine). */
@@ -59,7 +59,7 @@ export class GraphExecutionEngine {
   private isExecutingCueStarted = false
   private queuedParameters: ExecutionParameters[] = []
 
-  private get compiled(): CompiledYargCue {
+  private get compiled(): CompiledNetCue {
     if (!this.compiledCue) {
       throw new Error('GraphExecutionEngine: compiledCue not set')
     }
@@ -71,7 +71,7 @@ export class GraphExecutionEngine {
    * Effect registry required for effect-raiser nodes.
    */
   static forCue(
-    compiledCue: CompiledYargCue,
+    compiledCue: CompiledNetCue,
     cueId: string,
     policy: GraphExecutionPolicy,
     session: IGraphExecutionSession,

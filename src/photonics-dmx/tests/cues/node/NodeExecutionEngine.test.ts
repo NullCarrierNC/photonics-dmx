@@ -1,6 +1,6 @@
 import { NodeExecutionEngine } from '../../../cues/node/runtime/NodeExecutionEngine'
 import { ExecutionContext } from '../../../cues/node/runtime/ExecutionContext'
-import { NodeCueCompiler, CompiledYargCue } from '../../../cues/node/compiler/NodeCueCompiler'
+import { NodeCueCompiler, CompiledNetCue } from '../../../cues/node/compiler/NodeCueCompiler'
 import { EffectCompiler } from '../../../cues/node/compiler/EffectCompiler'
 import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
 import { LightingNodeCue } from '../../../cues/node/runtime/LightingNodeCue'
@@ -160,7 +160,7 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'action1' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -278,7 +278,7 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -392,7 +392,7 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -510,7 +510,7 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -694,7 +694,7 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'nonexistent-action' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -766,7 +766,7 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'action1' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -842,7 +842,7 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'action1' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -918,7 +918,7 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'raiser1' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -995,7 +995,7 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'raiser1' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -1088,7 +1088,7 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -1281,7 +1281,7 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'raiser1' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -1392,7 +1392,7 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'currentBpm', type: 'number', scope: 'cue', initialValue: 0 }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -1489,7 +1489,7 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'numFrontLights', type: 'number', scope: 'cue', initialValue: 0 }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -1597,7 +1597,7 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -1721,7 +1721,7 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'noteCount', type: 'number', scope: 'cue', initialValue: 0 }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -1833,7 +1833,7 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'totalCount', type: 'number', scope: 'cue', initialValue: 0 }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -1968,7 +1968,7 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'myColor', type: 'string', scope: 'cue', initialValue: '' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
@@ -2065,7 +2065,7 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'targetGroups', type: 'string', scope: 'cue', initialValue: '' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
@@ -2148,7 +2148,7 @@ describe('NodeExecutionEngine', () => {
         variables: [],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
@@ -2260,7 +2260,7 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
@@ -2362,7 +2362,7 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'badColor', type: 'string', scope: 'cue', initialValue: '' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
@@ -2437,7 +2437,7 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
@@ -2530,7 +2530,7 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
@@ -2628,7 +2628,7 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
@@ -2720,7 +2720,7 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
@@ -2813,7 +2813,7 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
@@ -3131,7 +3131,7 @@ describe('NodeExecutionEngine', () => {
           { from: 'lc1', to: 'action1', fromPort: 'each' },
         ],
       }
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
         mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
@@ -3207,7 +3207,7 @@ describe('NodeExecutionEngine', () => {
 
     it('runs the done branch after the fan-out and reuses the memoized body across frames', () => {
       const action2: ActionNode = { ...actionNode, id: 'action2' }
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         mode: 'rb3',
         definition: {
           id: 'test-cue',

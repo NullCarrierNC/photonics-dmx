@@ -1,7 +1,7 @@
 import type { ILightingController } from '../../controllers/sequencer/interfaces'
 
 /**
- * Shared, non-generic building blocks for the cue registries (Yarg, Audio, and RB3 via Yarg). These
+ * Shared, non-generic building blocks for the cue registries (the net modes and audio). These
  * hold the logic that is byte-identical across registries. They are composed, not inherited: a base
  * class would need generics over the cue element type and hit TS `Map` invariance, whereas these keep
  * everything string-keyed and consume the cue only structurally (`releaseSequencer?`), which every cue

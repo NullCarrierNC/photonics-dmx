@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 3,
+  "cueVersion": 4,
   "mode": "rb3",
   "group": {
     "id": "rb3-stagekit",
@@ -37,13 +37,6 @@
             "logicType": "config-data",
             "dataProperty": "strobe-lights-array",
             "assignTo": "strobeLights"
-          },
-          {
-            "id": "cue-skv2-strobe-slow-bd",
-            "type": "logic",
-            "logicType": "cue-data",
-            "dataProperty": "beat-duration-ms",
-            "assignTo": "beatMs"
           },
           {
             "id": "cue-skv2-strobe-slow-x4",
@@ -158,14 +151,6 @@
           "to": "cue-skv2-strobe-slow-lights"
         },
         {
-          "from": "cue-skv2-strobe-slow-lights",
-          "to": "cue-skv2-strobe-slow-bd"
-        },
-        {
-          "from": "cue-skv2-strobe-slow-bd",
-          "to": "cue-skv2-strobe-slow-x4"
-        },
-        {
           "from": "cue-skv2-strobe-slow-x4",
           "to": "cue-skv2-strobe-slow-int"
         },
@@ -176,6 +161,10 @@
         {
           "from": "cue-skv2-strobe-slow-called",
           "to": "cue-skv2-strobe-slow-flash"
+        },
+        {
+          "from": "cue-skv2-strobe-slow-lights",
+          "to": "cue-skv2-strobe-slow-x4"
         }
       ],
       "layout": {
@@ -191,10 +180,6 @@
           "cue-skv2-strobe-slow-lights": {
             "x": 0,
             "y": 150
-          },
-          "cue-skv2-strobe-slow-bd": {
-            "x": 0,
-            "y": 300
           },
           "cue-skv2-strobe-slow-x4": {
             "x": 0,
@@ -292,13 +277,6 @@
             "logicType": "config-data",
             "dataProperty": "strobe-lights-array",
             "assignTo": "strobeLights"
-          },
-          {
-            "id": "cue-skv2-strobe-medium-bd",
-            "type": "logic",
-            "logicType": "cue-data",
-            "dataProperty": "beat-duration-ms",
-            "assignTo": "beatMs"
           },
           {
             "id": "cue-skv2-strobe-medium-x4",
@@ -413,14 +391,6 @@
           "to": "cue-skv2-strobe-medium-lights"
         },
         {
-          "from": "cue-skv2-strobe-medium-lights",
-          "to": "cue-skv2-strobe-medium-bd"
-        },
-        {
-          "from": "cue-skv2-strobe-medium-bd",
-          "to": "cue-skv2-strobe-medium-x4"
-        },
-        {
           "from": "cue-skv2-strobe-medium-x4",
           "to": "cue-skv2-strobe-medium-int"
         },
@@ -431,6 +401,10 @@
         {
           "from": "cue-skv2-strobe-medium-called",
           "to": "cue-skv2-strobe-medium-flash"
+        },
+        {
+          "from": "cue-skv2-strobe-medium-lights",
+          "to": "cue-skv2-strobe-medium-x4"
         }
       ],
       "layout": {
@@ -446,10 +420,6 @@
           "cue-skv2-strobe-medium-lights": {
             "x": 0,
             "y": 150
-          },
-          "cue-skv2-strobe-medium-bd": {
-            "x": 0,
-            "y": 300
           },
           "cue-skv2-strobe-medium-x4": {
             "x": 0,
@@ -547,13 +517,6 @@
             "logicType": "config-data",
             "dataProperty": "strobe-lights-array",
             "assignTo": "strobeLights"
-          },
-          {
-            "id": "cue-skv2-strobe-fast-bd",
-            "type": "logic",
-            "logicType": "cue-data",
-            "dataProperty": "beat-duration-ms",
-            "assignTo": "beatMs"
           },
           {
             "id": "cue-skv2-strobe-fast-x4",
@@ -668,14 +631,6 @@
           "to": "cue-skv2-strobe-fast-lights"
         },
         {
-          "from": "cue-skv2-strobe-fast-lights",
-          "to": "cue-skv2-strobe-fast-bd"
-        },
-        {
-          "from": "cue-skv2-strobe-fast-bd",
-          "to": "cue-skv2-strobe-fast-x4"
-        },
-        {
           "from": "cue-skv2-strobe-fast-x4",
           "to": "cue-skv2-strobe-fast-int"
         },
@@ -686,6 +641,10 @@
         {
           "from": "cue-skv2-strobe-fast-called",
           "to": "cue-skv2-strobe-fast-flash"
+        },
+        {
+          "from": "cue-skv2-strobe-fast-lights",
+          "to": "cue-skv2-strobe-fast-x4"
         }
       ],
       "layout": {
@@ -701,10 +660,6 @@
           "cue-skv2-strobe-fast-lights": {
             "x": 0,
             "y": 150
-          },
-          "cue-skv2-strobe-fast-bd": {
-            "x": 0,
-            "y": 300
           },
           "cue-skv2-strobe-fast-x4": {
             "x": 0,
@@ -802,13 +757,6 @@
             "logicType": "config-data",
             "dataProperty": "strobe-lights-array",
             "assignTo": "strobeLights"
-          },
-          {
-            "id": "cue-skv2-strobe-fastest-bd",
-            "type": "logic",
-            "logicType": "cue-data",
-            "dataProperty": "beat-duration-ms",
-            "assignTo": "beatMs"
           },
           {
             "id": "cue-skv2-strobe-fastest-x4",
@@ -923,14 +871,6 @@
           "to": "cue-skv2-strobe-fastest-lights"
         },
         {
-          "from": "cue-skv2-strobe-fastest-lights",
-          "to": "cue-skv2-strobe-fastest-bd"
-        },
-        {
-          "from": "cue-skv2-strobe-fastest-bd",
-          "to": "cue-skv2-strobe-fastest-x4"
-        },
-        {
           "from": "cue-skv2-strobe-fastest-x4",
           "to": "cue-skv2-strobe-fastest-int"
         },
@@ -941,6 +881,10 @@
         {
           "from": "cue-skv2-strobe-fastest-called",
           "to": "cue-skv2-strobe-fastest-flash"
+        },
+        {
+          "from": "cue-skv2-strobe-fastest-lights",
+          "to": "cue-skv2-strobe-fastest-x4"
         }
       ],
       "layout": {
@@ -956,10 +900,6 @@
           "cue-skv2-strobe-fastest-lights": {
             "x": 0,
             "y": 150
-          },
-          "cue-skv2-strobe-fastest-bd": {
-            "x": 0,
-            "y": 300
           },
           "cue-skv2-strobe-fastest-x4": {
             "x": 0,

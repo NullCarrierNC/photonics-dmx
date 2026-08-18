@@ -290,7 +290,7 @@ export class AudioCueRegistry {
   public setDisabledCues(disabled: Record<string, string[]>): void {
     this.disabledCues.setAll(disabled)
     // Audio-specific: the cue-details cache is keyed by group and does not track disabled state, so
-    // clear it here to stay consistent. This is the one line that differs from the Yarg registry.
+    // clear it here to stay consistent. This is the one line that differs from the net registry.
     this.cueDetailsCache.clear()
   }
 

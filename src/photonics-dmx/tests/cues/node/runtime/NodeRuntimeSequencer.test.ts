@@ -1,6 +1,6 @@
 import { NodeExecutionEngine } from '../../../../cues/node/runtime/NodeExecutionEngine'
 import { EffectRegistry } from '../../../../cues/node/runtime/EffectRegistry'
-import type { CompiledYargCue } from '../../../../cues/node/compiler/NodeCueCompiler'
+import type { CompiledNetCue } from '../../../../cues/node/compiler/NodeCueCompiler'
 import type {
   ActionNode,
   Connection,
@@ -41,7 +41,7 @@ const buildAdjacency = (connections: Connection[]): Map<string, Connection[]> =>
   return adjacency
 }
 
-const compileCue = (definition: NetNodeCueDefinition): CompiledYargCue => {
+const compileCue = (definition: NetNodeCueDefinition): CompiledNetCue => {
   return {
     definition,
     mode: 'yarg',

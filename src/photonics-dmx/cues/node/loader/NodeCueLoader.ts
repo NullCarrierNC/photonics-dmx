@@ -291,7 +291,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       // Both net modes compile through the same path and differ only in which registry instance
       // they load into, which the per-mode map supplies.
       const registry = this.options.registries[mode]
-      const group = await this.buildYargGroup(file as NetNodeCueFile, compileErrors)
+      const group = await this.buildNetGroup(file as NetNodeCueFile, compileErrors)
       registry.registerGroup(group)
       const groupMeta = file.group
       if (groupMeta.isDefault) {
@@ -337,7 +337,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     this.fileRegistrations.delete(filePath)
   }
 
-  private async buildYargGroup(file: NetNodeCueFile, compileErrors: string[]): Promise<ICueGroup> {
+  private async buildNetGroup(file: NetNodeCueFile, compileErrors: string[]): Promise<ICueGroup> {
     const cueMap = new Map<CueType, INetCue>()
     const motionMap = new Map<string, INetCue>()
 

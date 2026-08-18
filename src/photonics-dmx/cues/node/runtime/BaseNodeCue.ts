@@ -2,7 +2,7 @@ import { INetCue, CueStyle } from '../../interfaces/INetCue'
 import { CueData } from '../../types/cueTypes'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
-import { CompiledYargCue } from '../compiler/NodeCueCompiler'
+import { CompiledNetCue } from '../compiler/NodeCueCompiler'
 import { EffectRegistry } from './EffectRegistry'
 import type { NodeRuntimeCallbacks, VariableValue } from './executionTypes'
 import { CueSession } from './CueSession'
@@ -30,7 +30,7 @@ interface NodeCueRunState {
  */
 export abstract class BaseNodeCue implements INetCue {
   protected readonly groupId: string
-  protected readonly compiledCue: CompiledYargCue
+  protected readonly compiledCue: CompiledNetCue
   private readonly effectRegistry: EffectRegistry
   private readonly runtimeCallbacks?: NodeRuntimeCallbacks
   private readonly runtimeBroadcaster: RuntimeBroadcaster
@@ -38,7 +38,7 @@ export abstract class BaseNodeCue implements INetCue {
 
   constructor(
     groupId: string,
-    compiledCue: CompiledYargCue,
+    compiledCue: CompiledNetCue,
     effectRegistry?: EffectRegistry,
     runtimeCallbacks?: NodeRuntimeCallbacks,
     runtimeBroadcaster?: RuntimeBroadcaster,

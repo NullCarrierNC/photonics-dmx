@@ -5,7 +5,7 @@
  */
 
 import { beforeEach, describe, expect, it } from '@jest/globals'
-import type { CompiledYargCue } from '../../../cues/node/compiler/NodeCueCompiler'
+import type { CompiledNetCue } from '../../../cues/node/compiler/NodeCueCompiler'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import type {
   NetNodeCueDefinition,
@@ -197,7 +197,7 @@ describe('GraphExecutionEngine', () => {
   let lightManager: DmxLightManager
   let sequencer: ILightingController
   let session: CueSession
-  let compiledCue: CompiledYargCue
+  let compiledCue: CompiledNetCue
   const cueId = 'group1:test-cue'
   const groupId = 'group1'
 

@@ -3,7 +3,7 @@
  */
 
 import { beforeEach, describe, expect, it } from '@jest/globals'
-import type { CompiledYargCue } from '../../../cues/node/compiler/NodeCueCompiler'
+import type { CompiledNetCue } from '../../../cues/node/compiler/NodeCueCompiler'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import type {
   NetNodeCueDefinition,
@@ -123,7 +123,7 @@ function cueDefinitionWithEventType(eventType: 'cue-started' | 'cue-called'): Ne
 describe('Sequencer behavior', () => {
   let lightManager: DmxLightManager
   let cueDefinition: NetNodeCueDefinition
-  let compiledCue: CompiledYargCue
+  let compiledCue: CompiledNetCue
 
   beforeEach(() => {
     lightManager = new DmxLightManager(createMockLightingConfig())
