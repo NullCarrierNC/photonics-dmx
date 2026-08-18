@@ -138,8 +138,14 @@ export class CompositeCueRuntime implements CueRuntime {
     this.setMuted(false)
   }
 
+  /**
+   * The feeding listener is going away, so the secondary drops its look and any held overlay is
+   * lifted with it. Without the lift a listener disabled mid-secondary-strobe leaves the primary
+   * occluded, with no cue left coming to clear it.
+   */
   public onDisable(): void {
     this.secondary.stopActiveCue()
+    this.setMuted(false)
   }
 
   public handleBeat(): void {

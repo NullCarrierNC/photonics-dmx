@@ -180,4 +180,19 @@ describe('CompositeCueRuntime', () => {
     composite.onDisable()
     expect(secondary.stopActiveCue).toHaveBeenCalledTimes(1)
   })
+
+  it('lifts the mute overlay when the feeding listener is disabled', async () => {
+    // Disabling mid-strobe ends the stream, so nothing arrives afterwards to release the overlay.
+    const mutePrimary = jest.fn()
+    const composite = new CompositeCueRuntime(primary, secondary, {
+      mutePrimary,
+      shouldMuteForSecondaryStrobe: () => true,
+    })
+
+    await composite.handleCue(CueType.Strobe_Fast, defaultCueData)
+    expect(mutePrimary).toHaveBeenLastCalledWith(true)
+
+    composite.onDisable()
+    expect(mutePrimary).toHaveBeenLastCalledWith(false)
+  })
 })
