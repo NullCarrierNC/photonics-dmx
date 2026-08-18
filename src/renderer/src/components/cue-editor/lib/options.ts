@@ -7,7 +7,6 @@ import type { WaitCondition, NetEventType } from '../../../../../photonics-dmx/t
 import { RB3_SONG_EVENTS } from '../../../../../photonics-dmx/types'
 import {
   AUDIO_EVENT_OPTIONS as AUDIO_EVENTS_BASE,
-  NET_EVENT_OPTIONS as YARG_EVENTS_BASE,
   WAIT_CONDITIONS_WITH_NONE_DELAY,
 } from '../../../../../photonics-dmx/constants/options'
 import {
@@ -36,12 +35,19 @@ const EASING_OPTIONS = [
 ] as const
 
 // RB3 StageKit LED / fog conditions only ever fire in RB3 cue mode (from the StageKit packet
-// stream), so they are excluded from every YARG vocabulary — a YARG cue can never receive them.
+// stream), so they are excluded from the YARG action-timing vocabulary — a YARG cue can never
+// receive them. Event nodes need no such filter: they read the domain descriptor, which already
+// splits the two.
 const RB3_CONDITIONS: ReadonlySet<string> = new Set(RB3_SONG_EVENTS)
 
-// Event options for EVENT NODES - includes system events (cue-started, cue-called), minus the
-// RB3-only LED/fog conditions (which live on RB3 cues).
-const YARG_EVENT_TYPES: NetEventType[] = [...YARG_EVENTS_BASE].filter((t) => !RB3_CONDITIONS.has(t))
+// Categorized event options, straight off each mode's domain descriptor.
+const YARG_EVENT_OPTIONS_CATEGORIZED = getYargEventCategories()
+
+// Event options for EVENT NODES. Flattened from the categorized list rather than filtered out of the
+// full net vocabulary, so both shapes answer to the yarg domain descriptor and cannot drift apart.
+const YARG_EVENT_TYPES: NetEventType[] = YARG_EVENT_OPTIONS_CATEGORIZED.flatMap((c) =>
+  c.events.map((e) => e.value as NetEventType),
+)
 const YARG_EVENT_OPTIONS = withDefaultLabels(YARG_EVENT_TYPES)
 const AUDIO_EVENT_LABELS: Partial<Record<AudioEventType, string>> = {
   'cue-started': 'Cue Started (once per lifecycle)',
@@ -55,9 +61,6 @@ const AUDIO_EVENT_OPTIONS = [...withDefaultLabels(AUDIO_EVENTS_BASE)]
     label: AUDIO_EVENT_LABELS[o.value as AudioEventType] ?? o.label,
   }))
   .sort((a, b) => a.label.localeCompare(b.label))
-
-// Categorized YARG event options - derived from shared constants
-const YARG_EVENT_OPTIONS_CATEGORIZED = getYargEventCategories()
 
 // Curated RB3 event options: only the lifecycle events and LED/fog edges the StageKit stream emits.
 // The values are all valid NetEventType (RB3 cues compile through the YARG path), so type them as

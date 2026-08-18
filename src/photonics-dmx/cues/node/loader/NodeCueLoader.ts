@@ -351,7 +351,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
         try {
           const compiled = NodeCueCompiler.compileCue<NetEventNode>(cue, file.mode)
           compiled.groupVariables = file.group.variables ?? []
-          const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg')
+          const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], file.mode)
           const callbacks = this.options.getNodeRuntimeCallbacks?.()
           cueMap.set(
             cue.cueType,
@@ -378,7 +378,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
         try {
           const compiled = NodeCueCompiler.compileCue<NetEventNode>(cue, file.mode)
           compiled.groupVariables = file.group.variables ?? []
-          const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'yarg')
+          const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], file.mode)
           const callbacks = this.options.getNodeRuntimeCallbacks?.()
           motionMap.set(
             cue.id,
@@ -569,7 +569,9 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       return registry
     }
 
-    const effectLoaderMode: EffectMode = mode === 'audio' ? 'audio' : 'yarg'
+    // Which effect tree this mode raises from is the domain's to say, not the loader's: RB3 folds
+    // onto the yarg tree, and a mode added later brings its own answer with its descriptor.
+    const effectLoaderMode: EffectMode = getCueDomain(mode).effectMode
 
     for (const effectRef of effectReferences) {
       try {

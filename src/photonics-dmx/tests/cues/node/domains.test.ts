@@ -102,7 +102,7 @@ describe('per-mode authoring vocabulary', () => {
     expect(getCueDomain('yarg').cueDataProperties).toContain('venue-size')
   })
 
-  it('agrees with the editor categories, which are a second source of the same vocabulary', () => {
+  it('is the only source of the editor categories', () => {
     const categorised = (cats: { events: { value: string }[] }[]): string[] =>
       cats.flatMap((c) => c.events.map((e) => e.value))
 
@@ -110,11 +110,9 @@ describe('per-mode authoring vocabulary', () => {
       ['yarg', getYargEventCategories()],
       ['rb3', getRb3EventCategories()],
     ] as const) {
-      // The editor may curate a subset, but it must never offer an event the domain disallows.
-      const allowed = new Set(getCueDomain(mode).eventTypes)
-      for (const value of categorised(cats)) {
-        expect(allowed.has(value)).toBe(true)
-      }
+      // Equality, not containment: the categories are derived from the descriptor, so the editor can
+      // neither offer an event the domain disallows nor miss one it allows.
+      expect(categorised(cats).sort()).toEqual([...getCueDomain(mode).eventTypes].sort())
     }
   })
 })
