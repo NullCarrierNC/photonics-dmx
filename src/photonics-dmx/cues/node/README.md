@@ -1,28 +1,35 @@
 # Node-Based Cue System
 
-JSON-defined node graphs for YARG and audio cues (lighting and motion programs) and reusable effects. The visual
-cue editor (renderer) produces these JSON files; this subsystem loads, validates, compiles, and executes them.
+JSON-defined node graphs for YARG, RB3 and audio cues (lighting and motion programs) and reusable effects. The
+visual cue editor (renderer) produces these JSON files; this subsystem loads, validates, compiles, and executes
+them.
 
-Cue files use `mode: 'yarg' | 'audio'` (paths under `node-data/cues/yarg/` and `node-data/cues/audio/`). Each cue
-definition includes a required `kind: 'lighting' | 'motion'`. Lighting cues drive colour/effect layers; motion
-programs share the same node graph model but are keyed by `id` and registered separately for random/locked
-selection alongside the active lighting cue for that platform.
+Cue files use `mode: 'yarg' | 'rb3' | 'audio'`, under `node-data/cues/<mode>/`. The directory pins the mode: the
+loader validates a file against the mode it was found in, so a file declaring a different one is rejected.
+
+`yarg` and `rb3` form the **net** family, where a cue type arrives from outside on a `CueData` frame. `audio`
+derives its cue from signal analysis. Runtime behaviour is per family, while the vocabulary each mode may author
+and the registry it loads into are per mode. Both live in the domain descriptors under `cues/domains/`.
+
+Each cue definition includes a required `kind: 'lighting' | 'motion'`. Lighting cues drive colour/effect layers.
+Motion programs share the same node graph model but are keyed by `id` and registered separately for random or
+locked selection alongside the active lighting cue for that platform.
 
 ## Data Flow
 
 ```
 JSON file (.json)
-    ↓
+    v
 NodeCueLoader / EffectLoader   (load, validate, watch)
-    ↓
-NodeCueCompiler / EffectCompiler   (compile graph → CompiledYargCue / CompiledAudioCue)
-    ↓
-YargCueRegistry / AudioCueRegistry / EffectRegistry   (register for dispatch)
-    ↓
-YargNodeCue / YargMotionNodeCue → GraphExecutionEngine (policy + IGraphExecutionSession) → NodeExecutionEngine
-AudioNodeCue / AudioMotionNodeCue → NodeExecutionEngine (directly, via BaseAudioNodeCue)
-EffectExecutionEngine                                                       (when an Action references a reusable effect)
-    ↓
+    v
+NodeCueCompiler / EffectCompiler   (compile graph to CompiledNetCue / CompiledAudioCue)
+    v
+CueRegistry (per net mode) / AudioCueRegistry / EffectRegistry   (register for dispatch)
+    v
+LightingNodeCue / MotionNodeCue -> GraphExecutionEngine (policy + IGraphExecutionSession) -> NodeExecutionEngine
+AudioNodeCue / AudioMotionNodeCue -> NodeExecutionEngine (directly, via BaseAudioNodeCue)
+EffectExecutionEngine                                          (when an Action references a reusable effect)
+    v
 Sequencer   (effects)
 ```
 
@@ -30,31 +37,36 @@ Sequencer   (effects)
 
 ```
 node/
-├── compiler/       # Compilation from JSON to executable form
-├── loader/          # File loading, validation, file watching
-├── runtime/         # Execution engine, cue instances
-├── schema/          # AJV validation
-└── utils/           # Shared utilities
+  compiler/    # Compilation from JSON to executable form
+  loader/      # File loading, validation, file watching
+  runtime/     # Execution engine, cue instances
+  schema/      # AJV validation
+  utils/       # Shared utilities
 ```
+
+Per-mode behaviour lives one level up in `cues/domains/`, not here. Each mode has a descriptor carrying its
+family, its authorable event types and cue-data properties, its effect tree, and the two runtime hooks (the
+per-frame event gate and the cue-data extractor). Engine code resolves behaviour through `getCueDomain(mode)`
+rather than branching on the mode itself.
 
 ### compiler/
 
-| File                         | Role                                                                                                                         |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `NodeCueCompiler`            | Compiles `YargNodeCueDefinition` / `AudioNodeCueDefinition` to `CompiledYargCue` / `CompiledAudioCue`                        |
-| `EffectCompiler`             | Compiles `YargEffectDefinition` / `AudioEffectDefinition` to executable effect                                               |
-| `AbstractGraphBuilder`       | Shared compile core both compilers extend: map build, endpoint/reachability/unreachable-action checks via per-compiler hooks |
-| `CompilationError`           | Unified base error; `NodeCueCompilationError` / `EffectCompilationError` are thin back-compat subclasses                     |
-| `sharedActionNodeValidation` | Shared structural checks for action targets, set-position, set-color, and motion-pattern payloads used by both compilers     |
-| `ActionEffectFactory`        | Builds concrete Effect objects from ActionNode config (color, timing, targets)                                               |
+| File                         | Role                                                                                                                                           |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NodeCueCompiler`            | `compileCue(definition, mode)` builds `CompiledNetCue` / `CompiledAudioCue`. `mode` is required: a definition carries none, only its file does |
+| `EffectCompiler`             | Compiles `YargEffectDefinition` / `AudioEffectDefinition` to executable effect                                                                 |
+| `AbstractGraphBuilder`       | Shared compile core both compilers extend: map build, endpoint/reachability/unreachable-action checks via per-compiler hooks                   |
+| `CompilationError`           | Unified base error; `NodeCueCompilationError` / `EffectCompilationError` are thin back-compat subclasses                                       |
+| `sharedActionNodeValidation` | Shared structural checks for action targets, set-position, set-color, and motion-pattern payloads used by both compilers                       |
+| `ActionEffectFactory`        | Builds concrete Effect objects from ActionNode config (color, timing, targets)                                                                 |
 
 ### loader/
 
-| File                 | Role                                                                                                                                               |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BaseNodeFileLoader` | Shared base for both loaders: directory layout, chokidar watching, per-mode summary bookkeeping, and path sandboxing                               |
-| `NodeCueLoader`      | Extends `BaseNodeFileLoader`: loads cue JSON from `yarg/` and `audio/` dirs; validates with AJV; registers with YargCueRegistry / AudioCueRegistry |
-| `EffectLoader`       | Extends `BaseNodeFileLoader`: loads effect JSON; validates; registers with EffectRegistry                                                          |
+| File                 | Role                                                                                                                                                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BaseNodeFileLoader` | Shared base for both loaders: directory layout, chokidar watching, per-mode summary bookkeeping, and path sandboxing                                                                                      |
+| `NodeCueLoader`      | Extends `BaseNodeFileLoader`: loads cue JSON per mode directory, validates, and registers into the registry for that mode. A build with its own cue kind registers a strategy rather than adding a branch |
+| `EffectLoader`       | Extends `BaseNodeFileLoader`: loads effect JSON; validates; registers with EffectRegistry                                                                                                                 |
 
 ### runtime/
 
@@ -68,23 +80,27 @@ node/
 | `graphActionHelpers`      | Small shared pieces for homogeneous set-color chains (visit marking, step collection, effect-factory argument mapping)               |
 | `CueSession`              | Per-cue session state: variable stores, first-submission policy, cue-started flag                                                    |
 | `ExecutionStateMachine`   | Lifecycle phases (IDLE, RUNNING, BLOCKED, COMPLETED, CANCELLED) per context                                                          |
-| `YargNodeCue`             | Runtime cue instance for YARG lighting; receives game events, drives GraphExecutionEngine                                            |
-| `YargMotionNodeCue`       | YARG motion program runtime (parallel with lighting; same graph execution model)                                                     |
+| `BaseNodeCue`             | Shared session and engine lifecycle for net cues, keyed per sequencer so parallel rigs stay isolated                                 |
+| `LightingNodeCue`         | Net lighting runtime (extends `BaseNodeCue`): group-level variable sharing, `cueType` identity, style from the definition            |
+| `MotionNodeCue`           | Net motion runtime (extends `BaseNodeCue`): fresh session per cue, `id` identity, always Primary, clears its effects on stop         |
 | `BaseAudioNodeCue`        | Shared audio graph execution (events, triggers, variables, `NodeExecutionEngine`) for lighting and motion                            |
 | `AudioNodeCue`            | Audio lighting runtime (`kind: 'lighting'`); primary/secondary/strobe slot semantics via `style`                                     |
 | `AudioMotionNodeCue`      | Audio motion runtime (`kind: 'motion'`); no lighting `style`; clamps detected BPM for fixture safety; receives `AudioCueData`        |
 | `ExecutionContext`        | Per-execution state: variables, light arrays, beat/measure, etc.                                                                     |
 | `EffectRegistry`          | Maps effect IDs to compiled effect definitions                                                                                       |
 | `valueResolver`           | Resolves ValueSource (literal/variable) to concrete values                                                                           |
-| `actionResolver`          | Resolves ActionNode → Effect; handles effect references                                                                              |
+| `actionResolver`          | Resolves ActionNode to Effect; handles effect references                                                                             |
 | `logicNodeEvaluator`      | Evaluates logic nodes (variable, math, conditional, loops, light selectors)                                                          |
 | `dataExtractors`          | Extract game/audio data for node execution                                                                                           |
 
 ### schema/
 
-| File            | Role                                                                                                            |
-| --------------- | --------------------------------------------------------------------------------------------------------------- |
-| `validation.ts` | AJV schemas; `validateNodeCueFile`, `validateYargNodeCueFile`, `validateAudioNodeCueFile`, `validateEffectFile` |
+| File                   | Role                                                                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `cueSchemaBuilder.ts`  | Builds a cue definition schema from what varies by kind and family (the key field, style values, event item shape)         |
+| `cueSchemaRegistry.ts` | Holds each kind's schema per family and compiles one file validator per mode on first use. Registering after that throws   |
+| `cueFiles.ts`          | Registers the `lighting` and `motion` kinds and exposes the per-mode validators                                            |
+| `validation.ts`        | Semantic checks over one shared body: `validateNodeCueFile`, `validateCueFileForMode`, the mode-pinned validators, effects |
 
 ### utils/
 
@@ -98,11 +114,11 @@ node/
 
 Core types live in `../types/nodeCueTypes.ts`:
 
-- `NodeCueFile`, `YargNodeCueFile`, `AudioNodeCueFile` – File structure
-- `YargNodeCueDefinition`, `AudioNodeCueDefinition` – Cue definition (discriminated by `kind`: lighting vs motion)
-- `YargEffectDefinition`, `AudioEffectDefinition` – Effect definition
-- `EventNode`, `ActionNode`, `LogicNode`, `EventRaiserNode`, `EffectRaiserNode`, `EffectListenerNode` – Node types
-- `ValueSource`, `VariableDefinition`, `Connection` – Supporting types
+- `NodeCueFile`, `NetNodeCueFile`, `AudioNodeCueFile`: file structure. `NetNodeCueFile` covers both net modes, discriminated by `mode`
+- `NetNodeCueDefinition`, `AudioNodeCueDefinition`: cue definition, discriminated by `kind` (lighting vs motion)
+- `YargEffectDefinition`, `AudioEffectDefinition`: effect definition. The effect trees on disk really are `yarg` and `audio`, so these keep their names
+- `NetEventNode`, `ActionNode`, `LogicNode`, `EventRaiserNode`, `EffectRaiserNode`, `EffectListenerNode`: node types
+- `ValueSource`, `VariableDefinition`, `Connection`: supporting types
 
 ## Validation
 
@@ -114,9 +130,9 @@ effects require effect-listener entry points. Shared physical action rules (targ
 motion-pattern) live in `sharedActionNodeValidation.ts` so cues and effects stay aligned. Cues still differ from
 effects in revisit/reachability rules and entry wiring (see `GraphExecutionPolicy` and compiler reachability starts).
 
-Effect files run the same graph-level semantic checks as cue files — logic-only cycle detection (`detectCycles`)
+Effect files run the same graph-level semantic checks as cue files, logic-only cycle detection (`detectCycles`)
 and conditional literal-vs-variable `validValues` checks (`checkConditionalValidValues`), via `checkEffectSemantics`
-in `validation.ts` — so an invalid effect graph is rejected at validation time just like an invalid cue graph.
+in `validation.ts`. An invalid effect graph is rejected at validation time just like an invalid cue graph.
 
 ## Related
 
