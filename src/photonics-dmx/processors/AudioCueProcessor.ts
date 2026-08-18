@@ -155,8 +155,8 @@ export class AudioCueProcessor {
     this.chainFanout.audioStop()
     this.registry.onMotionSongEnd()
 
-    // Clear all audio-related effects
-    // Remove effects from layers 0-7 (frequency band layers)
+    // audioStop clears each cue's own effects, whatever layer it authored them on. The band-layer
+    // sweep stays as a backstop for effects left by a cue that was replaced without stopping.
     for (let layer = 0; layer < 8; layer++) {
       this.chainFanout.audioRemoveEffectByLayer(layer, true)
     }
@@ -262,14 +262,14 @@ export class AudioCueProcessor {
   }
 
   /**
-   * Blank the running audio look so a solo secondary plays over dark lights. Mirrors the effect
-   * teardown in {@link stop}: clear the current cue, then remove the band-layer effects.
+   * Blank the running audio look so a solo secondary plays over dark lights.
+   *
+   * Clearing the current cue is enough and is the right scope: each cue takes its own effects off
+   * whatever layers it authored (bundled libraries reach layers 120 and 200), where a fixed
+   * band-layer sweep would both miss those and clobber a concurrent game look on layers 0-7.
    */
   private suppressLighting(): void {
     this.chainFanout.audioClearCurrentCue()
-    for (let layer = 0; layer < 8; layer++) {
-      this.chainFanout.audioRemoveEffectByLayer(layer, true)
-    }
   }
 
   /**

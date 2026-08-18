@@ -13,6 +13,19 @@ import { createLogger } from '../../shared/logger'
 import { monotonicNowMs } from '../../shared/time'
 const log = createLogger('AudioCueHandler')
 
+/**
+ * Stop one cue and take its effects with it. Falls back to plain `onStop` for a cue that predates
+ * the forced-removal hook, which keeps the old leave-them-up behaviour rather than throwing.
+ */
+function stopAndClear(cue: IAudioCue | null): void {
+  if (!cue) return
+  if (cue.stopAndClearEffects) {
+    cue.stopAndClearEffects()
+    return
+  }
+  cue.onStop?.()
+}
+
 export type AudioCueHandlerOptions = {
   getMotionCueMinimumHoldMs?: () => number
   /** Probability (0-100) that an automatic motion cue pick will play on a primary cue change. Defaults to 100 (always). */
@@ -359,19 +372,24 @@ export class AudioCueHandler extends EventEmitter {
     this.clearCurrentCue()
   }
 
+  /**
+   * End the running audio look. Every slot is stopped with its effects taken off the sequencer:
+   * unlike a cue change, nothing is coming to replace the look, so a primary cue's usual
+   * leave-the-effects-up behaviour would strand it lit on whatever layers it authored.
+   */
   public clearCurrentCue(): void {
-    this.currentPrimaryCue?.onStop?.()
+    stopAndClear(this.currentPrimaryCue)
     this.currentPrimaryCue = null
-    this.currentSecondaryCue?.onStop?.()
+    stopAndClear(this.currentSecondaryCue)
     this.currentSecondaryCue = null
     if (this.currentStrobeCue) {
-      this.currentStrobeCue.onStop?.()
+      stopAndClear(this.currentStrobeCue)
       this.currentStrobeCue = null
     }
     // Unconditional: an interrupted audio strobe (processing stops with no explicit clear) must
     // not leave the process-wide StrobeStateManager stuck on a slot.
     getStrobeStateManager().setActive(null)
-    this.currentMotionCue?.onStop?.()
+    stopAndClear(this.currentMotionCue)
     this.currentMotionCue = null
     this.currentMotionCueStartTime = null
     this.lastPrimaryForMotion = null
