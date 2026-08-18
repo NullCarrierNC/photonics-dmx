@@ -1,16 +1,13 @@
 import * as fs from 'fs/promises'
 import * as path from 'path'
-import {
-  validateNodeCueFile,
-  validateAudioNodeCueFile,
-  validateYargNodeCueFile,
-  validateRb3NodeCueFile,
-} from '../schema/validation'
+import { validateNodeCueFile, validateCueFileForMode } from '../schema/validation'
+import { getCueDomain } from '../../domains'
 import {
   AudioNodeCueFile,
   NodeCueFile,
   NodeCueMode,
   NetNodeCueFile,
+  NodeCueKind,
   NetEventNode,
   AudioEventNodeUnion,
 } from '../../types/nodeCueTypes'
@@ -43,6 +40,8 @@ export interface NodeCueFileSummary {
   cueCount: number
   lightingCueCount: number
   motionCueCount: number
+  /** Cue counts contributed by registered kind strategies, keyed by kind. */
+  kindCueCounts?: Record<string, number>
   mode: NodeCueMode
   updatedAt: number
   errors?: string[]
@@ -56,11 +55,19 @@ export type NodeCueLoadResult = BaseLoadResult
 /** Optional host callbacks for node cue debug/error emission; used when the host provides them. */
 export type NodeRuntimeCallbacks = import('../runtime/executionTypes').NodeRuntimeCallbacks
 
+/**
+ * The registry each mode loads into, keyed by mode. Audio is a different class from the net modes,
+ * so this is a per-mode type map rather than one registry type.
+ */
+export interface CueRegistriesByMode {
+  yarg: CueRegistry
+  rb3: CueRegistry
+  audio: AudioCueRegistry
+}
+
 interface NodeCueLoaderOptions {
   baseDir: string
-  yargRegistry: CueRegistry
-  audioRegistry: AudioCueRegistry
-  rb3Registry: CueRegistry
+  registries: CueRegistriesByMode
   effectLoader?: EffectLoader
   /** Injected host emit for cue/effect runtime IPC; required for production main. */
   runtimeBroadcaster: RuntimeBroadcaster
@@ -71,7 +78,44 @@ interface NodeCueLoaderOptions {
 interface FileRegistration {
   mode: NodeCueMode
   groupId: string
+  /** Which strategy owns this registration, so the same one tears it down. */
+  kind?: string
 }
+
+/**
+ * Handles cue files of a kind the loader does not build itself.
+ *
+ * A build that ships its own cue kind registers one of these instead of adding a branch to the
+ * loader's register, unregister, cue-type and summary paths. The lighting and motion kinds are built
+ * in, so a strategy is consulted only for files it claims.
+ */
+export interface NodeCueKindStrategy {
+  kind: string
+  /** Whether this strategy owns the file, decided from the cues it declares. */
+  claimsFile(file: NodeCueFile): boolean
+  /** Build and register the file's group, collecting per-cue compile failures. */
+  registerFile(file: NodeCueFile, mode: NodeCueMode, compileErrors: string[]): Promise<void>
+  unregisterFile(mode: NodeCueMode, groupId: string): void
+  /** Cue types this kind offers for a mode, when the editor asks for this kind. */
+  cueTypesFor?(mode: NodeCueMode): readonly string[]
+  /** Cues of this kind in the file, surfaced on its summary. */
+  countCues?(file: NodeCueFile): number
+}
+
+const kindStrategies: NodeCueKindStrategy[] = []
+
+/** Register a cue-kind handler. Call from an import-time module, before any file is loaded. */
+export function registerNodeCueKindStrategy(strategy: NodeCueKindStrategy): void {
+  kindStrategies.push(strategy)
+}
+
+/** Drops every registered strategy. Tests only, so each case starts from the built-in kinds. */
+export function __resetNodeCueKindStrategiesForTests(): void {
+  kindStrategies.length = 0
+}
+
+const strategyForFile = (file: NodeCueFile): NodeCueKindStrategy | undefined =>
+  kindStrategies.find((s) => s.claimsFile(file))
 
 export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSummary> {
   private fileRegistrations: Map<string, FileRegistration> = new Map()
@@ -85,18 +129,6 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     this.customAudioCueTypes.clear()
   }
 
-  /** Runs the per-mode validator for a parsed node cue file. */
-  private validateForMode(mode: NodeCueMode, parsed: unknown) {
-    switch (mode) {
-      case 'yarg':
-        return validateYargNodeCueFile(parsed)
-      case 'rb3':
-        return validateRb3NodeCueFile(parsed)
-      case 'audio':
-        return validateAudioNodeCueFile(parsed)
-    }
-  }
-
   public async readFile(filePath: string): Promise<NodeCueFile> {
     const resolvedPath = this.resolveExistingCueFilePath(filePath)
     const mode = this.getModeFromPath(resolvedPath)
@@ -107,7 +139,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     const data = await fs.readFile(resolvedPath, 'utf-8')
     const parsed = JSON.parse(data)
     migrateLegacyBearings(parsed)
-    const validation = this.validateForMode(mode, parsed)
+    const validation = validateCueFileForMode(mode, parsed)
 
     if (!validation.valid) {
       throw new Error(`Invalid node cue file: ${validation.errors.join(', ')}`)
@@ -166,25 +198,23 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     return { success: true }
   }
 
-  public getAvailableCueTypes(mode: NodeCueMode, kind?: 'lighting' | 'motion'): string[] {
-    // Motion cues are keyed by user-defined id, not by a fixed enum like lighting CueTypes, so
-    // there is no enumerable "type" set to return for them.
-    if (kind === 'motion') {
-      return []
+  public getAvailableCueTypes(
+    mode: NodeCueMode,
+    kind: NodeCueKind | string = 'lighting',
+  ): string[] {
+    const strategy = kindStrategies.find((s) => s.kind === kind)
+    if (strategy) {
+      return [...(strategy.cueTypesFor?.(mode) ?? [])]
     }
-    switch (mode) {
-      case 'yarg':
-        // RB3 is its own domain (a single always-active gameplay cue), not a YARG-selectable
-        // look, so it is excluded from the YARG lighting picker.
-        return Object.values(CueType).filter((t) => t !== CueType.RB3)
-      case 'rb3':
-        return [CueType.RB3]
-      case 'audio': {
-        const registryTypes = new Set(this.options.audioRegistry.getAvailableCueTypes(true))
-        this.customAudioCueTypes.forEach((type) => registryTypes.add(type))
-        return Array.from(registryTypes)
-      }
-    }
+    // Audio learns cue types at runtime from its registry and from files loaded this session, so it
+    // is the only mode with types to contribute beyond its own enum.
+    const registryTypes = new Set(this.options.registries.audio.getAvailableCueTypes(true))
+    this.customAudioCueTypes.forEach((type) => registryTypes.add(type))
+    return [
+      ...getCueDomain(mode).cueTypesFor(kind as NodeCueKind, {
+        extraTypes: Array.from(registryTypes),
+      }),
+    ]
   }
 
   protected async loadFile(
@@ -194,7 +224,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     const contents = await fs.readFile(filePath, 'utf-8')
     const parsed = JSON.parse(contents)
     migrateLegacyBearings(parsed)
-    const validation = this.validateForMode(mode, parsed)
+    const validation = validateCueFileForMode(mode, parsed)
 
     if (!validation.valid) {
       throw new Error(validation.errors.join(', '))
@@ -208,6 +238,11 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
 
     const lightingCueCount = file.cues.filter((c) => c.kind === 'lighting').length
     const motionCueCount = file.cues.filter((c) => c.kind === 'motion').length
+    const kindCueCounts: Record<string, number> = {}
+    for (const strategy of kindStrategies) {
+      const count = strategy.countCues?.(file)
+      if (count !== undefined) kindCueCounts[strategy.kind] = count
+    }
 
     const summary: NodeCueFileSummary = {
       path: filePath,
@@ -216,6 +251,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       cueCount: file.cues.length,
       lightingCueCount,
       motionCueCount,
+      kindCueCounts,
       mode,
       updatedAt: Date.now(),
       bundled: file.bundled ?? false,
@@ -236,7 +272,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     if (mode === 'audio') {
       const existing = this.fileRegistrations.get(filePath)
       if (existing) {
-        wasAudioGroupEnabled = this.options.audioRegistry
+        wasAudioGroupEnabled = this.options.registries.audio
           .getEnabledGroups()
           .includes(existing.groupId)
       }
@@ -244,32 +280,31 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
 
     this.unregisterFile(filePath)
 
-    if (mode === 'yarg') {
+    const strategy = strategyForFile(file)
+    if (strategy) {
+      await strategy.registerFile(file, mode, compileErrors)
+      this.fileRegistrations.set(filePath, { mode, groupId: file.group.id, kind: strategy.kind })
+      return
+    }
+
+    if (mode !== 'audio') {
+      // Both net modes compile through the same path and differ only in which registry instance
+      // they load into, which the per-mode map supplies.
+      const registry = this.options.registries[mode]
       const group = await this.buildYargGroup(file as NetNodeCueFile, compileErrors)
-      this.options.yargRegistry.registerGroup(group)
+      registry.registerGroup(group)
       const groupMeta = file.group
       if (groupMeta.isDefault) {
-        this.options.yargRegistry.setDefaultGroup(group.id)
+        registry.setDefaultGroup(group.id)
       }
       if (groupMeta.isStageKit) {
-        this.options.yargRegistry.setStageKitGroup(group.id)
-      }
-    } else if (mode === 'rb3') {
-      // RB3 cue mode compiles through the YARG path but registers into its own registry instance.
-      const group = await this.buildYargGroup(file as NetNodeCueFile, compileErrors)
-      this.options.rb3Registry.registerGroup(group)
-      const groupMeta = file.group
-      if (groupMeta.isDefault) {
-        this.options.rb3Registry.setDefaultGroup(group.id)
-      }
-      if (groupMeta.isStageKit) {
-        this.options.rb3Registry.setStageKitGroup(group.id)
+        registry.setStageKitGroup(group.id)
       }
     } else {
       const group = await this.buildAudioGroup(file as AudioNodeCueFile, compileErrors)
-      this.options.audioRegistry.registerGroup(group)
+      this.options.registries.audio.registerGroup(group)
       if (wasAudioGroupEnabled) {
-        this.options.audioRegistry.enableGroup(group.id)
+        this.options.registries.audio.enableGroup(group.id)
       }
       file.cues.forEach((cue) => {
         if (cue.kind === 'lighting') {
@@ -287,12 +322,13 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       return
     }
 
-    if (registration.mode === 'yarg') {
-      this.options.yargRegistry.unregisterGroup(registration.groupId)
-    } else if (registration.mode === 'rb3') {
-      this.options.rb3Registry.unregisterGroup(registration.groupId)
+    const owner = registration.kind
+      ? kindStrategies.find((s) => s.kind === registration.kind)
+      : undefined
+    if (owner) {
+      owner.unregisterFile(registration.mode, registration.groupId)
     } else {
-      this.options.audioRegistry.unregisterGroup(registration.groupId)
+      this.options.registries[registration.mode].unregisterGroup(registration.groupId)
     }
     this.summaries[registration.mode] = this.summaries[registration.mode].filter(
       (summary) => summary.path !== filePath,

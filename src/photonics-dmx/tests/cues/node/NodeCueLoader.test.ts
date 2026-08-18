@@ -174,9 +174,7 @@ describe('NodeCueLoader', () => {
     loader = new NodeCueLoader({
       runtimeBroadcaster: noopRuntimeBroadcaster(),
       baseDir: tmpDir,
-      yargRegistry,
-      audioRegistry,
-      rb3Registry: getCueRegistry('rb3'),
+      registries: { yarg: yargRegistry, rb3: getCueRegistry('rb3'), audio: audioRegistry },
     })
   })
 

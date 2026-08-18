@@ -1,7 +1,6 @@
 import * as path from 'path'
 import { app } from 'electron'
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
-import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import {
@@ -83,9 +82,11 @@ export class RegistryInitializer {
     const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
     const nodeCueLoader = new NodeCueLoader({
       baseDir,
-      yargRegistry: CueRegistry.getInstance(),
-      audioRegistry: AudioCueRegistry.getInstance(),
-      rb3Registry: getCueRegistry('rb3'),
+      registries: {
+        yarg: getCueRegistry('yarg'),
+        rb3: getCueRegistry('rb3'),
+        audio: AudioCueRegistry.getInstance(),
+      },
       effectLoader: this.ctx.getEffectLoader() ?? undefined,
       runtimeBroadcaster: this.ctx.runtimeBroadcaster,
     })

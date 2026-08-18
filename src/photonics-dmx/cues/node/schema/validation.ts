@@ -69,7 +69,7 @@ export function registerCueSemanticCheck(check: CueSemanticCheck): void {
   semanticChecks.push(check)
 }
 
-function validateCueFileForMode<T extends NodeCueFile>(
+function runCueFileValidation<T extends NodeCueFile>(
   spec: CueFileValidationSpec<T>,
   value: unknown,
 ): NodeCueValidationResult<T> {
@@ -163,7 +163,7 @@ const audioLightingKey = (cue: AudioNodeCueFile['cues'][number]): string =>
   cue.kind === 'lighting' ? cue.cueTypeId : cue.id
 
 export const validateYargNodeCueFile = (value: unknown): NodeCueValidationResult<NetNodeCueFile> =>
-  validateCueFileForMode<NetNodeCueFile>(
+  runCueFileValidation<NetNodeCueFile>(
     {
       mode: 'yarg',
       prepare: migrateEasingInNodeCueFile,
@@ -177,7 +177,7 @@ export const validateYargNodeCueFile = (value: unknown): NodeCueValidationResult
   )
 
 export const validateRb3NodeCueFile = (value: unknown): NodeCueValidationResult<NetNodeCueFile> =>
-  validateCueFileForMode<NetNodeCueFile>(
+  runCueFileValidation<NetNodeCueFile>(
     {
       mode: 'rb3',
       prepare: migrateEasingInNodeCueFile,
@@ -193,7 +193,7 @@ export const validateRb3NodeCueFile = (value: unknown): NodeCueValidationResult<
 export const validateAudioNodeCueFile = (
   value: unknown,
 ): NodeCueValidationResult<AudioNodeCueFile> =>
-  validateCueFileForMode<AudioNodeCueFile>(
+  runCueFileValidation<AudioNodeCueFile>(
     {
       mode: 'audio',
       prepare: prepareAudioNodeCueFileForValidation,
@@ -205,6 +205,25 @@ export const validateAudioNodeCueFile = (
     },
     value,
   )
+
+/**
+ * Validate against one mode's rules, for a caller that already knows the mode. The loader takes the
+ * mode from the file's directory, which is the authority, so a file declaring a different mode is
+ * rejected by that mode's envelope rather than being validated as whatever it claims to be.
+ */
+export const validateCueFileForMode = (
+  mode: NodeCueMode,
+  value: unknown,
+): NodeCueValidationResult => {
+  switch (mode) {
+    case 'yarg':
+      return validateYargNodeCueFile(value)
+    case 'rb3':
+      return validateRb3NodeCueFile(value)
+    case 'audio':
+      return validateAudioNodeCueFile(value)
+  }
+}
 
 export const validateNodeCueFile = (value: unknown): NodeCueValidationResult => {
   if (!value || typeof value !== 'object') {

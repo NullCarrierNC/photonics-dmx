@@ -160,9 +160,11 @@ export class CueSimulator {
     const effectLoader = new EffectLoader({ baseDir: this.opts.baseDir })
     const loader = new NodeCueLoader({
       baseDir: this.opts.baseDir,
-      yargRegistry: getCueRegistry('yarg'),
-      audioRegistry: AudioCueRegistry.getInstance(),
-      rb3Registry: getCueRegistry('rb3'),
+      registries: {
+        yarg: getCueRegistry('yarg'),
+        rb3: getCueRegistry('rb3'),
+        audio: AudioCueRegistry.getInstance(),
+      },
       effectLoader,
       runtimeBroadcaster: noopRuntimeBroadcaster(),
     })

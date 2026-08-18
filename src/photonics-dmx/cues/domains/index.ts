@@ -9,11 +9,13 @@
  */
 
 import type { CueData } from '../types/cueTypes'
+import { CueType } from '../types/cueTypes'
 import type { AudioCueData } from '../types/audioCueTypes'
 import type {
   AudioCueDataProperty,
   EffectMode,
   NetCueDataProperty,
+  NodeCueKind,
   NodeCueMode,
 } from '../types/nodeCueTypes'
 import {
@@ -46,6 +48,12 @@ export interface CueDomainDescriptor {
    * through this gate.
    */
   isEventTriggered(eventType: string, cueData: CueData, triggerOnColorChange?: boolean): boolean
+  /**
+   * The cue types a file of this mode may declare, for the editor's picker. Motion cues are keyed by
+   * a user-defined id rather than a fixed enum, so they have no enumerable set and yield none.
+   * `extraTypes` carries the types a registry has learnt at runtime, which only audio uses.
+   */
+  cueTypesFor(kind: NodeCueKind, ctx: { extraTypes: readonly string[] }): readonly string[]
   /** Resolve one cue-data property against this family's frame shape. */
   extractCueData(
     property: string,
@@ -78,6 +86,10 @@ export const CUE_DOMAIN_DESCRIPTORS: Record<NodeCueMode, CueDomainDescriptor> = 
     eventTypes: NET_EVENT_VOCABULARY,
     cueDataProperties: propertyIds(YARG_CUE_DATA_PROPERTY_META),
     effectMode: 'yarg',
+    // RB3 is its own domain (a single always-active gameplay cue), not a YARG-selectable look, so
+    // it is excluded from the YARG lighting picker.
+    cueTypesFor: (kind) =>
+      kind === 'motion' ? [] : Object.values(CueType).filter((t) => t !== CueType.RB3),
   },
   rb3: {
     ...netRuntime,
@@ -87,6 +99,7 @@ export const CUE_DOMAIN_DESCRIPTORS: Record<NodeCueMode, CueDomainDescriptor> = 
     eventTypes: RB3_EVENT_VOCABULARY,
     cueDataProperties: propertyIds(RB3_CUE_DATA_PROPERTY_META),
     effectMode: 'yarg',
+    cueTypesFor: (kind) => (kind === 'motion' ? [] : [CueType.RB3]),
   },
   audio: {
     id: 'audio',
@@ -94,6 +107,7 @@ export const CUE_DOMAIN_DESCRIPTORS: Record<NodeCueMode, CueDomainDescriptor> = 
     eventTypes: AUDIO_EVENT_OPTIONS,
     cueDataProperties: propertyIds(AUDIO_CUE_DATA_PROPERTY_META),
     effectMode: 'audio',
+    cueTypesFor: (kind, ctx) => (kind === 'motion' ? [] : ctx.extraTypes),
     isEventTriggered: () => false,
     extractCueData: (property, cueData, cueId) =>
       extractAudioCueDataValue(property as AudioCueDataProperty, cueData as AudioCueData, cueId),
