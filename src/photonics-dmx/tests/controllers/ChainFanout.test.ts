@@ -19,6 +19,7 @@ function makeChainStub(rigId: string, isPrimary: boolean): RigChain {
     cancelPanTiltClear: jest.fn(),
     blackout: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
     removeEffectByLayer: jest.fn(),
+    holdOcclusion: jest.fn(),
   } as unknown as Sequencer
   const yarg = {
     notifySongStart: jest.fn(),
@@ -231,5 +232,22 @@ describe('ChainFanout', () => {
     const fanout = new ChainFanout()
     fanout.setChains([a, b])
     expect(fanout.getChains()).toEqual([a, b])
+  })
+
+  it('mutes and unmutes through each chain sequencer own occlusion hold', () => {
+    // Not an ordinary effect submission: the sequencer owns the overlay so the blackout paths that
+    // wipe layers can re-assert it rather than leaving the rig visible again.
+    const a = makeChainStub('a', true)
+    const b = makeChainStub('b', false)
+    const fanout = new ChainFanout()
+    fanout.setChains([a, b])
+
+    fanout.muteLighting(true)
+    expect(a.sequencer.holdOcclusion).toHaveBeenCalledWith(true)
+    expect(b.sequencer.holdOcclusion).toHaveBeenCalledWith(true)
+
+    fanout.muteLighting(false)
+    expect(a.sequencer.holdOcclusion).toHaveBeenLastCalledWith(false)
+    expect(b.sequencer.holdOcclusion).toHaveBeenLastCalledWith(false)
   })
 })

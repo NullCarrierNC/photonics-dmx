@@ -60,6 +60,7 @@ describe('SystemEffectsController', () => {
         },
       ]),
       getAllLightIds: jest.fn().mockReturnValue(['moving-head-1', 'rgb-fixture-1']),
+      immediateBlackout: jest.fn(),
     } as unknown as jest.Mocked<LightTransitionController>
 
     layerManager = {
@@ -249,6 +250,34 @@ describe('SystemEffectsController', () => {
       expect(jest.getTimerCount()).toBe(0)
       await jest.advanceTimersByTimeAsync(2000)
       expect(layerManager.removeActiveEffect).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('holdOcclusion', () => {
+    beforeEach(() => {
+      lightTransitionController.setOcclusionHeld = jest.fn<(on: boolean) => void>()
+      lightTransitionController.isOcclusionHeld = jest.fn<() => boolean>().mockReturnValue(false)
+    })
+
+    it('delegates to the transition controller rather than stacking a layer', () => {
+      systemEffectsController.holdOcclusion(true)
+
+      // Not a transition on any layer: setEffect clears every transition through removeAllEffects,
+      // so an overlay expressed that way would be dropped by the next cue that submits.
+      expect(lightTransitionController.setOcclusionHeld).toHaveBeenCalledWith(true)
+      expect(lightTransitionController.setTransition).not.toHaveBeenCalled()
+    })
+
+    it('releases through the same path', () => {
+      systemEffectsController.holdOcclusion(false)
+
+      expect(lightTransitionController.setOcclusionHeld).toHaveBeenCalledWith(false)
+      expect(lightTransitionController.removeTransitionsByLayer).not.toHaveBeenCalled()
+    })
+
+    it('reports the transition controller state', () => {
+      ;(lightTransitionController.isOcclusionHeld as jest.Mock).mockReturnValue(true)
+      expect(systemEffectsController.isOcclusionHeld()).toBe(true)
     })
   })
 })

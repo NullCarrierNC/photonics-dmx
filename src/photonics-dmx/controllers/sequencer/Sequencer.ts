@@ -428,6 +428,14 @@ export class Sequencer implements ILightingController {
   }
 
   /**
+   * Holds or releases an opaque overlay above every cue layer, occluding the rig without stopping
+   * it. See {@link SystemEffectsController.holdOcclusion}.
+   */
+  public holdOcclusion(on: boolean): void {
+    this.systemEffectsController.holdOcclusion(on)
+  }
+
+  /**
    * Enables or disables the real-time debug table
    * @param enable Whether to enable the debug table
    * @param refreshRateMs Optional refresh rate in milliseconds

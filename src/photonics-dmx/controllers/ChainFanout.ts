@@ -4,15 +4,9 @@ import { CueData, CueType, DrumNoteType, InstrumentNoteType } from '../cues/type
 import type { CueRuntime } from '../cueHandlers/CueRuntime'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import type { SongEventCondition } from './sequencer/interfaces'
-import type { RGBIO } from '../types'
-import { getEffectSingleColor } from '../effects/effectSingleColor'
 import { RigChain } from './RigChain'
 import { ChainCueRuntime } from './ChainCueRuntime'
 import type { NetCueMode } from '../cues/types/nodeCueTypes'
-
-/** Top layer (above every cue layer) the lighting-mute overlay occupies, and its effect name. */
-const LIGHTING_MUTE_LAYER = 255
-const LIGHTING_MUTE_EFFECT = 'lighting-mute'
 
 /**
  * Listener / processor surface that dispatches the same incoming event to every active rig
@@ -250,39 +244,15 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
   }
 
   /**
-   * Mute / unmute the DMX lights with a held opaque-black overlay on the TOP layer (255). Unlike a
-   * blackout, this occludes without blocking lower-layer effect submission (blackout gates only
-   * layers < 255), so the underlying lighting cue keeps running on its own layers and reappears at
-   * its natural state the instant the overlay is removed. `on=false` removes just this overlay, not
-   * other layer-255 effects.
+   * Mute / unmute the DMX lights on every chain with a held occluding overlay.
+   *
+   * Unlike a blackout this leaves the running cue alone: it keeps advancing on its own layers and
+   * reappears at its natural state the instant the overlay is released. The overlay is owned by each
+   * sequencer's system-effects controller rather than submitted as an ordinary effect, so it sits
+   * above every cue layer and survives the blackout paths that wipe layers underneath it.
    */
   public muteLighting(on: boolean): void {
-    for (const c of this.chains) {
-      if (on) {
-        const lights = c.dmxLightManager.getLights(['front', 'back', 'strobe'], 'all')
-        if (lights.length === 0) continue
-        const black: RGBIO = {
-          red: 0,
-          green: 0,
-          blue: 0,
-          intensity: 0,
-          opacity: 1,
-          blendMode: 'replace',
-        }
-        c.sequencer.addEffect(
-          LIGHTING_MUTE_EFFECT,
-          getEffectSingleColor({
-            color: black,
-            duration: 0,
-            lights,
-            layer: LIGHTING_MUTE_LAYER,
-          }),
-          true, // persistent: hold the black until explicitly removed
-        )
-      } else {
-        c.sequencer.removeEffect(LIGHTING_MUTE_EFFECT, LIGHTING_MUTE_LAYER)
-      }
-    }
+    for (const c of this.chains) c.sequencer.holdOcclusion(on)
   }
 
   // ── RB3 menu (Rb3MenuCueDispatch) ─────────────────────────────────────────────────────

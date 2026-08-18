@@ -37,6 +37,8 @@ export class LightTransitionController {
    * Tracks the per-layer interpolated colour for each light.
    */
   private _currentLayerStates: Map<string, Map<number, RGBIO>>
+  /** Whether every published colour is forced dark. See {@link setOcclusionHeld}. */
+  private _occlusionHeld: boolean = false
 
   /**
    * Guards against state mutations while a global clear is running.
@@ -577,8 +579,10 @@ export class LightTransitionController {
       finalColor = this.blendWithOpacity(finalColor, layerColor)
     }
 
-    // Update the light state manager (will be batched)
-    this._lightStateManager.setLightState(lightId, finalColor)
+    // Update the light state manager (will be batched). Occlusion is applied here as well as in
+    // calculateFinalColorForLight: this is the per-frame path, so skipping it would let the very
+    // next tick republish the unoccluded blend.
+    this._lightStateManager.setLightState(lightId, this.applyOcclusion(finalColor))
   }
 
   /**
@@ -796,10 +800,49 @@ export class LightTransitionController {
       finalColor = this.blendWithOpacity(finalColor, layerColor)
     }
 
+    finalColor = this.applyOcclusion(finalColor)
+
     // Update the light state manager
     this._lightStateManager.setLightState(lightId, finalColor)
 
     return finalColor
+  }
+
+  /**
+   * Force a blended colour dark while an occlusion is held, keeping pan/tilt so moving heads hold
+   * their aim behind it.
+   *
+   * Applied here, at the one point every published colour passes through, rather than as a
+   * top-layer transition: `clearAllTransitions` (which `setEffect` reaches through
+   * `removeAllEffects`) and the blackout paths empty the transition map wholesale, so an overlay
+   * expressed as a transition would be dropped by the next cue that submits.
+   */
+  private applyOcclusion(color: RGBIO): RGBIO {
+    if (!this._occlusionHeld) {
+      return color
+    }
+    const occluded: RGBIO = { ...color, red: 0, green: 0, blue: 0, intensity: 0, opacity: 1.0 }
+    return occluded
+  }
+
+  /**
+   * Hold or release the occlusion, recomputing every tracked light so it takes effect now rather
+   * than whenever each light next happens to be recalculated.
+   */
+  public setOcclusionHeld(on: boolean): void {
+    if (this._occlusionHeld === on) {
+      return
+    }
+    this._occlusionHeld = on
+    for (const lightId of this._lightStateManager.getTrackedLightIds()) {
+      this.calculateFinalColorForLight(lightId)
+    }
+    this._lightStateManager.publishLightStates()
+  }
+
+  /** Whether the occlusion is currently held. */
+  public isOcclusionHeld(): boolean {
+    return this._occlusionHeld
   }
 
   /**
