@@ -1,5 +1,9 @@
-import { describe, it, expect } from '@jest/globals'
+import { describe, it, expect, jest } from '@jest/globals'
 import { CueSimulator } from '../../sim/CueSimulator'
+
+// Loads a cue library and runs many virtual frames, and the first test also absorbs the library
+// load, which is over the 5s default on a slower CI runner.
+jest.setTimeout(30000)
 
 /**
  * The simulator running an RB3 library: cues resolve against the RB3 registry and each frame carries
