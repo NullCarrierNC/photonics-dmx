@@ -26,6 +26,14 @@ export interface VirtualTimeOptions {
 }
 
 export class VirtualTime {
+  /**
+   * The sinon clock and the `performance.now` patch are process-global, so exactly one VirtualTime
+   * owns them at a time. The owner is tracked here so the next install can reclaim them from an
+   * instance that never disposed (a Jest test that times out before its `finally` runs), and so a
+   * dispose only tears down globals it still owns.
+   */
+  private static activeInstance: VirtualTime | null = null
+
   private clock: InstalledClock | null = null
   private readonly subscribers = new Set<(deltaMs: number) => void>()
   private readonly frameStepMs: number
@@ -41,6 +49,9 @@ export class VirtualTime {
     if (this.clock) {
       throw new Error('VirtualTime is already installed')
     }
+    // Reclaim the globals from an instance that never disposed. Running before the capture below
+    // keeps `originalPerformanceNow` pointing at the real function.
+    VirtualTime.activeInstance?.dispose()
     this.clock = FakeTimers.install({
       now: 0,
       // `performance` is patched directly below rather than via fake-timers: the Sequencer holds
@@ -48,19 +59,27 @@ export class VirtualTime {
       // patching that object in place, which would leave the sequencer on real wall-clock time.
       toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'],
     })
+    VirtualTime.activeInstance = this
     this.tickCount = 0
     const perf = nodePerformance as unknown as { now: () => number }
     this.originalPerformanceNow = perf.now.bind(perf)
     perf.now = () => (this.clock ? this.clock.now : 0)
   }
 
-  /** Restore the real timers. Safe to call more than once. */
+  /**
+   * Restore the real timers. Safe to call more than once, and safe to call late: the globals are
+   * touched only while this instance still owns them, so a superseded instance leaves the current
+   * owner's clock and `performance.now` intact.
+   */
   public dispose(): void {
-    if (this.originalPerformanceNow) {
-      ;(nodePerformance as unknown as { now: () => number }).now = this.originalPerformanceNow
-      this.originalPerformanceNow = null
+    if (VirtualTime.activeInstance === this) {
+      if (this.originalPerformanceNow) {
+        ;(nodePerformance as unknown as { now: () => number }).now = this.originalPerformanceNow
+      }
+      this.clock?.uninstall()
+      VirtualTime.activeInstance = null
     }
-    this.clock?.uninstall()
+    this.originalPerformanceNow = null
     this.clock = null
     this.subscribers.clear()
   }
