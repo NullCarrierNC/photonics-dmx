@@ -1,4 +1,9 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals'
+
+// ConfigFile and the loaders resolve their base directory from app.getPath('appData').
+jest.mock('electron', () => ({
+  app: { getPath: jest.fn(() => '/tmp/photonics-test') },
+}))
 import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
 import { RegistryInitializer } from '../../controllers/RegistryInitializer'
 import { noopRuntimeBroadcaster } from '../../../photonics-dmx/runtime/broadcaster'
