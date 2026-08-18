@@ -234,19 +234,17 @@ const CueEditor: React.FC = () => {
 
   const handleCuePlatformChange = useCallback(
     (p: 'yarg' | 'audio' | 'rb3') => {
-      // rb3 authors the single fixed lighting cue: no effects, no motion.
-      if (p === 'rb3') {
-        handleModeChange('rb3-cue')
-        return
-      }
-      if (isEffectMode) {
+      // rb3 has no effects of its own, so it always lands on a cue.
+      if (isEffectMode && p !== 'rb3') {
         handleModeChange(p === 'audio' ? 'audio-effect' : 'yarg-effect')
         return
       }
       if (cueKind === 'motion') {
-        handleModeChange(p === 'yarg' ? 'yarg-motion-cue' : 'audio-motion-cue')
+        handleModeChange(
+          p === 'yarg' ? 'yarg-motion-cue' : p === 'rb3' ? 'rb3-motion-cue' : 'audio-motion-cue',
+        )
       } else {
-        handleModeChange(p === 'yarg' ? 'yarg-cue' : 'audio-cue')
+        handleModeChange(p === 'yarg' ? 'yarg-cue' : p === 'rb3' ? 'rb3-cue' : 'audio-cue')
       }
     },
     [handleModeChange, isEffectMode, cueKind],
@@ -254,13 +252,19 @@ const CueEditor: React.FC = () => {
 
   const handleCueKindChange = useCallback(
     (k: NodeCueKind) => {
-      // The kind toggle is hidden for rb3 (fixed lighting cue), so it only maps yarg/audio.
-      if (isEffectMode || mode === 'rb3') return
+      // The kind toggle is hidden in effect mode, which has no motion side.
+      if (isEffectMode) return
       setCueKind(k)
       if (k === 'motion') {
-        handleModeChange(mode === 'yarg' ? 'yarg-motion-cue' : 'audio-motion-cue')
+        handleModeChange(
+          mode === 'yarg'
+            ? 'yarg-motion-cue'
+            : mode === 'rb3'
+              ? 'rb3-motion-cue'
+              : 'audio-motion-cue',
+        )
       } else {
-        handleModeChange(mode === 'yarg' ? 'yarg-cue' : 'audio-cue')
+        handleModeChange(mode === 'yarg' ? 'yarg-cue' : mode === 'rb3' ? 'rb3-cue' : 'audio-cue')
       }
     },
     [handleModeChange, isEffectMode, mode, setCueKind],

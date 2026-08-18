@@ -11,9 +11,9 @@ import type {
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { firstByName } from '../lib/cueUtils'
-import type { EditorModeKey } from './useLastCueFilePath'
 import {
   clearLastFilePathForMode,
+  modeKeyFor,
   setLastActiveMode,
   setLastFilePathForMode,
 } from './useLastCueFilePath'
@@ -108,14 +108,11 @@ export function useCueFileIO({
         loadCueIntoFlow(cueToLoad ?? null)
         rememberLastFilePath(fileSummary.path)
         const loadedKind = cueToLoad?.kind ?? cues[0]?.kind
-        const modeKey: EditorModeKey =
-          file.mode === 'yarg'
-            ? loadedKind === 'motion'
-              ? 'yarg-motion-cue'
-              : 'yarg-cue'
-            : loadedKind === 'motion'
-              ? 'audio-motion-cue'
-              : 'audio-cue'
+        const modeKey = modeKeyFor(
+          file.mode,
+          loadedKind === 'motion' ? 'motion' : 'lighting',
+          false,
+        )
         setLastFilePathForMode(modeKey, fileSummary.path)
         setLastActiveMode(modeKey)
       } catch (error) {
@@ -150,7 +147,7 @@ export function useCueFileIO({
         setIsDirty(false)
         loadCueIntoFlow(effectToLoad ?? null)
         rememberLastFilePath(fileSummary.path)
-        const modeKey: EditorModeKey = file.mode === 'yarg' ? 'yarg-effect' : 'audio-effect'
+        const modeKey = modeKeyFor(file.mode, 'lighting', true)
         setLastFilePathForMode(modeKey, fileSummary.path)
         setLastActiveMode(modeKey)
       } catch (error) {
@@ -264,23 +261,15 @@ export function useCueFileIO({
     if (editorDoc.path === lastStoredFilePathRef.current) {
       clearLastFilePath()
     }
-    const fileMode = editorDoc.file.mode
-    const modeKey: EditorModeKey =
-      editorDoc.mode === 'effect'
-        ? fileMode === 'yarg'
-          ? 'yarg-effect'
-          : 'audio-effect'
-        : (() => {
-            const cueFile = editorDoc.file as NodeCueFile
-            const currentCue = selectedCueId
-              ? cueFile.cues.find((c) => c.id === selectedCueId)
-              : undefined
-            const kind = currentCue?.kind
-            if (fileMode === 'yarg') {
-              return kind === 'motion' ? 'yarg-motion-cue' : 'yarg-cue'
-            }
-            return kind === 'motion' ? 'audio-motion-cue' : 'audio-cue'
-          })()
+    const isEffectDoc = editorDoc.mode === 'effect'
+    const deletedKind = isEffectDoc
+      ? undefined
+      : (editorDoc.file as NodeCueFile).cues.find((c) => c.id === selectedCueId)?.kind
+    const modeKey = modeKeyFor(
+      editorDoc.file.mode,
+      deletedKind === 'motion' ? 'motion' : 'lighting',
+      isEffectDoc,
+    )
     clearLastFilePathForMode(modeKey)
     setEditorDoc(null)
     setSelectedCueId(null)

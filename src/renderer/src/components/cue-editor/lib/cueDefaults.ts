@@ -142,8 +142,15 @@ const createDefaultCue = (
     },
   }
 
-  // rb3 authors the single fixed always-active gameplay cue (CueType.RB3), YARG-shaped.
+  // rb3 lighting is the single fixed always-active gameplay cue (CueType.RB3), YARG-shaped. rb3
+  // motion cues are keyed by id like the YARG ones, so they carry no cueType.
   if (mode === 'rb3') {
+    if (kind === 'motion') {
+      return {
+        ...base,
+        kind: 'motion',
+      } as NetNodeCueDefinition
+    }
     return {
       ...base,
       kind: 'lighting',
@@ -204,8 +211,15 @@ const createBlankCue = (
     },
   }
 
-  // rb3 authors the single fixed always-active gameplay cue (CueType.RB3), YARG-shaped.
+  // rb3 lighting is the single fixed always-active gameplay cue (CueType.RB3), YARG-shaped. rb3
+  // motion cues are keyed by id like the YARG ones, so they carry no cueType.
   if (mode === 'rb3') {
+    if (kind === 'motion') {
+      return {
+        ...base,
+        kind: 'motion',
+      } as NetNodeCueDefinition
+    }
     return {
       ...base,
       kind: 'lighting',
@@ -250,7 +264,9 @@ const createDefaultFile = (mode: NodeCueMode, kind: NodeCueKind): NodeCueFile =>
     id: `node-group-${Date.now()}`,
     name:
       mode === 'rb3'
-        ? 'New RB3 Group'
+        ? kind === 'motion'
+          ? 'New RB3 Motion Group'
+          : 'New RB3 Group'
         : mode === 'yarg'
           ? kind === 'motion'
             ? 'New YARG Motion Group'
@@ -266,7 +282,7 @@ const createDefaultFile = (mode: NodeCueMode, kind: NodeCueKind): NodeCueFile =>
       version: 1,
       mode,
       group,
-      cues: [createBlankCue('rb3', 'lighting') as NetNodeCueDefinition],
+      cues: [createBlankCue('rb3', kind) as NetNodeCueDefinition],
       bundled: false,
     } as NetNodeCueFile
   }

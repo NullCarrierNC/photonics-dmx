@@ -1,3 +1,5 @@
+import type { NodeCueKind, NodeCueMode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+
 const STORAGE_PREFIX = 'photonics.nodeCueEditor'
 const LAST_FILE_STORAGE_KEY = `${STORAGE_PREFIX}.lastFilePath`
 const LAST_ACTIVE_MODE_KEY = `${STORAGE_PREFIX}.lastActiveMode`
@@ -7,9 +9,32 @@ export type EditorModeKey =
   | 'audio-cue'
   | 'rb3-cue'
   | 'yarg-motion-cue'
+  | 'rb3-motion-cue'
   | 'audio-motion-cue'
   | 'yarg-effect'
   | 'audio-effect'
+
+/**
+ * The storage key for one editor context. Effects exist only for yarg and audio, and rb3 cues
+ * reference the YARG effects, so rb3 resolves to the yarg effect key.
+ */
+export const modeKeyFor = (
+  mode: NodeCueMode,
+  kind: NodeCueKind,
+  isEffect: boolean,
+): EditorModeKey => {
+  if (isEffect) return mode === 'audio' ? 'audio-effect' : 'yarg-effect'
+  if (mode === 'rb3') return kind === 'motion' ? 'rb3-motion-cue' : 'rb3-cue'
+  if (mode === 'audio') return kind === 'motion' ? 'audio-motion-cue' : 'audio-cue'
+  return kind === 'motion' ? 'yarg-motion-cue' : 'yarg-cue'
+}
+
+/**
+ * The cue-file mode a stored key belongs to. Stored paths are checked against this before being
+ * restored, so a path left behind by another platform is ignored rather than loaded.
+ */
+export const fileModeForModeKey = (modeKey: EditorModeKey): NodeCueMode =>
+  modeKey.startsWith('rb3') ? 'rb3' : modeKey.startsWith('audio') ? 'audio' : 'yarg'
 
 const getStorage = (): Storage | null => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -121,6 +146,7 @@ const getLastActiveMode = (): EditorModeKey | null => {
       raw !== 'rb3-cue' &&
       raw !== 'yarg-motion-cue' &&
       raw !== 'audio-motion-cue' &&
+      raw !== 'rb3-motion-cue' &&
       raw !== 'yarg-effect' &&
       raw !== 'audio-effect'
     )

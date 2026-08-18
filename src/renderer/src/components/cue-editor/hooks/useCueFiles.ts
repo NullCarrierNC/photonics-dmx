@@ -29,12 +29,13 @@ import {
   getLastActiveMode,
   getLastFilePathForMode,
   getLastItemIdForMode,
+  fileModeForModeKey,
   getStoredLastFilePath,
+  modeKeyFor,
   setLastActiveMode,
   setLastItemIdForMode,
   setStoredLastFilePath,
 } from './useLastCueFilePath'
-import type { EditorModeKey } from './useLastCueFilePath'
 import type { EditorDocument, EditorMode } from '../lib/types'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import { useCueFileIO } from './useCueFileIO'
@@ -90,7 +91,11 @@ const useCueFiles = ({
   })
   const [cueKind, setCueKind] = useState<NodeCueKind>(() => {
     const stored = getLastActiveMode()
-    return stored === 'yarg-motion-cue' || stored === 'audio-motion-cue' ? 'motion' : 'lighting'
+    return stored === 'yarg-motion-cue' ||
+      stored === 'audio-motion-cue' ||
+      stored === 'rb3-motion-cue'
+      ? 'motion'
+      : 'lighting'
   })
   const [editorMode, setEditorMode] = useState<EditorMode>(() => {
     const stored = getLastActiveMode()
@@ -384,26 +389,18 @@ const useCueFiles = ({
     (nextMode: string) => {
       const isEffect = nextMode === 'yarg-effect' || nextMode === 'audio-effect'
       const cueMode: NodeCueMode =
-        nextMode === 'rb3-cue'
+        nextMode === 'rb3-cue' || nextMode === 'rb3-motion-cue'
           ? 'rb3'
           : nextMode === 'yarg-effect' || nextMode === 'yarg-cue' || nextMode === 'yarg-motion-cue'
             ? 'yarg'
             : 'audio'
       const nextKind: NodeCueKind =
-        nextMode === 'yarg-motion-cue' || nextMode === 'audio-motion-cue' ? 'motion' : 'lighting'
-      const modeKey: EditorModeKey = isEffect
-        ? cueMode === 'yarg'
-          ? 'yarg-effect'
-          : 'audio-effect'
-        : nextMode === 'rb3-cue'
-          ? 'rb3-cue'
-          : nextMode === 'yarg-motion-cue'
-            ? 'yarg-motion-cue'
-            : nextMode === 'audio-motion-cue'
-              ? 'audio-motion-cue'
-              : cueMode === 'yarg'
-                ? 'yarg-cue'
-                : 'audio-cue'
+        nextMode === 'yarg-motion-cue' ||
+        nextMode === 'audio-motion-cue' ||
+        nextMode === 'rb3-motion-cue'
+          ? 'motion'
+          : 'lighting'
+      const modeKey = modeKeyFor(cueMode, nextKind, isEffect)
 
       setMode(cueMode)
       if (!isEffect) {
@@ -414,9 +411,15 @@ const useCueFiles = ({
 
       const storedPath = getLastFilePathForMode(modeKey)
       const preferredItemId = getLastItemIdForMode(modeKey) ?? undefined
+      // The stored path must also belong to the mode we are switching to. `files` is flattened
+      // across every mode, so a path left behind by another platform would otherwise load here and
+      // drag the editor back to that platform. An unmatched entry falls through and clears instead.
+      const expectedFileMode = fileModeForModeKey(modeKey)
 
       if (isEffect) {
-        const summary = effectFiles.find((f) => f.path === storedPath)
+        const summary = effectFiles.find(
+          (f) => f.path === storedPath && f.mode === expectedFileMode,
+        )
         if (summary) {
           fileIO.selectEffectFile(summary, preferredItemId)
         } else {
@@ -427,7 +430,7 @@ const useCueFiles = ({
           setIsDirty(false)
         }
       } else {
-        const summary = files.find((f) => f.path === storedPath)
+        const summary = files.find((f) => f.path === storedPath && f.mode === expectedFileMode)
         if (summary) {
           fileIO.selectFile(summary, preferredItemId)
         } else {
@@ -485,21 +488,10 @@ const useCueFiles = ({
     if (!selectedCueId || !editorDoc) return
     const isEffect = editorDoc.mode === 'effect'
     const cueMode = editorDoc.file.mode
-    const modeKey: EditorModeKey = isEffect
-      ? cueMode === 'yarg'
-        ? 'yarg-effect'
-        : 'audio-effect'
-      : (() => {
-          if (cueMode === 'rb3') return 'rb3-cue'
-          const currentCue = (editorDoc.file as NodeCueFile).cues.find(
-            (c) => c.id === selectedCueId,
-          )
-          const kind = currentCue?.kind
-          if (cueMode === 'yarg') {
-            return kind === 'motion' ? 'yarg-motion-cue' : 'yarg-cue'
-          }
-          return kind === 'motion' ? 'audio-motion-cue' : 'audio-cue'
-        })()
+    const selectedKind = isEffect
+      ? undefined
+      : (editorDoc.file as NodeCueFile).cues.find((c) => c.id === selectedCueId)?.kind
+    const modeKey = modeKeyFor(cueMode, selectedKind === 'motion' ? 'motion' : 'lighting', isEffect)
     setLastItemIdForMode(modeKey, selectedCueId)
   }, [selectedCueId, editorDoc])
 
@@ -521,14 +513,16 @@ const useCueFiles = ({
 
     const preferredItemId = getLastItemIdForMode(modeKey) ?? undefined
 
+    const expectedFileMode = fileModeForModeKey(modeKey)
+
     if (isEffect) {
       if (effectFiles.length === 0) return
-      const summary = effectFiles.find((f) => f.path === storedPath)
+      const summary = effectFiles.find((f) => f.path === storedPath && f.mode === expectedFileMode)
       restoredLastFileRef.current = true
       if (summary) fileIO.selectEffectFile(summary, preferredItemId)
     } else {
       if (files.length === 0) return
-      const summary = files.find((f) => f.path === storedPath)
+      const summary = files.find((f) => f.path === storedPath && f.mode === expectedFileMode)
       restoredLastFileRef.current = true
       if (summary) fileIO.selectFile(summary, preferredItemId)
     }
