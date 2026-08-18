@@ -121,3 +121,25 @@ describe('cue schema registry', () => {
     expect(() => validatorFor('yarg')).toThrow(/no cue kinds registered/i)
   })
 })
+
+describe('the shipped registration path', () => {
+  it('still accepts a kind registered after cueFiles is imported', async () => {
+    // The deferral is only worth anything if importing the module that registers the built-in kinds
+    // does not itself compile a validator. Resolving the exported accessors here rather than binding
+    // them at import is what keeps that true, so an added kind is not order-dependent.
+    const cueFiles = await import('../../../cues/node/schema/cueFiles')
+
+    expect(() =>
+      registerKindSchema('laser', {
+        net: kindSchema('laser', 'cueType'),
+        audio: kindSchema('laser', 'cueTypeId'),
+      }),
+    ).not.toThrow()
+
+    // And the kind it registered is in the validator the shipped accessor hands back.
+    const validate = cueFiles.validateYargSchema()
+    expect(
+      validate(file('yarg', [{ id: 'c1', kind: 'laser', cueType: 'Chorus' }]) as unknown as object),
+    ).toBe(true)
+  })
+})

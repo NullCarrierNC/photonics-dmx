@@ -60,7 +60,8 @@ interface CueFileValidationSpec<T extends NodeCueFile> {
   mode: NodeCueMode
   /** Migrations and defaulting applied before the envelope is checked. */
   prepare: (value: unknown) => unknown
-  validate: ValidateFunction
+  /** Resolved per call so the mode's validator compiles on first use, not at import. */
+  validate: () => ValidateFunction
   /** How a lighting cue of this mode is keyed, and how a clash reads. */
   lightingKey: (cue: T['cues'][number]) => string
   duplicateLightingMessage: (key: string, groupName: string) => string
@@ -116,11 +117,12 @@ function runCueFileValidation<T extends NodeCueFile>(
   value: unknown,
 ): NodeCueValidationResult<T> {
   const migrated = spec.prepare(value)
-  if (!spec.validate(migrated)) {
+  const validate = spec.validate()
+  if (!validate(migrated)) {
     return {
       valid: false,
-      errors: formatErrors(spec.validate.errors as DefinedError[]),
-      structuredErrors: extractStructuredErrors(spec.validate.errors as DefinedError[]),
+      errors: formatErrors(validate.errors as DefinedError[]),
+      structuredErrors: extractStructuredErrors(validate.errors as DefinedError[]),
     }
   }
 

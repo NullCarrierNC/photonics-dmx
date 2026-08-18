@@ -8,9 +8,10 @@
  * and a build that adds its own kind registers from an import-time module of its own.
  *
  * Compilation is deferred to the first {@link validatorFor} so a registration made while modules are
- * still loading is still included. Registering after that throws, because the validator it would
- * have joined has already been built and a silent no-op there would look like a schema that simply
- * refuses the new kind.
+ * still loading is still included. That deferral only holds if nothing resolves a validator at
+ * import time, which is why `cueFiles` exports accessors rather than bound validators. Registering
+ * after the first validation throws, because the validator it would have joined has already been
+ * built and a silent no-op there would look like a schema that simply refuses the new kind.
  */
 
 import type { ValidateFunction } from 'ajv'

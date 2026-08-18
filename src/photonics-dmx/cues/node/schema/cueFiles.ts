@@ -68,6 +68,13 @@ setGroupSchema(groupSchema)
 registerKindSchema('lighting', { net: netLightingCueSchema, audio: audioLightingCueSchema })
 registerKindSchema('motion', { net: netMotionCueSchema, audio: audioMotionCueSchema })
 
-export const validateYargSchema = validatorFor('yarg') as ValidateFunction<NetNodeCueFile>
-export const validateAudioSchema = validatorFor('audio') as ValidateFunction<AudioNodeCueFile>
-export const validateRb3Schema = validatorFor('rb3') as ValidateFunction<NetNodeCueFile>
+// Resolved per call rather than at import. The registry compiles a mode's validator once, on first
+// use, so a build registering its own cue kind from another import-time module is still included
+// whichever order the two modules happen to load in. Binding these eagerly here would compile all
+// three the moment this module was imported and turn every later registration into a throw.
+export const validateYargSchema = (): ValidateFunction<NetNodeCueFile> =>
+  validatorFor('yarg') as ValidateFunction<NetNodeCueFile>
+export const validateAudioSchema = (): ValidateFunction<AudioNodeCueFile> =>
+  validatorFor('audio') as ValidateFunction<AudioNodeCueFile>
+export const validateRb3Schema = (): ValidateFunction<NetNodeCueFile> =>
+  validatorFor('rb3') as ValidateFunction<NetNodeCueFile>
