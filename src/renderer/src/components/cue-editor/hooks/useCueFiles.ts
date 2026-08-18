@@ -91,7 +91,11 @@ const useCueFiles = ({
   })
   const [cueKind, setCueKind] = useState<NodeCueKind>(() => {
     const stored = getLastActiveMode()
-    return stored === 'yarg-motion-cue' || stored === 'audio-motion-cue' ? 'motion' : 'lighting'
+    return stored === 'yarg-motion-cue' ||
+      stored === 'audio-motion-cue' ||
+      stored === 'rb3-motion-cue'
+      ? 'motion'
+      : 'lighting'
   })
   const [editorMode, setEditorMode] = useState<EditorMode>(() => {
     const stored = getLastActiveMode()
@@ -385,13 +389,17 @@ const useCueFiles = ({
     (nextMode: string) => {
       const isEffect = nextMode === 'yarg-effect' || nextMode === 'audio-effect'
       const cueMode: NodeCueMode =
-        nextMode === 'rb3-cue'
+        nextMode === 'rb3-cue' || nextMode === 'rb3-motion-cue'
           ? 'rb3'
           : nextMode === 'yarg-effect' || nextMode === 'yarg-cue' || nextMode === 'yarg-motion-cue'
             ? 'yarg'
             : 'audio'
       const nextKind: NodeCueKind =
-        nextMode === 'yarg-motion-cue' || nextMode === 'audio-motion-cue' ? 'motion' : 'lighting'
+        nextMode === 'yarg-motion-cue' ||
+        nextMode === 'audio-motion-cue' ||
+        nextMode === 'rb3-motion-cue'
+          ? 'motion'
+          : 'lighting'
       const modeKey = modeKeyFor(cueMode, nextKind, isEffect)
 
       setMode(cueMode)

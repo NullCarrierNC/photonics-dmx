@@ -13,9 +13,9 @@ describe('modeKeyFor', () => {
     expect(modeKeyFor('audio', 'motion', false)).toBe('audio-motion-cue')
   })
 
-  it('keys rb3 cues to rb3-cue for either kind', () => {
+  it('keys rb3 cues by kind too', () => {
     expect(modeKeyFor('rb3', 'lighting', false)).toBe('rb3-cue')
-    expect(modeKeyFor('rb3', 'motion', false)).toBe('rb3-cue')
+    expect(modeKeyFor('rb3', 'motion', false)).toBe('rb3-motion-cue')
   })
 
   it('never files an rb3 cue under an audio key', () => {
@@ -34,8 +34,7 @@ describe('modeKeyFor', () => {
 
   it('returns a distinct key per cue context and never collides across modes', () => {
     const keys = MODES.flatMap((mode) => KINDS.map((kind) => modeKeyFor(mode, kind, false)))
-    // yarg and audio contribute two each, rb3 collapses its two kinds onto one key.
-    expect(new Set(keys).size).toBe(5)
+    expect(new Set(keys).size).toBe(MODES.length * KINDS.length)
   })
 })
 
