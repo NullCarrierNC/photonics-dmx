@@ -1,5 +1,10 @@
 import { describe, expect, it, jest } from '@jest/globals'
 
+// ConfigFile and the loaders resolve their base directory from app.getPath('appData').
+jest.mock('electron', () => ({
+  app: { getPath: jest.fn(() => '/tmp/photonics-test') },
+}))
+
 // Stub electron so BrowserWindow lookups inside sendToAllWindows don't crash on prototype-stub tests.
 jest.mock('../../utils/windowUtils', () => ({
   sendToAllWindows: jest.fn(),
