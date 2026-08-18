@@ -134,6 +134,34 @@ Effect files run the same graph-level semantic checks as cue files, logic-only c
 and conditional literal-vs-variable `validValues` checks (`checkConditionalValidValues`), via `checkEffectSemantics`
 in `validation.ts`. An invalid effect graph is rejected at validation time just like an invalid cue graph.
 
+A cue file's envelope accepts the whole net event superset rather than only its own mode's vocabulary, so a file
+that already reads outside its list keeps loading. What that would otherwise hide, an event a mode can never
+receive, is reported as a **warning**: the file still loads and runs, and the message reaches the loader summary,
+the log, and the JSON editor's notice line. Warnings come from the same registered checks as errors, which take
+`(file, errors, warnings)` and choose which list to push to.
+
+## Extension points
+
+Several seams here exist so a build can add a cue kind, a mode, or a second consumer of a cue stream without
+editing the shared code. Most have no in-tree consumer yet; they are listed so their contract is not guessed at.
+
+| Seam                                     | Where                           | What it takes                                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `registerNodeCueKindStrategy`            | `loader/NodeCueLoader.ts`       | A handler for cue files of a kind the loader does not build itself. Claims a file from the cues it declares, then owns its registration, teardown, cue-type list and summary count. Register from an import-time module, before any file loads.                                                                                           |
+| `registerKindSchema`                     | `schema/cueSchemaRegistry.ts`   | That kind's definition schema, one variant per family. A mode's file validator compiles on first use, so registration must happen before the first validation; it throws rather than silently no-op afterwards. `schema/cueFiles.ts` exports accessors rather than bound validators precisely so importing it does not close that window. |
+| `registerCueSemanticCheck`               | `schema/validation.ts`          | A check over a validated file. Pushing to `errors` fails the file, pushing to `warnings` reports it while the file still loads. The built-in event-vocabulary warning is registered through this hook.                                                                                                                                    |
+| `CueDomainDescriptor`                    | `../domains/index.ts`           | One descriptor per mode: family, authorable event types and cue-data properties, effect tree, and the two runtime hooks. Adding a mode is a descriptor plus a registry, not a branch in the engine.                                                                                                                                       |
+| `LogicNodeEvaluatorContext.lightManager` | `runtime/logicNodeEvaluator.ts` | Optional, so a graph that drives no DMX lights can run the same evaluator. The light-dependent logic types throw a clear error rather than reading undefined.                                                                                                                                                                             |
+
+Two more sit outside this directory, for a build teeing one cue stream to a second consumer:
+
+| Seam                                          | Where                                     | What it takes                                                                                                                                                                                                                                          |
+| --------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CompositeCueRuntime` / `SecondaryCueRuntime` | `cueHandlers/CompositeCueRuntime.ts`      | Wraps a `CueRuntime` so a listener still sees one runtime while a second consumer reads the same cues. The secondary decides whether its look plays; hooks decide whether the primary is suppressed, and whether an occluding overlay is held over it. |
+| `AudioSecondaryRuntime`                       | `processors/AudioSecondaryRuntime.ts`     | The audio-side equivalent, attached with `AudioCueProcessor.setSecondaryRuntime`. Fed the same frame as the DMX fan-out, following the same primary and strobe cue types.                                                                              |
+| `ListenerCoordinator.decorateCueRuntime`      | `main/controllers/ListenerCoordinator.ts` | Where a build wraps a domain's runtime before the listener or processor consumes it.                                                                                                                                                                   |
+| `ChainFanout.muteLighting`                    | `controllers/ChainFanout.ts`              | Holds or releases an occluding overlay across every rig, so a solo secondary plays over dark lights without stopping the running cue. Owned by each sequencer's system-effects controller, above every cue layer.                                      |
+
 ## Related
 
 - Visual editor: `src/renderer/src/components/cue-editor/`
