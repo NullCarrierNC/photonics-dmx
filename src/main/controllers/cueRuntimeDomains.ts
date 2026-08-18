@@ -7,7 +7,10 @@ import {
   noopRuntimeBroadcaster,
   type RuntimeBroadcaster,
 } from '../../photonics-dmx/runtime/broadcaster'
-import type { CueDomain } from '../../services/configuration/cueDomainTypes'
+import {
+  createDefaultCueDomainPrefs,
+  type CueDomain,
+} from '../../services/configuration/cueDomainTypes'
 import type { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { RigChain } from './RigChain'
@@ -65,13 +68,17 @@ export function readMotionPrefs(
   config: ConfigurationManager,
   domain: NetCueMode,
 ): MotionPrefsSnapshot {
-  const prefs = config.getPreference('cueDomains')[cueRuntimeDomain(domain).motionPrefs]
+  const motionDomain = cueRuntimeDomain(domain).motionPrefs
+  const prefs = config.getPreference('cueDomains')[motionDomain]
+  // Fall back to what a fresh install would have been seeded with, rather than to literals written
+  // out again here: a value the runtime invents is one the preferences UI would report differently.
+  const seeded = createDefaultCueDomainPrefs(motionDomain)
   return {
     activeCueRef: prefs.activeCueRef ?? null,
-    minimumHoldMs: prefs.minimumHoldMs ?? 5000,
-    probabilityPercent: prefs.probabilityPercent ?? 100,
-    cueDurationMin: prefs.cueDurationMin ?? 5,
-    cueDurationMax: prefs.cueDurationMax ?? 20,
+    minimumHoldMs: prefs.minimumHoldMs ?? seeded.minimumHoldMs!,
+    probabilityPercent: prefs.probabilityPercent ?? seeded.probabilityPercent!,
+    cueDurationMin: prefs.cueDurationMin ?? seeded.cueDurationMin!,
+    cueDurationMax: prefs.cueDurationMax ?? seeded.cueDurationMax!,
   }
 }
 

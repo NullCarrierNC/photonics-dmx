@@ -5,7 +5,10 @@ import { ipcError } from './ipcResult'
 import { LIGHT } from '../../shared/ipcChannels'
 import { validateCueGroupSelectionMode, validateNumberInRange } from './inputValidation'
 import type { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
-import type { CueDomain } from '../../services/configuration/cueDomainTypes'
+import {
+  createDefaultCueDomainPrefs,
+  type CueDomain,
+} from '../../services/configuration/cueDomainTypes'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('cue-selection-prefs-handlers')
 
@@ -21,7 +24,6 @@ interface MotionNumberPrefSpec {
   /** Key the renderer reads the value back under. */
   resultKey: 'minHoldMs' | 'percent'
   max: number
-  fallback: number
   validationLabel: string
   persist: (config: ConfigurationManager, value: number) => Promise<void>
   channels: { get: string; set: string }
@@ -34,7 +36,6 @@ const MOTION_NUMBER_PREFS: readonly MotionNumberPrefSpec[] = [
     field: 'minimumHoldMs',
     resultKey: 'minHoldMs',
     max: 600000,
-    fallback: 5000,
     validationLabel: 'motionCueMinimumHoldMs',
     persist: (config, value) => config.setMotionCueMinimumHoldMs(value),
     channels: { get: LIGHT.GET_MOTION_CUE_MIN_HOLD_MS, set: LIGHT.SET_MOTION_CUE_MIN_HOLD_MS },
@@ -45,7 +46,6 @@ const MOTION_NUMBER_PREFS: readonly MotionNumberPrefSpec[] = [
     field: 'minimumHoldMs',
     resultKey: 'minHoldMs',
     max: 600000,
-    fallback: 5000,
     validationLabel: 'rb3MotionCueMinimumHoldMs',
     persist: (config, value) => config.updateCueDomain('rb3Motion', { minimumHoldMs: value }),
     channels: {
@@ -59,7 +59,6 @@ const MOTION_NUMBER_PREFS: readonly MotionNumberPrefSpec[] = [
     field: 'probabilityPercent',
     resultKey: 'percent',
     max: 100,
-    fallback: 50,
     validationLabel: 'motionCueProbabilityPercent',
     persist: (config, value) => config.setMotionCueProbabilityPercent(value),
     channels: {
@@ -73,7 +72,6 @@ const MOTION_NUMBER_PREFS: readonly MotionNumberPrefSpec[] = [
     field: 'probabilityPercent',
     resultKey: 'percent',
     max: 100,
-    fallback: 50,
     validationLabel: 'audioMotionCueProbabilityPercent',
     persist: (config, value) => config.setAudioMotionCueProbabilityPercent(value),
     channels: {
@@ -87,7 +85,6 @@ const MOTION_NUMBER_PREFS: readonly MotionNumberPrefSpec[] = [
     field: 'probabilityPercent',
     resultKey: 'percent',
     max: 100,
-    fallback: 50,
     validationLabel: 'rb3MotionCueProbabilityPercent',
     persist: (config, value) => config.updateCueDomain('rb3Motion', { probabilityPercent: value }),
     channels: {
@@ -133,9 +130,12 @@ export function setupCueSelectionPrefsHandlers(
   })
 
   for (const spec of MOTION_NUMBER_PREFS) {
+    // An unset tunable reads back as whatever a fresh install would have been seeded with, so the
+    // preferences UI and the runtime never report different values for the same missing key.
     const read = () =>
       controllerManager.getConfig().getPreference('cueDomains')[spec.prefsDomain][spec.field] ??
-      spec.fallback
+      createDefaultCueDomainPrefs(spec.prefsDomain)[spec.field] ??
+      0
 
     ipcMain.handle(spec.channels.get, async () => {
       try {
