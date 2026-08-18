@@ -90,8 +90,13 @@ describe('LightsDmxChannelsPreview extra channels', () => {
   it('shows the DMX address alongside each value', () => {
     const l = light(RGB, [{ type: 'amber', channel: 5 }])
     render(<LightsDmxChannelsPreview lightingConfig={config(l)} dmxValues={{ 5: 200 }} />)
-    const amberRow = screen.getByText(/^Amber/).closest('li') as HTMLElement
-    expect(within(amberRow).getByText(/ch 5/)).toBeTruthy()
+    const address = within(screen.getByText(/^Amber/).closest('li') as HTMLElement).getByText(
+      /#5\b/,
+    )
+    expect(address.textContent).toContain('#5')
+    // Nothing else in the rig claims 5, so the shared-address marker stays off.
+    expect(address.textContent).not.toContain('⚠')
+    expect(address.getAttribute('title')).toBeNull()
   })
 
   it('flags an address two lights in the rig both claim', () => {
@@ -106,10 +111,10 @@ describe('LightsDmxChannelsPreview extra channels', () => {
     render(<LightsDmxChannelsPreview lightingConfig={twoLights} dmxValues={{ 11: 255 }} />)
 
     const amberRow = screen.getByText(/^Amber/).closest('li') as HTMLElement
-    expect(within(amberRow).getByText(/ch 11/).textContent).toContain('⚠')
+    expect(within(amberRow).getByText(/#11\b/).textContent).toContain('⚠')
     // The unshared channels stay unflagged.
     const redRow = screen.getAllByText(/^red/)[0].closest('li') as HTMLElement
-    expect(within(redRow).getByText(/ch 2/).textContent).not.toContain('⚠')
+    expect(within(redRow).getByText(/#2\b/).textContent).not.toContain('⚠')
   })
 
   it('does not flag AllCapable strobe snapshots that duplicate front/back addresses', () => {
@@ -123,7 +128,7 @@ describe('LightsDmxChannelsPreview extra channels', () => {
     render(<LightsDmxChannelsPreview lightingConfig={allCapable} dmxValues={{}} />)
 
     const redRow = screen.getByText(/^red/).closest('li') as HTMLElement
-    expect(within(redRow).getByText(/ch 2/).textContent).not.toContain('⚠')
+    expect(within(redRow).getByText(/#2\b/).textContent).not.toContain('⚠')
   })
 
   it('still flags a real overlap under AllCapable', () => {
@@ -142,7 +147,7 @@ describe('LightsDmxChannelsPreview extra channels', () => {
     render(<LightsDmxChannelsPreview lightingConfig={allCapable} dmxValues={{ 11: 255 }} />)
 
     const amberRow = screen.getByText(/^Amber/).closest('li') as HTMLElement
-    expect(within(amberRow).getByText(/ch 11/).textContent).toContain('⚠')
+    expect(within(amberRow).getByText(/#11\b/).textContent).toContain('⚠')
   })
 
   it('flags dedicated strobe rows that overlap primary lights', () => {
@@ -161,6 +166,6 @@ describe('LightsDmxChannelsPreview extra channels', () => {
     render(<LightsDmxChannelsPreview lightingConfig={dedicated} dmxValues={{ 2: 255 }} />)
 
     const redRow = screen.getByText(/^red/).closest('li') as HTMLElement
-    expect(within(redRow).getByText(/ch 2/).textContent).toContain('⚠')
+    expect(within(redRow).getByText(/#2\b/).textContent).toContain('⚠')
   })
 })
