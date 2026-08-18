@@ -1,12 +1,13 @@
 /**
  * Categorised event options for the cue editor's event-node dropdown.
  *
- * The values come from the mode's domain descriptor rather than a list kept here, so the editor can
- * never offer an event the domain disallows nor miss one it allows. This file only decides how those
- * values are grouped and labelled for display.
+ * The values come from the mode's vocabulary rather than a list kept here, so the editor can never
+ * offer an event the domain disallows nor miss one it allows. This file only decides how those
+ * values are grouped and labelled for display. It reads the vocabulary rather than the whole
+ * descriptor because the renderer bundles this, and the descriptor's runtime hooks cannot go there.
  */
 
-import { getCueDomain } from '../../domains'
+import { getCueVocabulary } from '../../domains/vocabulary'
 import type { NodeCueMode } from '../../types/nodeCueTypes'
 
 /**
@@ -70,7 +71,7 @@ function labelFor(value: string): string {
 /** Group one mode's authorable event types into the editor's categories, empty ones dropped. */
 function eventCategoriesFor(mode: NodeCueMode): EventCategory[] {
   const byCategory = new Map<string, { value: string; label: string }[]>()
-  for (const value of getCueDomain(mode).eventTypes) {
+  for (const value of getCueVocabulary(mode).eventTypes) {
     const category = CATEGORIES.find((c) => c.claims(value))!.category
     const events = byCategory.get(category) ?? []
     events.push({ value, label: labelFor(value) })

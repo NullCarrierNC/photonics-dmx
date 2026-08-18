@@ -18,28 +18,15 @@ import type {
   NodeCueKind,
   NodeCueMode,
 } from '../types/nodeCueTypes'
-import {
-  YARG_CUE_DATA_PROPERTY_META,
-  RB3_CUE_DATA_PROPERTY_META,
-  AUDIO_CUE_DATA_PROPERTY_META,
-} from '../../constants/cueDataPropertyMeta'
-import { NODE_SYSTEM_EVENTS, YARG_SONG_EVENTS, RB3_SONG_EVENTS } from '../../types'
-import { AUDIO_EVENT_OPTIONS } from '../../constants/options'
+import { getCueVocabulary, type CueVocabulary } from './vocabulary'
 import { isNetEventTriggered, extractNetCueDataValue } from './net'
 import { extractAudioCueDataValue } from './audio'
 
 export type CueFamily = 'net' | 'audio'
 
-export interface CueDomainDescriptor {
+export interface CueDomainDescriptor extends CueVocabulary {
   id: NodeCueMode
   family: CueFamily
-  /** The event types this mode may author, driving the editor lists and the bundled-cue audit. */
-  eventTypes: readonly string[]
-  /**
-   * The cue-data properties this mode may author, same role as `eventTypes`. Narrower than what the
-   * extractor resolves: the union stays readable so an existing file outside this list keeps working.
-   */
-  cueDataProperties: readonly string[]
   /** Which effect tree this mode's cues raise effects from. RB3 folds onto the yarg tree. */
   effectMode: EffectMode
   /**
@@ -62,9 +49,6 @@ export interface CueDomainDescriptor {
   ): number | string | boolean
 }
 
-const NET_EVENT_VOCABULARY = [...NODE_SYSTEM_EVENTS, ...YARG_SONG_EVENTS] as const
-const RB3_EVENT_VOCABULARY = [...NODE_SYSTEM_EVENTS, ...RB3_SONG_EVENTS] as const
-
 /**
  * Shared by both net modes: one gate and one extractor over the one `CueData` shape. The extractor
  * resolves the whole net superset rather than the mode's authoring list, so an existing rb3 file that
@@ -77,14 +61,11 @@ const netRuntime = {
     extractNetCueDataValue(property as NetCueDataProperty, cueData as CueData, cueId),
 }
 
-const propertyIds = (meta: readonly { id: string }[]): readonly string[] => meta.map((m) => m.id)
-
 export const CUE_DOMAIN_DESCRIPTORS: Record<NodeCueMode, CueDomainDescriptor> = {
   yarg: {
     ...netRuntime,
+    ...getCueVocabulary('yarg'),
     id: 'yarg',
-    eventTypes: NET_EVENT_VOCABULARY,
-    cueDataProperties: propertyIds(YARG_CUE_DATA_PROPERTY_META),
     effectMode: 'yarg',
     // RB3 is its own domain (a single always-active gameplay cue), not a YARG-selectable look, so
     // it is excluded from the YARG lighting picker.
@@ -93,19 +74,15 @@ export const CUE_DOMAIN_DESCRIPTORS: Record<NodeCueMode, CueDomainDescriptor> = 
   },
   rb3: {
     ...netRuntime,
+    ...getCueVocabulary('rb3'),
     id: 'rb3',
-    // The StageKit stream yields lifecycle plus LED/fog edges only, so the tempo, keyframe and
-    // instrument events are not authorable here: picking one would wait forever.
-    eventTypes: RB3_EVENT_VOCABULARY,
-    cueDataProperties: propertyIds(RB3_CUE_DATA_PROPERTY_META),
     effectMode: 'yarg',
     cueTypesFor: (kind) => (kind === 'motion' ? [] : [CueType.RB3]),
   },
   audio: {
+    ...getCueVocabulary('audio'),
     id: 'audio',
     family: 'audio',
-    eventTypes: AUDIO_EVENT_OPTIONS,
-    cueDataProperties: propertyIds(AUDIO_CUE_DATA_PROPERTY_META),
     effectMode: 'audio',
     cueTypesFor: (kind, ctx) => (kind === 'motion' ? [] : ctx.extraTypes),
     isEventTriggered: () => false,
