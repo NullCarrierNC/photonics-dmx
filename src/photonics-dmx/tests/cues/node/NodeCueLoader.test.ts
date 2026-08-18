@@ -363,7 +363,7 @@ describe('NodeCueLoader', () => {
   describe('cue file path resolution', () => {
     it('rejects readFile for paths outside YARG/audio cue directories', async () => {
       await expect(loader.readFile('/etc/passwd')).rejects.toThrow(
-        /Node cue file path must be under the YARG or audio cue directories/,
+        /Node cue file path must be under one of the cue directories/,
       )
     })
 
@@ -397,13 +397,13 @@ describe('NodeCueLoader', () => {
 
     it('rejects path traversal escaping the cue roots', () => {
       expect(() => loader.resolveCueFilePathForIpc('../../etc/passwd')).toThrow(
-        /must be under the YARG or audio cue directories/,
+        /must be under one of the cue directories/,
       )
     })
 
     it('rejects an absolute path outside the cue roots', () => {
       expect(() => loader.resolveCueFilePathForIpc('/etc/passwd')).toThrow(
-        /must be under the YARG or audio cue directories/,
+        /must be under one of the cue directories/,
       )
     })
 

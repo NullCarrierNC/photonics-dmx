@@ -84,7 +84,8 @@ export class CueSimulator {
 
   private frameDriver!: FrameDriver
   private groupId = ''
-  private loadedGroupIds: string[] = []
+  /** Groups this run registered, per net domain, so teardown drops exactly what it loaded. */
+  private loadedGroupIdsByDomain: Record<NetCueMode, string[]> = { yarg: [], rb3: [] }
 
   private currentCue: CueType | undefined
   private venue: VenueSize
@@ -170,8 +171,11 @@ export class CueSimulator {
     })
     await loader.loadAll()
 
-    const summaries = loader.getSummary()[this.opts.domain]
-    this.loadedGroupIds = summaries.map((s) => s.groupId)
+    const allSummaries = loader.getSummary()
+    for (const domain of ['yarg', 'rb3'] as const) {
+      this.loadedGroupIdsByDomain[domain] = allSummaries[domain].map((s) => s.groupId)
+    }
+    const summaries = allSummaries[this.opts.domain]
     const fileToGroup = new Map<string, string>()
     for (const summary of summaries) {
       fileToGroup.set(path.basename(summary.path, '.json'), summary.groupId)
@@ -181,7 +185,10 @@ export class CueSimulator {
     const resolvedGroupId = registry.getGroup(requested) ? requested : fileToGroup.get(requested)
     if (!resolvedGroupId || !registry.getGroup(resolvedGroupId)) {
       const available = Array.from(
-        new Set([...this.loadedGroupIds, ...Array.from(fileToGroup.keys())]),
+        new Set([
+          ...this.loadedGroupIdsByDomain[this.opts.domain],
+          ...Array.from(fileToGroup.keys()),
+        ]),
       ).sort()
       throw new Error(
         `Cue library '${requested}' not found. Available libraries: ${available.join(', ')}`,
@@ -331,12 +338,18 @@ export class CueSimulator {
     try {
       this.handler.shutdown()
       this.sequencer.shutdown()
-      const registry = getCueRegistry(this.opts.domain)
-      registry.releaseSequencerFromAllCues(this.sequencer)
-      for (const id of this.loadedGroupIds) {
-        registry.unregisterGroup(id)
+      // The loader fills every net registry, not just the one under test, so tear down both:
+      // a second simulator in the same process would otherwise find stale per-sequencer state and
+      // groups still registered from the previous run.
+      for (const domain of ['yarg', 'rb3'] as const) {
+        const registry = getCueRegistry(domain)
+        registry.releaseSequencerFromAllCues(this.sequencer)
+        for (const id of this.loadedGroupIdsByDomain[domain]) {
+          registry.unregisterGroup(id)
+        }
       }
-      registry.reset()
+      // Only the domain under test had its registry reset on the way in, so only it is reset here.
+      getCueRegistry(this.opts.domain).reset()
       this.lightStateManager.shutdown()
     } finally {
       this.virtualTime.dispose()

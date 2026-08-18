@@ -3,7 +3,7 @@ import type { IAudioCue } from '../../photonics-dmx/cues/interfaces/IAudioCue'
 import type { ChainFanout } from './ChainFanout'
 import type { RigChain } from './RigChain'
 import type { CueData } from '../../photonics-dmx/cues/types/cueTypes'
-import type { NetCueMode, NodeCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
+import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { createMockAudioCueData } from '../ipc/mockCueData'
 
 interface MotionCueSimulatorDeps {
@@ -64,32 +64,35 @@ export class MotionCueSimulator {
   }
 
   /**
-   * Execute one domain's active motion cue once per active rig chain. Game domains run against the
-   * supplied mock cue data; audio builds fresh mock audio each pass from its own execution counter.
+   * Execute one net domain's active motion cue once per active rig chain, against the supplied
+   * frame. Separate from {@link runAudio} rather than one call taking an optional frame: a net
+   * domain cannot run without one, and an optional parameter would turn forgetting it into a silent
+   * no-op instead of a type error.
    */
-  async run(domain: NodeCueMode, mockCueData?: CueData): Promise<void> {
-    if (domain === 'audio') {
-      if (!this.audioCue) return
-      this.audioExecutionCount++
-      const mockAudio = createMockAudioCueData(this.audioExecutionCount)
-      const cue = this.audioCue
-      await this.executeOnChains((sequencer, lightManager) =>
-        cue.execute(mockAudio, sequencer, lightManager),
-      )
-      return
-    }
+  async runNet(domain: NetCueMode, mockCueData: CueData): Promise<void> {
     const cue = this.netCues[domain]
-    if (!cue || !mockCueData) return
+    if (!cue) return
     await this.executeOnChains((sequencer, lightManager) =>
       cue.execute(mockCueData, sequencer, lightManager),
     )
   }
 
+  /** Execute the active audio motion cue, which builds fresh mock audio from its own counter. */
+  async runAudio(): Promise<void> {
+    const cue = this.audioCue
+    if (!cue) return
+    this.audioExecutionCount++
+    const mockAudio = createMockAudioCueData(this.audioExecutionCount)
+    await this.executeOnChains((sequencer, lightManager) =>
+      cue.execute(mockAudio, sequencer, lightManager),
+    )
+  }
+
   /** Run every domain's active motion cue for one simulation frame. */
   async runAll(mockCueData: CueData): Promise<void> {
-    await this.run('yarg', mockCueData)
-    await this.run('rb3', mockCueData)
-    await this.run('audio')
+    await this.runNet('yarg', mockCueData)
+    await this.runNet('rb3', mockCueData)
+    await this.runAudio()
   }
 
   private async executeOnChains(

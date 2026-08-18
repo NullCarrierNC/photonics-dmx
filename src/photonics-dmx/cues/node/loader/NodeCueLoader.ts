@@ -151,9 +151,9 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
   }
 
   /**
-   * Resolves a renderer-supplied path to an absolute path inside the YARG/audio cue roots,
-   * or throws. Use this when an IPC handler needs the rooted path (e.g. for fs.copyFile during
-   * export) and must not trust the raw IPC string.
+   * Resolves a renderer-supplied path to an absolute path inside one of the cue roots, or throws.
+   * Use this when an IPC handler needs the rooted path (e.g. for fs.copyFile during export) and must
+   * not trust the raw IPC string.
    */
   public resolveCueFilePathForIpc(filePath: string): string {
     return this.resolveExistingCueFilePath(filePath)
@@ -562,7 +562,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     return this.resolveExistingFilePath(
       userPath,
       'Node cue path',
-      'Node cue file path must be under the YARG or audio cue directories.',
+      'Node cue file path must be under one of the cue directories.',
     )
   }
 

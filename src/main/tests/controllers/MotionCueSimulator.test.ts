@@ -26,7 +26,7 @@ describe('MotionCueSimulator', () => {
     const sim = new MotionCueSimulator({ getChainFanout: () => fanoutStub(chains) })
     const cue = cueStub()
     sim.setNetCue('yarg', cue)
-    await sim.run('yarg', {} as never)
+    await sim.runNet('yarg', {} as never)
     expect(cue.execute).toHaveBeenCalledTimes(2)
   })
 
@@ -38,12 +38,12 @@ describe('MotionCueSimulator', () => {
     const sim = new MotionCueSimulator({ getChainFanout: () => fanoutStub(chains) })
     const cue = cueStub()
     sim.setNetCue('rb3', cue)
-    await sim.run('rb3', {} as never)
+    await sim.runNet('rb3', {} as never)
     expect(cue.execute).toHaveBeenCalledTimes(2)
 
     sim.reset()
     expect(cue.onStop).toHaveBeenCalledTimes(1)
-    await sim.run('rb3', {} as never)
+    await sim.runNet('rb3', {} as never)
     expect(cue.execute).toHaveBeenCalledTimes(2) // no further runs after reset
   })
 
@@ -57,7 +57,7 @@ describe('MotionCueSimulator', () => {
 
     expect(cue.onStop).toHaveBeenCalledTimes(1)
     expect(sim.hasNetCueActive('yarg')).toBe(false)
-    await sim.run('yarg', {} as never)
+    await sim.runNet('yarg', {} as never)
     expect(cue.execute).not.toHaveBeenCalled() // nothing runs against the torn-down chains
   })
 

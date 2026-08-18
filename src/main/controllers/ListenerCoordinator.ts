@@ -79,7 +79,7 @@ export class ListenerCoordinator {
       await this.yargListener.shutdown()
     }
     // The listener calls into the fanout, which iterates every chain's handler.
-    this.domainRuntimes.yarg = this.decorate('yarg', this.deps.getChainFanout())
+    this.domainRuntimes.yarg = this.decorate('yarg', this.deps.getChainFanout().cueRuntime('yarg'))
     this.yargListener = new YargNetworkListener(this.domainRuntimes.yarg, {
       getFallbackCueTimeMs: this.deps.getFallbackCueTimeMs,
     })

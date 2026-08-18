@@ -22,7 +22,9 @@ import { monotonicNowMs } from '../../shared/time'
 const log = createLogger('CueHandler')
 
 /**
- * CueHandler handles the cues called by the YARG network listener.
+ * CueHandler runs one net domain's cues against one rig: the YARG network listener and the RB3
+ * cue-mode processor each drive their own handler per chain, told apart only by which registry and
+ * motion-change channel they are constructed with.
  *
  * Cue selection is delegated to CueRegistry.getCueImplementation(cueType, trackMode), which uses
  * active/enabled groups, consistency tracking, stage-kit preference when applicable,
@@ -42,8 +44,8 @@ export type CueHandlerOptions = {
   /** Probability (0-100) that an automatic motion cue pick will play on a new lighting cue. Defaults to 100 (always). */
   getMotionCueProbabilityPercent?: () => number
   runtimeBroadcaster?: RuntimeBroadcaster
-  /** Cue registry to resolve against. Defaults to the shared YARG singleton; a separate domain
-   *  (e.g. RB3 cue mode) passes its own instance so its selections stay isolated. */
+  /** Cue registry to resolve against. Defaults to the process-wide YARG instance; another domain
+   *  (RB3 cue mode) passes its own so its selections stay isolated. */
   registry?: CueRegistry
   /** Which motion-cue-change channel to broadcast on. Defaults to YARG; RB3 cue mode passes its own
    *  so its motion selections don't surface as YARG changes. */
@@ -567,7 +569,7 @@ class CueHandler extends EventEmitter {
   /**
    * Clean up resources and stop any executing cue.
    *
-   * Node cue instances are singletons held by `CueRegistry`, so they are not
+   * Node cue instances are singletons held by the domain's `CueRegistry`, so they are not
    * literally destroyed when this handler tears down; the same instances are reused
    * by the next handler. We call `onStop()` so each cue's `CueSession` is reset
    * (`cueStartedFired` cleared, engine nulled) and the next activation can fire
