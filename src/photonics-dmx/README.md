@@ -31,11 +31,11 @@ Photonics uses node-based cues for YARG and audio lighting. Cues and reusable ef
 | Component                                       | Role                                                                                                                                               |
 | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `NodeCueLoader` / `EffectLoader`                | Loads JSON cue/effect files from disk, validates with AJV schema, watches for changes (chokidar); paths are confined to app-owned cue/effect roots |
-| `NodeCueCompiler` / `EffectCompiler`            | Compiles JSON node graph to `CompiledYargCue` / `CompiledAudioCue` / compiled effects                                                              |
-| `YargCueRegistry` / `AudioCueRegistry`          | Registers YARG and audio lighting cues plus motion programs for random/locked selection                                                            |
+| `NodeCueCompiler` / `EffectCompiler`            | Compiles JSON node graph to `CompiledNetCue` / `CompiledAudioCue` / compiled effects                                                               |
+| `CueRegistry` / `AudioCueRegistry`              | Registers lighting cues plus motion programs for random/locked selection. One `CueRegistry` per net mode, via `getCueRegistry('yarg' \| 'rb3')`    |
 | `GraphExecutionEngine`                          | Unified graph runner with cue/effect policy, sessions, and queuing                                                                                 |
 | `NodeExecutionEngine` / `EffectExecutionEngine` | Executes node graph at runtime: evaluates logic, resolves values, dispatches actions                                                               |
-| `YargNodeCue` / `AudioNodeCue`                  | Runtime cue instance that receives events and drives effects via the sequencer                                                                     |
+| `LightingNodeCue` / `AudioNodeCue`              | Runtime cue instance that receives events and drives effects via the sequencer                                                                     |
 
 `sACN`, `Art-Net`, `EnttecPro`, `OpenDMX`, and `IPC` senders are available for DMX output; preferences and console
 flows pick active rigs and enabled senders through `ConfigurationManager` and `SenderManager`.
@@ -50,7 +50,7 @@ Photonics uses different processing approaches for YARG and RB3E:
 
 ### YARG Processing
 
-YARG uses **node cue processing** where network cue events are routed through the `YargNetworkListener`, selected from `YargCueRegistry`, and executed by the node runtime.
+YARG uses **node cue processing** where network cue events are routed through the `YargNetworkListener`, selected from the YARG `CueRegistry`, and executed by the node runtime.
 
 ### RB3E Processing
 

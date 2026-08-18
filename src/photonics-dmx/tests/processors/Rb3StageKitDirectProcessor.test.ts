@@ -152,7 +152,10 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
         isPrimary: true,
         dmxLightManager: lightManager,
         sequencer: photonicsSequencer,
-        yargCueHandler: null,
+        cueHandlers: {
+          yarg: null,
+          rb3: null,
+        },
         audioCueHandler: null,
         rb3MenuCueHandler: menuHandler,
       } as unknown as RigChain,

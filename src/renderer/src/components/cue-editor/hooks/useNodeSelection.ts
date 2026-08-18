@@ -9,7 +9,7 @@ import type {
   EventRaiserNode,
   LogicNode,
   NotesNode,
-  YargEventNode,
+  NetEventNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type {
   EffectRaiserNode,
@@ -158,7 +158,7 @@ export function useNodeSelection({
   const updateSelectedNode = useCallback(
     <
       T extends
-        | YargEventNode
+        | NetEventNode
         | AudioEventNodeUnion
         | ActionNode
         | LogicNode
@@ -179,7 +179,7 @@ export function useNodeSelection({
             switch (node.data.kind) {
               case 'event': {
                 // RB3 nodes are YARG-shaped; only audio carries the trigger/label variant.
-                if (activeMode !== 'audio') return (nextPayload as YargEventNode).eventType
+                if (activeMode !== 'audio') return (nextPayload as NetEventNode).eventType
                 const audioPayload = nextPayload as AudioEventNodeUnion
                 return audioPayload.eventType === 'audio-trigger'
                   ? (audioPayload as AudioTriggerNode).nodeLabel

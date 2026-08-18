@@ -7,10 +7,9 @@ import {
   type NodeCueGroupMeta,
   type NodeCueKind,
   type NodeCueMode,
-  type Rb3NodeCueFile,
-  type YargEventNode,
-  type YargNodeCueDefinition,
-  type YargNodeCueFile,
+  type NetNodeCueFile,
+  type NetEventNode,
+  type NetNodeCueDefinition,
   type AudioEventNode,
   type AudioTriggerNode,
   type EffectFile,
@@ -84,14 +83,14 @@ const buildDefaultAction = (): ActionNode => ({
   layer: { source: 'literal', value: 0 },
 })
 
-const buildDefaultYargEvent = (): YargEventNode => ({
+const buildDefaultYargEvent = (): NetEventNode => ({
   id: `event-${createId()}`,
   type: 'event',
   eventType: 'beat',
 })
 
 /** Default event for blank cues: Cue Started (once per lifecycle), connected to set-color. */
-const buildDefaultYargCueStartedEvent = (): YargEventNode => ({
+const buildDefaultYargCueStartedEvent = (): NetEventNode => ({
   id: `event-${createId()}`,
   type: 'event',
   eventType: 'cue-started',
@@ -125,7 +124,7 @@ export const buildDefaultAudioTrigger = (id?: string): AudioTriggerNode => ({
 const createDefaultCue = (
   mode: NodeCueMode,
   kind: NodeCueKind,
-): YargNodeCueDefinition | AudioNodeCueDefinition => {
+): NetNodeCueDefinition | AudioNodeCueDefinition => {
   // rb3 is YARG-shaped, so it uses the YARG event node; only audio uses the audio event.
   const eventNode = mode === 'audio' ? buildDefaultAudioEvent() : buildDefaultYargEvent()
   const actionNode = kind === 'motion' ? buildDefaultSetPositionAction() : buildDefaultAction()
@@ -150,7 +149,7 @@ const createDefaultCue = (
       kind: 'lighting',
       cueType: 'RB3',
       style: 'primary',
-    } as YargNodeCueDefinition
+    } as NetNodeCueDefinition
   }
 
   if (mode === 'yarg' && kind === 'lighting') {
@@ -159,14 +158,14 @@ const createDefaultCue = (
       kind: 'lighting',
       cueType: 'Chorus',
       style: 'primary',
-    } as YargNodeCueDefinition
+    } as NetNodeCueDefinition
   }
 
   if (mode === 'yarg' && kind === 'motion') {
     return {
       ...base,
       kind: 'motion',
-    } as YargNodeCueDefinition
+    } as NetNodeCueDefinition
   }
 
   if (mode === 'audio' && kind === 'lighting') {
@@ -187,7 +186,7 @@ const createDefaultCue = (
 const createBlankCue = (
   mode: NodeCueMode,
   kind: NodeCueKind,
-): YargNodeCueDefinition | AudioNodeCueDefinition => {
+): NetNodeCueDefinition | AudioNodeCueDefinition => {
   // rb3 is YARG-shaped, so it uses the YARG cue-started event; only audio uses the audio event.
   const eventNode = mode === 'audio' ? buildDefaultAudioEvent() : buildDefaultYargCueStartedEvent()
   const actionNode = kind === 'motion' ? buildDefaultSetPositionAction() : buildDefaultAction()
@@ -212,7 +211,7 @@ const createBlankCue = (
       kind: 'lighting',
       cueType: 'RB3',
       style: 'primary',
-    } as YargNodeCueDefinition
+    } as NetNodeCueDefinition
   }
 
   if (mode === 'yarg' && kind === 'lighting') {
@@ -221,14 +220,14 @@ const createBlankCue = (
       kind: 'lighting',
       cueType: 'Chorus',
       style: 'primary',
-    } as YargNodeCueDefinition
+    } as NetNodeCueDefinition
   }
 
   if (mode === 'yarg' && kind === 'motion') {
     return {
       ...base,
       kind: 'motion',
-    } as YargNodeCueDefinition
+    } as NetNodeCueDefinition
   }
 
   if (mode === 'audio' && kind === 'lighting') {
@@ -267,9 +266,9 @@ const createDefaultFile = (mode: NodeCueMode, kind: NodeCueKind): NodeCueFile =>
       version: 1,
       mode,
       group,
-      cues: [createBlankCue('rb3', 'lighting') as YargNodeCueDefinition],
+      cues: [createBlankCue('rb3', 'lighting') as NetNodeCueDefinition],
       bundled: false,
-    } as Rb3NodeCueFile
+    } as NetNodeCueFile
   }
 
   if (mode === 'yarg') {
@@ -277,9 +276,9 @@ const createDefaultFile = (mode: NodeCueMode, kind: NodeCueKind): NodeCueFile =>
       version: 1,
       mode,
       group,
-      cues: [createBlankCue('yarg', kind) as YargNodeCueDefinition],
+      cues: [createBlankCue('yarg', kind) as NetNodeCueDefinition],
       bundled: false,
-    } as YargNodeCueFile
+    } as NetNodeCueFile
   }
 
   return {

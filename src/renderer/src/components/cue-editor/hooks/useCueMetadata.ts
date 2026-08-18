@@ -4,7 +4,7 @@ import type {
   AudioEffectDefinition,
   NodeCueFile,
   NodeCueGroupMeta,
-  YargNodeCueDefinition,
+  NetNodeCueDefinition,
   YargEffectDefinition,
   EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -40,7 +40,7 @@ export function useCueMetadata({
   )
 
   const updateCueMetadata = useCallback(
-    (updates: Partial<YargNodeCueDefinition> | Partial<AudioNodeCueDefinition>) => {
+    (updates: Partial<NetNodeCueDefinition> | Partial<AudioNodeCueDefinition>) => {
       if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return
       const cueFile = editorDoc.file as NodeCueFile
       const updatedCues = cueFile.cues.map((cue) =>

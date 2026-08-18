@@ -5,7 +5,7 @@ import type {
   AudioEffectDefinition,
   NodeCueFile,
   NodeCueMode,
-  YargNodeCueDefinition,
+  NetNodeCueDefinition,
   YargEffectDefinition,
   EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -47,7 +47,7 @@ export type UseCueFileIOParams = {
   setIsDirty: (dirty: boolean) => void
   loadCueIntoFlow: (
     cue:
-      | YargNodeCueDefinition
+      | NetNodeCueDefinition
       | AudioNodeCueDefinition
       | YargEffectDefinition
       | AudioEffectDefinition
@@ -98,7 +98,7 @@ export function useCueFileIO({
         setMode(file.mode)
         setFilename(fileSummary.path.split(/[/\\]/).pop() ?? fileSummary.path)
         const cueFile = file as NodeCueFile
-        const cues = cueFile.cues as (YargNodeCueDefinition | AudioNodeCueDefinition)[]
+        const cues = cueFile.cues as (NetNodeCueDefinition | AudioNodeCueDefinition)[]
         const preferredCue =
           preferredItemId != null ? cues.find((c) => c.id === preferredItemId) : null
         const cueToLoad = preferredCue ?? firstByName(cues)
@@ -350,7 +350,7 @@ export function useCueFileIO({
           setFilename(currentPath.split(/[/\\]/).pop() ?? currentPath)
           const cueFile = file as NodeCueFile
           const firstCue = firstByName(
-            cueFile.cues as (YargNodeCueDefinition | AudioNodeCueDefinition)[],
+            cueFile.cues as (NetNodeCueDefinition | AudioNodeCueDefinition)[],
           )
           const cueId = cueFile.cues.find((c) => c.id === selectedCueId)?.id ?? firstCue?.id ?? null
           setSelectedCueId(cueId)

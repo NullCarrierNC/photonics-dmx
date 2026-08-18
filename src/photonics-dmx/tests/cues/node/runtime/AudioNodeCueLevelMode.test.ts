@@ -14,6 +14,7 @@ import type {
   AudioEventNode,
   AudioLightingNodeCueDefinition,
   LogicNode,
+  AudioEventNodeUnion,
 } from '../../../../cues/types/nodeCueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
@@ -79,7 +80,7 @@ function levelEnergyEvent(threshold: number): AudioEventNode {
   } as AudioEventNode
 }
 
-function setColor(id: string, groups: ActionNode['target']['groups']): ActionNode {
+function setColor(id: string, groups: ActionNode['target']['groups'], layer = 0): ActionNode {
   return {
     id,
     type: 'action',
@@ -101,7 +102,7 @@ function setColor(id: string, groups: ActionNode['target']['groups']): ActionNod
       waitUntilCondition: { source: 'literal', value: 'none' },
       waitUntilTime: { source: 'literal', value: 0 },
     },
-    layer: { source: 'literal', value: 0 },
+    layer: { source: 'literal', value: layer },
   } as unknown as ActionNode
 }
 
@@ -154,7 +155,7 @@ describe('AudioNodeCue level mode', () => {
       layout: { nodePositions: {} },
     } as unknown as AudioLightingNodeCueDefinition
 
-    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
     const cue = new AudioNodeCue('g1', compiled)
     const buildEffectSpy = jest.spyOn(ActionEffectFactory, 'buildEffect')
 
@@ -186,7 +187,7 @@ describe('AudioNodeCue level mode', () => {
       layout: { nodePositions: {} },
     } as unknown as AudioLightingNodeCueDefinition
 
-    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
     const cue = new AudioNodeCue('g1', compiled)
 
     await cue.execute(audioCueData(0.5), sequencer, lightManager)
@@ -237,7 +238,7 @@ describe('AudioNodeCue level mode', () => {
       layout: { nodePositions: {} },
     } as unknown as AudioLightingNodeCueDefinition
 
-    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
     const cue = new AudioNodeCue('g1', compiled)
 
     await cue.execute(audioCueData(0.5), sequencer, lightManager)
@@ -277,7 +278,7 @@ describe('AudioNodeCue level mode', () => {
       layout: { nodePositions: {} },
     } as unknown as AudioLightingNodeCueDefinition
 
-    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
     const cue = new AudioNodeCue('g1', compiled, undefined, broadcaster)
 
     await expect(cue.execute(audioCueData(0.5), sequencer, lightManager)).resolves.toBeUndefined()
@@ -286,5 +287,68 @@ describe('AudioNodeCue level mode', () => {
       expect.objectContaining({ nodeId: 'ev-energy' }),
     )
     expect(sequencer.addEffect).not.toHaveBeenCalled()
+  })
+
+  it('takes a primary level effect off its own layer when the look ends', async () => {
+    // Level effects go straight to the sequencer rather than through the engine, and bundled audio
+    // libraries author well above the band layers, so ending the look has to remove them by the
+    // layer each was recorded against.
+    const def: AudioLightingNodeCueDefinition = {
+      kind: 'lighting',
+      id: 'level-high-layer',
+      cueTypeId: 'level-high-layer',
+      name: 'Level high layer',
+      style: 'primary',
+      variables: [],
+      nodes: {
+        events: [levelEnergyEvent(0.3)],
+        actions: [setColor('sc1', { source: 'literal', value: 'front' }, 120)],
+        logic: [],
+      },
+      connections: [{ from: 'ev-energy', to: 'sc1' }],
+      layout: { nodePositions: {} },
+    } as unknown as AudioLightingNodeCueDefinition
+
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
+    const cue = new AudioNodeCue('g1', compiled)
+
+    await cue.execute(audioCueData(0.5), sequencer, lightManager)
+    expect(sequencer.addEffect).toHaveBeenCalledTimes(1)
+    const effectKey = (sequencer.addEffect as jest.Mock).mock.calls[0][0] as string
+    ;(sequencer.removeEffect as jest.Mock).mockClear()
+
+    cue.stopAndClearEffects()
+    expect(sequencer.removeEffect).toHaveBeenCalledWith(effectKey, 120)
+  })
+
+  it('takes a secondary level effect off when the cue is replaced', async () => {
+    // A replaced secondary is stopped through plain onStop. Its level effect is keyed by group, cue
+    // and event id, so no later cue ever reuses the key: leaving it on the sequencer here stranded
+    // it lit for the rest of the session with nothing holding a reference to it.
+    const def: AudioLightingNodeCueDefinition = {
+      kind: 'lighting',
+      id: 'level-secondary',
+      cueTypeId: 'level-secondary',
+      name: 'Level secondary',
+      style: 'secondary',
+      variables: [],
+      nodes: {
+        events: [levelEnergyEvent(0.3)],
+        actions: [setColor('sc1', { source: 'literal', value: 'front' }, 20)],
+        logic: [],
+      },
+      connections: [{ from: 'ev-energy', to: 'sc1' }],
+      layout: { nodePositions: {} },
+    } as unknown as AudioLightingNodeCueDefinition
+
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
+    const cue = new AudioNodeCue('g1', compiled)
+
+    await cue.execute(audioCueData(0.5), sequencer, lightManager)
+    const effectKey = (sequencer.addEffect as jest.Mock).mock.calls[0][0] as string
+    ;(sequencer.removeEffect as jest.Mock).mockClear()
+
+    cue.onStop()
+    expect(sequencer.removeEffect).toHaveBeenCalledWith(effectKey, 20)
   })
 })

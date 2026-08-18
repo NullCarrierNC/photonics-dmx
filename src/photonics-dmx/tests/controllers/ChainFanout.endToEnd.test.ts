@@ -9,7 +9,7 @@ import { ChainFanout } from '../../controllers/ChainFanout'
 import { RigChain } from '../../controllers/RigChain'
 import { ManualTestClock } from '../helpers/sequencerHarness'
 import { makeTwoRigs } from '../helpers/multiRigFixtures'
-import { YargCueHandler } from '../../cueHandlers/YargCueHandler'
+import { CueHandler } from '../../cueHandlers/CueHandler'
 import { AudioCueHandler } from '../../cueHandlers/AudioCueHandler'
 import { Rb3MenuCueHandler } from '../../cueHandlers/Rb3MenuCueHandler'
 import { DrumNoteType, InstrumentNoteType } from '../../cues/types/cueTypes'
@@ -30,8 +30,8 @@ describe('ChainFanout end-to-end (listener → fanout → per-chain handlers →
     const clock = new ManualTestClock() as unknown as Clock
     const chainA = new RigChain({ rigId: rigA.id, config: rigA.config, clock, isPrimary: true })
     const chainB = new RigChain({ rigId: rigB.id, config: rigB.config, clock, isPrimary: false })
-    chainA.yargCueHandler = new YargCueHandler(chainA.dmxLightManager, chainA.sequencer)
-    chainB.yargCueHandler = new YargCueHandler(chainB.dmxLightManager, chainB.sequencer)
+    chainA.cueHandlers.yarg = new CueHandler(chainA.dmxLightManager, chainA.sequencer)
+    chainB.cueHandlers.yarg = new CueHandler(chainB.dmxLightManager, chainB.sequencer)
     chains = [chainA, chainB]
     return chains
   }
@@ -55,8 +55,8 @@ describe('ChainFanout end-to-end (listener → fanout → per-chain handlers →
     const fanout = new ChainFanout()
     fanout.setChains([a, b])
 
-    const aSongStart = jest.spyOn(a.yargCueHandler!, 'notifySongStart')
-    const bSongStart = jest.spyOn(b.yargCueHandler!, 'notifySongStart')
+    const aSongStart = jest.spyOn(a.cueHandlers.yarg!, 'notifySongStart')
+    const bSongStart = jest.spyOn(b.cueHandlers.yarg!, 'notifySongStart')
 
     fanout.notifySongStart()
 
@@ -70,10 +70,10 @@ describe('ChainFanout end-to-end (listener → fanout → per-chain handlers →
     fanout.setChains([a, b])
 
     const cueData = {} as Parameters<typeof fanout.handleDrumNote>[1]
-    const aDrum = jest.spyOn(a.yargCueHandler!, 'handleDrumNote')
-    const bDrum = jest.spyOn(b.yargCueHandler!, 'handleDrumNote')
-    const aGuitar = jest.spyOn(a.yargCueHandler!, 'handleGuitarNote')
-    const bGuitar = jest.spyOn(b.yargCueHandler!, 'handleGuitarNote')
+    const aDrum = jest.spyOn(a.cueHandlers.yarg!, 'handleDrumNote')
+    const bDrum = jest.spyOn(b.cueHandlers.yarg!, 'handleDrumNote')
+    const aGuitar = jest.spyOn(a.cueHandlers.yarg!, 'handleGuitarNote')
+    const bGuitar = jest.spyOn(b.cueHandlers.yarg!, 'handleGuitarNote')
 
     fanout.handleDrumNote(DrumNoteType.Kick, cueData)
     fanout.handleGuitarNote(InstrumentNoteType.Green, cueData)

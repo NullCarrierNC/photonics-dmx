@@ -8,8 +8,8 @@
 import fs from 'fs'
 import path from 'path'
 import { createSequencerHarness } from '../helpers/sequencerHarness'
-import { YargNodeCue } from '../../cues/node/runtime/YargNodeCue'
-import { YargMotionNodeCue } from '../../cues/node/runtime/YargMotionNodeCue'
+import { LightingNodeCue } from '../../cues/node/runtime/LightingNodeCue'
+import { MotionNodeCue } from '../../cues/node/runtime/MotionNodeCue'
 import { EffectRegistry } from '../../cues/node/runtime/EffectRegistry'
 import { NodeCueCompiler } from '../../cues/node/compiler/NodeCueCompiler'
 import { validateRb3NodeCueFile } from '../../cues/node/schema/validation'
@@ -52,9 +52,9 @@ function litFrame(): CueData {
 describe('RB3 motion animates alongside the base cue', () => {
   it('control: a motion cue alone animates the head pan (no base cue)', () => {
     const h = createSequencerHarness({ frontCount: 4, backCount: 4, movingHead: true })
-    const motion = new YargMotionNodeCue(
+    const motion = new MotionNodeCue(
       'rb3-motion-default',
-      NodeCueCompiler.compileYargCue(loadMotionCue('rb3-motion-wave')),
+      NodeCueCompiler.compileCue(loadMotionCue('rb3-motion-wave'), 'rb3'),
     )
     motion.execute(createMockCueData({}), h.sequencer, h.lightManager)
 
@@ -70,15 +70,15 @@ describe('RB3 motion animates alongside the base cue', () => {
 
   it('the head pan animates while the RB3 base cue re-dispatches every keepalive', () => {
     const h = createSequencerHarness({ frontCount: 4, backCount: 4, movingHead: true })
-    const base = new YargNodeCue(
+    const base = new LightingNodeCue(
       'rb3-stagekit',
-      NodeCueCompiler.compileYargCue(loadBaseCueDefinition()),
+      NodeCueCompiler.compileCue(loadBaseCueDefinition(), 'rb3'),
       new EffectRegistry(),
       noopCallbacks,
     )
-    const motion = new YargMotionNodeCue(
+    const motion = new MotionNodeCue(
       'rb3-motion-default',
-      NodeCueCompiler.compileYargCue(loadMotionCue('rb3-motion-wave')),
+      NodeCueCompiler.compileCue(loadMotionCue('rb3-motion-wave'), 'rb3'),
     )
 
     // Base cue first (its initial submission clears), then the motion cue — the sim order.

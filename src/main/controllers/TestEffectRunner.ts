@@ -151,7 +151,7 @@ export class TestEffectRunner {
     // test-effect frame after stop. Blackout is per-chain sequencer work shared across domains.
     const fanout = this.ctx.getChainFanout()
     this.dispatcher.stopActiveCue()
-    await fanout.yargBlackout(0)
+    await fanout.blackout(0)
   }
 
   private startInternal(): void {

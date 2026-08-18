@@ -1,4 +1,4 @@
-import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
+import { CueRegistry } from '../../cues/registries/CueRegistry'
 import { INetCue, CueStyle } from '../../cues/interfaces/INetCue'
 import { ICueGroup } from '../../cues/interfaces/INetCueGroup'
 import { CueData, CueType } from '../../cues/types/cueTypes'
@@ -45,12 +45,12 @@ class MockCueImplementation implements INetCue {
 }
 
 describe('Cue Descriptions', () => {
-  let registry: YargCueRegistry
+  let registry: CueRegistry
   let defaultGroup: ICueGroup
   let customGroup: ICueGroup
 
   beforeEach(() => {
-    registry = YargCueRegistry.getInstance()
+    registry = CueRegistry.getInstance()
     registry.reset() // Clear any existing groups
 
     // Create default group with descriptions

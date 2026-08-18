@@ -40,7 +40,7 @@ export interface TimingCompatResult {
 function isLevelModeEvent(node: EditorNode): boolean {
   if (node.data.kind !== 'event') return false
   const payload = node.data.payload
-  // Only AudioEventNode carries triggerMode; YargEventNode and the audio-trigger node do not.
+  // Only AudioEventNode carries triggerMode; NetEventNode and the audio-trigger node do not.
   if (!('triggerMode' in payload)) return false
   const audioEvent = payload as AudioEventNode
   return (

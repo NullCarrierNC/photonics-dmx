@@ -6,8 +6,8 @@ import {
   LocationGroup,
   WaitCondition,
   WAIT_CONDITIONS,
-  YargEventType,
-  YARG_EVENT_TYPES,
+  NetEventType,
+  NET_EVENT_TYPES,
 } from '../types'
 import { AudioEventType } from '../cues/types/nodeCueTypes'
 
@@ -68,8 +68,8 @@ export const LIGHT_TARGET_OPTIONS: LightTarget[] = [
  * and song events (beat, measure, keyframe, instruments).
  * Excludes 'none' and 'delay' as those are only for action timing.
  */
-export const YARG_EVENT_OPTIONS: YargEventType[] = YARG_EVENT_TYPES.filter(
-  (c): c is Exclude<YargEventType, 'none' | 'delay'> => c !== 'none' && c !== 'delay',
+export const NET_EVENT_OPTIONS: NetEventType[] = NET_EVENT_TYPES.filter(
+  (c): c is Exclude<NetEventType, 'none' | 'delay'> => c !== 'none' && c !== 'delay',
 )
 
 /**

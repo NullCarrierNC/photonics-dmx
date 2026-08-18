@@ -11,9 +11,9 @@ import { DmxLightManager } from '../../../photonics-dmx/controllers/DmxLightMana
 import { ILightingController } from '../../../photonics-dmx/controllers/sequencer/interfaces'
 import { ChainFanout } from '../../../photonics-dmx/controllers/ChainFanout'
 import { noopRuntimeBroadcaster } from '../../../photonics-dmx/runtime/broadcaster'
-import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
-import { getRb3CueRegistry } from '../../../photonics-dmx/cues/registries/Rb3CueRegistry'
-import { YargCueHandler } from '../../../photonics-dmx/cueHandlers/YargCueHandler'
+import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
+import { getCueRegistry } from '../../../photonics-dmx/cues/registries/cueRegistries'
+import { CueHandler } from '../../../photonics-dmx/cueHandlers/CueHandler'
 import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
 
 function makeDeps(): ListenerCoordinatorDeps {
@@ -29,7 +29,10 @@ function makeDeps(): ListenerCoordinatorDeps {
     isPrimary: true,
     dmxLightManager: dmx,
     sequencer: effects,
-    yargCueHandler: null,
+    cueHandlers: {
+      yarg: null,
+      rb3: null,
+    },
     audioCueHandler: null,
     rb3MenuCueHandler: null,
   } as unknown as RigChain
@@ -154,13 +157,13 @@ describe('ListenerCoordinator ends the song span on disable so locks do not leak
   it('disableYarg ends the YARG registry song via its handler and leaves the RB3 registry untouched', async () => {
     const deps = makeDeps()
     const chain = deps.getRigChains()[0]
-    chain.yargCueHandler = new YargCueHandler(chain.dmxLightManager, chain.sequencer, {
-      registry: YargCueRegistry.getInstance(),
+    chain.cueHandlers.yarg = new CueHandler(chain.dmxLightManager, chain.sequencer, {
+      registry: CueRegistry.getInstance(),
     })
     const lc = new ListenerCoordinator(deps)
-    const yargEnd = jest.spyOn(YargCueRegistry.getInstance(), 'onSongEnd')
-    const yargMotionEnd = jest.spyOn(YargCueRegistry.getInstance(), 'onMotionSongEnd')
-    const rb3End = jest.spyOn(getRb3CueRegistry(), 'onSongEnd')
+    const yargEnd = jest.spyOn(CueRegistry.getInstance(), 'onSongEnd')
+    const yargMotionEnd = jest.spyOn(CueRegistry.getInstance(), 'onMotionSongEnd')
+    const rb3End = jest.spyOn(getCueRegistry('rb3'), 'onSongEnd')
 
     const co = lc as unknown as {
       isYargEnabled: boolean
@@ -180,13 +183,13 @@ describe('ListenerCoordinator ends the song span on disable so locks do not leak
   it('disableRb3 ends the RB3 registry song via its handler and leaves the YARG registry untouched', async () => {
     const deps = makeDeps()
     const chain = deps.getRigChains()[0]
-    chain.rb3CueHandler = new YargCueHandler(chain.dmxLightManager, chain.sequencer, {
-      registry: getRb3CueRegistry(),
+    chain.cueHandlers.rb3 = new CueHandler(chain.dmxLightManager, chain.sequencer, {
+      registry: getCueRegistry('rb3'),
     })
     const lc = new ListenerCoordinator(deps)
-    const rb3End = jest.spyOn(getRb3CueRegistry(), 'onSongEnd')
-    const rb3MotionEnd = jest.spyOn(getRb3CueRegistry(), 'onMotionSongEnd')
-    const yargEnd = jest.spyOn(YargCueRegistry.getInstance(), 'onSongEnd')
+    const rb3End = jest.spyOn(getCueRegistry('rb3'), 'onSongEnd')
+    const rb3MotionEnd = jest.spyOn(getCueRegistry('rb3'), 'onMotionSongEnd')
+    const yargEnd = jest.spyOn(CueRegistry.getInstance(), 'onSongEnd')
 
     const co = lc as unknown as {
       isRb3Enabled: boolean

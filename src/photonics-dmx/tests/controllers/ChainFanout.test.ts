@@ -5,7 +5,7 @@
 import { describe, expect, it, jest } from '@jest/globals'
 import { ChainFanout } from '../../controllers/ChainFanout'
 import type { RigChain } from '../../controllers/RigChain'
-import type { YargCueHandler } from '../../cueHandlers/YargCueHandler'
+import type { CueHandler } from '../../cueHandlers/CueHandler'
 import type { AudioCueHandler } from '../../cueHandlers/AudioCueHandler'
 import type { Rb3MenuCueHandler } from '../../cueHandlers/Rb3MenuCueHandler'
 import type { Sequencer } from '../../controllers/sequencer/Sequencer'
@@ -19,6 +19,7 @@ function makeChainStub(rigId: string, isPrimary: boolean): RigChain {
     cancelPanTiltClear: jest.fn(),
     blackout: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
     removeEffectByLayer: jest.fn(),
+    holdOcclusion: jest.fn(),
   } as unknown as Sequencer
   const yarg = {
     notifySongStart: jest.fn(),
@@ -34,10 +35,10 @@ function makeChainStub(rigId: string, isPrimary: boolean): RigChain {
     handleBassNote: jest.fn(),
     handleKeysNote: jest.fn(),
     handleVocalNote: jest.fn(),
-    resetYargSessionState: jest.fn(),
+    resetSessionState: jest.fn(),
     stopActiveStrobe: jest.fn(),
     stopActiveCue: jest.fn(),
-  } as unknown as YargCueHandler
+  } as unknown as CueHandler
   const audio = {
     setMotionEnabled: jest.fn(),
     setManualMotionRef: jest.fn(),
@@ -57,7 +58,10 @@ function makeChainStub(rigId: string, isPrimary: boolean): RigChain {
     rigId,
     isPrimary,
     sequencer,
-    yargCueHandler: yarg,
+    cueHandlers: {
+      yarg: yarg,
+      rb3: null,
+    },
     audioCueHandler: audio,
     rb3MenuCueHandler: rb3Menu,
   } as unknown as RigChain
@@ -70,18 +74,18 @@ describe('ChainFanout', () => {
     const fanout = new ChainFanout()
     fanout.setChains([a, b])
     fanout.notifySongStart()
-    expect(a.yargCueHandler!.notifySongStart).toHaveBeenCalledTimes(1)
-    expect(b.yargCueHandler!.notifySongStart).toHaveBeenCalledTimes(1)
+    expect(a.cueHandlers.yarg!.notifySongStart).toHaveBeenCalledTimes(1)
+    expect(b.cueHandlers.yarg!.notifySongStart).toHaveBeenCalledTimes(1)
   })
 
   it('skips chains without a YARG handler', () => {
     const a = makeChainStub('a', true)
     const b = makeChainStub('b', false)
-    b.yargCueHandler = null
+    b.cueHandlers.yarg = null
     const fanout = new ChainFanout()
     fanout.setChains([a, b])
     fanout.handleBeat()
-    expect(a.yargCueHandler!.handleBeat).toHaveBeenCalledTimes(1)
+    expect(a.cueHandlers.yarg!.handleBeat).toHaveBeenCalledTimes(1)
   })
 
   it('stopActiveStrobe reaches every chain YARG handler', () => {
@@ -90,18 +94,18 @@ describe('ChainFanout', () => {
     const fanout = new ChainFanout()
     fanout.setChains([a, b])
     fanout.stopActiveStrobe()
-    expect(a.yargCueHandler!.stopActiveStrobe).toHaveBeenCalledTimes(1)
-    expect(b.yargCueHandler!.stopActiveStrobe).toHaveBeenCalledTimes(1)
+    expect(a.cueHandlers.yarg!.stopActiveStrobe).toHaveBeenCalledTimes(1)
+    expect(b.cueHandlers.yarg!.stopActiveStrobe).toHaveBeenCalledTimes(1)
   })
 
-  it('resetYargSessionState reaches every chain YARG handler', () => {
+  it('resetSessionState reaches every chain YARG handler', () => {
     const a = makeChainStub('a', true)
     const b = makeChainStub('b', false)
     const fanout = new ChainFanout()
     fanout.setChains([a, b])
-    fanout.resetYargSessionState()
-    expect(a.yargCueHandler!.resetYargSessionState).toHaveBeenCalledTimes(1)
-    expect(b.yargCueHandler!.resetYargSessionState).toHaveBeenCalledTimes(1)
+    fanout.resetSessionState()
+    expect(a.cueHandlers.yarg!.resetSessionState).toHaveBeenCalledTimes(1)
+    expect(b.cueHandlers.yarg!.resetSessionState).toHaveBeenCalledTimes(1)
   })
 
   it('handleCue awaits every chain (Promise.allSettled)', async () => {
@@ -110,8 +114,8 @@ describe('ChainFanout', () => {
     const fanout = new ChainFanout()
     fanout.setChains([a, b])
     await fanout.handleCue('test-cue' as never, { foo: 'bar' } as never)
-    expect(a.yargCueHandler!.handleCue).toHaveBeenCalledTimes(1)
-    expect(b.yargCueHandler!.handleCue).toHaveBeenCalledTimes(1)
+    expect(a.cueHandlers.yarg!.handleCue).toHaveBeenCalledTimes(1)
+    expect(b.cueHandlers.yarg!.handleCue).toHaveBeenCalledTimes(1)
   })
 
   it('audioOnBeat reaches every chain sequencer', () => {
@@ -161,15 +165,15 @@ describe('ChainFanout', () => {
   // These bypass the cue handler and drive each chain's sequencer directly. The simulation
   // IPC path uses them to multi-rig-correct ticks that used to call the primary sequencer.
 
-  it('yargOnBeat / yargOnMeasure / yargOnKeyframe reach every chain sequencer', () => {
+  it('onBeat / onMeasure / onKeyframe reach every chain sequencer', () => {
     const a = makeChainStub('a', true)
     const b = makeChainStub('b', false)
     const fanout = new ChainFanout()
     fanout.setChains([a, b])
 
-    fanout.yargOnBeat()
-    fanout.yargOnMeasure()
-    fanout.yargOnKeyframe()
+    fanout.onBeat()
+    fanout.onMeasure()
+    fanout.onKeyframe()
 
     expect(a.sequencer.onBeat).toHaveBeenCalledTimes(1)
     expect(b.sequencer.onBeat).toHaveBeenCalledTimes(1)
@@ -179,14 +183,14 @@ describe('ChainFanout', () => {
     expect(b.sequencer.onKeyframe).toHaveBeenCalledTimes(1)
   })
 
-  it('yargSchedulePanTiltClear / yargCancelPanTiltClear reach every chain sequencer', () => {
+  it('schedulePanTiltClear / cancelPanTiltClear reach every chain sequencer', () => {
     const a = makeChainStub('a', true)
     const b = makeChainStub('b', false)
     const fanout = new ChainFanout()
     fanout.setChains([a, b])
 
-    fanout.yargSchedulePanTiltClear()
-    fanout.yargCancelPanTiltClear()
+    fanout.schedulePanTiltClear()
+    fanout.cancelPanTiltClear()
 
     expect(a.sequencer.schedulePanTiltClear).toHaveBeenCalledTimes(1)
     expect(b.sequencer.schedulePanTiltClear).toHaveBeenCalledTimes(1)
@@ -194,27 +198,27 @@ describe('ChainFanout', () => {
     expect(b.sequencer.cancelPanTiltClear).toHaveBeenCalledTimes(1)
   })
 
-  it('yargStopActiveCue stops every chain that has a YARG handler', () => {
+  it('stopActiveCue stops every chain that has a YARG handler', () => {
     const a = makeChainStub('a', true)
     const b = makeChainStub('b', false)
-    b.yargCueHandler = null
+    b.cueHandlers.yarg = null
     const fanout = new ChainFanout()
     fanout.setChains([a, b])
 
-    fanout.yargStopActiveCue()
+    fanout.stopActiveCue()
 
-    expect(a.yargCueHandler!.stopActiveCue).toHaveBeenCalledTimes(1)
+    expect(a.cueHandlers.yarg!.stopActiveCue).toHaveBeenCalledTimes(1)
     // chain b has no handler — silent skip, no throw.
   })
 
-  it('yargBlackout awaits every chain sequencer blackout even if one rejects', async () => {
+  it('blackout awaits every chain sequencer blackout even if one rejects', async () => {
     const a = makeChainStub('a', true)
     const b = makeChainStub('b', false)
     ;(a.sequencer.blackout as jest.Mock).mockImplementation(() => Promise.reject(new Error('boom')))
     const fanout = new ChainFanout()
     fanout.setChains([a, b])
 
-    await fanout.yargBlackout(500)
+    await fanout.blackout(500)
 
     // Both chains' blackout were invoked despite chain a's rejection — Promise.allSettled
     // isolates errors so a misbehaving rig can't block its siblings.
@@ -228,5 +232,22 @@ describe('ChainFanout', () => {
     const fanout = new ChainFanout()
     fanout.setChains([a, b])
     expect(fanout.getChains()).toEqual([a, b])
+  })
+
+  it('mutes and unmutes through each chain sequencer own occlusion hold', () => {
+    // Not an ordinary effect submission: the sequencer owns the overlay so the blackout paths that
+    // wipe layers can re-assert it rather than leaving the rig visible again.
+    const a = makeChainStub('a', true)
+    const b = makeChainStub('b', false)
+    const fanout = new ChainFanout()
+    fanout.setChains([a, b])
+
+    fanout.muteLighting(true)
+    expect(a.sequencer.holdOcclusion).toHaveBeenCalledWith(true)
+    expect(b.sequencer.holdOcclusion).toHaveBeenCalledWith(true)
+
+    fanout.muteLighting(false)
+    expect(a.sequencer.holdOcclusion).toHaveBeenLastCalledWith(false)
+    expect(b.sequencer.holdOcclusion).toHaveBeenLastCalledWith(false)
   })
 })

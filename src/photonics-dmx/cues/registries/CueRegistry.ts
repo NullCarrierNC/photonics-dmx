@@ -1,13 +1,22 @@
-import { CueType } from '../types/cueTypes'
+import { CueType, type MotionCueRef } from '../types/cueTypes'
 import type { MotionGroupSelectionMode } from '../types/nodeCueTypes'
 import { ICueGroup } from '../interfaces/INetCueGroup'
 import { INetCue, CueStyle } from '../interfaces/INetCue'
-import { YargMotionNodeCue } from '../node/runtime/YargMotionNodeCue'
+import { MotionNodeCue } from '../node/runtime/MotionNodeCue'
 import { MotionSelectionState } from './MotionSelectionState'
-import { DisabledCueStore, releaseSequencersFor } from './cueRegistrySupport'
+import {
+  DisabledCueStore,
+  findMotionCueRefIn,
+  motionCueDetailsFor,
+  motionGroupsInfoFor,
+  releaseSequencersFor,
+  resolveMotionCue,
+  type MotionCueDetail,
+  type MotionGroupInfo,
+} from './cueRegistrySupport'
 import { createLogger } from '../../../shared/logger'
 import { monotonicNowMs } from '../../../shared/time'
-const log = createLogger('YargCueRegistry')
+const log = createLogger('CueRegistry')
 
 /**
  * Interface for cue state updates sent to frontend
@@ -32,9 +41,9 @@ export interface CueStateUpdate {
  * Enabled Groups: Groups that are enabled in user preferences (can be activated).
  * Active Groups: Groups that are currently active during gameplay (subset of enabled).
  */
-export class YargCueRegistry {
+export class CueRegistry {
   /** The singleton instance of the CueRegistry */
-  private static instance: YargCueRegistry
+  private static instance: CueRegistry
 
   /** Map of all registered cue groups by their name */
   private groups: Map<string, ICueGroup> = new Map()
@@ -167,11 +176,11 @@ export class YargCueRegistry {
    * Get the singleton instance of the CueRegistry
    * @returns The CueRegistry instance
    */
-  public static getInstance(): YargCueRegistry {
-    if (!YargCueRegistry.instance) {
-      YargCueRegistry.instance = new YargCueRegistry()
+  public static getInstance(): CueRegistry {
+    if (!CueRegistry.instance) {
+      CueRegistry.instance = new CueRegistry()
     }
-    return YargCueRegistry.instance
+    return CueRegistry.instance
   }
 
   /**
@@ -179,8 +188,8 @@ export class YargCueRegistry {
    * that reuse the YARG cue-selection machinery but need their own group/lock/consistency state
    * (e.g. RB3 cue mode), so their selections never cross with the YARG listener's.
    */
-  public static create(): YargCueRegistry {
-    return new YargCueRegistry()
+  public static create(): CueRegistry {
+    return new CueRegistry()
   }
 
   /**
@@ -1288,78 +1297,30 @@ export class YargCueRegistry {
    * Resolve a specific motion program when manual selection is active.
    * Returns null if the group is not motion-enabled, the cue is disabled, or the id is unknown.
    */
-  public getMotionCueImplementation(ref: { groupId: string; cueId: string }): INetCue | null {
-    const group = this.groups.get(ref.groupId)
-    const motionMap = group?.motionCues
-    if (!motionMap || motionMap.size === 0) {
-      return null
-    }
-    if (!this.motionState.getEnabledMotionGroups().includes(ref.groupId)) {
-      return null
-    }
-    if (this.isMotionCueDisabled(ref.groupId, ref.cueId)) {
-      return null
-    }
-    return motionMap.get(ref.cueId) ?? null
+  public getMotionCueImplementation(ref: MotionCueRef): INetCue | null {
+    return resolveMotionCue(
+      this.groups.get(ref.groupId),
+      ref,
+      (groupId) => this.motionState.getEnabledMotionGroups().includes(groupId),
+      (groupId, cueId) => this.isMotionCueDisabled(groupId, cueId),
+    )
   }
 
   /** Locate group/cue ids for a motion cue instance (for UI / IPC metadata). */
-  public findYargMotionCueRef(cue: INetCue): { groupId: string; cueId: string } | null {
-    for (const group of this.groups.values()) {
-      const motionMap = group.motionCues
-      if (!motionMap) continue
-      for (const [cueId, impl] of motionMap) {
-        if (impl === cue) {
-          return { groupId: group.id, cueId }
-        }
-      }
-    }
-    return null
+  public findMotionCueRef(cue: INetCue): MotionCueRef | null {
+    return findMotionCueRefIn(this.groups.values(), cue)
   }
 
-  public getYargMotionGroupsInfo(): Array<{
-    id: string
-    name: string
-    description?: string
-    cueCount: number
-  }> {
-    const rows: Array<{
-      id: string
-      name: string
-      description?: string
-      cueCount: number
-    }> = []
-    for (const group of this.groups.values()) {
-      const n = group.motionCues?.size ?? 0
-      if (n === 0) {
-        continue
-      }
-      rows.push({
-        id: group.id,
-        name: group.name,
-        description: group.description,
-        cueCount: n,
-      })
-    }
-    return rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  public getMotionGroupsInfo(): MotionGroupInfo[] {
+    return motionGroupsInfoFor(this.groups.values())
   }
 
-  public getYargMotionCueDetails(
-    groupId: string,
-  ): Array<{ id: string; name: string; description: string }> {
-    const group = this.groups.get(groupId)
-    const motionMap = group?.motionCues
-    if (!motionMap) {
-      return []
-    }
-    return Array.from(motionMap.values()).map((cue) => {
-      const name = cue instanceof YargMotionNodeCue ? cue.name : cue.cueId
-      return {
-        id: cue.cueId,
-        name,
-        description: cue.description ?? '',
-      }
-    })
+  public getMotionCueDetails(groupId: string): MotionCueDetail[] {
+    return motionCueDetailsFor(this.groups.get(groupId)?.motionCues, (cue) => ({
+      id: cue.cueId,
+      name: cue instanceof MotionNodeCue ? cue.name : cue.cueId,
+      description: cue.description ?? '',
+    }))
   }
 
   public setDisabledMotionCues(map: Record<string, string[]>): void {

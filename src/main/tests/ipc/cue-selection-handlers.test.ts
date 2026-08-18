@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect, jest } from '@jest/globals'
-import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
+import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
 import { INetCue, CueStyle } from '../../../photonics-dmx/cues/interfaces/INetCue'
 import { ICueGroup } from '../../../photonics-dmx/cues/interfaces/INetCueGroup'
 import { CueData, CueType } from '../../../photonics-dmx/cues/types/cueTypes'
@@ -30,11 +30,11 @@ function makeGroup(id: string): ICueGroup {
 }
 
 describe('cue-selection-handlers: enabling a group at runtime', () => {
-  let registry: YargCueRegistry
+  let registry: CueRegistry
   let handlers: Map<string, (...args: unknown[]) => unknown>
 
   beforeEach(() => {
-    registry = YargCueRegistry.getInstance()
+    registry = CueRegistry.getInstance()
     registry.reset()
     registry.registerGroup(makeGroup('groupA'))
     registry.registerGroup(makeGroup('groupB'))
@@ -71,7 +71,7 @@ describe('cue-selection-handlers: enabling a group at runtime', () => {
 
 describe('cue-selection-handlers: GET/SET serialization per domain', () => {
   it('does not let a mid-flight GET revert a concurrent SET on the registry', async () => {
-    const registry = YargCueRegistry.getInstance()
+    const registry = CueRegistry.getInstance()
     registry.reset()
     registry.registerGroup(makeGroup('groupA'))
     registry.registerGroup(makeGroup('groupB'))

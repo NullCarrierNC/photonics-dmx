@@ -8,20 +8,20 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import type {
-  YargNodeCueDefinition,
-  YargEventNode,
+  NetNodeCueDefinition,
+  NetEventNode,
   ActionNode,
 } from '../../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../../cues/types/cueTypes'
 import type { CueData } from '../../../../cues/types/cueTypes'
-import { YargNodeCue } from '../../../../cues/node/runtime/YargNodeCue'
+import { LightingNodeCue } from '../../../../cues/node/runtime/LightingNodeCue'
 import type { CueSession } from '../../../../cues/node/runtime/CueSession'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { createMockLightingConfig } from '../../../helpers/testFixtures'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 
-function cueWithSharedGroupVar(id: string, cueType: CueType): YargNodeCueDefinition {
-  const event: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+function cueWithSharedGroupVar(id: string, cueType: CueType): NetNodeCueDefinition {
+  const event: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
   const action: ActionNode = {
     id: 'action1',
     type: 'action',
@@ -75,7 +75,7 @@ function makeSequencer(): ILightingController {
 
 type Internals = { states: Map<ILightingController, { session: CueSession }> }
 
-function groupStoreFor(cue: YargNodeCue, sequencer: ILightingController) {
+function groupStoreFor(cue: LightingNodeCue, sequencer: ILightingController) {
   const state = (cue as unknown as Internals).states.get(sequencer)
   if (!state) throw new Error('expected run state for sequencer')
   return state.session.getGroupLevelVarStore()
@@ -90,14 +90,15 @@ describe('YARG group-level variable sharing', () => {
   })
 
   it('cues in the same group on the same sequencer share one group store', () => {
-    const stomp = new YargNodeCue(
+    const stomp = new LightingNodeCue(
       'g1',
-      NodeCueCompiler.compileYargCue(cueWithSharedGroupVar('cue-stomp', CueType.Stomp)),
+      NodeCueCompiler.compileCue(cueWithSharedGroupVar('cue-stomp', CueType.Stomp), 'yarg'),
     )
-    const spot = new YargNodeCue(
+    const spot = new LightingNodeCue(
       'g1',
-      NodeCueCompiler.compileYargCue(
+      NodeCueCompiler.compileCue(
         cueWithSharedGroupVar('cue-spot', CueType.Silhouettes_Spotlight),
+        'yarg',
       ),
     )
     const seq = makeSequencer()
@@ -117,13 +118,13 @@ describe('YARG group-level variable sharing', () => {
   })
 
   it('different cue groups do not share state', () => {
-    const a = new YargNodeCue(
+    const a = new LightingNodeCue(
       'groupA',
-      NodeCueCompiler.compileYargCue(cueWithSharedGroupVar('cue-a', CueType.Stomp)),
+      NodeCueCompiler.compileCue(cueWithSharedGroupVar('cue-a', CueType.Stomp), 'yarg'),
     )
-    const b = new YargNodeCue(
+    const b = new LightingNodeCue(
       'groupB',
-      NodeCueCompiler.compileYargCue(cueWithSharedGroupVar('cue-b', CueType.Stomp)),
+      NodeCueCompiler.compileCue(cueWithSharedGroupVar('cue-b', CueType.Stomp), 'yarg'),
     )
     const seq = makeSequencer()
 
@@ -134,9 +135,9 @@ describe('YARG group-level variable sharing', () => {
   })
 
   it('the same group on different sequencers stays isolated (multi-rig)', () => {
-    const cue = new YargNodeCue(
+    const cue = new LightingNodeCue(
       'g1',
-      NodeCueCompiler.compileYargCue(cueWithSharedGroupVar('cue-stomp', CueType.Stomp)),
+      NodeCueCompiler.compileCue(cueWithSharedGroupVar('cue-stomp', CueType.Stomp), 'yarg'),
     )
     const seqA = makeSequencer()
     const seqB = makeSequencer()
@@ -148,9 +149,9 @@ describe('YARG group-level variable sharing', () => {
   })
 
   it('group state survives a cue restart (onStop preserves group store)', () => {
-    const cue = new YargNodeCue(
+    const cue = new LightingNodeCue(
       'g1',
-      NodeCueCompiler.compileYargCue(cueWithSharedGroupVar('cue-stomp', CueType.Stomp)),
+      NodeCueCompiler.compileCue(cueWithSharedGroupVar('cue-stomp', CueType.Stomp), 'yarg'),
     )
     const seq = makeSequencer()
 

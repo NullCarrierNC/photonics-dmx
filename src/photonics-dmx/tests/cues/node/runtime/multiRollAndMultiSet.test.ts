@@ -32,6 +32,7 @@ function harness(declared: string[], seed: Record<string, VariableValue> = {}) {
   } as unknown as ExecutionContext
   const evalCtx: LogicNodeEvaluatorContext = {
     cueId: 'g:c',
+    mode: 'yarg',
     lightManager: {} as never,
     cueLevelVarStore: cueStore,
     groupLevelVarStore: groupStore,

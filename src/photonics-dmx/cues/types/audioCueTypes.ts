@@ -1,4 +1,5 @@
 import { AudioLightingData, AudioConfig } from '../../listeners/Audio/AudioTypes'
+import type { MotionCueRef } from './cueTypes'
 
 /**
  * AudioCueType is a free-form string so user-authored (node-based) cues can
@@ -7,10 +8,7 @@ import { AudioLightingData, AudioConfig } from '../../listeners/Audio/AudioTypes
 export type AudioCueType = string
 
 /** Registered audio motion program reference (manual picker / IPC). */
-export type AudioMotionCueRef = { groupId: string; cueId: string }
-
-/** YARG motion program selection (same shape as audio motion ref). */
-export type YargMotionCueRef = { groupId: string; cueId: string }
+export type AudioMotionCueRef = MotionCueRef
 
 /**
  * Context injected when execution was started from an AudioTriggerNode output path.

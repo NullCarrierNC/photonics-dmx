@@ -11,7 +11,7 @@ import type {
   AudioEffectDefinition,
   NodeCueKind,
   NodeCueMode,
-  YargNodeCueDefinition,
+  NetNodeCueDefinition,
   YargEffectDefinition,
   EffectDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -97,7 +97,7 @@ const useCueFlow = ({
   const loadCueIntoFlow = useCallback(
     (
       cue:
-        | YargNodeCueDefinition
+        | NetNodeCueDefinition
         | AudioNodeCueDefinition
         | YargEffectDefinition
         | AudioEffectDefinition

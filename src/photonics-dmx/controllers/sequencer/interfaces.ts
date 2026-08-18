@@ -276,7 +276,7 @@ export interface ISongEventHandler {
 }
 
 /** The condition union accepted by {@link ISongEventHandler.handleEvent} — the single source shared by
- *  every layer that forwards a song event (sequencer, ChainFanout, YargCueRuntime). */
+ *  every layer that forwards a song event (sequencer, ChainFanout, CueRuntime). */
 export type SongEventCondition = Parameters<ISongEventHandler['handleEvent']>[0]
 
 /**
@@ -286,6 +286,8 @@ export type SongEventCondition = Parameters<ISongEventHandler['handleEvent']>[0]
 export interface ISystemEffectsController {
   isBlackoutActive(): boolean
   cancelBlackout(): void
+  holdOcclusion(on: boolean): void
+  isOcclusionHeld(): boolean
   setOnBlackoutCompleteCallback(callback: () => void): void
 }
 
@@ -329,6 +331,11 @@ export interface ILightingController {
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void
   removeEffect(name: string, layer: number): void
   removeAllEffects(): void
+  /**
+   * Hold or release an opaque overlay above every cue layer. Occludes the rig without stopping it:
+   * the running cue keeps advancing and reappears at its natural state when the overlay is released.
+   */
+  holdOcclusion(on: boolean): void
   getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>
   isLayerFreeForLight(layer: number, lightId: string): boolean
   setState(lights: TrackedLight[], color: RGBIO, time: number): void

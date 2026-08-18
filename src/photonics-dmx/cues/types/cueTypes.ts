@@ -786,3 +786,9 @@ export const CueTypeDescriptions = [
 export function getCueTypeFromId(id: string): CueType | undefined {
   return Object.values(CueType).find((value) => value === id)
 }
+
+/**
+ * Reference to one registered motion program: the group it lives in and its cue id. Every domain
+ * (game and audio) picks motion the same way, so they all point at this shape.
+ */
+export type MotionCueRef = { groupId: string; cueId: string }

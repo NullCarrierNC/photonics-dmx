@@ -51,8 +51,8 @@ jest.mock('../../utils/windowUtils', () => ({ sendToAllWindows: mockSendToAllWin
 
 // These registries are imported inside config-handlers; mock them to avoid side effects
 jest.mock('../../../photonics-dmx/cues', () => ({}))
-jest.mock('../../../photonics-dmx/cues/registries/YargCueRegistry', () => ({
-  YargCueRegistry: {
+jest.mock('../../../photonics-dmx/cues/registries/CueRegistry', () => ({
+  CueRegistry: {
     getInstance: jest.fn().mockReturnValue({
       getRegisteredMotionGroupIds: jest.fn().mockReturnValue([]),
       setEnabledMotionGroups: jest.fn(),

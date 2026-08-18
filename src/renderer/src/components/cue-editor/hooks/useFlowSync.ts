@@ -8,7 +8,7 @@ import type { EffectDefinition } from '../../../../../photonics-dmx/cues/types/n
 import type { EditorNodeData } from '../lib/types'
 import { cueToFlow, effectToFlow } from '../lib/cueTransforms'
 import type {
-  YargNodeCueDefinition,
+  NetNodeCueDefinition,
   AudioNodeCueDefinition,
   YargEffectDefinition,
   AudioEffectDefinition,
@@ -120,7 +120,7 @@ export function useFlowSync({
   const loadCueIntoFlow = useCallback(
     (
       cue:
-        | YargNodeCueDefinition
+        | NetNodeCueDefinition
         | AudioNodeCueDefinition
         | YargEffectDefinition
         | AudioEffectDefinition
@@ -130,7 +130,7 @@ export function useFlowSync({
 
       const { nodes: flowNodes, edges: flowEdges } = isEffect
         ? effectToFlow(cue as YargEffectDefinition | AudioEffectDefinition)
-        : cueToFlow(cue as YargNodeCueDefinition | AudioNodeCueDefinition | null, effectDefinitions)
+        : cueToFlow(cue as NetNodeCueDefinition | AudioNodeCueDefinition | null, effectDefinitions)
 
       setNodes(flowNodes)
       setEdges(flowEdges)

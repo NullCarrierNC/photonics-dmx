@@ -1,176 +1,139 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
-import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
-import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
+import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import { ipcError } from './ipcResult'
 import { LIGHT } from '../../shared/ipcChannels'
 import { validateMotionSelectionMode } from './inputValidation'
+import type { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
+import type { CueDomain, CueDomainSelectionMode } from '../../services/configuration/cueDomainTypes'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('motion-group-handlers')
 
+type MotionSelectionMode = 'oncePerSong' | 'perCueChange' | 'none'
+
+/** The motion surface every registry exposes, whichever cue family it holds. */
+interface MotionCueRegistryView {
+  getMotionGroupsInfo(): Array<{ id: string; name: string; description?: string; cueCount: number }>
+  getMotionCueDetails(groupId: string): Array<{ id: string; name: string; description: string }>
+  getDefaultGroupId(): string | null
+  getEnabledMotionGroups(): string[]
+  setMotionSelectionMode(mode: MotionSelectionMode): void
+}
+
+interface MotionDomainSpec {
+  /** Used in log lines only. */
+  label: string
+  prefsDomain: CueDomain
+  registry: () => MotionCueRegistryView
+  /** The stored mode as the renderer sees it; the wider stored union is reported verbatim. */
+  getSelectionMode: (config: ConfigurationManager) => CueDomainSelectionMode
+  channels: {
+    groups: string
+    availableCues: string
+    getSelectionMode: string
+    setSelectionMode: string
+  }
+}
+
+const MOTION_DOMAINS: readonly MotionDomainSpec[] = [
+  {
+    label: 'YARG',
+    prefsDomain: 'yargMotion',
+    registry: () => getCueRegistry('yarg'),
+    getSelectionMode: (config) => config.getMotionGroupSelectionMode(),
+    channels: {
+      groups: LIGHT.GET_YARG_MOTION_CUE_GROUPS,
+      availableCues: LIGHT.GET_AVAILABLE_YARG_MOTION_CUES,
+      getSelectionMode: LIGHT.GET_YARG_MOTION_GROUP_SELECTION_MODE,
+      setSelectionMode: LIGHT.SET_YARG_MOTION_GROUP_SELECTION_MODE,
+    },
+  },
+  {
+    label: 'audio',
+    prefsDomain: 'audioMotion',
+    registry: () => AudioCueRegistry.getInstance(),
+    getSelectionMode: (config) => config.getAudioMotionGroupSelectionMode(),
+    channels: {
+      groups: LIGHT.GET_AUDIO_MOTION_CUE_GROUPS,
+      availableCues: LIGHT.GET_AVAILABLE_AUDIO_MOTION_CUES,
+      getSelectionMode: LIGHT.GET_AUDIO_MOTION_GROUP_SELECTION_MODE,
+      setSelectionMode: LIGHT.SET_AUDIO_MOTION_GROUP_SELECTION_MODE,
+    },
+  },
+  {
+    label: 'RB3',
+    prefsDomain: 'rb3Motion',
+    registry: () => getCueRegistry('rb3'),
+    getSelectionMode: (config) =>
+      config.getPreference('cueDomains').rb3Motion.selectionMode ?? 'perCueChange',
+    channels: {
+      groups: LIGHT.GET_RB3_MOTION_CUE_GROUPS,
+      availableCues: LIGHT.GET_AVAILABLE_RB3_MOTION_CUES,
+      getSelectionMode: LIGHT.GET_RB3_MOTION_GROUP_SELECTION_MODE,
+      setSelectionMode: LIGHT.SET_RB3_MOTION_GROUP_SELECTION_MODE,
+    },
+  },
+]
+
 /**
- * IPC handlers for YARG and audio motion cue groups and motion selection mode.
+ * IPC handlers for motion cue groups and motion selection mode. Every domain answers the same four
+ * questions against its own registry and preference domain, so they are registered from one table.
  */
 export function setupMotionGroupHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
 ): void {
-  ipcMain.handle(LIGHT.GET_YARG_MOTION_CUE_GROUPS, async () => {
-    try {
-      return YargCueRegistry.getInstance().getYargMotionGroupsInfo()
-    } catch (error) {
-      log.error('Error getting YARG motion cue groups:', error)
-      return []
-    }
-  })
-
-  ipcMain.handle(LIGHT.GET_AUDIO_MOTION_CUE_GROUPS, async () => {
-    try {
-      return AudioCueRegistry.getInstance().getAudioMotionGroupsInfo()
-    } catch (error) {
-      log.error('Error getting audio motion cue groups:', error)
-      return []
-    }
-  })
-
-  ipcMain.handle(LIGHT.GET_RB3_MOTION_CUE_GROUPS, async () => {
-    try {
-      return getRb3CueRegistry().getYargMotionGroupsInfo()
-    } catch (error) {
-      log.error('Error getting RB3 motion cue groups:', error)
-      return []
-    }
-  })
-
-  ipcMain.handle(LIGHT.GET_AVAILABLE_YARG_MOTION_CUES, async (_, groupId?: unknown) => {
-    try {
-      const registry = YargCueRegistry.getInstance()
-      const resolvedGroupId = typeof groupId === 'string' ? groupId : undefined
-      const targetGroupId =
-        resolvedGroupId || registry.getDefaultGroupId() || registry.getEnabledMotionGroups()[0]
-      if (!targetGroupId) {
+  for (const spec of MOTION_DOMAINS) {
+    ipcMain.handle(spec.channels.groups, async () => {
+      try {
+        return spec.registry().getMotionGroupsInfo()
+      } catch (error) {
+        log.error(`Error getting ${spec.label} motion cue groups:`, error)
         return []
       }
-      return registry.getYargMotionCueDetails(targetGroupId)
-    } catch (error) {
-      log.error('Error getting available YARG motion cues:', error)
-      return []
-    }
-  })
+    })
 
-  ipcMain.handle(LIGHT.GET_AVAILABLE_AUDIO_MOTION_CUES, async (_, groupId?: unknown) => {
-    try {
-      const registry = AudioCueRegistry.getInstance()
-      const resolvedGroupId = typeof groupId === 'string' ? groupId : undefined
-      const targetGroupId =
-        resolvedGroupId || registry.getDefaultGroup() || registry.getEnabledMotionGroups()[0]
-      if (!targetGroupId) {
+    ipcMain.handle(spec.channels.availableCues, async (_, groupId?: unknown) => {
+      try {
+        const registry = spec.registry()
+        const resolvedGroupId = typeof groupId === 'string' ? groupId : undefined
+        const targetGroupId =
+          resolvedGroupId || registry.getDefaultGroupId() || registry.getEnabledMotionGroups()[0]
+        if (!targetGroupId) {
+          return []
+        }
+        return registry.getMotionCueDetails(targetGroupId)
+      } catch (error) {
+        log.error(`Error getting available ${spec.label} motion cues:`, error)
         return []
       }
-      return registry.getAudioMotionCueDetails(targetGroupId)
-    } catch (error) {
-      log.error('Error getting available audio motion cues:', error)
-      return []
-    }
-  })
+    })
 
-  ipcMain.handle(LIGHT.GET_AVAILABLE_RB3_MOTION_CUES, async (_, groupId?: unknown) => {
-    try {
-      const registry = getRb3CueRegistry()
-      const resolvedGroupId = typeof groupId === 'string' ? groupId : undefined
-      const targetGroupId =
-        resolvedGroupId || registry.getDefaultGroupId() || registry.getEnabledMotionGroups()[0]
-      if (!targetGroupId) {
-        return []
+    ipcMain.handle(spec.channels.getSelectionMode, async () => {
+      try {
+        return { success: true, mode: spec.getSelectionMode(controllerManager.getConfig()) }
+      } catch (error) {
+        log.error(`Error getting ${spec.label} motion group selection mode:`, error)
+        return ipcError(error)
       }
-      return registry.getYargMotionCueDetails(targetGroupId)
-    } catch (error) {
-      log.error('Error getting available RB3 motion cues:', error)
-      return []
-    }
-  })
+    })
 
-  ipcMain.handle(LIGHT.GET_YARG_MOTION_GROUP_SELECTION_MODE, async () => {
-    try {
-      const mode = controllerManager.getConfig().getMotionGroupSelectionMode()
-      return { success: true, mode }
-    } catch (error) {
-      log.error('Error getting YARG motion group selection mode:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(LIGHT.SET_YARG_MOTION_GROUP_SELECTION_MODE, async (_, mode: unknown) => {
-    try {
-      const validation = validateMotionSelectionMode(mode)
-      if (!validation.ok) {
-        return ipcError(new Error(validation.error))
+    ipcMain.handle(spec.channels.setSelectionMode, async (_, mode: unknown) => {
+      try {
+        const validation = validateMotionSelectionMode(mode)
+        if (!validation.ok) {
+          return ipcError(new Error(validation.error))
+        }
+        await controllerManager
+          .getConfig()
+          .updateCueDomain(spec.prefsDomain, { selectionMode: validation.value })
+        spec.registry().setMotionSelectionMode(validation.value)
+        return { success: true, mode: validation.value }
+      } catch (error) {
+        log.error(`Error setting ${spec.label} motion group selection mode:`, error)
+        return ipcError(error)
       }
-      await controllerManager
-        .getConfig()
-        .updateCueDomain('yargMotion', { selectionMode: validation.value })
-      YargCueRegistry.getInstance().setMotionSelectionMode(validation.value)
-      return { success: true, mode: validation.value }
-    } catch (error) {
-      log.error('Error setting YARG motion group selection mode:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(LIGHT.GET_AUDIO_MOTION_GROUP_SELECTION_MODE, async () => {
-    try {
-      const mode = controllerManager.getConfig().getAudioMotionGroupSelectionMode()
-      return { success: true, mode }
-    } catch (error) {
-      log.error('Error getting audio motion group selection mode:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(LIGHT.SET_AUDIO_MOTION_GROUP_SELECTION_MODE, async (_, mode: unknown) => {
-    try {
-      const validation = validateMotionSelectionMode(mode)
-      if (!validation.ok) {
-        return ipcError(new Error(validation.error))
-      }
-      await controllerManager
-        .getConfig()
-        .updateCueDomain('audioMotion', { selectionMode: validation.value })
-      AudioCueRegistry.getInstance().setMotionSelectionMode(validation.value)
-      return { success: true, mode: validation.value }
-    } catch (error) {
-      log.error('Error setting audio motion group selection mode:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(LIGHT.GET_RB3_MOTION_GROUP_SELECTION_MODE, async () => {
-    try {
-      const mode =
-        controllerManager.getConfig().getPreference('cueDomains').rb3Motion.selectionMode ??
-        'perCueChange'
-      return { success: true, mode }
-    } catch (error) {
-      log.error('Error getting RB3 motion group selection mode:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(LIGHT.SET_RB3_MOTION_GROUP_SELECTION_MODE, async (_, mode: unknown) => {
-    try {
-      const validation = validateMotionSelectionMode(mode)
-      if (!validation.ok) {
-        return ipcError(new Error(validation.error))
-      }
-      await controllerManager
-        .getConfig()
-        .updateCueDomain('rb3Motion', { selectionMode: validation.value })
-      getRb3CueRegistry().setMotionSelectionMode(validation.value)
-      return { success: true, mode: validation.value }
-    } catch (error) {
-      log.error('Error setting RB3 motion group selection mode:', error)
-      return ipcError(error)
-    }
-  })
+    })
+  }
 }

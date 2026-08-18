@@ -35,7 +35,7 @@ import {
   type ForEachLightLogicNode,
   type IndexedVariableLogicNode,
   type LedChangedLogicNode,
-  type YargEventNode,
+  type NetEventNode,
   type NotesNode,
   type EffectRaiserNode,
   type EffectEventListenerNode,
@@ -461,7 +461,7 @@ const useNodeCreation = ({
 
   const addEventNode = useCallback(
     (
-      option?: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
+      option?: EventOption<NetEventNode['eventType'] | AudioEventNode['eventType']>,
       position?: { x: number; y: number },
     ) => {
       const nodeMode = activeMode
@@ -491,7 +491,7 @@ const useNodeCreation = ({
               ? {
                   id: newEventId,
                   type: 'event',
-                  eventType: defaultOption.value as YargEventNode['eventType'],
+                  eventType: defaultOption.value as NetEventNode['eventType'],
                 }
               : defaultOption.value === 'audio-trigger'
                 ? buildDefaultAudioTrigger(newEventId)

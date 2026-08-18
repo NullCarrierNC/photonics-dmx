@@ -1,7 +1,7 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
-import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
-import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
+import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
+import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import {
   DrumNoteType,
   InstrumentNoteType,
@@ -32,7 +32,7 @@ export function setupSimulationHandlers(
   const sim = controllerManager.getMotionCueSimulator()
 
   const stopMotionSimAndNotify = (): void => {
-    const hadYargSim = sim.hasYargActive()
+    const hadYargSim = sim.hasNetCueActive('yarg')
     sim.stop()
     if (hadYargSim) {
       sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
@@ -68,7 +68,7 @@ export function setupSimulationHandlers(
       const registry = AudioCueRegistry.getInstance()
       const resolvedGroupId = typeof groupId === 'string' ? groupId : undefined
       const targetGroupId =
-        resolvedGroupId || registry.getDefaultGroup() || registry.getEnabledGroups()[0]
+        resolvedGroupId || registry.getDefaultGroupId() || registry.getEnabledGroups()[0]
       if (!targetGroupId) return []
       return registry.getCueDetails(targetGroupId)
     } catch (error) {
@@ -79,7 +79,7 @@ export function setupSimulationHandlers(
 
   ipcMain.handle(LIGHT.GET_AVAILABLE_CUES, async (_, groupId?: unknown) => {
     try {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       const targetGroupId =
         typeof groupId === 'string' && groupId.trim() !== '' ? groupId : 'default'
       log.info(`Getting cues for group: ${targetGroupId}`)
@@ -230,7 +230,7 @@ export function setupSimulationHandlers(
       if (rb3Blocked() || !controllerManager.getIsInitialized()) return false
       // Make sure every chain has a YARG handler so the fanout `handleCue` actually
       // reaches secondary rigs even when no real network listener has run.
-      controllerManager.ensureChainsHaveYargHandlersForSimulation()
+      controllerManager.ensureChainsHaveHandlersForSimulation('yarg')
       const fanout = controllerManager.getChainFanout()
 
       const mockCueData = data
@@ -261,10 +261,8 @@ export function setupSimulationHandlers(
         }
       }
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
-      await sim.runYarg(mockCueData)
-      await sim.runRb3(mockCueData)
-      await sim.runAudio()
-      fanout.yargOnBeat()
+      await sim.runAll(mockCueData)
+      fanout.onBeat()
       return true
     },
   )
@@ -281,7 +279,7 @@ export function setupSimulationHandlers(
       },
     ) => {
       if (rb3Blocked() || !controllerManager.getIsInitialized()) return false
-      controllerManager.ensureChainsHaveYargHandlersForSimulation()
+      controllerManager.ensureChainsHaveHandlersForSimulation('yarg')
       const fanout = controllerManager.getChainFanout()
 
       const mockCueData = data
@@ -312,10 +310,8 @@ export function setupSimulationHandlers(
         }
       }
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
-      await sim.runYarg(mockCueData)
-      await sim.runRb3(mockCueData)
-      await sim.runAudio()
-      fanout.yargOnKeyframe()
+      await sim.runAll(mockCueData)
+      fanout.onKeyframe()
       return true
     },
   )
@@ -332,7 +328,7 @@ export function setupSimulationHandlers(
       },
     ) => {
       if (rb3Blocked() || !controllerManager.getIsInitialized()) return false
-      controllerManager.ensureChainsHaveYargHandlersForSimulation()
+      controllerManager.ensureChainsHaveHandlersForSimulation('yarg')
       const fanout = controllerManager.getChainFanout()
 
       const mockCueData = data
@@ -363,10 +359,8 @@ export function setupSimulationHandlers(
         }
       }
       sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
-      await sim.runYarg(mockCueData)
-      await sim.runRb3(mockCueData)
-      await sim.runAudio()
-      fanout.yargOnMeasure()
+      await sim.runAll(mockCueData)
+      fanout.onMeasure()
       return true
     },
   )
@@ -392,7 +386,7 @@ export function setupSimulationHandlers(
         if (!controllerManager.getIsInitialized()) {
           return { success: false, error: 'Lighting system not initialized' }
         }
-        controllerManager.ensureChainsHaveYargHandlersForSimulation()
+        controllerManager.ensureChainsHaveHandlersForSimulation('yarg')
         const fanout = controllerManager.getChainFanout()
 
         const mockCueData = createMockCueData({
@@ -471,7 +465,7 @@ export function setupSimulationHandlers(
       if (fanout.getChains().length === 0) {
         return ipcError(new Error('Lighting system not available'))
       }
-      const group = YargCueRegistry.getInstance().getGroup(groupId)
+      const group = CueRegistry.getInstance().getGroup(groupId)
       if (!group) {
         return ipcError(new Error(`YARG motion group not found: ${groupId}`))
       }
@@ -482,7 +476,7 @@ export function setupSimulationHandlers(
       sim.clearActive()
       // Cancel pending pan/tilt clears on every chain — without this, secondary rigs
       // would clear pan/tilt mid-motion after the previous simulation stopped.
-      fanout.yargCancelPanTiltClear()
+      fanout.cancelPanTiltClear()
       const mockCueData = createMockCueData({
         venueSize: 'Small',
         bpm: 120,
@@ -496,7 +490,7 @@ export function setupSimulationHandlers(
           await maybePromise
         }
       }
-      sim.setYargCue(cue)
+      sim.setNetCue('yarg', cue)
       sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
         ref: { groupId, cueId },
         source: 'auto',
@@ -529,7 +523,7 @@ export function setupSimulationHandlers(
       if (fanout.getChains().length === 0) {
         return ipcError(new Error('Lighting system not available'))
       }
-      const group = getRb3CueRegistry().getGroup(groupId)
+      const group = getCueRegistry('rb3').getGroup(groupId)
       if (!group) {
         return ipcError(new Error(`RB3 motion group not found: ${groupId}`))
       }
@@ -538,7 +532,7 @@ export function setupSimulationHandlers(
         return ipcError(new Error(`RB3 motion cue not found: ${groupId}/${cueId}`))
       }
       sim.clearActive()
-      fanout.yargCancelPanTiltClear()
+      fanout.cancelPanTiltClear()
       const mockCueData = createMockCueData({
         venueSize: 'Small',
         bpm: 120,
@@ -551,7 +545,7 @@ export function setupSimulationHandlers(
           await maybePromise
         }
       }
-      sim.setRb3Cue(cue)
+      sim.setNetCue('rb3', cue)
       sendToAllWindows(RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE, {
         ref: { groupId, cueId },
         source: 'auto',
@@ -593,7 +587,7 @@ export function setupSimulationHandlers(
         return ipcError(new Error(`Audio motion cue not found: ${groupId}/${cueId}`))
       }
       sim.clearActive()
-      fanout.yargCancelPanTiltClear()
+      fanout.cancelPanTiltClear()
       const mockAudio = createMockAudioCueData(1)
       for (const chain of fanout.getChains()) {
         const maybePromise = cue.execute(mockAudio, chain.sequencer, chain.dmxLightManager)
@@ -611,7 +605,7 @@ export function setupSimulationHandlers(
 
   ipcMain.handle(LIGHT.STOP_MOTION_CUE_SIMULATION, async () => {
     try {
-      const hadYargSim = sim.hasYargActive()
+      const hadYargSim = sim.hasNetCueActive('yarg')
       sim.stop()
       if (hadYargSim) {
         sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {

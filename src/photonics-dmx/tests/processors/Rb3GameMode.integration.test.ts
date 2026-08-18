@@ -12,12 +12,12 @@ jest.mock('../../../shared/time', () => ({
 import { EventEmitter } from 'events'
 import { describe, expect, it, jest } from '@jest/globals'
 import { Rb3StageKitCueProcessor } from '../../processors/Rb3StageKitCueProcessor'
-import { Rb3ChainRuntime } from '../../controllers/Rb3ChainRuntime'
+import { ChainCueRuntime } from '../../controllers/ChainCueRuntime'
 import { ChainFanout } from '../../controllers/ChainFanout'
-import { YargCueHandler } from '../../cueHandlers/YargCueHandler'
-import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
+import { CueHandler } from '../../cueHandlers/CueHandler'
+import { CueRegistry } from '../../cues/registries/CueRegistry'
 import { CueType } from '../../cues/types/cueTypes'
-import type { YargCueRuntime } from '../../listeners/YARG/YargNetworkListener'
+import type { CueRuntime } from '../../cueHandlers/CueRuntime'
 import type { RigChain } from '../../controllers/RigChain'
 import type { INetCue } from '../../cues/interfaces/INetCue'
 
@@ -37,7 +37,7 @@ function colourPacket(color: string, positions: number[]): unknown {
 const DURATION = { min: 5, max: 5 } // deterministic 5s countdown
 
 describe('RB3 game-mode integration (processor + manager + runtime)', () => {
-  function setup(runtime: YargCueRuntime) {
+  function setup(runtime: CueRuntime) {
     mockNowMs = 0
     const emitter = new EventEmitter()
     const proc = new Rb3StageKitCueProcessor(runtime, {
@@ -58,7 +58,7 @@ describe('RB3 game-mode integration (processor + manager + runtime)', () => {
       handleCue: jest.fn(async () => {}),
       handleSongEvent: jest.fn(),
       requestMotionRepick,
-    } as unknown as YargCueRuntime
+    } as unknown as CueRuntime
     const { proc, emit } = setup(runtime)
 
     // Song starts and Light 1 turns on (arms the timer; deadline = 0 + 5000).
@@ -87,7 +87,7 @@ describe('RB3 game-mode integration (processor + manager + runtime)', () => {
       handleCue: jest.fn(async () => {}),
       handleSongEvent: jest.fn(),
       requestMotionRepick,
-    } as unknown as YargCueRuntime
+    } as unknown as CueRuntime
     const { proc, emit } = setup(runtime)
 
     emit('red', [0]) // song start, led-1 on
@@ -112,7 +112,7 @@ describe('RB3 game-mode integration (processor + manager + runtime)', () => {
       handleCue,
       handleSongEvent: jest.fn(),
       requestMotionRepick,
-    } as unknown as YargCueRuntime
+    } as unknown as CueRuntime
     const onPrimaryCueChange = jest.fn()
 
     mockNowMs = 0
@@ -143,12 +143,12 @@ describe('RB3 game-mode integration (processor + manager + runtime)', () => {
     expect(lastFrame.preferredCueGroup).toBe(rotated)
   })
 
-  it('reaches a real cue handler through Rb3ChainRuntime and picks a motion cue', () => {
-    const registry = YargCueRegistry.create()
+  it('reaches a real cue handler through ChainCueRuntime and picks a motion cue', () => {
+    const registry = CueRegistry.create()
     const motionCue = { onStop: jest.fn(), execute: jest.fn() } as unknown as INetCue
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(motionCue)
     jest
-      .spyOn(registry, 'findYargMotionCueRef')
+      .spyOn(registry, 'findMotionCueRef')
       .mockReturnValue({ groupId: 'rb3-motion-default', cueId: 'rb3-motion-wave' })
 
     const sequencer = {
@@ -156,16 +156,20 @@ describe('RB3 game-mode integration (processor + manager + runtime)', () => {
       cancelPanTiltClear: jest.fn(),
       handleSongEvent: jest.fn(),
     } as never
-    const handler = new YargCueHandler({} as never, sequencer, {
+    const handler = new CueHandler({} as never, sequencer, {
       registry,
       getMotionCueProbabilityPercent: () => 100,
       getMotionCueMinimumHoldMs: () => 0,
     })
     const fanout = new ChainFanout()
     fanout.setChains([
-      { isPrimary: true, rb3CueHandler: handler, sequencer } as unknown as RigChain,
+      {
+        isPrimary: true,
+        cueHandlers: { yarg: null, rb3: handler },
+        sequencer,
+      } as unknown as RigChain,
     ])
-    const runtime = new Rb3ChainRuntime(fanout)
+    const runtime = new ChainCueRuntime(fanout, 'rb3')
 
     const proc = (() => {
       mockNowMs = 0

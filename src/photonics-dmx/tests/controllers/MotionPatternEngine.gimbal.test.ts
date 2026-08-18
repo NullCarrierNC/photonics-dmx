@@ -20,7 +20,7 @@ import { LightStateManager } from '../../controllers/sequencer/LightStateManager
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
 import type { FixtureConfig } from '../../types'
 import type { CueData } from '../../cues/types/cueTypes'
-import type { NodeMotionPatternSetting, YargEventNode } from '../../cues/types/nodeCueTypes'
+import type { NodeMotionPatternSetting, NetEventNode } from '../../cues/types/nodeCueTypes'
 import { panTiltDmxToSphericalXY } from '../../../renderer/src/components/lightsDmxPreviewMath'
 
 const TWO_PI = Math.PI * 2
@@ -29,7 +29,7 @@ const RAD_TO_DEG = 180 / Math.PI
 const NEAR_POLE_EPS_DEG = 1e-9
 
 function makeExecutionContext(): ExecutionContext {
-  const ev: YargEventNode = { id: 'ev', type: 'event', eventType: 'cue-started' }
+  const ev: NetEventNode = { id: 'ev', type: 'event', eventType: 'cue-started' }
   return new ExecutionContext(ev, {} as CueData, new Map(), new Map())
 }
 

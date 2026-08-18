@@ -8,27 +8,29 @@ import {
   isStrobeCueType,
   isVocalActive,
 } from '../cues/types/cueTypes'
-import { YargMotionCueRef } from '../cues/types/audioCueTypes'
+import type { MotionCueRef } from '../cues/types/cueTypes'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { getStrobeStateManager } from '../controllers/StrobeStateManager'
 import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
-import { YargCueRegistry } from '../cues/registries/YargCueRegistry'
+import { CueRegistry } from '../cues/registries/CueRegistry'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
 import { createLogger } from '../../shared/logger'
 import { monotonicNowMs } from '../../shared/time'
-const log = createLogger('YargCueHandler')
+const log = createLogger('CueHandler')
 
 /**
- * YargCueHandler handles the cues called by the YARG network listener.
+ * CueHandler runs one net domain's cues against one rig: the YARG network listener and the RB3
+ * cue-mode processor each drive their own handler per chain, told apart only by which registry and
+ * motion-change channel they are constructed with.
  *
- * Cue selection is delegated to YargCueRegistry.getCueImplementation(cueType, trackMode), which uses
+ * Cue selection is delegated to CueRegistry.getCueImplementation(cueType, trackMode), which uses
  * active/enabled groups, consistency tracking, stage-kit preference when applicable,
  * and default-group fallback when no active group implements the cue.
  *
- * Motion cues run in parallel via YargCueRegistry.getRandomMotionCue() when the lighting cue type
+ * Motion cues run in parallel via CueRegistry.getRandomMotionCue() when the lighting cue type
  * changes (not on re-queues of the same cue). Simulated cues (trackMode === 'simulated') skip
  * random motion selection; use motion simulation IPC instead. Optional once-per-song lock from
  * configuration applies to random selection.
@@ -37,14 +39,14 @@ const log = createLogger('YargCueHandler')
  * Layer 0 will maintain its state though.
  * addEffect will not clear other effects unless it's on the same layer.
  */
-export type YargCueHandlerOptions = {
+export type CueHandlerOptions = {
   getMotionCueMinimumHoldMs?: () => number
   /** Probability (0-100) that an automatic motion cue pick will play on a new lighting cue. Defaults to 100 (always). */
   getMotionCueProbabilityPercent?: () => number
   runtimeBroadcaster?: RuntimeBroadcaster
-  /** Cue registry to resolve against. Defaults to the shared YARG singleton; a separate domain
-   *  (e.g. RB3 cue mode) passes its own instance so its selections stay isolated. */
-  registry?: YargCueRegistry
+  /** Cue registry to resolve against. Defaults to the process-wide YARG instance; another domain
+   *  (RB3 cue mode) passes its own so its selections stay isolated. */
+  registry?: CueRegistry
   /** Which motion-cue-change channel to broadcast on. Defaults to YARG; RB3 cue mode passes its own
    *  so its motion selections don't surface as YARG changes. */
   motionChangeChannel?:
@@ -52,19 +54,19 @@ export type YargCueHandlerOptions = {
     | typeof RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE
 }
 
-class YargCueHandler extends EventEmitter {
+class CueHandler extends EventEmitter {
   private readonly _lightManager: DmxLightManager
   private readonly _sequencer: ILightingController
-  private readonly registry: YargCueRegistry
+  private readonly registry: CueRegistry
   private currentPrimaryCue: INetCue | null = null
   private currentSecondaryCue: INetCue | null = null
   private currentStrobeCue: INetCue | null = null
   private currentMotionCue: INetCue | null = null
   private currentMotionCueStartTime: number | null = null
   private motionEnabled = true
-  private manualMotionRef: YargMotionCueRef | null = null
+  private manualMotionRef: MotionCueRef | null = null
   /** Tracks which manual ref was used for the last motion pick (undefined = not yet synced). */
-  private lastManualMotionRefForMotion: YargMotionCueRef | null | undefined = undefined
+  private lastManualMotionRefForMotion: MotionCueRef | null | undefined = undefined
   private lastEmittedMotionKey: string | null = null
   private readonly getMotionCueMinimumHoldMs: () => number
   private readonly getMotionCueProbabilityPercent: () => number
@@ -81,13 +83,13 @@ class YargCueHandler extends EventEmitter {
   /** Tracks whether any vocal/harmony part was active on the previous frame, for note-on/off edge detection. */
   private wasVocalActive = false
 
-  public setManualMotionRef(ref: YargMotionCueRef | null): void {
+  public setManualMotionRef(ref: MotionCueRef | null): void {
     this.manualMotionRef = ref
     this.lastManualMotionRefForMotion = undefined
   }
 
-  private emitYargMotionCueChange(
-    ref: YargMotionCueRef | null,
+  private emitMotionCueChange(
+    ref: MotionCueRef | null,
     source: 'manual' | 'auto' | 'cleared',
     manualFallback?: boolean,
   ): void {
@@ -114,7 +116,7 @@ class YargCueHandler extends EventEmitter {
         this.currentMotionCue = null
         this.currentMotionCueStartTime = null
         this._sequencer.schedulePanTiltClear()
-        this.emitYargMotionCueChange(null, 'cleared')
+        this.emitMotionCueChange(null, 'cleared')
       }
       this.lastManualMotionRefForMotion = undefined
     } else {
@@ -125,12 +127,12 @@ class YargCueHandler extends EventEmitter {
   constructor(
     lightManager: DmxLightManager,
     photonicsSequencer: ILightingController,
-    options?: YargCueHandlerOptions,
+    options?: CueHandlerOptions,
   ) {
     super()
     this._lightManager = lightManager
     this._sequencer = photonicsSequencer
-    this.registry = options?.registry ?? YargCueRegistry.getInstance()
+    this.registry = options?.registry ?? CueRegistry.getInstance()
     this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
     this.getMotionCueProbabilityPercent = options?.getMotionCueProbabilityPercent ?? (() => 100)
     this.runtimeBroadcaster = options?.runtimeBroadcaster ?? noopRuntimeBroadcaster()
@@ -177,8 +179,8 @@ class YargCueHandler extends EventEmitter {
     getStrobeStateManager().setActive(null)
   }
 
-  /** Stops any active strobe slot and clears per-frame edge baselines at YARG session boundaries. */
-  public resetYargSessionState(): void {
+  /** Stops any active strobe slot and clears per-frame edge baselines at session boundaries. */
+  public resetSessionState(): void {
     this.stopActiveStrobe()
     this.resetInputEdgeState()
   }
@@ -416,7 +418,7 @@ class YargCueHandler extends EventEmitter {
           this.currentMotionCue = null
           this.currentMotionCueStartTime = null
           this._sequencer.schedulePanTiltClear()
-          this.emitYargMotionCueChange(null, 'cleared')
+          this.emitMotionCueChange(null, 'cleared')
         }
       } else {
         const motionCue = this.selectMotionCue(historicCueData.executionCount === 1, false)
@@ -431,7 +433,7 @@ class YargCueHandler extends EventEmitter {
             this.currentMotionCue = null
             this.currentMotionCueStartTime = null
             this._sequencer.schedulePanTiltClear()
-            this.emitYargMotionCueChange(null, 'cleared')
+            this.emitMotionCueChange(null, 'cleared')
           }
         }
       }
@@ -496,16 +498,16 @@ class YargCueHandler extends EventEmitter {
         this.currentMotionCueStartTime = now
       }
       this._sequencer.cancelPanTiltClear()
-      const ref = registry.findYargMotionCueRef(motionCue)
+      const ref = registry.findMotionCueRef(motionCue)
       if (ref) {
-        this.emitYargMotionCueChange(ref, pickSource, pickManualFallback)
+        this.emitMotionCueChange(ref, pickSource, pickManualFallback)
       }
     } else if (this.currentMotionCue) {
       this.currentMotionCue.onStop?.()
       this.currentMotionCue = null
       this.currentMotionCueStartTime = null
       this._sequencer.schedulePanTiltClear()
-      this.emitYargMotionCueChange(null, 'cleared')
+      this.emitMotionCueChange(null, 'cleared')
     }
     return this.currentMotionCue
   }
@@ -541,7 +543,7 @@ class YargCueHandler extends EventEmitter {
       this.currentMotionCue = null
       this.currentMotionCueStartTime = null
       this._sequencer.schedulePanTiltClear()
-      this.emitYargMotionCueChange(null, 'cleared')
+      this.emitMotionCueChange(null, 'cleared')
     }
   }
 
@@ -567,7 +569,7 @@ class YargCueHandler extends EventEmitter {
   /**
    * Clean up resources and stop any executing cue.
    *
-   * Node cue instances are singletons held by `YargCueRegistry`, so they are not
+   * Node cue instances are singletons held by the domain's `CueRegistry`, so they are not
    * literally destroyed when this handler tears down; the same instances are reused
    * by the next handler. We call `onStop()` so each cue's `CueSession` is reset
    * (`cueStartedFired` cleared, engine nulled) and the next activation can fire
@@ -597,4 +599,4 @@ class YargCueHandler extends EventEmitter {
   }
 }
 
-export { YargCueHandler, CueType }
+export { CueHandler, CueType }

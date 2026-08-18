@@ -1,14 +1,11 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../../controllers/ControllerManager'
 import { sendToAllWindows } from '../../utils/windowUtils'
-import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
-import { getRb3CueRegistry } from '../../../photonics-dmx/cues/registries/Rb3CueRegistry'
-import {
-  reconcileEnabledGroups,
-  persistReconciledGroups,
-} from '../../controllers/cueGroupReconcile'
+import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
+import { getCueRegistry } from '../../../photonics-dmx/cues/registries/cueRegistries'
 import {
   cueDomainBinding,
+  reconcileAndApplyGroups,
   type CueDomainRegistryBinding,
 } from '../../controllers/cueDomainBindings'
 import { ipcError } from '../ipcResult'
@@ -69,23 +66,8 @@ function registerCueGroupDomain(
   ipcMain.handle(spec.channels.getEnabled, () =>
     serialize(async () => {
       const config = controllerManager.getConfig()
-      const prefs = config.getAllPreferences()
-      const domainPrefs = prefs.cueDomains[domain]
-      const reconciled = reconcileEnabledGroups(
-        domainPrefs.enabledGroups,
-        domainPrefs.knownGroups,
-        binding.getRegisteredIds(),
-      )
-      await persistReconciledGroups(
-        config,
-        domain,
-        reconciled,
-        domainPrefs.enabledGroups,
-        domainPrefs.knownGroups,
-      )
-      binding.setEnabled(reconciled.enabled)
-      binding.setDisabled(domainPrefs.disabledCues)
-      spec.afterGet?.(prefs)
+      const reconciled = await reconcileAndApplyGroups(binding, config)
+      spec.afterGet?.(config.getAllPreferences())
       return reconciled.enabled
     }),
   )
@@ -149,12 +131,12 @@ function registerCueGroupDomain(
 
 /** Activate the enabled groups so a group enabled at runtime is immediately selectable (no restart). */
 function activateYargGroups(): void {
-  const registry = YargCueRegistry.getInstance()
+  const registry = CueRegistry.getInstance()
   registry.setActiveGroups(registry.getEnabledGroups())
 }
 
 function activateRb3Groups(): void {
-  const registry = getRb3CueRegistry()
+  const registry = getCueRegistry('rb3')
   registry.setActiveGroups(registry.getEnabledGroups())
 }
 
@@ -174,7 +156,7 @@ export function registerCueSelectionConfigHandlers(
       disabledLabel: 'disabledYargCues',
       afterSetEnabled: activateYargGroups,
       afterGet: (prefs) => {
-        const registry = YargCueRegistry.getInstance()
+        const registry = CueRegistry.getInstance()
         const configPriority = prefs.stageKitPrefs?.yargPriority || 'random'
         if (registry.getStageKitPriority() !== configPriority) {
           registry.setStageKitPriority(configPriority)

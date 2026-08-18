@@ -9,6 +9,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../types/cueTypes'
 import { AudioCueData } from '../../types/audioCueTypes'
 import { CompiledEffect } from '../compiler/EffectCompiler'
+import type { NodeCueMode } from '../../types/nodeCueTypes'
 import {
   ActionNode,
   BaseEventNode,
@@ -33,6 +34,12 @@ export interface EffectExecutionEngineOptions {
   consumeInitialClearPolicy?: () => boolean
   /** Re-entry policy; defaults to 'relaxed'. */
   revisitPolicy?: RevisitPolicy
+  /**
+   * The domain of the cue that raised this effect. Required: an effect reads cue data from the
+   * frame that triggered it, so it must resolve against the raiser's family rather than the effect
+   * tree's own EffectMode.
+   */
+  callerMode: NodeCueMode
 }
 
 export class EffectExecutionEngine extends BaseNodeExecutionEngine {
@@ -49,6 +56,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
   /** Callback-backed effects still running in sequencer for this engine instance. */
   private pendingCallbackEffects: Set<string> = new Set()
   private readonly revisitPolicyValue: RevisitPolicy
+  private readonly callerMode: NodeCueMode
 
   private maybeFireIdle(): void {
     if (
@@ -73,7 +81,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     broadcaster: RuntimeBroadcaster,
     parameterValues: Record<string, any>,
     callerCueData: CueData | AudioCueData,
-    options: EffectExecutionEngineOptions = {},
+    options: EffectExecutionEngineOptions,
   ) {
     super({
       sequencer,
@@ -89,6 +97,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     this.parameterValues = parameterValues
     this.callerCueData = callerCueData
     this.revisitPolicyValue = options.revisitPolicy ?? 'relaxed'
+    this.callerMode = options.callerMode
 
     // Initialize effect-local variable store
     this.effectVarStore = new Map()
@@ -100,6 +109,15 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
 
   protected get compiled(): CompiledGraph {
     return this.compiledEffect
+  }
+
+  /**
+   * The raising cue's domain, not the effect tree's: RB3 cues raise effects from the yarg effect
+   * tree, and cue data read inside such an effect resolves against the rb3 frame that raised it.
+   * Reading the effect's own EffectMode would send rb3 frames through the yarg extractor.
+   */
+  protected get mode(): NodeCueMode {
+    return this.callerMode
   }
 
   protected get revisitPolicy(): RevisitPolicy {

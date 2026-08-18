@@ -6,7 +6,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { performance } from 'perf_hooks'
-import { YargNetworkListener, YargCueRuntime } from '../../listeners/YARG/YargNetworkListener'
+import { YargNetworkListener } from '../../listeners/YARG/YargNetworkListener'
+import type { CueRuntime } from '../../cueHandlers/CueRuntime'
 import { CueData, CueType, defaultCueData, DrumNoteType } from '../../cues/types/cueTypes'
 import { BeatByte } from '../../listeners/YARG/yargTypes'
 import { buildYargPacket, buildYargShutdownPacket } from '../helpers/yargPacket'
@@ -26,7 +27,7 @@ class YargNetworkListenerMinV2 extends YargNetworkListener {
   }
 }
 
-class MockCueHandler implements YargCueRuntime {
+class MockCueHandler implements CueRuntime {
   public notifySongStart = jest.fn()
   public notifySongEnd = jest.fn()
   public handleBeat = jest.fn()
@@ -41,7 +42,7 @@ class MockCueHandler implements YargCueRuntime {
   public handleKeysNote = jest.fn()
   public handleVocalNote = jest.fn()
   public stopActiveStrobe = jest.fn()
-  public resetYargSessionState = jest.fn()
+  public resetSessionState = jest.fn()
 }
 
 const mockBind = jest.fn((_port: number, callback: () => void) => {
@@ -187,10 +188,10 @@ describe('YargNetworkListener', () => {
       }
 
       listener.processCueData(frameWithStrobe)
-      cueHandler.resetYargSessionState.mockClear()
+      cueHandler.resetSessionState.mockClear()
 
       deserializePacket(listener, buildYargShutdownPacket())
-      expect(cueHandler.resetYargSessionState).toHaveBeenCalledTimes(1)
+      expect(cueHandler.resetSessionState).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -461,7 +462,7 @@ describe('YargNetworkListener', () => {
       expect(cueHandler.handleDrumNote).toHaveBeenCalledTimes(1)
 
       deserializePacket(listener, buildYargShutdownPacket())
-      expect(cueHandler.resetYargSessionState).toHaveBeenCalledTimes(1)
+      expect(cueHandler.resetSessionState).toHaveBeenCalledTimes(1)
 
       cueHandler.handleDrumNote.mockClear()
       listener.processCueData(frame)
@@ -482,11 +483,11 @@ describe('YargNetworkListener', () => {
       expect(cueHandler.handleDrumNote).toHaveBeenCalledTimes(1)
 
       await listener.stop()
-      cueHandler.resetYargSessionState.mockClear()
+      cueHandler.resetSessionState.mockClear()
       cueHandler.handleDrumNote.mockClear()
       await listener.start()
 
-      expect(cueHandler.resetYargSessionState).toHaveBeenCalledTimes(1)
+      expect(cueHandler.resetSessionState).toHaveBeenCalledTimes(1)
       listener.processCueData(frame)
       expect(cueHandler.handleDrumNote).toHaveBeenCalledTimes(1)
     })

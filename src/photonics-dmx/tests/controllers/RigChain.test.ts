@@ -92,16 +92,16 @@ describe('RigChain', () => {
 
     const handlerA = new (
       jest.requireActual(
-        '../../cueHandlers/YargCueHandler',
-      ) as typeof import('../../cueHandlers/YargCueHandler')
-    ).YargCueHandler(chainA.dmxLightManager, chainA.sequencer)
+        '../../cueHandlers/CueHandler',
+      ) as typeof import('../../cueHandlers/CueHandler')
+    ).CueHandler(chainA.dmxLightManager, chainA.sequencer)
     const handlerB = new (
       jest.requireActual(
-        '../../cueHandlers/YargCueHandler',
-      ) as typeof import('../../cueHandlers/YargCueHandler')
-    ).YargCueHandler(chainB.dmxLightManager, chainB.sequencer)
-    chainA.yargCueHandler = handlerA
-    chainB.yargCueHandler = handlerB
+        '../../cueHandlers/CueHandler',
+      ) as typeof import('../../cueHandlers/CueHandler')
+    ).CueHandler(chainB.dmxLightManager, chainB.sequencer)
+    chainA.cueHandlers.yarg = handlerA
+    chainB.cueHandlers.yarg = handlerB
 
     const aSpy = jest.spyOn(handlerA, 'setMotionEnabled')
     const bSpy = jest.spyOn(handlerB, 'setMotionEnabled')
@@ -110,8 +110,8 @@ describe('RigChain', () => {
 
     // Iterate as ControllerManager does (`for (const chain of this.rigChains)`).
     for (const chain of [chainA, chainB]) {
-      chain.yargCueHandler?.setMotionEnabled(false)
-      chain.yargCueHandler?.setManualMotionRef({ groupId: 'g', cueId: 'c' })
+      chain.cueHandlers.yarg?.setMotionEnabled(false)
+      chain.cueHandlers.yarg?.setManualMotionRef({ groupId: 'g', cueId: 'c' })
     }
 
     expect(aSpy).toHaveBeenCalledWith(false)
@@ -124,9 +124,9 @@ describe('RigChain', () => {
   })
 
   it('dispose() releases per-sequencer state from cue registries', async () => {
-    const { YargCueRegistry } = await import('../../cues/registries/YargCueRegistry')
+    const { CueRegistry } = await import('../../cues/registries/CueRegistry')
     const { AudioCueRegistry } = await import('../../cues/registries/AudioCueRegistry')
-    const yargSpy = jest.spyOn(YargCueRegistry.getInstance(), 'releaseSequencerFromAllCues')
+    const yargSpy = jest.spyOn(CueRegistry.getInstance(), 'releaseSequencerFromAllCues')
     const audioSpy = jest.spyOn(AudioCueRegistry.getInstance(), 'releaseSequencerFromAllCues')
     try {
       const [rigA] = makeTwoRigs({ frontPerRig: 4 })

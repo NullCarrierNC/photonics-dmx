@@ -1,10 +1,10 @@
 import { NodeExecutionEngine } from '../../../cues/node/runtime/NodeExecutionEngine'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
-import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
+import { LightingNodeCue } from '../../../cues/node/runtime/LightingNodeCue'
 import {
-  YargNodeCueDefinition,
-  YargEventNode,
+  NetNodeCueDefinition,
+  NetEventNode,
   ActionNode,
   EventRaiserNode,
   EventListenerNode,
@@ -109,7 +109,7 @@ describe('Runtime Event System', () => {
         description: 'Test event',
       }
 
-      const systemEvent: YargEventNode = {
+      const systemEvent: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -150,7 +150,7 @@ describe('Runtime Event System', () => {
         },
       }
 
-      const cueDefinition: YargNodeCueDefinition = {
+      const cueDefinition: NetNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
         kind: 'lighting',
@@ -170,7 +170,7 @@ describe('Runtime Event System', () => {
         events: [eventDef],
       }
 
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         'cue1',
@@ -193,7 +193,7 @@ describe('Runtime Event System', () => {
         name: 'testEvent',
       }
 
-      const systemEvent: YargEventNode = {
+      const systemEvent: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -253,7 +253,7 @@ describe('Runtime Event System', () => {
         eventName: 'testEvent',
       }
 
-      const cueDefinition: YargNodeCueDefinition = {
+      const cueDefinition: NetNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
         kind: 'lighting',
@@ -273,7 +273,7 @@ describe('Runtime Event System', () => {
         events: [eventDef],
       }
 
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         'cue1',
@@ -298,7 +298,7 @@ describe('Runtime Event System', () => {
         name: 'multiEvent',
       }
 
-      const systemEvent: YargEventNode = {
+      const systemEvent: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -364,7 +364,7 @@ describe('Runtime Event System', () => {
         },
       }
 
-      const cueDefinition: YargNodeCueDefinition = {
+      const cueDefinition: NetNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
         kind: 'lighting',
@@ -384,7 +384,7 @@ describe('Runtime Event System', () => {
         events: [eventDef],
       }
 
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         'cue1',
@@ -408,7 +408,7 @@ describe('Runtime Event System', () => {
       const event1Def: EventDefinition = { name: 'event1' }
       const event2Def: EventDefinition = { name: 'event2' }
 
-      const systemEvent: YargEventNode = {
+      const systemEvent: NetEventNode = {
         id: 'sysEvent',
         type: 'event',
         eventType: 'beat',
@@ -474,7 +474,7 @@ describe('Runtime Event System', () => {
         },
       }
 
-      const cueDefinition: YargNodeCueDefinition = {
+      const cueDefinition: NetNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
         kind: 'lighting',
@@ -494,7 +494,7 @@ describe('Runtime Event System', () => {
         events: [event1Def, event2Def],
       }
 
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         'cue1',
@@ -516,7 +516,7 @@ describe('Runtime Event System', () => {
 
   describe('Compiler Validation', () => {
     it('should fail compilation if event raiser references undefined event', () => {
-      const systemEvent: YargEventNode = {
+      const systemEvent: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -549,7 +549,7 @@ describe('Runtime Event System', () => {
         },
       }
 
-      const cueDefinition: YargNodeCueDefinition = {
+      const cueDefinition: NetNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
         kind: 'lighting',
@@ -566,12 +566,12 @@ describe('Runtime Event System', () => {
       }
 
       expect(() => {
-        NodeCueCompiler.compileYargCue(cueDefinition)
+        NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       }).toThrow(/references undefined event/)
     })
 
     it('should fail compilation if event listener references undefined event', () => {
-      const systemEvent: YargEventNode = {
+      const systemEvent: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -604,7 +604,7 @@ describe('Runtime Event System', () => {
         },
       }
 
-      const cueDefinition: YargNodeCueDefinition = {
+      const cueDefinition: NetNodeCueDefinition = {
         id: 'cue1',
         name: 'Test Cue',
         kind: 'lighting',
@@ -621,14 +621,14 @@ describe('Runtime Event System', () => {
       }
 
       expect(() => {
-        NodeCueCompiler.compileYargCue(cueDefinition)
+        NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       }).toThrow(/references undefined event/)
     })
   })
 
   describe('First submission setEffect lifecycle', () => {
     it('uses setEffect for first submission when ref.use is true (engine with ref)', async () => {
-      const cueStartedEvent: YargEventNode = {
+      const cueStartedEvent: NetEventNode = {
         id: 'e-start',
         type: 'event',
         eventType: 'cue-started',
@@ -653,7 +653,7 @@ describe('Runtime Event System', () => {
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
-      const cueDefinition: YargNodeCueDefinition = {
+      const cueDefinition: NetNodeCueDefinition = {
         id: 'cue-lifecycle',
         name: 'Lifecycle Cue',
         kind: 'lighting',
@@ -667,7 +667,7 @@ describe('Runtime Event System', () => {
         connections: [{ from: 'e-start', to: 'action1' }],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const firstSubmissionRef = { use: true }
       const engine = new NodeExecutionEngine(
         compiled,
@@ -690,7 +690,7 @@ describe('Runtime Event System', () => {
     })
 
     it('uses addEffect when ref is not passed (engine without ref)', async () => {
-      const cueStartedEvent: YargEventNode = {
+      const cueStartedEvent: NetEventNode = {
         id: 'e-start',
         type: 'event',
         eventType: 'cue-started',
@@ -715,7 +715,7 @@ describe('Runtime Event System', () => {
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
-      const cueDefinition: YargNodeCueDefinition = {
+      const cueDefinition: NetNodeCueDefinition = {
         id: 'cue-no-ref',
         name: 'No Ref Cue',
         kind: 'lighting',
@@ -729,7 +729,7 @@ describe('Runtime Event System', () => {
         connections: [{ from: 'e-start', to: 'action1' }],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
       const engine = new NodeExecutionEngine(
         compiled,
         'cue-no-ref',
@@ -745,13 +745,13 @@ describe('Runtime Event System', () => {
       expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
     })
 
-    it('YargNodeCue (Primary): first execute uses setEffect, second uses addEffect, after onStop first again uses setEffect', async () => {
-      const cueStartedEvent: YargEventNode = {
+    it('LightingNodeCue (Primary): first execute uses setEffect, second uses addEffect, after onStop first again uses setEffect', async () => {
+      const cueStartedEvent: NetEventNode = {
         id: 'e-start',
         type: 'event',
         eventType: 'cue-started',
       }
-      const cueCalledEvent: YargEventNode = {
+      const cueCalledEvent: NetEventNode = {
         id: 'e-called',
         type: 'event',
         eventType: 'cue-called',
@@ -776,7 +776,7 @@ describe('Runtime Event System', () => {
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
-      const cueDefinition: YargNodeCueDefinition = {
+      const cueDefinition: NetNodeCueDefinition = {
         id: 'cue-full',
         name: 'Full Lifecycle Cue',
         kind: 'lighting',
@@ -793,8 +793,8 @@ describe('Runtime Event System', () => {
         ],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
-      const cue = new YargNodeCue('group1', compiled)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
+      const cue = new LightingNodeCue('group1', compiled)
       const cueData = createCueData()
 
       await cue.execute(cueData, mockSequencer, mockLightManager)
@@ -814,8 +814,8 @@ describe('Runtime Event System', () => {
       expect(mockSequencer.setEffectUnblockedName).toHaveBeenCalledTimes(2)
     })
 
-    it('YargNodeCue onStop does not remove effects from sequencer so lights stay lit during cue transition', async () => {
-      const cueStartedEvent: YargEventNode = {
+    it('LightingNodeCue onStop does not remove effects from sequencer so lights stay lit during cue transition', async () => {
+      const cueStartedEvent: NetEventNode = {
         id: 'e-start',
         type: 'event',
         eventType: 'cue-started',
@@ -840,7 +840,7 @@ describe('Runtime Event System', () => {
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
-      const cueDefinition: YargNodeCueDefinition = {
+      const cueDefinition: NetNodeCueDefinition = {
         id: 'cue-transition',
         name: 'Transition Test Cue',
         kind: 'lighting',
@@ -854,8 +854,8 @@ describe('Runtime Event System', () => {
         connections: [{ from: 'e-start', to: 'action1' }],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
-      const cue = new YargNodeCue('group1', compiled)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
+      const cue = new LightingNodeCue('group1', compiled)
       const cueData = createCueData()
 
       await cue.execute(cueData, mockSequencer, mockLightManager)
@@ -867,8 +867,8 @@ describe('Runtime Event System', () => {
       expect(mockSequencer.removeEffect).toHaveBeenCalledTimes(removeEffectCallsBefore)
     })
 
-    it('YargNodeCue (Secondary): execute submits effect via addEffect', async () => {
-      const cueStartedEvent: YargEventNode = {
+    it('LightingNodeCue (Secondary): execute submits effect via addEffect', async () => {
+      const cueStartedEvent: NetEventNode = {
         id: 'e-start',
         type: 'event',
         eventType: 'cue-started',
@@ -893,7 +893,7 @@ describe('Runtime Event System', () => {
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
-      const cueDefinition: YargNodeCueDefinition = {
+      const cueDefinition: NetNodeCueDefinition = {
         id: 'cue-secondary',
         name: 'Secondary Overlay Cue',
         kind: 'lighting',
@@ -907,8 +907,8 @@ describe('Runtime Event System', () => {
         connections: [{ from: 'e-start', to: 'action1' }],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
-      const cue = new YargNodeCue('group1', compiled)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
+      const cue = new LightingNodeCue('group1', compiled)
       const cueData = createCueData()
 
       await cue.execute(cueData, mockSequencer, mockLightManager)
@@ -917,8 +917,8 @@ describe('Runtime Event System', () => {
       expect(setCalls + addCalls).toBeGreaterThanOrEqual(1)
     })
 
-    it('YargNodeCue (Primary, no cue-started node): first execute uses setEffect', async () => {
-      const cueCalledEvent: YargEventNode = {
+    it('LightingNodeCue (Primary, no cue-started node): first execute uses setEffect', async () => {
+      const cueCalledEvent: NetEventNode = {
         id: 'e-called',
         type: 'event',
         eventType: 'cue-called',
@@ -943,7 +943,7 @@ describe('Runtime Event System', () => {
           waitUntilTime: { source: 'literal', value: 0 },
         },
       }
-      const cueDefinition: YargNodeCueDefinition = {
+      const cueDefinition: NetNodeCueDefinition = {
         id: 'cue-primary-called-only',
         name: 'Primary Cue Called Only',
         kind: 'lighting',
@@ -957,8 +957,8 @@ describe('Runtime Event System', () => {
         connections: [{ from: 'e-called', to: 'action1' }],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileYargCue(cueDefinition)
-      const cue = new YargNodeCue('group1', compiled)
+      const compiled = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
+      const cue = new LightingNodeCue('group1', compiled)
       const cueData = createCueData()
 
       await cue.execute(cueData, mockSequencer, mockLightManager)
@@ -986,7 +986,7 @@ describe('Runtime Event System', () => {
         ),
       } as any
 
-      const beatEvent: YargEventNode = {
+      const beatEvent: NetEventNode = {
         id: 'e-beat',
         type: 'event',
         eventType: 'beat',
@@ -997,7 +997,7 @@ describe('Runtime Event System', () => {
         effectId: 'blocking-effect',
         label: 'Raise',
       }
-      const cueDefinition: YargNodeCueDefinition = {
+      const cueDefinition: NetNodeCueDefinition = {
         id: 'cue-blocking',
         name: 'Blocking Cue',
         kind: 'lighting',
@@ -1012,7 +1012,7 @@ describe('Runtime Event System', () => {
         connections: [{ from: 'e-beat', to: 'raiser1' }],
         layout: { nodePositions: {} },
       }
-      const compiledCue = NodeCueCompiler.compileYargCue(cueDefinition)
+      const compiledCue = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
 
       const effectDef: YargEffectDefinition = {
         id: 'blocking-effect',

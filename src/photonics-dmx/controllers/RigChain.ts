@@ -4,12 +4,13 @@ import { LightTransitionController } from './sequencer/LightTransitionController
 import { Sequencer } from './sequencer/Sequencer'
 import { Clock } from './sequencer/Clock'
 import { LightingConfiguration } from '../types'
-import { YargCueHandler } from '../cueHandlers/YargCueHandler'
+import { CueHandler } from '../cueHandlers/CueHandler'
+import type { NetCueMode } from '../cues/types/nodeCueTypes'
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
 import { Rb3MenuCueHandler } from '../cueHandlers/Rb3MenuCueHandler'
-import { YargCueRegistry } from '../cues/registries/YargCueRegistry'
+import { CueRegistry } from '../cues/registries/CueRegistry'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
-import { getRb3CueRegistry } from '../cues/registries/Rb3CueRegistry'
+import { getCueRegistry } from '../cues/registries/cueRegistries'
 import { applyMirrorToConfig, RigMirror } from '../helpers/mirrorRig'
 import { createLogger } from '../../shared/logger'
 
@@ -55,9 +56,12 @@ export class RigChain {
    * Per-rig cue handler slots. Populated lazily by the listener controllers when each
    * listener enables (YARG / RB3 / audio), cleared on disable. Each handler is bound to
    * this chain's sequencer + light manager so events resolve against this rig's lights.
+   * The net domains keep one slot each so their cue state stays separate.
    */
-  public yargCueHandler: YargCueHandler | null = null
-  public rb3CueHandler: YargCueHandler | null = null
+  public readonly cueHandlers: Record<NetCueMode, CueHandler | null> = {
+    yarg: null,
+    rb3: null,
+  }
   public audioCueHandler: AudioCueHandler | null = null
   public rb3MenuCueHandler: Rb3MenuCueHandler | null = null
 
@@ -79,21 +83,15 @@ export class RigChain {
    * one chain's teardown stopping ticks for the others.
    */
   public async dispose(): Promise<void> {
-    if (this.yargCueHandler) {
+    for (const domain of Object.keys(this.cueHandlers) as NetCueMode[]) {
+      const handler = this.cueHandlers[domain]
+      if (!handler) continue
       try {
-        this.yargCueHandler.shutdown()
+        handler.shutdown()
       } catch (err) {
-        log.error(`Error shutting down YARG cue handler for rig ${this.rigId}:`, err)
+        log.error(`Error shutting down ${domain} cue handler for rig ${this.rigId}:`, err)
       }
-      this.yargCueHandler = null
-    }
-    if (this.rb3CueHandler) {
-      try {
-        this.rb3CueHandler.shutdown()
-      } catch (err) {
-        log.error(`Error shutting down RB3 cue handler for rig ${this.rigId}:`, err)
-      }
-      this.rb3CueHandler = null
+      this.cueHandlers[domain] = null
     }
     if (this.audioCueHandler) {
       try {
@@ -115,7 +113,7 @@ export class RigChain {
     // can drop their per-sequencer runtime state. Without this the cue singletons would
     // hold one stale state entry per disposed chain after every `restartControllers` cycle.
     try {
-      YargCueRegistry.getInstance().releaseSequencerFromAllCues(this.sequencer)
+      CueRegistry.getInstance().releaseSequencerFromAllCues(this.sequencer)
     } catch (err) {
       log.error(`Error releasing sequencer from YARG cues for rig ${this.rigId}:`, err)
     }
@@ -125,7 +123,7 @@ export class RigChain {
       log.error(`Error releasing sequencer from audio cues for rig ${this.rigId}:`, err)
     }
     try {
-      getRb3CueRegistry().releaseSequencerFromAllCues(this.sequencer)
+      getCueRegistry('rb3').releaseSequencerFromAllCues(this.sequencer)
     } catch (err) {
       log.error(`Error releasing sequencer from RB3 cues for rig ${this.rigId}:`, err)
     }

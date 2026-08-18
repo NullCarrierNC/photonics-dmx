@@ -18,7 +18,7 @@ import { setupSimulationHandlers } from '../../ipc/simulation-handlers'
 import { LIGHT } from '../../../shared/ipcChannels'
 import { ChainFanout } from '../../../photonics-dmx/controllers/ChainFanout'
 import { MotionCueSimulator } from '../../controllers/MotionCueSimulator'
-import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
+import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
 import { AudioCueRegistry } from '../../../photonics-dmx/cues/registries/AudioCueRegistry'
 import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
 
@@ -54,13 +54,16 @@ function makeChainStub(rigId: string, isPrimary: boolean): RigChain {
       schedulePanTiltClear: jest.fn(),
       cancelPanTiltClear: jest.fn(),
     } as unknown as RigChain['sequencer'],
-    yargCueHandler: {
-      handleCue: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-      handleDrumNote: jest.fn(),
-      handleGuitarNote: jest.fn(),
-      handleBassNote: jest.fn(),
-      handleKeysNote: jest.fn(),
-    } as unknown as RigChain['yargCueHandler'],
+    cueHandlers: {
+      yarg: {
+        handleCue: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        handleDrumNote: jest.fn(),
+        handleGuitarNote: jest.fn(),
+        handleBassNote: jest.fn(),
+        handleKeysNote: jest.fn(),
+      } as unknown as RigChain['cueHandlers']['yarg'],
+      rb3: null,
+    },
     audioCueHandler: null,
     rb3MenuCueHandler: null,
   } as unknown as RigChain
@@ -68,7 +71,7 @@ function makeChainStub(rigId: string, isPrimary: boolean): RigChain {
 
 describe('simulation IPC handlers fan out to every active rig chain', () => {
   const TEST_GROUP = 'sim-fanout-test-group'
-  let yargRegistry: YargCueRegistry
+  let yargRegistry: CueRegistry
   let audioRegistry: AudioCueRegistry
   let chains: RigChain[]
   let fanout: ChainFanout
@@ -76,7 +79,7 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
   let controllerManager: {
     setOnConsoleEnter: jest.Mock
     setOnSimulationPreempt: jest.Mock
-    ensureChainsHaveYargHandlersForSimulation: jest.Mock
+    ensureChainsHaveHandlersForSimulation: jest.Mock
     getChainFanout: () => ChainFanout
     getMotionCueSimulator: () => MotionCueSimulator
     getIsInitialized: () => boolean
@@ -91,7 +94,7 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
     cm as unknown as Parameters<typeof setupSimulationHandlers>[1]
 
   beforeEach(() => {
-    yargRegistry = YargCueRegistry.getInstance()
+    yargRegistry = CueRegistry.getInstance()
     yargRegistry.reset()
     audioRegistry = AudioCueRegistry.getInstance()
     audioRegistry.reset()
@@ -103,7 +106,7 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
     controllerManager = {
       setOnConsoleEnter: jest.fn(),
       setOnSimulationPreempt: jest.fn(),
-      ensureChainsHaveYargHandlersForSimulation: jest.fn(),
+      ensureChainsHaveHandlersForSimulation: jest.fn(),
       getChainFanout: () => fanout,
       getMotionCueSimulator: () => motionCueSimulator,
       getIsInitialized: () => true,
@@ -118,22 +121,22 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
     audioRegistry.reset()
   })
 
-  it('SIMULATE_BEAT calls yargOnBeat on the fanout (every chain sequencer)', async () => {
+  it('SIMULATE_BEAT calls onBeat on the fanout (every chain sequencer)', async () => {
     const handler = ipc.getHandler(LIGHT.SIMULATE_BEAT)!
     await handler({}, undefined)
     expect(chains[0].sequencer.onBeat).toHaveBeenCalledTimes(1)
     expect(chains[1].sequencer.onBeat).toHaveBeenCalledTimes(1)
-    expect(controllerManager.ensureChainsHaveYargHandlersForSimulation).toHaveBeenCalledTimes(1)
+    expect(controllerManager.ensureChainsHaveHandlersForSimulation).toHaveBeenCalledTimes(1)
   })
 
-  it('SIMULATE_KEYFRAME calls yargOnKeyframe on the fanout', async () => {
+  it('SIMULATE_KEYFRAME calls onKeyframe on the fanout', async () => {
     const handler = ipc.getHandler(LIGHT.SIMULATE_KEYFRAME)!
     await handler({}, undefined)
     expect(chains[0].sequencer.onKeyframe).toHaveBeenCalledTimes(1)
     expect(chains[1].sequencer.onKeyframe).toHaveBeenCalledTimes(1)
   })
 
-  it('SIMULATE_MEASURE calls yargOnMeasure on the fanout', async () => {
+  it('SIMULATE_MEASURE calls onMeasure on the fanout', async () => {
     const handler = ipc.getHandler(LIGHT.SIMULATE_MEASURE)!
     await handler({}, undefined)
     expect(chains[0].sequencer.onMeasure).toHaveBeenCalledTimes(1)
@@ -143,8 +146,8 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
   it('SIMULATE_INSTRUMENT_NOTE routes drum notes through every chain handler', async () => {
     const handler = ipc.getHandler(LIGHT.SIMULATE_INSTRUMENT_NOTE)!
     await handler({}, { instrument: 'drums', noteType: 'Kick' })
-    expect(chains[0].yargCueHandler!.handleDrumNote).toHaveBeenCalledTimes(1)
-    expect(chains[1].yargCueHandler!.handleDrumNote).toHaveBeenCalledTimes(1)
+    expect(chains[0].cueHandlers.yarg!.handleDrumNote).toHaveBeenCalledTimes(1)
+    expect(chains[1].cueHandlers.yarg!.handleDrumNote).toHaveBeenCalledTimes(1)
   })
 
   it('SIMULATE_INSTRUMENT_NOTE routes guitar/bass/keys through every chain handler', async () => {
@@ -152,12 +155,12 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
     await handler({}, { instrument: 'guitar', noteType: 'Green' })
     await handler({}, { instrument: 'bass', noteType: 'Red' })
     await handler({}, { instrument: 'keys', noteType: 'Blue' })
-    expect(chains[0].yargCueHandler!.handleGuitarNote).toHaveBeenCalledTimes(1)
-    expect(chains[1].yargCueHandler!.handleGuitarNote).toHaveBeenCalledTimes(1)
-    expect(chains[0].yargCueHandler!.handleBassNote).toHaveBeenCalledTimes(1)
-    expect(chains[1].yargCueHandler!.handleBassNote).toHaveBeenCalledTimes(1)
-    expect(chains[0].yargCueHandler!.handleKeysNote).toHaveBeenCalledTimes(1)
-    expect(chains[1].yargCueHandler!.handleKeysNote).toHaveBeenCalledTimes(1)
+    expect(chains[0].cueHandlers.yarg!.handleGuitarNote).toHaveBeenCalledTimes(1)
+    expect(chains[1].cueHandlers.yarg!.handleGuitarNote).toHaveBeenCalledTimes(1)
+    expect(chains[0].cueHandlers.yarg!.handleBassNote).toHaveBeenCalledTimes(1)
+    expect(chains[1].cueHandlers.yarg!.handleBassNote).toHaveBeenCalledTimes(1)
+    expect(chains[0].cueHandlers.yarg!.handleKeysNote).toHaveBeenCalledTimes(1)
+    expect(chains[1].cueHandlers.yarg!.handleKeysNote).toHaveBeenCalledTimes(1)
   })
 
   it('START_YARG_MOTION_CUE_SIMULATION executes the cue once per chain with that chain pair', async () => {

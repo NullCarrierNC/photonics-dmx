@@ -5,7 +5,7 @@ import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
 import { getStrobeStateManager } from '../../photonics-dmx/controllers/StrobeStateManager'
 import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
 import { LightingConfiguration, ConfigStrobeType, FixtureConfig } from '../../photonics-dmx/types'
-import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
+import { CueHandler } from '../../photonics-dmx/cueHandlers/CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
 import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
 import {
@@ -21,11 +21,10 @@ import * as path from 'path'
 import { EffectLoader } from '../../photonics-dmx/cues/node/loader/EffectLoader'
 
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
-import { noopRuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 import { RigChain } from './RigChain'
 import { ChainFanout } from './ChainFanout'
 import { TestEffectRunner, type Rb3LedState } from './TestEffectRunner'
-import { Rb3ChainRuntime } from '../../photonics-dmx/controllers/Rb3ChainRuntime'
+import { ChainCueRuntime } from '../../photonics-dmx/controllers/ChainCueRuntime'
 import { MotionCueSimulator } from './MotionCueSimulator'
 import { ListenerLifecycleController } from './ListenerLifecycleController'
 import {
@@ -36,16 +35,15 @@ import { ConsoleModeController } from './ConsoleModeController'
 import { RegistryInitializer } from './RegistryInitializer'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { LifecyclePhase } from '../../shared/ipcTypes'
-import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
-import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
-import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
-import { reconcileEnabledGroups, persistReconciledGroups } from './cueGroupReconcile'
-import { CUE_DOMAIN_BINDINGS, type CueDomainRegistryBinding } from './cueDomainBindings'
 import {
-  AudioCueType,
-  AudioMotionCueRef,
-  YargMotionCueRef,
-} from '../../photonics-dmx/cues/types/audioCueTypes'
+  CUE_DOMAIN_BINDINGS,
+  reconcileAndApplyGroups,
+  type CueDomainRegistryBinding,
+} from './cueDomainBindings'
+import { buildDomainChainHandlers, readMotionPrefs } from './cueRuntimeDomains'
+import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
+import { AudioCueType, AudioMotionCueRef } from '../../photonics-dmx/cues/types/audioCueTypes'
+import type { MotionCueRef } from '../../photonics-dmx/cues/types/cueTypes'
 import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues'
@@ -122,8 +120,8 @@ export class ControllerManager {
   private effectsController: ILightingController | null = null
   private dmxPublisher: DmxPublisher | null = null
 
-  private cueHandler: YargCueHandler | null = null
-  private rb3CueHandler: YargCueHandler | null = null
+  private cueHandler: CueHandler | null = null
+  private rb3CueHandler: CueHandler | null = null
   private lifecycleOpChain: Promise<void> = Promise.resolve()
   private nodeCueLoader: NodeCueLoader | null = null
   private effectLoader: EffectLoader | null = null
@@ -135,7 +133,7 @@ export class ControllerManager {
   /** RB3 cue-mode twin of {@link testEffectRunner}: dispatches through the RB3 chain runtime. */
   private readonly rb3TestEffectRunner: TestEffectRunner
   /** Reused RB3 dispatch surface for the RB3 test-effect runner (the fanout is stable). */
-  private readonly rb3SimRuntime = new Rb3ChainRuntime(this.chainFanout)
+  private readonly rb3SimRuntime = new ChainCueRuntime(this.chainFanout, 'rb3')
   private readonly motionCueSimulator: MotionCueSimulator
   private readonly senderLifecycle: SenderLifecycleController
   private readonly listenerLifecycle: ListenerLifecycleController
@@ -163,12 +161,12 @@ export class ControllerManager {
       ensureInitialized: () => this.init(),
     }
     this.testEffectRunner = new TestEffectRunner(testEffectCtx, {
-      ensureHandlers: () => this.ensureChainsHaveYargHandlersForSimulation(),
+      ensureHandlers: () => this.ensureChainsHaveHandlersForSimulation('yarg'),
       dispatch: (cue, data) => void this.chainFanout.handleCue(cue, data),
-      stopActiveCue: () => this.chainFanout.yargStopActiveCue(),
+      stopActiveCue: () => this.chainFanout.stopActiveCue(),
     })
     this.rb3TestEffectRunner = new TestEffectRunner(testEffectCtx, {
-      ensureHandlers: () => this.ensureChainsHaveRb3HandlersForSimulation(),
+      ensureHandlers: () => this.ensureChainsHaveHandlersForSimulation('rb3'),
       dispatch: (cue, data) => void this.rb3SimRuntime.handleCue(cue, data),
       stopActiveCue: () => this.rb3SimRuntime.stopActiveCue(),
       songEvent: (condition) => this.rb3SimRuntime.handleSongEvent(condition),
@@ -183,18 +181,16 @@ export class ControllerManager {
         getRigChains: () => this.rigChains,
         getChainFanout: () => this.chainFanout,
         getMotionEnabled: () => this.config.getPreference('motionEnabled') ?? true,
-        getActiveYargMotionCueRef: () =>
-          this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
-        getMotionCueMinimumHoldMs: () =>
-          this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
+        getActiveYargMotionCueRef: () => readMotionPrefs(this.config, 'yarg').activeCueRef,
+        getMotionCueMinimumHoldMs: () => readMotionPrefs(this.config, 'yarg').minimumHoldMs,
         getMotionCueProbabilityPercent: () =>
-          this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
-        getActiveRb3MotionCueRef: () => this.getRb3MotionDomain().activeCueRef ?? null,
-        getRb3MotionCueMinimumHoldMs: () => this.getRb3MotionDomain().minimumHoldMs ?? 5000,
+          readMotionPrefs(this.config, 'yarg').probabilityPercent,
+        getActiveRb3MotionCueRef: () => readMotionPrefs(this.config, 'rb3').activeCueRef,
+        getRb3MotionCueMinimumHoldMs: () => readMotionPrefs(this.config, 'rb3').minimumHoldMs,
         getRb3MotionCueProbabilityPercent: () =>
-          this.getRb3MotionDomain().probabilityPercent ?? 100,
+          readMotionPrefs(this.config, 'rb3').probabilityPercent,
         getRb3MotionCueDurationRangeSec: () => {
-          const d = this.getRb3MotionDomain()
+          const d = readMotionPrefs(this.config, 'rb3')
           return { min: d.cueDurationMin, max: d.cueDurationMax }
         },
         getFallbackCueTimeMs: () => this.config.getPreference('yargFallbackCueTimeMs') ?? 20000,
@@ -356,10 +352,9 @@ export class ControllerManager {
 
     this.senderLifecycle.ensureSenderManager()
     await this.initializeRigChains()
-    await this.registryInit.initializeCueRegistry()
-    await this.registryInit.initializeAudioCueRegistry()
-    await this.registryInit.initializeRb3CueRegistry()
-    await this.applyMotionPreferencesFromConfig()
+    for (const binding of CUE_DOMAIN_BINDINGS) {
+      await this.registryInit.initializeCueRegistry(binding.domain)
+    }
     const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
     await copyDefaultData(process.resourcesPath, baseDir)
     await this.registryInit.initializeEffectLoader() // effects before node cues
@@ -457,25 +452,6 @@ export class ControllerManager {
   /**
    * Apply YARG and Audio motion preferences from configuration (groups register later via NodeCueLoader).
    */
-  private async applyMotionPreferencesFromConfig(): Promise<void> {
-    const yarg = YargCueRegistry.getInstance()
-    const audio = AudioCueRegistry.getInstance()
-    const rb3 = getRb3CueRegistry()
-    yarg.setMotionSelectionMode(this.config.getMotionGroupSelectionMode())
-    yarg.setDisabledMotionCues(this.config.getPreference('cueDomains').yargMotion.disabledCues)
-    audio.setMotionSelectionMode(this.config.getAudioMotionGroupSelectionMode())
-    audio.setDisabledMotionCues(this.config.getPreference('cueDomains').audioMotion.disabledCues)
-    rb3.setMotionSelectionMode(this.rb3MotionSelectionMode())
-    rb3.setDisabledMotionCues(this.config.getPreference('cueDomains').rb3Motion.disabledCues)
-    log.info('YARG + Audio + RB3 motion registries initialized (selection modes from preferences).')
-  }
-
-  /** RB3 motion selection mode from the RB3 motion domain, narrowed to the motion union. */
-  private rb3MotionSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
-    const mode = this.config.getPreference('cueDomains').rb3Motion.selectionMode
-    return mode === 'oncePerSong' || mode === 'none' ? mode : 'perCueChange'
-  }
-
   /**
    * Re-apply one cue domain's enabled groups and disabled cues from configuration after all groups
    * are registered. Node cue groups are registered in initializeNodeCueLoader(), and each
@@ -485,23 +461,8 @@ export class ControllerManager {
    * remain in the known set, and deregistered groups are dropped.
    */
   private async applyEnabledGroupsFromConfig(binding: CueDomainRegistryBinding): Promise<void> {
-    const { domain } = binding
-    const domainPrefs = this.config.getPreference('cueDomains')[domain]
-    const reconciled = reconcileEnabledGroups(
-      domainPrefs.enabledGroups,
-      domainPrefs.knownGroups,
-      binding.getRegisteredIds(),
-    )
-    await persistReconciledGroups(
-      this.config,
-      domain,
-      reconciled,
-      domainPrefs.enabledGroups,
-      domainPrefs.knownGroups,
-    )
-    binding.setEnabled(reconciled.enabled)
-    binding.setDisabled(this.config.getPreference('cueDomains')[domain].disabledCues)
-    log.info(`${domain} enabled groups re-applied from config:`, reconciled.enabled)
+    const reconciled = await reconcileAndApplyGroups(binding, this.config)
+    log.info(`${binding.domain} enabled groups re-applied from config:`, reconciled.enabled)
   }
 
   /** Re-apply every cue domain's enabled groups and disabled cues from configuration. */
@@ -520,17 +481,13 @@ export class ControllerManager {
     if (!this.dmxLightManager || !this.effectsController) return
 
     // Create cue handler (default to YARG)
-    const yargHandler = new YargCueHandler(this.dmxLightManager, this.effectsController, {
-      getMotionCueMinimumHoldMs: () =>
-        this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
-      getMotionCueProbabilityPercent: () =>
-        this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
+    const yargHandler = new CueHandler(this.dmxLightManager, this.effectsController, {
+      getMotionCueMinimumHoldMs: () => readMotionPrefs(this.config, 'yarg').minimumHoldMs,
+      getMotionCueProbabilityPercent: () => readMotionPrefs(this.config, 'yarg').probabilityPercent,
       runtimeBroadcaster: mainRuntimeBroadcaster,
     })
     yargHandler.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
-    yargHandler.setManualMotionRef(
-      this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
-    )
+    yargHandler.setManualMotionRef(readMotionPrefs(this.config, 'yarg').activeCueRef)
     this.cueHandler = yargHandler
   }
 
@@ -801,11 +758,11 @@ export class ControllerManager {
     this.onSimulationPreempt = callback
   }
 
-  public getCueHandler(): YargCueHandler | null {
+  public getCueHandler(): CueHandler | null {
     return this.cueHandler
   }
 
-  public getRb3CueHandler(): YargCueHandler | null {
+  public getRb3CueHandler(): CueHandler | null {
     return this.rb3CueHandler
   }
 
@@ -836,24 +793,6 @@ export class ControllerManager {
     }
   }
 
-  /** RB3 motion preferences for the RB3 cue handlers, from the RB3 motion cue domain. */
-  private getRb3MotionDomain(): {
-    activeCueRef: YargMotionCueRef | null
-    minimumHoldMs: number
-    probabilityPercent: number
-    cueDurationMin: number
-    cueDurationMax: number
-  } {
-    const domain = this.config.getPreference('cueDomains').rb3Motion
-    return {
-      activeCueRef: domain.activeCueRef ?? null,
-      minimumHoldMs: domain.minimumHoldMs ?? 5000,
-      probabilityPercent: domain.probabilityPercent ?? 100,
-      cueDurationMin: domain.cueDurationMin ?? 5,
-      cueDurationMax: domain.cueDurationMax ?? 20,
-    }
-  }
-
   /**
    * Returns the listener / processor fanout. Exposed so simulation IPC handlers and the
    * test-effect runner can dispatch events to every active rig's handler without going
@@ -869,59 +808,24 @@ export class ControllerManager {
   }
 
   /**
-   * Idempotent: ensures every active rig chain has a `YargCueHandler` attached, creating
-   * one bound to the chain's own `(dmxLightManager, sequencer)` for any chain whose slot is
-   * still null. Used by the simulation IPC path and `TestEffectRunner` to bring secondary
-   * chains up to par with the primary so cues dispatched through `ChainFanout` reach every
-   * rig — even when no real network listener has run `enableYargInternal`.
+   * Idempotent: ensures every active rig chain has a cue handler in the domain's slot, creating one
+   * bound to the chain's own `(dmxLightManager, sequencer)` for any chain whose slot is still null.
+   * Used by the simulation IPC path and `TestEffectRunner` to bring secondary chains up to par with
+   * the primary so cues dispatched through `ChainFanout` reach every rig, even when no real network
+   * listener has run.
    *
-   * Handler construction mirrors `ListenerCoordinator.enableYargInternal`: same motion
-   * preferences, and only the primary chain's handler gets the main runtime broadcaster so
-   * renderer events stay deduped.
-   *
-   * Safe to call after `enableYargInternal` (no-op for chains that already have handlers)
-   * and after `disableYarg` (rebuilds the chain slots from scratch).
+   * Safe to call after a listener has enabled (no-op for chains that already have handlers) and
+   * after it is disabled (rebuilds the chain slots from scratch).
    */
-  public ensureChainsHaveYargHandlersForSimulation(): void {
-    for (const chain of this.rigChains) {
-      if (chain.yargCueHandler) continue
-      const handler = new YargCueHandler(chain.dmxLightManager, chain.sequencer, {
-        getMotionCueMinimumHoldMs: () =>
-          this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
-        getMotionCueProbabilityPercent: () =>
-          this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
-        runtimeBroadcaster: chain.isPrimary ? mainRuntimeBroadcaster : noopRuntimeBroadcaster(),
-      })
-      handler.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
-      handler.setManualMotionRef(
-        this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
-      )
-      chain.yargCueHandler = handler
-    }
-  }
-
-  /**
-   * Idempotent RB3 twin of {@link ensureChainsHaveYargHandlersForSimulation}: attaches an RB3 cue
-   * handler (bound to the RB3 cue registry) to every chain whose slot is still null, so the cue
-   * simulator can dispatch RB3 cues through `Rb3ChainRuntime` even when the live RB3E listener has
-   * never run. Handler construction mirrors `ListenerCoordinator.buildRb3ChainHandlers`: RB3 motion
-   * preferences, RB3 registry, and only the primary chain gets the main runtime broadcaster.
-   */
-  public ensureChainsHaveRb3HandlersForSimulation(): void {
-    const motion = this.getRb3MotionDomain()
-    for (const chain of this.rigChains) {
-      if (chain.rb3CueHandler) continue
-      const handler = new YargCueHandler(chain.dmxLightManager, chain.sequencer, {
-        registry: getRb3CueRegistry(),
-        getMotionCueMinimumHoldMs: () => this.getRb3MotionDomain().minimumHoldMs,
-        getMotionCueProbabilityPercent: () => this.getRb3MotionDomain().probabilityPercent,
-        runtimeBroadcaster: chain.isPrimary ? mainRuntimeBroadcaster : noopRuntimeBroadcaster(),
-        motionChangeChannel: RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE,
-      })
-      handler.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
-      handler.setManualMotionRef(motion.activeCueRef)
-      chain.rb3CueHandler = handler
-    }
+  public ensureChainsHaveHandlersForSimulation(domain: NetCueMode): void {
+    buildDomainChainHandlers(domain, this.rigChains, {
+      getMotionEnabled: () => this.config.getPreference('motionEnabled') ?? true,
+      getMotionCueMinimumHoldMs: () => readMotionPrefs(this.config, domain).minimumHoldMs,
+      getMotionCueProbabilityPercent: () => readMotionPrefs(this.config, domain).probabilityPercent,
+      getActiveMotionCueRef: () => readMotionPrefs(this.config, domain).activeCueRef,
+      runtimeBroadcaster: mainRuntimeBroadcaster,
+      replaceExisting: false,
+    })
   }
 
   public getNodeCueLoader(): NodeCueLoader | null {
@@ -1262,8 +1166,8 @@ export class ControllerManager {
    */
   public setMotionEnabledGlobal(enabled: boolean): void {
     for (const chain of this.rigChains) {
-      chain.yargCueHandler?.setMotionEnabled(enabled)
-      chain.rb3CueHandler?.setMotionEnabled(enabled)
+      chain.cueHandlers.yarg?.setMotionEnabled(enabled)
+      chain.cueHandlers.rb3?.setMotionEnabled(enabled)
     }
     this.listenerLifecycle.audio.setMotionEnabled(enabled)
   }
@@ -1281,9 +1185,9 @@ export class ControllerManager {
    * pick up the new reference together. Only the primary chain emits the renderer
    * broadcast for the change (see Phase 4 dedup); the secondary chains apply silently.
    */
-  public setActiveYargMotionCueRef(ref: YargMotionCueRef | null): void {
+  public setActiveYargMotionCueRef(ref: MotionCueRef | null): void {
     for (const chain of this.rigChains) {
-      chain.yargCueHandler?.setManualMotionRef(ref)
+      chain.cueHandlers.yarg?.setManualMotionRef(ref)
     }
   }
 
@@ -1291,9 +1195,9 @@ export class ControllerManager {
    * Update the manual RB3 motion cue reference on every active rig's RB3 handler so all rigs
    * pick up the new reference together.
    */
-  public setActiveRb3MotionCueRef(ref: YargMotionCueRef | null): void {
+  public setActiveRb3MotionCueRef(ref: MotionCueRef | null): void {
     for (const chain of this.rigChains) {
-      chain.rb3CueHandler?.setManualMotionRef(ref)
+      chain.cueHandlers.rb3?.setManualMotionRef(ref)
     }
   }
 

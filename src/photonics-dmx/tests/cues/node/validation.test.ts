@@ -11,12 +11,13 @@ import {
   validateAudioEffectFile,
   validateEffectFile,
 } from '../../../cues/node/schema/validation'
-import { YargNodeCueDefinition, AudioNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
+import { NetNodeCueDefinition, AudioNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../cues/types/cueTypes'
+import type { AudioEventNodeUnion } from '../../../cues/types/nodeCueTypes'
 
 describe('Node cue validation', () => {
   it('validates a simple YARG node cue', () => {
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'test-cue',
       name: 'Test Cue',
       description: '',
@@ -71,7 +72,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates a YARG node cue containing a pulse logic node, and rejects one missing anchorVar', () => {
-    const makeDef = (pulse: Record<string, unknown>): YargNodeCueDefinition =>
+    const makeDef = (pulse: Record<string, unknown>): NetNodeCueDefinition =>
       ({
         id: 'pulse-cue',
         name: 'Pulse Cue',
@@ -113,7 +114,7 @@ describe('Node cue validation', () => {
           { from: 'logic-1', to: 'action-1' },
         ],
         layout: { nodePositions: {} },
-      }) as YargNodeCueDefinition
+      }) as NetNodeCueDefinition
 
     const validPulse = {
       id: 'logic-1',
@@ -146,7 +147,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates multi-set variable and multi-roll random logic nodes, and rejects a roll missing assignTo', () => {
-    const makeDef = (logic: Record<string, unknown>): YargNodeCueDefinition =>
+    const makeDef = (logic: Record<string, unknown>): NetNodeCueDefinition =>
       ({
         id: 'logic-cue',
         name: 'Logic Cue',
@@ -188,7 +189,7 @@ describe('Node cue validation', () => {
           { from: 'logic-1', to: 'action-1' },
         ],
         layout: { nodePositions: {} },
-      }) as YargNodeCueDefinition
+      }) as NetNodeCueDefinition
 
     const isValid = (logic: Record<string, unknown>): boolean =>
       validateYargNodeCueFile({
@@ -242,7 +243,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates a tempo logic node with only its required beat output, and full options', () => {
-    const makeDef = (logic: Record<string, unknown>): YargNodeCueDefinition =>
+    const makeDef = (logic: Record<string, unknown>): NetNodeCueDefinition =>
       ({
         id: 'tempo-cue',
         name: 'Tempo Cue',
@@ -284,7 +285,7 @@ describe('Node cue validation', () => {
           { from: 'logic-1', to: 'action-1' },
         ],
         layout: { nodePositions: {} },
-      }) as YargNodeCueDefinition
+      }) as NetNodeCueDefinition
 
     const isValid = (logic: Record<string, unknown>): boolean =>
       validateYargNodeCueFile({
@@ -324,7 +325,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates indexed-variable and led-changed logic nodes, rejecting missing required fields', () => {
-    const makeDef = (logic: Record<string, unknown>): YargNodeCueDefinition =>
+    const makeDef = (logic: Record<string, unknown>): NetNodeCueDefinition =>
       ({
         id: 'logic-cue',
         name: 'Logic Cue',
@@ -366,7 +367,7 @@ describe('Node cue validation', () => {
           { from: 'logic-1', to: 'action-1', fromPort: 'each' },
         ],
         layout: { nodePositions: {} },
-      }) as YargNodeCueDefinition
+      }) as NetNodeCueDefinition
 
     const isValid = (logic: Record<string, unknown>): boolean =>
       validateYargNodeCueFile({
@@ -442,7 +443,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates a simple RB3 node cue (YARG-shaped, mode rb3)', () => {
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'rb3-cue',
       name: 'RB3 Cue',
       kind: 'lighting',
@@ -1199,7 +1200,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates logic nodes and detects cycles across logic/actions', () => {
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'logic-validate',
       name: 'Logic Validate',
       kind: 'lighting',
@@ -1277,7 +1278,7 @@ describe('Node cue validation', () => {
   })
 
   describe('schema rejections', () => {
-    const validCue = (): YargNodeCueDefinition => ({
+    const validCue = (): NetNodeCueDefinition => ({
       id: 'test-cue',
       name: 'Test Cue',
       description: '',
@@ -1328,7 +1329,7 @@ describe('Node cue validation', () => {
       const { id: _id, ...cueWithoutId } = cue
       const result = validateYargNodeCueFile({
         ...validFile(),
-        cues: [cueWithoutId as YargNodeCueDefinition],
+        cues: [cueWithoutId as NetNodeCueDefinition],
       })
       expect(result.valid).toBe(false)
       expect(result.errors.length).toBeGreaterThan(0)
@@ -1339,7 +1340,7 @@ describe('Node cue validation', () => {
       const { name: _n, ...cueWithoutName } = cue
       const result = validateYargNodeCueFile({
         ...validFile(),
-        cues: [{ ...cueWithoutName, name: undefined } as unknown as YargNodeCueDefinition],
+        cues: [{ ...cueWithoutName, name: undefined } as unknown as NetNodeCueDefinition],
       })
       expect(result.valid).toBe(false)
       expect(result.errors.length).toBeGreaterThan(0)
@@ -1548,7 +1549,7 @@ describe('Node cue validation', () => {
 
   describe('node variety coverage', () => {
     it('validates cue with effectRaiser and effectListener nodes', () => {
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'effect-cue',
         name: 'Effect Cue',
         kind: 'lighting',
@@ -1600,7 +1601,7 @@ describe('Node cue validation', () => {
     })
 
     it('validates cue with eventRaiser and eventListener nodes', () => {
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'event-cue',
         name: 'Event Cue',
         kind: 'lighting',
@@ -1653,7 +1654,7 @@ describe('Node cue validation', () => {
     })
 
     it('validates cue containing array-manipulation logic node types', () => {
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'array-cue',
         name: 'Array Cue',
         kind: 'lighting',
@@ -1784,7 +1785,7 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
     if (result.valid) {
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
       }
     }
   })
@@ -1799,7 +1800,7 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
     if (result.valid) {
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
       }
     }
   })
@@ -1814,7 +1815,7 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
     if (result.valid) {
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
       }
     }
   })
@@ -1829,7 +1830,7 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
     if (result.valid) {
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
       }
     }
   })
@@ -1844,7 +1845,7 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
     if (result.valid) {
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileAudioCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
       }
     }
   })
@@ -1860,7 +1861,7 @@ describe('Node cue validation', () => {
     if (result.valid) {
       expect(result.data.group.id).toBe('yarg-stagekit')
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue(cue, 'yarg')).not.toThrow()
       }
       // every cue must lay its nodes out (no stacking at the origin in the editor)
       for (const cue of result.data.cues) {
@@ -1891,7 +1892,7 @@ describe('Node cue validation', () => {
         CueType.RB3,
       ])
       for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue(cue, 'yarg')).not.toThrow()
         const positions = cue.layout?.nodePositions ?? {}
         expect(Object.keys(positions).length).toBeGreaterThan(0)
       }
@@ -1924,7 +1925,7 @@ describe('Node cue validation', () => {
         expect(cueTypes).toEqual([CueType.RB3])
         const positionsSeen = new Set<string>()
         for (const cue of result.data.cues) {
-          expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+          expect(() => NodeCueCompiler.compileCue(cue, 'yarg')).not.toThrow()
           const positions = cue.layout?.nodePositions ?? {}
           const nodeCount = Object.values(cue.nodes ?? {}).reduce(
             (total, bucket) => total + (Array.isArray(bucket) ? bucket.length : 0),
@@ -1957,7 +1958,7 @@ describe('Node cue validation', () => {
       expect(result.data.cues.length).toBe(9)
       for (const cue of result.data.cues) {
         expect(cue.kind).toBe('motion')
-        expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+        expect(() => NodeCueCompiler.compileCue(cue, 'yarg')).not.toThrow()
         const eventTypes = (cue.nodes?.events ?? []).map((e) => e.eventType)
         expect(eventTypes).toEqual(['cue-started'])
       }
@@ -1975,7 +1976,7 @@ describe('Node cue validation', () => {
       expect(result.valid).toBe(true)
       if (result.valid) {
         for (const cue of result.data.cues) {
-          expect(() => NodeCueCompiler.compileYargCue(cue)).not.toThrow()
+          expect(() => NodeCueCompiler.compileCue(cue, 'yarg')).not.toThrow()
         }
       }
       // max/linear brightness is reserved for strobes; these libraries must not use it

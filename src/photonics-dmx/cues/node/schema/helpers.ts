@@ -7,11 +7,11 @@ import {
   ValueSource,
   VariableDefinition,
 } from '../../types/nodeCueTypes'
-import { YargEventType, YARG_EVENT_TYPES as YARG_EVENT_TYPES_SOURCE } from '../../../types'
+import { NetEventType, NET_EVENT_TYPES as NET_EVENT_TYPES_SOURCE } from '../../../types'
 import { AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY } from '../../../constants/options'
 
 // All event types for YARG event nodes (includes system events + song events)
-export const YARG_EVENT_TYPES: YargEventType[] = [...YARG_EVENT_TYPES_SOURCE]
+export const NET_EVENT_TYPES: NetEventType[] = [...NET_EVENT_TYPES_SOURCE]
 
 export const AUDIO_EVENT_TYPES: AudioEventType[] = AUDIO_EVENT_OPTIONS_WITH_NONE_DELAY.filter(
   (t) => t !== 'audio-trigger',

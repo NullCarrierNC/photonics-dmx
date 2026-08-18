@@ -1,17 +1,17 @@
 /**
  * Regression: re-enabling YARG mid-song must replay the current cue.
  *
- * `YargNodeCue` instances are singletons in `YargCueRegistry`, so their
+ * `LightingNodeCue` instances are singletons in `CueRegistry`, so their
  * `CueSession` (which gates `cue-started`) survives a YARG disable. The handler's
  * shutdown must call `onStop()` on each tracked slot so the next activation can
  * fire `cue-started` from a clean state.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
-import { YargCueHandler } from '../../cueHandlers/YargCueHandler'
+import { CueHandler } from '../../cueHandlers/CueHandler'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { monotonicNowMs } from '../../../shared/time'
-import { YargCueRegistry } from '../../cues/registries/YargCueRegistry'
+import { CueRegistry } from '../../cues/registries/CueRegistry'
 import { CueStyle, INetCue } from '../../cues/interfaces/INetCue'
 import { CueData, CueType, defaultCueData, DrumNoteType } from '../../cues/types/cueTypes'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
@@ -68,11 +68,11 @@ function gameplayCueData(overrides?: Partial<CueData>): CueData {
   }
 }
 
-describe('YargCueHandler shutdown lifecycle', () => {
-  let registry: YargCueRegistry
+describe('CueHandler shutdown lifecycle', () => {
+  let registry: CueRegistry
 
   beforeEach(() => {
-    registry = YargCueRegistry.getInstance()
+    registry = CueRegistry.getInstance()
     jest.restoreAllMocks()
   })
 
@@ -81,7 +81,7 @@ describe('YargCueHandler shutdown lifecycle', () => {
     jest.spyOn(registry, 'getCueImplementation').mockReturnValue(primary)
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
 
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer())
     handler.setMotionEnabled(false)
 
     await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
@@ -93,7 +93,7 @@ describe('YargCueHandler shutdown lifecycle', () => {
   })
 
   it('shutdown stops every tracked cue slot (primary, secondary, strobe, motion)', () => {
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer())
 
     const primary = makeFakeCue(CueStyle.Primary, 'primary')
     const secondary = makeFakeCue(CueStyle.Secondary, 'secondary')
@@ -133,7 +133,7 @@ describe('YargCueHandler shutdown lifecycle', () => {
     getStrobeStateManager().setActive('fast')
     expect(getStrobeStateManager().getActive()).toBe('fast')
 
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer())
     // No currentStrobeCue set — old code only cleared when one was present.
     handler.shutdown()
 
@@ -141,10 +141,10 @@ describe('YargCueHandler shutdown lifecycle', () => {
   })
 
   it('shutdown ends the registry song so once-per-song and motion locks do not leak', () => {
-    const injected = YargCueRegistry.getInstance()
+    const injected = CueRegistry.getInstance()
     const songEnd = jest.spyOn(injected, 'onSongEnd')
     const motionSongEnd = jest.spyOn(injected, 'onMotionSongEnd')
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), { registry: injected })
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), { registry: injected })
 
     handler.shutdown()
 
@@ -153,7 +153,7 @@ describe('YargCueHandler shutdown lifecycle', () => {
   })
 })
 
-describe('YargCueHandler strobe history isolation', () => {
+describe('CueHandler strobe history isolation', () => {
   beforeEach(() => {
     __resetStrobeStateManagerForTests()
   })
@@ -163,7 +163,7 @@ describe('YargCueHandler strobe history isolation', () => {
   })
 
   it('a held strobe does not thrash the primary cue executionCount', async () => {
-    const registry = YargCueRegistry.getInstance()
+    const registry = CueRegistry.getInstance()
     const primary = makeFakeCue(CueStyle.Primary, 'frenzy')
     const strobe = makeFakeCue(CueStyle.Primary, 'strobe')
     jest
@@ -172,7 +172,7 @@ describe('YargCueHandler strobe history isolation', () => {
         cueType === CueType.Frenzy ? primary : cueType === CueType.Strobe_Fast ? strobe : null,
       )
 
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer())
     const execCounts: Array<number | undefined> = []
     handler.addCueHandledListener((data) => execCounts.push(data.executionCount))
 
@@ -187,14 +187,14 @@ describe('YargCueHandler strobe history isolation', () => {
   })
 })
 
-describe('YargCueHandler vocal note edge detection', () => {
+describe('CueHandler vocal note edge detection', () => {
   afterEach(() => {
     jest.restoreAllMocks()
   })
 
   it('fires note-on then note-off only on the active-state edges', () => {
     const sequencer = makeSequencer()
-    const handler = new YargCueHandler(makeLightManager(), sequencer)
+    const handler = new CueHandler(makeLightManager(), sequencer)
     const onVocalNote = sequencer.onVocalNote as jest.Mock
 
     // Silence -> no edge
@@ -217,7 +217,7 @@ describe('YargCueHandler vocal note edge detection', () => {
 
   it('treats any harmony part as singing', () => {
     const sequencer = makeSequencer()
-    const handler = new YargCueHandler(makeLightManager(), sequencer)
+    const handler = new CueHandler(makeLightManager(), sequencer)
     const onVocalNote = sequencer.onVocalNote as jest.Mock
 
     handler.handleVocalNote(gameplayCueData({ vocalNote: 0, harmony1Note: 0.9 }))
@@ -230,17 +230,17 @@ describe('YargCueHandler vocal note edge detection', () => {
   })
 })
 
-describe('YargCueHandler RB3 LED edge history', () => {
+describe('CueHandler RB3 LED edge history', () => {
   afterEach(() => {
     jest.restoreAllMocks()
   })
 
   it('stamps previousFrame with the prior ledBanks and fogState so LED/fog edges fire', async () => {
-    const registry = YargCueRegistry.getInstance()
+    const registry = CueRegistry.getInstance()
     const cue = makeFakeCue(CueStyle.Primary, 'rb3')
     jest.spyOn(registry, 'getCueImplementation').mockReturnValue(cue)
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer())
 
     const banksA = { red: 0b0001, green: 0, blue: 0, yellow: 0 }
     const banksB = { red: 0b0101, green: 0, blue: 0, yellow: 0 }
@@ -261,17 +261,17 @@ describe('YargCueHandler RB3 LED edge history', () => {
   })
 })
 
-describe('YargCueHandler input edge reset', () => {
+describe('CueHandler input edge reset', () => {
   afterEach(() => {
     jest.restoreAllMocks()
   })
 
   it('resetInputEdgeState clears previousFrame baseline without resetting executionCount', async () => {
-    const registry = YargCueRegistry.getInstance()
+    const registry = CueRegistry.getInstance()
     const cue = makeFakeCue(CueStyle.Primary, 'frenzy')
     jest.spyOn(registry, 'getCueImplementation').mockReturnValue(cue)
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer())
 
     await handler.handleCue(
       CueType.Frenzy,
@@ -291,11 +291,11 @@ describe('YargCueHandler input edge reset', () => {
   })
 
   it('records drum note release in previousFrame for rapid re-hit detection', async () => {
-    const registry = YargCueRegistry.getInstance()
+    const registry = CueRegistry.getInstance()
     const cue = makeFakeCue(CueStyle.Primary, 'frenzy')
     jest.spyOn(registry, 'getCueImplementation').mockReturnValue(cue)
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer())
 
     await handler.handleCue(
       CueType.Frenzy,
@@ -314,14 +314,14 @@ describe('YargCueHandler input edge reset', () => {
     expect(rehitFrame.previousFrame?.drumNotes ?? []).toEqual([])
   })
 
-  it('resetYargSessionState stops active strobe slot and clears previousFrame', async () => {
+  it('resetSessionState stops active strobe slot and clears previousFrame', async () => {
     __resetStrobeStateManagerForTests()
-    const registry = YargCueRegistry.getInstance()
+    const registry = CueRegistry.getInstance()
     const strobe = makeFakeCue(CueStyle.Primary, 'strobe')
     jest
       .spyOn(registry, 'getCueImplementation')
       .mockImplementation((cueType) => (cueType === CueType.Strobe_Fast ? strobe : null))
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer())
 
     await handler.handleCue(
       CueType.Strobe_Fast,
@@ -329,7 +329,7 @@ describe('YargCueHandler input edge reset', () => {
     )
     expect(getStrobeStateManager().getActive()).not.toBeNull()
 
-    handler.resetYargSessionState()
+    handler.resetSessionState()
 
     expect(strobe.onStop).toHaveBeenCalledTimes(1)
     expect(getStrobeStateManager().getActive()).toBeNull()
@@ -343,7 +343,7 @@ describe('YargCueHandler input edge reset', () => {
 
   it('stopActiveStrobe clears the strobe slot without clearing previousFrame baseline', async () => {
     __resetStrobeStateManagerForTests()
-    const registry = YargCueRegistry.getInstance()
+    const registry = CueRegistry.getInstance()
     const primary = makeFakeCue(CueStyle.Primary, 'frenzy')
     const strobe = makeFakeCue(CueStyle.Primary, 'strobe')
     jest
@@ -352,7 +352,7 @@ describe('YargCueHandler input edge reset', () => {
         cueType === CueType.Frenzy ? primary : cueType === CueType.Strobe_Fast ? strobe : null,
       )
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer())
 
     await handler.handleCue(
       CueType.Frenzy,
@@ -377,14 +377,14 @@ describe('YargCueHandler input edge reset', () => {
   })
 })
 
-describe('YargCueHandler injected registry', () => {
+describe('CueHandler injected registry', () => {
   afterEach(() => {
     jest.restoreAllMocks()
   })
 
   it('resolves cues and song notifications against the injected registry, not the singleton', async () => {
-    const singleton = YargCueRegistry.getInstance()
-    const injected = YargCueRegistry.create()
+    const singleton = CueRegistry.getInstance()
+    const injected = CueRegistry.create()
     const cue = makeFakeCue(CueStyle.Primary, 'injected')
     jest.spyOn(injected, 'getCueImplementation').mockReturnValue(cue)
     jest.spyOn(injected, 'getRandomMotionCue').mockReturnValue(null)
@@ -392,7 +392,7 @@ describe('YargCueHandler injected registry', () => {
     const injectedSongStart = jest.spyOn(injected, 'onSongStart')
     const singletonSongStart = jest.spyOn(singleton, 'onSongStart')
 
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), { registry: injected })
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), { registry: injected })
     handler.setMotionEnabled(false)
     handler.notifySongStart()
     await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
@@ -404,11 +404,11 @@ describe('YargCueHandler injected registry', () => {
   })
 })
 
-describe('YargCueHandler Fallback motion suppression', () => {
-  let registry: YargCueRegistry
+describe('CueHandler Fallback motion suppression', () => {
+  let registry: CueRegistry
 
   beforeEach(() => {
-    registry = YargCueRegistry.getInstance()
+    registry = CueRegistry.getInstance()
     jest.restoreAllMocks()
   })
 
@@ -417,7 +417,7 @@ describe('YargCueHandler Fallback motion suppression', () => {
     jest.spyOn(registry, 'getCueImplementation').mockReturnValue(primary)
     const getRandomMotionCue = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
 
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer())
 
     await handler.handleCue(CueType.Fallback, gameplayCueData({ lightingCue: CueType.Fallback }))
 
@@ -433,7 +433,7 @@ describe('YargCueHandler Fallback motion suppression', () => {
     const getRandomMotionCue = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
 
     const sequencer = makeSequencer()
-    const handler = new YargCueHandler(makeLightManager(), sequencer)
+    const handler = new CueHandler(makeLightManager(), sequencer)
 
     // Seed a freshly-started motion cue from a previous (real) cue. startTime = now keeps it inside
     // the min-hold so the unpatched handler would re-execute it rather than clear it.
@@ -455,15 +455,15 @@ describe('YargCueHandler Fallback motion suppression', () => {
   })
 })
 
-describe('YargCueHandler requestMotionRepick (RB3 external trigger)', () => {
-  let registry: YargCueRegistry
+describe('CueHandler requestMotionRepick (RB3 external trigger)', () => {
+  let registry: CueRegistry
 
   beforeEach(() => {
-    registry = YargCueRegistry.getInstance()
+    registry = CueRegistry.getInstance()
     jest.restoreAllMocks()
   })
 
-  function motionInternals(handler: YargCueHandler) {
+  function motionInternals(handler: CueHandler) {
     return handler as unknown as {
       currentMotionCue: INetCue | null
       currentMotionCueStartTime: number | null
@@ -475,9 +475,9 @@ describe('YargCueHandler requestMotionRepick (RB3 external trigger)', () => {
     const motion = makeFakeCue(CueStyle.Primary, 'motion')
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(motion)
     jest
-      .spyOn(registry, 'findYargMotionCueRef')
+      .spyOn(registry, 'findMotionCueRef')
       .mockReturnValue({ groupId: 'rb3-motion-default', cueId: 'rb3-motion-wave' })
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), { registry })
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), { registry })
 
     handler.requestMotionRepick()
 
@@ -489,7 +489,7 @@ describe('YargCueHandler requestMotionRepick (RB3 external trigger)', () => {
   it('respects the min-hold floor (no re-pick within the hold window)', () => {
     const motion = makeFakeCue(CueStyle.Primary, 'motion')
     const getRandom = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(motion)
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), {
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), {
       registry,
       getMotionCueMinimumHoldMs: () => 60_000,
     })
@@ -507,7 +507,7 @@ describe('YargCueHandler requestMotionRepick (RB3 external trigger)', () => {
 
   it('is a no-op while motion is disabled', () => {
     const getRandom = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), { registry })
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), { registry })
     handler.setMotionEnabled(false)
 
     handler.requestMotionRepick()
@@ -519,10 +519,10 @@ describe('YargCueHandler requestMotionRepick (RB3 external trigger)', () => {
     const motion = makeFakeCue(CueStyle.Primary, 'motion')
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(motion)
     jest
-      .spyOn(registry, 'findYargMotionCueRef')
+      .spyOn(registry, 'findMotionCueRef')
       .mockReturnValue({ groupId: 'rb3-motion-default', cueId: 'rb3-motion-wave' })
     const emit = jest.fn()
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), {
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), {
       registry,
       runtimeBroadcaster: { emit } as never,
       motionChangeChannel: RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE,
@@ -538,14 +538,14 @@ describe('YargCueHandler requestMotionRepick (RB3 external trigger)', () => {
   })
 })
 
-describe('YargCueHandler forced primary group (RB3 game-mode rotation)', () => {
+describe('CueHandler forced primary group (RB3 game-mode rotation)', () => {
   it('routes a tracked frame with preferredCueGroup through getCueImplementationFromGroup', async () => {
-    const registry = YargCueRegistry.create()
+    const registry = CueRegistry.create()
     const cue = makeFakeCue(CueStyle.Primary, 'rb3-primary')
     const fromGroup = jest.spyOn(registry, 'getCueImplementationFromGroup').mockReturnValue(cue)
     const normal = jest.spyOn(registry, 'getCueImplementation').mockReturnValue(null)
 
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), { registry })
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), { registry })
     await handler.handleCue(
       CueType.RB3,
       gameplayCueData({ lightingCue: CueType.RB3, preferredCueGroup: 'rb3-mirror' }),
@@ -558,12 +558,12 @@ describe('YargCueHandler forced primary group (RB3 game-mode rotation)', () => {
 
   it('falls back to normal selection when the forced group lacks the cueType', async () => {
     // Strobes carry RB3's rotated group, but only the Stage Kit group ships them.
-    const registry = YargCueRegistry.create()
+    const registry = CueRegistry.create()
     const strobe = makeFakeCue(CueStyle.Secondary, 'stagekit-strobe')
     const fromGroup = jest.spyOn(registry, 'getCueImplementationFromGroup').mockReturnValue(null)
     const normal = jest.spyOn(registry, 'getCueImplementation').mockReturnValue(strobe)
 
-    const handler = new YargCueHandler(makeLightManager(), makeSequencer(), { registry })
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), { registry })
     await handler.handleCue(
       CueType.Strobe_Fast,
       gameplayCueData({ lightingCue: CueType.RB3, preferredCueGroup: 'rb3-mirror' }),

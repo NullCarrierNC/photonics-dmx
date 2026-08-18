@@ -1,5 +1,6 @@
 /**
- * AudioCueProcessor: strobe slot independent from secondary; getEffective* accessors.
+ * AudioCueProcessor: strobe slot independent from secondary; getEffective* accessors; the secondary
+ * runtime tee (same frame and cue types as the lighting fan-out, solo suppression, idle blank).
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { performance } from 'perf_hooks'
@@ -20,6 +21,7 @@ import {
 import { AUDIO_IDLE_EFFECT_NAME, AUDIO_IDLE_LAYER } from '../../processors/audioIdleConstants'
 import { AudioLightingData } from '../../listeners/Audio/AudioTypes'
 import { noopRuntimeBroadcaster } from '../../runtime/broadcaster'
+import type { AudioSecondaryRuntime } from '../../processors/AudioSecondaryRuntime'
 
 const TEST_GROUP = 'audio-cue-processor-test-group'
 
@@ -43,6 +45,16 @@ function minimalLightingData(energy: number): AudioLightingData {
     beatDetected: false,
     energy,
   }
+}
+
+function makeSecondaryRuntime(
+  decision: { plays: boolean; suppress: boolean } = { plays: true, suppress: false },
+): AudioSecondaryRuntime & Record<string, jest.Mock> {
+  return {
+    handleFrame: jest.fn(),
+    getLastDispatchDecision: jest.fn(() => decision),
+    blank: jest.fn(),
+  } as unknown as AudioSecondaryRuntime & Record<string, jest.Mock>
 }
 
 /** AudioCueProcessor fires handleAudioData without awaiting; flush async completion. */
@@ -113,7 +125,10 @@ describe('AudioCueProcessor', () => {
       isPrimary: true,
       dmxLightManager: lightManager,
       sequencer,
-      yargCueHandler: null,
+      cueHandlers: {
+        yarg: null,
+        rb3: null,
+      },
       audioCueHandler: null,
       rb3MenuCueHandler: null,
     } as unknown as RigChain
@@ -250,5 +265,71 @@ describe('AudioCueProcessor', () => {
     await flushAudioFrame()
     expect(processor.getEffectiveStrobeCueType()).toBeNull()
     expect(processor.getEffectiveSecondaryCueType()).toBe('proc-secondary')
+  })
+
+  it('tees each frame to the secondary runtime with the lighting cue types', async () => {
+    const runtime = makeSecondaryRuntime()
+    processor.setSecondaryRuntime(runtime)
+
+    processor.processAudioData(minimalLightingData(0.9))
+    await flushAudioFrame()
+
+    expect(runtime.handleFrame).toHaveBeenCalledWith(
+      expect.objectContaining({ enabledBandCount: DEFAULT_AUDIO_CONFIG.bands.length }),
+      'proc-primary',
+      'proc-strobe',
+    )
+  })
+
+  it('clears the lighting once and skips dispatch while the secondary runs solo', async () => {
+    const handleDataSpy = jest.spyOn(AudioCueHandler.prototype, 'handleAudioData')
+    const clearSpy = jest.spyOn(AudioCueHandler.prototype, 'clearCurrentCue')
+    processor.setSecondaryRuntime(makeSecondaryRuntime({ plays: true, suppress: true }))
+    handleDataSpy.mockClear()
+
+    processor.processAudioData(minimalLightingData(0.9))
+    processor.processAudioData(minimalLightingData(0.9))
+    await flushAudioFrame()
+
+    expect(handleDataSpy).not.toHaveBeenCalled()
+    expect(clearSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('resumes the lighting when the secondary stops suppressing', async () => {
+    const handleDataSpy = jest.spyOn(AudioCueHandler.prototype, 'handleAudioData')
+    const decision = { plays: true, suppress: true }
+    processor.setSecondaryRuntime(makeSecondaryRuntime(decision))
+    handleDataSpy.mockClear()
+
+    processor.processAudioData(minimalLightingData(0.9))
+    await flushAudioFrame()
+    expect(handleDataSpy).not.toHaveBeenCalled()
+
+    decision.suppress = false
+    processor.processAudioData(minimalLightingData(0.9))
+    await flushAudioFrame()
+    expect(handleDataSpy).toHaveBeenCalled()
+  })
+
+  it('blanks the secondary when the audio goes idle', () => {
+    const runtime = makeSecondaryRuntime()
+    processor.setSecondaryRuntime(runtime)
+    let t = 0
+    const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => {
+      t += 500
+      return t
+    })
+    try {
+      processor.enableGameMode({ enabled: true, cueDurationMin: 5, cueDurationMax: 20 })
+
+      for (let i = 0; i < 12; i += 1) {
+        processor.processAudioData({ ...minimalLightingData(0.01) })
+      }
+
+      expect(runtime.blank).toHaveBeenCalledTimes(1)
+    } finally {
+      nowSpy.mockRestore()
+      processor.disableGameMode()
+    }
   })
 })

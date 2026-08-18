@@ -6,14 +6,14 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import { monotonicNowMs } from '../../../../../shared/time'
-import { YargMotionNodeCue } from '../../../../cues/node/runtime/YargMotionNodeCue'
+import { MotionNodeCue } from '../../../../cues/node/runtime/MotionNodeCue'
 import { AudioMotionNodeCue } from '../../../../cues/node/runtime/AudioMotionNodeCue'
 import type {
   ActionNode,
   AudioMotionNodeCueDefinition,
   LogicNode,
-  YargEventNode,
-  YargMotionNodeCueDefinition,
+  NetEventNode,
+  NetMotionNodeCueDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
@@ -21,6 +21,7 @@ import { createMockLightingConfig } from '../../../helpers/testFixtures'
 import type { CueData } from '../../../../cues/types/cueTypes'
 import type { AudioCueData } from '../../../../cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
+import type { AudioEventNodeUnion } from '../../../../cues/types/nodeCueTypes'
 
 function minimalYargCueData(overrides?: Partial<CueData>): CueData {
   return {
@@ -81,9 +82,9 @@ function motionPatternActionUsingTickVar(): ActionNode {
   }
 }
 
-function yargMotionWithCueStarted(): YargMotionNodeCueDefinition {
-  const evStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
-  const evCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+function yargMotionWithCueStarted(): NetMotionNodeCueDefinition {
+  const evStart: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+  const evCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   const initTick: LogicNode = {
     id: 'init-tick',
     type: 'logic',
@@ -122,7 +123,7 @@ function yargMotionWithCueStarted(): YargMotionNodeCueDefinition {
   }
 }
 
-function yargMotionWithoutCueStarted(): YargMotionNodeCueDefinition {
+function yargMotionWithoutCueStarted(): NetMotionNodeCueDefinition {
   const def = yargMotionWithCueStarted()
   return {
     ...def,
@@ -136,7 +137,7 @@ function yargMotionWithoutCueStarted(): YargMotionNodeCueDefinition {
   }
 }
 
-describe('YargMotionNodeCue stop/start variable lifecycle', () => {
+describe('MotionNodeCue stop/start variable lifecycle', () => {
   let lightManager: DmxLightManager
   let sequencer: ILightingController
 
@@ -163,8 +164,8 @@ describe('YargMotionNodeCue stop/start variable lifecycle', () => {
   it('second activation after onStop does not reach motion-pattern when cue-started is missing (tick uninitialized)', () => {
     const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
     try {
-      const compiled = NodeCueCompiler.compileYargCue(yargMotionWithoutCueStarted())
-      const cue = new YargMotionNodeCue('g1', compiled)
+      const compiled = NodeCueCompiler.compileCue(yargMotionWithoutCueStarted(), 'yarg')
+      const cue = new MotionNodeCue('g1', compiled)
       const data = minimalYargCueData()
       cue.execute(data, sequencer, lightManager)
       expect(sequencer.addMotionPattern).toHaveBeenCalledTimes(1)
@@ -177,8 +178,8 @@ describe('YargMotionNodeCue stop/start variable lifecycle', () => {
   })
 
   it('second activation after onStop runs motion-pattern when cue-started re-inits tick', () => {
-    const compiled = NodeCueCompiler.compileYargCue(yargMotionWithCueStarted())
-    const cue = new YargMotionNodeCue('g1', compiled)
+    const compiled = NodeCueCompiler.compileCue(yargMotionWithCueStarted(), 'yarg')
+    const cue = new MotionNodeCue('g1', compiled)
     const data = minimalYargCueData()
     cue.execute(data, sequencer, lightManager)
     expect(sequencer.addMotionPattern).toHaveBeenCalledTimes(1)
@@ -266,7 +267,10 @@ describe('AudioMotionNodeCue stop/start variable lifecycle', () => {
   })
 
   it('second activation after onStop runs cue-started then cue-called (motion-pattern twice)', async () => {
-    const compiled = NodeCueCompiler.compileAudioCue(audioMotionWithCueStarted())
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(
+      audioMotionWithCueStarted(),
+      'audio',
+    )
     const cue = new AudioMotionNodeCue('g1', compiled)
     const data: AudioCueData = {
       timestamp: 0,

@@ -7,9 +7,9 @@ import type {
   NodeCueFile,
   NodeCueKind,
   NodeCueMode,
-  YargNodeCueDefinition,
+  NetNodeCueDefinition,
   YargEffectDefinition,
-  YargNodeCueFile,
+  NetNodeCueFile,
   AudioNodeCueFile,
   YargEffectFile,
   AudioEffectFile,
@@ -43,7 +43,7 @@ export type UseCueCrudParams = {
   setIsDirty: (dirty: boolean) => void
   loadCueIntoFlow: (
     cue:
-      | YargNodeCueDefinition
+      | NetNodeCueDefinition
       | AudioNodeCueDefinition
       | YargEffectDefinition
       | AudioEffectDefinition
@@ -202,12 +202,12 @@ export function useCueCrud({
     const updatedCues = [...baseCueFile.cues, newCue]
     const updatedFile =
       mode === 'yarg'
-        ? ({ ...baseDoc.file, cues: updatedCues as YargNodeCueDefinition[] } as YargNodeCueFile)
+        ? ({ ...baseDoc.file, cues: updatedCues as NetNodeCueDefinition[] } as NetNodeCueFile)
         : ({ ...baseDoc.file, cues: updatedCues as AudioNodeCueDefinition[] } as AudioNodeCueFile)
     const updatedDoc: EditorDocument = { ...baseDoc, file: updatedFile }
     setEditorDoc(updatedDoc)
     setSelectedCueId(newCue.id)
-    loadCueIntoFlow(newCue as YargNodeCueDefinition | AudioNodeCueDefinition)
+    loadCueIntoFlow(newCue as NetNodeCueDefinition | AudioNodeCueDefinition)
     setIsDirty(true)
   }, [
     editorDoc,
@@ -262,7 +262,7 @@ export function useCueCrud({
       const updatedCues = cueFile.cues.filter((cue) => cue.id !== cueId)
       const updatedFile =
         cueFile.mode === 'yarg'
-          ? ({ ...cueFile, cues: updatedCues as YargNodeCueDefinition[] } as YargNodeCueFile)
+          ? ({ ...cueFile, cues: updatedCues as NetNodeCueDefinition[] } as NetNodeCueFile)
           : ({ ...cueFile, cues: updatedCues as AudioNodeCueDefinition[] } as AudioNodeCueFile)
       const updatedDoc: EditorDocument = { ...editorDoc, file: updatedFile }
 
@@ -277,7 +277,7 @@ export function useCueCrud({
 
       const nextCue =
         updatedCues.find((cue) => cue.id === nextCueId) ?? firstByName(updatedCues) ?? null
-      loadCueIntoFlow(nextCue as YargNodeCueDefinition | AudioNodeCueDefinition | null)
+      loadCueIntoFlow(nextCue as NetNodeCueDefinition | AudioNodeCueDefinition | null)
       setIsDirty(true)
     },
     [editorDoc, loadCueIntoFlow, selectedCueId, setEditorDoc, setSelectedCueId, setIsDirty],

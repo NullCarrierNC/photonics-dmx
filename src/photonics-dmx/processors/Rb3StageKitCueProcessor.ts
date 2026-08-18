@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events'
-import type { YargCueRuntime } from '../listeners/YARG/YargNetworkListener'
+import type { CueRuntime } from '../cueHandlers/CueRuntime'
 import type { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import { CueType, defaultCueData, ledAggregateMask } from '../cues/types/cueTypes'
 import type { CueData, StrobeState } from '../cues/types/cueTypes'
@@ -75,8 +75,8 @@ export interface Rb3StageKitCueProcessorOptions {
  * RB3 "cue mode": turns the RB3E StageKit packet stream into node-cue dispatches, in parallel to the
  * direct processor. It keeps the persistent per-colour-bank LED state (replace-per-colour, like the
  * direct processor's updateColorBank) and, on each packet, dispatches an RB3 cue frame (plus strobe /
- * blackout control cues) to a YargCueRuntime — usually the ChainFanout, which fans to every rig's
- * YargCueHandler. The handler stamps previousFrame, so led-N / fog event nodes fire on edges.
+ * blackout control cues) to a CueRuntime — usually the ChainFanout, which fans to every rig's
+ * CueHandler. The handler stamps previousFrame, so led-N / fog event nodes fire on edges.
  */
 export class Rb3StageKitCueProcessor {
   private banks: Record<ColourBank, number> = { red: 0, green: 0, blue: 0, yellow: 0 }
@@ -113,7 +113,7 @@ export class Rb3StageKitCueProcessor {
   private readonly gameModeManager: Rb3GameModeManager | null
 
   constructor(
-    private readonly runtime: YargCueRuntime,
+    private readonly runtime: CueRuntime,
     options: Rb3StageKitCueProcessorOptions = {},
   ) {
     this.keepaliveMs =

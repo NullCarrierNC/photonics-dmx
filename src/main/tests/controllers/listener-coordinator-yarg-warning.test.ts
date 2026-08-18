@@ -38,7 +38,10 @@ function makeDeps(): ListenerCoordinatorDeps & { sendToAllWindows: jest.Mock } {
     isPrimary: true,
     dmxLightManager: dmx,
     sequencer: effects,
-    yargCueHandler: null,
+    cueHandlers: {
+      yarg: null,
+      rb3: null,
+    },
     audioCueHandler: null,
     rb3MenuCueHandler: null,
   } as unknown as RigChain

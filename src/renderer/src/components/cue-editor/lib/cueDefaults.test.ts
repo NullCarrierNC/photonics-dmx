@@ -1,11 +1,11 @@
 import { describe, expect, it } from '@jest/globals'
 import { createDefaultCue, createDefaultFile } from './cueDefaults'
-import type { YargNodeCueDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { NetNodeCueDefinition } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 describe('cueDefaults rb3 platform', () => {
   it('creates a YARG-shaped lighting cue fixed to CueType.RB3', () => {
     const cue = createDefaultCue('rb3', 'lighting') as Extract<
-      YargNodeCueDefinition,
+      NetNodeCueDefinition,
       { kind: 'lighting' }
     >
     expect(cue.kind).toBe('lighting')
@@ -20,7 +20,7 @@ describe('cueDefaults rb3 platform', () => {
     expect(file.mode).toBe('rb3')
     expect(file.group.name).toBe('New RB3 Group')
     expect(file.cues).toHaveLength(1)
-    const cue = file.cues[0] as Extract<YargNodeCueDefinition, { kind: 'lighting' }>
+    const cue = file.cues[0] as Extract<NetNodeCueDefinition, { kind: 'lighting' }>
     expect(cue.cueType).toBe('RB3')
     expect(cue.style).toBe('primary')
   })

@@ -6,9 +6,11 @@ import {
   StrobeState,
   defaultCueData,
   isStrobeCueType,
+  ledAggregateMask,
 } from '../cues/types/cueTypes'
-import type { YargCueHandler } from '../cueHandlers/YargCueHandler'
-import type { VenueSize } from './types'
+import type { CueHandler } from '../cueHandlers/CueHandler'
+import type { NetCueMode } from '../cues/types/nodeCueTypes'
+import type { LedBanks, VenueSize } from './types'
 
 /** Live, persistent frame state shared across dispatched frames. */
 export interface FrameState {
@@ -17,7 +19,13 @@ export interface FrameState {
   bpm: number
   /** Whether any vocal/harmony part is currently sounding (drives vocal note-on/off edges). */
   vocalActive: boolean
+  /** RB3 only: the four StageKit LED bank masks the cue mirrors. */
+  ledBanks?: LedBanks
+  /** RB3 only: whether the fog machine is running. */
+  fogState?: boolean
 }
+
+const LED_BANK_ORDER = ['red', 'green', 'blue', 'yellow'] as const
 
 /** Per-frame transient signals (reset every frame). */
 export interface FrameTransient {
@@ -38,18 +46,19 @@ const STROBE_STATE_BY_CUE: Partial<Record<CueType, StrobeState>> = {
 
 /**
  * Synthesises one {@link CueData} frame from the live {@link FrameState} plus a per-frame
- * {@link FrameTransient}, then dispatches it to the {@link YargCueHandler} in the same order
+ * {@link FrameTransient}, then dispatches it to the {@link CueHandler} in the same order
  * as {@link YargNetworkListener.processCueData}: beat/measure -> keyframe -> primary cue ->
  * strobe slot -> instrument notes -> vocal note edge.
  *
  * Frames carry `trackMode: 'simulated'` + `simulationCueGroup`, pinning cue resolution to the
- * library under test (see {@link YargCueRegistry.getCueImplementationFromGroup}).
+ * library under test (see {@link CueRegistry.getCueImplementationFromGroup}).
  */
 export class FrameDriver {
   constructor(
-    private readonly handler: YargCueHandler,
+    private readonly handler: CueHandler,
     private readonly getState: () => FrameState,
     private readonly simulationCueGroup: string,
+    private readonly domain: NetCueMode = 'yarg',
   ) {}
 
   public async dispatch(transient: FrameTransient = {}): Promise<void> {
@@ -108,6 +117,9 @@ export class FrameDriver {
   }
 
   private buildFrame(state: FrameState, transient: FrameTransient, cueIsStrobe: boolean): CueData {
+    if (this.domain === 'rb3') {
+      return this.buildRb3Frame(state, transient, cueIsStrobe)
+    }
     return {
       ...defaultCueData,
       datagramVersion: 1,
@@ -130,6 +142,41 @@ export class FrameDriver {
       beat: transient.beat ?? 'Off',
       keyframe: transient.keyframe ?? 'Off',
       bonusEffect: false,
+      trackMode: 'simulated',
+      simulationCueGroup: this.simulationCueGroup,
+    }
+  }
+
+  /**
+   * The RB3 cue-mode frame: one always-on `RB3` cue carrying the accumulated StageKit LED banks,
+   * mirroring {@link Rb3StageKitCueProcessor.buildFrame}. `ledColor` names the first lit bank in
+   * red/green/blue/yellow order, which is the deterministic stand-in for the processor's
+   * most-recently-updated colour.
+   */
+  private buildRb3Frame(
+    state: FrameState,
+    transient: FrameTransient,
+    cueIsStrobe: boolean,
+  ): CueData {
+    const banks = state.ledBanks ?? { red: 0, green: 0, blue: 0, yellow: 0 }
+    const aggregate = ledAggregateMask({ ledBanks: banks })
+    const positions: number[] = []
+    for (let i = 0; i < 8; i++) {
+      if (aggregate & (1 << i)) positions.push(i)
+    }
+    return {
+      ...defaultCueData,
+      currentScene: 'Gameplay',
+      venueSize: state.venue,
+      beatsPerMinute: state.bpm,
+      lightingCue: CueType.RB3,
+      fogState: state.fogState ?? false,
+      strobeState: cueIsStrobe ? STROBE_STATE_BY_CUE[state.cue] ?? 'Strobe_Off' : 'Strobe_Off',
+      ledBanks: banks,
+      ledColor: LED_BANK_ORDER.find((colour) => banks[colour] !== 0) ?? 'off',
+      ledPositions: positions,
+      beat: transient.beat ?? 'Off',
+      keyframe: transient.keyframe ?? 'Off',
       trackMode: 'simulated',
       simulationCueGroup: this.simulationCueGroup,
     }

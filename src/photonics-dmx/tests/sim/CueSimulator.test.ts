@@ -4,7 +4,7 @@ import type { SimSample, SimTimeline } from '../../sim/types'
 
 /**
  * Self-verification for the cue simulation harness. These exercise the real loader, registry,
- * YargCueHandler, Sequencer and LightStateManager against the bundled Stage Kit v2 library, so
+ * CueHandler, Sequencer and LightStateManager against the bundled Stage Kit v2 library, so
  * they double as the first automated cue-behaviour regression tests.
  */
 

@@ -6,7 +6,7 @@ import type { INetCue } from '../../../photonics-dmx/cues/interfaces/INetCue'
 function fanoutStub(chains: unknown[] = []) {
   return {
     getChains: () => chains,
-    yargSchedulePanTiltClear: jest.fn(),
+    schedulePanTiltClear: jest.fn(),
   } as unknown as ChainFanout
 }
 
@@ -25,8 +25,8 @@ describe('MotionCueSimulator', () => {
     ]
     const sim = new MotionCueSimulator({ getChainFanout: () => fanoutStub(chains) })
     const cue = cueStub()
-    sim.setYargCue(cue)
-    await sim.runYarg({} as never)
+    sim.setNetCue('yarg', cue)
+    await sim.runNet('yarg', {} as never)
     expect(cue.execute).toHaveBeenCalledTimes(2)
   })
 
@@ -37,36 +37,36 @@ describe('MotionCueSimulator', () => {
     ]
     const sim = new MotionCueSimulator({ getChainFanout: () => fanoutStub(chains) })
     const cue = cueStub()
-    sim.setRb3Cue(cue)
-    await sim.runRb3({} as never)
+    sim.setNetCue('rb3', cue)
+    await sim.runNet('rb3', {} as never)
     expect(cue.execute).toHaveBeenCalledTimes(2)
 
     sim.reset()
     expect(cue.onStop).toHaveBeenCalledTimes(1)
-    await sim.runRb3({} as never)
+    await sim.runNet('rb3', {} as never)
     expect(cue.execute).toHaveBeenCalledTimes(2) // no further runs after reset
   })
 
   it('reset() stops the active cue so it no longer runs (the restart fix)', async () => {
     const sim = new MotionCueSimulator({ getChainFanout: () => fanoutStub([{ sequencer: 's' }]) })
     const cue = cueStub()
-    sim.setYargCue(cue)
-    expect(sim.hasYargActive()).toBe(true)
+    sim.setNetCue('yarg', cue)
+    expect(sim.hasNetCueActive('yarg')).toBe(true)
 
     sim.reset()
 
     expect(cue.onStop).toHaveBeenCalledTimes(1)
-    expect(sim.hasYargActive()).toBe(false)
-    await sim.runYarg({} as never)
+    expect(sim.hasNetCueActive('yarg')).toBe(false)
+    await sim.runNet('yarg', {} as never)
     expect(cue.execute).not.toHaveBeenCalled() // nothing runs against the torn-down chains
   })
 
   it('stop() clears state AND schedules a pan/tilt clear (unlike reset)', () => {
     const fanout = fanoutStub()
     const sim = new MotionCueSimulator({ getChainFanout: () => fanout })
-    sim.setYargCue(cueStub())
+    sim.setNetCue('yarg', cueStub())
     sim.stop()
-    expect(sim.hasYargActive()).toBe(false)
-    expect(fanout.yargSchedulePanTiltClear as jest.Mock).toHaveBeenCalledTimes(1)
+    expect(sim.hasNetCueActive('yarg')).toBe(false)
+    expect(fanout.schedulePanTiltClear as jest.Mock).toHaveBeenCalledTimes(1)
   })
 })

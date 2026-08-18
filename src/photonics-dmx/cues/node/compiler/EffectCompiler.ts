@@ -4,7 +4,7 @@ import {
   BaseEventNode,
   BaseEffectDefinition,
   EffectEventListenerNode,
-  YargEventNode,
+  NetEventNode,
   YargEffectDefinition,
   VariableDefinition,
 } from '../../types/nodeCueTypes'
@@ -29,7 +29,7 @@ export interface CompiledEffect<TEvent extends BaseEventNode> extends CompiledGr
   parameters: Map<string, VariableDefinition>
 }
 
-export type CompiledYargEffect = CompiledEffect<YargEventNode>
+export type CompiledYargEffect = CompiledEffect<NetEventNode>
 export type CompiledAudioEffect = CompiledEffect<AudioEventNodeUnion>
 
 export class EffectCompiler extends AbstractGraphBuilder {

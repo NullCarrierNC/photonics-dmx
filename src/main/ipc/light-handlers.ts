@@ -1,9 +1,6 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
-import {
-  YargCueRegistry,
-  CueStateUpdate,
-} from '../../photonics-dmx/cues/registries/YargCueRegistry'
+import { CueRegistry, CueStateUpdate } from '../../photonics-dmx/cues/registries/CueRegistry'
 import { sendToAllWindows } from '../utils/windowUtils'
 import { setupSenderHandlers } from './sender-handlers'
 import { setupSimulationHandlers } from './simulation-handlers'
@@ -19,7 +16,7 @@ import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
  */
 export function setupLightHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
   const sendCueStateUpdate = (cueState: CueStateUpdate) => {
-    const registry = YargCueRegistry.getInstance()
+    const registry = CueRegistry.getInstance()
     const group = registry.getGroup(cueState.groupId)
     const groupName = group ? group.name : null
     sendToAllWindows(RENDERER_RECEIVE.CUE_STATE_UPDATE, {
@@ -33,7 +30,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
     })
   }
 
-  const registry = YargCueRegistry.getInstance()
+  const registry = CueRegistry.getInstance()
   registry.setCueStateUpdateCallback(sendCueStateUpdate)
 
   setupSenderHandlers(ipcMain, controllerManager)

@@ -1,7 +1,7 @@
 /**
  * Golden-frame regression for bundled cue libraries.
  *
- * The cue simulator drives the real loader, registry, YargCueHandler, Sequencer and
+ * The cue simulator drives the real loader, registry, CueHandler, Sequencer and
  * LightStateManager under a virtual clock, producing a deterministic per-light timeline. We
  * serialize that timeline and diff it against a committed golden, so any drift in a cue's colour,
  * timing or intensity output trips a test rather than slipping out in a release.

@@ -110,11 +110,11 @@ export const RB3_CUE_DATA_PROPERTY_META: CueDataPropertyMeta[] = [
 
 /**
  * Lookup map: property id -> metadata. The UNION of the YARG and RB3 lists (the LED block resolves
- * even though it's hidden from the YARG dropdown), so `getYargCueDataPropertyMeta` resolves any id a
+ * even though it's hidden from the YARG dropdown), so `getNetCueDataPropertyMeta` resolves any id a
  * mode-`yarg`/`rb3` file may carry — validValues sync and legacy nodes keep working. The lists drive
  * the per-mode dropdowns; this map is the resolution superset.
  */
-export const YARG_CUE_DATA_PROPERTY_MAP = new Map<string, CueDataPropertyMeta>(
+export const NET_CUE_DATA_PROPERTY_MAP = new Map<string, CueDataPropertyMeta>(
   [...YARG_CUE_DATA_PROPERTY_META, ...LED_STATE_PROPERTIES].map((m) => [m.id, m]),
 )
 
@@ -205,8 +205,8 @@ export const AUDIO_CUE_DATA_PROPERTY_MAP = new Map<string, CueDataPropertyMeta>(
 )
 
 /** Get metadata for a YARG cue data property id. */
-export function getYargCueDataPropertyMeta(propertyId: string): CueDataPropertyMeta | undefined {
-  return YARG_CUE_DATA_PROPERTY_MAP.get(propertyId)
+export function getNetCueDataPropertyMeta(propertyId: string): CueDataPropertyMeta | undefined {
+  return NET_CUE_DATA_PROPERTY_MAP.get(propertyId)
 }
 
 /** Get metadata for an Audio cue data property id. */

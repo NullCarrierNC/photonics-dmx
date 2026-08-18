@@ -83,7 +83,7 @@ export const ALL_CONFIG_DATA_PROPERTIES = [
 /**
  * YARG cue data properties
  */
-export const YARG_CUE_DATA_PROPERTIES = [
+export const NET_CUE_DATA_PROPERTIES = [
   'cue-name',
   'cue-type',
   'previous-cue',

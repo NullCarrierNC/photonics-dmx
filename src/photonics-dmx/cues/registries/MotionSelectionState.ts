@@ -7,7 +7,7 @@ export interface MotionCueGroupView<TCue> {
 
 /**
  * Shared motion-program selection: mode, per-song lock, enabled pool, disabled ids, random pick with default-group fallback.
- * Used by YargCueRegistry and AudioCueRegistry.
+ * Used by CueRegistry and AudioCueRegistry.
  */
 export class MotionSelectionState<TCue> {
   private motionSelectionMode: MotionGroupSelectionMode = 'perCueChange'

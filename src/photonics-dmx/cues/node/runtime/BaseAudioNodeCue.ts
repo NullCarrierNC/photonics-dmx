@@ -316,8 +316,20 @@ export abstract class BaseAudioNodeCue {
   }
 
   onStop(): void {
-    const skipEffectRemoval = this.skipEffectRemovalOnStop()
-    for (const state of this.states.values()) {
+    this.stopEveryState(this.skipEffectRemovalOnStop())
+  }
+
+  /**
+   * Stop and take every effect off the sequencer regardless of style. A primary cue normally leaves
+   * its effects up so the next cue can take over from the running look, which is wrong when the
+   * audio look is ending rather than changing.
+   */
+  stopAndClearEffects(): void {
+    this.stopEveryState(false)
+  }
+
+  private stopEveryState(skipEffectRemoval: boolean): void {
+    for (const [sequencer, state] of this.states) {
       if (state.executionEngine) {
         state.executionEngine.cancelAll(skipEffectRemoval)
       }
@@ -328,6 +340,14 @@ export abstract class BaseAudioNodeCue {
       state.triggerPhase.clear()
       state.triggerEnterTime.clear()
       state.lastTriggerTime.clear()
+      // Level-mode effects are submitted straight to the sequencer rather than through the engine,
+      // so cancelAll never sees them. Take them off by the layer each was recorded against before
+      // dropping the tracking, or they stay lit with nothing left holding a reference to them.
+      if (!skipEffectRemoval) {
+        for (const [effectKey, layer] of state.activeLevelEffects) {
+          sequencer.removeEffect(effectKey, layer)
+        }
+      }
       state.activeLevelEffects.clear()
       state.smoothedBandEnergy.clear()
       state.bandSmoothTime.clear()
@@ -436,6 +456,8 @@ export abstract class BaseAudioNodeCue {
     )
     const evaluatorContext: LogicNodeEvaluatorContext = {
       cueId: this.id,
+      // Audio cues are always the audio family; they never route through the net extractor.
+      mode: 'audio',
       lightManager,
       cueLevelVarStore: runState.cueLevelVarStore,
       groupLevelVarStore: runState.groupLevelVarStore,

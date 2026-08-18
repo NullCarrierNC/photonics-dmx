@@ -2,7 +2,7 @@ import { describe, expect, it } from '@jest/globals'
 import {
   YARG_CUE_DATA_PROPERTY_META,
   RB3_CUE_DATA_PROPERTY_META,
-  getYargCueDataPropertyMeta,
+  getNetCueDataPropertyMeta,
 } from '../../constants/cueDataPropertyMeta'
 
 const isLedId = (id: string) => /^led-/.test(id)
@@ -36,7 +36,7 @@ describe('cue-data property vocabulary separation', () => {
 
   it('every RB3 property still resolves through the YARG lookup map (union intact)', () => {
     for (const m of RB3_CUE_DATA_PROPERTY_META) {
-      expect(getYargCueDataPropertyMeta(m.id)).toBeDefined()
+      expect(getNetCueDataPropertyMeta(m.id)).toBeDefined()
     }
   })
 })

@@ -1,14 +1,14 @@
 import { NodeExecutionEngine } from '../../../../cues/node/runtime/NodeExecutionEngine'
 import { EffectRegistry } from '../../../../cues/node/runtime/EffectRegistry'
-import type { CompiledYargCue } from '../../../../cues/node/compiler/NodeCueCompiler'
+import type { CompiledNetCue } from '../../../../cues/node/compiler/NodeCueCompiler'
 import type {
   ActionNode,
   Connection,
   EventListenerNode,
   EventRaiserNode,
   LogicNode,
-  YargEventNode,
-  YargNodeCueDefinition,
+  NetEventNode,
+  NetNodeCueDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import {
   CueType,
@@ -41,9 +41,10 @@ const buildAdjacency = (connections: Connection[]): Map<string, Connection[]> =>
   return adjacency
 }
 
-const compileCue = (definition: YargNodeCueDefinition): CompiledYargCue => {
+const compileCue = (definition: NetNodeCueDefinition): CompiledNetCue => {
   return {
     definition,
+    mode: 'yarg',
     eventMap: new Map(definition.nodes.events.map((node) => [node.id, node])),
     actionMap: new Map(definition.nodes.actions.map((node) => [node.id, node])),
     logicMap: new Map((definition.nodes.logic ?? []).map((node) => [node.id, node])),
@@ -73,7 +74,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('chains actions across layers in sequence', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -125,7 +126,7 @@ describe('Node runtime with real Sequencer', () => {
       layer: { source: 'literal', value: 5 },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'chain-test',
       name: 'Chain Test',
       kind: 'lighting',
@@ -192,7 +193,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('gates transitions on beat events', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -220,7 +221,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'beat-gate',
       name: 'Beat Gate',
       kind: 'lighting',
@@ -269,7 +270,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('uses light-array transforms to target a single light', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -322,7 +323,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'array-target',
       name: 'Array Target',
       kind: 'lighting',
@@ -382,7 +383,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('selects palette colours by index with color-from-index (wraps around)', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -438,7 +439,7 @@ describe('Node runtime with real Sequencer', () => {
 
     const palette = ['red', 'green', 'blue'] as const
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'color-index',
       name: 'Color Index',
       kind: 'lighting',
@@ -495,7 +496,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('reads a palette from a color-array variable set via the variable node', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -561,7 +562,7 @@ describe('Node runtime with real Sequencer', () => {
 
     const palette = ['red', 'green', 'blue'] as const
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'color-var-index',
       name: 'Color Var Index',
       kind: 'lighting',
@@ -619,7 +620,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('transforms color-array variables with reverse, concat, and shuffle', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -669,7 +670,7 @@ describe('Node runtime with real Sequencer', () => {
       assignTo: 'shuffled',
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'color-transforms',
       name: 'Color Transforms',
       kind: 'lighting',
@@ -727,7 +728,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('branches on cue data string comparisons', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -772,7 +773,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'string-conditional',
       name: 'String Conditional',
       kind: 'lighting',
@@ -822,7 +823,7 @@ describe('Node runtime with real Sequencer', () => {
   it('blocks execution through delay nodes', async () => {
     jest.useFakeTimers()
     try {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event-1',
         type: 'event',
         eventType: 'beat',
@@ -857,7 +858,7 @@ describe('Node runtime with real Sequencer', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'delay-test',
         name: 'Delay Test',
         kind: 'lighting',
@@ -912,7 +913,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('waits until beat to complete action', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -940,7 +941,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'wait-until-beat',
       name: 'Wait Until Beat',
       kind: 'lighting',
@@ -992,7 +993,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('waits until beat count before completing', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -1021,7 +1022,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'wait-until-count',
       name: 'Wait Until Count',
       kind: 'lighting',
@@ -1072,7 +1073,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('gates on measure and keyframe events', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -1122,7 +1123,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'measure-keyframe',
       name: 'Measure + Keyframe',
       kind: 'lighting',
@@ -1183,7 +1184,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('gates on measure count and keyframe until count', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -1235,7 +1236,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'measure-keyframe-count',
       name: 'Measure + Keyframe Count',
       kind: 'lighting',
@@ -1304,7 +1305,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('gates on drum and guitar note counts', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -1356,7 +1357,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'note-counts',
       name: 'Note Counts',
       kind: 'lighting',
@@ -1421,7 +1422,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('gates on bass and keys note counts', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -1473,7 +1474,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'bass-keys-counts',
       name: 'Bass Keys Counts',
       kind: 'lighting',
@@ -1538,7 +1539,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('calculates math operators and feeds action duration', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -1576,7 +1577,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'math-duration',
       name: 'Math Duration',
       kind: 'lighting',
@@ -1629,7 +1630,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('supports all math operators for variable updates', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -1685,7 +1686,7 @@ describe('Node runtime with real Sequencer', () => {
       assignTo: 'modResult',
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'math-ops',
       name: 'Math Ops',
       kind: 'lighting',
@@ -1738,7 +1739,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('initializes variables and uses conditional branch', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -1795,7 +1796,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'init-fallback',
       name: 'Init/Conditional',
       kind: 'lighting',
@@ -1843,7 +1844,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('passes through variable get mode without mutation', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -1899,7 +1900,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'variable-get',
       name: 'Variable Get',
       kind: 'lighting',
@@ -1942,7 +1943,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('uses array-length and concat-lights for targeting', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -2011,7 +2012,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'concat-length',
       name: 'Concat + Length',
       kind: 'lighting',
@@ -2069,7 +2070,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('creates pairs in opposite and diagonal patterns', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -2132,7 +2133,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'pairs-test',
       name: 'Pairs Test',
       kind: 'lighting',
@@ -2202,7 +2203,7 @@ describe('Node runtime with real Sequencer', () => {
     const localCueStore = new Map()
     const localGroupStore = new Map()
 
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -2252,7 +2253,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'target-groups',
       name: 'Target Groups',
       kind: 'lighting',
@@ -2323,7 +2324,7 @@ describe('Node runtime with real Sequencer', () => {
     const randomSpy = jest.spyOn(utils, 'randomBetween')
     randomSpy.mockReturnValue(0)
 
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -2351,7 +2352,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'random-targets',
       name: 'Random Targets',
       kind: 'lighting',
@@ -2411,7 +2412,7 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('raises events to trigger listener actions in a new context', () => {
-    const eventNode: YargEventNode = {
+    const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
@@ -2478,7 +2479,7 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'event-chain',
       name: 'Event Chain',
       kind: 'lighting',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals'
 import { getYargEventCategories, getRb3EventCategories } from '../../../cues/node/utils/eventUtils'
-import { YARG_EVENT_TYPES } from '../../../types'
+import { NET_EVENT_TYPES } from '../../../types'
 
 describe('getYargEventCategories', () => {
   it('excludes the RB3 StageKit LED/fog events (they never fire under YARG)', () => {
@@ -18,7 +18,7 @@ describe('getYargEventCategories', () => {
   it('only lists events that are valid YARG event types', () => {
     const values = getYargEventCategories().flatMap((c) => c.events.map((e) => e.value))
     for (const v of values) {
-      expect(YARG_EVENT_TYPES as readonly string[]).toContain(v)
+      expect(NET_EVENT_TYPES as readonly string[]).toContain(v)
     }
   })
 })
@@ -40,7 +40,7 @@ describe('getRb3EventCategories', () => {
   it('lists only valid YARG event types (RB3 cues compile through the YARG path)', () => {
     const values = getRb3EventCategories().flatMap((c) => c.events.map((e) => e.value))
     for (const v of values) {
-      expect(YARG_EVENT_TYPES as readonly string[]).toContain(v)
+      expect(NET_EVENT_TYPES as readonly string[]).toContain(v)
     }
   })
 

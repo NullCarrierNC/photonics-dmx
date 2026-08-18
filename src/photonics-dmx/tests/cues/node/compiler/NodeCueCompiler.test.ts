@@ -7,7 +7,7 @@ import {
   NodeCueCompilationError,
   calculateActionDuration,
 } from '../../../../cues/node/compiler/NodeCueCompiler'
-import type { YargNodeCueDefinition, ActionNode } from '../../../../cues/types/nodeCueTypes'
+import type { NetNodeCueDefinition, ActionNode } from '../../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../../cues/types/cueTypes'
 
 function minimalAction(id: string, overrides?: Partial<ActionNode['timing']>): ActionNode {
@@ -71,7 +71,7 @@ describe('NodeCueCompiler', () => {
 
   describe('compileYargCue', () => {
     it('throws when action node is unreachable from any event', () => {
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'unreach-cue',
         name: 'Unreachable Cue',
         kind: 'lighting',
@@ -88,12 +88,12 @@ describe('NodeCueCompiler', () => {
         layout: { nodePositions: {} },
       }
 
-      expect(() => NodeCueCompiler.compileYargCue(definition)).toThrow(NodeCueCompilationError)
-      expect(() => NodeCueCompiler.compileYargCue(definition)).toThrow(/not reachable/i)
+      expect(() => NodeCueCompiler.compileCue(definition, 'yarg')).toThrow(NodeCueCompilationError)
+      expect(() => NodeCueCompiler.compileCue(definition, 'yarg')).toThrow(/not reachable/i)
     })
 
     it('compiles cue with only effectRaisers and no actions', () => {
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'effects-only-cue',
         name: 'Effects Only',
         kind: 'lighting',
@@ -108,7 +108,7 @@ describe('NodeCueCompiler', () => {
         layout: { nodePositions: {} },
       }
 
-      const compiled = NodeCueCompiler.compileYargCue(definition)
+      const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
       expect(compiled).toBeDefined()
       expect(compiled.actionMap.size).toBe(0)
       expect(compiled.effectRaiserMap.size).toBe(1)

@@ -9,9 +9,9 @@ describe('simulation handlers console integration', () => {
       on: jest.fn(),
     } as any
     // The console-enter callback stops the motion simulator, which drives the chain fanout so
-    // secondary rigs also get their pan/tilt cleared. Stub `yargSchedulePanTiltClear` to verify it.
-    const yargSchedulePanTiltClear = jest.fn()
-    const getChainFanout = jest.fn(() => ({ yargSchedulePanTiltClear }))
+    // secondary rigs also get their pan/tilt cleared. Stub `schedulePanTiltClear` to verify it.
+    const schedulePanTiltClear = jest.fn()
+    const getChainFanout = jest.fn(() => ({ schedulePanTiltClear }))
     const motionCueSimulator = new MotionCueSimulator({
       getChainFanout: getChainFanout as never,
     })
@@ -32,6 +32,6 @@ describe('simulation handlers console integration', () => {
     expect(typeof onConsoleEnter).toBe('function')
     onConsoleEnter?.()
 
-    expect(yargSchedulePanTiltClear).toHaveBeenCalledTimes(1)
+    expect(schedulePanTiltClear).toHaveBeenCalledTimes(1)
   })
 })

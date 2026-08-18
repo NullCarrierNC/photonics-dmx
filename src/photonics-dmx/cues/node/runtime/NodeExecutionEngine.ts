@@ -14,7 +14,7 @@ import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../types/cueTypes'
 import { AudioCueData } from '../../types/audioCueTypes'
-import { CompiledYargCue, CompiledAudioCue } from '../compiler/NodeCueCompiler'
+import { CompiledNetCue, CompiledAudioCue } from '../compiler/NodeCueCompiler'
 import {
   ActionEffectFactory,
   resolvedMotionPatternSettingsEqual,
@@ -30,6 +30,7 @@ import {
   VariableDefinition,
   ValueSource,
   VariableType,
+  NodeCueMode,
 } from '../../types/nodeCueTypes'
 import { TrackedLight, Color } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
@@ -86,7 +87,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
     return NodeExecutionEngine.globalDebugEnabled
   }
 
-  private compiledCue: CompiledYargCue | CompiledAudioCue
+  private compiledCue: CompiledNetCue | CompiledAudioCue
   private cueId: string
   private cueLevelVarStore: Map<string, VariableValue>
   private groupLevelVarStore: Map<string, VariableValue>
@@ -104,7 +105,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
   private readonly onContextLifecycle?: (contextId: string, event: ContextLifecycleEvent) => void
 
   constructor(
-    compiledCue: CompiledYargCue | CompiledAudioCue,
+    compiledCue: CompiledNetCue | CompiledAudioCue,
     cueId: string,
     sequencer: ILightingController,
     lightManager: DmxLightManager,
@@ -145,6 +146,11 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
 
   protected get compiled(): CompiledGraph {
     return this.compiledCue
+  }
+
+  /** A cue's domain is its own, set from the directory its file was loaded from. */
+  protected get mode(): NodeCueMode {
+    return this.compiledCue.mode
   }
 
   protected get revisitPolicy(): RevisitPolicy {
@@ -562,6 +568,8 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
           firstSubmissionUsesSetEffectRef: this.firstSubmissionUsesSetEffectRef,
           runtimeCallbacks: this.runtimeCallbacks,
           consumeInitialClearPolicy: this.consumeInitialClearPolicy,
+          // The raising cue's mode, so cue-data inside the effect reads the frame that raised it.
+          callerMode: this.mode,
         },
       )
 

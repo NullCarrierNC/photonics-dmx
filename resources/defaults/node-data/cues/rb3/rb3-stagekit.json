@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 3,
+  "cueVersion": 5,
   "mode": "rb3",
   "group": {
     "id": "rb3-stagekit",
@@ -37,58 +37,6 @@
             "logicType": "config-data",
             "dataProperty": "strobe-lights-array",
             "assignTo": "strobeLights"
-          },
-          {
-            "id": "cue-skv2-strobe-slow-bd",
-            "type": "logic",
-            "logicType": "cue-data",
-            "dataProperty": "beat-duration-ms",
-            "assignTo": "beatMs"
-          },
-          {
-            "id": "cue-skv2-strobe-slow-x4",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "multiply",
-            "left": {
-              "source": "variable",
-              "name": "beatMs"
-            },
-            "right": {
-              "source": "literal",
-              "value": 4
-            },
-            "assignTo": "beat4"
-          },
-          {
-            "id": "cue-skv2-strobe-slow-int",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "beat4"
-            },
-            "right": {
-              "source": "literal",
-              "value": 16
-            },
-            "assignTo": "intervalMs"
-          },
-          {
-            "id": "cue-skv2-strobe-slow-gap",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "subtract",
-            "left": {
-              "source": "variable",
-              "name": "intervalMs"
-            },
-            "right": {
-              "source": "literal",
-              "value": 40
-            },
-            "assignTo": "gapMs"
           }
         ],
         "eventRaisers": [],
@@ -144,8 +92,8 @@
                 "value": "delay"
               },
               "endWait": {
-                "source": "variable",
-                "name": "gapMs"
+                "source": "literal",
+                "value": 85
               }
             }
           }
@@ -156,22 +104,6 @@
         {
           "from": "cue-skv2-strobe-slow-start",
           "to": "cue-skv2-strobe-slow-lights"
-        },
-        {
-          "from": "cue-skv2-strobe-slow-lights",
-          "to": "cue-skv2-strobe-slow-bd"
-        },
-        {
-          "from": "cue-skv2-strobe-slow-bd",
-          "to": "cue-skv2-strobe-slow-x4"
-        },
-        {
-          "from": "cue-skv2-strobe-slow-x4",
-          "to": "cue-skv2-strobe-slow-int"
-        },
-        {
-          "from": "cue-skv2-strobe-slow-int",
-          "to": "cue-skv2-strobe-slow-gap"
         },
         {
           "from": "cue-skv2-strobe-slow-called",
@@ -192,22 +124,6 @@
             "x": 0,
             "y": 150
           },
-          "cue-skv2-strobe-slow-bd": {
-            "x": 0,
-            "y": 300
-          },
-          "cue-skv2-strobe-slow-x4": {
-            "x": 0,
-            "y": 450
-          },
-          "cue-skv2-strobe-slow-int": {
-            "x": 0,
-            "y": 600
-          },
-          "cue-skv2-strobe-slow-gap": {
-            "x": 0,
-            "y": 750
-          },
           "cue-skv2-strobe-slow-flash": {
             "x": 280,
             "y": 150
@@ -225,34 +141,6 @@
           "type": "light-array",
           "scope": "cue",
           "initialValue": [],
-          "isParameter": false
-        },
-        {
-          "name": "beatMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 500,
-          "isParameter": false
-        },
-        {
-          "name": "beat4",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 2000,
-          "isParameter": false
-        },
-        {
-          "name": "intervalMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 125,
-          "isParameter": false
-        },
-        {
-          "name": "gapMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 85,
           "isParameter": false
         }
       ],
@@ -292,58 +180,6 @@
             "logicType": "config-data",
             "dataProperty": "strobe-lights-array",
             "assignTo": "strobeLights"
-          },
-          {
-            "id": "cue-skv2-strobe-medium-bd",
-            "type": "logic",
-            "logicType": "cue-data",
-            "dataProperty": "beat-duration-ms",
-            "assignTo": "beatMs"
-          },
-          {
-            "id": "cue-skv2-strobe-medium-x4",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "multiply",
-            "left": {
-              "source": "variable",
-              "name": "beatMs"
-            },
-            "right": {
-              "source": "literal",
-              "value": 4
-            },
-            "assignTo": "beat4"
-          },
-          {
-            "id": "cue-skv2-strobe-medium-int",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "beat4"
-            },
-            "right": {
-              "source": "literal",
-              "value": 24
-            },
-            "assignTo": "intervalMs"
-          },
-          {
-            "id": "cue-skv2-strobe-medium-gap",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "subtract",
-            "left": {
-              "source": "variable",
-              "name": "intervalMs"
-            },
-            "right": {
-              "source": "literal",
-              "value": 40
-            },
-            "assignTo": "gapMs"
           }
         ],
         "eventRaisers": [],
@@ -399,8 +235,8 @@
                 "value": "delay"
               },
               "endWait": {
-                "source": "variable",
-                "name": "gapMs"
+                "source": "literal",
+                "value": 43
               }
             }
           }
@@ -411,22 +247,6 @@
         {
           "from": "cue-skv2-strobe-medium-start",
           "to": "cue-skv2-strobe-medium-lights"
-        },
-        {
-          "from": "cue-skv2-strobe-medium-lights",
-          "to": "cue-skv2-strobe-medium-bd"
-        },
-        {
-          "from": "cue-skv2-strobe-medium-bd",
-          "to": "cue-skv2-strobe-medium-x4"
-        },
-        {
-          "from": "cue-skv2-strobe-medium-x4",
-          "to": "cue-skv2-strobe-medium-int"
-        },
-        {
-          "from": "cue-skv2-strobe-medium-int",
-          "to": "cue-skv2-strobe-medium-gap"
         },
         {
           "from": "cue-skv2-strobe-medium-called",
@@ -447,22 +267,6 @@
             "x": 0,
             "y": 150
           },
-          "cue-skv2-strobe-medium-bd": {
-            "x": 0,
-            "y": 300
-          },
-          "cue-skv2-strobe-medium-x4": {
-            "x": 0,
-            "y": 450
-          },
-          "cue-skv2-strobe-medium-int": {
-            "x": 0,
-            "y": 600
-          },
-          "cue-skv2-strobe-medium-gap": {
-            "x": 0,
-            "y": 750
-          },
           "cue-skv2-strobe-medium-flash": {
             "x": 280,
             "y": 150
@@ -480,34 +284,6 @@
           "type": "light-array",
           "scope": "cue",
           "initialValue": [],
-          "isParameter": false
-        },
-        {
-          "name": "beatMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 500,
-          "isParameter": false
-        },
-        {
-          "name": "beat4",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 2000,
-          "isParameter": false
-        },
-        {
-          "name": "intervalMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 125,
-          "isParameter": false
-        },
-        {
-          "name": "gapMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 85,
           "isParameter": false
         }
       ],
@@ -547,58 +323,6 @@
             "logicType": "config-data",
             "dataProperty": "strobe-lights-array",
             "assignTo": "strobeLights"
-          },
-          {
-            "id": "cue-skv2-strobe-fast-bd",
-            "type": "logic",
-            "logicType": "cue-data",
-            "dataProperty": "beat-duration-ms",
-            "assignTo": "beatMs"
-          },
-          {
-            "id": "cue-skv2-strobe-fast-x4",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "multiply",
-            "left": {
-              "source": "variable",
-              "name": "beatMs"
-            },
-            "right": {
-              "source": "literal",
-              "value": 4
-            },
-            "assignTo": "beat4"
-          },
-          {
-            "id": "cue-skv2-strobe-fast-int",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "beat4"
-            },
-            "right": {
-              "source": "literal",
-              "value": 32
-            },
-            "assignTo": "intervalMs"
-          },
-          {
-            "id": "cue-skv2-strobe-fast-gap",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "subtract",
-            "left": {
-              "source": "variable",
-              "name": "intervalMs"
-            },
-            "right": {
-              "source": "literal",
-              "value": 40
-            },
-            "assignTo": "gapMs"
           }
         ],
         "eventRaisers": [],
@@ -654,8 +378,8 @@
                 "value": "delay"
               },
               "endWait": {
-                "source": "variable",
-                "name": "gapMs"
+                "source": "literal",
+                "value": 23
               }
             }
           }
@@ -666,22 +390,6 @@
         {
           "from": "cue-skv2-strobe-fast-start",
           "to": "cue-skv2-strobe-fast-lights"
-        },
-        {
-          "from": "cue-skv2-strobe-fast-lights",
-          "to": "cue-skv2-strobe-fast-bd"
-        },
-        {
-          "from": "cue-skv2-strobe-fast-bd",
-          "to": "cue-skv2-strobe-fast-x4"
-        },
-        {
-          "from": "cue-skv2-strobe-fast-x4",
-          "to": "cue-skv2-strobe-fast-int"
-        },
-        {
-          "from": "cue-skv2-strobe-fast-int",
-          "to": "cue-skv2-strobe-fast-gap"
         },
         {
           "from": "cue-skv2-strobe-fast-called",
@@ -702,22 +410,6 @@
             "x": 0,
             "y": 150
           },
-          "cue-skv2-strobe-fast-bd": {
-            "x": 0,
-            "y": 300
-          },
-          "cue-skv2-strobe-fast-x4": {
-            "x": 0,
-            "y": 450
-          },
-          "cue-skv2-strobe-fast-int": {
-            "x": 0,
-            "y": 600
-          },
-          "cue-skv2-strobe-fast-gap": {
-            "x": 0,
-            "y": 750
-          },
           "cue-skv2-strobe-fast-flash": {
             "x": 280,
             "y": 150
@@ -735,34 +427,6 @@
           "type": "light-array",
           "scope": "cue",
           "initialValue": [],
-          "isParameter": false
-        },
-        {
-          "name": "beatMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 500,
-          "isParameter": false
-        },
-        {
-          "name": "beat4",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 2000,
-          "isParameter": false
-        },
-        {
-          "name": "intervalMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 125,
-          "isParameter": false
-        },
-        {
-          "name": "gapMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 85,
           "isParameter": false
         }
       ],
@@ -802,58 +466,6 @@
             "logicType": "config-data",
             "dataProperty": "strobe-lights-array",
             "assignTo": "strobeLights"
-          },
-          {
-            "id": "cue-skv2-strobe-fastest-bd",
-            "type": "logic",
-            "logicType": "cue-data",
-            "dataProperty": "beat-duration-ms",
-            "assignTo": "beatMs"
-          },
-          {
-            "id": "cue-skv2-strobe-fastest-x4",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "multiply",
-            "left": {
-              "source": "variable",
-              "name": "beatMs"
-            },
-            "right": {
-              "source": "literal",
-              "value": 4
-            },
-            "assignTo": "beat4"
-          },
-          {
-            "id": "cue-skv2-strobe-fastest-int",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "divide",
-            "left": {
-              "source": "variable",
-              "name": "beat4"
-            },
-            "right": {
-              "source": "literal",
-              "value": 64
-            },
-            "assignTo": "intervalMs"
-          },
-          {
-            "id": "cue-skv2-strobe-fastest-gap",
-            "type": "logic",
-            "logicType": "math",
-            "operator": "subtract",
-            "left": {
-              "source": "variable",
-              "name": "intervalMs"
-            },
-            "right": {
-              "source": "literal",
-              "value": 40
-            },
-            "assignTo": "gapMs"
           }
         ],
         "eventRaisers": [],
@@ -894,7 +506,7 @@
               },
               "holdTime": {
                 "source": "literal",
-                "value": 40
+                "value": 15
               },
               "durationIn": {
                 "source": "literal",
@@ -909,8 +521,8 @@
                 "value": "delay"
               },
               "endWait": {
-                "source": "variable",
-                "name": "gapMs"
+                "source": "literal",
+                "value": 16
               }
             }
           }
@@ -921,22 +533,6 @@
         {
           "from": "cue-skv2-strobe-fastest-start",
           "to": "cue-skv2-strobe-fastest-lights"
-        },
-        {
-          "from": "cue-skv2-strobe-fastest-lights",
-          "to": "cue-skv2-strobe-fastest-bd"
-        },
-        {
-          "from": "cue-skv2-strobe-fastest-bd",
-          "to": "cue-skv2-strobe-fastest-x4"
-        },
-        {
-          "from": "cue-skv2-strobe-fastest-x4",
-          "to": "cue-skv2-strobe-fastest-int"
-        },
-        {
-          "from": "cue-skv2-strobe-fastest-int",
-          "to": "cue-skv2-strobe-fastest-gap"
         },
         {
           "from": "cue-skv2-strobe-fastest-called",
@@ -957,22 +553,6 @@
             "x": 0,
             "y": 150
           },
-          "cue-skv2-strobe-fastest-bd": {
-            "x": 0,
-            "y": 300
-          },
-          "cue-skv2-strobe-fastest-x4": {
-            "x": 0,
-            "y": 450
-          },
-          "cue-skv2-strobe-fastest-int": {
-            "x": 0,
-            "y": 600
-          },
-          "cue-skv2-strobe-fastest-gap": {
-            "x": 0,
-            "y": 750
-          },
           "cue-skv2-strobe-fastest-flash": {
             "x": 280,
             "y": 150
@@ -990,34 +570,6 @@
           "type": "light-array",
           "scope": "cue",
           "initialValue": [],
-          "isParameter": false
-        },
-        {
-          "name": "beatMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 500,
-          "isParameter": false
-        },
-        {
-          "name": "beat4",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 2000,
-          "isParameter": false
-        },
-        {
-          "name": "intervalMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 125,
-          "isParameter": false
-        },
-        {
-          "name": "gapMs",
-          "type": "number",
-          "scope": "cue",
-          "initialValue": 85,
           "isParameter": false
         }
       ],

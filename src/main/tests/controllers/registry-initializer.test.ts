@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals'
-import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
+import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
 import { RegistryInitializer } from '../../controllers/RegistryInitializer'
 import { noopRuntimeBroadcaster } from '../../../photonics-dmx/runtime/broadcaster'
 
@@ -16,9 +16,7 @@ describe('RegistryInitializer', () => {
       setCueGroupSelectionMode: jest.fn(),
       setDisabledCues: jest.fn(),
     }
-    const getInstance = jest
-      .spyOn(YargCueRegistry, 'getInstance')
-      .mockReturnValue(registry as never)
+    const getInstance = jest.spyOn(CueRegistry, 'getInstance').mockReturnValue(registry as never)
 
     const getPreference = jest.fn((k: string) => {
       if (k === 'cueDomains') {
@@ -53,7 +51,7 @@ describe('RegistryInitializer', () => {
       },
     })
 
-    await init.initializeCueRegistry()
+    await init.initializeCueRegistry('yarg')
 
     expect(getInstance).toHaveBeenCalled()
     expect(registry.setEnabledGroups).toHaveBeenCalledWith(['a'])

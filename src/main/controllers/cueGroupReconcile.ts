@@ -39,7 +39,9 @@ export function reconcileEnabledGroups(
   return { enabled, known: registeredIds }
 }
 
-function sameIds(a: string[], b: string[]): boolean {
+/** Order-sensitive equality of two id lists, so every domain's "already matches stored, do not
+ *  persist" check stays identical. */
+export function sameIds(a: readonly string[], b: readonly string[]): boolean {
   if (a.length !== b.length) {
     return false
   }

@@ -1,12 +1,12 @@
 import { NodeExecutionEngine } from '../../../cues/node/runtime/NodeExecutionEngine'
 import { ExecutionContext } from '../../../cues/node/runtime/ExecutionContext'
-import { NodeCueCompiler, CompiledYargCue } from '../../../cues/node/compiler/NodeCueCompiler'
+import { NodeCueCompiler, CompiledNetCue } from '../../../cues/node/compiler/NodeCueCompiler'
 import { EffectCompiler } from '../../../cues/node/compiler/EffectCompiler'
 import { EffectRegistry } from '../../../cues/node/runtime/EffectRegistry'
-import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
+import { LightingNodeCue } from '../../../cues/node/runtime/LightingNodeCue'
 import {
-  YargNodeCueDefinition,
-  YargEventNode,
+  NetNodeCueDefinition,
+  NetEventNode,
   ActionNode,
   LogicNode,
 } from '../../../cues/types/nodeCueTypes'
@@ -118,7 +118,7 @@ describe('NodeExecutionEngine', () => {
   describe('Basic Execution', () => {
     it('should execute a simple action node', () => {
       // Create a simple cue: event -> action
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -146,7 +146,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -160,8 +160,9 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'action1' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map(),
@@ -192,7 +193,7 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should handle action -> action chain', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -260,7 +261,7 @@ describe('NodeExecutionEngine', () => {
         ]
       })
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -277,8 +278,9 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([
           ['action1', action1],
@@ -315,7 +317,7 @@ describe('NodeExecutionEngine', () => {
 
   describe('Logic Node Execution', () => {
     it('should evaluate conditional node at runtime', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -372,7 +374,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -390,8 +392,9 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([
           ['action-true', actionTrue],
@@ -435,7 +438,7 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should set and read variables at runtime', async () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -481,7 +484,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -507,8 +510,9 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map<string, LogicNode>([
@@ -556,7 +560,7 @@ describe('NodeExecutionEngine', () => {
 
   describe('Execution Context', () => {
     it('should prevent cycles with visited tracking', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -580,7 +584,7 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should track active actions', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -624,7 +628,7 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should detect completion correctly', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -670,13 +674,13 @@ describe('NodeExecutionEngine', () => {
 
   describe('Error Handling', () => {
     it('should handle missing action nodes gracefully', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -690,8 +694,9 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'nonexistent-action' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map(),
         logicMap: new Map(),
@@ -720,7 +725,7 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should cleanup on cancelAll', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -747,7 +752,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -761,8 +766,9 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'action1' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map(),
@@ -795,7 +801,7 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('cancelAll(true) leaves effects on sequencer so lights stay lit during cue transition', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -822,7 +828,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -836,8 +842,9 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'action1' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map(),
@@ -879,7 +886,7 @@ describe('NodeExecutionEngine', () => {
 
   describe('Effect Raiser Node', () => {
     it('should execute effect when Effect Raiser is triggered', async () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -893,7 +900,7 @@ describe('NodeExecutionEngine', () => {
         outputs: [],
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -911,8 +918,9 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'raiser1' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map(),
         logicMap: new Map(),
@@ -955,7 +963,7 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should handle missing effect gracefully', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -969,7 +977,7 @@ describe('NodeExecutionEngine', () => {
         outputs: [],
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -987,8 +995,9 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'raiser1' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map(),
         logicMap: new Map(),
@@ -1019,7 +1028,7 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should continue execution after Effect Raiser (non-blocking)', async () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -1058,7 +1067,7 @@ describe('NodeExecutionEngine', () => {
         layer: { source: 'literal', value: 0 },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -1079,8 +1088,9 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map(),
@@ -1233,7 +1243,7 @@ describe('NodeExecutionEngine', () => {
       const effectRegistry = new EffectRegistry()
       effectRegistry.registerEffect('score-like-effect', compiledEffect)
 
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -1253,7 +1263,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -1271,8 +1281,9 @@ describe('NodeExecutionEngine', () => {
         connections: [{ from: 'event1', to: 'raiser1' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map(),
         logicMap: new Map(),
@@ -1327,7 +1338,7 @@ describe('NodeExecutionEngine', () => {
 
   describe('Data Nodes', () => {
     it('should extract YARG cue data and assign to variable', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -1363,7 +1374,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -1381,8 +1392,9 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'currentBpm', type: 'number', scope: 'cue', initialValue: 0 }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map([['cuedata1', cueDataNode]]),
@@ -1423,7 +1435,7 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should extract config data and assign to variable', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -1459,7 +1471,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -1477,8 +1489,9 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'numFrontLights', type: 'number', scope: 'cue', initialValue: 0 }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map([['configdata1', configDataNode]]),
@@ -1531,7 +1544,7 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should handle cue data node without assignTo', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -1567,7 +1580,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -1584,8 +1597,9 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map([['cuedata1', cueDataNode]]),
@@ -1620,7 +1634,7 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should use cue data in conditional branching', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -1687,7 +1701,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -1707,8 +1721,9 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'noteCount', type: 'number', scope: 'cue', initialValue: 0 }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([
           ['action-high', actionHigh],
@@ -1764,7 +1779,7 @@ describe('NodeExecutionEngine', () => {
     })
 
     it('should extract config data for total lights', () => {
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -1800,7 +1815,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -1818,8 +1833,9 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'totalCount', type: 'number', scope: 'cue', initialValue: 0 }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map([['configdata1', configDataNode]]),
@@ -1892,7 +1908,7 @@ describe('NodeExecutionEngine', () => {
 
     it('should resolve variable for color name', () => {
       // Setup: event -> variable (set color) -> action (use color variable)
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -1934,7 +1950,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -1952,8 +1968,9 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'myColor', type: 'string', scope: 'cue', initialValue: '' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
         actionMap: new Map([[actionNode.id, actionNode]]),
         logicMap: new Map<string, LogicNode>([[variableNode.id, variableNode]]),
@@ -1988,7 +2005,7 @@ describe('NodeExecutionEngine', () => {
 
     it('should resolve variable for target groups', () => {
       // Setup: variable (set groups) -> action (use groups variable)
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -2030,7 +2047,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -2048,8 +2065,9 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'targetGroups', type: 'string', scope: 'cue', initialValue: '' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
         actionMap: new Map([[actionNode.id, actionNode]]),
         logicMap: new Map<string, LogicNode>([[variableNode.id, variableNode]]),
@@ -2084,7 +2102,7 @@ describe('NodeExecutionEngine', () => {
 
     it('should report runtime error when variable not found', () => {
       // Action references non-existent variable; runtime reports error via IPC
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -2115,7 +2133,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -2130,8 +2148,9 @@ describe('NodeExecutionEngine', () => {
         variables: [],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
         actionMap: new Map([[actionNode.id, actionNode]]),
         logicMap: new Map<string, LogicNode>(),
@@ -2168,7 +2187,7 @@ describe('NodeExecutionEngine', () => {
 
     it('should resolve variable for duration', () => {
       // Cue data -> math -> action with dynamic duration
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -2219,7 +2238,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -2241,8 +2260,9 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
         actionMap: new Map([[actionNode.id, actionNode]]),
         logicMap: new Map<string, LogicNode>([
@@ -2282,7 +2302,7 @@ describe('NodeExecutionEngine', () => {
 
     it('should handle invalid color variable gracefully', () => {
       // Variable contains invalid color, should use default
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -2324,7 +2344,7 @@ describe('NodeExecutionEngine', () => {
         },
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -2342,8 +2362,9 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'badColor', type: 'string', scope: 'cue', initialValue: '' }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
         actionMap: new Map([[actionNode.id, actionNode]]),
         logicMap: new Map<string, LogicNode>([[variableNode.id, variableNode]]),
@@ -2387,7 +2408,7 @@ describe('NodeExecutionEngine', () => {
 
       mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights)
 
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -2401,7 +2422,7 @@ describe('NodeExecutionEngine', () => {
         assignTo: 'frontLights',
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -2416,8 +2437,9 @@ describe('NodeExecutionEngine', () => {
         variables: [{ name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] }],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
         actionMap: new Map(),
         logicMap: new Map<string, LogicNode>([[configDataNode.id, configDataNode]]),
@@ -2465,7 +2487,7 @@ describe('NodeExecutionEngine', () => {
         return []
       }) as unknown as DmxLightManager['getLightsInGroup']
 
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -2487,7 +2509,7 @@ describe('NodeExecutionEngine', () => {
         assignTo: 'backLights',
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -2508,8 +2530,9 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
         actionMap: new Map(),
         logicMap: new Map<string, LogicNode>([
@@ -2561,7 +2584,7 @@ describe('NodeExecutionEngine', () => {
 
       mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights)
 
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -2584,7 +2607,7 @@ describe('NodeExecutionEngine', () => {
         assignTo: 'selectedLight',
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -2605,8 +2628,9 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
         actionMap: new Map(),
         logicMap: new Map<string, LogicNode>([
@@ -2652,7 +2676,7 @@ describe('NodeExecutionEngine', () => {
 
       mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights)
 
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -2675,7 +2699,7 @@ describe('NodeExecutionEngine', () => {
         assignTo: 'selectedLight',
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -2696,8 +2720,9 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
         actionMap: new Map(),
         logicMap: new Map<string, LogicNode>([
@@ -2744,7 +2769,7 @@ describe('NodeExecutionEngine', () => {
 
       mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights)
 
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -2767,7 +2792,7 @@ describe('NodeExecutionEngine', () => {
         assignTo: 'selectedLight',
       }
 
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -2788,8 +2813,9 @@ describe('NodeExecutionEngine', () => {
         ],
       }
 
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([[eventNode.id, eventNode]]),
         actionMap: new Map(),
         logicMap: new Map<string, LogicNode>([
@@ -2844,7 +2870,7 @@ describe('NodeExecutionEngine', () => {
         .fn()
         .mockReturnValue([movingHead]) as unknown as DmxLightManager['getLights']
 
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -2871,7 +2897,7 @@ describe('NodeExecutionEngine', () => {
           easing: { source: 'literal', value: 'linear' },
         },
       }
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'position-cue',
         name: 'Position Cue',
         kind: 'lighting',
@@ -2882,7 +2908,7 @@ describe('NodeExecutionEngine', () => {
       }
 
       const engine = new NodeExecutionEngine(
-        NodeCueCompiler.compileYargCue(definition),
+        NodeCueCompiler.compileCue<NetEventNode>(definition, 'yarg'),
         'test-group:position-cue',
         mockSequencer,
         mockLightManager,
@@ -2917,7 +2943,7 @@ describe('NodeExecutionEngine', () => {
 
       cueLevelVarStore.set('bearing', { type: 'number', value: 90 })
 
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'beat',
@@ -2944,7 +2970,7 @@ describe('NodeExecutionEngine', () => {
           easing: { source: 'literal', value: 'easeInOut' },
         },
       }
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'crossbeat-style-cue',
         name: 'Crossbeat Style Cue',
         kind: 'lighting',
@@ -2955,7 +2981,7 @@ describe('NodeExecutionEngine', () => {
       }
 
       const engine = new NodeExecutionEngine(
-        NodeCueCompiler.compileYargCue(definition),
+        NodeCueCompiler.compileCue<NetEventNode>(definition, 'yarg'),
         'test-group:crossbeat-style-cue',
         mockSequencer,
         mockLightManager,
@@ -2977,7 +3003,7 @@ describe('NodeExecutionEngine', () => {
   describe('two cues sharing one groupId, one stops', () => {
     it('second cue can still run after first cue is stopped', async () => {
       const groupId = 'shared-group'
-      const eventNode: YargEventNode = {
+      const eventNode: NetEventNode = {
         id: 'event1',
         type: 'event',
         eventType: 'cue-started',
@@ -3003,7 +3029,7 @@ describe('NodeExecutionEngine', () => {
           easing: { source: 'literal', value: 'linear' },
         },
       }
-      const definition1: YargNodeCueDefinition = {
+      const definition1: NetNodeCueDefinition = {
         id: 'cue-a',
         name: 'Cue A',
         kind: 'lighting',
@@ -3012,7 +3038,7 @@ describe('NodeExecutionEngine', () => {
         nodes: { events: [eventNode], actions: [actionNode], logic: [] },
         connections: [{ from: 'event1', to: 'action1' }],
       }
-      const definition2: YargNodeCueDefinition = {
+      const definition2: NetNodeCueDefinition = {
         id: 'cue-b',
         name: 'Cue B',
         kind: 'lighting',
@@ -3025,11 +3051,11 @@ describe('NodeExecutionEngine', () => {
         },
         connections: [{ from: 'ev2', to: 'act2' }],
       }
-      const compiled1 = NodeCueCompiler.compileYargCue(definition1)
-      const compiled2 = NodeCueCompiler.compileYargCue(definition2)
+      const compiled1 = NodeCueCompiler.compileCue(definition1, 'yarg')
+      const compiled2 = NodeCueCompiler.compileCue(definition2, 'yarg')
       const registry = new EffectRegistry()
-      const cue1 = new YargNodeCue(groupId, compiled1, registry)
-      const cue2 = new YargNodeCue(groupId, compiled2, registry)
+      const cue1 = new LightingNodeCue(groupId, compiled1, registry)
+      const cue2 = new LightingNodeCue(groupId, compiled2, registry)
       const params = createCueData('Strong')
 
       await cue1.execute(params, mockSequencer, mockLightManager)
@@ -3090,10 +3116,10 @@ describe('NodeExecutionEngine', () => {
       },
     }
 
-    const eventNode: YargEventNode = { id: 'event1', type: 'event', eventType: 'beat' }
+    const eventNode: NetEventNode = { id: 'event1', type: 'event', eventType: 'beat' }
 
     const buildEngine = (): NodeExecutionEngine => {
-      const definition: YargNodeCueDefinition = {
+      const definition: NetNodeCueDefinition = {
         id: 'test-cue',
         name: 'Test Cue',
         kind: 'lighting',
@@ -3105,8 +3131,9 @@ describe('NodeExecutionEngine', () => {
           { from: 'lc1', to: 'action1', fromPort: 'each' },
         ],
       }
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
         definition,
+        mode: 'yarg',
         eventMap: new Map([['event1', eventNode]]),
         actionMap: new Map([['action1', actionNode]]),
         logicMap: new Map([['lc1', ledChangedNode]]),
@@ -3180,7 +3207,8 @@ describe('NodeExecutionEngine', () => {
 
     it('runs the done branch after the fan-out and reuses the memoized body across frames', () => {
       const action2: ActionNode = { ...actionNode, id: 'action2' }
-      const compiledCue: CompiledYargCue = {
+      const compiledCue: CompiledNetCue = {
+        mode: 'rb3',
         definition: {
           id: 'test-cue',
           name: 'Test Cue',

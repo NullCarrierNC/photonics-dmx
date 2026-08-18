@@ -1,6 +1,6 @@
 import { IpcMain } from 'electron'
-import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
-import { getRb3CueRegistry } from '../../photonics-dmx/cues/registries/Rb3CueRegistry'
+import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
+import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import { ipcError } from './ipcResult'
 import { isNonEmptyString, validateCueType } from './inputValidation'
 import { LIGHT } from '../../shared/ipcChannels'
@@ -14,7 +14,7 @@ const log = createLogger('cue-group-handlers')
  */
 export function setupCueGroupHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(LIGHT.GET_CUE_GROUPS, async () => {
-    const registry = YargCueRegistry.getInstance()
+    const registry = CueRegistry.getInstance()
     const groupIds = registry.getAllGroups()
     return groupIds
       .map((groupId) => {
@@ -33,7 +33,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
   })
 
   ipcMain.handle(LIGHT.GET_RB3_CUE_GROUPS, async () => {
-    const registry = getRb3CueRegistry()
+    const registry = getCueRegistry('rb3')
     return registry
       .getAllGroups()
       .map((groupId) => {
@@ -53,7 +53,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle(LIGHT.GET_AVAILABLE_RB3_CUES, async (_, groupId?: unknown) => {
     try {
-      const registry = getRb3CueRegistry()
+      const registry = getCueRegistry('rb3')
       const resolvedGroupId =
         typeof groupId === 'string' && groupId.trim() !== '' ? groupId : undefined
       const targetGroupId =
@@ -85,7 +85,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
       return { success: false, error: 'groupId is required' }
     }
     try {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       const group = registry.getGroup(groupId)
       if (!group) {
         return { success: false, error: `Group '${groupId}' not found` }
@@ -108,7 +108,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
       return { success: false, error: 'groupId is required' }
     }
     try {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       const group = registry.getGroup(groupId)
       if (!group) {
         return { success: false, error: `Group '${groupId}' not found` }
@@ -135,7 +135,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
       return { success: false, error: validated.error }
     }
     try {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       const cueState = registry.getCueState(validated.value)
       if (cueState) {
         return {
@@ -157,7 +157,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle(LIGHT.GET_CONSISTENCY_STATUS, async () => {
     try {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       const status = registry.getConsistencyStatus()
       return { success: true, status }
     } catch (error) {

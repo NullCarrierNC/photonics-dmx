@@ -11,44 +11,13 @@ import {
   DrumNoteType,
 } from '../../cues/types/cueTypes'
 import { createLogger } from '../../../shared/logger'
-import type { SongEventCondition } from '../../controllers/sequencer/interfaces'
+import type { CueRuntime } from '../../cueHandlers/CueRuntime'
 import { monotonicNowMs } from '../../../shared/time'
 import { MIN_SUPPORTED_DATAGRAM_VERSION, MAX_KNOWN_DATAGRAM_VERSION } from './yargTypes'
 import { parseYargPacket } from './yargPacketParser'
 import { computeInstrumentRisingEdges, shouldForwardFrame } from './yargFrameDispatch'
 
 const log = createLogger('YargNetworkListener')
-
-export interface YargCueRuntime {
-  notifySongStart(): void
-  notifySongEnd(): void
-  handleBeat(): void
-  handleMeasure(): void
-  handleKeyframeFirst(): void
-  handleKeyframeNext(): void
-  handleKeyframePrevious(): void
-  handleCue(cueType: CueType, parameters: CueData): Promise<void>
-  handleDrumNote(noteType: DrumNoteType, data: CueData): void
-  handleGuitarNote(noteType: InstrumentNoteType, data: CueData): void
-  handleBassNote(noteType: InstrumentNoteType, data: CueData): void
-  handleKeysNote(noteType: InstrumentNoteType, data: CueData): void
-  handleVocalNote(data: CueData): void
-  /** Stops the active strobe slot without clearing per-frame edge baselines. */
-  stopActiveStrobe?(): void
-  /** Stops any active strobe and clears per-frame edge baselines at YARG session boundaries. */
-  resetYargSessionState?(): void
-  /**
-   * Advance action-timing waits gated on a song event (e.g. an RB3 `led-3` / `fog-on` edge). Optional
-   * so existing YARG-only runtimes need no change; the RB3 cue-mode processor calls it. Typed off the
-   * sequencer union so the two can't drift.
-   */
-  handleSongEvent?(condition: SongEventCondition): void
-  /**
-   * Force a motion-cue re-pick on every chain. Optional; the RB3 cue-mode processor calls it when its
-   * switch-timer has elapsed and Light 1 changes state (RB3 has no beat to key motion selection on).
-   */
-  requestMotionRepick?(): void
-}
 
 const PORT = 36107
 
@@ -57,7 +26,7 @@ const FALLBACK_POLL_MS = 500
 
 export class YargNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null
-  private cueHandler: YargCueRuntime
+  private cueHandler: CueRuntime
 
   //private logFilePath = path.join(app.getPath('documents'), 'yargLog.json');
   private listening = false
@@ -101,7 +70,7 @@ export class YargNetworkListener extends EventEmitter {
   /** Polls for the fallback condition independently of incoming packets (covers YARG going silent). */
   private fallbackTimer: NodeJS.Timeout | null = null
 
-  constructor(cueHandler: YargCueRuntime, options?: { getFallbackCueTimeMs?: () => number }) {
+  constructor(cueHandler: CueRuntime, options?: { getFallbackCueTimeMs?: () => number }) {
     super() // Initialize EventEmitter
     this.cueHandler = cueHandler
     this.getFallbackCueTimeMs = options?.getFallbackCueTimeMs ?? (() => 20000)
@@ -238,7 +207,7 @@ export class YargNetworkListener extends EventEmitter {
     this.fallbackActive = true
     this.lastFallbackFireAt = now
     log.info('YARG: Fallback cue triggered (no new lighting cue within fallback window)')
-    this.cueHandler.stopActiveStrobe?.()
+    this.cueHandler.stopActiveStrobe()
     void this.cueHandler.handleCue(CueType.Fallback, {
       ...data,
       lightingCue: CueType.Fallback,
@@ -292,7 +261,7 @@ export class YargNetworkListener extends EventEmitter {
 
   /** Reset dispatch and handler edge baselines at YARG session boundaries. */
   private resetSessionInputState(): void {
-    this.cueHandler.resetYargSessionState?.()
+    this.cueHandler.resetSessionState()
     this.lastData = null
     this.lastReceivedData = null
     this.lastForwardedAt = 0

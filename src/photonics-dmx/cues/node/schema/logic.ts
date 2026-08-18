@@ -1,7 +1,7 @@
 import { JSONSchemaType } from 'ajv'
 import { VARIABLE_TYPES } from '../../types/nodeCueTypes'
 import {
-  YARG_CUE_DATA_PROPERTIES,
+  NET_CUE_DATA_PROPERTIES,
   AUDIO_CUE_DATA_PROPERTIES,
   ALL_CONFIG_DATA_PROPERTIES,
 } from '../../../constants/nodeConstants'
@@ -40,9 +40,7 @@ import { LOGIC_COMPARATORS, MATH_OPERATORS } from './helpers'
 import { stringIdSchema, valueSourceSchema, colorArrayValueSourceSchema } from './primitives'
 
 // Combine cue data properties without duplicates (dedupe overlapping properties like 'cue-name', 'bpm', 'execution-count')
-const CUE_DATA_PROPERTIES = [
-  ...new Set([...YARG_CUE_DATA_PROPERTIES, ...AUDIO_CUE_DATA_PROPERTIES]),
-]
+const CUE_DATA_PROPERTIES = [...new Set([...NET_CUE_DATA_PROPERTIES, ...AUDIO_CUE_DATA_PROPERTIES])]
 
 // Use shared config data properties
 const CONFIG_DATA_PROPERTIES = ALL_CONFIG_DATA_PROPERTIES

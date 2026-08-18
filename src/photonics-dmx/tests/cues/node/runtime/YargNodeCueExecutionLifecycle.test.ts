@@ -2,11 +2,11 @@ import { describe, expect, it } from '@jest/globals'
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import type {
   ActionNode,
-  YargEventNode,
-  YargNodeCueDefinition,
+  NetEventNode,
+  NetNodeCueDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import { CueData, CueType } from '../../../../cues/types/cueTypes'
-import { YargNodeCue } from '../../../../cues/node/runtime/YargNodeCue'
+import { LightingNodeCue } from '../../../../cues/node/runtime/LightingNodeCue'
 import { EffectRegistry } from '../../../../cues/node/runtime/EffectRegistry'
 import type { NodeRuntimeCallbacks } from '../../../../cues/node/runtime/executionTypes'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
@@ -85,7 +85,7 @@ function createSetColorAction(duration: number): ActionNode {
   }
 }
 
-function createCueDefinition(events: YargEventNode[], duration: number): YargNodeCueDefinition {
+function createCueDefinition(events: NetEventNode[], duration: number): NetNodeCueDefinition {
   return {
     id: 'execution-lifecycle',
     name: 'Execution Lifecycle',
@@ -110,7 +110,7 @@ const baseCueData: CueData = {
   beatsPerMinute: 120,
 } as CueData
 
-describe('YargNodeCue execution lifecycle', () => {
+describe('LightingNodeCue execution lifecycle', () => {
   it('runs cue-started once and cue-called on every execute', async () => {
     const { sequencer, recorded } = createRecordingSequencer()
     const def = createCueDefinition(
@@ -120,9 +120,9 @@ describe('YargNodeCue execution lifecycle', () => {
       ],
       0,
     )
-    const nodeCue = new YargNodeCue(
+    const nodeCue = new LightingNodeCue(
       'group1',
-      NodeCueCompiler.compileYargCue(def),
+      NodeCueCompiler.compileCue(def, 'yarg'),
       new EffectRegistry(),
       noopCallbacks,
     )
@@ -141,9 +141,9 @@ describe('YargNodeCue execution lifecycle', () => {
       [{ id: 'ev-called', type: 'event', eventType: 'cue-called' }],
       200,
     )
-    const nodeCue = new YargNodeCue(
+    const nodeCue = new LightingNodeCue(
       'group1',
-      NodeCueCompiler.compileYargCue(def),
+      NodeCueCompiler.compileCue(def, 'yarg'),
       new EffectRegistry(),
       noopCallbacks,
     )

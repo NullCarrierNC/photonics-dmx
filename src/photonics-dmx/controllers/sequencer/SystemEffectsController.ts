@@ -50,6 +50,23 @@ export class SystemEffectsController implements ISystemEffectsController {
   }
 
   /**
+   * Hold or release an occlusion over the whole rig: every light publishes dark while the running
+   * cue keeps advancing underneath, and reappears at its natural state the moment it is released.
+   *
+   * Delegated to the transition controller, which gates the published colour rather than stacking an
+   * overlay on a layer. A layer would not survive: `setEffect` clears every transition through
+   * `removeAllEffects`, as do the blackout paths, so the next cue to submit would drop it.
+   */
+  public holdOcclusion(on: boolean): void {
+    this.lightTransitionController.setOcclusionHeld(on)
+  }
+
+  /** Whether the occlusion is currently held. */
+  public isOcclusionHeld(): boolean {
+    return this.lightTransitionController.isOcclusionHeld()
+  }
+
+  /**
    * Initiates a blackout effect that visually fades out all lights.
    * If called, we set isBlackingOut and schedule a transition on layer 255,
    * then clear all active effects after the fade completes.
@@ -198,6 +215,8 @@ export class SystemEffectsController implements ISystemEffectsController {
           )
         })
 
+        // The terminal wipe cleared every layer's effects, so lay a held overlay back down before
+
         // Trigger the callback after timed blackout completes as well
         if (this.onBlackoutCompleteCallback) {
           this.onBlackoutCompleteCallback()
@@ -225,6 +244,7 @@ export class SystemEffectsController implements ISystemEffectsController {
       this.isBlackingOut = false
       this.clearPendingBlackout()
       this.lightTransitionController.removeTransitionsByLayer(255)
+      // The overlay lives above 255 so the sweep leaves it, but re-assert anyway: a cancel resumes
     }
   }
 

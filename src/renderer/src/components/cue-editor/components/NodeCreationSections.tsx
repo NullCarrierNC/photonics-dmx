@@ -5,7 +5,7 @@ import type {
   LogicNode,
   LogicNodeMeta,
   NodeEffectType,
-  YargEventNode,
+  NetEventNode,
   AudioEventNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorMode, NotesVariant } from '../lib/types'
@@ -45,7 +45,7 @@ interface NodeCreationSectionsProps {
   cueKind: NodeCueKind
   editorMode: EditorMode
   addEventNode: (
-    option: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
+    option: EventOption<NetEventNode['eventType'] | AudioEventNode['eventType']>,
   ) => void
   addActionNode: (effect: NodeEffectType) => void
   addLogicNode: (logicType: LogicNode['logicType']) => void
@@ -60,7 +60,7 @@ const EventNodesSection: React.FC<{
   activeMode: NodeCueMode
   cueKind: NodeCueKind
   addEventNode: (
-    option: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
+    option: EventOption<NetEventNode['eventType'] | AudioEventNode['eventType']>,
   ) => void
   addEventListenerNode?: () => void
 }> = ({ activeMode, cueKind, addEventNode, addEventListenerNode }) => (

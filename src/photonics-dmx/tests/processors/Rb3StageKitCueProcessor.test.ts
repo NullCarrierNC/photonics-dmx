@@ -1,24 +1,24 @@
 /**
  * Drives Rb3StageKitCueProcessor via an EventEmitter (mirroring the RB3E listener) and a mock
- * YargCueRuntime, asserting the accumulated LED bank state and the dispatched cue frames.
+ * CueRuntime, asserting the accumulated LED bank state and the dispatched cue frames.
  */
 import { EventEmitter } from 'events'
 import { describe, expect, it, jest } from '@jest/globals'
 import { Rb3StageKitCueProcessor } from '../../processors/Rb3StageKitCueProcessor'
-import type { YargCueRuntime } from '../../listeners/YARG/YargNetworkListener'
+import type { CueRuntime } from '../../cueHandlers/CueRuntime'
 import { ChainFanout } from '../../controllers/ChainFanout'
 import type { RigChain } from '../../controllers/RigChain'
 import { CueType } from '../../cues/types/cueTypes'
 import type { CueData } from '../../cues/types/cueTypes'
 
 function mockRuntime(): {
-  runtime: YargCueRuntime
+  runtime: CueRuntime
   calls: Array<{ cueType: CueType; frame: CueData }>
   events: string[]
 } {
   const calls: Array<{ cueType: CueType; frame: CueData }> = []
   const events: string[] = []
-  const runtime: YargCueRuntime = {
+  const runtime: CueRuntime = {
     notifySongStart: jest.fn(),
     notifySongEnd: jest.fn(),
     handleBeat: jest.fn(),
@@ -28,15 +28,17 @@ function mockRuntime(): {
     handleKeyframePrevious: jest.fn(),
     handleCue: jest.fn(async (cueType: CueType, frame: CueData) => {
       calls.push({ cueType, frame })
-    }) as YargCueRuntime['handleCue'],
+    }) as CueRuntime['handleCue'],
     handleDrumNote: jest.fn(),
     handleGuitarNote: jest.fn(),
     handleBassNote: jest.fn(),
     handleKeysNote: jest.fn(),
     handleVocalNote: jest.fn(),
+    stopActiveStrobe: jest.fn(),
+    resetSessionState: jest.fn(),
     handleSongEvent: jest.fn((condition: string) => {
       events.push(condition)
-    }) as YargCueRuntime['handleSongEvent'],
+    }) as CueRuntime['handleSongEvent'],
   }
   return { runtime, calls, events }
 }
@@ -62,7 +64,7 @@ function setup(keepaliveMs: number | null = null): {
   proc: Rb3StageKitCueProcessor
   calls: Array<{ cueType: CueType; frame: CueData }>
   events: string[]
-  runtime: YargCueRuntime
+  runtime: CueRuntime
 } {
   const emitter = new EventEmitter()
   const { runtime, calls, events } = mockRuntime()
@@ -390,12 +392,20 @@ describe('Rb3StageKitCueProcessor wait-gate edges (handleSongEvent)', () => {
     const seqB = { handleSongEvent: jest.fn() }
     const fanout = new ChainFanout()
     fanout.setChains([
-      { rigId: 'a', isPrimary: true, sequencer: seqA, yargCueHandler: null } as unknown as RigChain,
+      {
+        rigId: 'a',
+        isPrimary: true,
+        sequencer: seqA,
+        cueHandlers: { yarg: null, rb3: null },
+      } as unknown as RigChain,
       {
         rigId: 'b',
         isPrimary: false,
         sequencer: seqB,
-        yargCueHandler: null,
+        cueHandlers: {
+          yarg: null,
+          rb3: null,
+        },
       } as unknown as RigChain,
     ])
     const proc = new Rb3StageKitCueProcessor(fanout, { keepaliveMs: null })

@@ -6,9 +6,9 @@ import * as os from 'os'
 import * as path from 'path'
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
 import { NodeCueLoader } from '../../../cues/node/loader/NodeCueLoader'
-import { YargCueRegistry } from '../../../cues/registries/YargCueRegistry'
+import { CueRegistry } from '../../../cues/registries/CueRegistry'
 import { AudioCueRegistry } from '../../../cues/registries/AudioCueRegistry'
-import { getRb3CueRegistry } from '../../../cues/registries/Rb3CueRegistry'
+import { getCueRegistry } from '../../../cues/registries/cueRegistries'
 import {
   validateAudioNodeCueFile,
   validateRb3NodeCueFile,
@@ -19,11 +19,10 @@ import type {
   AudioEventNodeUnion,
   AudioMotionNodeCueDefinition,
   AudioNodeCueFile,
-  Rb3NodeCueFile,
-  YargEventNode,
-  YargLightingNodeCueDefinition,
-  YargMotionNodeCueDefinition,
-  YargNodeCueFile,
+  NetNodeCueFile,
+  NetEventNode,
+  NetLightingNodeCueDefinition,
+  NetMotionNodeCueDefinition,
 } from '../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../cues/types/cueTypes'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
@@ -32,8 +31,8 @@ import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 function rb3LightingFile(
   cueType: CueType = CueType.Strobe_Fast,
   groupId = 'loader-test-rb3',
-): Rb3NodeCueFile {
-  const ev: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+): NetNodeCueFile {
+  const ev: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   const action: ActionNode = {
     id: 'a1',
     type: 'action',
@@ -55,7 +54,7 @@ function rb3LightingFile(
     },
     layer: { source: 'literal', value: 100 },
   }
-  const cue: YargLightingNodeCueDefinition = {
+  const cue: NetLightingNodeCueDefinition = {
     kind: 'lighting',
     id: 'c1',
     name: 'RB3 light',
@@ -72,8 +71,8 @@ function rb3LightingFile(
   }
 }
 
-function yargMotionOnlyFile(): YargNodeCueFile {
-  const ev: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+function yargMotionOnlyFile(): NetNodeCueFile {
+  const ev: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   const action: ActionNode = {
     id: 'mp1',
     type: 'action',
@@ -96,7 +95,7 @@ function yargMotionOnlyFile(): YargNodeCueFile {
     },
     layer: { source: 'literal', value: 120 },
   }
-  const cue: YargMotionNodeCueDefinition = {
+  const cue: NetMotionNodeCueDefinition = {
     kind: 'motion',
     id: 'm1',
     name: 'Motion',
@@ -159,32 +158,30 @@ function audioMotionOnlyFile(): AudioNodeCueFile {
 
 describe('NodeCueLoader', () => {
   let tmpDir: string
-  let yargRegistry: YargCueRegistry
+  let yargRegistry: CueRegistry
   let audioRegistry: AudioCueRegistry
   let loader: NodeCueLoader
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'node-cue-loader-'))
-    yargRegistry = YargCueRegistry.getInstance()
+    yargRegistry = CueRegistry.getInstance()
     audioRegistry = AudioCueRegistry.getInstance()
     yargRegistry.reset()
     audioRegistry.reset()
     // The RB3 registry is a module singleton; reset it so rb3 groups don't leak across tests.
-    getRb3CueRegistry().reset()
+    getCueRegistry('rb3').reset()
 
     loader = new NodeCueLoader({
       runtimeBroadcaster: noopRuntimeBroadcaster(),
       baseDir: tmpDir,
-      yargRegistry,
-      audioRegistry,
-      rb3Registry: getRb3CueRegistry(),
+      registries: { yarg: yargRegistry, rb3: getCueRegistry('rb3'), audio: audioRegistry },
     })
   })
 
   afterEach(() => {
     yargRegistry.reset()
     audioRegistry.reset()
-    getRb3CueRegistry().reset()
+    getCueRegistry('rb3').reset()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
@@ -228,8 +225,8 @@ describe('NodeCueLoader', () => {
     const file = yargMotionOnlyFile()
     // Second motion cue whose action has no incoming connection: schema-valid but fails
     // compilation (unreachable action). Reachability is a compile-time, not schema, check.
-    const goodAction = (file.cues[0] as YargMotionNodeCueDefinition).nodes.actions[0]
-    const brokenCue: YargMotionNodeCueDefinition = {
+    const goodAction = (file.cues[0] as NetMotionNodeCueDefinition).nodes.actions[0]
+    const brokenCue: NetMotionNodeCueDefinition = {
       kind: 'motion',
       id: 'm-broken',
       name: 'Broken',
@@ -278,7 +275,7 @@ describe('NodeCueLoader', () => {
 
   it('migrates legacy compass bearing literals when loading from disk', async () => {
     const file = yargMotionOnlyFile()
-    const cue = file.cues[0] as YargMotionNodeCueDefinition
+    const cue = file.cues[0] as NetMotionNodeCueDefinition
     const motionAction = cue.nodes.actions[0]
     motionAction.motionPattern = {
       pattern: { source: 'literal', value: 'circle' },
@@ -296,7 +293,7 @@ describe('NodeCueLoader', () => {
     const rel = path.join('node-data', 'cues', 'yarg', 'legacy-bearing.json')
     const read = await loader.readFile(rel)
     expect(read.mode).toBe('yarg')
-    const motionCue = read.cues[0] as YargMotionNodeCueDefinition
+    const motionCue = read.cues[0] as NetMotionNodeCueDefinition
     const bearingLit = motionCue.nodes.actions[0].motionPattern?.bearing
     expect(bearingLit?.source).toBe('literal')
     if (bearingLit?.source === 'literal') {
@@ -366,7 +363,7 @@ describe('NodeCueLoader', () => {
   describe('cue file path resolution', () => {
     it('rejects readFile for paths outside YARG/audio cue directories', async () => {
       await expect(loader.readFile('/etc/passwd')).rejects.toThrow(
-        /Node cue file path must be under the YARG or audio cue directories/,
+        /Node cue file path must be under one of the cue directories/,
       )
     })
 
@@ -400,13 +397,13 @@ describe('NodeCueLoader', () => {
 
     it('rejects path traversal escaping the cue roots', () => {
       expect(() => loader.resolveCueFilePathForIpc('../../etc/passwd')).toThrow(
-        /must be under the YARG or audio cue directories/,
+        /must be under one of the cue directories/,
       )
     })
 
     it('rejects an absolute path outside the cue roots', () => {
       expect(() => loader.resolveCueFilePathForIpc('/etc/passwd')).toThrow(
-        /must be under the YARG or audio cue directories/,
+        /must be under one of the cue directories/,
       )
     })
 
@@ -440,7 +437,7 @@ describe('NodeCueLoader', () => {
   })
 
   describe('RB3 cue mode', () => {
-    const writeRb3 = (filename: string, file: Rb3NodeCueFile): void => {
+    const writeRb3 = (filename: string, file: NetNodeCueFile): void => {
       const rb3Dir = path.join(tmpDir, 'node-data', 'cues', 'rb3')
       fs.mkdirSync(rb3Dir, { recursive: true })
       fs.writeFileSync(path.join(rb3Dir, filename), JSON.stringify(file), 'utf-8')
@@ -453,7 +450,7 @@ describe('NodeCueLoader', () => {
 
       await loader.loadAll()
 
-      const group = getRb3CueRegistry().getGroup('loader-test-rb3')
+      const group = getCueRegistry('rb3').getGroup('loader-test-rb3')
       expect(group).toBeDefined()
       expect(group!.cues.get(CueType.Strobe_Fast)).toBeDefined()
       // The RB3 domain is isolated from the YARG listener's registry.
@@ -469,7 +466,7 @@ describe('NodeCueLoader', () => {
       writeRb3('rb3.json', rb3LightingFile(CueType.Strobe_Fast))
       await loader.loadAll()
 
-      const rb3 = getRb3CueRegistry()
+      const rb3 = getCueRegistry('rb3')
       // The registered strobe resolves to a cue implementation...
       expect(rb3.getCueImplementation(CueType.Strobe_Fast, 'simulated')).not.toBeNull()
       // ...while the always-active base RB3 cue is unauthored and resolves to a clean no-op.
