@@ -46,7 +46,8 @@ jobs:
 
   test:
     name: test
-    needs: [source-checks]
+    # Deliberately not gated on source-checks, so tests report on every push whatever lint,
+    # format and audit do. all-checks-passed requires both jobs to succeed.
     strategy:
       fail-fast: false
       matrix:
