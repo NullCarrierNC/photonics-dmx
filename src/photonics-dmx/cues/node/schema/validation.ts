@@ -25,6 +25,7 @@ import type {
 } from '../../types/nodeCueTypes'
 import type { EffectMode } from '../../types/nodeCueTypes'
 import type { StructuredValidationError } from './helpers'
+import { getCueDomain } from '../../domains'
 
 export type { StructuredValidationError } from './helpers'
 
@@ -32,6 +33,11 @@ export interface NodeCueValidationSuccess<T extends NodeCueFile> {
   valid: true
   data: T
   errors: []
+  /**
+   * Non-fatal findings: the file loads and runs, but something in it will not do what it looks like
+   * it does. Kept apart from `errors` so a warning never stops an existing file from loading.
+   */
+  warnings: string[]
   mode: NodeCueMode
 }
 
@@ -61,13 +67,49 @@ interface CueFileValidationSpec<T extends NodeCueFile> {
   duplicateMotionMessage: (id: string, groupName: string) => string
 }
 
-/** Semantic checks registered by a build that ships its own cue kind. */
-type CueSemanticCheck = (file: NodeCueFile, errors: string[]) => void
+/**
+ * A check over a whole cue file, run after the envelope passes.
+ *
+ * Anything pushed to `errors` fails the file; anything pushed to `warnings` is reported while the
+ * file still loads. Registered rather than called directly so a build shipping its own cue kind can
+ * add its rules without editing this module.
+ */
+type CueSemanticCheck = (file: NodeCueFile, errors: string[], warnings: string[]) => void
 const semanticChecks: CueSemanticCheck[] = []
 
 export function registerCueSemanticCheck(check: CueSemanticCheck): void {
   semanticChecks.push(check)
 }
+
+/** Drops every registered check. Tests only, so each case starts from the built-in set. */
+export function __resetCueSemanticChecksForTests(): void {
+  semanticChecks.length = 0
+  registerCueSemanticCheck(checkEventVocabulary)
+}
+
+/**
+ * Warn about event nodes naming an event the file's mode can never receive.
+ *
+ * The envelope accepts the whole net superset on purpose, so an existing file keeps loading whatever
+ * it carries. That leaves one silent failure: an RB3 cue authored with `beat`, or a YARG cue with
+ * `led-3`, validates and saves and then simply never fires. The editor's own dropdown cannot produce
+ * one, but the JSON view and hand-edited files can.
+ */
+function checkEventVocabulary(file: NodeCueFile, _errors: string[], warnings: string[]): void {
+  const allowed = new Set(getCueDomain(file.mode).eventTypes)
+  for (const cue of file.cues) {
+    for (const event of cue.nodes.events ?? []) {
+      const eventType = (event as { eventType?: string }).eventType
+      if (eventType && !allowed.has(eventType)) {
+        warnings.push(
+          `cue '${cue.name}': event '${eventType}' is never raised in ${file.mode} mode, so this node will not fire.`,
+        )
+      }
+    }
+  }
+}
+
+registerCueSemanticCheck(checkEventVocabulary)
 
 function runCueFileValidation<T extends NodeCueFile>(
   spec: CueFileValidationSpec<T>,
@@ -137,8 +179,9 @@ function runCueFileValidation<T extends NodeCueFile>(
     checkConditionalValidValues(cue.name, 'cue', cue.nodes.logic ?? [], cueVarDefs, semanticErrors)
   }
 
+  const warnings: string[] = []
   for (const check of semanticChecks) {
-    check(fileData, semanticErrors)
+    check(fileData, semanticErrors, warnings)
   }
 
   if (semanticErrors.length > 0) {
@@ -152,6 +195,7 @@ function runCueFileValidation<T extends NodeCueFile>(
     valid: true,
     data: fileData,
     errors: [],
+    warnings,
     mode: spec.mode,
   }
 }

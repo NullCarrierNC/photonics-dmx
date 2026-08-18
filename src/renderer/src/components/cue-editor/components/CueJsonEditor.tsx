@@ -202,6 +202,12 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
 
     view.dispatch(setDiagnostics(view.state, []))
     setValidationErrors([])
+    // Warnings do not block a save: the cue is valid, but something in it will not fire. Surfaced on
+    // the same notice line as the collision messages so the author sees it before saving.
+    const warnings = (result as { warnings?: string[] }).warnings ?? []
+    if (warnings.length > 0) {
+      setNotices((current) => [...current, ...warnings])
+    }
     setValidationPassed(true)
     setContentChangedAfterValidation(false)
   }, [buildFileWithCue, selectedCueId, editorDoc.file, availableCueTypes])

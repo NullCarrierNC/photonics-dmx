@@ -6,10 +6,11 @@
  * The fixtures are bundled cue files, so the schema layer passes for reasons unrelated to the hook.
  */
 
-import { describe, expect, it } from '@jest/globals'
+import { beforeEach, describe, expect, it } from '@jest/globals'
 import * as fs from 'fs'
 import * as path from 'path'
 import {
+  __resetCueSemanticChecksForTests,
   registerCueSemanticCheck,
   validateAudioNodeCueFile,
   validateRb3NodeCueFile,
@@ -47,5 +48,63 @@ describe('registered cue semantic checks', () => {
     const result = validateYargNodeCueFile(rejected)
     expect(result.valid).toBe(false)
     expect(result.errors).toContain('registered check rejected this file')
+  })
+
+  it('reports a warning without failing the file', () => {
+    registerCueSemanticCheck((file: NodeCueFile, _errors: string[], warnings: string[]) => {
+      if (file.group.id === 'warn-me') warnings.push('registered check warned about this file')
+    })
+
+    const warned = bundled('yarg')
+    ;(warned.group as Record<string, unknown>).id = 'warn-me'
+    const result = validateYargNodeCueFile(warned)
+
+    expect(result.valid).toBe(true)
+    expect(result.valid && result.warnings).toContain('registered check warned about this file')
+  })
+})
+
+describe('the built-in event vocabulary check', () => {
+  // Drop the ad-hoc checks the cases above registered, so these assert the shipped set alone.
+  beforeEach(() => __resetCueSemanticChecksForTests())
+
+  /** Point the first cue's first event at an event type of the other net mode. */
+  const withEvent = (mode: string, eventType: string): Record<string, unknown> => {
+    const file = bundled(mode)
+    const cues = file.cues as Record<string, unknown>[]
+    const nodes = cues[0].nodes as Record<string, unknown>
+    const events = nodes.events as Record<string, unknown>[]
+    events[0].eventType = eventType
+    return file
+  }
+
+  it('warns when an rb3 cue waits on a YARG song event', () => {
+    // The envelope accepts the whole net superset, so this saves and then never fires.
+    const result = validateRb3NodeCueFile(withEvent('rb3', 'beat'))
+
+    expect(result.valid).toBe(true)
+    expect(result.valid && result.warnings.join('\n')).toContain(
+      "event 'beat' is never raised in rb3 mode",
+    )
+  })
+
+  it('warns when a yarg cue waits on a StageKit edge', () => {
+    const result = validateYargNodeCueFile(withEvent('yarg', 'led-3'))
+
+    expect(result.valid).toBe(true)
+    expect(result.valid && result.warnings.join('\n')).toContain(
+      "event 'led-3' is never raised in yarg mode",
+    )
+  })
+
+  it('leaves the bundled corpus clean', () => {
+    for (const [mode, validate] of [
+      ['yarg', validateYargNodeCueFile],
+      ['rb3', validateRb3NodeCueFile],
+      ['audio', validateAudioNodeCueFile],
+    ] as const) {
+      const result = validate(bundled(mode))
+      expect(result.valid && result.warnings).toEqual([])
+    }
   })
 })

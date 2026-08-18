@@ -45,6 +45,8 @@ export interface NodeCueFileSummary {
   mode: NodeCueMode
   updatedAt: number
   errors?: string[]
+  /** Non-fatal findings from validation: the file loaded, but something in it will not do what it looks like it does. */
+  warnings?: string[]
   bundled?: boolean
 }
 
@@ -244,6 +246,10 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       if (count !== undefined) kindCueCounts[strategy.kind] = count
     }
 
+    for (const warning of validation.warnings) {
+      log.warn(`${filePath}: ${warning}`)
+    }
+
     const summary: NodeCueFileSummary = {
       path: filePath,
       groupId: file.group.id,
@@ -256,6 +262,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       updatedAt: Date.now(),
       bundled: file.bundled ?? false,
       errors: compileErrors.length > 0 ? compileErrors : undefined,
+      warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
     }
 
     this.updateSummary(summary)
