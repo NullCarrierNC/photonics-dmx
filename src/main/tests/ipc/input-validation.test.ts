@@ -852,5 +852,89 @@ describe('inputValidation', () => {
         ).toBe(false)
       })
     })
+
+    // effectDebounce, complex and clockRate are required with a declared type by the prefs schema,
+    // so a wrong type reaching disk sends the whole file to corrupt-recovery on the next load.
+    describe('schema-required scalars', () => {
+      it.each([
+        ['effectDebounce', 'x'],
+        ['complex', 'yes'],
+        ['clockRate', 'slow'],
+      ])('rejects a wrong-typed %s', (key, badValue) => {
+        expect(validatePreferencesPayload({ [key]: badValue }).ok).toBe(false)
+      })
+
+      it.each([
+        ['effectDebounce', 250],
+        ['complex', true],
+        ['clockRate', 10],
+      ])('accepts a well-typed %s', (key, goodValue) => {
+        const r = validatePreferencesPayload({ [key]: goodValue })
+        expect(r.ok).toBe(true)
+        expect((r as { value: Record<string, unknown> }).value[key]).toBe(goodValue)
+      })
+
+      it('clamps clockRate into the window the Clock accepts', () => {
+        const under = validatePreferencesPayload({ clockRate: 0 })
+        expect(under.ok && under.value.clockRate).toBe(1)
+        const over = validatePreferencesPayload({ clockRate: 9999 })
+        expect(over.ok && over.value.clockRate).toBe(100)
+      })
+    })
+
+    describe('window state', () => {
+      it('clamps unusable extents rather than losing the whole save', () => {
+        const r = validatePreferencesPayload({ windowState: { width: 0, height: -5 } })
+        expect(r.ok && r.value.windowState).toEqual({ width: 1, height: 1 })
+      })
+
+      it('keeps negative coordinates, which are valid on a multi-monitor desktop', () => {
+        const state = { width: 800, height: 600, x: -1920, y: 0 }
+        const r = validatePreferencesPayload({ windowState: state })
+        expect(r.ok && r.value.windowState).toEqual(state)
+      })
+
+      it.each(['windowState', 'cueEditorWindowState', 'audioPreviewWindowState'])(
+        'rejects a non-finite extent on %s',
+        (key) => {
+          expect(validatePreferencesPayload({ [key]: { width: NaN, height: 600 } }).ok).toBe(false)
+        },
+      )
+    })
+
+    describe('booleans, adapter configs and audio', () => {
+      it.each(['motionEnabled', 'allowMultipleActiveRigs', 'leftMenuCollapsed'])(
+        'rejects a non-boolean %s',
+        (key) => {
+          expect(validatePreferencesPayload({ [key]: 'yes' }).ok).toBe(false)
+          expect(validatePreferencesPayload({ [key]: true }).ok).toBe(true)
+        },
+      )
+
+      it('validates the adapter config shapes', () => {
+        expect(validatePreferencesPayload({ enttecProConfig: { port: 'COM3' } }).ok).toBe(true)
+        expect(validatePreferencesPayload({ enttecProConfig: { port: 3 } }).ok).toBe(false)
+        expect(
+          validatePreferencesPayload({ openDmxConfig: { port: 'COM3', dmxSpeed: 40 } }).ok,
+        ).toBe(true)
+        expect(
+          validatePreferencesPayload({ openDmxConfig: { port: 'COM3', dmxSpeed: 'fast' } }).ok,
+        ).toBe(false)
+        expect(validatePreferencesPayload({ dmxOutputConfig: { sacnEnabled: true } }).ok).toBe(true)
+        expect(validatePreferencesPayload({ dmxOutputConfig: { sacnEnabled: 1 } }).ok).toBe(false)
+      })
+
+      it('rejects a malformed audioGameMode instead of storing it', () => {
+        expect(validatePreferencesPayload({ audioGameMode: { enabled: 'yes' } }).ok).toBe(false)
+        expect(validatePreferencesPayload({ audioGameMode: { cueDurationMin: -1 } }).ok).toBe(false)
+        expect(validatePreferencesPayload({ audioGameMode: { enabled: true } }).ok).toBe(true)
+      })
+
+      it('accepts an unregistered activeAudioCueType but caps its length', () => {
+        expect(validatePreferencesPayload({ activeAudioCueType: 'user:authored' }).ok).toBe(true)
+        expect(validatePreferencesPayload({ activeAudioCueType: 42 }).ok).toBe(false)
+        expect(validatePreferencesPayload({ activeAudioCueType: 'x'.repeat(201) }).ok).toBe(false)
+      })
+    })
   })
 })
