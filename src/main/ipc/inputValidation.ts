@@ -806,6 +806,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'cueDomains',
   'cueConsistencyWindow',
   'clockRate',
+  'yargFallbackCueTimeMs',
   'globalDmxPublishingRateHz',
   'dmxOutputConfig',
   'stageKitPrefs',
@@ -988,6 +989,19 @@ export function validatePreferencesPayload(
     const v = validateNumberInRange(cleaned.effectDebounce, 0, 60000, 'effectDebounce')
     if (!v.ok) return v
     cleaned.effectDebounce = Math.round(v.value)
+  }
+
+  // Same bound the dedicated SET_YARG_FALLBACK_CUE_TIME_MS channel applies, so a value that is
+  // legal through one write path is legal through the other.
+  if ('yargFallbackCueTimeMs' in cleaned) {
+    const v = validateNumberInRange(
+      cleaned.yargFallbackCueTimeMs,
+      0,
+      600000,
+      'yargFallbackCueTimeMs',
+    )
+    if (!v.ok) return v
+    cleaned.yargFallbackCueTimeMs = Math.round(v.value)
   }
 
   if ('clockRate' in cleaned) {

@@ -874,6 +874,13 @@ describe('inputValidation', () => {
         expect((r as { value: Record<string, unknown> }).value[key]).toBe(goodValue)
       })
 
+      it('keeps yargFallbackCueTimeMs in the payload and bounds it', () => {
+        const r = validatePreferencesPayload({ yargFallbackCueTimeMs: 30000 })
+        expect(r.ok && r.value.yargFallbackCueTimeMs).toBe(30000)
+        expect(validatePreferencesPayload({ yargFallbackCueTimeMs: 600001 }).ok).toBe(false)
+        expect(validatePreferencesPayload({ yargFallbackCueTimeMs: 'later' }).ok).toBe(false)
+      })
+
       it('clamps clockRate into the window the Clock accepts', () => {
         const under = validatePreferencesPayload({ clockRate: 0 })
         expect(under.ok && under.value.clockRate).toBe(1)
