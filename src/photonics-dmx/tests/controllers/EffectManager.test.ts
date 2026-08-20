@@ -794,6 +794,40 @@ describe('EffectManager', () => {
     const lightA = createMockTrackedLight({ id: 'light-a', position: 1 })
     const lightB = createMockTrackedLight({ id: 'light-b', position: 2 })
 
+    it('queues a persistent light with the run id it was counted into', () => {
+      // The run's light total is fixed when the run is registered and counts every light, including
+      // ones that end up queued. A queued light that starts without the id never reports against
+      // the run, so the run stays a completion short and no light in it ever restarts.
+      const effect: Effect = {
+        id: 'persistent-effect',
+        description: 'Persistent test effect',
+        transitions: [
+          {
+            lights: [lightA],
+            layer: 1,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: { color: createMockRGBIP(), easing: 'linear', duration: 100 },
+            waitUntilCondition: 'none',
+            waitUntilTime: 0,
+          },
+        ],
+      }
+      layerManager.getActiveEffect.mockReturnValue({
+        name: 'persistent-effect',
+        lightId: 'light-a',
+        layer: 1,
+      } as unknown as LightEffectState)
+
+      effectManager.addEffect('persistent-effect', effect, true)
+
+      expect(layerManager.addQueuedEffect).toHaveBeenCalledWith(
+        1,
+        'light-a',
+        expect.objectContaining({ isPersistent: true, effectRunId: expect.any(String) }),
+      )
+    })
+
     const twoLightEffect = (layer: number): Effect => ({
       id: 'queued-effect',
       description: 'Queued test effect',
@@ -837,6 +871,22 @@ describe('EffectManager', () => {
 
       expect(layerManager.removeQueuedEffect).toHaveBeenCalledWith(1, 'light-a')
       expect(layerManager.addActiveEffect).not.toHaveBeenCalled()
+    })
+
+    it('carries the queued run id through to the started effect', () => {
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'queued-effect',
+        effect: twoLightEffect(1),
+        lightId: 'light-a',
+        isPersistent: true,
+        effectRunId: 'run-1',
+      })
+
+      effectManager.startNextEffectInQueue(1, 'light-a')
+
+      const state = layerManager.addActiveEffect.mock.calls[0][2] as LightEffectState
+      expect(state.effectRunId).toBe('run-1')
+      expect(state.isPersistent).toBe(true)
     })
 
     it('discards an entry whose light no transition targets', () => {

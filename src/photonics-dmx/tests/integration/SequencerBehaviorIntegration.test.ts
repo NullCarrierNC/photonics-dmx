@@ -162,6 +162,68 @@ describe('Sequencer blending and queueing (real harness)', () => {
     harness.cleanup()
   })
 
+  it('keeps a queued persistent effect attached to its run when it starts', () => {
+    // Re-adding a persistent effect under its own name queues it, and the queued light is already
+    // counted in the new run's light total. If it starts without that run id it never reports its
+    // completion, leaving the run a light short so it can never restart.
+    //
+    // Staggered durations are what make the queue drain: the shorter light finishes while the other
+    // is still running, so its run does not restart and the queued entry is started instead.
+    const harness = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const lights = harness.lightManager.getLights(['front'], ['all'])
+    const colorA = { ...getColor('red', 'high', 'replace'), opacity: 1 }
+    const colorB = { ...getColor('blue', 'high', 'replace'), opacity: 1 }
+
+    const staggered = (color: typeof colorA): Effect => ({
+      id: 'staggered',
+      description: 'staggered two-light effect',
+      transitions: [
+        {
+          lights: [lights[0]],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          waitUntilCondition: 'none',
+          waitUntilTime: 0,
+          transform: { color, duration: 20, easing: 'linear' },
+        },
+        {
+          lights: [lights[1]],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          waitUntilCondition: 'none',
+          waitUntilTime: 0,
+          transform: { color, duration: 200, easing: 'linear' },
+        },
+      ],
+    })
+
+    harness.sequencer.addEffect('loop-test', staggered(colorA), true)
+    harness.sequencer.addEffect('loop-test', staggered(colorB), true)
+
+    const layerManager = (
+      harness.sequencer as unknown as {
+        layerManager: { getEffectQueue: () => Map<number, Map<string, unknown>> }
+      }
+    ).layerManager
+    const queueSize = (): number => layerManager.getEffectQueue().get(1)?.size ?? 0
+    expect(queueSize()).toBe(2)
+
+    // Advance to the moment the short light's entry leaves the queue and starts.
+    const shortLightId = lights[0].id
+    for (let i = 0; i < 12 && queueSize() === 2; i += 1) {
+      harness.advanceBy(10)
+    }
+    expect(queueSize()).toBe(1)
+
+    const state = harness.sequencer.getActiveEffectsForLight(shortLightId).get(1)
+    expect(state?.isPersistent).toBe(true)
+    expect(state?.effectRunId).toBeDefined()
+
+    harness.cleanup()
+  })
+
   it('fires completion callback after all lights finish', () => {
     const harness = createSequencerHarness({ frontCount: 2, backCount: 0 })
     const lights = harness.lightManager.getLights(['front'], ['all'])

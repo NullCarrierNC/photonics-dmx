@@ -52,6 +52,12 @@ export interface QueuedEffect {
   effect: Effect
   lightId: string
   isPersistent: boolean
+  /**
+   * Run this entry belongs to, carried so a light that starts from the queue still counts towards
+   * its run. The run's light total is fixed when the run is registered and includes queued lights,
+   * so an entry that starts without its id leaves the run one completion short forever.
+   */
+  effectRunId?: string
 }
 
 /**
