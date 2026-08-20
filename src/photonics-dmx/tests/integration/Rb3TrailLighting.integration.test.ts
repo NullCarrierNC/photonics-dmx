@@ -1,5 +1,5 @@
 /**
- * End-to-end render test for the bundled RB3 "Comet" cue. Asserts a lit LED renders as plain Stage
+ * End-to-end render test for the bundled RB3 "Trail" cue. Asserts a lit LED renders as plain Stage
  * Kit, that clearing it decays the light over the tail window rather than snapping to black, and
  * that a cell whose LED never lit stays dark.
  */
@@ -11,10 +11,10 @@ import {
   renderFrames,
 } from '../helpers/rb3CueFile'
 
-describe('RB3 Comet cue', () => {
+describe('RB3 Trail cue', () => {
   it('ships only its gameplay cue, leaving strobes to the Stage Kit group', () => {
-    const file = loadRb3CueFile('rb3-comet')
-    expect(file.group.id).toBe('rb3-comet')
+    const file = loadRb3CueFile('rb3-trail')
+    expect(file.group.id).toBe('rb3-trail')
     expect(file.cues.flatMap((c) => (c.kind === 'lighting' ? [c.cueType] : []))).toEqual(
       RB3_LIBRARY_CUE_TYPES,
     )
@@ -22,7 +22,7 @@ describe('RB3 Comet cue', () => {
 
   it('renders a lit LED as the faithful Stage Kit dot', () => {
     const h = createSequencerHarness()
-    const cue = createRb3Cue('rb3-comet')
+    const cue = createRb3Cue('rb3-trail')
 
     renderFrames(h, cue, { red: 0b00000001 })
 
@@ -37,7 +37,7 @@ describe('RB3 Comet cue', () => {
 
   it('fades a cleared LED out over the tail instead of snapping to black', () => {
     const h = createSequencerHarness()
-    const cue = createRb3Cue('rb3-comet')
+    const cue = createRb3Cue('rb3-trail')
 
     renderFrames(h, cue, { red: 0b00000001 })
     const lit = h.getLightState(h.allLightIds[0])!.intensity
@@ -59,7 +59,7 @@ describe('RB3 Comet cue', () => {
 
   it('never lights a cell whose LED has not been lit', () => {
     const h = createSequencerHarness()
-    const cue = createRb3Cue('rb3-comet')
+    const cue = createRb3Cue('rb3-trail')
 
     for (let k = 0; k < 12; k++) {
       renderFrames(h, cue, { red: 0b00000001 }, 1)
@@ -72,7 +72,7 @@ describe('RB3 Comet cue', () => {
 
   it('holds a lit cell at full while the LED stays on', () => {
     const h = createSequencerHarness()
-    const cue = createRb3Cue('rb3-comet')
+    const cue = createRb3Cue('rb3-trail')
 
     renderFrames(h, cue, { red: 0b00000001 })
     const settled = h.getLightState(h.allLightIds[0])!.intensity
@@ -83,7 +83,7 @@ describe('RB3 Comet cue', () => {
 
   it('keeps each bank tail independent', () => {
     const h = createSequencerHarness()
-    const cue = createRb3Cue('rb3-comet')
+    const cue = createRb3Cue('rb3-trail')
 
     // Red and blue both on cell 0, then only blue clears: red must stay at full.
     renderFrames(h, cue, { red: 0b00000001, blue: 0b00000001 })

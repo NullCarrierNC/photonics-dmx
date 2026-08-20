@@ -1,17 +1,17 @@
 {
   "version": 1,
-  "cueVersion": 1,
+  "cueVersion": 2,
   "mode": "rb3",
   "group": {
     "id": "rb3-mirror",
     "name": "RB3 Mirror",
-    "description": "The front row renders its own StageKit LEDs and the back row copies the light in front of it, ignoring the rear LED data. Chases render as two matched rows instead of one ring."
+    "description": "The front row renders LEDs 1-4 left to right and the back row copies the light in front of it. LEDs 5-8 do the same but from right to left."
   },
   "cues": [
     {
       "id": "cue-rb3-mirror",
       "name": "Mirror",
-      "description": "The front row renders its own StageKit LEDs and the back row copies the light in front of it, ignoring the rear LED data. Chases render as two matched rows instead of one ring.",
+      "description": "The front row renders LEDs 1-4 left to right and the back row copies the light in front of it. LEDs 5-8 do the same but from right to left.",
       "cueType": "RB3",
       "style": "primary",
       "kind": "lighting",
@@ -442,7 +442,7 @@
             "id": "rb3-mirror-red-bit",
             "type": "logic",
             "logicType": "expression",
-            "expression": "floor(mRed / pow(2, ledIdx)) % 2",
+            "expression": "max(floor(mRed / pow(2, ledIdx)) % 2, floor(mRed / pow(2, 7 - ledIdx)) % 2)",
             "assignTo": "bitRed"
           },
           {
@@ -470,7 +470,7 @@
             "id": "rb3-mirror-green-bit",
             "type": "logic",
             "logicType": "expression",
-            "expression": "floor(mGreen / pow(2, ledIdx)) % 2",
+            "expression": "max(floor(mGreen / pow(2, ledIdx)) % 2, floor(mGreen / pow(2, 7 - ledIdx)) % 2)",
             "assignTo": "bitGreen"
           },
           {
@@ -498,7 +498,7 @@
             "id": "rb3-mirror-blue-bit",
             "type": "logic",
             "logicType": "expression",
-            "expression": "floor(mBlue / pow(2, ledIdx)) % 2",
+            "expression": "max(floor(mBlue / pow(2, ledIdx)) % 2, floor(mBlue / pow(2, 7 - ledIdx)) % 2)",
             "assignTo": "bitBlue"
           },
           {
@@ -526,7 +526,7 @@
             "id": "rb3-mirror-yellow-bit",
             "type": "logic",
             "logicType": "expression",
-            "expression": "floor(mYellow / pow(2, ledIdx)) % 2",
+            "expression": "max(floor(mYellow / pow(2, ledIdx)) % 2, floor(mYellow / pow(2, 7 - ledIdx)) % 2)",
             "assignTo": "bitYellow"
           },
           {
@@ -559,9 +559,9 @@
             "id": "rb3-mirror-note-1",
             "type": "notes",
             "label": "Notes",
-            "title": "Front data on both rows",
+            "title": "Ring folded onto four columns",
             "style": "notes",
-            "note": "Similar to Stage Kit, the difference is the LED map: ring cells 0-3 (the front row) show LEDs 1-4, and cells 4-7 (the back row) repeat their mirrored front partner rather than showing LEDs 5-8, so the back row always matches the light in front of it. The rear LED data is ignored."
+            "note": "Similar to Stage Kit, the difference is the LED map: ring cells 0-3 (the front row) and cells 4-7 (the back row) both resolve to one of four columns, so the back row always matches the light in front of it. Each column renders its own LED from 1-4 plus the reversed LED from 5-8, so column 1 carries LEDs 1 and 8, column 2 carries LEDs 2 and 7, column 3 carries LEDs 3 and 6, and column 4 carries LEDs 4 and 5. A column lights when either of its two LEDs is on, at the same brightness for one as for both."
           },
           {
             "id": "rb3-mirror-note-3",
@@ -686,33 +686,17 @@
             "x": 0.6358076725155115,
             "y": 5.5706849582493305
           },
-          "rb3-mirror-called": {
-            "x": 250.2878381125629,
-            "y": -3.4866658374667168
+          "rb3-mirror-ring": {
+            "x": 8.091027114540339,
+            "y": 107.36048732697964
           },
           "rb3-mirror-black": {
             "x": 8.104349948465824,
             "y": 213.63844348862767
           },
-          "rb3-mirror-red-act": {
-            "x": 654.4107811562717,
-            "y": 221.91773203760386
-          },
-          "rb3-mirror-green-act": {
-            "x": 659.5389983896166,
-            "y": 686.0958959013224
-          },
-          "rb3-mirror-blue-act": {
-            "x": 1046.3182944189757,
-            "y": -2.4948467947542667
-          },
-          "rb3-mirror-yellow-act": {
-            "x": 1033.7894827909768,
-            "y": 478.4262527041137
-          },
-          "rb3-mirror-ring": {
-            "x": 8.091027114540339,
-            "y": 107.36048732697964
+          "rb3-mirror-called": {
+            "x": 250.2878381125629,
+            "y": -3.4866658374667168
           },
           "rb3-mirror-cd-red": {
             "x": 259.8306608851999,
@@ -758,6 +742,10 @@
             "x": 638.4515600632876,
             "y": 111.9926104620099
           },
+          "rb3-mirror-red-act": {
+            "x": 654.4107811562717,
+            "y": 221.91773203760386
+          },
           "rb3-mirror-green-bit": {
             "x": 647.8832674659789,
             "y": 368.9548205062747
@@ -769,6 +757,10 @@
           "rb3-mirror-green-lay": {
             "x": 641.1449712850153,
             "y": 574.3446768820286
+          },
+          "rb3-mirror-green-act": {
+            "x": 659.5389983896166,
+            "y": 686.0958959013224
           },
           "rb3-mirror-blue-bit": {
             "x": 660.7214093971997,
@@ -782,6 +774,10 @@
             "x": 645.5148464404047,
             "y": 1058.469885673374
           },
+          "rb3-mirror-blue-act": {
+            "x": 1046.3182944189757,
+            "y": -2.4948467947542667
+          },
           "rb3-mirror-yellow-bit": {
             "x": 1051.3305704295635,
             "y": 155.04526859894395
@@ -793,6 +789,10 @@
           "rb3-mirror-yellow-lay": {
             "x": 1048.037942711264,
             "y": 371.1451641321182
+          },
+          "rb3-mirror-yellow-act": {
+            "x": 1033.7894827909768,
+            "y": 478.4262527041137
           },
           "rb3-mirror-note-1": {
             "x": 1355.5456132858149,

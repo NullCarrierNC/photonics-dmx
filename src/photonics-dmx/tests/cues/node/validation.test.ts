@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { jest } from '@jest/globals'
+import { describe, expect, it, jest } from '@jest/globals'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import {
   validateYargNodeCueFile,
@@ -1906,7 +1906,7 @@ describe('Node cue validation', () => {
     'rb3-mirror-blended',
     'rb3-stagekit-reversed',
     'rb3-stagekit-wash',
-    'rb3-comet',
+    'rb3-trail',
     'rb3-bloom',
     'rb3-glow',
   ]) {
