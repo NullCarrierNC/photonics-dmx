@@ -275,11 +275,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
                 <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">
                   Bottom
                 </div>
-                <div className="flex justify-center gap-x-4 mb-4">
-                  {[...lightingConfig.backLights]
-                    .reverse()
-                    .map((light, index) => renderLightCircle(light, index))}
-                </div>
+                {renderLightRow([...lightingConfig.backLights].reverse())}
               </div>
             )}
 
@@ -325,7 +321,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
                   <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">
                     Back
                   </div>
-                  {renderLightRow(lightingConfig.backLights)}
+                  {renderLightRow([...lightingConfig.backLights].reverse())}
                 </div>
               )}
               {((lightingConfig?.frontLights.length ?? 0) > 0 ||
@@ -341,11 +337,7 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
                   <div className="mb-1 text-lg font-semibold text-gray-700 dark:text-gray-300">
                     Back
                   </div>
-                  <div className="flex justify-center gap-x-4 mb-4">
-                    {[...lightingConfig.backLights]
-                      .reverse()
-                      .map((light, index) => renderLightCircle(light, index))}
-                  </div>
+                  {renderLightRow([...lightingConfig.backLights].reverse())}
                 </div>
               )}
             </>
