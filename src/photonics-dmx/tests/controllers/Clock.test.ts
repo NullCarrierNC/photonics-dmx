@@ -203,6 +203,20 @@ describe('Clock', () => {
       expect(entries.filter((e) => e.message.includes('resynced'))).toHaveLength(0)
     })
 
+    it('falls back to the default interval when given a non-finite one', () => {
+      // A NaN interval survives the clamp and leaves setTimeout on its 1ms floor, so the clock would
+      // free-run far faster than any configured rate.
+      const notANumber = new Clock(NaN)
+      const paced = new Clock(10)
+      notANumber.start()
+      paced.start()
+      jest.advanceTimersByTime(200)
+      expect(notANumber.getTickCount()).toBeGreaterThan(0)
+      expect(notANumber.getTickCount()).toBe(paced.getTickCount())
+      notANumber.destroy()
+      paced.destroy()
+    })
+
     it('clamps the interval to the 1-100ms range and still ticks', () => {
       // 0 clamps up to 1ms, 1000 clamps down to 100ms. Neither should stall.
       const tooFast = new Clock(0)

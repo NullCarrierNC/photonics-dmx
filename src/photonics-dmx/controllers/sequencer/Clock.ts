@@ -13,6 +13,9 @@ const OVERRUN_FACTOR = 2
  */
 const MAX_CATCHUP_TICKS = 5
 
+/** Tick interval used when the caller supplies a non-finite one. */
+const DEFAULT_INTERVAL_MS = 10
+
 /**
  * @class Clock
  * @description Centralized timing source for the lighting sequencer system.
@@ -35,7 +38,11 @@ export class Clock {
   private resyncActive: boolean = false
 
   constructor(intervalMs: number = 10) {
-    this.intervalMs = Math.max(1, Math.min(100, intervalMs)) // Clamp between 1-100ms
+    // Math.min/max propagate NaN, and a NaN interval makes setTimeout fire on its 1ms floor, so the
+    // clock free-runs at roughly 840Hz and the overrun watchdog (a `>` against NaN) never reports it.
+    // The interval comes from the clockRate preference, so a non-finite value has to land somewhere.
+    const requested = Number.isFinite(intervalMs) ? intervalMs : DEFAULT_INTERVAL_MS
+    this.intervalMs = Math.max(1, Math.min(100, requested)) // Clamp between 1-100ms
     this.startTime = this.getCurrentTime()
     this.lastUpdateTime = this.startTime
   }
