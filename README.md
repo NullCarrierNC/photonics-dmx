@@ -164,6 +164,8 @@ $ npm install
 $ npm run dev
 ```
 
+Electron 42 and later no longer download their binary during `npm install`, so the first `npm run dev` fetches it (roughly 110 MB). Later runs skip the download.
+
 ### Build
 
 ```bash
