@@ -157,6 +157,8 @@ export interface ChannelBreakdownEntry {
   value: number
   /** `rgb(...)` for the emitter at that drive. */
   css: string
+  /** `rgb(...)` for the emitter at full drive — used for a fixed swatch border colour. */
+  borderCss: string
 }
 
 /** Unit primaries for the base channels, so they mix into the swatch table like any emitter. */
@@ -208,10 +210,12 @@ export function getLightColorChannelBreakdown(
     const channel = channels[base]
     if (typeof channel !== 'number' || channel <= 0) continue
     const value = channelValue(dmxValues, channel)
+    const primary = BASE_PRIMARIES[base]
     entries.push({
       label: EXTRA_CHANNEL_TYPE_LABELS[base],
       value,
-      css: swatchCss(value, BASE_PRIMARIES[base]),
+      css: swatchCss(value, primary),
+      borderCss: swatchCss(255, primary),
     })
   }
 
@@ -230,6 +234,7 @@ export function getLightColorChannelBreakdown(
       label: extraChannelDisplayLabel(light, i),
       value,
       css: swatchCss(value, primary),
+      borderCss: swatchCss(255, primary),
     })
   })
 
