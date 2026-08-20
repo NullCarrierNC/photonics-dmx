@@ -178,6 +178,60 @@ describe('Clock', () => {
       }
     }
 
+    // Some platforms fire timers on a fixed granularity boundary (~15.6ms on Windows) whatever
+    // delay was asked for, so every tick lands late and the debt accrues. Advance the fake clock by
+    // the floor rather than the requested delay to reproduce that.
+    const runWithTimerFloor = (
+      floorMs: number,
+      fires: number,
+      intervalMs = 10,
+    ): { entries: LogEntry[]; ticks: number } => {
+      jest.useRealTimers()
+      let fakeNow = 1000
+      const entries: LogEntry[] = []
+      setLogSink((e) => entries.push(e))
+      const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => fakeNow)
+      const pending: Array<{ fn: () => void; delay: number }> = []
+      const timeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+        fn: () => void,
+        delay: number,
+      ) => {
+        pending.push({ fn, delay })
+        return 0 as unknown as NodeJS.Timeout
+      }) as never)
+
+      try {
+        const c = new Clock(intervalMs)
+        c.start()
+        for (let i = 0; i < fires && pending.length > 0; i++) {
+          const next = pending.shift()!
+          fakeNow += Math.max(next.delay, floorMs)
+          next.fn()
+        }
+        const ticks = c.getTickCount()
+        c.destroy()
+        return { entries, ticks }
+      } finally {
+        timeoutSpy.mockRestore()
+        nowSpy.mockRestore()
+        resetLogConfiguration()
+      }
+    }
+
+    it('reports a coarse timer once instead of warning on every resync', () => {
+      // A 10ms interval on a 15.6ms timer accrues ~5.6ms of debt per tick, crossing the resync
+      // threshold every few ticks for as long as the clock runs. Each individual gap is small, so
+      // this is the platform's resolution rather than a stall and must not read as one.
+      const { entries, ticks } = runWithTimerFloor(15.6, 60)
+      expect(ticks).toBeGreaterThan(40)
+      expect(
+        entries.filter((e) => e.level === 'warn' && e.message.includes('resynced')),
+      ).toHaveLength(0)
+      expect(entries.filter((e) => e.message.includes('Timer resolution is coarser'))).toHaveLength(
+        1,
+      )
+    })
+
     it('drops the missed ticks after a stall instead of firing one per missed interval', () => {
       const { delays } = runStall(5000)
       // Zero-delay schedules are the back-to-back catch-up run. One tick lands, then the clock is
@@ -193,6 +247,10 @@ describe('Clock', () => {
       )
       expect(resyncWarns).toHaveLength(1)
       expect(resyncWarns[0].message).toContain('dropped')
+      // The gap between the last two ticks, not the drift that tripped the resync. Reading the
+      // wrong one reports every stall as 0ms, since the tick's own update resets that reference
+      // immediately before this runs.
+      expect(resyncWarns[0].message).toContain('stalled for 5000ms')
     })
 
     it('still repays lag smaller than the stall threshold', () => {
