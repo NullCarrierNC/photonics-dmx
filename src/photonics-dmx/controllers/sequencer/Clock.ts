@@ -5,6 +5,18 @@ const log = createLogger('Clock')
 const OVERRUN_FACTOR = 2
 
 /**
+ * Lag beyond this many tick intervals counts as a stall rather than jitter: the clock resyncs to the
+ * wall clock and drops the missed deadlines instead of firing one tick per missed interval at zero
+ * delay. A multiple rather than a fixed millisecond value because the interval is user-configurable
+ * (1-100ms), so a flat bound would be twitchy at one end and useless at the other. Five intervals is
+ * 50ms at the default rate, well clear of ordinary GC and event-loop jitter.
+ */
+const MAX_CATCHUP_TICKS = 5
+
+/** Tick interval used when the caller supplies a non-finite one. */
+const DEFAULT_INTERVAL_MS = 10
+
+/**
  * @class Clock
  * @description Centralized timing source for the lighting sequencer system.
  *
@@ -22,9 +34,15 @@ export class Clock {
   private intervalMs: number
   /** True while a run of overrunning ticks is in progress, so we warn once per episode not per tick. */
   private overrunActive: boolean = false
+  /** True while the clock is resyncing after a stall, so we warn once per episode not per tick. */
+  private resyncActive: boolean = false
 
   constructor(intervalMs: number = 10) {
-    this.intervalMs = Math.max(1, Math.min(100, intervalMs)) // Clamp between 1-100ms
+    // Math.min/max propagate NaN, and a NaN interval makes setTimeout fire on its 1ms floor, so the
+    // clock free-runs at roughly 840Hz and the overrun watchdog (a `>` against NaN) never reports it.
+    // The interval comes from the clockRate preference, so a non-finite value has to land somewhere.
+    const requested = Number.isFinite(intervalMs) ? intervalMs : DEFAULT_INTERVAL_MS
+    this.intervalMs = Math.max(1, Math.min(100, requested)) // Clamp between 1-100ms
     this.startTime = this.getCurrentTime()
     this.lastUpdateTime = this.startTime
   }
@@ -73,13 +91,34 @@ export class Clock {
   }
 
   /**
-   * Schedule the next tick with drift correction
+   * Schedule the next tick with drift correction.
+   *
+   * Small lag is repaid by shortening the next delay. Lag past {@link MAX_CATCHUP_TICKS} intervals
+   * is a stall (machine asleep, a long GC pause, the host under load) and is resynced instead: the
+   * missed deadlines are dropped rather than fired back-to-back at zero delay. Every tick runs the
+   * whole pipeline synchronously, so replaying a stall's worth of them costs one redundant pass per
+   * missed interval and starves the event loop while it drains. The lights want to be current, not
+   * to work through the past. Resyncing onto `now` (not `now + intervalMs`) keeps the steady-state
+   * invariant that `nextTargetTime` after its increment is the ideal time of the tick that just ran.
    */
   private scheduleNext(): void {
     if (!this.isRunning) return
 
     const now = this.getCurrentTime()
-    const drift = now - this.nextTargetTime
+    let drift = now - this.nextTargetTime
+    if (drift > this.intervalMs * MAX_CATCHUP_TICKS) {
+      const missed = Math.max(1, Math.round(drift / this.intervalMs))
+      this.nextTargetTime = now
+      drift = 0
+      if (!this.resyncActive) {
+        this.resyncActive = true
+        log.warn(
+          `Clock stalled for ${Math.round(now - this.lastUpdateTime)}ms, dropped ${missed} missed ticks and resynced.`,
+        )
+      }
+    } else {
+      this.resyncActive = false
+    }
     const delay = Math.max(0, this.intervalMs - drift)
 
     this.timeoutId = setTimeout(() => {

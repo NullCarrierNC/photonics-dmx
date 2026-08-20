@@ -137,6 +137,86 @@ describe('Clock', () => {
       }
     })
 
+    // A stall is the wall clock jumping while no timer fires, which neither real nor fake timers
+    // reproduce on their own. Drive the timer queue by hand and move performance.now() separately,
+    // then read back the delay the clock asked for on each pass.
+    const runStall = (
+      stallMs: number,
+      intervalMs = 10,
+    ): { delays: number[]; entries: LogEntry[] } => {
+      jest.useRealTimers()
+      let fakeNow = 1000
+      const entries: LogEntry[] = []
+      setLogSink((e) => entries.push(e))
+      const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => fakeNow)
+      const pending: Array<{ fn: () => void; delay: number }> = []
+      const timeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+        fn: () => void,
+        delay: number,
+      ) => {
+        pending.push({ fn, delay })
+        return 0 as unknown as NodeJS.Timeout
+      }) as never)
+
+      try {
+        const c = new Clock(intervalMs)
+        c.start()
+        fakeNow += stallMs
+
+        const delays: number[] = []
+        for (let i = 0; i < 50 && pending.length > 0; i++) {
+          const next = pending.shift()!
+          delays.push(next.delay)
+          next.fn()
+        }
+        c.destroy()
+        return { delays, entries }
+      } finally {
+        timeoutSpy.mockRestore()
+        nowSpy.mockRestore()
+        resetLogConfiguration()
+      }
+    }
+
+    it('drops the missed ticks after a stall instead of firing one per missed interval', () => {
+      const { delays } = runStall(5000)
+      // Zero-delay schedules are the back-to-back catch-up run. One tick lands, then the clock is
+      // back on its interval.
+      expect(delays.filter((d) => d === 0)).toHaveLength(0)
+      expect(delays.every((d) => d > 0)).toBe(true)
+    })
+
+    it('warns once per stall episode', () => {
+      const { entries } = runStall(5000)
+      const resyncWarns = entries.filter(
+        (e) => e.level === 'warn' && e.message.includes('resynced'),
+      )
+      expect(resyncWarns).toHaveLength(1)
+      expect(resyncWarns[0].message).toContain('dropped')
+    })
+
+    it('still repays lag smaller than the stall threshold', () => {
+      // 30ms behind at a 10ms interval is 3 intervals, under the 5-interval threshold, so it is
+      // caught up by shortening the next delay rather than resynced.
+      const { delays, entries } = runStall(30)
+      expect(delays.some((d) => d < 10)).toBe(true)
+      expect(entries.filter((e) => e.message.includes('resynced'))).toHaveLength(0)
+    })
+
+    it('falls back to the default interval when given a non-finite one', () => {
+      // A NaN interval survives the clamp and leaves setTimeout on its 1ms floor, so the clock would
+      // free-run far faster than any configured rate.
+      const notANumber = new Clock(NaN)
+      const paced = new Clock(10)
+      notANumber.start()
+      paced.start()
+      jest.advanceTimersByTime(200)
+      expect(notANumber.getTickCount()).toBeGreaterThan(0)
+      expect(notANumber.getTickCount()).toBe(paced.getTickCount())
+      notANumber.destroy()
+      paced.destroy()
+    })
+
     it('clamps the interval to the 1-100ms range and still ticks', () => {
       // 0 clamps up to 1ms, 1000 clamps down to 100ms. Neither should stall.
       const tooFast = new Clock(0)
