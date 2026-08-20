@@ -790,6 +790,70 @@ describe('EffectManager', () => {
     })
   })
 
+  describe('startNextEffectInQueue', () => {
+    const lightA = createMockTrackedLight({ id: 'light-a', position: 1 })
+    const lightB = createMockTrackedLight({ id: 'light-b', position: 2 })
+
+    const twoLightEffect = (layer: number): Effect => ({
+      id: 'queued-effect',
+      description: 'Queued test effect',
+      transitions: [
+        {
+          lights: [lightA, lightB],
+          layer,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: createMockRGBIP(), easing: 'linear', duration: 100 },
+          waitUntilCondition: 'none',
+          waitUntilTime: 0,
+        },
+      ],
+    })
+
+    it('starts the queued effect only for the light it was queued for', () => {
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'queued-effect',
+        effect: twoLightEffect(1),
+        lightId: 'light-a',
+        isPersistent: false,
+      })
+
+      expect(effectManager.startNextEffectInQueue(1, 'light-a')).toBe(true)
+
+      expect(layerManager.addActiveEffect).toHaveBeenCalledTimes(1)
+      const state = layerManager.addActiveEffect.mock.calls[0][2] as LightEffectState
+      expect(state.lightId).toBe('light-a')
+    })
+
+    it('discards an entry no transition on this layer targets, and reports no next effect', () => {
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'queued-effect',
+        effect: twoLightEffect(2),
+        lightId: 'light-a',
+        isPersistent: false,
+      })
+
+      expect(effectManager.startNextEffectInQueue(1, 'light-a')).toBe(false)
+
+      expect(layerManager.removeQueuedEffect).toHaveBeenCalledWith(1, 'light-a')
+      expect(layerManager.addActiveEffect).not.toHaveBeenCalled()
+    })
+
+    it('discards an entry whose light no transition targets', () => {
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'queued-effect',
+        effect: twoLightEffect(1),
+        lightId: 'light-missing',
+        isPersistent: false,
+      })
+
+      expect(effectManager.startNextEffectInQueue(1, 'light-missing')).toBe(false)
+
+      expect(layerManager.removeQueuedEffect).toHaveBeenCalledWith(1, 'light-missing')
+      expect(layerManager.addActiveEffect).not.toHaveBeenCalled()
+    })
+  })
+
   describe('removeEffect', () => {
     it('should remove an effect by name and layer', () => {
       const effectName = 'test-effect'
