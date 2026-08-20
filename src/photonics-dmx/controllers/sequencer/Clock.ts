@@ -36,6 +36,14 @@ export class Clock {
   private overrunActive: boolean = false
   /** True while the clock is resyncing after a stall, so we warn once per episode not per tick. */
   private resyncActive: boolean = false
+  /**
+   * Gap between the last two ticks. Debt accumulated across many ticks and one long gap both push
+   * drift past the resync threshold, but only the second is a stall, so this is what the warning
+   * keys off rather than the drift that triggered the resync.
+   */
+  private lastTickGapMs: number = 0
+  /** Set once the coarse-timer notice has been logged, so it reports per clock rather than per resync. */
+  private reportedCoarseTimer: boolean = false
 
   constructor(intervalMs: number = 10) {
     // Math.min/max propagate NaN, and a NaN interval makes setTimeout fire on its 1ms floor, so the
@@ -106,14 +114,27 @@ export class Clock {
 
     const now = this.getCurrentTime()
     let drift = now - this.nextTargetTime
-    if (drift > this.intervalMs * MAX_CATCHUP_TICKS) {
+    const threshold = this.intervalMs * MAX_CATCHUP_TICKS
+    if (drift > threshold) {
       const missed = Math.max(1, Math.round(drift / this.intervalMs))
       this.nextTargetTime = now
       drift = 0
-      if (!this.resyncActive) {
-        this.resyncActive = true
-        log.warn(
-          `Clock stalled for ${Math.round(now - this.lastUpdateTime)}ms, dropped ${missed} missed ticks and resynced.`,
+      // Drift past the threshold has two causes and they warrant different reporting. One long gap
+      // between ticks is a stall (machine asleep, a long GC) and is worth a warning. Many small
+      // gaps are a timer whose resolution is coarser than the interval, which on some platforms is
+      // every tick, so warning per resync would be a constant stream. Dropping the debt is right
+      // either way, since the sequencer reads the clock rather than counting ticks.
+      if (this.lastTickGapMs > threshold) {
+        if (!this.resyncActive) {
+          this.resyncActive = true
+          log.warn(
+            `Clock stalled for ${Math.round(this.lastTickGapMs)}ms, dropped ${missed} missed ticks and resynced.`,
+          )
+        }
+      } else if (!this.reportedCoarseTimer) {
+        this.reportedCoarseTimer = true
+        log.info(
+          `Timer resolution is coarser than the ${this.intervalMs}ms tick interval (gaps around ${Math.round(this.lastTickGapMs)}ms), so the clock runs at the rate the platform can deliver.`,
         )
       }
     } else {
@@ -177,6 +198,7 @@ export class Clock {
     const currentTime = this.getCurrentTime()
     const deltaTime = currentTime - this.lastUpdateTime
     this.lastUpdateTime = currentTime
+    this.lastTickGapMs = deltaTime
 
     // Watchdog: the callbacks run synchronously inside the timer handler, so a slow tick directly
     // delays the next one and can stutter output. Measure the callback pass and warn once when an
