@@ -104,9 +104,9 @@ describe('getLightColorChannelBreakdown', () => {
       4: 0,
     })!
     expect(breakdown).toEqual([
-      { label: 'Red', value: 200, css: 'rgb(200, 0, 0)' },
-      { label: 'Green', value: 80, css: 'rgb(0, 80, 0)' },
-      { label: 'Blue', value: 0, css: 'rgb(0, 0, 0)' },
+      { label: 'Red', value: 200, css: 'rgb(200, 0, 0)', borderCss: 'rgb(255, 0, 0)' },
+      { label: 'Green', value: 80, css: 'rgb(0, 80, 0)', borderCss: 'rgb(0, 255, 0)' },
+      { label: 'Blue', value: 0, css: 'rgb(0, 0, 0)', borderCss: 'rgb(0, 0, 255)' },
     ])
   })
 
@@ -146,15 +146,23 @@ describe('getLightColorChannelBreakdown', () => {
     expect(breakdown.map((e) => e.label)).toEqual(['Red', 'Green', 'Blue', 'Amber', 'Red 2'])
     expect(breakdown.map((e) => e.value)).toEqual([100, 0, 0, 200, 40])
     expect(breakdown[0].css).toBe('rgb(100, 0, 0)')
+    expect(breakdown[0].borderCss).toBe('rgb(255, 0, 0)')
     expect(breakdown[4].css).toBe('rgb(40, 0, 0)')
+    expect(breakdown[4].borderCss).toBe('rgb(255, 0, 0)')
     // Amber's swatch uses the mixer's emitter primary (1, 0.75, 0).
     expect(breakdown[3].css).toBe('rgb(200, 150, 0)')
+    expect(breakdown[3].borderCss).toBe('rgb(255, 191, 0)')
   })
 
   it('reads an unassigned extra channel as 0 rather than following channel 0', () => {
     const f = fixture(FixtureTypes.RGB, RGB, [{ type: 'amber', channel: 0 }])
     const breakdown = getLightColorChannelBreakdown(f, { 0: 255, 2: 10 })!
-    expect(breakdown.at(-1)).toEqual({ label: 'Amber', value: 0, css: 'rgb(0, 0, 0)' })
+    expect(breakdown.at(-1)).toEqual({
+      label: 'Amber',
+      value: 0,
+      css: 'rgb(0, 0, 0)',
+      borderCss: 'rgb(255, 191, 0)',
+    })
   })
 
   it('is not scaled by the master dimmer, so channels stay readable while it rides', () => {

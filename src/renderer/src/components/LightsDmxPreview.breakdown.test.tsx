@@ -69,9 +69,10 @@ describe('LightsDmxPreview per-channel swatches', () => {
     expect(screen.getByLabelText('Blue: 0')).toBeTruthy()
     expect(screen.getByLabelText('Amber: 128')).toBeTruthy()
     expect(screen.getByLabelText('Red 2: 200')).toBeTruthy()
-    expect(screen.getByLabelText('Red 2: 200').getAttribute('style')).toContain(
-      'background-color: rgb(200, 0, 0)',
-    )
+    const red2Swatch = screen.getByLabelText('Red 2: 200')
+    expect(red2Swatch.getAttribute('style')).toContain('background-color: rgb(200, 0, 0)')
+    expect(red2Swatch.getAttribute('style')).toContain('border: 1px solid rgb(255, 0, 0)')
+    expect(red2Swatch.getAttribute('title')).toBe('Red 2')
   })
 
   it('shows the three primaries for a plain RGB fixture', () => {

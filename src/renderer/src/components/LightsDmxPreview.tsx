@@ -111,9 +111,9 @@ const LightChannelSwatches: React.FC<{ entries: ChannelBreakdownEntry[] }> = ({ 
       <span
         key={entry.label}
         aria-label={`${entry.label}: ${entry.value}`}
-        title={`${entry.label}: ${entry.value}`}
-        className="w-3 h-3 rounded-full ring-1 ring-gray-400/70 dark:ring-gray-500/70"
-        style={{ backgroundColor: entry.css }}
+        title={entry.label}
+        className="w-3 h-3 rounded-full box-border"
+        style={{ backgroundColor: entry.css, border: `1px solid ${entry.borderCss}` }}
       />
     ))}
   </div>
