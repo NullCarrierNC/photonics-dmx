@@ -21,6 +21,7 @@ import {
 import {
   AUDIO_BAND_GAIN_MAX,
   AUDIO_BAND_GAIN_MIN,
+  DEFAULT_AUDIO_GAME_MODE,
   type AudioGameModeConfig,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import type { Brightness, Color, DmxFixture } from '../../photonics-dmx/types'
@@ -754,6 +755,46 @@ function validateCueDomainsPayload(
   return { ok: true, value: out }
 }
 
+/** Upper bound on a persisted window edge, wide enough for any real multi-monitor desktop. */
+const WINDOW_DIMENSION_MAX = 100000
+
+/** Cap on a persisted audio cue id, so an unbounded string can't be written to prefs. */
+const MAX_AUDIO_CUE_TYPE_LENGTH = 200
+
+type PersistedWindowState = { width: number; height: number; x?: number; y?: number }
+
+/**
+ * Shape-check a persisted window rectangle. These feed the BrowserWindow constructor, which
+ * misbehaves on zero, negative or non-finite extents, so width and height are clamped into a usable
+ * range rather than rejected, and a whole prefs save isn't lost to an odd window size. Position is
+ * left unclamped because negative coordinates are legitimate on a multi-monitor desktop.
+ */
+function validateWindowStatePayload(
+  value: unknown,
+  field: string,
+): ValidationResult<PersistedWindowState> {
+  if (!isPlainObject(value)) {
+    return { ok: false, error: `${field} must be an object` }
+  }
+  const out: PersistedWindowState = { width: 0, height: 0 }
+  for (const key of ['width', 'height'] as const) {
+    const n = value[key]
+    if (typeof n !== 'number' || !Number.isFinite(n)) {
+      return { ok: false, error: `${field}.${key} must be a finite number` }
+    }
+    out[key] = Math.round(Math.max(1, Math.min(WINDOW_DIMENSION_MAX, n)))
+  }
+  for (const key of ['x', 'y'] as const) {
+    if (value[key] === undefined) continue
+    const n = value[key]
+    if (typeof n !== 'number' || !Number.isFinite(n)) {
+      return { ok: false, error: `${field}.${key} must be a finite number` }
+    }
+    out[key] = Math.round(n)
+  }
+  return { ok: true, value: out }
+}
+
 const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'effectDebounce',
   'complex',
@@ -765,6 +806,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'cueDomains',
   'cueConsistencyWindow',
   'clockRate',
+  'yargFallbackCueTimeMs',
   'globalDmxPublishingRateHz',
   'dmxOutputConfig',
   'stageKitPrefs',
@@ -938,6 +980,125 @@ export function validatePreferencesPayload(
     const instruments = ['guitar', 'bass', 'keys', 'drums']
     if (typeof s.instrument !== 'string' || !instruments.includes(s.instrument)) {
       return { ok: false, error: 'simulationSettings.instrument must be guitar/bass/keys/drums' }
+    }
+  }
+
+  // effectDebounce, complex and clockRate are required with a declared type by the prefs schema, so
+  // a wrong type here is what routes the file to corrupt-recovery on the next load.
+  if ('effectDebounce' in cleaned) {
+    const v = validateNumberInRange(cleaned.effectDebounce, 0, 60000, 'effectDebounce')
+    if (!v.ok) return v
+    cleaned.effectDebounce = Math.round(v.value)
+  }
+
+  // Same bound the dedicated SET_YARG_FALLBACK_CUE_TIME_MS channel applies, so a value that is
+  // legal through one write path is legal through the other.
+  if ('yargFallbackCueTimeMs' in cleaned) {
+    const v = validateNumberInRange(
+      cleaned.yargFallbackCueTimeMs,
+      0,
+      600000,
+      'yargFallbackCueTimeMs',
+    )
+    if (!v.ok) return v
+    cleaned.yargFallbackCueTimeMs = Math.round(v.value)
+  }
+
+  if ('clockRate' in cleaned) {
+    const rate = cleaned.clockRate
+    if (typeof rate !== 'number' || !Number.isFinite(rate)) {
+      return { ok: false, error: 'clockRate must be a finite number' }
+    }
+    // Clamped to the window Clock itself accepts: a value outside it drives the tick scheduler off
+    // its interval, and the slider that produces this is already bounded the same way.
+    cleaned.clockRate = Math.round(Math.max(1, Math.min(100, rate)))
+  }
+
+  for (const key of [
+    'complex',
+    'motionEnabled',
+    'allowMultipleActiveRigs',
+    'leftMenuCollapsed',
+  ] as const) {
+    if (key in cleaned && typeof cleaned[key] !== 'boolean') {
+      return { ok: false, error: `${key} must be a boolean` }
+    }
+  }
+
+  for (const key of ['windowState', 'cueEditorWindowState', 'audioPreviewWindowState'] as const) {
+    if (key in cleaned) {
+      const w = validateWindowStatePayload(cleaned[key], key)
+      if (!w.ok) return w
+      cleaned[key] = w.value
+    }
+  }
+
+  if ('enttecProConfig' in cleaned) {
+    const c = cleaned.enttecProConfig
+    if (!isPlainObject(c)) {
+      return { ok: false, error: 'enttecProConfig must be an object' }
+    }
+    if ('port' in c && typeof c.port !== 'string') {
+      return { ok: false, error: 'enttecProConfig.port must be a string' }
+    }
+  }
+
+  if ('openDmxConfig' in cleaned) {
+    const c = cleaned.openDmxConfig
+    if (!isPlainObject(c)) {
+      return { ok: false, error: 'openDmxConfig must be an object' }
+    }
+    if ('port' in c && typeof c.port !== 'string') {
+      return { ok: false, error: 'openDmxConfig.port must be a string' }
+    }
+    if ('dmxSpeed' in c && (typeof c.dmxSpeed !== 'number' || !Number.isFinite(c.dmxSpeed))) {
+      return { ok: false, error: 'openDmxConfig.dmxSpeed must be a finite number' }
+    }
+  }
+
+  if ('dmxOutputConfig' in cleaned) {
+    const c = cleaned.dmxOutputConfig
+    if (!isPlainObject(c)) {
+      return { ok: false, error: 'dmxOutputConfig must be an object' }
+    }
+    for (const key of [
+      'sacnEnabled',
+      'artNetEnabled',
+      'enttecProEnabled',
+      'openDmxEnabled',
+    ] as const) {
+      if (key in c && typeof c[key] !== 'boolean') {
+        return { ok: false, error: `dmxOutputConfig.${key} must be a boolean` }
+      }
+    }
+  }
+
+  if ('audioConfig' in cleaned) {
+    const a = validateAudioConfigPayload(cleaned.audioConfig)
+    if (!a.ok) return a
+    cleaned.audioConfig = a.value
+  }
+
+  if ('audioGameMode' in cleaned) {
+    // updatePreferences replaces this key wholesale, so validating the payload against the defaults
+    // yields the complete config that gets stored.
+    const g = validateAudioGameModePayload(cleaned.audioGameMode, DEFAULT_AUDIO_GAME_MODE)
+    if (!g.ok) return g
+    cleaned.audioGameMode = g.value
+  }
+
+  if ('activeAudioCueType' in cleaned) {
+    const t = cleaned.activeAudioCueType
+    // AudioCueType is free-form so node-authored cues can register their own ids, so this checks the
+    // type and a sane length rather than membership of the registry, which may not be loaded yet.
+    if (typeof t !== 'string') {
+      return { ok: false, error: 'activeAudioCueType must be a string' }
+    }
+    if (t.length > MAX_AUDIO_CUE_TYPE_LENGTH) {
+      return {
+        ok: false,
+        error: `activeAudioCueType must be ${MAX_AUDIO_CUE_TYPE_LENGTH} characters or fewer`,
+      }
     }
   }
 

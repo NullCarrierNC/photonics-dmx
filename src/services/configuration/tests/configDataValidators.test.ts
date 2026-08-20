@@ -4,6 +4,7 @@ import {
   validateUserLightsData,
 } from '../configDataValidators'
 import { createDefaultCueDomains } from '../cueDomainTypes'
+import { DEFAULT_PREFERENCES } from '../configurationDefaults'
 
 type Prefs = Parameters<typeof validateAppPreferencesData>[0]
 
@@ -20,6 +21,14 @@ function validPrefs(): Prefs {
 describe('validateAppPreferencesData selectionMode enum', () => {
   it('accepts the default cue domains', () => {
     expect(validateAppPreferencesData(validPrefs()).valid).toBe(true)
+  })
+
+  // ConfigFile.update validates before writing, so the shipped defaults must satisfy their own
+  // schema or the first save of an untouched install would be refused. Cheap to check, and it
+  // pins the precondition the write-time gate depends on.
+  it('accepts DEFAULT_PREFERENCES as shipped', () => {
+    const outcome = validateAppPreferencesData(DEFAULT_PREFERENCES as unknown as Prefs)
+    expect(outcome).toEqual({ valid: true })
   })
 
   it('accepts every valid selectionMode (lighting and motion)', () => {
