@@ -357,9 +357,29 @@ export class ConfigFile<T> {
   }
 
   /**
-   * Updates the data and saves to file
+   * Updates the data and saves to file.
+   *
+   * Data is validated before it reaches disk: an invalid value on disk fails {@link load}'s check on
+   * the next launch, and {@link recoverToDefault} then renames the whole file aside, so the user
+   * silently loses every setting in it.
+   *
+   * The check lives here rather than in {@link save} because `save` is also the write path for
+   * {@link recoverToDefault}, {@link load} and {@link applyLoadMigration}. Gating those would let a
+   * validator fault block corruption recovery itself, leaving the file moved aside with nothing
+   * written back. `update` is the only caller carrying user edits, so it is the only one that needs
+   * the gate. The throw happens before `this.data` is touched, so in-memory state is unchanged and
+   * the rollback below is not involved.
    */
   async update(newData: T): Promise<void> {
+    if (this.validate) {
+      const v = this.validate(newData)
+      if (!v.valid) {
+        const detail = v.errors.join('; ')
+        log.error(`[Photonics Config] Refusing to save invalid data to ${this.filePath}: ${detail}`)
+        throw new Error(`Invalid configuration for ${path.basename(this.filePath)}: ${detail}`)
+      }
+    }
+
     const previous = this.data
     try {
       await this.save(newData)
