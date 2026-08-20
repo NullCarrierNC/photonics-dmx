@@ -1,8 +1,8 @@
 /**
  * End-to-end render test for the bundled RB3 "Mirror" cue. Drives the compiled cue against a real
- * Sequencer with mock StageKit LED-bank frames and asserts the front row renders its own LEDs while
- * the back row copies its mirrored front partner (ring cell c pairs with 7 - c) and the rear LED
- * data is ignored.
+ * Sequencer with mock StageKit LED-bank frames and asserts the ring folds onto four columns: the
+ * back row copies its mirrored front partner (ring cell c pairs with 7 - c), LEDs 1-4 run across
+ * the columns left to right, and LEDs 5-8 run back across them right to left.
  */
 import { createSequencerHarness } from '../helpers/sequencerHarness'
 import {
@@ -53,16 +53,51 @@ describe('RB3 Mirror cue', () => {
     h.cleanup()
   })
 
-  it('ignores the rear LED data entirely', () => {
-    const h = createSequencerHarness()
+  it('runs LEDs 5-8 back across the columns right to left', () => {
     const cue = createRb3Cue('rb3-mirror')
 
-    renderFrames(h, cue, { blue: 0b11110000 })
-
-    for (const id of h.allLightIds) {
-      expect(h.getLightState(id)!.intensity).toBe(0)
+    // LED 5 (bit 4) takes the rightmost column: front light 4 and the back light behind it.
+    const right = createSequencerHarness()
+    renderFrames(right, cue, { blue: 0b00010000 })
+    const rightStates = right.allLightIds.map((id) => right.getLightState(id)!)
+    expect(rightStates[3].blue).toBeGreaterThan(0)
+    expect(rightStates[4].blue).toBeGreaterThan(0)
+    for (const i of [0, 1, 2, 5, 6, 7]) {
+      expect(rightStates[i].intensity).toBe(0)
     }
-    h.cleanup()
+    right.cleanup()
+
+    // LED 8 (bit 7) takes the leftmost column, the opposite end from LED 5.
+    const left = createSequencerHarness()
+    renderFrames(left, cue, { blue: 0b10000000 })
+    const leftStates = left.allLightIds.map((id) => left.getLightState(id)!)
+    expect(leftStates[0].blue).toBeGreaterThan(0)
+    expect(leftStates[7].blue).toBeGreaterThan(0)
+    for (const i of [1, 2, 3, 4, 5, 6]) {
+      expect(leftStates[i].intensity).toBe(0)
+    }
+    left.cleanup()
+  })
+
+  it('lights a column once when both of its LEDs are on', () => {
+    const cue = createRb3Cue('rb3-mirror')
+
+    // Column 1 carries LED 1 and LED 8. Lighting both must read the same as lighting one, not
+    // stack into a brighter dot.
+    const one = createSequencerHarness()
+    renderFrames(one, cue, { red: 0b00000001 })
+    const alone = one.getLightState(one.allLightIds[0])!.intensity
+    one.cleanup()
+
+    const both = createSequencerHarness()
+    renderFrames(both, cue, { red: 0b10000001 })
+    const states = both.allLightIds.map((id) => both.getLightState(id)!)
+    expect(states[0].intensity).toBe(alone)
+    expect(states[7].intensity).toBe(alone)
+    for (const i of [1, 2, 3, 4, 5, 6]) {
+      expect(states[i].intensity).toBe(0)
+    }
+    both.cleanup()
   })
 
   it('blends overlapping banks additively on both lights of a pair', () => {
