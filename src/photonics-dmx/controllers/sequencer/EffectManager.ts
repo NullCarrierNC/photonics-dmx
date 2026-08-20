@@ -475,6 +475,7 @@ export class EffectManager implements IEffectManager {
               effect,
               isPersistent,
               lightId,
+              effectRunId,
             })
           } else {
             this.removeEffectByLayer(layer, false)
@@ -647,6 +648,8 @@ export class EffectManager implements IEffectManager {
    * @param layer The layer to apply the effect on
    * @param transitions The transitions to apply
    * @param isPersistent Whether the effect should persist after completion
+   * @param effectRunId Run this start belongs to, required for a persistent effect to loop: the run
+   *   only restarts once every light reports completion against its id
    */
   public startEffect(
     name: string,
@@ -657,6 +660,12 @@ export class EffectManager implements IEffectManager {
     isPersistent = false,
     effectRunId?: string,
   ): void {
+    if (isPersistent && !effectRunId) {
+      // Every caller registers a run before starting a persistent effect, so this combination means
+      // a run id was dropped somewhere and the effect will run once and stop looping silently.
+      log.warn(`Persistent effect ${name} started on layer ${layer} without a run id, cannot loop`)
+    }
+
     // Get current time once for all lights - atomic synchronization
     const currentTime = performance.now()
 
@@ -824,24 +833,39 @@ export class EffectManager implements IEffectManager {
   public startNextEffectInQueue(layer: number, lightId: string): boolean {
     const nextEffect = this.layerManager.getQueuedEffect(layer, lightId)
     if (!nextEffect) return false
-    // console.log(`Starting next effect in queue: ${JSON.stringify(nextEffect)}`);
 
-    // Remove from queue
+    // Resolve everything the start depends on before consuming the entry, so a queue slot is never
+    // emptied for a start that then doesn't happen.
+    const transitions = nextEffect.effect.transitions.filter((t) => t.layer === layer)
+    const targetLight = transitions[0]?.lights.find((l) => l.id === lightId)
+
+    if (transitions.length === 0 || !targetLight) {
+      // Nothing startable in this entry. Drop it anyway so a malformed one can't wedge the slot.
+      this.layerManager.removeQueuedEffect(layer, lightId)
+      log.warn(
+        `Discarding queued effect ${nextEffect.name} for light ${lightId} on layer ${layer}: no transitions target it`,
+      )
+      return false
+    }
+
     this.layerManager.removeQueuedEffect(layer, lightId)
 
-    // Check if we have any active transitions for these lights
-    const transitions = nextEffect.effect.transitions.filter((t) => t.layer === layer)
-    if (transitions.length === 0) return false
-
-    // Start the effect
+    // Scoped to the light this entry was queued for. The transition's `lights` array covers every
+    // light the effect targets, so starting across it would overwrite the other lights' state on
+    // this layer, each of which owns its own queue slot.
+    // The entry's own run id, not a fresh one. This light is already counted in that run's light
+    // total, so it needs to report its completion against the same run for the run to finish and
+    // restart. Minting a new id here would split one logical run in two, and the original could
+    // never reach zero remaining lights. A run cancelled while the entry sat in the queue is simply
+    // not found on completion, which correctly stops the loop.
     this.startEffect(
       nextEffect.name,
       nextEffect.effect,
-      transitions[0].lights,
+      [targetLight],
       layer,
       transitions,
       nextEffect.isPersistent,
-      undefined,
+      nextEffect.effectRunId,
     )
 
     return true
