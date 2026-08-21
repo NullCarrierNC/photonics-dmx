@@ -94,7 +94,7 @@ describe('Preferences', () => {
     expect(screen.queryByTestId('prefs-active-rigs')).toBeNull()
     expect(screen.getByTestId('prefs-dmx-output')).toBeTruthy()
     expect(screen.getByTestId('prefs-brightness')).toBeTruthy()
-    expect(screen.queryByTestId('prefs-white-mix-mode')).toBeNull()
+    expect(screen.getByTestId('prefs-white-mix-mode')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Advanced' }))
     expect(screen.getByTestId('prefs-advanced-mode')).toBeTruthy()
@@ -115,7 +115,6 @@ describe('Preferences', () => {
 
     expect(screen.getByRole('tab', { name: 'Audio' })).toBeTruthy()
     expect(screen.getByTestId('prefs-active-rigs')).toBeTruthy()
-    expect(screen.getByTestId('prefs-white-mix-mode')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('tab', { name: 'YARG' }))
     expect(screen.getByTestId('prefs-yarg-cues')).toBeTruthy()
