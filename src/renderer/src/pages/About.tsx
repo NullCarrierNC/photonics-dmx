@@ -115,12 +115,12 @@ const About = () => {
         </ul>
 
         <p className="mt-10 text-sm text-gray-600 dark:text-gray-400">
-          Photonics is developed by <em>Null Carrier</em>, you can reach me at{' '}
+          Photonics is developed by <em>Null Carrier</em>, you can reach me through{' '}
           <a
-            href="https://photonics.rocks/contact"
+            href="https://discord.com/invite/2Vyqc2hYcK"
             className="text-blue-600 dark:text-blue-500 hover:underline"
             target="_blank">
-            Photonics.rocks/contact
+            Discord
           </a>
           .
         </p>
