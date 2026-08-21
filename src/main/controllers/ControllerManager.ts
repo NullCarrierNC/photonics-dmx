@@ -1,5 +1,8 @@
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
-import { normalizeRb3ProcessingMode } from '../../services/configuration/configurationDefaults'
+import {
+  normalizeRb3ProcessingMode,
+  normalizeWhiteChannelMixMode,
+} from '../../services/configuration/configurationDefaults'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
 import { getStrobeStateManager } from '../../photonics-dmx/controllers/StrobeStateManager'
@@ -436,6 +439,9 @@ export class ControllerManager {
       this.config.getPreference('globalDmxPublishingRateHz') ?? DMX_OUTPUT_REFRESH_RATE_HZ_MAX
     this.dmxPublisher = new DmxPublisher(this.senderLifecycle.getSenderManager(), null, undefined, {
       outputRateHz: globalDmxRateHz,
+      whiteChannelMixMode: normalizeWhiteChannelMixMode(
+        this.config.getPreference('whiteChannelMixMode'),
+      ),
     })
     // Subscribe the publisher to every chain's LightStateManager. Each chain's emission
     // writes its rig's lights into the publisher's aggregated map; a coalesced flush calls

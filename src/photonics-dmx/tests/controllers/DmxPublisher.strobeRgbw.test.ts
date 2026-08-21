@@ -99,10 +99,13 @@ function setup(
 } {
   const sender = makeMockSender()
   const strobe = new StrobeStateManager()
+  // Pinned rather than left to the shipped default, since these cases are about what
+  // `strobe-rgbw` does either side of the strobe gate.
   const publisher = new DmxPublisher(
     sender as unknown as SenderManager,
     new LightStateManager(),
     strobe,
+    { whiteChannelMixMode: 'strobe-rgbw' },
   )
   publisher.updateActiveRigs([makeRig(lights, strobeType)])
   return {
@@ -236,6 +239,96 @@ describe('DmxPublisher — RGBW strobes drive white and rgb together', () => {
     ctx.publish({ s1: WHITE_FLASH })
     const buf = ctx.publish({ s1: rgbio() })
     expect(buf[6]).toBe(30)
+    expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([255, 255, 255, 255])
+  })
+})
+
+describe('DmxPublisher — White Channel Mix Mode', () => {
+  const RED_WASH = rgbio({ red: 255, intensity: 255 })
+
+  it("keeps a strobing light on substitution under 'w-only'", () => {
+    const ctx = setup([STROBE_RGBW])
+    ctx.publisher.setWhiteChannelMixMode('w-only')
+    ctx.strobe.setActive('fast')
+    const buf = ctx.publish({ s1: WHITE_FLASH })
+    expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([255, 0, 0, 0])
+  })
+
+  it("keeps a strobe-channel light on substitution under 'w-only'", () => {
+    const ctx = setup(
+      [
+        {
+          id: 's1',
+          channels: { ...RGB, strobeChannel: 6 },
+          extraChannels: WHITE_EXTRA,
+          isStrobeEnabled: true,
+        },
+      ],
+      ConfigStrobeType.Dedicated,
+    )
+    ctx.publisher.setWhiteChannelMixMode('w-only')
+    ctx.strobe.setActive('medium')
+    const buf = ctx.publish({ s1: WHITE_FLASH })
+    // The hardware chop still runs; only the colour mixing changes.
+    expect(buf[6]).toBe(DEFAULT_STROBE_CHANNEL_VALUES.medium)
+    expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([255, 0, 0, 0])
+  })
+
+  it("mixes a plain wash additively under 'always-rgbw', with no strobe running", () => {
+    const ctx = setup([{ id: 'f1', channels: RGB, extraChannels: WHITE_EXTRA }])
+    ctx.publisher.setWhiteChannelMixMode('always-rgbw')
+    const buf = ctx.publish({ f1: WHITE_FLASH })
+    expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([255, 255, 255, 255])
+  })
+
+  it("leaves a saturated wash unchanged under 'always-rgbw'", () => {
+    const ctx = setup([{ id: 'f1', channels: RGB, extraChannels: WHITE_EXTRA }])
+    ctx.publisher.setWhiteChannelMixMode('always-rgbw')
+    const buf = ctx.publish({ f1: RED_WASH })
+    expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([0, 255, 0, 0])
+  })
+
+  it("leaves a non-strobing wash substituting under 'strobe-rgbw'", () => {
+    const ctx = setup([{ id: 'f1', channels: RGB, extraChannels: WHITE_EXTRA }])
+    const buf = ctx.publish({ f1: WHITE_FLASH })
+    expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([255, 0, 0, 0])
+  })
+
+  it('hot-swaps on the next published frame', () => {
+    const ctx = setup([{ id: 'f1', channels: RGB, extraChannels: WHITE_EXTRA }])
+    expect(ctx.publish({ f1: WHITE_FLASH })[2]).toBe(0)
+
+    ctx.publisher.setWhiteChannelMixMode('always-rgbw')
+    expect(ctx.publish({ f1: WHITE_FLASH })[2]).toBe(255)
+
+    ctx.publisher.setWhiteChannelMixMode('w-only')
+    expect(ctx.publish({ f1: WHITE_FLASH })[2]).toBe(0)
+  })
+
+  it('ships always-rgbw, so an unconfigured rig mixes additively', () => {
+    const sender = makeMockSender()
+    const publisher = new DmxPublisher(
+      sender as unknown as SenderManager,
+      new LightStateManager(),
+      new StrobeStateManager(),
+    )
+    publisher.updateActiveRigs([makeRig([{ id: 'f1', channels: RGB, extraChannels: WHITE_EXTRA }])])
+    publisher.publish(new Map([['f1', WHITE_FLASH]]))
+    const buf = sender.send.mock.calls.at(-1)![1] as Record<number, number>
+    expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([255, 255, 255, 255])
+  })
+
+  it('honours the constructor option', () => {
+    const sender = makeMockSender()
+    const publisher = new DmxPublisher(
+      sender as unknown as SenderManager,
+      new LightStateManager(),
+      new StrobeStateManager(),
+      { whiteChannelMixMode: 'always-rgbw' },
+    )
+    publisher.updateActiveRigs([makeRig([{ id: 'f1', channels: RGB, extraChannels: WHITE_EXTRA }])])
+    publisher.publish(new Map([['f1', WHITE_FLASH]]))
+    const buf = sender.send.mock.calls.at(-1)![1] as Record<number, number>
     expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([255, 255, 255, 255])
   })
 })

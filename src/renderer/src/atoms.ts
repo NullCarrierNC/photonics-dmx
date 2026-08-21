@@ -7,6 +7,7 @@ import {
   LightingConfiguration,
   DmxRig,
   normalizeFixtureConfig,
+  type WhiteChannelMixMode,
 } from '../../photonics-dmx/types'
 import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
@@ -300,6 +301,8 @@ export interface LightingPreferences {
   globalDmxPublishingRateHz?: number
   allowMultipleActiveRigs?: boolean
   advancedModeEnabled?: boolean
+  /** How RGB fixtures carrying a White channel drive that emitter. */
+  whiteChannelMixMode?: WhiteChannelMixMode
 
   // Frontend-specific preferences
   dmxOutputConfig?: {

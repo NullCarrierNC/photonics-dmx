@@ -12,6 +12,7 @@ import StageKitYargPrioritySettings from '../components/StageKitYargPrioritySett
 import YargFallbackSettings from '../components/YargFallbackSettings'
 import StageKitRb3EnhancedSettings from '../components/StageKitRb3EnhancedSettings'
 import BrightnessSettings from '../components/BrightnessSettings'
+import WhiteChannelMixModeSettings from '../components/WhiteChannelMixModeSettings'
 import ClockRateSettings from '../components/ClockRateSettings'
 import ActiveRigsSettings from '../components/ActiveRigsSettings'
 import AudioPreferencesTabContent from '../components/AudioPreferencesTabContent'
@@ -118,6 +119,7 @@ const Preferences: React.FC = () => {
             {advancedModeEnabled && <ActiveRigsSettings />}
             <DmxOutputSettings />
             <BrightnessSettings />
+            <WhiteChannelMixModeSettings />
           </>
         )}
       </div>

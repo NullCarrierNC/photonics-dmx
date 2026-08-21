@@ -822,6 +822,14 @@ describe('inputValidation', () => {
         expect(validatePreferencesPayload({ rb3Prefs: 'cue' }).ok).toBe(false)
       })
 
+      it('validates whiteChannelMixMode against the allowed set', () => {
+        expect(validatePreferencesPayload({ whiteChannelMixMode: 'w-only' }).ok).toBe(true)
+        expect(validatePreferencesPayload({ whiteChannelMixMode: 'strobe-rgbw' }).ok).toBe(true)
+        expect(validatePreferencesPayload({ whiteChannelMixMode: 'always-rgbw' }).ok).toBe(true)
+        expect(validatePreferencesPayload({ whiteChannelMixMode: 'rgbw' }).ok).toBe(false)
+        expect(validatePreferencesPayload({ whiteChannelMixMode: 3 }).ok).toBe(false)
+      })
+
       it('requires dmxSettingsPrefs expansion flags to be booleans', () => {
         expect(validatePreferencesPayload({ dmxSettingsPrefs: { artNetExpanded: true } }).ok).toBe(
           true,

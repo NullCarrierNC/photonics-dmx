@@ -12,6 +12,11 @@ import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio'
 import { createDefaultCueDomains, type CueDomainPrefs, type CueDomain } from './cueDomainTypes'
 import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
+import {
+  DEFAULT_WHITE_CHANNEL_MIX_MODE,
+  WHITE_CHANNEL_MIX_MODES,
+  type WhiteChannelMixMode,
+} from '../../photonics-dmx/types'
 
 /**
  * Application preferences (persisted in prefs.json).
@@ -92,6 +97,8 @@ export interface AppPreferences {
   allowMultipleActiveRigs?: boolean
   /** When true, show audio preferences, spectrum analyzer, cue editor, multi-rig UI, and other advanced features. */
   advancedModeEnabled?: boolean
+  /** How RGB fixtures carrying a `white` extra channel drive that emitter. */
+  whiteChannelMixMode?: WhiteChannelMixMode
   audioConfig?: AudioConfig
   activeAudioCueType?: AudioCueType
   audioGameMode?: AudioGameModeConfig
@@ -130,6 +137,16 @@ export interface AppPreferences {
  */
 export function normalizeRb3ProcessingMode(value: unknown): ProcessingMode {
   return value === 'cue' ? 'cue' : 'direct'
+}
+
+/**
+ * Normalizes a persisted White Channel Mix Mode. Prefs loaded from disk bypass IPC validation, so
+ * anything unrecognised falls back to the default.
+ */
+export function normalizeWhiteChannelMixMode(value: unknown): WhiteChannelMixMode {
+  return WHITE_CHANNEL_MIX_MODES.includes(value as WhiteChannelMixMode)
+    ? (value as WhiteChannelMixMode)
+    : DEFAULT_WHITE_CHANNEL_MIX_MODE
 }
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
@@ -193,6 +210,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   },
   allowMultipleActiveRigs: false,
   advancedModeEnabled: false,
+  whiteChannelMixMode: DEFAULT_WHITE_CHANNEL_MIX_MODE,
   audioConfig: DEFAULT_AUDIO_CONFIG,
   cueEditorWindowState: {
     width: 1200,

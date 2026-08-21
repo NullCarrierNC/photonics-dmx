@@ -1,6 +1,7 @@
 /**
  * Config-propagation IPC tests: verifies that SAVE_DMX_RIG, setConsoleFixtureConfig, and
- * DELETE_DMX_RIG trigger the correct controller restart/refresh strategy.
+ * DELETE_DMX_RIG trigger the correct controller restart/refresh strategy, and that SAVE_PREFS
+ * hot-swaps the publisher settings that must apply without a restart.
  *
  * Regression coverage for the config-staleness bugs fixed alongside the inversion pipeline:
  *   - Bug 2: SAVE_DMX_RIG didn't call restartControllers when config fields changed
@@ -29,6 +30,13 @@ const mockConfig = {
   getLightingLayout: jest.fn().mockReturnValue(null),
   updateUserLights: jest.fn().mockImplementation(() => Promise.resolve()),
   getAllPreferences: jest.fn().mockReturnValue({}),
+  updatePreferences: jest.fn().mockImplementation(() => Promise.resolve()),
+}
+
+/** Publisher settings SAVE_PREFS applies live rather than through a controller restart. */
+const mockPublisher = {
+  setOutputRateHz: jest.fn(),
+  setWhiteChannelMixMode: jest.fn(),
 }
 
 const mockControllerManager = {
@@ -38,6 +46,7 @@ const mockControllerManager = {
   setConsoleFixtureConfig: jest.fn().mockImplementation(() => Promise.resolve({ success: true })),
   flushValidationErrors: jest.fn().mockReturnValue([]),
   getIsInitialized: jest.fn().mockReturnValue(true),
+  getDmxPublisher: jest.fn().mockReturnValue(mockPublisher),
 }
 
 const mockSendToAllWindows = jest.fn()
@@ -221,5 +230,61 @@ describe('DELETE_DMX_RIG propagation', () => {
     const handler = handlers.get(CONFIG.DELETE_DMX_RIG)!
     const result = await handler({}, 'rig-1')
     expect(result).toEqual({ success: true })
+  })
+})
+
+describe('SAVE_PREFS publisher hot-swap', () => {
+  let handlers: Map<string, (event: unknown, ...args: any[]) => Promise<any>>
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockControllerManager.getDmxPublisher.mockReturnValue(mockPublisher)
+    handlers = captureHandlers()
+    setupConfigHandlers(mockIpcMain as any, mockControllerManager as any)
+  })
+
+  it('persists a White Channel Mix Mode change and applies it without a restart', async () => {
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!(
+      {},
+      {
+        whiteChannelMixMode: 'always-rgbw',
+      },
+    )
+
+    expect(result).toEqual({ success: true })
+    expect(mockConfig.updatePreferences).toHaveBeenCalledWith({
+      whiteChannelMixMode: 'always-rgbw',
+    })
+    expect(mockPublisher.setWhiteChannelMixMode).toHaveBeenCalledWith('always-rgbw')
+    expect(mockControllerManager.restartControllers).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unknown mode without persisting or applying it', async () => {
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!({}, { whiteChannelMixMode: 'rgbw' })
+
+    expect(result.success).toBe(false)
+    expect(mockConfig.updatePreferences).not.toHaveBeenCalled()
+    expect(mockPublisher.setWhiteChannelMixMode).not.toHaveBeenCalled()
+  })
+
+  it('leaves the mode alone when the payload does not carry it', async () => {
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!({}, { effectDebounce: 5 })
+
+    expect(result).toEqual({ success: true })
+    expect(mockPublisher.setWhiteChannelMixMode).not.toHaveBeenCalled()
+  })
+
+  it('survives a publisher that has not been built yet', async () => {
+    mockControllerManager.getDmxPublisher.mockReturnValue(null)
+
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!(
+      {},
+      {
+        whiteChannelMixMode: 'w-only',
+      },
+    )
+
+    expect(result).toEqual({ success: true })
+    expect(mockConfig.updatePreferences).toHaveBeenCalled()
   })
 })
