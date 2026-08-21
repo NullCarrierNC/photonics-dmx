@@ -42,12 +42,12 @@ const StageKitRb3EnhancedSettings: React.FC = () => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
-        Stage Kit Mode (RB3)
+        Rock Band 3 Enhanced
       </h2>
 
       <div>
         <h3 className="text-lg font-medium mb-3 text-gray-800 dark:text-gray-200">
-          Rock Band 3 Enhanced
+          Processing Mode
         </h3>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           RB3E reports the game's Stage Kit LED state over the network. <em>Direct</em> mode maps
