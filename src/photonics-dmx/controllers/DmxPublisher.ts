@@ -506,6 +506,9 @@ export class DmxPublisher {
       curWireTargets = wireTargets
       curIpcBuffer = ipcBuffer
 
+      // While a strobe holds the slot, this rig's strobing lights mix with additive white.
+      const strobeLightIds = activeStrobeSlot != null ? manager.getStrobeLightIds() : null
+
       // Fixtures reached below via the light-states map. Anything left over (a fixture no cue has
       // addressed, or a strobe-group light excluded from cue targeting) gets its pinned `fixed`
       // channels emitted in a follow-up pass so mode/macro channels still publish.
@@ -529,6 +532,9 @@ export class DmxPublisher {
           hasStrobeChannel && dmxLight.fixture !== FixtureTypes.STROBE
         const strobeChannelActive =
           activeStrobeSlot != null && dmxLight.isStrobeEnabled && isRgbFamilyWithStrobeChannel
+        // Either strobe mechanism mixes additively — the flash path (strobe set) or the hardware
+        // chop, whose colour the latch below resolves to the flash peak.
+        const strobeAdditiveWhite = strobeChannelActive || strobeLightIds?.has(lightId) === true
 
         let { red: r, green: g, blue: b, intensity } = lightValue
         const { pan, tilt } = lightValue
@@ -630,7 +636,7 @@ export class DmxPublisher {
         const mixPlan = this._getMixPlan(dmxLight)
         if (mixPlan) {
           this._warnInvalidExtras(lightId, mixPlan)
-          applyChannelMixPlan(mixPlan, r, g, b, mixWrite)
+          applyChannelMixPlan(mixPlan, r, g, b, mixWrite, strobeAdditiveWhite)
         }
 
         for (const [channelName, channelNumber] of Object.entries(dmxLight.channels)) {

@@ -28,6 +28,8 @@ export class DmxLightManager {
   private _frontLights: TrackedLight[] = []
   private _backLights: TrackedLight[] = []
   private _strobeLights: TrackedLight[] = []
+  /** Ids of {@link _strobeLights} — a cheap membership test for the publish hot path. */
+  private _strobeLightIds: Set<string> = new Set<string>()
 
   private _dmxLights: Map<string, DmxFixture> = new Map<string, DmxFixture>()
   private _lightsCache: Map<string, TrackedLight[]> = new Map<string, TrackedLight[]>()
@@ -74,6 +76,8 @@ export class DmxLightManager {
         config: light.config,
       }))
       .sort((a, b) => a.position - b.position)
+
+    this._strobeLightIds = new Set(this._strobeLights.map((light) => light.id))
   }
 
   /**
@@ -107,6 +111,14 @@ export class DmxLightManager {
    */
   public getAllDmxLights(): ReadonlyMap<string, DmxFixture> {
     return this._dmxLights
+  }
+
+  /**
+   * Ids of the `strobe` group, matching {@link getLightsInGroup}; empty when the rig's strobe mode
+   * is `None`. Live set — do not mutate.
+   */
+  public getStrobeLightIds(): ReadonlySet<string> {
+    return this._strobeLightIds
   }
 
   /**
@@ -516,6 +528,7 @@ export class DmxLightManager {
     this._frontLights = []
     this._backLights = []
     this._strobeLights = []
+    this._strobeLightIds.clear()
     this._dmxLights.clear()
     this._lightsCache.clear() // Clear cache during shutdown
     this.config = {} as LightingConfiguration
