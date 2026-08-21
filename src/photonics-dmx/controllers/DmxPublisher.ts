@@ -7,8 +7,10 @@ import {
   DmxRig,
   FixtureTypes,
   DEFAULT_STROBE_CHANNEL_VALUES,
+  DEFAULT_WHITE_CHANNEL_MIX_MODE,
   normalizeFixtureConfig,
   WireSenderId,
+  type WhiteChannelMixMode,
 } from '../types'
 import type { DmxValuesPayload } from '../../shared/ipcTypes'
 import { DmxLightManager } from './DmxLightManager'
@@ -60,6 +62,8 @@ export interface DmxPublisherOptions {
    */
   outputRateHz?: number
   timing?: PublisherTiming
+  /** Initial White Channel Mix Mode; {@link DmxPublisher.setWhiteChannelMixMode} swaps it live. */
+  whiteChannelMixMode?: WhiteChannelMixMode
 }
 
 /**
@@ -193,6 +197,9 @@ export class DmxPublisher {
   /** Tracks whether a strobe was active on the previous publish, so we can clear the latch on transition. */
   private _lastStrobeActive = false
 
+  /** How a `white` emitter is driven; see {@link WhiteChannelMixMode}. */
+  private _whiteChannelMixMode: WhiteChannelMixMode = DEFAULT_WHITE_CHANNEL_MIX_MODE
+
   // --- Output-rate governor (opt-in via DmxPublisherOptions.outputRateHz) ---
   /** Min ms between wire sends. 0 = governor disabled (legacy synchronous pass-through). */
   private _minIntervalMs = 0
@@ -217,6 +224,9 @@ export class DmxPublisher {
     const hz = options.outputRateHz
     if (typeof hz === 'number' && Number.isFinite(hz) && hz > 0) {
       this._minIntervalMs = 1000 / hz
+    }
+    if (options.whiteChannelMixMode) {
+      this._whiteChannelMixMode = options.whiteChannelMixMode
     }
 
     this.publish = this.publish.bind(this)
@@ -346,6 +356,14 @@ export class DmxPublisher {
     }
     this._minIntervalMs = next
     this._resetGovernorAllSlots()
+  }
+
+  /**
+   * Hot-swap the White Channel Mix Mode. Takes effect on the next published frame; nothing is
+   * cached per mode, so no governor or plan reset is needed.
+   */
+  public setWhiteChannelMixMode(mode: WhiteChannelMixMode): void {
+    this._whiteChannelMixMode = mode
   }
 
   /**
@@ -506,6 +524,13 @@ export class DmxPublisher {
       curWireTargets = wireTargets
       curIpcBuffer = ipcBuffer
 
+      // Only `strobe-rgbw` needs to know which lights a strobe drives; the other modes are
+      // unconditional.
+      const strobeLightIds =
+        this._whiteChannelMixMode === 'strobe-rgbw' && activeStrobeSlot != null
+          ? manager.getStrobeLightIds()
+          : null
+
       // Fixtures reached below via the light-states map. Anything left over (a fixture no cue has
       // addressed, or a strobe-group light excluded from cue targeting) gets its pinned `fixed`
       // channels emitted in a follow-up pass so mode/macro channels still publish.
@@ -529,6 +554,13 @@ export class DmxPublisher {
           hasStrobeChannel && dmxLight.fixture !== FixtureTypes.STROBE
         const strobeChannelActive =
           activeStrobeSlot != null && dmxLight.isStrobeEnabled && isRgbFamilyWithStrobeChannel
+        // White Channel Mix Mode. Under `strobe-rgbw` either strobe mechanism counts — the flash
+        // path (strobe set) or the hardware chop, whose colour the latch below resolves to the
+        // flash peak. A fixture with no white emitter has no plan stage to apply this to.
+        const additiveWhite =
+          this._whiteChannelMixMode === 'always-rgbw' ||
+          (this._whiteChannelMixMode === 'strobe-rgbw' &&
+            (strobeChannelActive || strobeLightIds?.has(lightId) === true))
 
         let { red: r, green: g, blue: b, intensity } = lightValue
         const { pan, tilt } = lightValue
@@ -630,7 +662,7 @@ export class DmxPublisher {
         const mixPlan = this._getMixPlan(dmxLight)
         if (mixPlan) {
           this._warnInvalidExtras(lightId, mixPlan)
-          applyChannelMixPlan(mixPlan, r, g, b, mixWrite)
+          applyChannelMixPlan(mixPlan, r, g, b, mixWrite, additiveWhite)
         }
 
         for (const [channelName, channelNumber] of Object.entries(dmxLight.channels)) {

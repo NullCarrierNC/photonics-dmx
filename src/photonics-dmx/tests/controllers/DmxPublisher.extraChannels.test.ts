@@ -3,7 +3,7 @@
  *
  * Covers the substitution colour mixer wired into the publish path:
  *  - A plain RGB fixture (no extras) produces the same buffer as before the feature existed.
- *  - The built-in RGBW white channel is now driven (white = min(r,g,b), reduced RGB).
+ *  - A white channel is driven under 'w-only' (white = min(r,g,b), reduced RGB).
  *  - Added colour channels (amber/uv) and duplicate red banks receive the mixed values on both the
  *    wire and IPC buffers.
  *  - `fixed` channels publish on every frame, including all-black frames and for fixtures no cue
@@ -134,8 +134,9 @@ describe('DmxPublisher extra channels', () => {
     expect(Object.keys(buf).sort()).toEqual(['1', '2', '3', '4'])
   })
 
-  it('drives a white channel with substitution (sanctioned change)', () => {
-    // The RGBW shape after the archetype collapse: RGB plus a white extra on channel 5.
+  it("drives a white channel with substitution under 'w-only'", () => {
+    // The RGBW shape after the archetype collapse: RGB plus a white extra on channel 5. White is
+    // the one emitter whose mixing the White Channel Mix Mode changes, so the mode is pinned here.
     const ctx = setup([
       {
         id: 'l1',
@@ -144,11 +145,12 @@ describe('DmxPublisher extra channels', () => {
         extraChannels: [{ type: 'white', channel: 5 }],
       },
     ])
+    ctx.publisher.setWhiteChannelMixMode('w-only')
     ctx.publisher.publish(
       new Map([['l1', rgbio({ red: 255, green: 191, blue: 64, intensity: 255 })]]),
     )
     const buf = ctx.lastWire()
-    // Vector #1: white=64, red=191, green=127, blue=0. (Previously white was never written.)
+    // Vector #1: white=64, red=191, green=127, blue=0.
     expect(buf[5]).toBe(64)
     expect(buf[2]).toBe(191)
     expect(buf[3]).toBe(127)

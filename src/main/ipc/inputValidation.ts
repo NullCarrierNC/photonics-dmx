@@ -11,7 +11,11 @@ import type {
   SerialSenderConfig,
   WireSenderId,
 } from '../../photonics-dmx/types'
-import { ConfigStrobeType, WIRE_SENDER_IDS } from '../../photonics-dmx/types'
+import {
+  ConfigStrobeType,
+  WHITE_CHANNEL_MIX_MODES,
+  WIRE_SENDER_IDS,
+} from '../../photonics-dmx/types'
 import type { AppPreferences } from '../../services/configuration/ConfigurationManager'
 import {
   CUE_DOMAINS,
@@ -823,6 +827,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'windowState',
   'cueEditorWindowState',
   'audioPreviewWindowState',
+  'whiteChannelMixMode',
 ])
 
 /**
@@ -937,6 +942,17 @@ export function validatePreferencesPayload(
     const mode = validateStringUnion(r.processingMode, RB3_PROCESSING_MODES, 'processingMode')
     if (!mode.ok) {
       return { ok: false, error: `rb3Prefs.${mode.error}` }
+    }
+  }
+
+  if ('whiteChannelMixMode' in cleaned) {
+    const mode = validateStringUnion(
+      cleaned.whiteChannelMixMode,
+      WHITE_CHANNEL_MIX_MODES,
+      'whiteChannelMixMode',
+    )
+    if (!mode.ok) {
+      return { ok: false, error: mode.error }
     }
   }
 

@@ -59,3 +59,33 @@ describe('DmxLightManager strobe group gating', () => {
     expect(mgr.getLightsInGroup('strobe').map((l) => l.id)).toEqual(['on-1'])
   })
 })
+
+describe('DmxLightManager.getStrobeLightIds', () => {
+  const config = makeConfig([
+    strobeRow('on-1', true, 1),
+    strobeRow('off-1', false, 2),
+    strobeRow('on-2', true, 3),
+  ])
+
+  it("holds exactly the ids of the 'strobe' group", () => {
+    const mgr = new DmxLightManager(config)
+    expect([...mgr.getStrobeLightIds()].sort()).toEqual(
+      mgr
+        .getLightsInGroup('strobe')
+        .map((l) => l.id)
+        .sort(),
+    )
+  })
+
+  it('tracks a configuration swap', () => {
+    const mgr = new DmxLightManager(config)
+    mgr.setConfiguration(makeConfig([strobeRow('later-1', true, 1)]))
+    expect([...mgr.getStrobeLightIds()]).toEqual(['later-1'])
+  })
+
+  it('empties on shutdown', () => {
+    const mgr = new DmxLightManager(config)
+    mgr.shutdown()
+    expect(mgr.getStrobeLightIds().size).toBe(0)
+  })
+})

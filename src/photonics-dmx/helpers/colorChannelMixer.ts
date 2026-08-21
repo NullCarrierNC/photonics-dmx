@@ -18,8 +18,8 @@ import {
  * fixture with no extra emitters produces no plan at all — the publisher then writes its channels
  * one by one, so a plain fixture pays nothing for this module existing.
  *
- * White is not special here: an RGBW fixture is modelled as an RGB fixture carrying a `white` extra
- * channel, so it flows through the same stage as any other emitter.
+ * An RGBW fixture is an RGB fixture carrying a `white` extra channel, so white extracts through the
+ * same stage as any other emitter — bar the strobe-only additive mode on {@link applyChannelMixPlan}.
  *
  * See {@link EMITTER_PRIMARIES} for the RGB approximation of each emitter and {@link STAGE_ORDER}
  * for the order they extract in, which never affects chromaticity — it only decides which emitter
@@ -51,6 +51,8 @@ export const EMITTER_PRIMARIES: Readonly<
 export const STAGE_ORDER: readonly MixableChannelType[] = ['white', 'amber', 'orange', 'lime', 'uv']
 
 export interface MixStage {
+  /** Which emitter this stage drives; additive-white keys on `white`. */
+  type: MixableChannelType
   /** This emitter's RGB triple, from {@link EMITTER_PRIMARIES}. */
   er: number
   eg: number
@@ -174,7 +176,7 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
     const channels = mixableChannels[type]
     if (!channels.length) continue
     const [er, eg, eb] = EMITTER_PRIMARIES[type]
-    stages.push({ er, eg, eb, channels })
+    stages.push({ type, er, eg, eb, channels })
   }
 
   if (stages.length === 0 && !hasRgbExtra && fixedWrites.length === 0 && reportableProblems === 0) {
@@ -190,6 +192,10 @@ export function buildChannelMixPlan(fixture: DmxFixture): ChannelMixPlan | null 
  * emitted directly by the publisher, so they still fire for fixtures no cue has addressed). Inputs
  * are sanitised to the legacy `clamp(value, 0, 255)` domain so NaN/negative colour can't poison
  * sender buffers or inflate sibling channels. Zero allocation.
+ *
+ * `additiveWhite` (strobe mode): white drives at its normal value but is not charged to the RGB
+ * residual, so an RGBW fixture flashes on every emitter at unchanged hue. The narrower emitters
+ * still substitute. The publisher decides which lights are strobing.
  */
 export function applyChannelMixPlan(
   plan: ChannelMixPlan,
@@ -197,10 +203,16 @@ export function applyChannelMixPlan(
   green: number,
   blue: number,
   write: (channel: number, value: number) => void,
+  additiveWhite = false,
 ): void {
   let r = Number.isFinite(red) ? Math.max(0, Math.min(255, red)) : 0
   let g = Number.isFinite(green) ? Math.max(0, Math.min(255, green)) : 0
   let b = Number.isFinite(blue) ? Math.max(0, Math.min(255, blue)) : 0
+
+  // White's share, returned to the residual in additive mode. Float, so it cancels exactly.
+  let whiteAddR = 0
+  let whiteAddG = 0
+  let whiteAddB = 0
 
   for (const stage of plan.stages) {
     // Drive is limited by the tightest residual/emitter ratio across the components this emitter
@@ -221,11 +233,19 @@ export function applyChannelMixPlan(
     r -= v * stage.er
     g -= v * stage.eg
     b -= v * stage.eb
+
+    // Subtract-then-add-back keeps every later stage identical to substitution mode.
+    if (additiveWhite && stage.type === 'white') {
+      whiteAddR = v * stage.er
+      whiteAddG = v * stage.eg
+      whiteAddB = v * stage.eb
+    }
   }
 
-  const redOut = Math.max(0, Math.round(r))
-  const greenOut = Math.max(0, Math.round(g))
-  const blueOut = Math.max(0, Math.round(b))
+  // The add-back restores at most the colour that came in, so no upper clamp is needed.
+  const redOut = Math.max(0, Math.round(r + whiteAddR))
+  const greenOut = Math.max(0, Math.round(g + whiteAddG))
+  const blueOut = Math.max(0, Math.round(b + whiteAddB))
   for (const channel of plan.redChannels) write(channel, redOut)
   for (const channel of plan.greenChannels) write(channel, greenOut)
   for (const channel of plan.blueChannels) write(channel, blueOut)

@@ -83,6 +83,19 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.cueDomains.rb3Motion).toBeDefined()
   })
 
+  it('loads a same-version v6 file that predates whiteChannelMixMode without wiping it', () => {
+    const appData = freshAppData()
+    const { whiteChannelMixMode: _omitted, ...withoutKey } = DEFAULT_PREFERENCES
+    seedPrefs(appData, 6, { ...withoutKey, effectDebounce: 77 })
+
+    const onCorruptRecovery = jest.fn()
+    const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+    expect(onCorruptRecovery).not.toHaveBeenCalled()
+    expect(prefs.effectDebounce).toBe(77)
+    expect(prefs.whiteChannelMixMode).toBeUndefined()
+  })
+
   it('migrates a stored v4 file end-to-end without throwing or recovering', () => {
     const appData = freshAppData()
     const all = createDefaultCueDomains()

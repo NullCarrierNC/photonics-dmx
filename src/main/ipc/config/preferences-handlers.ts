@@ -51,6 +51,14 @@ export function registerPreferencesDiagnosticsConfigHandlers(
         }
       }
 
+      // Same hot-swap treatment as the rate above.
+      if (typeof validation.value.whiteChannelMixMode === 'string') {
+        const publisher = controllerManager.getDmxPublisher()
+        if (publisher) {
+          publisher.setWhiteChannelMixMode(validation.value.whiteChannelMixMode)
+        }
+      }
+
       return { success: true }
     } catch (error) {
       log.error('Error saving preferences:', error)

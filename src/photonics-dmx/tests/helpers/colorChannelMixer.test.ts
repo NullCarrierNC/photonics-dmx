@@ -5,7 +5,8 @@
  * (white / amber / orange / lime / uv), duplicate red/green/blue banks, and pinned "fixed"
  * channels, using substitution (energy moves out of RGB into the emitters). These tests pin the
  * worked vectors used to design it, the reconstruction/bounds invariants, and the "no extras → no
- * plan" contract that leaves a plain fixture on the per-channel path.
+ * plan" contract that leaves a plain fixture on the per-channel path. Strobes opt into an additive
+ * mode where white's drive is not charged to the RGB residual, covered in its own block.
  */
 import { describe, expect, it } from '@jest/globals'
 import {
@@ -47,6 +48,14 @@ function mix(fixture: DmxFixture, r: number, g: number, b: number): Record<numbe
   const plan = buildChannelMixPlan(fixture)
   const out: Record<number, number> = {}
   if (plan) applyChannelMixPlan(plan, r, g, b, (ch, v) => (out[ch] = v))
+  return out
+}
+
+/** As {@link mix}, in the additive-white mode the publisher selects for strobe frames. */
+function mixAdditive(fixture: DmxFixture, r: number, g: number, b: number): Record<number, number> {
+  const plan = buildChannelMixPlan(fixture)
+  const out: Record<number, number> = {}
+  if (plan) applyChannelMixPlan(plan, r, g, b, (ch, v) => (out[ch] = v), true)
   return out
 }
 
@@ -170,6 +179,68 @@ describe('applyChannelMixPlan — white precedence and duplicates', () => {
     expect(out[6]).toBe(255)
     // Subtracted once — residual matches the single-amber vector (#4), not double.
     expect([out[2], out[3], out[4]]).toEqual([0, 0, 0])
+  })
+})
+
+describe('applyChannelMixPlan — additive white (strobe mode)', () => {
+  it('drives white and rgb together on a neutral flash instead of white alone', () => {
+    // Substitution vector #2 puts the whole flash on white and leaves rgb dark.
+    expect(mixAdditive(rgbwFixture(), 255, 255, 255)).toEqual({ 5: 255, 2: 255, 3: 255, 4: 255 })
+  })
+
+  it('leaves rgb at the flash colour while white still carries its own drive', () => {
+    // Same white value as vector #1; the residual is no longer charged for it.
+    expect(mixAdditive(rgbwFixture(), 255, 191, 64)).toEqual({ 5: 64, 2: 255, 3: 191, 4: 64 })
+    expect(mixAdditive(rgbwFixture(), 255, 128, 128)).toEqual({ 5: 128, 2: 255, 3: 128, 4: 128 })
+  })
+
+  it('changes nothing for a saturated flash, where white has no drive to add back', () => {
+    const f = rgbwFixture()
+    expect(mixAdditive(f, 255, 0, 0)).toEqual(mix(f, 255, 0, 0))
+  })
+
+  it('leaves the narrower emitters substituting, so an RGBWA flash keeps its hue', () => {
+    // Amber still extracts from the post-white remainder, holding its vector #5 value.
+    const f = rgbwFixture([extra('amber', 6)])
+    expect(mixAdditive(f, 255, 223, 128)).toEqual({ 5: 128, 6: 127, 2: 128, 3: 128, 4: 128 })
+  })
+
+  it('is inert on a fixture with no white emitter', () => {
+    const uv = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('uv', 5)])
+    expect(mixAdditive(uv, 128, 0, 128)).toEqual(mix(uv, 128, 0, 128))
+    const amber = makeFixture(FixtureTypes.RGB, RGB_CHANNELS, [extra('amber', 5)])
+    expect(mixAdditive(amber, 255, 191, 0)).toEqual(mix(amber, 255, 191, 0))
+  })
+
+  it('adds back once when two white banks share a drive', () => {
+    const f = rgbwFixture([extra('white', 6)])
+    expect(mixAdditive(f, 255, 191, 64)).toEqual({ 5: 64, 6: 64, 2: 255, 3: 191, 4: 64 })
+  })
+
+  it('returns rgb to the flash colour exactly, never above it', () => {
+    const fixtures = [
+      rgbwFixture(),
+      rgbwFixture([extra('amber', 6)]),
+      rgbwFixture([extra('uv', 6)]),
+    ]
+    for (const f of fixtures) {
+      for (let r = 0; r <= 255; r += 17) {
+        for (let g = 0; g <= 255; g += 17) {
+          for (let b = 0; b <= 255; b += 17) {
+            const out = mixAdditive(f, r, g, b)
+            for (const value of Object.values(out)) {
+              expect(Number.isInteger(value)).toBe(true)
+              expect(value).toBeGreaterThanOrEqual(0)
+              expect(value).toBeLessThanOrEqual(255)
+            }
+            // The add-back restores at most the input colour; later emitters still take a share.
+            expect(out[2]).toBeLessThanOrEqual(r)
+            expect(out[3]).toBeLessThanOrEqual(g)
+            expect(out[4]).toBeLessThanOrEqual(b)
+          }
+        }
+      }
+    }
   })
 })
 

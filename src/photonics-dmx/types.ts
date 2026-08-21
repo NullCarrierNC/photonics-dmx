@@ -342,6 +342,20 @@ export const MIXABLE_CHANNEL_TYPES = ['white', 'amber', 'orange', 'lime', 'uv'] 
 export type MixableChannelType = (typeof MIXABLE_CHANNEL_TYPES)[number]
 
 /**
+ * How a fixture's `white` emitter is driven, chosen by the White Channel Mix Mode preference.
+ * Applies only to RGB fixtures carrying a `white` extra channel. Persisted values — never rename.
+ *
+ *  - `w-only`      substitution everywhere: white takes min(r,g,b) and RGB is charged for it.
+ *  - `strobe-rgbw` substitution for regular lighting, additive for lights a strobe drives.
+ *  - `always-rgbw` additive everywhere: white drives at min(r,g,b) and RGB keeps its full values.
+ */
+export const WHITE_CHANNEL_MIX_MODES = ['w-only', 'strobe-rgbw', 'always-rgbw'] as const
+export type WhiteChannelMixMode = (typeof WHITE_CHANNEL_MIX_MODES)[number]
+
+/** Brightest option, and what a rig gets until the preference is set. */
+export const DEFAULT_WHITE_CHANNEL_MIX_MODE: WhiteChannelMixMode = 'always-rgbw'
+
+/**
  * Everything the "+ Add Channel" picker offers: the mixable colours, plain red/green/blue (so a
  * fixture with a second red bank is expressible), and `fixed` (a utility channel pinned to a
  * constant, e.g. a mode/macro channel).
