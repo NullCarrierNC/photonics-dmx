@@ -16,6 +16,7 @@ import {
   getLightColorChannelBreakdown,
   type ChannelBreakdownEntry,
 } from './dmxPreviewLightColor'
+import { fixtureDmxValuesEqual } from './fixtureDmxValues'
 import LightsDmxPreview3D from './LightsDmxPreview3D'
 
 interface LightsDmxPreviewProps {
@@ -119,132 +120,145 @@ const LightChannelSwatches: React.FC<{ entries: ChannelBreakdownEntry[] }> = ({ 
   </div>
 )
 
+const isMovingHead = (light: DmxFixture): boolean => light.fixture === FixtureTypes.RGBMH
+
+const baseCircleClasses =
+  'w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold shadow-md'
+const subtitleClass = 'text-[9px] text-gray-500 dark:text-gray-400 mt-0.5 select-none'
+
+type LightCircleProps = { light: DmxFixture; dmxValues: Record<number, number> }
+
+/** A fixture only redraws when its own addresses move; see {@link fixtureDmxValuesEqual}. */
+const lightCirclePropsEqual = (a: LightCircleProps, b: LightCircleProps): boolean =>
+  a.light === b.light && fixtureDmxValuesEqual(a.light, a.dmxValues, b.dmxValues)
+
+/** One light's circle (moving heads include the pan/tilt dot overlay) and its swatch row. */
+const LightCircle = React.memo(function LightCircle({ light, dmxValues }: LightCircleProps) {
+  const color = getDmxPreviewLightColorCss(light, dmxValues)
+  const breakdown = getLightColorChannelBreakdown(light, dmxValues)
+
+  if (!isMovingHead(light)) {
+    return (
+      <div className="flex flex-col items-center mx-2 shrink-0">
+        <div className="relative flex items-center justify-center w-20 h-20">
+          <div
+            className={baseCircleClasses}
+            style={{
+              backgroundColor: color,
+            }}>
+            {light.position}
+          </div>
+        </div>
+        {/* The swatch row takes over the slot the spacer reserves. The spacer still covers the
+            fixtures with no colour channels to break down, so rows stay aligned either way. */}
+        {breakdown ? (
+          <LightChannelSwatches entries={breakdown} />
+        ) : (
+          <span className={`${subtitleClass} invisible`} aria-hidden>
+            upstage / downstage
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  const channels = light.channels as RgbMovingHeadDmxChannels
+  const pan = dmxValues[channels.pan] ?? 0
+  const tilt = dmxValues[channels.tilt] ?? 0
+  const { xPct, yPct } = panTiltDmxToSphericalXY(pan, tilt, light.config)
+
+  return (
+    <div className="flex flex-col items-center mx-2 shrink-0">
+      <div className="relative flex items-center justify-center w-20 h-20">
+        <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 text-[9px] font-medium text-gray-600 dark:text-gray-400 select-none">
+          US
+        </span>
+        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 text-[9px] font-medium text-gray-600 dark:text-gray-400 select-none">
+          DS
+        </span>
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 text-[9px] font-medium text-gray-600 dark:text-gray-400 select-none">
+          SR
+        </span>
+        <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[9px] font-medium text-gray-600 dark:text-gray-400 select-none">
+          SL
+        </span>
+        <div
+          className={`${baseCircleClasses} relative overflow-hidden`}
+          style={{
+            backgroundColor: color,
+          }}>
+          <div
+            className="absolute rounded-full bg-red-500 z-10"
+            style={{
+              width: 6,
+              height: 6,
+              left: `${xPct}%`,
+              top: `${yPct}%`,
+              transform: 'translate(-50%, -50%)',
+              border: '3px solid black',
+              boxSizing: 'content-box',
+            }}
+          />
+          <span className="relative z-0">{light.position}</span>
+        </div>
+      </div>
+      {breakdown && <LightChannelSwatches entries={breakdown} />}
+    </div>
+  )
+}, lightCirclePropsEqual)
+
+/** A row of lights. */
+const LightRow: React.FC<{ lights: DmxFixture[]; dmxValues: Record<number, number> }> = ({
+  lights,
+  dmxValues,
+}) => (
+  <div className="flex justify-center gap-x-4 mb-4">
+    {lights.map((light, index) => (
+      <LightCircle key={light.id || `light-${index}`} light={light} dmxValues={dmxValues} />
+    ))}
+  </div>
+)
+
+/** People icons between the front and back rows. */
+const PreviewPeople: React.FC = () => (
+  <div className="flex justify-center mt-1">
+    {[1, 2, 3, 4].map((i) => (
+      <div key={i} className="mx-2 ">
+        <FaUser size={20} className="text-gray-600 dark:text-gray-300" />
+      </div>
+    ))}
+  </div>
+)
+
+const StrobeIndicator = React.memo(function StrobeIndicator({
+  light,
+  dmxValues,
+}: LightCircleProps) {
+  return (
+    <div
+      className="w-24 h-8 flex items-center justify-center text-white dark:text-white rounded mt-4 mx-auto"
+      style={{
+        backgroundColor: getDmxPreviewLightColorCss(light, dmxValues),
+      }}>
+      Strobe
+    </div>
+  )
+}, lightCirclePropsEqual)
+
 const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmxValues }) => {
   const layoutId = lightingConfig.lightLayout?.id ?? 'front'
   const isStacked = layoutId === 'stacked'
   const isTwoRowsOnStage = layoutId === 'two-rows'
   const [previewMode, setPreviewMode] = useAtom(dmxPreviewDimensionAtom)
 
-  const getLightColor = (light: DmxFixture): string => getDmxPreviewLightColorCss(light, dmxValues)
-
-  const isMovingHead = (light: DmxFixture): boolean => light.fixture === FixtureTypes.RGBMH
-
-  /**
-   * Helper function to render individual light circles (moving heads include pan/tilt dot overlay).
-   */
-  const renderLightCircle = (light: DmxFixture, index: number) => {
-    const baseCircleClasses =
-      'w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold shadow-md'
-
-    const subtitleClass = 'text-[9px] text-gray-500 dark:text-gray-400 mt-0.5 select-none'
-    const breakdown = getLightColorChannelBreakdown(light, dmxValues)
-
-    if (!isMovingHead(light)) {
-      return (
-        <div
-          key={light.id || `light-${index}`}
-          className="flex flex-col items-center mx-2 shrink-0">
-          <div className="relative flex items-center justify-center w-20 h-20">
-            <div
-              className={baseCircleClasses}
-              style={{
-                backgroundColor: getLightColor(light),
-              }}>
-              {light.position}
-            </div>
-          </div>
-          {/* The swatch row takes over the slot the spacer reserves. The spacer still covers the
-              fixtures with no colour channels to break down, so rows stay aligned either way. */}
-          {breakdown ? (
-            <LightChannelSwatches entries={breakdown} />
-          ) : (
-            <span className={`${subtitleClass} invisible`} aria-hidden>
-              upstage / downstage
-            </span>
-          )}
-        </div>
-      )
-    }
-
-    const channels = light.channels as RgbMovingHeadDmxChannels
-    const pan = dmxValues[channels.pan] ?? 0
-    const tilt = dmxValues[channels.tilt] ?? 0
-    const { xPct, yPct } = panTiltDmxToSphericalXY(pan, tilt, light.config)
-
-    return (
-      <div key={light.id || `light-${index}`} className="flex flex-col items-center mx-2 shrink-0">
-        <div className="relative flex items-center justify-center w-20 h-20">
-          <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 text-[9px] font-medium text-gray-600 dark:text-gray-400 select-none">
-            US
-          </span>
-          <span className="absolute bottom-0 left-1/2 -translate-x-1/2 text-[9px] font-medium text-gray-600 dark:text-gray-400 select-none">
-            DS
-          </span>
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 text-[9px] font-medium text-gray-600 dark:text-gray-400 select-none">
-            SR
-          </span>
-          <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[9px] font-medium text-gray-600 dark:text-gray-400 select-none">
-            SL
-          </span>
-          <div
-            className={`${baseCircleClasses} relative overflow-hidden`}
-            style={{
-              backgroundColor: getLightColor(light),
-            }}>
-            <div
-              className="absolute rounded-full bg-red-500 z-10"
-              style={{
-                width: 6,
-                height: 6,
-                left: `${xPct}%`,
-                top: `${yPct}%`,
-                transform: 'translate(-50%, -50%)',
-                border: '3px solid black',
-                boxSizing: 'content-box',
-              }}
-            />
-            <span className="relative z-0">{light.position}</span>
-          </div>
-        </div>
-        {breakdown && <LightChannelSwatches entries={breakdown} />}
-      </div>
-    )
-  }
-
-  /**
-   * Helper function to render a row of lights.
-   */
   const renderLightRow = (lights: DmxFixture[]) => (
-    <div className="flex justify-center gap-x-4 mb-4">
-      {lights.map((light, index) => renderLightCircle(light, index))}
-    </div>
+    <LightRow lights={lights} dmxValues={dmxValues} />
   )
 
-  /**
-   * Helper function to render people icons between front and back rows.
-   */
-  const renderPeople = () => (
-    <div className="flex justify-center mt-1">
-      {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="mx-2 ">
-          <FaUser size={20} className="text-gray-600 dark:text-gray-300" />
-        </div>
-      ))}
-    </div>
-  )
+  const renderPeople = () => <PreviewPeople />
 
-  /**
-   * Helper function to render the strobe indicator.
-   */
   const renderStrobeIndicator = (light: DmxFixture) => (
-    <div
-      key={light.id}
-      className="w-24 h-8 flex items-center justify-center text-white dark:text-white rounded mt-4 mx-auto"
-      style={{
-        backgroundColor: getLightColor(light),
-      }}>
-      Strobe
-    </div>
+    <StrobeIndicator key={light.id} light={light} dmxValues={dmxValues} />
   )
 
   const preview3d = <LightsDmxPreview3D lightingConfig={lightingConfig} dmxValues={dmxValues} />

@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { useAtom, useAtomValue } from 'jotai'
+import { useAtomValue, useSetAtom } from 'jotai'
 import { dmxValuesAtom, previewRigIdAtom } from '@renderer/atoms'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getDmxRig, enableSender } from '../ipcApi'
-import { selectDmxBufferForRig } from '../utils/dmxPreviewBuffer'
+import { useRigDmxValues } from './useRigDmxValues'
 import type { DmxRig, LightingConfiguration, IpcSenderConfig } from '../../../photonics-dmx/types'
-import type { DmxValuesPayload } from '../../../shared/ipcTypes'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('useDmxPreview')
 
@@ -17,16 +16,19 @@ const log = createLogger('useDmxPreview')
  *
  * Refreshes the rig config whenever CONTROLLERS_RESTARTED is received so that fixture params
  * (invertPan, invertTilt, tiltStageDeg, etc.) always match the runtime publisher config.
+ *
+ * Writes incoming DMX buffers to `dmxValuesAtom` without subscribing to it, so mounting this hook
+ * does not re-render the page on every DMX frame. The surfaces that draw live values subscribe
+ * themselves (see LiveDmxPreview).
  */
 export function useDmxPreview(): {
   selectedRig: DmxRig | null
   rigConfig: LightingConfiguration | null
-  dmxValues: Record<number, number>
 } {
   const selectedRigId = useAtomValue(previewRigIdAtom)
   const [selectedRig, setSelectedRig] = useState<DmxRig | null>(null)
   const [rigConfig, setRigConfig] = useState<LightingConfiguration | null>(null)
-  const [dmxValues, setDmxValues] = useAtom(dmxValuesAtom)
+  const setDmxValues = useSetAtom(dmxValuesAtom)
 
   // Keep a ref so the CONTROLLERS_RESTARTED handler always sees the latest rigId
   const selectedRigIdRef = useRef(selectedRigId)
@@ -90,19 +92,8 @@ export function useDmxPreview(): {
     return registerIpcListener(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, handleControllersRestarted)
   }, [])
 
-  // Listen for DMX values (one native listener per channel; subscribers fan out). The payload
-  // is a tagged union: `kind: 'rigs'` carries one buffer per active rig (we pick by the current
-  // preview rig id, read through the ref so the closure stays correct across rig switches);
-  // `kind: 'manual'` is DMX Console / shutdown blackout — we store the flat buffer as-is.
-  useEffect(() => {
-    const handleDmxValues = (payload: DmxValuesPayload) => {
-      setDmxValues(selectDmxBufferForRig(payload, selectedRigIdRef.current))
-    }
+  // Publish the selected rig's live buffer into the atom the preview surfaces read.
+  useRigDmxValues(selectedRigIdRef, setDmxValues)
 
-    return registerIpcListener(RENDERER_RECEIVE.DMX_VALUES, handleDmxValues)
-  }, [setDmxValues])
-
-  const dmxValuesForPreview = selectedRig !== null ? dmxValues : {}
-
-  return { selectedRig, rigConfig, dmxValues: dmxValuesForPreview }
+  return { selectedRig, rigConfig }
 }
