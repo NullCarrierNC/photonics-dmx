@@ -3,8 +3,10 @@ import { getDefaultStore, useAtom } from 'jotai'
 import { lightingPrefsAtom, previewRigIdAtom, resolveLastUsedRigId } from '@renderer/atoms'
 import { getActiveRigs } from '@renderer/ipcApi'
 import { createLogger } from '../../../shared/logger'
-import LightsDmxPreview from '@renderer/components/LightsDmxPreview'
-import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPreview'
+import {
+  LiveLightsDmxPreview,
+  LiveLightsDmxChannelsPreview,
+} from '@renderer/components/LiveDmxPreview'
 import StrobeChannelPreviewNotice from '@renderer/components/StrobeChannelPreviewNotice'
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles'
 import CuePreview from '@renderer/components/CuePreview'
@@ -19,7 +21,7 @@ const DmxPreview: React.FC = () => {
   const [prefs] = useAtom(lightingPrefsAtom)
   const advancedModeEnabled = prefs.advancedModeEnabled ?? false
   const [selectedRigId, setSelectedRigId] = useAtom(previewRigIdAtom)
-  const { selectedRig, rigConfig, dmxValues } = useDmxPreview()
+  const { selectedRig, rigConfig } = useDmxPreview()
   const platform = useCuePreviewInputPlatform()
 
   useEffect(() => {
@@ -72,12 +74,12 @@ const DmxPreview: React.FC = () => {
       {selectedRig !== null && rigConfig !== null && (
         <>
           <StrobeChannelPreviewNotice lightingConfig={rigConfig} className="mb-3" />
-          <LightsDmxPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
+          <LiveLightsDmxPreview lightingConfig={rigConfig} />
           <CuePreview
             className={platform === 'AUDIO' ? 'mt-6' : ''}
             showAudioQuickControls={platform === 'AUDIO'}
           />
-          <LightsDmxChannelsPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
+          <LiveLightsDmxChannelsPreview lightingConfig={rigConfig} />
         </>
       )}
       {selectedRig === null && (

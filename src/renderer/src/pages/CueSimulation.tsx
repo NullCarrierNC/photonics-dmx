@@ -12,9 +12,11 @@ import EffectsDropdown from '../components/EffectSelector'
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles'
 import CuePreviewYarg from '@renderer/components/CuePreviewYarg'
 import CuePreviewAudio from '@renderer/components/CuePreviewAudio'
-import LightsDmxPreview from '@renderer/components/LightsDmxPreview'
 import StrobeChannelPreviewNotice from '@renderer/components/StrobeChannelPreviewNotice'
-import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPreview'
+import {
+  LiveLightsDmxPreview,
+  LiveLightsDmxChannelsPreview,
+} from '@renderer/components/LiveDmxPreview'
 import DmxRigSelector from '@renderer/components/DmxRigSelector'
 import { useTimeoutEffect } from '../utils/useTimeout'
 import CueRegistrySelector from '@renderer/components/CueRegistrySelector'
@@ -71,7 +73,7 @@ const CueSimulation: React.FC = () => {
   const [currentGroup, setCurrentGroup] = useState<CueGroup | null>(null)
   const [isAboutOpen, setIsAboutOpen] = useState(false)
   const [selectedRigId, setSelectedRigId] = useAtom(previewRigIdAtom)
-  const { selectedRig, rigConfig, dmxValues } = useDmxPreview()
+  const { selectedRig, rigConfig } = useDmxPreview()
   const [selectedVenueSize, setSelectedVenueSize] = useState<'NoVenue' | 'Small' | 'Large'>('Large')
   const [selectedBpm, setSelectedBpm] = useState<number>(120)
 
@@ -612,10 +614,10 @@ const CueSimulation: React.FC = () => {
         </>
       )}
 
-      {selectedRig !== null && rigConfig !== null && dmxValues !== null && (
+      {selectedRig !== null && rigConfig !== null && (
         <>
           <StrobeChannelPreviewNotice lightingConfig={rigConfig} className="mb-3" />
-          <LightsDmxPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
+          <LiveLightsDmxPreview lightingConfig={rigConfig} />
         </>
       )}
 
@@ -640,7 +642,7 @@ const CueSimulation: React.FC = () => {
 
       {selectedRig !== null && rigConfig !== null && (
         <>
-          <LightsDmxChannelsPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
+          <LiveLightsDmxChannelsPreview lightingConfig={rigConfig} />
         </>
       )}
       {selectedRig === null && (
