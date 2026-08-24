@@ -643,6 +643,8 @@ const DmxConsole: React.FC = () => {
               Light Preview
             </h2>
             <StrobeChannelPreviewNotice lightingConfig={rigConfig} className="mb-3" />
+            {/* No scaling toggle: console output bypasses scaling (see setManualBuffer), so a
+                scaled preview would not be what this page sends. */}
             <LightsDmxPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
           </div>
 

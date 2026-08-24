@@ -3,6 +3,8 @@ import LightType from './../components/LightType'
 import DmxChannels from './../components/DmxChannels'
 import ExtraChannelsEditor from './../components/ExtraChannelsEditor'
 import {
+  BrightnessScaling,
+  DEFAULT_BRIGHTNESS_SCALE_PERCENT,
   DEFAULT_MOVING_HEAD_FIXTURE_CONFIG,
   DEFAULT_STROBE_CHANNEL_VALUES,
   DmxFixture,
@@ -14,6 +16,8 @@ import {
   StrobeChannelValues,
   normalizeFixtureConfig,
 } from '../../../photonics-dmx/types'
+import { isStorableBrightnessScale } from '../../../photonics-dmx/helpers/brightnessScaling'
+import { extraChannelDisplayLabel } from './lightChannelDisplay'
 
 function isFixtureConfigKey(name: string): name is keyof FixtureConfig {
   return name in DEFAULT_MOVING_HEAD_FIXTURE_CONFIG
@@ -25,6 +29,17 @@ const STROBE_VALUE_FIELDS: ReadonlyArray<{ key: keyof StrobeChannelValues; label
   { key: 'fast', label: 'Strobe Fast' },
   { key: 'fastest', label: 'Strobe Fastest' },
 ]
+
+const BRIGHTNESS_SCALING_FIELDS: ReadonlyArray<{ key: keyof BrightnessScaling; label: string }> = [
+  { key: 'red', label: 'Red' },
+  { key: 'green', label: 'Green' },
+  { key: 'blue', label: 'Blue' },
+]
+
+/** Colour extras can be trimmed; a `fixed` channel is a pinned constant with nothing to scale. */
+function isScalableExtra(extra: ExtraChannel): boolean {
+  return extra.type !== 'fixed'
+}
 
 interface LightSettingsProps {
   currentLight: DmxFixture | null
@@ -39,6 +54,9 @@ interface LightSettingsProps {
  * @returns {JSX.Element | null} Form for editing light properties
  */
 const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentLight }) => {
+  // Niche hardware-matching control, so its fields stay behind a toggle.
+  const [scalingRevealed, setScalingRevealed] = React.useState(false)
+
   if (!currentLight) {
     return null // Hide form if currentLight is null
   }
@@ -51,6 +69,17 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
   // intrinsically have a strobe channel and they don't consume `strobeValues`.
   const showStrobeChannelToggle = !isDedicatedStrobe
   const showStrobeFields = !isDedicatedStrobe && hasStrobeChannel
+
+  // A fixture that already carries a trim shows its fields without hunting for the toggle.
+  const scalableExtras = (currentLight.extraChannels ?? [])
+    .map((extra, index) => ({ extra, index }))
+    .filter(({ extra }) => isScalableExtra(extra))
+  const hasBrightnessScaling =
+    BRIGHTNESS_SCALING_FIELDS.some(({ key }) =>
+      isStorableBrightnessScale(currentLight.brightnessScaling?.[key]),
+    ) || scalableExtras.some(({ extra }) => isStorableBrightnessScale(extra.scale))
+  const showScalingToggle = !isDedicatedStrobe
+  const showScalingFields = showScalingToggle && (scalingRevealed || hasBrightnessScaling)
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCurrentLight({ ...currentLight, name: e.target.value })
@@ -99,6 +128,9 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
     if (nextExtras && nextExtras.length > 0) nextLight.extraChannels = nextExtras
     else delete nextLight.extraChannels
 
+    // A colour-less strobe has nothing to balance. Its colour extras were filtered out above.
+    if (newIsStrobeFixture) delete nextLight.brightnessScaling
+
     setCurrentLight(nextLight)
   }
 
@@ -144,6 +176,52 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
         strobeValues: undefined,
       })
     }
+  }
+
+  /** Clamps to 0-100; anything unreadable reads as unscaled. */
+  const parseScalePercent = (raw: string): number => {
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed)) return DEFAULT_BRIGHTNESS_SCALE_PERCENT
+    return Math.max(0, Math.min(100, Math.round(parsed)))
+  }
+
+  const handleScalingToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked
+    setScalingRevealed(checked)
+    if (checked) return
+    // Unchecking clears the trim rather than hiding it, like the strobe-channel toggle above.
+    const next: DmxFixture = { ...currentLight }
+    delete next.brightnessScaling
+    if (next.extraChannels) {
+      next.extraChannels = next.extraChannels.map((ec) => {
+        const { scale: _scale, ...rest } = ec
+        return rest
+      })
+    }
+    setCurrentLight(next)
+  }
+
+  const handleBaseScaleChange = (key: keyof BrightnessScaling, raw: string) => {
+    const percent = parseScalePercent(raw)
+    const nextScaling: BrightnessScaling = { ...currentLight.brightnessScaling }
+    // 100 is never stored; absence is how every layer spells "unscaled".
+    if (isStorableBrightnessScale(percent)) nextScaling[key] = percent
+    else delete nextScaling[key]
+
+    const next: DmxFixture = { ...currentLight }
+    if (Object.keys(nextScaling).length > 0) next.brightnessScaling = nextScaling
+    else delete next.brightnessScaling
+    setCurrentLight(next)
+  }
+
+  const handleExtraScaleChange = (index: number, raw: string) => {
+    const percent = parseScalePercent(raw)
+    const nextExtras = (currentLight.extraChannels ?? []).map((ec, i) => {
+      if (i !== index) return ec
+      const { scale: _scale, ...rest } = ec
+      return isStorableBrightnessScale(percent) ? { ...rest, scale: percent } : rest
+    })
+    setCurrentLight({ ...currentLight, extraChannels: nextExtras })
   }
 
   const handleStrobeValueChange = (key: keyof StrobeChannelValues, raw: string) => {
@@ -213,6 +291,77 @@ const LightSettings: React.FC<LightSettingsProps> = ({ currentLight, setCurrentL
           setCurrentLight(next)
         }}
       />
+
+      {/* Brightness scaling toggle (hidden for colour-less STROBE fixtures) */}
+      {showScalingToggle && (
+        <label
+          className="flex items-center space-x-2 max-w-[360px]"
+          title="Trim individual colour channels to balance a fixture whose emitters differ in brightness">
+          <input
+            type="checkbox"
+            checked={showScalingFields}
+            onChange={handleScalingToggle}
+            className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+          />
+          <span className="text-sm text-gray-700 dark:text-gray-300">Use Brightness Scaling</span>
+        </label>
+      )}
+
+      {/* Per-colour-channel brightness trim, revealed by the toggle above */}
+      {showScalingFields && (
+        <div className="space-y-2 max-w-[360px]">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+            Brightness Scaling
+          </h3>
+          <p className="text-xs text-gray-600 dark:text-gray-400">
+            Percentage of each colour channel&apos;s output sent to the fixture. If your lights
+            don&apos;t produce a nice white when RGB are set to full, try reducing the stronger
+            colours. Setting a colour to 80% means it will be 20% dimmer at full power than the
+            other channels.
+          </p>
+          {BRIGHTNESS_SCALING_FIELDS.map(({ key, label }) => (
+            <div key={key} className="flex items-center space-x-4">
+              <label
+                htmlFor={`brightness-scale-${key}`}
+                className="text-sm w-1/3 text-gray-700 dark:text-gray-300">
+                {label}:
+              </label>
+              <input
+                id={`brightness-scale-${key}`}
+                type="number"
+                min={0}
+                max={100}
+                value={currentLight.brightnessScaling?.[key] ?? DEFAULT_BRIGHTNESS_SCALE_PERCENT}
+                onChange={(e) => handleBaseScaleChange(key, e.target.value)}
+                className="p-2 border border-gray-300 rounded w-[100px] text-black"
+              />
+              <span className="text-sm text-gray-600 dark:text-gray-400">%</span>
+            </div>
+          ))}
+          {scalableExtras.map(({ extra, index }) => {
+            const label = extraChannelDisplayLabel(currentLight, index)
+            return (
+              <div key={`extra-scale-${index}`} className="flex items-center space-x-4">
+                <label
+                  htmlFor={`brightness-scale-extra-${index}`}
+                  className="text-sm w-1/3 text-gray-700 dark:text-gray-300">
+                  {label}:
+                </label>
+                <input
+                  id={`brightness-scale-extra-${index}`}
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={extra.scale ?? DEFAULT_BRIGHTNESS_SCALE_PERCENT}
+                  onChange={(e) => handleExtraScaleChange(index, e.target.value)}
+                  className="p-2 border border-gray-300 rounded w-[100px] text-black"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-400">%</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Per-fixture strobe DMX values (only meaningful when strobe channel is enabled) */}
       {showStrobeFields && (

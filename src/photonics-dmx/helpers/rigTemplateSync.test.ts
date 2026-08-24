@@ -342,6 +342,42 @@ describe('syncDmxLightWithTemplate', () => {
     expect(changed).toBe(false)
     expect(light).toBe(baseRgbLight)
   })
+
+  it('materialises template brightness scaling onto the rig light', () => {
+    const template: DmxFixture = {
+      ...baseRgbTemplate,
+      brightnessScaling: { green: 80, blue: 50 },
+      extraChannels: [{ type: 'amber', channel: 5, scale: 60 }],
+    }
+    const { light, changed } = syncDmxLightWithTemplate(baseRgbLight, template)
+    expect(changed).toBe(true)
+    expect(light.brightnessScaling).toEqual({ green: 80, blue: 50 })
+    // The extra's scale is template-owned and rides through the channel-offset derivation.
+    expect(light.extraChannels).toEqual([{ type: 'amber', channel: 15, scale: 60 }])
+  })
+
+  it('replaces rig scaling when the template changes it and removes it when the template drops it', () => {
+    const scaled: DmxLight = { ...baseRgbLight, brightnessScaling: { red: 40 } }
+
+    const retrimmed = syncDmxLightWithTemplate(scaled, {
+      ...baseRgbTemplate,
+      brightnessScaling: { red: 90 },
+    })
+    expect(retrimmed.changed).toBe(true)
+    expect(retrimmed.light.brightnessScaling).toEqual({ red: 90 })
+
+    const cleared = syncDmxLightWithTemplate(scaled, baseRgbTemplate)
+    expect(cleared.changed).toBe(true)
+    expect('brightnessScaling' in cleared.light).toBe(false)
+  })
+
+  it('is a no-op when rig and template already carry the same scaling', () => {
+    const template: DmxFixture = { ...baseRgbTemplate, brightnessScaling: { blue: 70 } }
+    const scaled: DmxLight = { ...baseRgbLight, brightnessScaling: { blue: 70 } }
+    const { light, changed } = syncDmxLightWithTemplate(scaled, template)
+    expect(changed).toBe(false)
+    expect(light).toBe(scaled)
+  })
 })
 
 describe('syncLightingConfigurationWithUserLights', () => {

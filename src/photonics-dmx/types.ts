@@ -382,6 +382,12 @@ export interface ExtraChannel {
   channel: number
   /** Constant DMX output 0–255. Only meaningful when `type === 'fixed'`. */
   value?: number
+  /**
+   * Brightness trim for this emitter, integer percent 0–100 (see
+   * {@link DmxFixture.brightnessScaling}). Absent means 100 and 100 is never stored, so dedup sees
+   * an unscaled row and a scale-less one as the same. Not used on `fixed`, whose value is pinned.
+   */
+  scale?: number
 }
 
 export interface MovingHeadDmxChannels {
@@ -617,6 +623,23 @@ export const DEFAULT_STROBE_CHANNEL_VALUES: Readonly<StrobeChannelValues> = {
   fastest: 255,
 }
 
+/** Full emitter output, and what every colour channel gets until it is trimmed. */
+export const DEFAULT_BRIGHTNESS_SCALE_PERCENT = 100
+
+/**
+ * Brightness trim for a fixture's base red/green/blue emitters, integer percents 0–100. Colour
+ * extras carry their own {@link ExtraChannel.scale}. A weak red pulls every mixed colour towards
+ * green/blue, so trimming the stronger emitters rebalances the fixture.
+ *
+ * A key is present only when scaled, the object only when some key is. The default is absence at
+ * every layer, which template dedup on rig import depends on.
+ */
+export interface BrightnessScaling {
+  red?: number
+  green?: number
+  blue?: number
+}
+
 export type TrackedLight = {
   id: string
   position: number
@@ -653,6 +676,11 @@ export interface DmxFixture {
    * `channel` is re-derived by the master-dimmer offset model on every sync.
    */
   extraChannels?: ExtraChannel[]
+  /**
+   * Trim for the base red/green/blue channels (see {@link BrightnessScaling}). Wire output only, and
+   * template-owned on a rig snapshot ({@link DmxLight}): every sync copies it wholesale.
+   */
+  brightnessScaling?: BrightnessScaling
 }
 
 export interface DmxLight extends DmxFixture {

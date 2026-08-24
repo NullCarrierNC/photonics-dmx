@@ -30,6 +30,10 @@ import {
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import type { Brightness, Color, DmxFixture } from '../../photonics-dmx/types'
 import { EXTRA_CHANNEL_TYPES, FixtureTypes } from '../../photonics-dmx/types'
+import {
+  isStorableBrightnessScale,
+  isValidBrightnessScalePercent,
+} from '../../photonics-dmx/helpers/brightnessScaling'
 import { CueType } from '../../photonics-dmx/cues/types/cueTypes'
 import type { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
@@ -487,6 +491,16 @@ function validateLightArrayChannels(lights: unknown[], fieldName: string): strin
         return extraError
       }
     }
+    if (el.brightnessScaling != null) {
+      const scalingError = validateBrightnessScaling(
+        el.brightnessScaling,
+        `${fieldName}[${i}].brightnessScaling`,
+      )
+      if (scalingError) {
+        return scalingError
+      }
+    }
+    normalizeBrightnessScalingKeys(el)
   }
   return null
 }
@@ -1440,6 +1454,16 @@ export function validateDmxFixturesArray(
         return { ok: false, error: extraError }
       }
     }
+    if (el.brightnessScaling != null) {
+      const scalingError = validateBrightnessScaling(
+        el.brightnessScaling,
+        `${fieldName}[${i}].brightnessScaling`,
+      )
+      if (scalingError) {
+        return { ok: false, error: scalingError }
+      }
+    }
+    normalizeBrightnessScalingKeys(el)
   }
   return { ok: true, value: value as DmxFixture[] }
 }
@@ -1490,8 +1514,64 @@ function validateExtraChannels(value: unknown, fieldName: string): string | null
       // otherwise persist and defeat template dedup against an identical value-less row.
       return `${fieldName}[${i}].value is only valid on a fixed channel`
     }
+    if (ec.type === 'fixed') {
+      if (ec.scale !== undefined) {
+        // A fixed channel is a pinned constant, so a scale on it would never be applied, and it
+        // would ride through sync forever, the same dedup hazard as a value on a colour row.
+        return `${fieldName}[${i}].scale is not valid on a fixed channel`
+      }
+    } else if (ec.scale !== undefined && !isValidBrightnessScalePercent(ec.scale)) {
+      return `${fieldName}[${i}].scale must be an integer percent between 0 and 100`
+    }
   }
   return null
+}
+
+const BRIGHTNESS_SCALING_KEYS = ['red', 'green', 'blue'] as const
+const BRIGHTNESS_SCALING_KEY_SET = new Set<string>(BRIGHTNESS_SCALING_KEYS)
+
+/**
+ * Validates a fixture's `brightnessScaling`: integer percents 0–100, keys limited to red/green/blue
+ * (an unrecognised one would ride through sync and defeat dedup). Null when valid.
+ */
+function validateBrightnessScaling(value: unknown, fieldName: string): string | null {
+  if (!isPlainObject(value)) {
+    return `${fieldName} must be a plain object`
+  }
+  for (const [key, percent] of Object.entries(value)) {
+    if (!BRIGHTNESS_SCALING_KEY_SET.has(key)) {
+      return `${fieldName}.${key} is not a scalable colour channel`
+    }
+    if (percent !== undefined && !isValidBrightnessScalePercent(percent)) {
+      return `${fieldName}.${key} must be an integer percent between 0 and 100`
+    }
+  }
+  return null
+}
+
+/**
+ * Applies the "never persist a 100% scale" invariant in place. Normalised rather than rejected,
+ * because a hand-edited config may reasonably say 100; it just must not reach storage, where it
+ * would stop an unscaled fixture deep-equalling one that omits the field.
+ */
+function normalizeBrightnessScalingKeys(el: Record<string, unknown>): void {
+  const scaling = el.brightnessScaling
+  if (isPlainObject(scaling)) {
+    for (const key of BRIGHTNESS_SCALING_KEYS) {
+      if (!isStorableBrightnessScale(scaling[key])) delete scaling[key]
+    }
+    if (Object.keys(scaling).length === 0) delete el.brightnessScaling
+  } else {
+    // Covers an explicit null, which would otherwise persist and stop an unscaled fixture
+    // deep-equalling one that simply omits the key.
+    delete el.brightnessScaling
+  }
+
+  if (Array.isArray(el.extraChannels)) {
+    for (const ec of el.extraChannels) {
+      if (isPlainObject(ec) && !isStorableBrightnessScale(ec.scale)) delete ec.scale
+    }
+  }
 }
 
 /**
