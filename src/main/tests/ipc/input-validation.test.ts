@@ -728,6 +728,103 @@ describe('inputValidation', () => {
       })
     })
 
+    describe('brightness scaling', () => {
+      const fixtureWith = (fields: Record<string, unknown>): Record<string, unknown> => ({
+        id: 'l1',
+        name: 'L1',
+        label: 'L1',
+        isStrobeEnabled: false,
+        universe: 1,
+        fixture: 'rgb',
+        position: 1,
+        channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
+        ...fields,
+      })
+
+      it('accepts integer percents 0–100 on base channels and colour extras', () => {
+        const result = validateDmxFixturesArray([
+          fixtureWith({
+            brightnessScaling: { red: 0, green: 80, blue: 99 },
+            extraChannels: [{ type: 'amber', channel: 5, scale: 55 }],
+          }),
+        ])
+        expect(result.ok).toBe(true)
+      })
+
+      it('accepts a fixture with no scaling at all', () => {
+        expect(validateDmxFixturesArray([fixtureWith({})]).ok).toBe(true)
+      })
+
+      it.each([
+        ['percent above 100', { brightnessScaling: { red: 101 } }],
+        ['negative percent', { brightnessScaling: { red: -1 } }],
+        ['fractional percent', { brightnessScaling: { red: 99.5 } }],
+        ['string percent', { brightnessScaling: { red: '80' } }],
+        ['unknown colour key', { brightnessScaling: { white: 80 } }],
+        ['non-object scaling', { brightnessScaling: 80 }],
+        ['extra scale above 100', { extraChannels: [{ type: 'amber', channel: 5, scale: 101 }] }],
+        ['extra scale fractional', { extraChannels: [{ type: 'amber', channel: 5, scale: 1.5 }] }],
+        [
+          'scale on a fixed row',
+          { extraChannels: [{ type: 'fixed', channel: 5, value: 10, scale: 50 }] },
+        ],
+      ])('rejects %s', (_label, fields) => {
+        expect(validateDmxFixturesArray([fixtureWith(fields)]).ok).toBe(false)
+      })
+
+      it('normalises 100% away so an unscaled fixture stays key-less', () => {
+        const el = fixtureWith({
+          brightnessScaling: { red: 100, green: 80 },
+          extraChannels: [{ type: 'amber', channel: 5, scale: 100 }],
+        })
+        expect(validateDmxFixturesArray([el]).ok).toBe(true)
+        expect(el.brightnessScaling).toEqual({ green: 80 })
+        expect((el.extraChannels as Array<Record<string, unknown>>)[0]).toEqual({
+          type: 'amber',
+          channel: 5,
+        })
+      })
+
+      it('drops an all-default scaling object and a null one entirely', () => {
+        for (const scaling of [{ red: 100, green: 100 }, null]) {
+          const el = fixtureWith({ brightnessScaling: scaling })
+          expect(validateDmxFixturesArray([el]).ok).toBe(true)
+          expect('brightnessScaling' in el).toBe(false)
+        }
+      })
+
+      it('validates and normalises scaling on rig-snapshot lights via the layout path', () => {
+        const rigLight = {
+          id: 'l1',
+          name: 'L1',
+          label: 'L1',
+          isStrobeEnabled: false,
+          universe: 1,
+          fixture: 'rgb',
+          group: 'front',
+          position: 1,
+          fixtureId: 'tpl-1',
+          channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 },
+          brightnessScaling: { green: 80, blue: 100 },
+        }
+        const config = {
+          numLights: 1,
+          lightLayout: { id: 'two-rows', label: 'Two Rows' },
+          strobeType: 'None',
+          frontLights: [rigLight],
+          backLights: [],
+          strobeLights: [],
+        }
+        expect(validateLightingConfiguration(config).ok).toBe(true)
+        expect(rigLight.brightnessScaling).toEqual({ green: 80 })
+
+        const badRigLight = { ...rigLight, brightnessScaling: { green: 200 } }
+        expect(validateLightingConfiguration({ ...config, frontLights: [badRigLight] }).ok).toBe(
+          false,
+        )
+      })
+    })
+
     describe('default roots', () => {
       // Outside a real Electron runtime the packaged check fails closed, so the defaults here are
       // homedir + tmpdir WITHOUT cwd — the same roots a packaged app gets. (A packaged app launched

@@ -45,8 +45,9 @@ const ExtraChannelsEditor: React.FC<ExtraChannelsEditorProps> = ({ light, onChan
     const next = extras.map((ec, i) => {
       if (i !== index) return ec
       if (type === 'fixed') return { type, channel: ec.channel, value: ec.value ?? 0 }
-      // Drop the value when leaving 'fixed' — it's only valid on fixed channels.
-      return { type, channel: ec.channel }
+      // Drop the fixed value when leaving 'fixed'; keep brightness trim on colour emitters.
+      const { value: _value, ...rest } = ec
+      return { ...rest, type, channel: ec.channel }
     })
     emit(next)
   }

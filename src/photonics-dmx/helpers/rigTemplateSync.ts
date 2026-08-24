@@ -26,9 +26,11 @@ import type {
  *    {@link createDmxLightInstance} and LightChannelsConfig use. Re-laying-out channel offsets in
  *    a template therefore propagates to every rig light using it.
  *  - Default `strobeValues` (when the rig has no per-light override)
- *  - `extraChannels` — user-added channels beyond the archetype map. `type`/`value` are copied
- *    verbatim; each `channel` is offset-derived from the template the same way the base channels
- *    are (see {@link deriveExtraChannelsForMaster}).
+ *  - `extraChannels`: user-added channels beyond the archetype map. `type`/`value`/`scale` are
+ *    copied verbatim; each `channel` is offset-derived from the template the same way the base
+ *    channels are (see {@link deriveExtraChannelsForMaster}).
+ *  - `brightnessScaling`: the colour trim. No per-rig override, so the template's value replaces
+ *    whatever the snapshot held.
  *  - `config` defaults when the rig has none and the template provides them (e.g. fixture-type
  *    change RGB→RGBMH adds moving-head defaults). Existing rig calibration is preserved.
  *
@@ -51,9 +53,9 @@ function channelsAsRecord(channels: DmxFixture['channels']): ChannelRecord {
 }
 
 /**
- * Derives a rig light's `extraChannels` from its template. `type` and `value` are template-owned and
- * copied verbatim; `channel` follows the same offset model as the base channels —
- * `master + (templateChannel - templateMaster)`. A template channel of 0 means "unassigned" and
+ * Derives a rig light's `extraChannels` from its template. `type`, `value` and `scale` are
+ * template-owned and copied verbatim; `channel` follows the same offset model as the base
+ * channels: `master + (templateChannel - templateMaster)`. A template channel of 0 means "unassigned" and
  * stays 0 (never offset); a derived result outside 1–512 — off either end — collapses to 0 via
  * {@link clampDerivedDmxChannel} so it can't fail the 0–512 validators. Returns `undefined` for a
  * nullish *or empty* input — never `[]` — so callers can use the set/delete pattern and
@@ -193,6 +195,12 @@ export function syncDmxLightWithTemplate(
     rigMaster,
   )
 
+  // brightnessScaling: template-owned outright. It describes the emitters, which every rig using
+  // the template shares, so there is no per-light override to preserve.
+  const nextBrightnessScaling = template.brightnessScaling
+    ? { ...template.brightnessScaling }
+    : undefined
+
   // Build the synced light without explicit `undefined` values for optional fields, so deep
   // equality against the (potentially key-less) input doesn't trip on `{key: undefined}` vs absent.
   const synced: DmxLight = {
@@ -216,6 +224,11 @@ export function syncDmxLightWithTemplate(
     synced.extraChannels = nextExtraChannels
   } else {
     delete synced.extraChannels
+  }
+  if (nextBrightnessScaling !== undefined) {
+    synced.brightnessScaling = nextBrightnessScaling
+  } else {
+    delete synced.brightnessScaling
   }
 
   return equal(light, synced) ? { light, changed: false } : { light: synced, changed: true }

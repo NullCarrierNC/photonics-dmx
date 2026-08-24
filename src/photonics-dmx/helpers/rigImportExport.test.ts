@@ -302,6 +302,30 @@ describe('reconcileImportedTemplates (de-dup policy)', () => {
     expect(result.templatesToAdd).toEqual([])
     expect(result.fixtureIdMap).toEqual({ b: 'a' })
   })
+
+  it('content-dedups a template whose scaling is spelled out at the 100% default', () => {
+    const local: DmxFixture = { ...rgbTemplate, id: 'a' }
+    const foreign: DmxFixture = {
+      ...rgbTemplate,
+      id: 'b',
+      brightnessScaling: { red: 100, green: 100 },
+      extraChannels: [{ type: 'amber', channel: 5, scale: 100 }],
+    }
+    const localWithAmber: DmxFixture = {
+      ...local,
+      extraChannels: [{ type: 'amber', channel: 5 }],
+    }
+    const result = reconcileImportedTemplates([foreign], [localWithAmber])
+    expect(result.templatesToAdd).toEqual([])
+    expect(result.fixtureIdMap).toEqual({ b: 'a' })
+  })
+
+  it('keeps a genuinely scaled template distinct from an unscaled one', () => {
+    const unscaled: DmxFixture = { ...rgbTemplate, id: 'a' }
+    const scaled: DmxFixture = { ...rgbTemplate, id: 'b', brightnessScaling: { green: 80 } }
+    const result = reconcileImportedTemplates([scaled], [unscaled])
+    expect(result.templatesToAdd.map((t) => t.id)).toEqual(['b'])
+  })
 })
 
 describe('countOrphanLights', () => {

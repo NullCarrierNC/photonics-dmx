@@ -1,6 +1,7 @@
 import equal from 'fast-deep-equal'
 import type { DmxFixture, DmxLight, DmxRig } from '../types'
 import { migrateFixtureSchema, migrateLightingConfiguration } from './lightingConfigMigration'
+import { isStorableBrightnessScale } from './brightnessScaling'
 
 /**
  * Pure, process-agnostic core for exporting, importing, and duplicating rigs. No Electron / IO so
@@ -44,6 +45,19 @@ function sameTemplateContent(a: DmxFixture, b: DmxFixture): boolean {
     // "No extras" is canonically a missing key (never `[]`), but a hand-edited or foreign file may
     // carry an empty array — normalise so absent and `[]` compare equal and don't defeat dedup.
     if (!rest.extraChannels?.length) delete rest.extraChannels
+    // Same normalisation for brightness scaling, whose canonical form is "absent means 100%": a
+    // foreign file may spell an unscaled channel out as 100, which must still dedup against a
+    // template that simply omits it.
+    for (const ec of rest.extraChannels ?? []) {
+      if (!isStorableBrightnessScale(ec.scale)) delete ec.scale
+    }
+    const scaling = rest.brightnessScaling
+    if (scaling) {
+      for (const key of ['red', 'green', 'blue'] as const) {
+        if (!isStorableBrightnessScale(scaling[key])) delete scaling[key]
+      }
+      if (Object.keys(scaling).length === 0) delete rest.brightnessScaling
+    }
     return rest
   }
   return equal(strip(a), strip(b))

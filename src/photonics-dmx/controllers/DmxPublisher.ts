@@ -25,6 +25,7 @@ import {
   buildChannelMixPlan,
   type ChannelMixPlan,
 } from '../helpers/colorChannelMixer'
+import { buildBrightnessScaleMap, scaleDmxValueByPercent } from '../helpers/brightnessScaling'
 import { SenderManager } from './SenderManager'
 import { LightStateManager, type LightStatesListener } from './sequencer/LightStateManager'
 import { getStrobeStateManager, StrobeStateManager } from './StrobeStateManager'
@@ -186,6 +187,8 @@ export class DmxPublisher {
    * mixing needed" (per-channel path); it is cached too so we don't rebuild it every frame.
    */
   private _mixPlans = new WeakMap<DmxFixture, ChannelMixPlan | null>()
+  /** Per-fixture brightness scale maps, keyed on identity like {@link _mixPlans}. */
+  private _scaleMaps = new WeakMap<DmxFixture, Map<number, number> | null>()
   /**
    * Per-light peak colour seen since the current strobe became active. The stock strobe cues
    * modulate opacity, which the blender bakes into rgb/intensity — so the brightest blended
@@ -306,6 +309,9 @@ export class DmxPublisher {
    * Console mode broadcasts the same buffer to every enabled wire slot (routing applies to cue
    * output only — the console isn't rig-aware) and emits a `kind: 'manual'` IPC payload so the
    * console page sees its own loopback.
+   *
+   * Values reach the wire exactly as given, with no brightness scaling: the console is a raw
+   * per-channel takeover, and calibration depends on reading back the number you typed.
    */
   public setManualBuffer(buffer: Record<number, number>): void {
     this._manualMode = true
@@ -414,6 +420,14 @@ export class DmxPublisher {
     return plan
   }
 
+  /** Memoised scale map for a fixture (see {@link _scaleMaps}); `null` = nothing scaled. */
+  private _getScaleMap(fixture: DmxFixture): Map<number, number> | null {
+    if (this._scaleMaps.has(fixture)) return this._scaleMaps.get(fixture)!
+    const scaleMap = buildBrightnessScaleMap(fixture)
+    this._scaleMaps.set(fixture, scaleMap)
+    return scaleMap
+  }
+
   /**
    * Reports a plan's excluded extra channels once per light. Shared by the per-light-state pass and
    * the unvisited-fixture pass, so a fixture no cue addresses still explains its dead mode channel.
@@ -473,6 +487,9 @@ export class DmxPublisher {
     let curWireTargets: WireSenderId[] = []
     let curIpcBuffer: Record<number, number> | null = null
     let curLightId = ''
+    // Brightness trim for the light being written. Cleared before the fixed-channel passes, since
+    // a pinned constant must reach the wire verbatim even on a scaled colour address.
+    let curScaleMap: Map<number, number> | null = null
     const writeChannel = (channelNumber: number, value: number, channelLabel: string): void => {
       // DMX-addressable channels are 1–512; anything else (0 = unassigned template slot,
       // NaN/negative/huge from a bad config already on disk) must not become a buffer key the wire
@@ -488,9 +505,14 @@ export class DmxPublisher {
         return
       }
       const clamped = Math.max(0, Math.min(255, value))
+      // Scaling is a property of the fixture, so the wire gets it and the IPC buffer keeps cue
+      // intent. The preview re-applies it on request, rounding through the same helper.
+      const scalePercent = curScaleMap?.get(channelNumber)
+      const wireValue =
+        scalePercent === undefined ? clamped : scaleDmxValueByPercent(clamped, scalePercent)
       for (const wireId of curWireTargets) {
         // _reconcileSlots ensured every enabled wire sender has slot state.
-        this._slots.get(wireId)!.buffer[channelNumber] = clamped
+        this._slots.get(wireId)!.buffer[channelNumber] = wireValue
       }
       if (curIpcBuffer !== null) {
         curIpcBuffer[channelNumber] = clamped
@@ -544,6 +566,7 @@ export class DmxPublisher {
         }
         visitedLightIds.add(lightId)
         curLightId = lightId
+        curScaleMap = this._getScaleMap(dmxLight)
 
         const lightChannels = dmxLight.channels as RgbDmxChannels
         const hasStrobeChannel = typeof lightChannels.strobeChannel === 'number'
@@ -705,6 +728,7 @@ export class DmxPublisher {
         // the console/calibration seeds. (The editor warns about duplicate numbers but doesn't
         // block them, so this state reaches the wire.)
         if (mixPlan) {
+          curScaleMap = null
           for (const fw of mixPlan.fixedWrites) writeChannel(fw.channel, fw.value, 'fixed channel')
         }
       }
@@ -712,6 +736,7 @@ export class DmxPublisher {
       // Unvisited-fixture pass: emit pinned `fixed` channels for planned fixtures no light state
       // addressed this frame (pre-first-cue lights, or strobe-group lights excluded from cue
       // targeting). Colour/mixable channels legitimately need a state, so only fixed writes fire.
+      curScaleMap = null
       for (const [lightId, fixture] of manager.getAllDmxLights()) {
         if (visitedLightIds.has(lightId)) continue
         const plan = this._getMixPlan(fixture)

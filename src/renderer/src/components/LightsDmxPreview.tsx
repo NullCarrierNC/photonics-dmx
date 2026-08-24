@@ -22,6 +22,8 @@ import LightsDmxPreview3D from './LightsDmxPreview3D'
 interface LightsDmxPreviewProps {
   lightingConfig: LightingConfiguration
   dmxValues: Record<number, number>
+  /** Controls pinned to the card's bottom-left corner, for anything governing how it draws. */
+  cornerControls?: React.ReactNode
 }
 
 export {
@@ -63,7 +65,9 @@ const DmxPreviewWithStageLegend: React.FC<{
   children: React.ReactNode
   /** When false (e.g. 3D preview), border labels are hidden; stage direction is shown in the 3D scene. */
   showStageLegend?: boolean
-}> = ({ children, showStageLegend = true }) => (
+  /** Pinned bottom-left, clear of the stage legend and the lights. */
+  cornerControls?: React.ReactNode
+}> = ({ children, showStageLegend = true, cornerControls }) => (
   <div
     className={`relative mt-4 rounded-lg bg-gray-200 dark:bg-gray-700 ${
       showStageLegend
@@ -97,6 +101,11 @@ const DmxPreviewWithStageLegend: React.FC<{
       </>
     )}
     <div className="relative z-0 flex w-full min-w-0 flex-col items-center">{children}</div>
+    {cornerControls && (
+      <div className="absolute z-[2] bottom-1.5 left-1.5 sm:bottom-2 sm:left-3">
+        {cornerControls}
+      </div>
+    )}
   </div>
 )
 
@@ -245,7 +254,11 @@ const StrobeIndicator = React.memo(function StrobeIndicator({
   )
 }, lightCirclePropsEqual)
 
-const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmxValues }) => {
+const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({
+  lightingConfig,
+  dmxValues,
+  cornerControls,
+}) => {
   const layoutId = lightingConfig.lightLayout?.id ?? 'front'
   const isStacked = layoutId === 'stacked'
   const isTwoRowsOnStage = layoutId === 'two-rows'
@@ -265,7 +278,9 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
 
   if (isStacked) {
     return (
-      <DmxPreviewWithStageLegend showStageLegend={previewMode === '2d'}>
+      <DmxPreviewWithStageLegend
+        showStageLegend={previewMode === '2d'}
+        cornerControls={cornerControls}>
         <PreviewDimensionToggle mode={previewMode} onChange={setPreviewMode} />
         {previewMode === '3d' ? (
           preview3d
@@ -306,7 +321,9 @@ const LightsDmxPreview: React.FC<LightsDmxPreviewProps> = ({ lightingConfig, dmx
   }
 
   return (
-    <DmxPreviewWithStageLegend showStageLegend={previewMode === '2d'}>
+    <DmxPreviewWithStageLegend
+      showStageLegend={previewMode === '2d'}
+      cornerControls={cornerControls}>
       <PreviewDimensionToggle mode={previewMode} onChange={setPreviewMode} />
       {previewMode === '3d' ? (
         preview3d

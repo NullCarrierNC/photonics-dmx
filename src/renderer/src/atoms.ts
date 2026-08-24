@@ -153,6 +153,12 @@ export const dmxPreviewDimensionAtom = atomWithStorage<'2d' | '3d'>(
 )
 
 /**
+ * DMX preview: draw each fixture's brightness scaling. Not persisted, since it is a demonstration
+ * mode rather than a display preference.
+ */
+export const previewBrightnessScalingAtom = atom<boolean>(false)
+
+/**
  * Atom for last-known DMX values (channel -> value).
  * Persists across page navigation so persistent cues (e.g. YARG menu) remain visible in preview.
  */

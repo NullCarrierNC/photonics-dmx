@@ -33,8 +33,12 @@ const TWO_ROWS_LAYOUT = { id: 'two-rows', label: 'Two Rows (one in front of the 
  *  v7 — `rgbw`/`rgbw/mh` collapsed onto `rgb`/`rgb/mh` with the white channel moved into an
  *       `extraChannels` entry. The substitution mixer drives a white extra exactly as it drove the
  *       named white channel, so migrated fixtures publish identical DMX.
+ *  v8 adds per-colour-channel brightness scaling to rig lights (`brightnessScaling` on the
+ *       fixture, `scale` on a colour `extraChannels` entry), synced from their templates. No data
+ *       transformation is needed, since an absent field means 100%, so the bump is a marker that
+ *       this code understands the fields.
  */
-export const CURRENT_RIGS_SCHEMA_VERSION = 7
+export const CURRENT_RIGS_SCHEMA_VERSION = 8
 
 /**
  * Converts a single fixture/light from the pre-v2 strobe model. Only RGB-family fixtures are
