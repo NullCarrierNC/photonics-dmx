@@ -65,6 +65,32 @@ const sizes = measureSources()
 if (process.argv.includes('--write')) {
   mkdirSync(join(root, 'metrics'), { recursive: true })
   const listed = overLimit(sizes)
+
+  // Regenerating must never launder a file that grew. Raising an allowance is a deliberate act, so
+  // it is done by editing the entry, not by running this.
+  if (existsSync(BUDGET_FILE)) {
+    /** @type {string[]} */
+    const grown = []
+    for (const line of readFileSync(BUDGET_FILE, 'utf8').trim().split('\n').slice(1)) {
+      const match = /^(\d+) (.+)$/.exec(line)
+      if (!match) continue
+      const cap = parseInt(match[1], 10)
+      const now = sizes.get(match[2])
+      if (now !== undefined && now > cap) {
+        grown.push(`${match[2]} is ${now} lines, over its ${cap} line allowance`)
+      }
+    }
+    if (grown.length > 0) {
+      for (const entry of grown) {
+        console.error(entry)
+      }
+      console.error(
+        `Refusing to raise an allowance. Shrink the file, or edit its entry in ${BUDGET_FILE} if the growth is intended.`,
+      )
+      process.exit(1)
+    }
+  }
+
   const header = [
     `limit ${LIMIT}`,
     'Auto-generated: non-test sources under src/ that exceed the line limit.',

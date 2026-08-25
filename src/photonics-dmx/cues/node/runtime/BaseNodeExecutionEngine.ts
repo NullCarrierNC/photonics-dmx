@@ -15,8 +15,8 @@
  * - effect-raiser dispatch (cue-only) — `dispatchSpecialNode`
  * - debug logging (cue-only) — `debugLog`
  *
- * The shared `executeActionNode` dispatcher lives here; the genuine per-engine differences are
- * routed through the hooks above.
+ * The shared `executeActionNode` dispatcher lives here; per-engine differences route through the
+ * hooks above. The dispatcher is most of the length: one branch per action type, so it stays whole.
  */
 
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
