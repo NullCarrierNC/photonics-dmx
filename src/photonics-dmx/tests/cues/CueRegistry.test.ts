@@ -1,4 +1,4 @@
-import { CueRegistry } from '../../cues/registries/CueRegistry'
+import { CueRegistry, CueStateUpdate } from '../../cues/registries/CueRegistry'
 import { INetCue, CueStyle } from '../../cues/interfaces/INetCue'
 import { ICueGroup } from '../../cues/interfaces/INetCueGroup'
 import { CueData, CueType } from '../../cues/types/cueTypes'
@@ -10,7 +10,10 @@ import { beforeEach, describe, it, expect } from '@jest/globals'
 // Mock implementations
 class MockCueImplementation implements INetCue {
   private _id: string
-  constructor(private _name: string) {
+  constructor(
+    private _name: string,
+    public style: CueStyle = CueStyle.Primary,
+  ) {
     this._id = `mock-${this._name}-${Math.random().toString(36).substring(2, 11)}`
   }
   get cueId(): string {
@@ -20,7 +23,6 @@ class MockCueImplementation implements INetCue {
     return this._id
   }
   description = 'Mock cue for testing'
-  style = CueStyle.Primary
   async execute(
     _data: CueData,
     _controller: ILightingController,
@@ -660,6 +662,133 @@ describe('CueRegistry', () => {
 
       registry.setEnabledGroups(['groupA'])
       expect(registry.getActiveGroups()).toEqual(['groupA'])
+    })
+  })
+
+  describe('per-role selection tracking', () => {
+    const cueGroup = (id: string, style: CueStyle): ICueGroup => ({
+      id,
+      name: id,
+      cues: new Map([
+        [CueType.Chorus, new MockCueImplementation(`${id}-chorus`, style)],
+        [CueType.Verse, new MockCueImplementation(`${id}-verse`, style)],
+      ]),
+    })
+
+    const updates = (reg: CueRegistry): CueStateUpdate[] => {
+      const seen: CueStateUpdate[] = []
+      reg.setCueStateUpdateCallback((state) => seen.push(state))
+      return seen
+    }
+
+    it('counts consecutive calls per role and reports the role limit', () => {
+      registry.reset()
+      registry.registerGroup(cueGroup('primaries', CueStyle.Primary))
+      registry.setActiveGroups(['primaries'])
+      const seen = updates(registry)
+
+      registry.getCueImplementation(CueType.Chorus)
+      registry.getCueImplementation(CueType.Chorus)
+      registry.getCueImplementation(CueType.Chorus)
+
+      expect(seen.map((u) => u.counter)).toEqual([1, 2, 3])
+      expect(seen.every((u) => u.cueStyle === 'primary')).toBe(true)
+      expect(seen[0].limit).toBe(100)
+    })
+
+    it('secondary cues count on their own limit', () => {
+      registry.reset()
+      registry.registerGroup(cueGroup('secondaries', CueStyle.Secondary))
+      registry.setActiveGroups(['secondaries'])
+      const seen = updates(registry)
+
+      registry.getCueImplementation(CueType.Chorus)
+      registry.getCueImplementation(CueType.Chorus)
+
+      expect(seen.map((u) => u.counter)).toEqual([1, 2])
+      expect(seen.every((u) => u.cueStyle === 'secondary')).toBe(true)
+      expect(seen[0].limit).toBe(50)
+    })
+
+    it('keeps counting across a cue type change while the group serves both', () => {
+      registry.reset()
+      registry.registerGroup(cueGroup('primaries', CueStyle.Primary))
+      registry.setActiveGroups(['primaries'])
+      const seen = updates(registry)
+
+      registry.getCueImplementation(CueType.Chorus)
+      registry.getCueImplementation(CueType.Chorus)
+      registry.getCueImplementation(CueType.Verse)
+
+      expect(seen.map((u) => u.counter)).toEqual([1, 2, 3])
+    })
+
+    it('counts the two roles on separate counters when both styles are in play', () => {
+      registry.reset()
+      const mixed: ICueGroup = {
+        id: 'mixed',
+        name: 'mixed',
+        cues: new Map([
+          [CueType.Chorus, new MockCueImplementation('mixed-chorus', CueStyle.Primary)],
+          [CueType.Verse, new MockCueImplementation('mixed-verse', CueStyle.Secondary)],
+        ]),
+      }
+      registry.registerGroup(mixed)
+      registry.setActiveGroups(['mixed'])
+      const seen = updates(registry)
+
+      registry.getCueImplementation(CueType.Chorus)
+      registry.getCueImplementation(CueType.Verse)
+      registry.getCueImplementation(CueType.Chorus)
+      registry.getCueImplementation(CueType.Verse)
+
+      expect(seen.map((u) => [u.cueStyle, u.counter])).toEqual([
+        ['primary', 1],
+        ['secondary', 1],
+        ['primary', 2],
+        ['secondary', 2],
+      ])
+    })
+
+    // Every caller resolves and validates the group before handing it to the role handler, so the
+    // handler always takes its pre-selection branch. The last-cue name and group it would otherwise
+    // record stay unset, and the two readers below report that.
+    it('leaves the last-cue name unset while selections arrive pre-resolved', () => {
+      registry.reset()
+      registry.registerGroup(cueGroup('primaries', CueStyle.Primary))
+      registry.registerGroup(cueGroup('secondaries', CueStyle.Secondary))
+      registry.setActiveGroups(['primaries', 'secondaries'])
+
+      registry.getCueImplementation(CueType.Chorus)
+      registry.getCueImplementation(CueType.Verse)
+      registry.getCueImplementationFromGroup(CueType.Chorus, 'primaries')
+
+      const info = registry.getDebugInfo()
+      expect(info.lastPrimaryCue).toMatchObject({ name: null, group: null })
+      expect(info.lastSecondaryCue).toMatchObject({ name: null, group: null })
+    })
+
+    it('returns no cue state while the last-cue name is unset', () => {
+      registry.reset()
+      registry.registerGroup(cueGroup('primaries', CueStyle.Primary))
+      registry.setActiveGroups(['primaries'])
+
+      registry.getCueImplementation(CueType.Chorus)
+
+      expect(registry.getCueState(CueType.Chorus)).toBeNull()
+    })
+
+    it('clears both roles on reset', () => {
+      registry.reset()
+      registry.registerGroup(cueGroup('primaries', CueStyle.Primary))
+      registry.setActiveGroups(['primaries'])
+      registry.getCueImplementation(CueType.Chorus)
+
+      registry.reset()
+
+      const info = registry.getDebugInfo()
+      expect(info.lastPrimaryCue).toMatchObject({ name: null, group: null, counter: 0 })
+      expect(info.lastSecondaryCue).toMatchObject({ name: null, group: null, counter: 0 })
     })
   })
 })
