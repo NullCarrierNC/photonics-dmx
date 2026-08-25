@@ -95,6 +95,17 @@ export class LifecycleAbortedError extends Error {
   }
 }
 
+/**
+ * Collaborators a caller can supply instead of the ones this builds for itself.
+ *
+ * Production passes nothing. Tests pass a configuration store so constructing a manager does not
+ * reach the real config files, which is what lets them drive a normally constructed instance rather
+ * than assembling one field by field off the prototype.
+ */
+export interface ControllerManagerDeps {
+  config?: ConfigurationManager
+}
+
 export class ControllerManager {
   private config: ConfigurationManager
   /**
@@ -160,8 +171,8 @@ export class ControllerManager {
    *  overwriting each other. */
   private readonly onControllerRestartListeners: Array<() => void> = []
 
-  constructor() {
-    this.config = new ConfigurationManager()
+  constructor(deps: ControllerManagerDeps = {}) {
+    this.config = deps.config ?? new ConfigurationManager()
     this.senderLifecycle = new SenderLifecycleController(() => this.config, {
       broadcaster: mainRuntimeBroadcaster,
       hasReceivers: hasBrowserWindows,
