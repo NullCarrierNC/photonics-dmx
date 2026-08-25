@@ -31,6 +31,38 @@ export interface CueStateUpdate {
 }
 
 /**
+ * Selection state for one cue role. Primary and secondary cues are tracked separately so a run of
+ * one does not rotate the other, and each role rotates to a fresh group once its counter reaches
+ * `limit`.
+ */
+interface CueRoleState {
+  readonly style: 'primary' | 'secondary'
+  readonly limit: number
+  lastCueName: string | null
+  lastCueGroup: string | null
+  lastIsFallback: boolean
+  counter: number
+}
+
+function newCueRoleState(style: 'primary' | 'secondary', limit: number): CueRoleState {
+  return {
+    style,
+    limit,
+    lastCueName: null,
+    lastCueGroup: null,
+    lastIsFallback: false,
+    counter: 0,
+  }
+}
+
+function resetCueRoleState(role: CueRoleState): void {
+  role.lastCueName = null
+  role.lastCueGroup = null
+  role.lastIsFallback = false
+  role.counter = 0
+}
+
+/**
  * Registry for managing multiple sets of cue implementations.
  * Additional groups can define unique implementations for cues.
  * If a group doesn't define a specific cue we will fall back to the
@@ -68,23 +100,9 @@ export class CueRegistry {
   /** Current stage kit priority preference */
   private stageKitPriority: 'prefer-for-tracked' | 'random' | 'never' = 'prefer-for-tracked'
 
-  /** Track last called primary cue and its source group */
-  private lastPrimaryCueName: string | null = null
-  private lastPrimaryCueGroup: string | null = null
-  private lastPrimaryIsFallback: boolean = false
-
-  /** Track last called secondary cue and its source group */
-  private lastSecondaryCueName: string | null = null
-  private lastSecondaryCueGroup: string | null = null
-  private lastSecondaryIsFallback: boolean = false
-
-  /** Counter for consecutive calls to the same primary cue */
-  private primaryCueCounter: number = 0
-  private primaryCueLimit: number = 100
-
-  /** Counter for consecutive calls to the same secondary cue */
-  private secondaryCueCounter: number = 0
-  private secondaryCueLimit: number = 50
+  /** Last called cue and source group per role, with the consecutive-call counter for that role */
+  private readonly primaryRole: CueRoleState = newCueRoleState('primary', 100)
+  private readonly secondaryRole: CueRoleState = newCueRoleState('secondary', 50)
 
   /** Cue consistency throttling to prevent rapid randomization changes */
   private cueConsistencyWindow: number = 2000 // 2 seconds in milliseconds
@@ -155,14 +173,8 @@ export class CueRegistry {
     this.defaultGroup = null
     this.stageKitGroup = null
     this.stageKitPriority = 'prefer-for-tracked'
-    this.lastPrimaryCueName = null
-    this.lastPrimaryCueGroup = null
-    this.lastPrimaryIsFallback = false
-    this.lastSecondaryCueName = null
-    this.lastSecondaryCueGroup = null
-    this.lastSecondaryIsFallback = false
-    this.primaryCueCounter = 0
-    this.secondaryCueCounter = 0
+    resetCueRoleState(this.primaryRole)
+    resetCueRoleState(this.secondaryRole)
 
     // Clear consistency tracking and once-per-song lock
     this.lockSelectionsForSong = false
@@ -287,13 +299,15 @@ export class CueRegistry {
         // Stage kit group has this cue and should be preferred
         const cue = stageKitGroup.cues.get(cueType)!
         if (cue.style === CueStyle.Primary) {
-          return this.handlePrimaryCue(
+          return this.handleRoleCue(
+            this.primaryRole,
             cueType,
             { groupId: this.stageKitGroup, isFallback: false },
             false,
           )
         } else {
-          return this.handleSecondaryCue(
+          return this.handleRoleCue(
+            this.secondaryRole,
             cueType,
             { groupId: this.stageKitGroup, isFallback: false },
             false,
@@ -312,9 +326,19 @@ export class CueRegistry {
       const cue = group?.cues.get(cueType)
       if (group && cue && !this.isCueDisabled(consistentSelection.groupId, cueType)) {
         if (cue.style === CueStyle.Primary) {
-          return this.handlePrimaryCue(cueType, consistentSelection, trackMode === 'autogen')
+          return this.handleRoleCue(
+            this.primaryRole,
+            cueType,
+            consistentSelection,
+            trackMode === 'autogen',
+          )
         } else {
-          return this.handleSecondaryCue(cueType, consistentSelection, trackMode === 'autogen')
+          return this.handleRoleCue(
+            this.secondaryRole,
+            cueType,
+            consistentSelection,
+            trackMode === 'autogen',
+          )
         }
       }
     }
@@ -338,16 +362,16 @@ export class CueRegistry {
 
     const tempCue = this.groups.get(tempSelection.groupId)!.cues.get(cueType)!
     if (tempCue.style === CueStyle.Primary) {
-      return this.handlePrimaryCue(cueType, tempSelection, trackMode === 'autogen')
+      return this.handleRoleCue(this.primaryRole, cueType, tempSelection, trackMode === 'autogen')
     } else {
-      return this.handleSecondaryCue(cueType, tempSelection, trackMode === 'autogen')
+      return this.handleRoleCue(this.secondaryRole, cueType, tempSelection, trackMode === 'autogen')
     }
   }
 
   /**
    * Get cue implementation from a specific group (deterministic, for simulation).
    * Does not use random selection or mutate activeGroups. Routes through
-   * handlePrimaryCue/handleSecondaryCue so state tracking and cue-state updates are preserved.
+   * handleRoleCue so state tracking and cue-state updates are preserved.
    * @param cueType The cue type to resolve
    * @param groupId The group to use (must exist and contain the cue, or fallback to defaultGroup if it has the cue)
    * @param trackMode Used only for autoGen flag when calling handlers
@@ -363,9 +387,9 @@ export class CueRegistry {
       const cue = group.cues.get(cueType)!
       const selection = { groupId, isFallback: false }
       if (cue.style === CueStyle.Primary) {
-        return this.handlePrimaryCue(cueType, selection, trackMode === 'autogen')
+        return this.handleRoleCue(this.primaryRole, cueType, selection, trackMode === 'autogen')
       }
-      return this.handleSecondaryCue(cueType, selection, trackMode === 'autogen')
+      return this.handleRoleCue(this.secondaryRole, cueType, selection, trackMode === 'autogen')
     }
     if (
       this.defaultGroup &&
@@ -375,9 +399,9 @@ export class CueRegistry {
       const selection = { groupId: this.defaultGroup, isFallback: true }
       const cue = this.groups.get(this.defaultGroup)!.cues.get(cueType)!
       if (cue.style === CueStyle.Primary) {
-        return this.handlePrimaryCue(cueType, selection, trackMode === 'autogen')
+        return this.handleRoleCue(this.primaryRole, cueType, selection, trackMode === 'autogen')
       }
-      return this.handleSecondaryCue(cueType, selection, trackMode === 'autogen')
+      return this.handleRoleCue(this.secondaryRole, cueType, selection, trackMode === 'autogen')
     }
     return null
   }
@@ -549,32 +573,40 @@ export class CueRegistry {
   }
 
   /**
-   * Handle primary cue selection logic.
+   * Handle cue selection for one role.
+   *
+   * Callers resolve and validate the group first and pass it as `preSelection`, which is the path
+   * this takes in practice. The branches below it cover a pre-selection that no longer resolves:
+   * the role falls back to its consistent selection, then to a fresh random pick, then to the group
+   * the role used last.
+   *
+   * @param role Selection state for the cue's role, mutated in place
    * @param cueType The type of cue to get
    * @param preSelection Optional pre-selected group to avoid redundant selection
    * @param autoGen Whether the song is auto-generated (affects stage kit priority)
    * @returns The cue implementation or null if not found
    */
-  private handlePrimaryCue(
+  private handleRoleCue(
+    role: CueRoleState,
     cueType: CueType,
     preSelection?: { groupId: string; isFallback: boolean },
     autoGen: boolean = false,
   ): INetCue | null {
-    // If we have a pre-selection, use it directly
+    // If we have a pre-selection, use it directly and bypass consistency
     if (preSelection) {
       const group = this.groups.get(preSelection.groupId)
       const cue = group?.cues.get(cueType)
 
       if (group && cue && !this.isCueDisabled(preSelection.groupId, cueType)) {
         // Use the pre-selection and increment counter
-        this.primaryCueCounter++
+        role.counter++
         this.emitCueStateUpdate(
           cueType,
           preSelection.groupId,
           preSelection.isFallback,
-          'primary',
-          this.primaryCueCounter,
-          this.primaryCueLimit,
+          role.style,
+          role.counter,
+          role.limit,
         )
 
         // Record this execution for consistency tracking
@@ -593,14 +625,14 @@ export class CueRegistry {
 
       if (group && cue && !this.isCueDisabled(consistentSelection.groupId, cueType)) {
         // Use the consistent selection and increment counter
-        this.primaryCueCounter++
+        role.counter++
         this.emitCueStateUpdate(
           cueType,
           consistentSelection.groupId,
           consistentSelection.isFallback,
-          'primary',
-          this.primaryCueCounter,
-          this.primaryCueLimit,
+          role.style,
+          role.counter,
+          role.limit,
         )
         return cue
       } else {
@@ -612,19 +644,19 @@ export class CueRegistry {
       }
     }
 
-    const isNewCue = this.lastPrimaryCueName !== cueType
-    const shouldReset = this.primaryCueCounter >= this.primaryCueLimit
+    const isNewCue = role.lastCueName !== cueType
+    const shouldReset = role.counter >= role.limit
 
     if (isNewCue || shouldReset) {
       // Reset counter and select new implementation
-      this.primaryCueCounter = 0
+      role.counter = 0
       const selection = preSelection || this.getRandomCueFromActiveGroups(cueType)
 
       if (selection) {
-        this.lastPrimaryCueName = cueType
-        this.lastPrimaryCueGroup = selection.groupId
-        this.lastPrimaryIsFallback = selection.isFallback
-        this.primaryCueCounter++
+        role.lastCueName = cueType
+        role.lastCueGroup = selection.groupId
+        role.lastIsFallback = selection.isFallback
+        role.counter++
 
         // Record this execution for consistency tracking
         this.recordCueExecution(cueType, selection)
@@ -632,144 +664,30 @@ export class CueRegistry {
         this.emitCueStateUpdate(
           cueType,
           selection.groupId,
-          this.lastPrimaryIsFallback,
-          'primary',
-          this.primaryCueCounter,
-          this.primaryCueLimit,
+          role.lastIsFallback,
+          role.style,
+          role.counter,
+          role.limit,
         )
         return this.groups.get(selection.groupId)!.cues.get(cueType)!
       }
     } else {
       // Use same group as last time
-      this.primaryCueCounter++
+      role.counter++
       if (
-        this.lastPrimaryCueGroup &&
-        this.groups.get(this.lastPrimaryCueGroup)?.cues.has(cueType) &&
-        !this.isCueDisabled(this.lastPrimaryCueGroup, cueType)
+        role.lastCueGroup &&
+        this.groups.get(role.lastCueGroup)?.cues.has(cueType) &&
+        !this.isCueDisabled(role.lastCueGroup, cueType)
       ) {
         this.emitCueStateUpdate(
           cueType,
-          this.lastPrimaryCueGroup,
-          this.lastPrimaryIsFallback,
-          'primary',
-          this.primaryCueCounter,
-          this.primaryCueLimit,
+          role.lastCueGroup,
+          role.lastIsFallback,
+          role.style,
+          role.counter,
+          role.limit,
         )
-        return this.groups.get(this.lastPrimaryCueGroup)!.cues.get(cueType)!
-      }
-    }
-
-    return null
-  }
-
-  /**
-   * Handle secondary cue selection logic.
-   * @param cueType The type of cue to get
-   * @param preSelection Optional pre-selected group to avoid redundant selection
-   * @param autoGen Whether the song is auto-generated (affects stage kit priority)
-   * @returns The cue implementation or null if not found
-   */
-  private handleSecondaryCue(
-    cueType: CueType,
-    preSelection?: { groupId: string; isFallback: boolean },
-    autoGen: boolean = false,
-  ): INetCue | null {
-    // If we have a pre-selection (from stage kit priority), use it directly and bypass consistency
-    if (preSelection) {
-      const group = this.groups.get(preSelection.groupId)
-      const cue = group?.cues.get(cueType)
-
-      if (group && cue && !this.isCueDisabled(preSelection.groupId, cueType)) {
-        // Use the pre-selection and increment counter
-        this.secondaryCueCounter++
-        this.emitCueStateUpdate(
-          cueType,
-          preSelection.groupId,
-          preSelection.isFallback,
-          'secondary',
-          this.secondaryCueCounter,
-          this.secondaryCueLimit,
-        )
-
-        // Record this execution for consistency tracking
-        this.recordCueExecution(cueType, preSelection)
-
-        return cue
-      }
-    }
-
-    // Check consistency throttling if no pre-selection
-    const consistentSelection = this.shouldUseConsistentSelection(cueType, autoGen)
-    if (consistentSelection) {
-      // Double-check that the group and cue are still available before using
-      const group = this.groups.get(consistentSelection.groupId)
-      const cue = group?.cues.get(cueType)
-
-      if (group && cue && !this.isCueDisabled(consistentSelection.groupId, cueType)) {
-        // Use the consistent selection and increment counter
-        this.secondaryCueCounter++
-        this.emitCueStateUpdate(
-          cueType,
-          consistentSelection.groupId,
-          consistentSelection.isFallback,
-          'secondary',
-          this.secondaryCueCounter,
-          this.secondaryCueLimit,
-        )
-        return cue
-      } else {
-        // Something went wrong with the consistent selection, clear it and fall through to normal logic
-        log.warn(
-          `[Consistency] Consistent selection validation failed for ${cueType}, falling back to normal selection`,
-        )
-        this.clearCueConsistencyTracking(cueType)
-      }
-    }
-
-    const isNewCue = this.lastSecondaryCueName !== cueType
-    const shouldReset = this.secondaryCueCounter >= this.secondaryCueLimit
-
-    if (isNewCue || shouldReset) {
-      // Reset counter and select new implementation
-      this.secondaryCueCounter = 0
-      const selection = preSelection || this.getRandomCueFromActiveGroups(cueType)
-
-      if (selection) {
-        this.lastSecondaryCueName = cueType
-        this.lastSecondaryCueGroup = selection.groupId
-        this.lastSecondaryIsFallback = selection.isFallback
-        this.secondaryCueCounter++
-
-        // Record this execution for consistency tracking
-        this.recordCueExecution(cueType, selection)
-
-        this.emitCueStateUpdate(
-          cueType,
-          selection.groupId,
-          this.lastSecondaryIsFallback,
-          'secondary',
-          this.secondaryCueCounter,
-          this.secondaryCueLimit,
-        )
-        return this.groups.get(selection.groupId)!.cues.get(cueType)!
-      }
-    } else {
-      // Use same group as last time
-      this.secondaryCueCounter++
-      if (
-        this.lastSecondaryCueGroup &&
-        this.groups.get(this.lastSecondaryCueGroup)?.cues.has(cueType) &&
-        !this.isCueDisabled(this.lastSecondaryCueGroup, cueType)
-      ) {
-        this.emitCueStateUpdate(
-          cueType,
-          this.lastSecondaryCueGroup,
-          this.lastSecondaryIsFallback,
-          'secondary',
-          this.secondaryCueCounter,
-          this.secondaryCueLimit,
-        )
-        return this.groups.get(this.lastSecondaryCueGroup)!.cues.get(cueType)!
+        return this.groups.get(role.lastCueGroup)!.cues.get(cueType)!
       }
     }
 
@@ -1122,16 +1040,16 @@ export class CueRegistry {
   } {
     return {
       lastPrimaryCue: {
-        name: this.lastPrimaryCueName,
-        group: this.lastPrimaryCueGroup,
-        counter: this.primaryCueCounter,
-        isFallback: this.lastPrimaryIsFallback,
+        name: this.primaryRole.lastCueName,
+        group: this.primaryRole.lastCueGroup,
+        counter: this.primaryRole.counter,
+        isFallback: this.primaryRole.lastIsFallback,
       },
       lastSecondaryCue: {
-        name: this.lastSecondaryCueName,
-        group: this.lastSecondaryCueGroup,
-        counter: this.secondaryCueCounter,
-        isFallback: this.lastSecondaryIsFallback,
+        name: this.secondaryRole.lastCueName,
+        group: this.secondaryRole.lastCueGroup,
+        counter: this.secondaryRole.counter,
+        isFallback: this.secondaryRole.lastIsFallback,
       },
       activeGroups: Array.from(this.activeGroups),
       enabledGroups: Array.from(this.enabledGroups),
@@ -1145,14 +1063,8 @@ export class CueRegistry {
    * Reset the cue selection counters and last selected groups.
    */
   public resetCueSelectionState(): void {
-    this.lastPrimaryCueName = null
-    this.lastPrimaryCueGroup = null
-    this.lastPrimaryIsFallback = false
-    this.lastSecondaryCueName = null
-    this.lastSecondaryCueGroup = null
-    this.lastSecondaryIsFallback = false
-    this.primaryCueCounter = 0
-    this.secondaryCueCounter = 0
+    resetCueRoleState(this.primaryRole)
+    resetCueRoleState(this.secondaryRole)
   }
 
   /**
@@ -1203,27 +1115,15 @@ export class CueRegistry {
     const tempCue = this.groups.get(tempSelection.groupId)!.cues.get(cueType)!
     const isPrimary = tempCue.style === CueStyle.Primary
 
-    if (isPrimary) {
-      if (this.lastPrimaryCueName === cueType) {
-        return {
-          cueType,
-          groupId: this.lastPrimaryCueGroup!,
-          isFallback: this.lastPrimaryIsFallback,
-          cueStyle: 'primary',
-          counter: this.primaryCueCounter,
-          limit: this.primaryCueLimit,
-        }
-      }
-    } else {
-      if (this.lastSecondaryCueName === cueType) {
-        return {
-          cueType,
-          groupId: this.lastSecondaryCueGroup!,
-          isFallback: this.lastSecondaryIsFallback,
-          cueStyle: 'secondary',
-          counter: this.secondaryCueCounter,
-          limit: this.secondaryCueLimit,
-        }
+    const role = isPrimary ? this.primaryRole : this.secondaryRole
+    if (role.lastCueName === cueType) {
+      return {
+        cueType,
+        groupId: role.lastCueGroup!,
+        isFallback: role.lastIsFallback,
+        cueStyle: role.style,
+        counter: role.counter,
+        limit: role.limit,
       }
     }
 
