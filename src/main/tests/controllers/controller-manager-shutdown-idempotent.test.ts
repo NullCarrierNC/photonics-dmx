@@ -8,9 +8,11 @@ jest.mock('../../utils/windowUtils', () => ({
 }))
 
 import { ControllerManager } from '../../controllers/ControllerManager'
+import type { ControllerLifecycle } from '../../controllers/ControllerLifecycle'
+import { lifecycleAt } from './lifecycleStub'
 
 type ShutdownStub = Record<string, unknown> & {
-  lifecyclePhase: string
+  lifecycle: ControllerLifecycle
   isInitialized: boolean
   listenerLifecycle: unknown
   nodeCueLoader: null
@@ -24,8 +26,6 @@ type ShutdownStub = Record<string, unknown> & {
   effectsController: null
   dmxPublisher: { shutdown: jest.Mock }
   senderLifecycle: { shutdownSenderOnAppExit: jest.Mock }
-  controllerShutdownPromise?: Promise<void> | null
-  controllerShutdownCompleted?: boolean
 }
 
 function makeShutdownStub(overrides: {
@@ -49,7 +49,7 @@ function makeShutdownStub(overrides: {
 
   // Prototype-based partial: real class has private fields that break intersection typing with stubs.
   const stub = Object.create(ControllerManager.prototype) as ShutdownStub
-  stub.lifecyclePhase = 'running'
+  stub.lifecycle = lifecycleAt('running')
   stub.isInitialized = true
   stub.listenerLifecycle = {
     yargRb3: { disableYarg, disableRb3 },
@@ -95,7 +95,7 @@ describe('ControllerManager.shutdown idempotency', () => {
     expect(effectsShutdown).toHaveBeenCalledTimes(1)
     expect(publisherShutdown).toHaveBeenCalledTimes(1)
     expect(senderShutdown).toHaveBeenCalledTimes(1)
-    expect(stub.lifecyclePhase).toBe('stopped')
+    expect(stub.lifecycle.phase).toBe('stopped')
   })
 
   it('concurrent shutdowns share a single in-flight promise', async () => {
@@ -112,7 +112,7 @@ describe('ControllerManager.shutdown idempotency', () => {
     await Promise.all([p1, p2])
 
     expect(senderShutdown).toHaveBeenCalledTimes(1)
-    expect(stub.lifecyclePhase).toBe('stopped')
+    expect(stub.lifecycle.phase).toBe('stopped')
   })
 
   it('per-step rejections are caught and shutdown still completes', async () => {
@@ -124,21 +124,20 @@ describe('ControllerManager.shutdown idempotency', () => {
     await ControllerManager.prototype.shutdown.call(stub as unknown as ControllerManager)
 
     expect(disableYarg).toHaveBeenCalledTimes(1)
-    expect(stub.lifecyclePhase).toBe('stopped')
-    expect(stub.controllerShutdownCompleted).toBe(true)
+    expect(stub.lifecycle.phase).toBe('stopped')
+    expect(stub.lifecycle.shutdownCompleted).toBe(true)
   })
 
   it('a rejected inner shutdown leaves shutdownCompleted false and clears the in-flight promise so a retry can run', async () => {
-    // The fix moves `controllerShutdownCompleted = true` out of `finally` and inside the success
-    // branch. To exercise the rejection path (per-step try/catch wrappers swallow normal teardown
-    // errors) we force a rejection via an override on the stub's setLifecyclePhase call.
+    // The fix moves `shutdownCompleted = true` out of `finally` and inside the success branch. To
+    // exercise the rejection path (per-step try/catch wrappers swallow normal teardown errors) we
+    // force a rejection from the phase transition itself.
     const senderShutdown = jest.fn().mockImplementation(() => Promise.resolve())
-    const stub = makeShutdownStub({ senderShutdown }) as ShutdownStub & {
-      setLifecyclePhase?: (next: string) => void
-    }
+    const stub = makeShutdownStub({ senderShutdown })
     let throwOnce = true
-    stub.setLifecyclePhase = function (this: ShutdownStub, next: string) {
-      this.lifecyclePhase = next
+    const realSetPhase = stub.lifecycle.setPhase.bind(stub.lifecycle)
+    stub.lifecycle.setPhase = (next) => {
+      realSetPhase(next)
       if (next === 'stopped' && throwOnce) {
         throwOnce = false
         throw new Error('phase emit failed')
@@ -149,10 +148,10 @@ describe('ControllerManager.shutdown idempotency', () => {
       ControllerManager.prototype.shutdown.call(stub as unknown as ControllerManager),
     ).rejects.toThrow(/phase emit failed/)
 
-    expect(stub.controllerShutdownCompleted).toBe(true)
-    expect(stub.controllerShutdownPromise ?? null).toBeNull()
+    expect(stub.lifecycle.shutdownCompleted).toBe(true)
+    expect(stub.lifecycle.shutdownPromise ?? null).toBeNull()
 
-    // The retry short-circuits because controllerShutdownCompleted was set just before the throw.
+    // The retry short-circuits because shutdownCompleted was set just before the throw.
     // This is the documented contract: in-process state is consistent (work done) even though
     // the trailing notification failed. Crucially the in-flight promise is cleared either way.
     await ControllerManager.prototype.shutdown.call(stub as unknown as ControllerManager)

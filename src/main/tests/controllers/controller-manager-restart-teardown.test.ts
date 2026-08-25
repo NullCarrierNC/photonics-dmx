@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals'
 
-// Stub electron window helpers so setLifecyclePhase's broadcast is a no-op under test.
+// Stub electron window helpers so the phase broadcast is a no-op under test.
 jest.mock('../../utils/windowUtils', () => ({
   sendToAllWindows: jest.fn(),
   hasBrowserWindows: () => false,
@@ -8,6 +8,8 @@ jest.mock('../../utils/windowUtils', () => ({
 }))
 
 import { ControllerManager } from '../../controllers/ControllerManager'
+import type { ControllerLifecycle } from '../../controllers/ControllerLifecycle'
+import { lifecycleAt } from './lifecycleStub'
 
 /**
  * When tearing controllers down during a restart fails and no shutdown is concurrently running,
@@ -18,9 +20,8 @@ describe('ControllerManager.runRestartControllers when teardown fails', () => {
   it('aborts reinitialization and enters the failed phase when teardown throws', async () => {
     const init = jest.fn(() => Promise.resolve())
     const stub = Object.create(ControllerManager.prototype) as Record<string, unknown>
-    stub.lifecyclePhase = 'running'
+    stub.lifecycle = lifecycleAt('running')
     stub.isInitialized = true
-    stub.controllerShutdownPromise = null
     stub.listenerLifecycle = {
       yargRb3: { getIsYargEnabled: () => false, getIsRb3Enabled: () => false },
       audio: { getIsAudioEnabled: () => false },
@@ -45,7 +46,7 @@ describe('ControllerManager.runRestartControllers when teardown fails', () => {
 
     await expect(runRestart.call(stub)).rejects.toThrow(/teardown failed/i)
     expect(init).not.toHaveBeenCalled()
-    expect(stub.lifecyclePhase).toBe('failed')
+    expect((stub.lifecycle as ControllerLifecycle).phase).toBe('failed')
     expect(stub.isInitialized).toBe(false)
   })
 })

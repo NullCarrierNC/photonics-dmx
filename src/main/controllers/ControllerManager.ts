@@ -38,6 +38,7 @@ import {
 } from './SenderLifecycleController'
 import { ConsoleModeController } from './ConsoleModeController'
 import { RegistryInitializer } from './RegistryInitializer'
+import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycle'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { LifecyclePhase } from '../../shared/ipcTypes'
 import {
@@ -83,17 +84,7 @@ const log = createLogger('ControllerManager')
 // LifecyclePhase is owned by `shared/ipcTypes` so the renderer hook can reference the same union.
 export type { LifecyclePhase } from '../../shared/ipcTypes'
 
-/**
- * Thrown when a lifecycle method (typically `init()` invoked from a restart) is called against a
- * controller that has already begun shutting down. Restart routines treat this as a clean abort
- * rather than a reinit failure.
- */
-export class LifecycleAbortedError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'LifecycleAbortedError'
-  }
-}
+export { LifecycleAbortedError } from './ControllerLifecycle'
 
 /**
  * Collaborators a caller can supply instead of the ones this builds for itself.
@@ -143,7 +134,6 @@ export class ControllerManager {
 
   private cueHandler: CueHandler | null = null
   private rb3CueHandler: CueHandler | null = null
-  private lifecycleOpChain: Promise<void> = Promise.resolve()
   private nodeCueLoader: NodeCueLoader | null = null
   private effectLoader: EffectLoader | null = null
 
@@ -162,10 +152,10 @@ export class ControllerManager {
   private readonly consoleMode: ConsoleModeController
 
   private isInitialized = false
-  private lifecyclePhase: LifecyclePhase = 'initializing'
-  private controllerShutdownPromise: Promise<void> | null = null
-  private controllerShutdownCompleted = false
-  private restartControllersInFlight: Promise<void> | null = null
+  /** Phase state, the op queue, and the in-flight restart and shutdown memos. */
+  private readonly lifecycle = new ControllerLifecycle((phase) => {
+    sendToAllWindows(RENDERER_RECEIVE.LIFECYCLE_PHASE_CHANGED, phase)
+  })
   /** Invoked during restart teardown so process-scoped consumers (e.g. laser sim) drop state tied to the
    *  engine/registry being rebuilt. A list, not a single slot, so multiple consumers can register without
    *  overwriting each other. */
@@ -279,86 +269,8 @@ export class ControllerManager {
     })
   }
 
-  private assertPhase(allowed: readonly LifecyclePhase[], context: string): void {
-    if (!allowed.includes(this.lifecyclePhase)) {
-      throw new Error(
-        `ControllerManager: invalid lifecycle for ${context} (phase=${this.lifecyclePhase}, allowed=[${allowed.join(
-          ', ',
-        )}])`,
-      )
-    }
-  }
-
-  /**
-   * Single point that mutates `lifecyclePhase`; emits LIFECYCLE_PHASE_CHANGED on every real
-   * transition so the renderer can disable actions outside `running` / `consoleMode`.
-   */
-  private setLifecyclePhase(next: LifecyclePhase): void {
-    if (this.lifecyclePhase === next) return
-    this.lifecyclePhase = next
-    sendToAllWindows(RENDERER_RECEIVE.LIFECYCLE_PHASE_CHANGED, next)
-  }
-
-  /**
-   * Wait for any in-flight restart (or shutdown) to settle before mutating audio lifecycle.
-   * Errors from the in-flight operation are swallowed here so that the caller can still attempt
-   * its own work; the operation that owns the promise is responsible for surfacing its error.
-   *
-   * Off-queue callers only (audio enable/disable). Never call this from inside a queued lifecycle
-   * op: the restart is itself a queued op, so a queued op awaiting `restartControllersInFlight`
-   * that sits behind it on the queue would deadlock. Queued ops use `awaitShutdownWork` instead.
-   */
-  private async awaitInFlightLifecycleWork(): Promise<void> {
-    const pending = this.restartControllersInFlight ?? this.controllerShutdownPromise
-    if (!pending) return
-    try {
-      await pending
-    } catch {
-      // The owner already logged / rethrew; we just needed to wait.
-    }
-  }
-
-  /**
-   * Wait for an in-flight shutdown to settle. Used by queued lifecycle ops, which already exclude
-   * each other and any restart via the queue, but must still yield to `shutdown()` (which runs off
-   * the queue). Deliberately does NOT await `restartControllersInFlight` — the restart is a queued
-   * op, so a toggle queued ahead of it awaiting that memo would deadlock.
-   */
-  private async awaitShutdownWork(): Promise<void> {
-    if (!this.controllerShutdownPromise) return
-    try {
-      await this.controllerShutdownPromise
-    } catch {
-      // The owner already logged / rethrew; we just needed to wait.
-    }
-  }
-
-  /**
-   * Serialize every listener toggle and controller restart on one lifecycle queue: each op waits
-   * for the previous one to settle (success or failure) before running, so handler slots and rig
-   * chains are never built and torn down concurrently.
-   */
-  private runLifecycleOp<T>(op: () => Promise<T>): Promise<T> {
-    const previous = this.lifecycleOpChain ?? Promise.resolve()
-    const run = previous.then(op, op)
-    // Flatten so the next op runs regardless of this one's outcome, and log any failure here
-    // exactly once so fire-and-forget callers (`void enableYarg()`) don't discard it silently.
-    // A LifecycleAbortedError is a clean shutdown/restart abort, not a fault, so log it at info.
-    this.lifecycleOpChain = run.then(
-      () => undefined,
-      (err) => {
-        if (err instanceof LifecycleAbortedError) {
-          log.info('Lifecycle operation aborted:', err.message)
-        } else {
-          log.error('Lifecycle operation failed:', err)
-        }
-      },
-    )
-    return run
-  }
-
   public getLifecyclePhase(): LifecyclePhase {
-    return this.lifecyclePhase
+    return this.lifecycle.phase
   }
 
   /**
@@ -368,12 +280,12 @@ export class ControllerManager {
     if (this.isInitialized) {
       return
     }
-    if (this.lifecyclePhase === 'shuttingDown' || this.lifecyclePhase === 'stopped') {
+    if (this.lifecycle.phase === 'shuttingDown' || this.lifecycle.phase === 'stopped') {
       throw new LifecycleAbortedError(
-        `ControllerManager.init aborted: shutdown in progress or already complete (phase=${this.lifecyclePhase})`,
+        `ControllerManager.init aborted: shutdown in progress or already complete (phase=${this.lifecycle.phase})`,
       )
     }
-    this.assertPhase(['initializing', 'restarting', 'failed'], 'init')
+    this.lifecycle.assertPhase(['initializing', 'restarting', 'failed'], 'init')
 
     this.senderLifecycle.ensureSenderManager()
     await this.initializeRigChains()
@@ -388,7 +300,7 @@ export class ControllerManager {
     await this.initializeListeners()
 
     this.isInitialized = true
-    this.setLifecyclePhase('running')
+    this.lifecycle.setPhase('running')
   }
 
   /**
@@ -568,8 +480,8 @@ export class ControllerManager {
    * additionally yields to any in-flight shutdown.
    */
   public async enableYarg(): Promise<void> {
-    await this.runLifecycleOp(async () => {
-      await this.awaitShutdownWork()
+    await this.lifecycle.runOp(async () => {
+      await this.lifecycle.awaitShutdownWork()
       await this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
     })
   }
@@ -578,8 +490,8 @@ export class ControllerManager {
    * Disable YARG listener
    */
   public async disableYarg(): Promise<void> {
-    await this.runLifecycleOp(async () => {
-      await this.awaitShutdownWork()
+    await this.lifecycle.runOp(async () => {
+      await this.lifecycle.awaitShutdownWork()
       await this.listenerLifecycle.yargRb3.disableYarg()
     })
   }
@@ -589,8 +501,8 @@ export class ControllerManager {
    * chains from here and simulation IPC is refused while RB3E is enabled.
    */
   public async enableRb3(): Promise<void> {
-    await this.runLifecycleOp(async () => {
-      await this.awaitShutdownWork()
+    await this.lifecycle.runOp(async () => {
+      await this.lifecycle.awaitShutdownWork()
       await this.stopTestEffect()
       this.onSimulationPreempt?.()
       await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
@@ -601,8 +513,8 @@ export class ControllerManager {
    * Disable Rb3 listener
    */
   public async disableRb3(): Promise<void> {
-    await this.runLifecycleOp(async () => {
-      await this.awaitShutdownWork()
+    await this.lifecycle.runOp(async () => {
+      await this.lifecycle.awaitShutdownWork()
       await this.listenerLifecycle.yargRb3.disableRb3()
     })
   }
@@ -631,18 +543,21 @@ export class ControllerManager {
    * `controllerShutdownPromise` (assigned below), so waiting on the queue here would deadlock.
    */
   public async shutdown(): Promise<void> {
-    if (this.controllerShutdownCompleted) {
+    if (this.lifecycle.shutdownCompleted) {
       return
     }
-    if (this.controllerShutdownPromise) {
-      return this.controllerShutdownPromise
+    if (this.lifecycle.shutdownPromise) {
+      return this.lifecycle.shutdownPromise
     }
 
-    this.assertPhase(['initializing', 'running', 'restarting', 'consoleMode', 'failed'], 'shutdown')
-    this.setLifecyclePhase('shuttingDown')
+    this.lifecycle.assertPhase(
+      ['initializing', 'running', 'restarting', 'consoleMode', 'failed'],
+      'shutdown',
+    )
+    this.lifecycle.setPhase('shuttingDown')
     log.info('ControllerManager shutdown: starting')
 
-    this.controllerShutdownPromise = (async () => {
+    this.lifecycle.shutdownPromise = (async () => {
       // Shutdown in reverse order of initialization
       try {
         await this.listenerLifecycle.yargRb3.disableYarg()
@@ -729,15 +644,15 @@ export class ControllerManager {
       }
 
       this.isInitialized = false
-      this.controllerShutdownCompleted = true
-      this.setLifecyclePhase('stopped')
+      this.lifecycle.shutdownCompleted = true
+      this.lifecycle.setPhase('stopped')
       log.info('ControllerManager shutdown: completed')
     })()
 
     try {
-      await this.controllerShutdownPromise
+      await this.lifecycle.shutdownPromise
     } finally {
-      this.controllerShutdownPromise = null
+      this.lifecycle.shutdownPromise = null
     }
   }
 
@@ -931,34 +846,34 @@ export class ControllerManager {
    * This shuts down existing controllers and reinitializes them
    */
   public async restartControllers(): Promise<void> {
-    if (this.restartControllersInFlight) {
-      return this.restartControllersInFlight
+    if (this.lifecycle.restartInFlight) {
+      return this.lifecycle.restartInFlight
     }
     // A restart is a peer on the lifecycle queue with the listener toggles, so teardown never runs
     // while a toggle is mid-flight (and vice versa). The memo dedupes overlapping calls and gates
     // the off-queue audio toggles. Assigned synchronously so a same-tick second call shares it.
-    this.restartControllersInFlight = this.runLifecycleOp(() =>
-      this.runRestartControllers(),
-    ).finally(() => {
-      this.restartControllersInFlight = null
-    })
-    return this.restartControllersInFlight
+    this.lifecycle.restartInFlight = this.lifecycle
+      .runOp(() => this.runRestartControllers())
+      .finally(() => {
+        this.lifecycle.restartInFlight = null
+      })
+    return this.lifecycle.restartInFlight
   }
 
   private async runRestartControllers(): Promise<void> {
     // A shutdown may have started while this restart waited its turn on the queue; abort cleanly
     // (typed) rather than failing assertPhase with a generic invalid-lifecycle error. Snapshot into
-    // a local so the check doesn't narrow `this.lifecyclePhase` for the post-teardown guard below.
-    const phaseAtDequeue: LifecyclePhase = this.lifecyclePhase
+    // a local so the check doesn't narrow `this.lifecycle.phase` for the post-teardown guard below.
+    const phaseAtDequeue: LifecyclePhase = this.lifecycle.phase
     if (
       phaseAtDequeue === 'shuttingDown' ||
       phaseAtDequeue === 'stopped' ||
-      this.controllerShutdownPromise
+      this.lifecycle.shutdownPromise
     ) {
       throw new LifecycleAbortedError('restartControllers aborted: shutdown in progress')
     }
-    this.assertPhase(['running', 'consoleMode', 'failed'], 'restartControllers')
-    this.setLifecyclePhase('restarting')
+    this.lifecycle.assertPhase(['running', 'consoleMode', 'failed'], 'restartControllers')
+    this.lifecycle.setPhase('restarting')
     log.info('Restarting controllers to apply configuration changes')
 
     // The lifecycle queue guarantees no listener toggle is mid-flight here, so the was-enabled
@@ -1042,9 +957,9 @@ export class ControllerManager {
     // If shutdown began while we were tearing down, do not reinitialize. The shutdown promise
     // owns the next phase transition; restartControllers exits with a typed abort.
     if (
-      this.lifecyclePhase === 'shuttingDown' ||
-      this.lifecyclePhase === 'stopped' ||
-      this.controllerShutdownPromise
+      this.lifecycle.phase === 'shuttingDown' ||
+      this.lifecycle.phase === 'stopped' ||
+      this.lifecycle.shutdownPromise
     ) {
       log.info('Restart aborted: shutdown started during teardown')
       throw new LifecycleAbortedError(
@@ -1057,14 +972,14 @@ export class ControllerManager {
     // so fail the restart instead of building a fresh graph over a broken one.
     if (!teardownSucceeded) {
       log.error('Restart aborted: controller teardown did not complete; not reinitializing')
-      this.setLifecyclePhase('failed')
+      this.lifecycle.setPhase('failed')
       this.isInitialized = false
       throw new Error('Controller teardown failed during restart; reinitialization aborted')
     }
 
     try {
       await this.init()
-      this.setLifecyclePhase(wasConsoleMode ? 'consoleMode' : 'running')
+      this.lifecycle.setPhase(wasConsoleMode ? 'consoleMode' : 'running')
       this.consoleMode.onControllersReinitializedWhileConsoleOpen()
 
       if (wasYargEnabled) {
@@ -1098,7 +1013,7 @@ export class ControllerManager {
         throw error
       }
       log.error('Error reinitializing controllers:', error)
-      this.setLifecyclePhase('failed')
+      this.lifecycle.setPhase('failed')
       this.isInitialized = false
       throw error
     }
@@ -1119,7 +1034,7 @@ export class ControllerManager {
    * Enable audio listener and processor
    */
   public async enableAudio(): Promise<void> {
-    await this.awaitInFlightLifecycleWork()
+    await this.lifecycle.awaitInFlightWork()
     await this.listenerLifecycle.audio.enableAudio(this.isInitialized, () => this.init())
   }
 
@@ -1127,7 +1042,7 @@ export class ControllerManager {
    * Disable audio processing
    */
   public async disableAudio(): Promise<void> {
-    await this.awaitInFlightLifecycleWork()
+    await this.lifecycle.awaitInFlightWork()
     await this.listenerLifecycle.audio.disableAudio()
   }
 
@@ -1249,12 +1164,12 @@ export class ControllerManager {
     rigId: string,
   ): Promise<{ success: true } | { success: false; error: string }> {
     await this.init()
-    if (this.lifecyclePhase !== 'consoleMode') {
-      this.assertPhase(['running'], 'enableConsoleMode')
+    if (this.lifecycle.phase !== 'consoleMode') {
+      this.lifecycle.assertPhase(['running'], 'enableConsoleMode')
     }
     const r = await this.consoleMode.enableConsoleMode(rigId)
     if (r.success) {
-      this.setLifecyclePhase('consoleMode')
+      this.lifecycle.setPhase('consoleMode')
     }
     return r
   }
@@ -1263,8 +1178,8 @@ export class ControllerManager {
     { success: true } | { success: false; error: string }
   > {
     const r = await this.consoleMode.disableConsoleMode()
-    if (r.success && this.lifecyclePhase === 'consoleMode') {
-      this.setLifecyclePhase('running')
+    if (r.success && this.lifecycle.phase === 'consoleMode') {
+      this.lifecycle.setPhase('running')
     }
     return r
   }
