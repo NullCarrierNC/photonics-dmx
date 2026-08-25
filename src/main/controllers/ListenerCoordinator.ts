@@ -5,7 +5,7 @@ import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetwo
 import { Rb3MenuCueHandler } from '../../photonics-dmx/cueHandlers/Rb3MenuCueHandler'
 import { CueHandler } from '../../photonics-dmx/cueHandlers/CueHandler'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
-import { CueType } from '../../photonics-dmx/cues/types/cueTypes'
+import { CueType, type PostProcessing } from '../../photonics-dmx/cues/types/cueTypes'
 import type { CueRuntime } from '../../photonics-dmx/cueHandlers/CueRuntime'
 import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
@@ -32,6 +32,8 @@ export interface ListenerCoordinatorDeps {
   getRb3MotionCueProbabilityPercent: () => number
   getRb3MotionCueDurationRangeSec: () => { min: number; max: number }
   getFallbackCueTimeMs: () => number
+  /** Applies the venue effect YARG reports to DMX output. */
+  setVenuePostProcessing: (state: PostProcessing) => void
   sendSenderError: (message: string) => void
   sendToAllWindows: (channel: string, payload: unknown) => void
   runtimeBroadcaster: RuntimeBroadcaster
@@ -82,6 +84,7 @@ export class ListenerCoordinator {
     this.domainRuntimes.yarg = this.decorate('yarg', this.deps.getChainFanout().cueRuntime('yarg'))
     this.yargListener = new YargNetworkListener(this.domainRuntimes.yarg, {
       getFallbackCueTimeMs: this.deps.getFallbackCueTimeMs,
+      onVenuePostProcessing: this.deps.setVenuePostProcessing,
     })
     this.yargListener.on(
       'yarg-error',
@@ -119,6 +122,7 @@ export class ListenerCoordinator {
       log.error('Failed to start YARG listener:', err)
       this.yargListener = null
       this.isYargEnabled = false
+      this.deps.setVenuePostProcessing('Default')
       this.notifyRuntimeDisabled('yarg')
       this.clearChainHandlers('yarg')
       this.deps.sendToAllWindows(RENDERER_RECEIVE.YARG_ERROR, {
@@ -149,6 +153,7 @@ export class ListenerCoordinator {
       this.yargListener = null
     }
     this.isYargEnabled = false
+    this.deps.setVenuePostProcessing('Default')
     this.notifyRuntimeDisabled('yarg')
     this.clearChainHandlers('yarg')
   }

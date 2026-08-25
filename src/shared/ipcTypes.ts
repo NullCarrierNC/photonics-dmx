@@ -390,6 +390,10 @@ export interface IpcInvokeMap {
       | undefined
     response: boolean
   }
+  [LIGHT.SIMULATE_POST_PROCESSING]: {
+    request: { state: string }
+    response: boolean
+  }
   [LIGHT.SIMULATE_INSTRUMENT_NOTE]: {
     request: {
       instrument: string

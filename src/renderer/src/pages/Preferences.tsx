@@ -9,6 +9,7 @@ import MotionMasterToggle from '../components/MotionMasterToggle'
 import CueConsistencySettings from '../components/CueConsistencySettings'
 import DmxOutputSettings from '../components/DmxOutputSettings'
 import StageKitYargPrioritySettings from '../components/StageKitYargPrioritySettings'
+import VenuePostProcessingSettings from '../components/VenuePostProcessingSettings'
 import YargFallbackSettings from '../components/YargFallbackSettings'
 import StageKitRb3EnhancedSettings from '../components/StageKitRb3EnhancedSettings'
 import BrightnessSettings from '../components/BrightnessSettings'
@@ -135,6 +136,7 @@ const Preferences: React.FC = () => {
             <YargEnabledCueGroups />
             {motionMasterEnabled && <MotionEnabledCueGroups platform="yarg" />}
             <StageKitYargPrioritySettings />
+            <VenuePostProcessingSettings />
             <YargFallbackSettings />
           </>
         )}

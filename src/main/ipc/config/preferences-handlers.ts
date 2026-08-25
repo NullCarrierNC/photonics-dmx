@@ -59,6 +59,12 @@ export function registerPreferencesDiagnosticsConfigHandlers(
         }
       }
 
+      if (typeof validation.value.venuePostProcessingEnabled === 'boolean') {
+        controllerManager
+          .getVenueFrameProcessor()
+          .setVenuePostProcessingEnabled(validation.value.venuePostProcessingEnabled)
+      }
+
       return { success: true }
     } catch (error) {
       log.error('Error saving preferences:', error)

@@ -762,6 +762,64 @@ describe('YargNetworkListener', () => {
     })
   })
 
+  describe('venue post-processing', () => {
+    let states: string[]
+    let ppListener: YargNetworkListener
+
+    function venueFrame(postProcessing: CueData['postProcessing']): CueData {
+      return { ...defaultCueData, currentScene: 'Gameplay', postProcessing }
+    }
+
+    beforeEach(() => {
+      states = []
+      ppListener = new YargNetworkListener(cueHandler, {
+        onVenuePostProcessing: (state) => {
+          states.push(state)
+        },
+      })
+    })
+
+    afterEach(async () => {
+      await ppListener.shutdown()
+    })
+
+    it('reports a change once and stays quiet on repeats', () => {
+      ppListener.processCueData(venueFrame('BlackAndWhite'))
+      ppListener.processCueData(venueFrame('BlackAndWhite'))
+      expect(states).toEqual(['BlackAndWhite'])
+
+      ppListener.processCueData(venueFrame('SepiaTone'))
+      expect(states).toEqual(['BlackAndWhite', 'SepiaTone'])
+    })
+
+    it('reads the state off a real packet', () => {
+      deserializePacket(ppListener, buildYargPacket({ datagramVersion: 5, playerStarPower: [] }))
+      expect(states).toEqual(['Scanlines_Blue'])
+    })
+
+    it('clears the effect outside a venue scene', () => {
+      ppListener.processCueData(venueFrame('BlackAndWhite'))
+      ppListener.processCueData({
+        ...defaultCueData,
+        currentScene: 'Menu',
+        postProcessing: 'BlackAndWhite',
+      })
+      expect(states).toEqual(['BlackAndWhite', 'Default'])
+    })
+
+    it('clears the effect when YARG shuts down', () => {
+      ppListener.processCueData(venueFrame('BlackAndWhite'))
+      deserializePacket(ppListener, buildYargShutdownPacket())
+      expect(states).toEqual(['BlackAndWhite', 'Default'])
+    })
+
+    it('clears the effect when the listener stops', async () => {
+      ppListener.processCueData(venueFrame('Trails'))
+      await ppListener.stop()
+      expect(states).toEqual(['Trails', 'Default'])
+    })
+  })
+
   describe('keepalive throttling (30 Hz)', () => {
     const keepaliveMs = FRAME_KEEPALIVE_MS
     let perfNowSpy: ReturnType<typeof jest.spyOn>

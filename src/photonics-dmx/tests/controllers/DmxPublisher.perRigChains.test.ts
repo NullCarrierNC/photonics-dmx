@@ -8,6 +8,7 @@ import { DmxPublisher } from '../../controllers/DmxPublisher'
 import { SenderManager } from '../../controllers/SenderManager'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
+import { VenueFrameProcessor } from '../../controllers/VenueFrameProcessor'
 import {
   ConfigStrobeType,
   FixtureTypes,
@@ -102,6 +103,56 @@ async function flushMicrotasks(): Promise<void> {
   // Two awaits drain the microtask queue reliably across runtimes.
   await Promise.resolve()
   await Promise.resolve()
+}
+
+/** Two-fixture front row rig for bloom isolation tests. */
+function makeTwoLightRig(id: string, channelBase: number): DmxRig {
+  const config: LightingConfiguration = {
+    numLights: 2,
+    lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
+    strobeType: ConfigStrobeType.None,
+    frontLights: [
+      {
+        id: `${id}-1`,
+        fixtureId: `tpl-${id}-1`,
+        position: 1,
+        name: `${id}-1`,
+        label: `${id}-1`,
+        fixture: FixtureTypes.RGB,
+        isStrobeEnabled: false,
+        group: 'front',
+        universe: 1,
+        mount: 'floor',
+        channels: {
+          masterDimmer: channelBase,
+          red: channelBase + 1,
+          green: channelBase + 2,
+          blue: channelBase + 3,
+        } as unknown as DmxRig['config']['frontLights'][number]['channels'],
+      },
+      {
+        id: `${id}-2`,
+        fixtureId: `tpl-${id}-2`,
+        position: 2,
+        name: `${id}-2`,
+        label: `${id}-2`,
+        fixture: FixtureTypes.RGB,
+        isStrobeEnabled: false,
+        group: 'front',
+        universe: 1,
+        mount: 'floor',
+        channels: {
+          masterDimmer: channelBase + 10,
+          red: channelBase + 11,
+          green: channelBase + 12,
+          blue: channelBase + 13,
+        } as unknown as DmxRig['config']['frontLights'][number]['channels'],
+      },
+    ],
+    backLights: [],
+    strobeLights: [],
+  }
+  return { id, name: id, active: true, config }
 }
 
 describe('DmxPublisher.setRigChains (per-rig chain subscriptions)', () => {
@@ -234,5 +285,40 @@ describe('DmxPublisher.setRigChains (per-rig chain subscriptions)', () => {
     legacyLsm.publishLightStates()
     await flushMicrotasks()
     expect(sender.send).not.toHaveBeenCalled()
+  })
+
+  it('keeps bloom spill isolated per rig under chain subscriptions', async () => {
+    const sender = makeMockSender({ wireSenders: ['sacn'] })
+    const venue = new VenueFrameProcessor()
+    const publisher = new DmxPublisher(
+      sender as unknown as SenderManager,
+      null,
+      new StrobeStateManager(),
+      { frameProcessor: venue },
+    )
+    venue.setVenuePostProcessing('Bloom')
+    const rigA = makeTwoLightRig('A', 1)
+    const rigB = makeTwoLightRig('B', 20)
+    const lsmA = new LightStateManager()
+    const lsmB = new LightStateManager()
+    publisher.updateActiveRigs([rigA, rigB])
+    publisher.setRigChains([
+      { rigId: rigA.id, lightStateManager: lsmA },
+      { rigId: rigB.id, lightStateManager: lsmB },
+    ])
+
+    lsmA.setLightState('A-1', rgbio())
+    lsmA.setLightState('A-2', rgbio({ red: 255, intensity: 255 }))
+    lsmA.publishLightStates()
+    lsmB.setLightState('B-1', rgbio())
+    lsmB.setLightState('B-2', rgbio())
+    lsmB.publishLightStates()
+    await flushMicrotasks()
+
+    const buf = lastBufferFor(sender, 'sacn')!
+    expect(buf[2]).toBeGreaterThan(0)
+    expect(buf[12]).toBe(255)
+    expect(buf[21] ?? 0).toBe(0)
+    expect(buf[31] ?? 0).toBe(0)
   })
 })

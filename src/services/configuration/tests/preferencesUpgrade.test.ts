@@ -96,6 +96,19 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.whiteChannelMixMode).toBeUndefined()
   })
 
+  it('loads a same-version v6 file that predates venuePostProcessingEnabled without wiping it', () => {
+    const appData = freshAppData()
+    const { venuePostProcessingEnabled: _omitted, ...withoutKey } = DEFAULT_PREFERENCES
+    seedPrefs(appData, 6, { ...withoutKey, effectDebounce: 88 })
+
+    const onCorruptRecovery = jest.fn()
+    const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+    expect(onCorruptRecovery).not.toHaveBeenCalled()
+    expect(prefs.effectDebounce).toBe(88)
+    expect(prefs.venuePostProcessingEnabled).toBeUndefined()
+  })
+
   it('migrates a stored v4 file end-to-end without throwing or recovering', () => {
     const appData = freshAppData()
     const all = createDefaultCueDomains()

@@ -43,6 +43,8 @@ const mockControllerManager = {
   })),
   ensureChainsHaveHandlersForSimulation: jest.fn(),
   getIsInitialized: jest.fn().mockReturnValue(true),
+  getDmxPublisher: jest.fn().mockReturnValue(null),
+  getVenueFrameProcessor: jest.fn(() => ({ getVenuePostProcessing: () => 'Default' })),
   getIsYargEnabled: jest.fn().mockReturnValue(true),
   getIsRb3Enabled: jest.fn().mockReturnValue(false),
   init: jest.fn(),

@@ -5,9 +5,11 @@ import {
   lightingPrefsAtom,
   previewRigIdAtom,
   rb3eListenerEnabledAtom,
+  yargListenerEnabledAtom,
   resolveLastUsedRigId,
 } from '@renderer/atoms'
 import { EffectSelector } from '../../../photonics-dmx/types'
+import type { PostProcessing } from '../../../photonics-dmx/cues/types/cueTypes'
 import EffectsDropdown from '../components/EffectSelector'
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles'
 import CuePreviewYarg from '@renderer/components/CuePreviewYarg'
@@ -25,6 +27,7 @@ import CueSimulationAbout from './CueSimulation/CueSimulationAbout'
 import CueSimulationActions from './CueSimulation/CueSimulationActions'
 import CueSimulationInstrument from './CueSimulation/CueSimulationInstrument'
 import CueSimulationMotion from './CueSimulation/CueSimulationMotion'
+import CueSimulationPostProcessing from './CueSimulation/CueSimulationPostProcessing'
 import {
   startTestEffect,
   startRb3TestEffect,
@@ -40,6 +43,7 @@ import {
   simulateKeyframe,
   simulateMeasure,
   simulateInstrumentNote,
+  simulatePostProcessing,
   stopMotionCueSimulation,
 } from '../ipcApi'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
@@ -64,8 +68,10 @@ const fetchCueGroupsForRegistry = (registryType: CueRegistryType) =>
 const CueSimulation: React.FC = () => {
   const [isAudioReactiveEnabled] = useAtom(audioListenerEnabledAtom)
   const [isRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
+  const [isYargEnabled] = useAtom(yargListenerEnabledAtom)
   const [lightingPrefs] = useAtom(lightingPrefsAtom)
   const advancedModeEnabled = lightingPrefs.advancedModeEnabled ?? false
+  const venuePostProcessingEnabled = lightingPrefs.venuePostProcessingEnabled ?? true
   const [selectedEffect, setSelectedEffect] = useState<EffectSelector | null>(null)
   const [selectedRegistryType, setSelectedRegistryType] = useState<CueRegistryType>('YARG')
   const [selectedGroup, setSelectedGroup] = useState<string>('Select')
@@ -81,6 +87,8 @@ const CueSimulation: React.FC = () => {
   const [selectedInstrument, setSelectedInstrument] = useState<
     'guitar' | 'bass' | 'keys' | 'drums'
   >('guitar')
+
+  const [selectedPostProcessing, setSelectedPostProcessing] = useState<PostProcessing>('Default')
 
   // State for manual simulation indicators
   const [showBeatIndicator, setShowBeatIndicator] = useState(false)
@@ -105,6 +113,7 @@ const CueSimulation: React.FC = () => {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hasLoadedSavedEffect = useRef(false)
   const savedEffectIdRef = useRef<string | null>(null)
+  const postProcessingSimulationActiveRef = useRef(false)
 
   useEffect(() => {
     if (!advancedModeEnabled) {
@@ -113,6 +122,13 @@ const CueSimulation: React.FC = () => {
       })
     }
   }, [advancedModeEnabled])
+
+  // With the preference off the publisher stops applying the effect but keeps the one YARG last
+  // reported, so clear the picker rather than leave it naming an effect nothing is showing.
+  useEffect(() => {
+    if (venuePostProcessingEnabled) return
+    setSelectedPostProcessing('Default')
+  }, [venuePostProcessingEnabled])
 
   useEffect(() => {
     if (advancedModeEnabled) return
@@ -146,6 +162,12 @@ const CueSimulation: React.FC = () => {
       stopMotionCueSimulation().catch((error) => {
         log.error('Error stopping motion cue simulation on unmount:', error)
       })
+      // Only release a simulated effect this page successfully applied.
+      if (postProcessingSimulationActiveRef.current) {
+        simulatePostProcessing('Default').catch((error) => {
+          log.error('Error clearing simulated post-processing on unmount:', error)
+        })
+      }
       // Clear any pending save timeout
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
@@ -350,6 +372,23 @@ const CueSimulation: React.FC = () => {
     }
   }
 
+  const handlePostProcessingChange = async (state: PostProcessing) => {
+    const previous = selectedPostProcessing
+    setSelectedPostProcessing(state)
+    try {
+      const applied = await simulatePostProcessing(state)
+      if (applied === true) {
+        postProcessingSimulationActiveRef.current = state !== 'Default'
+      } else {
+        setSelectedPostProcessing(previous)
+        log.warn('Post-processing simulation refused while live input owns the lights')
+      }
+    } catch (error) {
+      setSelectedPostProcessing(previous)
+      log.error('Error simulating post-processing:', error)
+    }
+  }
+
   const handleSimulateBeat = async () => {
     await simulateBeat({
       venueSize: selectedVenueSize,
@@ -404,6 +443,10 @@ const CueSimulation: React.FC = () => {
     setSelectedGroup('')
     setSelectedGroupId('')
     setSelectedEffect(null)
+    // RB3 mode hides the post-processing control, so clear the effect it was holding.
+    if (selectedPostProcessing !== 'Default') {
+      void handlePostProcessingChange('Default')
+    }
   }
 
   // Memoize handleGroupChange to prevent unnecessary re-renders/calls from CueRegistrySelector
@@ -589,6 +632,11 @@ const CueSimulation: React.FC = () => {
               RB3E is enabled and owns the lights. Disable RB3E to simulate cues.
             </div>
           )}
+          {isYargEnabled && !isRb3Enabled && (
+            <div className="mb-4 p-3 rounded border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 text-sm text-amber-800 dark:text-amber-300">
+              YARG is enabled and owns venue post-processing. Disable YARG to simulate effects here.
+            </div>
+          )}
           <CueSimulationActions
             disabled={!selectedEffect || !selectedGroupId || isRb3Enabled}
             onTestEffect={handleTestEffect}
@@ -606,6 +654,15 @@ const CueSimulation: React.FC = () => {
               onInstrumentChange={setSelectedInstrument}
               onSimulateNote={handleSimulateInstrumentNote}
               disabled={!selectedGroupId || isRb3Enabled}
+            />
+          )}
+          {/* Post-processing is a YARG venue signal, so RB3 mode has nothing to drive it, and the
+              preference being off means output would ignore whatever was picked. */}
+          {selectedRegistryType !== 'RB3E' && venuePostProcessingEnabled && (
+            <CueSimulationPostProcessing
+              selectedState={selectedPostProcessing}
+              onStateChange={(state) => void handlePostProcessingChange(state)}
+              disabled={isRb3Enabled || isYargEnabled}
             />
           )}
           {advancedModeEnabled && (

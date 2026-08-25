@@ -39,6 +39,11 @@ const mockPublisher = {
   setWhiteChannelMixMode: jest.fn(),
 }
 
+/** The venue stage the preference drives, owned by ControllerManager rather than the publisher. */
+const mockVenueFrameProcessor = {
+  setVenuePostProcessingEnabled: jest.fn(),
+}
+
 const mockControllerManager = {
   getConfig: jest.fn().mockReturnValue(mockConfig),
   restartControllers: jest.fn().mockImplementation(() => Promise.resolve()),
@@ -47,6 +52,7 @@ const mockControllerManager = {
   flushValidationErrors: jest.fn().mockReturnValue([]),
   getIsInitialized: jest.fn().mockReturnValue(true),
   getDmxPublisher: jest.fn().mockReturnValue(mockPublisher),
+  getVenueFrameProcessor: jest.fn().mockReturnValue(mockVenueFrameProcessor),
 }
 
 const mockSendToAllWindows = jest.fn()
@@ -272,6 +278,26 @@ describe('SAVE_PREFS publisher hot-swap', () => {
 
     expect(result).toEqual({ success: true })
     expect(mockPublisher.setWhiteChannelMixMode).not.toHaveBeenCalled()
+    expect(mockVenueFrameProcessor.setVenuePostProcessingEnabled).not.toHaveBeenCalled()
+  })
+
+  it('persists a venue post-processing change and applies it without a restart', async () => {
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!({}, { venuePostProcessingEnabled: false })
+
+    expect(result).toEqual({ success: true })
+    expect(mockConfig.updatePreferences).toHaveBeenCalledWith({
+      venuePostProcessingEnabled: false,
+    })
+    expect(mockVenueFrameProcessor.setVenuePostProcessingEnabled).toHaveBeenCalledWith(false)
+    expect(mockControllerManager.restartControllers).not.toHaveBeenCalled()
+  })
+
+  it('rejects a non-boolean venue post-processing value', async () => {
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!({}, { venuePostProcessingEnabled: 'yes' })
+
+    expect(result.success).toBe(false)
+    expect(mockConfig.updatePreferences).not.toHaveBeenCalled()
+    expect(mockVenueFrameProcessor.setVenuePostProcessingEnabled).not.toHaveBeenCalled()
   })
 
   it('survives a publisher that has not been built yet', async () => {

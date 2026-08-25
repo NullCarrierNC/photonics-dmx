@@ -2,9 +2,11 @@ import { ConfigurationManager } from '../../services/configuration/Configuration
 import {
   normalizeRb3ProcessingMode,
   normalizeWhiteChannelMixMode,
+  normalizeVenuePostProcessingEnabled,
 } from '../../services/configuration/configurationDefaults'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
+import { VenueFrameProcessor } from '../../photonics-dmx/controllers/VenueFrameProcessor'
 import { getStrobeStateManager } from '../../photonics-dmx/controllers/StrobeStateManager'
 import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
 import { LightingConfiguration, ConfigStrobeType, FixtureConfig } from '../../photonics-dmx/types'
@@ -122,6 +124,11 @@ export class ControllerManager {
   private dmxLightManager: DmxLightManager | null = null
   private effectsController: ILightingController | null = null
   private dmxPublisher: DmxPublisher | null = null
+  /**
+   * The venue post-processing stage. Owned here rather than by the publisher so the effect YARG
+   * reported survives a controller restart, and so publisher rebuilds do not drop it.
+   */
+  private readonly venueFrameProcessor = new VenueFrameProcessor()
 
   private cueHandler: CueHandler | null = null
   private rb3CueHandler: CueHandler | null = null
@@ -162,6 +169,7 @@ export class ControllerManager {
     const testEffectCtx = {
       getChainFanout: () => this.chainFanout,
       ensureInitialized: () => this.init(),
+      getVenuePostProcessing: () => this.venueFrameProcessor.getVenuePostProcessing(),
     }
     this.testEffectRunner = new TestEffectRunner(testEffectCtx, {
       ensureHandlers: () => this.ensureChainsHaveHandlersForSimulation('yarg'),
@@ -197,6 +205,9 @@ export class ControllerManager {
           return { min: d.cueDurationMin, max: d.cueDurationMax }
         },
         getFallbackCueTimeMs: () => this.config.getPreference('yargFallbackCueTimeMs') ?? 20000,
+        setVenuePostProcessing: (state) => {
+          this.venueFrameProcessor.setVenuePostProcessing(state)
+        },
         sendSenderError: (message: string) => {
           sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
         },
@@ -442,7 +453,11 @@ export class ControllerManager {
       whiteChannelMixMode: normalizeWhiteChannelMixMode(
         this.config.getPreference('whiteChannelMixMode'),
       ),
+      frameProcessor: this.venueFrameProcessor,
     })
+    this.venueFrameProcessor.setVenuePostProcessingEnabled(
+      normalizeVenuePostProcessingEnabled(this.config.getPreference('venuePostProcessingEnabled')),
+    )
     // Subscribe the publisher to every chain's LightStateManager. Each chain's emission
     // writes its rig's lights into the publisher's aggregated map; a coalesced flush calls
     // publishNow once per tick.
@@ -848,6 +863,11 @@ export class ControllerManager {
 
   public getDmxPublisher(): DmxPublisher | null {
     return this.dmxPublisher
+  }
+
+  /** The venue post-processing stage, for callers driving or reporting the effect. */
+  public getVenueFrameProcessor(): VenueFrameProcessor {
+    return this.venueFrameProcessor
   }
 
   public getIsInitialized(): boolean {

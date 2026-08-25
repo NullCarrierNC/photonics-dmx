@@ -5,6 +5,7 @@ import {
   DrumNoteType,
 } from '../../../photonics-dmx/cues/types/cueTypes'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
+import { postProcessingLabel } from '../utils/postProcessingLabel'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import {
   getActiveYargMotionCue,
@@ -489,14 +490,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
             </div>
 
             <div>
-              <p className="font-medium">Auto-Gen:</p>
-              <p>
-                {currentCueData.trackMode !== undefined
-                  ? currentCueData.trackMode === 'autogen'
-                    ? 'Yes'
-                    : 'No'
-                  : 'Unknown'}
-              </p>
+              <p className="font-medium">Post-Processing:</p>
+              <p>{postProcessingLabel(currentCueData.postProcessing)}</p>
             </div>
 
             {/* Second row - 4 columns */}

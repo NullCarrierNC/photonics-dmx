@@ -504,6 +504,9 @@ export const setRb3SimLedState = (state: {
 
 export const stopTestEffect = () => window.api.invoke(LIGHT.STOP_TEST_EFFECT, undefined)
 
+export const simulatePostProcessing = (state: string) =>
+  window.api.invoke(LIGHT.SIMULATE_POST_PROCESSING, { state })
+
 export const simulateBeat = (data?: {
   venueSize?: 'NoVenue' | 'Small' | 'Large'
   bpm?: number
