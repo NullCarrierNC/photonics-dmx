@@ -2,11 +2,8 @@ import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { LIGHT } from '../../shared/ipcChannels'
 import { ipcError } from './ipcResult'
+import { isPlainObject } from './validation/primitives'
 import type { FixtureConfig } from '../../photonics-dmx/types'
-
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object' && !Array.isArray(v)
-}
 
 /**
  * DMX Console: exclusive manual buffer mode and channel configuration updates.
