@@ -29,6 +29,7 @@ import { useCueFlow } from '../components/cue-editor/hooks/useCueFlow'
 import { useActiveNodes } from '../components/cue-editor/hooks/useActiveNodes'
 import { useErrorNodes } from '../components/cue-editor/hooks/useErrorNodes'
 import { useLevelModeWarnings } from '../components/cue-editor/hooks/useLevelModeWarnings'
+import { useEffectDefinitions } from '../components/cue-editor/hooks/useEffectDefinitions'
 import { ActiveNodesContext } from '../components/cue-editor/context/ActiveNodesContext'
 import { ErrorNodesContext } from '../components/cue-editor/context/ErrorNodesContext'
 import { WarningNodesContext } from '../components/cue-editor/context/WarningNodesContext'
@@ -45,24 +46,21 @@ import type {
   EffectReference,
   YargEffectDefinition,
   AudioEffectDefinition,
-  EffectDefinition,
-  ActionNode,
-  LogicNode,
-  EffectRaiserNode,
-  ValueSource,
   NetNodeCueDefinition,
   AudioNodeCueDefinition,
-  NodeCueMode,
   NodeCueKind,
 } from '../../../photonics-dmx/cues/types/nodeCueTypes'
+import { showItemInFolder } from '../ipcApi'
 import {
-  getAudioCueDataPropertyMeta,
-  getNetCueDataPropertyMeta,
-} from '../../../photonics-dmx/constants/cueDataPropertyMeta'
-import { expressionVariables } from '../../../photonics-dmx/cues/node/runtime/expressionEvaluator'
-import { readEffectFile, showItemInFolder } from '../ipcApi'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('CueEditor')
+  DEFAULT_SIDEBAR_LAYOUT,
+  getStoredSidebarLayout,
+  setStoredSidebarLayout,
+} from '../components/cue-editor/lib/sidebarLayout'
+import { enrichAvailableVariables } from '../components/cue-editor/lib/availableVariables'
+import {
+  collectEventReferences,
+  collectVariableReferences,
+} from '../components/cue-editor/lib/graphReferences'
 
 type EditorCueOrEffect =
   | NetNodeCueDefinition
@@ -70,92 +68,6 @@ type EditorCueOrEffect =
   | YargEffectDefinition
   | AudioEffectDefinition
   | null
-
-const SIDEBAR_LAYOUT_KEY = 'photonics.nodeCueEditor.sidebarLayout'
-// Original grid was minmax(260px,300px) | 2fr | minmax(260px,400px) — approximate as %
-const DEFAULT_SIDEBAR_LAYOUT: Layout = { left: 25, center: 42, right: 33 }
-
-type AvailableVariable = {
-  name: string
-  type: string
-  scope: 'cue' | 'cue-group'
-  validValues?: string[]
-}
-
-function deriveCueDataValidValues(
-  logicNodes: LogicNode[] | undefined,
-  mode: NodeCueMode,
-): Map<string, string[]> {
-  const derivedValidValues = new Map<string, string[]>()
-
-  for (const node of logicNodes ?? []) {
-    if (node.logicType !== 'cue-data' || !node.assignTo || !node.dataProperty) continue
-
-    const meta =
-      mode === 'audio'
-        ? getAudioCueDataPropertyMeta(node.dataProperty)
-        : getNetCueDataPropertyMeta(node.dataProperty)
-
-    if (!meta?.validValues?.length) continue
-    derivedValidValues.set(node.assignTo, [...meta.validValues])
-  }
-
-  return derivedValidValues
-}
-
-function enrichAvailableVariables(
-  variables: AvailableVariable[],
-  logicNodes: LogicNode[] | undefined,
-  mode: NodeCueMode,
-): AvailableVariable[] {
-  const derivedValidValues = deriveCueDataValidValues(logicNodes, mode)
-  if (derivedValidValues.size === 0) return variables
-
-  return variables.map((variable) => {
-    if (variable.validValues?.length) return variable
-
-    const validValues = derivedValidValues.get(variable.name)
-    return validValues ? { ...variable, validValues } : variable
-  })
-}
-
-function getStoredSidebarLayout(): Layout | null {
-  try {
-    if (typeof window === 'undefined' || !window.localStorage) return null
-    const raw = window.localStorage.getItem(SIDEBAR_LAYOUT_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Layout
-    if (!parsed || typeof parsed !== 'object') return null
-    const left = Number(parsed.left)
-    const center = Number(parsed.center)
-    const right = Number(parsed.right)
-    const sum = left + center + right
-    if (
-      Number.isNaN(left) ||
-      Number.isNaN(center) ||
-      Number.isNaN(right) ||
-      left < 15 ||
-      right < 15 ||
-      center < 25 ||
-      sum < 99 ||
-      sum > 101
-    ) {
-      return null
-    }
-    return { left, center, right }
-  } catch {
-    return null
-  }
-}
-
-function setStoredSidebarLayout(layout: Layout): void {
-  try {
-    if (typeof window === 'undefined' || !window.localStorage) return
-    window.localStorage.setItem(SIDEBAR_LAYOUT_KEY, JSON.stringify(layout))
-  } catch {
-    // Storage might be unavailable
-  }
-}
 
 const CueEditor: React.FC = () => {
   const [registryTab, setRegistryTab] = useState<'variables' | 'events' | 'effects'>('variables')
@@ -167,9 +79,6 @@ const CueEditor: React.FC = () => {
   const [jsonEditorDirty, setJsonEditorDirty] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [loadedEffectDefinitions, setLoadedEffectDefinitions] = useState<
-    Map<string, EffectDefinition>
-  >(new Map())
   const { toasts, showToast, hideToast } = useToast()
   const loadCueIntoFlowRef = useRef<(cue: EditorCueOrEffect) => void>(() => {})
   const getUpdatedDocumentRef = useRef<() => NodeCueFile | EffectFile | null>(() => null)
@@ -231,6 +140,13 @@ const CueEditor: React.FC = () => {
   })
 
   const isEffectMode = editorMode === 'effect'
+
+  const loadedEffectDefinitions = useEffectDefinitions(
+    editorDoc,
+    selectedCueId,
+    mode,
+    groupedEffectFiles,
+  )
 
   const handleCuePlatformChange = useCallback(
     (p: 'yarg' | 'audio' | 'rb3') => {
@@ -497,307 +413,16 @@ const CueEditor: React.FC = () => {
   )
 
   const getVariableReferences = useCallback(
-    (varName: string, _scope: 'cue' | 'cue-group'): string[] => {
-      if (!editorDoc) return []
-
-      const references: string[] = []
-      const addReference = (nodeType: string, nodeId: string, label?: string, detail?: string) => {
-        const labelSuffix = label ? ` "${label}"` : ''
-        const detailSuffix = detail ? ` (${detail})` : ''
-        references.push(`${nodeType} ${nodeId}${labelSuffix}${detailSuffix}`)
-      }
-      const checkValueSource = (
-        source: ValueSource | undefined,
-        nodeType: string,
-        nodeId: string,
-        nodeLabel: string | undefined,
-        detail: string,
-      ) => {
-        if (source?.source === 'variable' && source.name === varName) {
-          addReference(nodeType, nodeId, nodeLabel, detail)
-        }
-      }
-      const checkVarName = (
-        name: string | undefined,
-        nodeType: string,
-        nodeId: string,
-        nodeLabel: string | undefined,
-        detail: string,
-      ) => {
-        if (name === varName) {
-          addReference(nodeType, nodeId, nodeLabel, detail)
-        }
-      }
-
-      for (const node of nodes) {
-        const nodeId = node.id
-        const nodeLabel = typeof node.data.label === 'string' ? node.data.label : undefined
-        if (node.data.kind === 'action') {
-          const action = node.data.payload as ActionNode
-          const nodeType = 'Action Node'
-          checkValueSource(action.target?.groups, nodeType, nodeId, nodeLabel, 'target.groups')
-          checkValueSource(action.target?.filter, nodeType, nodeId, nodeLabel, 'target.filter')
-          checkValueSource(action.color?.name, nodeType, nodeId, nodeLabel, 'color.name')
-          checkValueSource(
-            action.color?.brightness,
-            nodeType,
-            nodeId,
-            nodeLabel,
-            'color.brightness',
-          )
-          checkValueSource(action.color?.blendMode, nodeType, nodeId, nodeLabel, 'color.blendMode')
-          checkValueSource(action.color?.opacity, nodeType, nodeId, nodeLabel, 'color.opacity')
-          checkValueSource(action.layer, nodeType, nodeId, nodeLabel, 'layer')
-          if (action.timing) {
-            checkValueSource(
-              action.timing.waitForTime,
-              nodeType,
-              nodeId,
-              nodeLabel,
-              'timing.waitForTime',
-            )
-            checkValueSource(
-              action.timing.waitForConditionCount,
-              nodeType,
-              nodeId,
-              nodeLabel,
-              'timing.waitForConditionCount',
-            )
-            checkValueSource(action.timing.duration, nodeType, nodeId, nodeLabel, 'timing.duration')
-            checkValueSource(
-              action.timing.waitUntilTime,
-              nodeType,
-              nodeId,
-              nodeLabel,
-              'timing.waitUntilTime',
-            )
-            checkValueSource(
-              action.timing.waitUntilConditionCount,
-              nodeType,
-              nodeId,
-              nodeLabel,
-              'timing.waitUntilConditionCount',
-            )
-            checkValueSource(action.timing.level, nodeType, nodeId, nodeLabel, 'timing.level')
-            checkValueSource(action.timing.easing, nodeType, nodeId, nodeLabel, 'timing.easing')
-          }
-        }
-
-        if (node.data.kind === 'logic') {
-          const logicNode = node.data.payload as LogicNode
-          const nodeType = `Logic Node (${logicNode.logicType})`
-          switch (logicNode.logicType) {
-            case 'variable':
-              checkVarName(logicNode.varName, nodeType, nodeId, nodeLabel, 'varName')
-              checkValueSource(logicNode.value, nodeType, nodeId, nodeLabel, 'value')
-              for (const assignment of logicNode.assignments ?? []) {
-                checkVarName(assignment.varName, nodeType, nodeId, nodeLabel, 'assignments.varName')
-                checkValueSource(assignment.value, nodeType, nodeId, nodeLabel, 'assignments.value')
-              }
-              break
-            case 'math':
-              checkValueSource(logicNode.left, nodeType, nodeId, nodeLabel, 'left')
-              checkValueSource(logicNode.right, nodeType, nodeId, nodeLabel, 'right')
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              break
-            case 'conditional':
-              checkValueSource(logicNode.left, nodeType, nodeId, nodeLabel, 'left')
-              checkValueSource(logicNode.right, nodeType, nodeId, nodeLabel, 'right')
-              break
-            case 'cue-data':
-            case 'config-data':
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              break
-            case 'lights-from-index':
-              checkVarName(logicNode.sourceVariable, nodeType, nodeId, nodeLabel, 'sourceVariable')
-              checkValueSource(logicNode.index, nodeType, nodeId, nodeLabel, 'index')
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              break
-            case 'color-from-index':
-              checkValueSource(logicNode.colors, nodeType, nodeId, nodeLabel, 'colors')
-              checkValueSource(logicNode.index, nodeType, nodeId, nodeLabel, 'index')
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              break
-            case 'array-length':
-            case 'reverse-lights':
-            case 'create-pairs':
-            case 'reverse-colors':
-            case 'shuffle-colors':
-              checkVarName(logicNode.sourceVariable, nodeType, nodeId, nodeLabel, 'sourceVariable')
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              break
-            case 'concat-lights':
-            case 'concat-colors':
-              for (const sourceVar of logicNode.sourceVariables ?? []) {
-                checkVarName(sourceVar, nodeType, nodeId, nodeLabel, 'sourceVariables')
-              }
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              break
-            case 'build-ring':
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              checkVarName(
-                logicNode.assignGroupSize,
-                nodeType,
-                nodeId,
-                nodeLabel,
-                'assignGroupSize',
-              )
-              break
-            case 'delay':
-              checkValueSource(logicNode.delayTime, nodeType, nodeId, nodeLabel, 'delayTime')
-              break
-            case 'debugger':
-              checkValueSource(logicNode.message, nodeType, nodeId, nodeLabel, 'message')
-              for (const loggedVar of logicNode.variablesToLog ?? []) {
-                checkVarName(loggedVar, nodeType, nodeId, nodeLabel, 'variablesToLog')
-              }
-              break
-            case 'expression':
-              for (const usedVar of expressionVariables(logicNode.expression)) {
-                checkVarName(usedVar, nodeType, nodeId, nodeLabel, 'expression')
-              }
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              break
-            case 'clamp':
-              checkValueSource(logicNode.value, nodeType, nodeId, nodeLabel, 'value')
-              checkValueSource(logicNode.min, nodeType, nodeId, nodeLabel, 'min')
-              checkValueSource(logicNode.max, nodeType, nodeId, nodeLabel, 'max')
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              break
-            case 'select-from-list':
-              checkValueSource(logicNode.index, nodeType, nodeId, nodeLabel, 'index')
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              break
-            case 'pulse':
-              checkValueSource(logicNode.interval, nodeType, nodeId, nodeLabel, 'interval')
-              checkVarName(logicNode.anchorVar, nodeType, nodeId, nodeLabel, 'anchorVar')
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              checkVarName(logicNode.assignPhase, nodeType, nodeId, nodeLabel, 'assignPhase')
-              break
-            case 'frame-gate':
-              checkValueSource(logicNode.divisor, nodeType, nodeId, nodeLabel, 'divisor')
-              break
-            case 'tempo':
-              checkVarName(logicNode.assignBeatMs, nodeType, nodeId, nodeLabel, 'assignBeatMs')
-              checkVarName(logicNode.assignBarMs, nodeType, nodeId, nodeLabel, 'assignBarMs')
-              checkVarName(logicNode.assignPhraseMs, nodeType, nodeId, nodeLabel, 'assignPhraseMs')
-              checkVarName(logicNode.assignCycles, nodeType, nodeId, nodeLabel, 'assignCycles')
-              checkValueSource(logicNode.beatsPerBar, nodeType, nodeId, nodeLabel, 'beatsPerBar')
-              checkValueSource(
-                logicNode.barsPerPhrase,
-                nodeType,
-                nodeId,
-                nodeLabel,
-                'barsPerPhrase',
-              )
-              checkValueSource(logicNode.minBeatMs, nodeType, nodeId, nodeLabel, 'minBeatMs')
-              checkValueSource(logicNode.maxBeatMs, nodeType, nodeId, nodeLabel, 'maxBeatMs')
-              checkValueSource(
-                logicNode.fallbackBeatMs,
-                nodeType,
-                nodeId,
-                nodeLabel,
-                'fallbackBeatMs',
-              )
-              break
-            case 'indexed-variable':
-              checkVarName(logicNode.varName, nodeType, nodeId, nodeLabel, 'varName')
-              checkValueSource(logicNode.index, nodeType, nodeId, nodeLabel, 'index')
-              checkValueSource(logicNode.value, nodeType, nodeId, nodeLabel, 'value')
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              break
-            case 'led-changed':
-              checkVarName(logicNode.assignIndex, nodeType, nodeId, nodeLabel, 'assignIndex')
-              checkVarName(logicNode.assignColor, nodeType, nodeId, nodeLabel, 'assignColor')
-              checkVarName(logicNode.assignEdge, nodeType, nodeId, nodeLabel, 'assignEdge')
-              break
-            case 'random':
-              checkVarName(logicNode.sourceVariable, nodeType, nodeId, nodeLabel, 'sourceVariable')
-              checkValueSource(logicNode.min, nodeType, nodeId, nodeLabel, 'min')
-              checkValueSource(logicNode.max, nodeType, nodeId, nodeLabel, 'max')
-              checkValueSource(logicNode.count, nodeType, nodeId, nodeLabel, 'count')
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              for (const roll of logicNode.rolls ?? []) {
-                checkVarName(
-                  roll.sourceVariable,
-                  nodeType,
-                  nodeId,
-                  nodeLabel,
-                  'rolls.sourceVariable',
-                )
-                checkValueSource(roll.min, nodeType, nodeId, nodeLabel, 'rolls.min')
-                checkValueSource(roll.max, nodeType, nodeId, nodeLabel, 'rolls.max')
-                checkValueSource(roll.count, nodeType, nodeId, nodeLabel, 'rolls.count')
-                checkVarName(roll.assignTo, nodeType, nodeId, nodeLabel, 'rolls.assignTo')
-              }
-              break
-            case 'shuffle-lights':
-              checkVarName(logicNode.sourceVariable, nodeType, nodeId, nodeLabel, 'sourceVariable')
-              checkVarName(logicNode.assignTo, nodeType, nodeId, nodeLabel, 'assignTo')
-              break
-            case 'for-each-light':
-              checkVarName(logicNode.sourceVariable, nodeType, nodeId, nodeLabel, 'sourceVariable')
-              checkVarName(
-                logicNode.currentLightVariable,
-                nodeType,
-                nodeId,
-                nodeLabel,
-                'currentLightVariable',
-              )
-              checkVarName(
-                logicNode.currentIndexVariable,
-                nodeType,
-                nodeId,
-                nodeLabel,
-                'currentIndexVariable',
-              )
-              checkValueSource(logicNode.groupSize, nodeType, nodeId, nodeLabel, 'groupSize')
-              break
-          }
-        }
-
-        if (node.data.kind === 'effect-raiser') {
-          const raiser = node.data.payload as EffectRaiserNode
-          const nodeType = 'Effect Raiser Node'
-          const parameterValues = raiser.parameterValues ?? {}
-          for (const [paramName, value] of Object.entries(parameterValues)) {
-            checkValueSource(value, nodeType, nodeId, nodeLabel, `parameterValues.${paramName}`)
-          }
-        }
-      }
-
-      return references
-    },
+    (varName: string, _scope: 'cue' | 'cue-group'): string[] =>
+      editorDoc ? collectVariableReferences(nodes, varName) : [],
     [editorDoc, nodes],
   )
 
   const getEventReferences = useCallback(
-    (eventName: string): string[] => {
-      if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return []
-
-      const references: string[] = []
-      const cueFile = editorDoc.file as NodeCueFile
-      const currentCue = cueFile.cues.find((c) => c.id === selectedCueId)
-      if (!currentCue) return []
-
-      // Check event raiser nodes
-      const eventRaisers = currentCue.nodes.eventRaisers ?? []
-      for (const raiser of eventRaisers) {
-        if (raiser.eventName === eventName) {
-          references.push(`Event Raiser: ${raiser.label ?? raiser.id}`)
-        }
-      }
-
-      // Check event listener nodes
-      const eventListeners = currentCue.nodes.eventListeners ?? []
-      for (const listener of eventListeners) {
-        if (listener.eventName === eventName) {
-          references.push(`Event Listener: ${listener.label ?? listener.id}`)
-        }
-      }
-
-      return references
-    },
+    (eventName: string): string[] =>
+      editorDoc && selectedCueId && editorDoc.mode === 'cue'
+        ? collectEventReferences(editorDoc.file as NodeCueFile, selectedCueId, eventName)
+        : [],
     [editorDoc, selectedCueId],
   )
 
@@ -854,48 +479,6 @@ const CueEditor: React.FC = () => {
       definition: loadedEffectDefinitions.get(e.effectId),
     }))
   }, [editorDoc, selectedCueId, loadedEffectDefinitions])
-
-  // Load effect definitions when effect references change
-  useEffect(() => {
-    if (!editorDoc || editorDoc.mode !== 'cue' || !selectedCueId) return
-
-    const cueFile = editorDoc.file as NodeCueFile
-    const currentCue = cueFile.cues.find((c) => c.id === selectedCueId)
-    const effectRefs = currentCue?.effects ?? []
-
-    let cancelled = false
-
-    const loadEffects = async () => {
-      // rb3 cues reference YARG effects, so rb3 reads the yarg effect bucket; only audio differs.
-      const effectFileList = mode === 'audio' ? groupedEffectFiles.audio : groupedEffectFiles.yarg
-      const promises = effectRefs.map(async (effectRef) => {
-        try {
-          const fileEntry = effectFileList.find((f) => f.groupId === effectRef.effectFileId)
-          if (!fileEntry) return null
-          const effectFileData = (await readEffectFile(fileEntry.path)) as EffectFile
-          const effectDef = effectFileData.effects.find((e) => e.id === effectRef.effectId)
-          return effectDef ? ([effectRef.effectId, effectDef] as const) : null
-        } catch (error) {
-          log.warn(`Failed to load effect ${effectRef.effectId}:`, error)
-          return null
-        }
-      })
-
-      const results = await Promise.all(promises)
-      if (cancelled) return
-
-      const newDefinitions = new Map<string, EffectDefinition>()
-      for (const result of results) {
-        if (result) newDefinitions.set(result[0], result[1])
-      }
-      setLoadedEffectDefinitions(newDefinitions)
-    }
-
-    loadEffects()
-    return () => {
-      cancelled = true
-    }
-  }, [editorDoc, selectedCueId, mode, groupedEffectFiles])
 
   const handleJsonEditorSave = useCallback(
     (updatedCue: NetNodeCueDefinition | AudioNodeCueDefinition) => {
