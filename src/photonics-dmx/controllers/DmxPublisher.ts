@@ -28,6 +28,13 @@ import {
 import { buildBrightnessScaleMap, scaleDmxValueByPercent } from '../helpers/brightnessScaling'
 import { SenderManager } from './SenderManager'
 import { LightStateManager, type LightStatesListener } from './sequencer/LightStateManager'
+import type {
+  ProcessedLightColor,
+  PublisherFrameContext,
+  PublisherFrameProcessor,
+  PublisherFrameRigView,
+} from './PublisherFrameProcessor'
+import { VenueFrameProcessor } from './VenueFrameProcessor'
 import { getStrobeStateManager, StrobeStateManager } from './StrobeStateManager'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('DmxPublisher')
@@ -65,6 +72,11 @@ export interface DmxPublisherOptions {
   timing?: PublisherTiming
   /** Initial White Channel Mix Mode; {@link DmxPublisher.setWhiteChannelMixMode} swaps it live. */
   whiteChannelMixMode?: WhiteChannelMixMode
+  /**
+   * Frame-processing stage inserted after cue blending and before strobe latch / DMX encoding.
+   * Whoever supplies it keeps the reference and drives it; the publisher only reads from it.
+   */
+  frameProcessor?: PublisherFrameProcessor
 }
 
 /**
@@ -203,6 +215,12 @@ export class DmxPublisher {
   /** How a `white` emitter is driven; see {@link WhiteChannelMixMode}. */
   private _whiteChannelMixMode: WhiteChannelMixMode = DEFAULT_WHITE_CHANNEL_MIX_MODE
 
+  private _frameProcessor: PublisherFrameProcessor
+  /** Re-pointed per rig rather than rebuilt, like the channel-write closure below. */
+  private _frameContext: PublisherFrameContext = { nowMs: 0, rigId: '' }
+  /** Reused across every fixture in a frame so the colour stage allocates nothing. */
+  private _frameColor: ProcessedLightColor = { r: 0, g: 0, b: 0, intensity: 0 }
+
   // --- Output-rate governor (opt-in via DmxPublisherOptions.outputRateHz) ---
   /** Min ms between wire sends. 0 = governor disabled (legacy synchronous pass-through). */
   private _minIntervalMs = 0
@@ -231,6 +249,7 @@ export class DmxPublisher {
     if (options.whiteChannelMixMode) {
       this._whiteChannelMixMode = options.whiteChannelMixMode
     }
+    this._frameProcessor = options.frameProcessor ?? new VenueFrameProcessor()
 
     this.publish = this.publish.bind(this)
     if (this._lightStateManager) {
@@ -478,6 +497,11 @@ export class DmxPublisher {
     }
     this._lastStrobeActive = activeStrobeSlot != null
 
+    // One timestamp for the whole frame, so a light reached by more than one rig neither advances
+    // its trail twice nor re-rolls its grain.
+    const frameProcActive = this._frameProcessor.isFrameProcessingActive()
+    this._frameContext.nowMs = frameProcActive ? this._timing.now() : 0
+
     // Sort light IDs for consistent processing order
     const sortedLightIds = Array.from(lights.keys()).sort((a, b) => a.localeCompare(b))
 
@@ -546,6 +570,18 @@ export class DmxPublisher {
       curWireTargets = wireTargets
       curIpcBuffer = ipcBuffer
 
+      // Skipped entirely while no effect is running, which is the common case.
+      let frameView: PublisherFrameRigView | null = null
+      if (frameProcActive) {
+        this._frameContext.rigId = rigId
+        frameView = this._frameProcessor.prepareRigFrame(
+          rig.config,
+          manager,
+          lights,
+          this._frameContext,
+        )
+      }
+
       // Only `strobe-rgbw` needs to know which lights a strobe drives; the other modes are
       // unconditional.
       const strobeLightIds =
@@ -587,6 +623,16 @@ export class DmxPublisher {
 
         let { red: r, green: g, blue: b, intensity } = lightValue
         const { pan, tilt } = lightValue
+
+        // Ahead of the strobe latch and the mixer so a latched colour and any derived white /
+        // amber / UV emitter follow the venue effect too.
+        if (frameView !== null && frameView.isActive()) {
+          frameView.colorFor(lightId, lightValue, this._frameColor)
+          r = this._frameColor.r
+          g = this._frameColor.g
+          b = this._frameColor.b
+          intensity = this._frameColor.intensity
+        }
 
         // Hardware-strobe peak-hold: stock strobe cues flash opacity, which the blender folds
         // into rgb/intensity — so the post-blend stream swings between the peak (highest-opacity)

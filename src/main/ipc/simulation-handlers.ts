@@ -6,11 +6,13 @@ import {
   DrumNoteType,
   InstrumentNoteType,
   getCueTypeFromId,
+  type CueData,
 } from '../../photonics-dmx/cues/types/cueTypes'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
+import { isPostProcessingState } from '../../photonics-dmx/helpers/venuePostProcessing'
 import { sendToAllWindows } from '../utils/windowUtils'
 import { ipcError } from './ipcResult'
-import { createMockAudioCueData, createMockCueData } from './mockCueData'
+import { createMockAudioCueData, createMockCueData, type MockCueDataOptions } from './mockCueData'
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { isNonEmptyString, isPlainObject } from './inputValidation'
@@ -48,10 +50,20 @@ export function setupSimulationHandlers(
   // same teardown so the renderer's motion-sim state clears too.
   controllerManager.setOnSimulationPreempt(stopMotionSimAndNotify)
 
+  // Every simulated frame reports the venue effect output is actually getting, the same way a real
+  // YARG frame does. The publisher holds it, so the preview cannot disagree with the lights.
+  const simCueData = (options: MockCueDataOptions = {}): CueData =>
+    createMockCueData({
+      postProcessing: controllerManager.getVenueFrameProcessor().getVenuePostProcessing(),
+      ...options,
+    })
+
   // Simulation dispatches through the same chain cue handlers RB3E drives (cue mode re-dispatches
   // the RB3 look at ~30 Hz), so simulation requests are refused while the RB3E listener is enabled.
   const rb3Blocked = (): boolean => controllerManager.getIsRb3Enabled()
   const RB3_BLOCKED_ERROR = 'Disable RB3E before simulating cues'
+  const livePostProcessingBlocked = (): boolean =>
+    controllerManager.getIsRb3Enabled() || controllerManager.getIsYargEnabled()
 
   ipcMain.handle(LIGHT.GET_AUDIO_CUE_GROUPS, async () => {
     try {
@@ -216,6 +228,19 @@ export function setupSimulationHandlers(
     }
   })
 
+  // Drives the same publisher state the YARG listener feeds, so a real packet arriving later
+  // simply takes over.
+  ipcMain.handle(LIGHT.SIMULATE_POST_PROCESSING, async (_, data?: { state?: unknown }) => {
+    if (livePostProcessingBlocked() || !controllerManager.getIsInitialized()) return false
+    const state = data?.state
+    if (!isPostProcessingState(state)) {
+      log.warn(`Ignoring unknown post-processing state: ${String(state)}`)
+      return false
+    }
+    controllerManager.getVenueFrameProcessor().setVenuePostProcessing(state)
+    return true
+  })
+
   ipcMain.handle(
     LIGHT.SIMULATE_BEAT,
     async (
@@ -234,7 +259,7 @@ export function setupSimulationHandlers(
       const fanout = controllerManager.getChainFanout()
 
       const mockCueData = data
-        ? createMockCueData({
+        ? simCueData({
             venueSize: data.venueSize ?? 'Small',
             bpm: data.bpm ?? 120,
             effectId: data.effectId ?? undefined,
@@ -242,7 +267,7 @@ export function setupSimulationHandlers(
             keyframe: 'Unknown',
             simulationCueGroup: data.cueGroup,
           })
-        : createMockCueData({
+        : simCueData({
             beat: 'Strong',
             keyframe: 'Unknown',
           })
@@ -283,7 +308,7 @@ export function setupSimulationHandlers(
       const fanout = controllerManager.getChainFanout()
 
       const mockCueData = data
-        ? createMockCueData({
+        ? simCueData({
             venueSize: data.venueSize ?? 'Small',
             bpm: data.bpm ?? 120,
             effectId: data.effectId ?? undefined,
@@ -291,7 +316,7 @@ export function setupSimulationHandlers(
             keyframe: 'Next',
             simulationCueGroup: data.cueGroup,
           })
-        : createMockCueData({
+        : simCueData({
             beat: 'Unknown',
             keyframe: 'Next',
           })
@@ -332,7 +357,7 @@ export function setupSimulationHandlers(
       const fanout = controllerManager.getChainFanout()
 
       const mockCueData = data
-        ? createMockCueData({
+        ? simCueData({
             venueSize: data.venueSize ?? 'Small',
             bpm: data.bpm ?? 120,
             effectId: data.effectId ?? undefined,
@@ -340,7 +365,7 @@ export function setupSimulationHandlers(
             keyframe: 'Unknown',
             simulationCueGroup: data.cueGroup,
           })
-        : createMockCueData({
+        : simCueData({
             beat: 'Measure',
             keyframe: 'Unknown',
           })
@@ -389,7 +414,7 @@ export function setupSimulationHandlers(
         controllerManager.ensureChainsHaveHandlersForSimulation('yarg')
         const fanout = controllerManager.getChainFanout()
 
-        const mockCueData = createMockCueData({
+        const mockCueData = simCueData({
           venueSize,
           bpm,
           effectId: effectId ?? undefined,
@@ -477,7 +502,7 @@ export function setupSimulationHandlers(
       // Cancel pending pan/tilt clears on every chain — without this, secondary rigs
       // would clear pan/tilt mid-motion after the previous simulation stopped.
       fanout.cancelPanTiltClear()
-      const mockCueData = createMockCueData({
+      const mockCueData = simCueData({
         venueSize: 'Small',
         bpm: 120,
         simulationCueGroup: groupId,
@@ -533,7 +558,7 @@ export function setupSimulationHandlers(
       }
       sim.clearActive()
       fanout.cancelPanTiltClear()
-      const mockCueData = createMockCueData({
+      const mockCueData = simCueData({
         venueSize: 'Small',
         bpm: 120,
         simulationCueGroup: groupId,

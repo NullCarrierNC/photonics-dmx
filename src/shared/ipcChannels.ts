@@ -87,6 +87,7 @@ export const LIGHT = {
   SIMULATE_KEYFRAME: 'simulate-keyframe',
   SIMULATE_MEASURE: 'simulate-measure',
   SIMULATE_INSTRUMENT_NOTE: 'simulate-instrument-note',
+  SIMULATE_POST_PROCESSING: 'simulate-post-processing',
   GET_AVAILABLE_CUES: 'get-available-cues',
   GET_AVAILABLE_AUDIO_CUES: 'get-available-audio-cues',
   GET_AVAILABLE_RB3_CUES: 'get-available-rb3-cues',

@@ -63,6 +63,7 @@ function makeDeps(): ListenerCoordinatorDeps & { sendToAllWindows: jest.Mock } {
     getRb3MotionCueProbabilityPercent: () => 100,
     getRb3MotionCueDurationRangeSec: () => ({ min: 5, max: 20 }),
     getFallbackCueTimeMs: () => 20000,
+    setVenuePostProcessing: jest.fn(),
     sendSenderError: jest.fn(),
     sendToAllWindows,
     runtimeBroadcaster: noopRuntimeBroadcaster(),

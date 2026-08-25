@@ -4,6 +4,7 @@ import {
   StrobeState,
   getCueTypeFromId,
   ledAggregateMask,
+  type PostProcessing,
 } from '../../photonics-dmx/cues/types/cueTypes'
 import { sendToAllWindows } from '../utils/windowUtils'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
@@ -26,6 +27,8 @@ const RB3_LED_OFF: Rb3LedState = { red: 0, green: 0, blue: 0, yellow: 0, fog: fa
 export interface TestEffectRunnerContext {
   getChainFanout: () => ChainFanout
   ensureInitialized: () => Promise<void>
+  /** The venue effect colouring output, so a dispatched frame reports what the rig is doing. */
+  getVenuePostProcessing?: () => PostProcessing
 }
 
 /**
@@ -212,7 +215,7 @@ export class TestEffectRunner {
       harmony1Note: 0,
       harmony2Note: 0,
       lightingCue: cueId,
-      postProcessing: 'Default',
+      postProcessing: this.ctx.getVenuePostProcessing?.() ?? 'Default',
       fogState: this.rb3LedState.fog,
       strobeState: strobe,
       performer: 0,

@@ -309,6 +309,8 @@ export interface LightingPreferences {
   advancedModeEnabled?: boolean
   /** How RGB fixtures carrying a White channel drive that emitter. */
   whiteChannelMixMode?: WhiteChannelMixMode
+  /** When false, YARG's venue post-processing leaves light colour untouched. */
+  venuePostProcessingEnabled?: boolean
 
   // Frontend-specific preferences
   dmxOutputConfig?: {

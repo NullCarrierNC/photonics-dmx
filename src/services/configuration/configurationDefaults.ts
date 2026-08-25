@@ -99,6 +99,8 @@ export interface AppPreferences {
   advancedModeEnabled?: boolean
   /** How RGB fixtures carrying a `white` extra channel drive that emitter. */
   whiteChannelMixMode?: WhiteChannelMixMode
+  /** When false, YARG's venue post-processing leaves DMX colour output untouched. */
+  venuePostProcessingEnabled?: boolean
   audioConfig?: AudioConfig
   activeAudioCueType?: AudioCueType
   audioGameMode?: AudioGameModeConfig
@@ -147,6 +149,11 @@ export function normalizeWhiteChannelMixMode(value: unknown): WhiteChannelMixMod
   return WHITE_CHANNEL_MIX_MODES.includes(value as WhiteChannelMixMode)
     ? (value as WhiteChannelMixMode)
     : DEFAULT_WHITE_CHANNEL_MIX_MODE
+}
+
+/** Normalizes the persisted venue post-processing toggle. Absent means enabled. */
+export function normalizeVenuePostProcessingEnabled(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : true
 }
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
@@ -211,6 +218,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   allowMultipleActiveRigs: false,
   advancedModeEnabled: false,
   whiteChannelMixMode: DEFAULT_WHITE_CHANNEL_MIX_MODE,
+  venuePostProcessingEnabled: true,
   audioConfig: DEFAULT_AUDIO_CONFIG,
   cueEditorWindowState: {
     width: 1200,

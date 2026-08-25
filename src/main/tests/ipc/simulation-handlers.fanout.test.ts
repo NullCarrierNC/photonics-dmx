@@ -84,6 +84,8 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
     getMotionCueSimulator: () => MotionCueSimulator
     getIsInitialized: () => boolean
     getIsRb3Enabled: () => boolean
+    getDmxPublisher: () => null
+    getVenueFrameProcessor: () => { getVenuePostProcessing: () => 'Default' }
     init: jest.Mock
   }
   // Cast for setupSimulationHandlers' parameter type — the IPC handlers exercise only a
@@ -111,6 +113,8 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
       getMotionCueSimulator: () => motionCueSimulator,
       getIsInitialized: () => true,
       getIsRb3Enabled: () => false,
+      getDmxPublisher: () => null,
+      getVenueFrameProcessor: () => ({ getVenuePostProcessing: () => 'Default' }),
       init: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
     }
     setupSimulationHandlers(ipc as never, asControllerManager(controllerManager))

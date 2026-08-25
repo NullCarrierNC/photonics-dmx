@@ -842,6 +842,7 @@ const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
   'cueEditorWindowState',
   'audioPreviewWindowState',
   'whiteChannelMixMode',
+  'venuePostProcessingEnabled',
 ])
 
 /**
@@ -882,6 +883,13 @@ export function validatePreferencesPayload(
 
   if ('advancedModeEnabled' in cleaned && typeof cleaned.advancedModeEnabled !== 'boolean') {
     return { ok: false, error: 'advancedModeEnabled must be a boolean' }
+  }
+
+  if (
+    'venuePostProcessingEnabled' in cleaned &&
+    typeof cleaned.venuePostProcessingEnabled !== 'boolean'
+  ) {
+    return { ok: false, error: 'venuePostProcessingEnabled must be a boolean' }
   }
 
   if ('globalDmxPublishingRateHz' in cleaned) {

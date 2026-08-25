@@ -15,6 +15,8 @@ export type MockCueDataOptions = {
   ledBanks?: CueData['ledBanks']
   ledColor?: string | null
   ledPositions?: number[]
+  /** Venue effect the simulator is holding, so the cue preview reports what output is getting. */
+  postProcessing?: CueData['postProcessing']
 }
 
 /**
@@ -31,6 +33,7 @@ export function createMockCueData(options: MockCueDataOptions = {}): CueData {
     ledBanks = { red: 0, green: 0, blue: 0, yellow: 0 },
     ledColor = 'off',
     ledPositions = [],
+    postProcessing = 'Default',
   } = options
 
   const base: CueData = {
@@ -50,7 +53,7 @@ export function createMockCueData(options: MockCueDataOptions = {}): CueData {
     harmony1Note: 0,
     harmony2Note: 0,
     lightingCue: effectId ?? 'None',
-    postProcessing: 'Default',
+    postProcessing,
     fogState: false,
     strobeState: 'Strobe_Off',
     performer: 0,

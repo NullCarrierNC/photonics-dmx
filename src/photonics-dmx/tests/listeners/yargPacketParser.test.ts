@@ -89,6 +89,16 @@ describe('yargPacketParser', () => {
     expect(result.data.singalong).toBe(0b01010)
     expect(result.data.fogRemainingCentiseconds).toBe(0xffff)
     expect(result.data.playerStarPower).toEqual([])
+    expect(result.data.postProcessing).toBe('Scanlines_Blue')
+  })
+
+  it('reports an unmapped post-processing byte as Unknown', () => {
+    const buf = buildYargPacket({ datagramVersion: 5, postProcessing: 200, playerStarPower: [] })
+    const result = parseYargPacket(buf, minVersion)
+    expect(result.kind).toBe('cue')
+    if (result.kind !== 'cue') return
+
+    expect(result.data.postProcessing).toBe('Unknown')
   })
 
   it('round-trips v4 packet with star power tail', () => {

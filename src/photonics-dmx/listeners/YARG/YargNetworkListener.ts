@@ -9,6 +9,7 @@ import {
   isNonDrivingCueType,
   InstrumentNoteType,
   DrumNoteType,
+  type PostProcessing,
 } from '../../cues/types/cueTypes'
 import { createLogger } from '../../../shared/logger'
 import type { CueRuntime } from '../../cueHandlers/CueRuntime'
@@ -70,10 +71,23 @@ export class YargNetworkListener extends EventEmitter {
   /** Polls for the fallback condition independently of incoming packets (covers YARG going silent). */
   private fallbackTimer: NodeJS.Timeout | null = null
 
-  constructor(cueHandler: CueRuntime, options?: { getFallbackCueTimeMs?: () => number }) {
+  // --- Venue post-processing ---
+  /** Receives the venue effect YARG is applying on screen, on change only. */
+  private readonly onVenuePostProcessing: (state: PostProcessing) => void
+  /** Last state handed to {@link onVenuePostProcessing}; null before the first packet of a session. */
+  private lastPostProcessing: PostProcessing | null = null
+
+  constructor(
+    cueHandler: CueRuntime,
+    options?: {
+      getFallbackCueTimeMs?: () => number
+      onVenuePostProcessing?: (state: PostProcessing) => void
+    },
+  ) {
     super() // Initialize EventEmitter
     this.cueHandler = cueHandler
     this.getFallbackCueTimeMs = options?.getFallbackCueTimeMs ?? (() => 20000)
+    this.onVenuePostProcessing = options?.onVenuePostProcessing ?? ((): void => {})
 
     log.info('YargNetworkListener initialized.')
 
@@ -137,6 +151,7 @@ export class YargNetworkListener extends EventEmitter {
     this.server = null
     this.listening = false
     this.stopFallbackPolling()
+    this.publishPostProcessing('Default')
     if (!sock) {
       return Promise.resolve()
     }
@@ -266,6 +281,16 @@ export class YargNetworkListener extends EventEmitter {
     this.lastReceivedData = null
     this.lastForwardedAt = 0
     this.lastScene = null
+    this.publishPostProcessing('Default')
+  }
+
+  /** Forward a venue post-processing change once. */
+  private publishPostProcessing(state: PostProcessing): void {
+    if (state === this.lastPostProcessing) {
+      return
+    }
+    this.lastPostProcessing = state
+    this.onVenuePostProcessing(state)
   }
 
   private emitNewerVersionWarning(datagramVersion: number): void {
@@ -343,6 +368,13 @@ export class YargNetworkListener extends EventEmitter {
     }
 
     this.handleSceneTransition(YargCueData.currentScene)
+
+    // Read off the raw frame rather than the cue dispatch below, which is skipped for unknown cue
+    // strings and while the fallback cue holds the look. Outside a venue the effect does not
+    // apply, so a byte left over from the last song cannot colour the menu.
+    const showsVenue =
+      YargCueData.currentScene === 'Gameplay' || YargCueData.currentScene === 'Practice'
+    this.publishPostProcessing(showsVenue ? YargCueData.postProcessing : 'Default')
 
     switch (YargCueData.beat) {
       case 'Strong':
