@@ -8,22 +8,10 @@ import {
   LightEffectState,
 } from './interfaces'
 import { LightTransitionController } from './LightTransitionController'
-import { performance } from 'perf_hooks'
+import { EffectCallbackRegistry } from './EffectCallbackRegistry'
+import { PersistentEffectRun, PersistentRunRegistry } from './PersistentRunRegistry'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('EffectManager')
-
-/**
- * Tracks the lifecycle of a persistent effect that should restart only after
- * all participating lights complete their transitions.
- */
-type PersistentEffectRun = {
-  id: string
-  name: string
-  effect: Effect
-  transitionsByLayerAndLight: Map<number, Map<string, EffectTransition[]>>
-  totalLights: number
-  remainingLights: number
-}
 
 /**
  * @class EffectManager
@@ -56,10 +44,8 @@ export class EffectManager implements IEffectManager {
   // Cached reference to avoid repeated method calls
   private lightTransitionController: LightTransitionController
   private _lastCalled0LayerEffect: string = '' // Tracks the last effect name that targeted layer 0
-  /** Active effect-level persistence runs keyed by run id */
-  private persistentRuns: Map<string, PersistentEffectRun> = new Map()
-  /** Callbacks for effect completion, keyed by effect name */
-  private effectCallbacks: Map<string, (cancelled: boolean) => void> = new Map()
+  private readonly persistentRuns = new PersistentRunRegistry()
+  private readonly effectCallbacks = new EffectCallbackRegistry()
 
   // Reusable default state template
   private defaultStateTemplate: RGBIO = {
@@ -154,38 +140,53 @@ export class EffectManager implements IEffectManager {
    * @param name The name of the effect
    */
   public removeEffectCallback(name: string): void {
-    this.effectCallbacks.delete(name)
+    this.effectCallbacks.remove(name)
   }
 
   /**
-   * Fire the completion callback for an effect, if one exists.
-   * Called internally when an effect completes.
-   *
-   * @param effectName The name of the effect that completed
+   * Warns and reports true when an effect carries nothing to run, so callers can bail out.
    */
-  private fireEffectCallback(effectName: string, cancelled = false): void {
-    const callback = this.effectCallbacks.get(effectName)
-    if (callback) {
-      this.effectCallbacks.delete(effectName)
-      callback(cancelled)
+  private hasNoTransitions(name: string, effect: Effect): boolean {
+    if (effect.transitions.length === 0) {
+      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
+      return true
     }
+    return false
+  }
+
+  /** Whether an effect of this name is active on any layer, for any light. */
+  private isEffectRunning(name: string): boolean {
+    return Array.from(this.layerManager.getActiveEffects().values()).some((layerMap) =>
+      Array.from(layerMap.values()).some((activeEffect) => activeEffect.name === name),
+    )
   }
 
   /**
-   * Fire every pending completion callback with `cancelled = true`, then drop them. Used when
-   * effects are force-cleared (cue switch / removeAllEffects): a blocking graph node waiting on one
-   * of these effects would otherwise never be told its action ended and would strand its context.
+   * Groups an effect's transitions by layer and light, records the name as owning layer 0 when it
+   * targets that layer, and opens a persistence run when the effect is persistent. Returns what the
+   * apply step needs.
    */
-  private cancelPendingCallbacks(): void {
-    const pending = [...this.effectCallbacks.values()]
-    this.effectCallbacks.clear()
-    for (const callback of pending) {
-      try {
-        callback(true)
-      } catch (err) {
-        log.error('Error in cancelled effect completion callback:', err)
-      }
+  private prepareSubmission(
+    name: string,
+    effect: Effect,
+    isPersistent: boolean,
+  ): {
+    transitionsByLayerAndLight: Map<number, Map<string, EffectTransition[]>>
+    persistentRunId?: string
+  } {
+    const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(
+      effect.transitions,
+    )
+
+    if (transitionsByLayerAndLight.has(0)) {
+      this._lastCalled0LayerEffect = name
     }
+
+    const persistentRunId = isPersistent
+      ? this.persistentRuns.register(name, effect, transitionsByLayerAndLight)
+      : undefined
+
+    return { transitionsByLayerAndLight, persistentRunId }
   }
 
   /**
@@ -198,8 +199,7 @@ export class EffectManager implements IEffectManager {
    * @param isPersistent If true, the effect re-queues itself after completing
    */
   public addEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
-    if (effect.transitions.length === 0) {
-      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
+    if (this.hasNoTransitions(name, effect)) {
       return
     }
 
@@ -208,19 +208,11 @@ export class EffectManager implements IEffectManager {
       this.systemEffects.cancelBlackout()
     }
 
-    const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(
-      effect.transitions,
+    const { transitionsByLayerAndLight, persistentRunId } = this.prepareSubmission(
+      name,
+      effect,
+      isPersistent,
     )
-
-    // Check if the effect contains transitions for layer 0
-    const hasLayer0 = transitionsByLayerAndLight.has(0)
-    if (hasLayer0) {
-      this._lastCalled0LayerEffect = name
-    }
-
-    const persistentRunId = isPersistent
-      ? this.registerPersistentRun(name, effect, transitionsByLayerAndLight)
-      : undefined
 
     this.applyEffectTransitions(
       name,
@@ -248,8 +240,7 @@ export class EffectManager implements IEffectManager {
    * transition behind a stale in-flight one would cause desynchronised motion.
    */
   public replaceEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
-    if (effect.transitions.length === 0) {
-      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
+    if (this.hasNoTransitions(name, effect)) {
       return
     }
 
@@ -258,18 +249,11 @@ export class EffectManager implements IEffectManager {
       this.systemEffects.cancelBlackout()
     }
 
-    const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(
-      effect.transitions,
+    const { transitionsByLayerAndLight, persistentRunId } = this.prepareSubmission(
+      name,
+      effect,
+      isPersistent,
     )
-
-    const hasLayer0 = transitionsByLayerAndLight.has(0)
-    if (hasLayer0) {
-      this._lastCalled0LayerEffect = name
-    }
-
-    const persistentRunId = isPersistent
-      ? this.registerPersistentRun(name, effect, transitionsByLayerAndLight)
-      : undefined
 
     transitionsByLayerAndLight.forEach((layerMap, layer) => {
       layerMap.forEach((transitionsForLight, lightId) => {
@@ -284,7 +268,7 @@ export class EffectManager implements IEffectManager {
         const activeEffect = this.layerManager.getActiveEffect(layer, lightId)
         if (activeEffect) {
           if (activeEffect.effectRunId) {
-            this.cancelPersistentRun(activeEffect.effectRunId)
+            this.persistentRuns.cancel(activeEffect.effectRunId)
           }
           this.layerManager.removeActiveEffect(layer, lightId)
         }
@@ -317,8 +301,7 @@ export class EffectManager implements IEffectManager {
       this.systemEffects.cancelBlackout()
     }
 
-    if (effect.transitions.length === 0) {
-      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
+    if (this.hasNoTransitions(name, effect)) {
       return
     }
 
@@ -360,8 +343,7 @@ export class EffectManager implements IEffectManager {
     effect: Effect,
     isPersistent: boolean = false,
   ): boolean {
-    if (effect.transitions.length === 0) {
-      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
+    if (this.hasNoTransitions(name, effect)) {
       return false
     }
 
@@ -370,30 +352,16 @@ export class EffectManager implements IEffectManager {
       return false
     }
 
-    // Check if any effect with the same name is already running across all layers
-    const effectAlreadyRunning = Array.from(this.layerManager.getActiveEffects().values()).some(
-      (layerMap) =>
-        Array.from(layerMap.values()).some((activeEffect) => activeEffect.name === name),
-    )
-
-    if (effectAlreadyRunning) {
+    if (this.isEffectRunning(name)) {
       //  console.warn(`Not adding effect "${name}" because an effect with the same name is already running. Preventing timing issues.`);
       return false
     }
 
-    const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(
-      effect.transitions,
+    const { transitionsByLayerAndLight, persistentRunId } = this.prepareSubmission(
+      name,
+      effect,
+      isPersistent,
     )
-
-    // Check if the effect contains transitions for layer 0
-    const hasLayer0 = transitionsByLayerAndLight.has(0)
-    if (hasLayer0) {
-      this._lastCalled0LayerEffect = name
-    }
-
-    const persistentRunId = isPersistent
-      ? this.registerPersistentRun(name, effect, transitionsByLayerAndLight)
-      : undefined
 
     this.applyEffectTransitions(
       name,
@@ -520,8 +488,7 @@ export class EffectManager implements IEffectManager {
     effect: Effect,
     isPersistent: boolean = false,
   ): boolean {
-    if (effect.transitions.length === 0) {
-      log.warn(`Effect "${name}" has no transitions. Ignoring.`)
+    if (this.hasNoTransitions(name, effect)) {
       return false
     }
 
@@ -530,13 +497,7 @@ export class EffectManager implements IEffectManager {
       return false
     }
 
-    // Check if any effect with the same name is already running across all layers
-    const effectAlreadyRunning = Array.from(this.layerManager.getActiveEffects().values()).some(
-      (layerMap) =>
-        Array.from(layerMap.values()).some((activeEffect) => activeEffect.name === name),
-    )
-
-    if (effectAlreadyRunning) {
+    if (this.isEffectRunning(name)) {
       log.warn(
         `Not setting effect "${name}" because an effect with the same name is already running. Preventing timing issues.`,
       )
@@ -546,19 +507,11 @@ export class EffectManager implements IEffectManager {
     // Remove all existing effects first
     this.removeAllEffects()
 
-    const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(
-      effect.transitions,
+    const { transitionsByLayerAndLight, persistentRunId } = this.prepareSubmission(
+      name,
+      effect,
+      isPersistent,
     )
-
-    // Check if the effect contains transitions for layer 0
-    const hasLayer0 = transitionsByLayerAndLight.has(0)
-    if (hasLayer0) {
-      this._lastCalled0LayerEffect = name
-    }
-
-    const persistentRunId = isPersistent
-      ? this.registerPersistentRun(name, effect, transitionsByLayerAndLight)
-      : undefined
 
     this.applyEffectTransitions(
       name,
@@ -619,7 +572,7 @@ export class EffectManager implements IEffectManager {
       //    nodes waiting on these effects are told their action ended instead of stranding.
       this._lastCalled0LayerEffect = ''
       this.persistentRuns.clear()
-      this.cancelPendingCallbacks()
+      this.effectCallbacks.cancelAll()
     } finally {
       // Always release the clearing lock, even if an error occurs
       this.lightTransitionController.endClearingSequence()
@@ -795,7 +748,7 @@ export class EffectManager implements IEffectManager {
     for (const lightId of lightIds) {
       const effectState = activeEffects.get(lightId)
       if (effectState?.effectRunId) {
-        this.cancelPersistentRun(effectState.effectRunId)
+        this.persistentRuns.cancel(effectState.effectRunId)
       }
       // Remove the effect from active effects
       this.layerManager.removeActiveEffect(layer, lightId)
@@ -889,7 +842,7 @@ export class EffectManager implements IEffectManager {
 
     if (!effectStillActive) {
       // This was the last light for this effect - fire the callback
-      this.fireEffectCallback(effectState.name)
+      this.effectCallbacks.fire(effectState.name)
     }
 
     // Handle persistence
@@ -909,43 +862,6 @@ export class EffectManager implements IEffectManager {
   }
 
   /**
-   * Stores the transitions required to re-run a persistent effect once every
-   * light completes. Returns the run identifier assigned to this effect.
-   */
-  private registerPersistentRun(
-    name: string,
-    effect: Effect,
-    transitionsByLayerAndLight: Map<number, Map<string, EffectTransition[]>>,
-  ): string | undefined {
-    let totalLights = 0
-    const storedMap = new Map<number, Map<string, EffectTransition[]>>()
-
-    transitionsByLayerAndLight.forEach((layerMap, layer) => {
-      const clonedLayerMap = new Map<string, EffectTransition[]>()
-      layerMap.forEach((transitionList, lightId) => {
-        clonedLayerMap.set(lightId, transitionList)
-        totalLights += 1
-      })
-      storedMap.set(layer, clonedLayerMap)
-    })
-
-    if (totalLights === 0) {
-      return undefined
-    }
-
-    const runId = `${name}-${performance.now()}-${Math.floor(Math.random() * 1000000)}`
-    this.persistentRuns.set(runId, {
-      id: runId,
-      name,
-      effect,
-      transitionsByLayerAndLight: storedMap,
-      totalLights,
-      remainingLights: totalLights,
-    })
-    return runId
-  }
-
-  /**
    * Restarts the supplied persistent run by re-applying its original
    * transitions while preserving the shared run identifier.
    */
@@ -955,14 +871,6 @@ export class EffectManager implements IEffectManager {
     }
     run.remainingLights = run.totalLights
     this.applyEffectTransitions(run.name, run.effect, run.transitionsByLayerAndLight, true, run.id)
-  }
-
-  /**
-   * Cancels the persistent run so it no longer schedules restarts.
-   */
-  private cancelPersistentRun(runId?: string): void {
-    if (!runId) return
-    this.persistentRuns.delete(runId)
   }
 
   /**

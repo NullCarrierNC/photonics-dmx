@@ -14,6 +14,7 @@
 
 import '@jest/globals'
 import { EffectManager } from '../../controllers/sequencer/EffectManager'
+import { EffectCallbackRegistry } from '../../controllers/sequencer/EffectCallbackRegistry'
 import { LayerManager } from '../../controllers/sequencer/LayerManager'
 import { TransitionEngine } from '../../controllers/sequencer/TransitionEngine'
 import { EffectTransformer } from '../../controllers/sequencer/EffectTransformer'
@@ -1017,10 +1018,8 @@ describe('EffectManager', () => {
         effectTransformer as unknown as IEffectTransformer,
         systemEffects as unknown as ISystemEffectsController,
       )
-      const callbacks = (effectManagerWithCallbacks as any).effectCallbacks as Map<
-        string,
-        () => void
-      >
+      const callbacks = (effectManagerWithCallbacks as any)
+        .effectCallbacks as EffectCallbackRegistry
       callbacks.set('orphan', () => {})
 
       effectManagerWithCallbacks.removeAllEffects()
@@ -1035,10 +1034,8 @@ describe('EffectManager', () => {
         effectTransformer as unknown as IEffectTransformer,
         systemEffects as unknown as ISystemEffectsController,
       )
-      const callbacks = (effectManagerWithCallbacks as any).effectCallbacks as Map<
-        string,
-        (cancelled: boolean) => void
-      >
+      const callbacks = (effectManagerWithCallbacks as any)
+        .effectCallbacks as EffectCallbackRegistry
       const cb = jest.fn()
       callbacks.set('pending', cb)
 
@@ -1070,7 +1067,7 @@ describe('EffectManager', () => {
       const onComplete = jest.fn()
       effectManager.setEffectWithCallback('cb-effect', effect, onComplete)
 
-      const callbacks = (effectManager as any).effectCallbacks as Map<string, () => void>
+      const callbacks = (effectManager as any).effectCallbacks as EffectCallbackRegistry
       // setEffect clears callbacks internally, so registering before it (the old order) would have
       // left this empty; the callback must survive to fire on completion.
       expect(callbacks.get('cb-effect')).toBe(onComplete)
