@@ -7,7 +7,6 @@ Entries may only shrink. Regenerate after a split with: node scripts/size-budget
 1295 src/main/controllers/ControllerManager.ts
 1132 src/photonics-dmx/cues/node/runtime/BaseNodeExecutionEngine.ts
 1074 src/photonics-dmx/controllers/DmxPublisher.ts
-1044 src/shared/ipcTypes.ts
 1035 src/photonics-dmx/controllers/sequencer/EffectManager.ts
 1027 src/photonics-dmx/types.ts
 1022 src/photonics-dmx/cues/node/runtime/logicNodeEvaluator.ts
