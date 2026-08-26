@@ -710,7 +710,7 @@ describe('CueRegistry', () => {
       expect(seen[0].limit).toBe(50)
     })
 
-    it('keeps counting across a cue type change while the group serves both', () => {
+    it('restarts the counter when the cue type changes', () => {
       registry.reset()
       registry.registerGroup(cueGroup('primaries', CueStyle.Primary))
       registry.setActiveGroups(['primaries'])
@@ -720,7 +720,25 @@ describe('CueRegistry', () => {
       registry.getCueImplementation(CueType.Chorus)
       registry.getCueImplementation(CueType.Verse)
 
-      expect(seen.map((u) => u.counter)).toEqual([1, 2, 3])
+      expect(seen.map((u) => u.counter)).toEqual([1, 2, 1])
+    })
+
+    it('restarts the counter when the source group changes', () => {
+      registry.reset()
+      registry.registerGroup(cueGroup('groupA', CueStyle.Primary))
+      registry.registerGroup(cueGroup('groupB', CueStyle.Primary))
+      registry.setActiveGroups(['groupA', 'groupB'])
+      const seen = updates(registry)
+
+      registry.getCueImplementationFromGroup(CueType.Chorus, 'groupA')
+      registry.getCueImplementationFromGroup(CueType.Chorus, 'groupA')
+      registry.getCueImplementationFromGroup(CueType.Chorus, 'groupB')
+
+      expect(seen.map((u) => [u.groupId, u.counter])).toEqual([
+        ['groupA', 1],
+        ['groupA', 2],
+        ['groupB', 1],
+      ])
     })
 
     it('counts the two roles on separate counters when both styles are in play', () => {
@@ -750,32 +768,110 @@ describe('CueRegistry', () => {
       ])
     })
 
-    // Every caller resolves and validates the group before handing it to the role handler, so the
-    // handler always takes its pre-selection branch. The last-cue name and group it would otherwise
-    // record stay unset, and the two readers below report that.
-    it('leaves the last-cue name unset while selections arrive pre-resolved', () => {
+    it('records the last cue and group for both roles', () => {
       registry.reset()
-      registry.registerGroup(cueGroup('primaries', CueStyle.Primary))
-      registry.registerGroup(cueGroup('secondaries', CueStyle.Secondary))
+      const primaries = cueGroup('primaries', CueStyle.Primary)
+      const secondaries = cueGroup('secondaries', CueStyle.Secondary)
+      primaries.cues.delete(CueType.Verse)
+      secondaries.cues.delete(CueType.Chorus)
+      registry.registerGroup(primaries)
+      registry.registerGroup(secondaries)
       registry.setActiveGroups(['primaries', 'secondaries'])
 
       registry.getCueImplementation(CueType.Chorus)
       registry.getCueImplementation(CueType.Verse)
-      registry.getCueImplementationFromGroup(CueType.Chorus, 'primaries')
 
       const info = registry.getDebugInfo()
-      expect(info.lastPrimaryCue).toMatchObject({ name: null, group: null })
-      expect(info.lastSecondaryCue).toMatchObject({ name: null, group: null })
+      expect(info.lastPrimaryCue).toMatchObject({ name: CueType.Chorus, group: 'primaries' })
+      expect(info.lastSecondaryCue).toMatchObject({ name: CueType.Verse, group: 'secondaries' })
     })
 
-    it('returns no cue state while the last-cue name is unset', () => {
+    it('reports the cue state of the last resolution', () => {
       registry.reset()
       registry.registerGroup(cueGroup('primaries', CueStyle.Primary))
       registry.setActiveGroups(['primaries'])
+      const seen = updates(registry)
 
       registry.getCueImplementation(CueType.Chorus)
+      registry.getCueImplementation(CueType.Chorus)
 
-      expect(registry.getCueState(CueType.Chorus)).toBeNull()
+      expect(registry.getCueState(CueType.Chorus)).toEqual(seen[seen.length - 1])
+      expect(registry.getCueState(CueType.Chorus)).toEqual({
+        cueType: CueType.Chorus,
+        groupId: 'primaries',
+        isFallback: false,
+        cueStyle: 'primary',
+        counter: 2,
+        limit: 100,
+      })
+      expect(registry.getCueState(CueType.Verse)).toBeNull()
+    })
+
+    it('direct group resolutions record state against the role', () => {
+      registry.reset()
+      registry.registerGroup(cueGroup('groupA', CueStyle.Secondary))
+      registry.registerGroup(cueGroup('groupB', CueStyle.Secondary))
+      registry.setActiveGroups(['groupA', 'groupB'])
+      const seen = updates(registry)
+
+      for (let i = 0; i < 60; i++) {
+        registry.getCueImplementationFromGroup(CueType.Chorus, 'groupA')
+      }
+
+      expect(seen).toHaveLength(60)
+      expect(seen.every((u) => u.groupId === 'groupA')).toBe(true)
+      expect(seen[59].counter).toBe(60)
+      expect(registry.getCueState(CueType.Chorus)).toMatchObject({ groupId: 'groupA', counter: 60 })
+    })
+
+    it('keeps the same group for 101 resolutions inside the consistency window', () => {
+      registry.reset()
+      registry.registerGroup(cueGroup('groupA', CueStyle.Primary))
+      registry.registerGroup(cueGroup('groupB', CueStyle.Primary))
+      registry.setActiveGroups(['groupA', 'groupB'])
+      registry.setCueConsistencyWindow(2000)
+      const seen = updates(registry)
+
+      for (let i = 0; i < 101; i++) {
+        registry.getCueImplementation(CueType.Chorus)
+      }
+
+      expect(seen.every((u) => u.groupId === seen[0].groupId)).toBe(true)
+      expect(seen[100].counter).toBe(101)
+    })
+
+    it('holds the locked group across a long run while once-per-song is active', () => {
+      registry.reset()
+      registry.registerGroup(cueGroup('groupA', CueStyle.Secondary))
+      registry.registerGroup(cueGroup('groupB', CueStyle.Secondary))
+      registry.setActiveGroups(['groupA', 'groupB'])
+      registry.setCueGroupSelectionMode('oncePerSong')
+      registry.onSongStart()
+      const seen = updates(registry)
+
+      for (let i = 0; i < 51; i++) {
+        registry.getCueImplementation(CueType.Chorus)
+      }
+
+      const lockedGroup = seen[0].groupId
+      expect(seen.every((u) => u.groupId === lockedGroup)).toBe(true)
+      expect(seen[50].counter).toBe(51)
+    })
+
+    it('holds the stage kit group across a long run under stage kit priority', () => {
+      registry.reset()
+      registry.registerGroup(cueGroup('kit', CueStyle.Secondary))
+      registry.registerGroup(cueGroup('other', CueStyle.Secondary))
+      registry.setActiveGroups(['kit', 'other'])
+      registry.setStageKitGroup('kit')
+      const seen = updates(registry)
+
+      for (let i = 0; i < 51; i++) {
+        registry.getCueImplementation(CueType.Chorus, 'tracked')
+      }
+
+      expect(seen.every((u) => u.groupId === 'kit')).toBe(true)
+      expect(seen[50].counter).toBe(51)
     })
 
     it('clears both roles on reset', () => {
