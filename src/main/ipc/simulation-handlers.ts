@@ -146,9 +146,8 @@ export function setupSimulationHandlers(
           log.info('System not initialized, initializing now before testing effect')
           await controllerManager.init()
         }
-        controllerManager
-          .getTestEffectRunner('yarg')
-          .startTestEffect(effectId, venueSize, bpm, cueGroup)
+        const runner = controllerManager.getTestEffectRunner('yarg')
+        runner.startTestEffect(effectId, venueSize, bpm, cueGroup)
         return { success: true }
       } catch (error) {
         log.error('Error starting test effect:', error)
@@ -181,9 +180,8 @@ export function setupSimulationHandlers(
         if (!getCueTypeFromId(effectId)) {
           return { success: false, error: `Unknown RB3 cue: ${effectId}` }
         }
-        controllerManager
-          .getTestEffectRunner('rb3')
-          .startTestEffect(effectId, venueSize, bpm, cueGroup)
+        const runner = controllerManager.getTestEffectRunner('rb3')
+        runner.startTestEffect(effectId, venueSize, bpm, cueGroup)
         return { success: true }
       } catch (error) {
         log.error('Error starting RB3 test effect:', error)

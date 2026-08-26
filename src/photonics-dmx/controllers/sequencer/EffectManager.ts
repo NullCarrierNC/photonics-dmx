@@ -9,6 +9,14 @@ import {
 } from './interfaces'
 import { LightTransitionController } from './LightTransitionController'
 import { EffectCallbackRegistry } from './EffectCallbackRegistry'
+import {
+  ADD_EFFECT,
+  ADD_EFFECT_UNBLOCKED_NAME,
+  REPLACE_EFFECT,
+  SET_EFFECT,
+  SET_EFFECT_UNBLOCKED_NAME,
+  type SubmissionPolicy,
+} from './effectSubmission'
 import { PersistentEffectRun, PersistentRunRegistry } from './PersistentRunRegistry'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('EffectManager')
@@ -161,6 +169,15 @@ export class EffectManager implements IEffectManager {
     )
   }
 
+  /** Whether an effect of this name is active for any light other than the given one. */
+  private isEffectRunningOnAnotherLight(name: string, lightId: string): boolean {
+    return Array.from(this.layerManager.getActiveEffects().values()).some((layerMap) =>
+      Array.from(layerMap.values()).some(
+        (activeEffect) => activeEffect.name === name && activeEffect.lightId !== lightId,
+      ),
+    )
+  }
+
   /**
    * Groups an effect's transitions by layer and light, records the name as owning layer 0 when it
    * targets that layer, and opens a persistence run when the effect is persistent. Returns what the
@@ -199,28 +216,7 @@ export class EffectManager implements IEffectManager {
    * @param isPersistent If true, the effect re-queues itself after completing
    */
   public addEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
-    if (this.hasNoTransitions(name, effect)) {
-      return
-    }
-
-    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      log.warn('Add cancelling blackout')
-      this.systemEffects.cancelBlackout()
-    }
-
-    const { transitionsByLayerAndLight, persistentRunId } = this.prepareSubmission(
-      name,
-      effect,
-      isPersistent,
-    )
-
-    this.applyEffectTransitions(
-      name,
-      effect,
-      transitionsByLayerAndLight,
-      isPersistent,
-      persistentRunId,
-    )
+    this.submitEffect(name, effect, isPersistent, ADD_EFFECT)
   }
 
   /**
@@ -240,13 +236,59 @@ export class EffectManager implements IEffectManager {
    * transition behind a stale in-flight one would cause desynchronised motion.
    */
   public replaceEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
+    this.submitEffect(name, effect, isPersistent, REPLACE_EFFECT)
+  }
+
+  /**
+   * Adds a new effect and clears all other effects that were running.
+   * Used for significant changes in scenes. E.g., from Menu to in-game.
+   *
+   * @param name The name of the effect
+   * @param effect The effect configuration
+   * @param isPersistent If true, the effect re-queues itself after completing
+   */
+  public setEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
+    this.submitEffect(name, effect, isPersistent, SET_EFFECT)
+  }
+
+  /**
+   * The single submission pipeline behind every public add/set/replace variant: blackout gate and
+   * transition validation in the policy's order, the duplicate-name gate, the 'set' clearing step,
+   * then grouping and the policy's apply path.
+   * @returns True when the effect was applied, false when a gate refused it
+   */
+  private submitEffect(
+    name: string,
+    effect: Effect,
+    isPersistent: boolean,
+    policy: SubmissionPolicy,
+  ): boolean {
+    if (policy.blackoutFirst && !this.passBlackoutGate(name, effect, policy)) {
+      return false
+    }
     if (this.hasNoTransitions(name, effect)) {
-      return
+      return false
+    }
+    if (!policy.blackoutFirst && !this.passBlackoutGate(name, effect, policy)) {
+      return false
     }
 
-    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      log.warn('Replace cancelling blackout')
-      this.systemEffects.cancelBlackout()
+    if (policy.blockDuplicateName && this.isEffectRunning(name)) {
+      log.warn(
+        `Not ${policy.verb.progressive} effect "${name}" because an effect with the same name is already running. Preventing timing issues.`,
+      )
+      return false
+    }
+
+    if (policy.mode === 'set') {
+      const grouped = this.effectTransformer.groupTransitionsByLayerAndLight(effect.transitions)
+      if (policy.layer0RepeatQueues && grouped.has(0) && this._lastCalled0LayerEffect === name) {
+        // A repeated layer-0 set of the same effect retires its previous run and queues the new
+        // one, so the scene is not cleared on every re-trigger.
+        this.removeEffect(name, 0)
+      } else {
+        this.removeAllEffects()
+      }
     }
 
     const { transitionsByLayerAndLight, persistentRunId } = this.prepareSubmission(
@@ -255,6 +297,61 @@ export class EffectManager implements IEffectManager {
       isPersistent,
     )
 
+    if (policy.mode === 'replace') {
+      this.replaceEffectTransitions(
+        name,
+        effect,
+        transitionsByLayerAndLight,
+        isPersistent,
+        persistentRunId,
+      )
+    } else {
+      this.applyEffectTransitions(
+        name,
+        effect,
+        transitionsByLayerAndLight,
+        isPersistent,
+        persistentRunId,
+      )
+    }
+    return true
+  }
+
+  /**
+   * The blackout gate: with no blackout active the submission passes, otherwise the policy either
+   * cancels the blackout and proceeds or refuses the submission.
+   * @returns True when the submission may proceed
+   */
+  private passBlackoutGate(name: string, effect: Effect, policy: SubmissionPolicy): boolean {
+    if (!this.systemEffects.isBlackoutActive()) {
+      return true
+    }
+    if (policy.blackoutBaseLayerOnly && !(effect.transitions[0].layer < 255)) {
+      return true
+    }
+    if (policy.blackout === 'refuse') {
+      log.warn(
+        `Cannot ${policy.verb.imperative} effect "${name}" because a blackout is in progress.`,
+      )
+      return false
+    }
+    log.warn(policy.blackoutCancelLog)
+    this.systemEffects.cancelBlackout()
+    return true
+  }
+
+  /**
+   * The 'replace' apply path: for each (layer, light) slot the effect targets, cancels the active
+   * and queued effect on that slot and starts the new transitions immediately, easing from the
+   * light's current state.
+   */
+  private replaceEffectTransitions(
+    name: string,
+    effect: Effect,
+    transitionsByLayerAndLight: Map<number, Map<string, EffectTransition[]>>,
+    isPersistent: boolean,
+    effectRunId?: string,
+  ): void {
     transitionsByLayerAndLight.forEach((layerMap, layer) => {
       layerMap.forEach((transitionsForLight, lightId) => {
         const targetLight = transitionsForLight[0].lights.find((l) => l.id === lightId)
@@ -281,51 +378,10 @@ export class EffectManager implements IEffectManager {
           layer,
           transitionsForLight,
           isPersistent,
-          persistentRunId,
+          effectRunId,
         )
       })
     })
-  }
-
-  /**
-   * Adds a new effect and clears all other effects that were running.
-   * Used for significant changes in scenes. E.g., from Menu to in-game.
-   *
-   * @param name The name of the effect
-   * @param effect The effect configuration
-   * @param isPersistent If true, the effect re-queues itself after completing
-   */
-  public setEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
-    if (this.systemEffects.isBlackoutActive()) {
-      log.warn('Cancelling blackout for setEffect')
-      this.systemEffects.cancelBlackout()
-    }
-
-    if (this.hasNoTransitions(name, effect)) {
-      return
-    }
-
-    const transitionsByLayerAndLight = this.effectTransformer.groupTransitionsByLayerAndLight(
-      effect.transitions,
-    )
-
-    // Check if the effect contains transitions for layer 0
-    const hasLayer0 = transitionsByLayerAndLight.has(0)
-
-    // Check to see if we've called setEffect before for this effect. If so, queue it and don't clear all.
-    if (hasLayer0 && this._lastCalled0LayerEffect === name) {
-      this.removeEffect(name, 0)
-      this.addEffect(name, effect, isPersistent)
-      this._lastCalled0LayerEffect = name
-      return
-    }
-
-    this.removeAllEffects()
-
-    this.addEffect(name, effect, isPersistent)
-    if (hasLayer0) {
-      this._lastCalled0LayerEffect = name
-    }
   }
 
   /**
@@ -343,35 +399,7 @@ export class EffectManager implements IEffectManager {
     effect: Effect,
     isPersistent: boolean = false,
   ): boolean {
-    if (this.hasNoTransitions(name, effect)) {
-      return false
-    }
-
-    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      log.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
-      return false
-    }
-
-    if (this.isEffectRunning(name)) {
-      //  console.warn(`Not adding effect "${name}" because an effect with the same name is already running. Preventing timing issues.`);
-      return false
-    }
-
-    const { transitionsByLayerAndLight, persistentRunId } = this.prepareSubmission(
-      name,
-      effect,
-      isPersistent,
-    )
-
-    this.applyEffectTransitions(
-      name,
-      effect,
-      transitionsByLayerAndLight,
-      isPersistent,
-      persistentRunId,
-    )
-
-    return true
+    return this.submitEffect(name, effect, isPersistent, ADD_EFFECT_UNBLOCKED_NAME)
   }
 
   /**
@@ -488,40 +516,7 @@ export class EffectManager implements IEffectManager {
     effect: Effect,
     isPersistent: boolean = false,
   ): boolean {
-    if (this.hasNoTransitions(name, effect)) {
-      return false
-    }
-
-    if (this.systemEffects.isBlackoutActive() && effect.transitions[0].layer < 255) {
-      log.warn(`Cannot add effect "${name}" because a blackout is in progress.`)
-      return false
-    }
-
-    if (this.isEffectRunning(name)) {
-      log.warn(
-        `Not setting effect "${name}" because an effect with the same name is already running. Preventing timing issues.`,
-      )
-      return false
-    }
-
-    // Remove all existing effects first
-    this.removeAllEffects()
-
-    const { transitionsByLayerAndLight, persistentRunId } = this.prepareSubmission(
-      name,
-      effect,
-      isPersistent,
-    )
-
-    this.applyEffectTransitions(
-      name,
-      effect,
-      transitionsByLayerAndLight,
-      isPersistent,
-      persistentRunId,
-    )
-
-    return true
+    return this.submitEffect(name, effect, isPersistent, SET_EFFECT_UNBLOCKED_NAME)
   }
 
   /**
@@ -831,16 +826,7 @@ export class EffectManager implements IEffectManager {
    */
   public onLightEffectComplete(effectState: LightEffectState): void {
     // Fire the completion callback for this effect (if no other lights are still running it)
-    // Check if any other lights are still running this effect
-    const effectStillActive = Array.from(this.layerManager.getActiveEffects().values()).some(
-      (layerMap) =>
-        Array.from(layerMap.values()).some(
-          (activeEffect) =>
-            activeEffect.name === effectState.name && activeEffect.lightId !== effectState.lightId,
-        ),
-    )
-
-    if (!effectStillActive) {
+    if (!this.isEffectRunningOnAnotherLight(effectState.name, effectState.lightId)) {
       // This was the last light for this effect - fire the callback
       this.effectCallbacks.fire(effectState.name)
     }
