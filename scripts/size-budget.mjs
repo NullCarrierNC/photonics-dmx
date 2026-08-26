@@ -2,17 +2,29 @@
  * Measures line counts of non-test sources under `src/` and compares them to
  * metrics/size-budget.txt so files at or over the limit cannot grow further and no new file
  * crosses it. Files already over the limit are listed with the size they may not exceed;
- * that list only ever ratchets down, via `node scripts/size-budget.mjs --write`.
+ * that list only ever ratchets down, via `node scripts/size-budget.mjs --write`. A file that has
+ * shrunk below its entry fails the check too, so the baseline cannot go stale and leave the file
+ * room to grow back.
  */
 import { readdirSync, readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const {
+  parseBaseline,
+  compareBudget,
+  grownSinceBaseline,
+  renderBaseline,
+} = require('./sizeBudgetCore.cjs')
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = join(__dirname, '..')
 const BUDGET_FILE = join(root, 'metrics', 'size-budget.txt')
 const SRC_DIR = join(root, 'src')
 const LIMIT = 600
+const REGENERATE = 'node scripts/size-budget.mjs --write'
 
 /**
  * @param {string} path
@@ -53,120 +65,80 @@ function measureSources() {
 }
 
 /**
- * @param {Map<string, number>} sizes
- * @returns {Array<[string, number]>} files at or over the limit, largest first
+ * @param {string[]} messages
+ * @param {string} advice
  */
-function overLimit(sizes) {
-  return [...sizes].filter(([, lines]) => lines > LIMIT).sort(([, a], [, b]) => b - a)
+function fail(messages, advice) {
+  for (const message of messages) {
+    console.error(message)
+  }
+  console.error(advice)
+  process.exit(1)
 }
 
 const sizes = measureSources()
 
 if (process.argv.includes('--write')) {
   mkdirSync(join(root, 'metrics'), { recursive: true })
-  const listed = overLimit(sizes)
 
   // Regenerating must never launder a file that grew. Raising an allowance is a deliberate act, so
   // it is done by editing the entry, not by running this.
   if (existsSync(BUDGET_FILE)) {
-    /** @type {string[]} */
-    const grown = []
-    for (const line of readFileSync(BUDGET_FILE, 'utf8').trim().split('\n').slice(1)) {
-      const match = /^(\d+) (.+)$/.exec(line)
-      if (!match) continue
-      const cap = parseInt(match[1], 10)
-      const now = sizes.get(match[2])
-      if (now !== undefined && now > cap) {
-        grown.push(`${match[2]} is ${now} lines, over its ${cap} line allowance`)
-      }
+    const baseline = parseBaseline(readFileSync(BUDGET_FILE, 'utf8'))
+    if (!baseline) {
+      fail(
+        [`Budget file must start with a \`limit <number>\` line: ${BUDGET_FILE}`],
+        'Fix the header, or delete the file to regenerate it from scratch.',
+      )
     }
+    const grown = grownSinceBaseline(sizes, baseline)
     if (grown.length > 0) {
-      for (const entry of grown) {
-        console.error(entry)
-      }
-      console.error(
+      fail(
+        grown,
         `Refusing to raise an allowance. Shrink the file, or edit its entry in ${BUDGET_FILE} if the growth is intended.`,
       )
-      process.exit(1)
     }
   }
 
-  const header = [
-    `limit ${LIMIT}`,
-    'Auto-generated: non-test sources under src/ that exceed the line limit.',
-    'Entries may only shrink. Regenerate after a split with: node scripts/size-budget.mjs --write',
-  ]
-  const body = listed.map(([path, lines]) => `${lines} ${path}`)
-  writeFileSync(BUDGET_FILE, `${[...header, ...body].join('\n')}\n`, 'utf8')
-  console.log(`Wrote ${BUDGET_FILE} with ${listed.length} entries over ${LIMIT}`)
+  writeFileSync(BUDGET_FILE, renderBaseline(sizes, LIMIT), 'utf8')
+  const listed = renderBaseline(sizes, LIMIT).trim().split('\n').length - 3
+  console.log(`Wrote ${BUDGET_FILE} with ${listed} entries over ${LIMIT}`)
   process.exit(0)
 }
 
 if (!existsSync(BUDGET_FILE)) {
-  console.error(`Missing ${BUDGET_FILE}, run: node scripts/size-budget.mjs --write`)
-  process.exit(1)
+  fail([`Missing ${BUDGET_FILE}`], `Generate it with: ${REGENERATE}`)
 }
 
-const budgetLines = readFileSync(BUDGET_FILE, 'utf8').trim().split('\n')
-const limitMatch = /^limit (\d+)$/.exec(budgetLines[0])
-if (!limitMatch) {
-  console.error('Budget file must start with a `limit <number>` line')
-  process.exit(1)
-}
-const fileLimit = parseInt(limitMatch[1], 10)
-
-/** @type {Map<string, number>} */
-const allowed = new Map()
-for (const line of budgetLines.slice(1)) {
-  const match = /^(\d+) (.+)$/.exec(line)
-  if (match) {
-    allowed.set(match[2], parseInt(match[1], 10))
-  }
-}
-
-/** @type {string[]} */
-const failures = []
-/** @type {string[]} */
-const slack = []
-
-for (const [path, lines] of sizes) {
-  const cap = allowed.get(path)
-  if (cap === undefined) {
-    if (lines > fileLimit) {
-      failures.push(`${path} is ${lines} lines, over the ${fileLimit} line limit for new files`)
-    }
-    continue
-  }
-  if (lines > cap) {
-    failures.push(`${path} grew to ${lines} lines, over its ${cap} line allowance`)
-  } else if (lines < cap) {
-    slack.push(`${path} is ${lines} lines, allowance ${cap}`)
-  }
-}
-
-for (const path of allowed.keys()) {
-  if (!sizes.has(path)) {
-    slack.push(`${path} no longer exists`)
-  }
-}
-
-if (failures.length > 0) {
-  for (const failure of failures) {
-    console.error(failure)
-  }
-  console.error(
-    'Split the file, or if the growth is deliberate run: node scripts/size-budget.mjs --write',
+const baseline = parseBaseline(readFileSync(BUDGET_FILE, 'utf8'))
+if (!baseline) {
+  fail(
+    ['Budget file must start with a `limit <number>` line'],
+    `Fix the header, or regenerate it with: ${REGENERATE}`,
   )
-  process.exit(1)
+}
+if (baseline.malformed.length > 0) {
+  fail(
+    baseline.malformed.map((line) => `Unparseable budget entry: ${line}`),
+    `Each entry must read \`<lines> <path>\`. Regenerate with: ${REGENERATE}`,
+  )
 }
 
-if (slack.length > 0) {
-  console.log(
-    `Size budget: ${allowed.size} listed, ${slack.length} below allowance, tighten with --write`,
+const { overAllowance, overLimit, slack, removed } = compareBudget(sizes, baseline)
+
+if (overAllowance.length > 0 || overLimit.length > 0) {
+  fail(
+    [...overAllowance, ...overLimit],
+    `Split the file or shrink it. Allowances only ratchet down, so if the growth is deliberate edit its entry in ${BUDGET_FILE}.`,
   )
-  for (const entry of slack) {
-    console.log(`  ${entry}`)
-  }
-} else {
-  console.log(`Size budget: ${allowed.size} files listed, none over allowance, limit ${fileLimit}`)
 }
+
+// A stale entry leaves the file room to grow back to a size it no longer needs, so ratcheting the
+// baseline down is part of the change that shrank it.
+if (slack.length > 0 || removed.length > 0) {
+  fail([...slack, ...removed], `The baseline is out of date. Tighten it with: ${REGENERATE}`)
+}
+
+console.log(
+  `Size budget: ${baseline.allowances.size} files listed, none over allowance, limit ${baseline.limit}`,
+)
