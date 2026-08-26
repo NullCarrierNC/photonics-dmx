@@ -132,6 +132,28 @@ describe('ControllerLifecycle', () => {
       expect(work).toHaveBeenCalledTimes(1)
     })
 
+    it('a failing stopped-phase broadcast still marks completion so the retry short-circuits', async () => {
+      // In-process state is consistent (work done) even though the trailing notification failed,
+      // so a retry must not re-run the teardown.
+      const lifecycle = new ControllerLifecycle((phase) => {
+        if (phase === 'stopped') {
+          throw new Error('phase emit failed')
+        }
+      })
+      lifecycle.setPhase('running')
+      const work = jest.fn().mockImplementation(() => Promise.resolve())
+
+      await expect(lifecycle.runExclusiveShutdown(work as () => Promise<void>)).rejects.toThrow(
+        /phase emit failed/,
+      )
+
+      expect(lifecycle.isShutdownComplete()).toBe(true)
+      expect(lifecycle.isShutdownInFlight()).toBe(false)
+
+      await lifecycle.runExclusiveShutdown(work as () => Promise<void>)
+      expect(work).toHaveBeenCalledTimes(1)
+    })
+
     it('a failed teardown clears the memo, stays incomplete, and can be retried', async () => {
       const lifecycle = new ControllerLifecycle(() => {})
       lifecycle.setPhase('running')

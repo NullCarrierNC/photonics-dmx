@@ -1,14 +1,10 @@
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
-import {
-  normalizeWhiteChannelMixMode,
-  normalizeVenuePostProcessingEnabled,
-} from '../../services/configuration/configurationDefaults'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
 import { VenueFrameProcessor } from '../../photonics-dmx/controllers/VenueFrameProcessor'
 import { getStrobeStateManager } from '../../photonics-dmx/controllers/StrobeStateManager'
 import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
-import { LightingConfiguration, ConfigStrobeType, FixtureConfig } from '../../photonics-dmx/types'
+import { FixtureConfig } from '../../photonics-dmx/types'
 import { CueHandler } from '../../photonics-dmx/cueHandlers/CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
 import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
@@ -17,15 +13,13 @@ import {
   AudioGameModeConfig,
   AudioLightingData,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
-import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock'
 import { app } from 'electron'
-import { sendToAllWindows, mainRuntimeBroadcaster } from '../utils/windowUtils'
+import { sendToAllWindows } from '../utils/windowUtils'
 import { copyDefaultData } from '../utils/copyDefaultData'
 import * as path from 'path'
 import { EffectLoader } from '../../photonics-dmx/cues/node/loader/EffectLoader'
 
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
-import { RigChain } from './RigChain'
 import { ChainFanout } from './ChainFanout'
 import { TestEffectRunner, type Rb3LedState } from './TestEffectRunner'
 import { MotionCueSimulator } from './MotionCueSimulator'
@@ -37,6 +31,7 @@ import {
 import { ConsoleModeController } from './ConsoleModeController'
 import { RegistryInitializer } from './RegistryInitializer'
 import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycle'
+import { ControllerGraph } from './ControllerGraph'
 import {
   buildControllerCollaborators,
   type ControllerCollaborators,
@@ -49,7 +44,6 @@ import {
   reconcileAndApplyGroups,
   type CueDomainRegistryBinding,
 } from './cueDomainBindings'
-import { buildDomainChainHandlers, readMotionPrefs } from './cueRuntimeDomains'
 import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { AudioCueType, AudioMotionCueRef } from '../../photonics-dmx/cues/types/audioCueTypes'
 import type { MotionCueRef } from '../../photonics-dmx/cues/types/cueTypes'
@@ -57,7 +51,6 @@ import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoade
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues'
 import { createLogger } from '../../shared/logger'
-import { DMX_OUTPUT_REFRESH_RATE_HZ_MAX } from '../../shared/dmxOutputRefresh'
 
 const log = createLogger('ControllerManager')
 
@@ -102,16 +95,11 @@ export interface ControllerManagerDeps {
   config?: ConfigurationManager
   collaborators?: Partial<ControllerCollaborators>
   lifecycle?: ControllerLifecycle
+  graph?: ControllerGraph
 }
 
 export class ControllerManager {
   private config: ConfigurationManager
-  /**
-   * Per-rig sequencer chains. Order is significant: `rigChains[0]` is the primary chain,
-   * whose handlers own user-visible renderer broadcasts so the UI sees one event per
-   * logical cue rather than one per rig.
-   */
-  private rigChains: RigChain[] = []
   /**
    * Listener / processor surface that dispatches each incoming event to every chain's
    * matching cue handler. Held here so listener controllers can read the up-to-date chain
@@ -119,30 +107,12 @@ export class ControllerManager {
    */
   private chainFanout = new ChainFanout()
   /**
-   * Shared tick source for every chain's `Sequencer`. Owned here (rather than inside a
-   * `Sequencer`) so chains can share one clock and tear down independently without
-   * stopping ticks for the others. Rebuilt on every `restartControllers`.
-   */
-  private clock: Clock | null = null
-  /**
-   * Shorthand accessors pointing at the same instances exposed by `rigChains[0]`. Provided
-   * for call sites (listener coordinators, audio controller, IPC handlers, test runner)
-   * that need a single light manager / effects controller reference without iterating
-   * chains.
-   */
-  private dmxLightManager: DmxLightManager | null = null
-  private effectsController: ILightingController | null = null
-  private dmxPublisher: DmxPublisher | null = null
-  /**
    * The venue post-processing stage. Owned here rather than by the publisher so the effect YARG
    * reported survives a controller restart, and so publisher rebuilds do not drop it.
    */
   private readonly venueFrameProcessor = new VenueFrameProcessor()
-
-  private cueHandler: CueHandler | null = null
-  private rb3CueHandler: CueHandler | null = null
-  private nodeCueLoader: NodeCueLoader | null = null
-  private effectLoader: EffectLoader | null = null
+  /** The built controller-object graph: chains, clock, publisher, cue handlers, loaders. */
+  private readonly graph: ControllerGraph
 
   private pendingValidationErrors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }> = []
   private onSimulationPreempt: (() => void) | null = null
@@ -179,6 +149,14 @@ export class ControllerManager {
     this.listenerLifecycle = collaborators.listenerLifecycle
     this.registryInit = collaborators.registryInit
     this.consoleMode = collaborators.consoleMode
+    this.graph =
+      deps.graph ??
+      new ControllerGraph({
+        getConfig: () => this.config,
+        getSenderManager: () => this.senderLifecycle.getSenderManager(),
+        chainFanout: this.chainFanout,
+        venueFrameProcessor: this.venueFrameProcessor,
+      })
   }
 
   /** The host surface the collaborators are wired against. */
@@ -186,28 +164,20 @@ export class ControllerManager {
     return {
       getConfig: () => this.config,
       getChainFanout: () => this.chainFanout,
-      getRigChains: () => this.rigChains,
-      getDmxLightManager: () => this.dmxLightManager,
-      getEffectsController: () => this.effectsController,
-      getDmxPublisher: () => this.dmxPublisher,
+      getRigChains: () => this.graph.getChains(),
+      getDmxLightManager: () => this.graph.getDmxLightManager(),
+      getEffectsController: () => this.graph.getEffectsController(),
+      getDmxPublisher: () => this.graph.getDmxPublisher(),
       getVenueFrameProcessor: () => this.venueFrameProcessor,
       ensureInitialized: () => this.init(),
       ensureChainsHaveHandlersForSimulation: (domain) =>
         this.ensureChainsHaveHandlersForSimulation(domain),
-      setCueHandlerRef: (h) => {
-        this.cueHandler = h
-      },
-      setRb3CueHandlerRef: (h) => {
-        this.rb3CueHandler = h
-      },
-      getNodeCueLoader: () => this.nodeCueLoader,
-      setNodeCueLoader: (l) => {
-        this.nodeCueLoader = l
-      },
-      getEffectLoader: () => this.effectLoader,
-      setEffectLoader: (l) => {
-        this.effectLoader = l
-      },
+      setCueHandlerRef: (h) => this.graph.setCueHandler(h),
+      setRb3CueHandlerRef: (h) => this.graph.setRb3CueHandler(h),
+      getNodeCueLoader: () => this.graph.getNodeCueLoader(),
+      setNodeCueLoader: (l) => this.graph.setNodeCueLoader(l),
+      getEffectLoader: () => this.graph.getEffectLoader(),
+      setEffectLoader: (l) => this.graph.setEffectLoader(l),
       pushValidationError: (e) => {
         this.pendingValidationErrors.push(e)
       },
@@ -242,7 +212,7 @@ export class ControllerManager {
     this.lifecycle.assertPhase(['initializing', 'restarting', 'failed'], 'init')
 
     this.senderLifecycle.ensureSenderManager()
-    await this.initializeRigChains()
+    this.graph.buildChains()
     for (const binding of CUE_DOMAIN_BINDINGS) {
       await this.registryInit.initializeCueRegistry(binding.domain)
     }
@@ -251,100 +221,10 @@ export class ControllerManager {
     await this.registryInit.initializeEffectLoader() // effects before node cues
     await this.registryInit.initializeNodeCueLoader()
     await this.applyAllEnabledGroupsFromConfig()
-    await this.initializeListeners()
+    this.graph.buildPrimaryYargHandler()
 
     this.isInitialized = true
     this.lifecycle.setPhase('running')
-  }
-
-  /**
-   * Build one `RigChain` per active rig and wire up the DMX publisher. Each chain owns its
-   * own sequencer, light manager, and (later) cue handlers; the same listener event fans
-   * out to every chain so the cue resolves against each rig's own lights independently.
-   *
-   * If no rigs are active, a single empty chain is built so the rest of the system has a
-   * sequencer/light-state plumbing to reference (cue handlers never get installed; nothing
-   * makes it to the wire).
-   *
-   * `Clock` is rebuilt every time we initialise so a stale clock from a previous lifecycle
-   * never drives a fresh sequencer.
-   */
-  private async initializeRigChains(): Promise<void> {
-    const activeRigs = this.config.getActiveRigs()
-
-    const clockRate = this.config.getPreference('clockRate')
-    this.clock = new Clock(clockRate)
-
-    if (activeRigs.length === 0) {
-      log.warn('No active DMX rigs found. DMX output will be disabled.')
-      const emptyConfig: LightingConfiguration = {
-        numLights: 0,
-        lightLayout: { id: 'default-layout', label: 'Default Layout' },
-        strobeType: ConfigStrobeType.None,
-        frontLights: [],
-        backLights: [],
-        strobeLights: [],
-      }
-      this.rigChains = [
-        new RigChain({
-          rigId: 'empty',
-          config: emptyConfig,
-          clock: this.clock,
-          isPrimary: true,
-        }),
-      ]
-    } else {
-      log.info(`Initializing ${activeRigs.length} active DMX rig(s)`)
-      // One chain per active rig. The first chain is marked primary so its handlers own
-      // user-visible renderer broadcasts; secondary chains run silently.
-      this.rigChains = activeRigs.map(
-        (rig, index) =>
-          new RigChain({
-            rigId: rig.id,
-            config: rig.config,
-            clock: this.clock!,
-            isPrimary: index === 0,
-            mirror: { horiz: rig.mirrorHoriz, vert: rig.mirrorVert },
-          }),
-      )
-    }
-
-    const primaryChain = this.rigChains[0]
-    this.dmxLightManager = primaryChain.dmxLightManager
-    this.effectsController = primaryChain.sequencer
-
-    this.chainFanout.setChains(this.rigChains)
-
-    // Start the centralized timing system
-    this.clock.start()
-
-    // Set up DMX publisher. Govern wire output so the render tick rate (clockRate, up to
-    // 100 Hz) doesn't fire-hose cheap USB / low-end sACN adapters. The Global DMX Publishing
-    // Rate pref sits upstream of all enabled senders; per-sender refresh settings still pace
-    // individual slow links below this cap. Falls back to the absolute DMX ceiling when the
-    // pref is absent so the governor never throttles a sender below what it could output.
-    const globalDmxRateHz =
-      this.config.getPreference('globalDmxPublishingRateHz') ?? DMX_OUTPUT_REFRESH_RATE_HZ_MAX
-    this.dmxPublisher = new DmxPublisher(this.senderLifecycle.getSenderManager(), null, undefined, {
-      outputRateHz: globalDmxRateHz,
-      whiteChannelMixMode: normalizeWhiteChannelMixMode(
-        this.config.getPreference('whiteChannelMixMode'),
-      ),
-      frameProcessor: this.venueFrameProcessor,
-    })
-    this.venueFrameProcessor.setVenuePostProcessingEnabled(
-      normalizeVenuePostProcessingEnabled(this.config.getPreference('venuePostProcessingEnabled')),
-    )
-    // Subscribe the publisher to every chain's LightStateManager. Each chain's emission
-    // writes its rig's lights into the publisher's aggregated map; a coalesced flush calls
-    // publishNow once per tick.
-    this.dmxPublisher.setRigChains(
-      this.rigChains.map((c) => ({ rigId: c.rigId, lightStateManager: c.lightStateManager })),
-    )
-
-    if (activeRigs.length > 0) {
-      this.dmxPublisher.updateActiveRigs(activeRigs)
-    }
   }
 
   /**
@@ -370,23 +250,6 @@ export class ControllerManager {
     }
     // Audio selection reads the freshly-applied enabled/disabled state; refresh once after the loop.
     this.refreshAudioCueSelection()
-  }
-
-  /**
-   * Initialize network listeners
-   */
-  private async initializeListeners(): Promise<void> {
-    if (!this.dmxLightManager || !this.effectsController) return
-
-    // Create cue handler (default to YARG)
-    const yargHandler = new CueHandler(this.dmxLightManager, this.effectsController, {
-      getMotionCueMinimumHoldMs: () => readMotionPrefs(this.config, 'yarg').minimumHoldMs,
-      getMotionCueProbabilityPercent: () => readMotionPrefs(this.config, 'yarg').probabilityPercent,
-      runtimeBroadcaster: mainRuntimeBroadcaster,
-    })
-    yargHandler.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
-    yargHandler.setManualMotionRef(readMotionPrefs(this.config, 'yarg').activeCueRef)
-    this.cueHandler = yargHandler
   }
 
   /**
@@ -497,8 +360,9 @@ export class ControllerManager {
    */
   public async shutdown(): Promise<void> {
     return this.lifecycle.runExclusiveShutdown(async () => {
+      // 'shuttingDown' is allowed so a retry after a failed teardown can run again.
       this.lifecycle.assertPhase(
-        ['initializing', 'running', 'restarting', 'consoleMode', 'failed'],
+        ['initializing', 'running', 'restarting', 'consoleMode', 'failed', 'shuttingDown'],
         'shutdown',
       )
       this.lifecycle.setPhase('shuttingDown')
@@ -526,61 +390,11 @@ export class ControllerManager {
         log.error('Error disabling Audio:', err)
       }
 
-      if (this.nodeCueLoader) {
-        try {
-          await this.nodeCueLoader.dispose()
-          this.nodeCueLoader.removeAllListeners()
-          this.nodeCueLoader = null
-          log.info('ControllerManager shutdown: node cue loader stopped')
-        } catch (err) {
-          log.error('Error shutting down node cue loader:', err)
-        }
-      }
-
-      if (this.effectLoader) {
-        try {
-          await this.effectLoader.dispose()
-          this.effectLoader.removeAllListeners()
-          this.effectLoader = null
-          log.info('ControllerManager shutdown: effect loader stopped')
-        } catch (err) {
-          log.error('Error shutting down effect loader:', err)
-        }
-      }
-
-      this.shutdownDomainCueHandlerRefs()
-
-      // Dispose every rig chain. The shared clock is stopped separately below so a chain
-      // tearing down can't take ticks away from any sibling chain.
-      for (const chain of this.rigChains) {
-        try {
-          await chain.dispose()
-        } catch (err) {
-          log.error(`Error disposing rig chain ${chain.rigId}:`, err)
-        }
-      }
-      this.rigChains = []
-      this.dmxLightManager = null
-      this.effectsController = null
-      log.info('ControllerManager shutdown: rig chains disposed')
-
-      if (this.dmxPublisher) {
-        try {
-          await this.dmxPublisher.shutdown()
-          log.info('ControllerManager shutdown: DMX publisher stopped')
-        } catch (err) {
-          log.error('Error shutting down DMX publisher:', err)
-        }
-      }
-
-      if (this.clock) {
-        try {
-          this.clock.destroy()
-        } catch (err) {
-          log.error('Error stopping shared clock:', err)
-        }
-        this.clock = null
-      }
+      await this.graph.disposeLoaders()
+      this.graph.shutdownDomainCueHandlerRefs()
+      await this.graph.disposeChainsForShutdown()
+      await this.graph.shutdownPublisherSafe()
+      this.graph.destroyClock()
 
       try {
         await this.senderLifecycle.shutdownSenderOnAppExit()
@@ -600,11 +414,11 @@ export class ControllerManager {
   }
 
   public getDmxLightManager(): DmxLightManager | null {
-    return this.dmxLightManager
+    return this.graph.getDmxLightManager()
   }
 
   public getLightingController(): ILightingController | null {
-    return this.effectsController
+    return this.graph.getEffectsController()
   }
 
   public getSenderManager(): SenderManager {
@@ -644,38 +458,11 @@ export class ControllerManager {
   }
 
   public getCueHandler(): CueHandler | null {
-    return this.cueHandler
+    return this.graph.getCueHandler()
   }
 
   public getRb3CueHandler(): CueHandler | null {
-    return this.rb3CueHandler
-  }
-
-  /**
-   * Shut down and null every domain cue-handler ref (YARG + RB3). Single owner for both the
-   * shutdown and restart-teardown paths, so a handler ref can never survive teardown pointing at a
-   * disposed handler. Each is guarded independently so one failing shutdown can't strand the other;
-   * a new domain adds one block here rather than another pair of mirrored teardown sites.
-   */
-  private shutdownDomainCueHandlerRefs(): void {
-    if (this.cueHandler) {
-      try {
-        this.cueHandler.shutdown()
-      } catch (err) {
-        log.error('Error shutting down cue handler:', err)
-      }
-      this.cueHandler = null
-      log.info('ControllerManager teardown: cue handler stopped')
-    }
-    if (this.rb3CueHandler) {
-      try {
-        this.rb3CueHandler.shutdown()
-      } catch (err) {
-        log.error('Error shutting down RB3 cue handler:', err)
-      }
-      this.rb3CueHandler = null
-      log.info('ControllerManager teardown: RB3 cue handler stopped')
-    }
+    return this.graph.getRb3CueHandler()
   }
 
   /**
@@ -703,22 +490,15 @@ export class ControllerManager {
    * after it is disabled (rebuilds the chain slots from scratch).
    */
   public ensureChainsHaveHandlersForSimulation(domain: NetCueMode): void {
-    buildDomainChainHandlers(domain, this.rigChains, {
-      getMotionEnabled: () => this.config.getPreference('motionEnabled') ?? true,
-      getMotionCueMinimumHoldMs: () => readMotionPrefs(this.config, domain).minimumHoldMs,
-      getMotionCueProbabilityPercent: () => readMotionPrefs(this.config, domain).probabilityPercent,
-      getActiveMotionCueRef: () => readMotionPrefs(this.config, domain).activeCueRef,
-      runtimeBroadcaster: mainRuntimeBroadcaster,
-      replaceExisting: false,
-    })
+    this.graph.ensureChainsHaveHandlersForSimulation(domain)
   }
 
   public getNodeCueLoader(): NodeCueLoader | null {
-    return this.nodeCueLoader
+    return this.graph.getNodeCueLoader()
   }
 
   public getEffectLoader(): EffectLoader | null {
-    return this.effectLoader
+    return this.graph.getEffectLoader()
   }
 
   public getProcessorManager(): ProcessorManager | null {
@@ -726,7 +506,7 @@ export class ControllerManager {
   }
 
   public getDmxPublisher(): DmxPublisher | null {
-    return this.dmxPublisher
+    return this.graph.getDmxPublisher()
   }
 
   /** The venue post-processing stage, for callers driving or reporting the effect. */
@@ -771,12 +551,10 @@ export class ControllerManager {
    * Use this when only the active-rig set changes so senders stay running.
    */
   public refreshActiveRigs(): void {
-    if (!this.isInitialized || !this.dmxPublisher) {
+    if (!this.isInitialized) {
       return
     }
-    const activeRigs = this.config.getActiveRigs()
-    this.dmxPublisher.updateActiveRigs(activeRigs)
-    log.info('Refreshed active rigs for DMX output:', activeRigs.length, 'rig(s)')
+    this.graph.refreshActiveRigs()
   }
 
   /**
@@ -826,17 +604,12 @@ export class ControllerManager {
         await this.listenerLifecycle.audio.disableAudio()
       }
 
-      for (const chain of this.rigChains) {
-        await chain.dispose()
-      }
-      this.rigChains = []
+      await this.graph.disposeChainsForRestart()
 
-      if (this.dmxPublisher) {
-        await this.dmxPublisher.shutdown()
-      }
+      await this.graph.shutdownPublisher()
       await this.senderLifecycle.resetSenderForControllerRestart()
 
-      this.shutdownDomainCueHandlerRefs()
+      this.graph.shutdownDomainCueHandlerRefs()
 
       // Gguarantee the process-wide strobe state is cleared on every restart,
       // even if no cue handler was active to clear it during its own shutdown.
@@ -867,14 +640,9 @@ export class ControllerManager {
 
       // Clear the shared tick source so `init()` builds a fresh one rather than reusing
       // a clock whose tick callbacks have been unregistered.
-      if (this.clock) {
-        this.clock.destroy()
-        this.clock = null
-      }
+      this.graph.destroyClock()
 
-      this.dmxLightManager = null
-      this.effectsController = null
-      this.dmxPublisher = null
+      this.graph.clearBuildRefs()
 
       this.isInitialized = false
 
@@ -1047,10 +815,7 @@ export class ControllerManager {
    * motion output until the next listener restart.
    */
   public setMotionEnabledGlobal(enabled: boolean): void {
-    for (const chain of this.rigChains) {
-      chain.cueHandlers.yarg?.setMotionEnabled(enabled)
-      chain.cueHandlers.rb3?.setMotionEnabled(enabled)
-    }
+    this.graph.setMotionEnabledOnChains(enabled)
     this.listenerLifecycle.audio.setMotionEnabled(enabled)
   }
 
@@ -1068,9 +833,7 @@ export class ControllerManager {
    * broadcast for the change (see Phase 4 dedup); the secondary chains apply silently.
    */
   public setActiveYargMotionCueRef(ref: MotionCueRef | null): void {
-    for (const chain of this.rigChains) {
-      chain.cueHandlers.yarg?.setManualMotionRef(ref)
-    }
+    this.graph.setManualMotionRefOnChains('yarg', ref)
   }
 
   /**
@@ -1078,9 +841,7 @@ export class ControllerManager {
    * pick up the new reference together.
    */
   public setActiveRb3MotionCueRef(ref: MotionCueRef | null): void {
-    for (const chain of this.rigChains) {
-      chain.cueHandlers.rb3?.setManualMotionRef(ref)
-    }
+    this.graph.setManualMotionRefOnChains('rb3', ref)
   }
 
   /**
