@@ -12,6 +12,9 @@ jest.mock('../../utils/windowUtils', () => ({
 }))
 
 import { ControllerManager } from '../../controllers/ControllerManager'
+import { ControllerLifecycle } from '../../controllers/ControllerLifecycle'
+import type { SenderLifecycleController } from '../../controllers/SenderLifecycleController'
+import type { ListenerLifecycleController } from '../../controllers/ListenerLifecycleController'
 import { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
 import { sendToAllWindows } from '../../utils/windowUtils'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
@@ -102,5 +105,39 @@ describe('ControllerManager construction', () => {
     const manager = new ControllerManager({ config: stubConfig() })
 
     await expect(manager.restartControllers()).rejects.toThrow(/invalid lifecycle/)
+  })
+
+  it('accepts an injected lifecycle', () => {
+    const lifecycle = new ControllerLifecycle(() => {})
+    lifecycle.setPhase('running')
+
+    const manager = new ControllerManager({ config: stubConfig(), lifecycle })
+
+    expect(manager.getLifecyclePhase()).toBe('running')
+  })
+
+  it('accepts injected collaborators and uses them over its own', async () => {
+    const shutdownSenderOnAppExit = jest.fn().mockImplementation(() => Promise.resolve())
+    const senderLifecycle = {
+      shutdownSenderOnAppExit,
+      getSenderManager: jest.fn(),
+    } as unknown as SenderLifecycleController
+    const disableYarg = jest.fn().mockImplementation(() => Promise.resolve())
+    const disableRb3 = jest.fn().mockImplementation(() => Promise.resolve())
+    const disableAudio = jest.fn().mockImplementation(() => Promise.resolve())
+    const listenerLifecycle = {
+      yargRb3: { disableYarg, disableRb3 },
+      audio: { disableAudio },
+    } as unknown as ListenerLifecycleController
+
+    const manager = new ControllerManager({
+      config: stubConfig(),
+      collaborators: { senderLifecycle, listenerLifecycle },
+    })
+    await manager.shutdown()
+
+    expect(shutdownSenderOnAppExit).toHaveBeenCalledTimes(1)
+    expect(disableYarg).toHaveBeenCalledTimes(1)
+    expect(manager.getLifecyclePhase()).toBe('stopped')
   })
 })

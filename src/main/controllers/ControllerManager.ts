@@ -1,6 +1,5 @@
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
 import {
-  normalizeRb3ProcessingMode,
   normalizeWhiteChannelMixMode,
   normalizeVenuePostProcessingEnabled,
 } from '../../services/configuration/configurationDefaults'
@@ -20,7 +19,7 @@ import {
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock'
 import { app } from 'electron'
-import { sendToAllWindows, mainRuntimeBroadcaster, hasBrowserWindows } from '../utils/windowUtils'
+import { sendToAllWindows, mainRuntimeBroadcaster } from '../utils/windowUtils'
 import { copyDefaultData } from '../utils/copyDefaultData'
 import * as path from 'path'
 import { EffectLoader } from '../../photonics-dmx/cues/node/loader/EffectLoader'
@@ -29,7 +28,6 @@ import { ILightingController } from '../../photonics-dmx/controllers/sequencer/i
 import { RigChain } from './RigChain'
 import { ChainFanout } from './ChainFanout'
 import { TestEffectRunner, type Rb3LedState } from './TestEffectRunner'
-import { ChainCueRuntime } from '../../photonics-dmx/controllers/ChainCueRuntime'
 import { MotionCueSimulator } from './MotionCueSimulator'
 import { ListenerLifecycleController } from './ListenerLifecycleController'
 import {
@@ -39,6 +37,11 @@ import {
 import { ConsoleModeController } from './ConsoleModeController'
 import { RegistryInitializer } from './RegistryInitializer'
 import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycle'
+import {
+  buildControllerCollaborators,
+  type ControllerCollaborators,
+  type ControllerHost,
+} from './controllerWiring'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { LifecyclePhase } from '../../shared/ipcTypes'
 import {
@@ -91,11 +94,14 @@ export { LifecycleAbortedError } from './ControllerLifecycle'
  * Collaborators a caller can supply instead of the ones this builds for itself.
  *
  * Production passes nothing. Tests pass a configuration store so constructing a manager does not
- * reach the real config files, which is what lets them drive a normally constructed instance rather
- * than assembling one field by field off the prototype.
+ * reach the real config files, plus any subset of collaborators (fakes for the sender, listener,
+ * console, registry or simulator controllers) and a lifecycle, which is what lets them drive a
+ * normally constructed instance rather than assembling one field by field off the prototype.
  */
 export interface ControllerManagerDeps {
   config?: ConfigurationManager
+  collaborators?: Partial<ControllerCollaborators>
+  lifecycle?: ControllerLifecycle
 }
 
 export class ControllerManager {
@@ -144,8 +150,6 @@ export class ControllerManager {
   private readonly testEffectRunner: TestEffectRunner
   /** RB3 cue-mode twin of {@link testEffectRunner}: dispatches through the RB3 chain runtime. */
   private readonly rb3TestEffectRunner: TestEffectRunner
-  /** Reused RB3 dispatch surface for the RB3 test-effect runner (the fanout is stable). */
-  private readonly rb3SimRuntime = new ChainCueRuntime(this.chainFanout, 'rb3')
   private readonly motionCueSimulator: MotionCueSimulator
   private readonly senderLifecycle: SenderLifecycleController
   private readonly listenerLifecycle: ListenerLifecycleController
@@ -154,9 +158,7 @@ export class ControllerManager {
 
   private isInitialized = false
   /** Phase state, the op queue, and the in-flight restart and shutdown memos. */
-  private readonly lifecycle = new ControllerLifecycle((phase) => {
-    sendToAllWindows(RENDERER_RECEIVE.LIFECYCLE_PHASE_CHANGED, phase)
-  })
+  private readonly lifecycle: ControllerLifecycle
   /** Invoked during restart teardown so process-scoped consumers (e.g. laser sim) drop state tied to the
    *  engine/registry being rebuilt. A list, not a single slot, so multiple consumers can register without
    *  overwriting each other. */
@@ -164,84 +166,39 @@ export class ControllerManager {
 
   constructor(deps: ControllerManagerDeps = {}) {
     this.config = deps.config ?? new ConfigurationManager()
-    this.senderLifecycle = new SenderLifecycleController(() => this.config, {
-      broadcaster: mainRuntimeBroadcaster,
-      hasReceivers: hasBrowserWindows,
-    })
-    const testEffectCtx = {
-      getChainFanout: () => this.chainFanout,
-      ensureInitialized: () => this.init(),
-      getVenuePostProcessing: () => this.venueFrameProcessor.getVenuePostProcessing(),
-    }
-    this.testEffectRunner = new TestEffectRunner(testEffectCtx, {
-      ensureHandlers: () => this.ensureChainsHaveHandlersForSimulation('yarg'),
-      dispatch: (cue, data) => void this.chainFanout.handleCue(cue, data),
-      stopActiveCue: () => this.chainFanout.stopActiveCue(),
-    })
-    this.rb3TestEffectRunner = new TestEffectRunner(testEffectCtx, {
-      ensureHandlers: () => this.ensureChainsHaveHandlersForSimulation('rb3'),
-      dispatch: (cue, data) => void this.rb3SimRuntime.handleCue(cue, data),
-      stopActiveCue: () => this.rb3SimRuntime.stopActiveCue(),
-      songEvent: (condition) => this.rb3SimRuntime.handleSongEvent(condition),
-    })
-    this.motionCueSimulator = new MotionCueSimulator({
-      getChainFanout: () => this.chainFanout,
-    })
-    this.listenerLifecycle = new ListenerLifecycleController(
-      {
-        getDmxLightManager: () => this.dmxLightManager,
-        getEffectsController: () => this.effectsController,
-        getRigChains: () => this.rigChains,
-        getChainFanout: () => this.chainFanout,
-        getMotionEnabled: () => this.config.getPreference('motionEnabled') ?? true,
-        getActiveYargMotionCueRef: () => readMotionPrefs(this.config, 'yarg').activeCueRef,
-        getMotionCueMinimumHoldMs: () => readMotionPrefs(this.config, 'yarg').minimumHoldMs,
-        getMotionCueProbabilityPercent: () =>
-          readMotionPrefs(this.config, 'yarg').probabilityPercent,
-        getActiveRb3MotionCueRef: () => readMotionPrefs(this.config, 'rb3').activeCueRef,
-        getRb3MotionCueMinimumHoldMs: () => readMotionPrefs(this.config, 'rb3').minimumHoldMs,
-        getRb3MotionCueProbabilityPercent: () =>
-          readMotionPrefs(this.config, 'rb3').probabilityPercent,
-        getRb3MotionCueDurationRangeSec: () => {
-          const d = readMotionPrefs(this.config, 'rb3')
-          return { min: d.cueDurationMin, max: d.cueDurationMax }
-        },
-        getFallbackCueTimeMs: () => this.config.getPreference('yargFallbackCueTimeMs') ?? 20000,
-        setVenuePostProcessing: (state) => {
-          this.venueFrameProcessor.setVenuePostProcessing(state)
-        },
-        sendSenderError: (message: string) => {
-          sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
-        },
-        sendToAllWindows,
-        runtimeBroadcaster: mainRuntimeBroadcaster,
-        setCueHandlerRef: (h) => {
-          this.cueHandler = h
-        },
-        setRb3CueHandlerRef: (h) => {
-          this.rb3CueHandler = h
-        },
-        getRb3ProcessingMode: () =>
-          normalizeRb3ProcessingMode(this.config.getPreference('rb3Prefs')?.processingMode),
-      },
-      {
-        getDmxLightManager: () => this.dmxLightManager,
-        getEffectsController: () => this.effectsController,
-        getRigChains: () => this.rigChains,
-        getChainFanout: () => this.chainFanout,
-        config: this.config,
-        sendToAllWindows,
-        runtimeBroadcaster: mainRuntimeBroadcaster,
-      },
-    )
-    this.registryInit = new RegistryInitializer({
+    this.lifecycle =
+      deps.lifecycle ??
+      new ControllerLifecycle((phase) => {
+        sendToAllWindows(RENDERER_RECEIVE.LIFECYCLE_PHASE_CHANGED, phase)
+      })
+    const collaborators = buildControllerCollaborators(this.asControllerHost(), deps.collaborators)
+    this.senderLifecycle = collaborators.senderLifecycle
+    this.testEffectRunner = collaborators.testEffectRunner
+    this.rb3TestEffectRunner = collaborators.rb3TestEffectRunner
+    this.motionCueSimulator = collaborators.motionCueSimulator
+    this.listenerLifecycle = collaborators.listenerLifecycle
+    this.registryInit = collaborators.registryInit
+    this.consoleMode = collaborators.consoleMode
+  }
+
+  /** The host surface the collaborators are wired against. */
+  private asControllerHost(): ControllerHost {
+    return {
       getConfig: () => this.config,
-      sendToAllWindows,
-      pushValidationError: (e) => {
-        this.pendingValidationErrors.push(e)
+      getChainFanout: () => this.chainFanout,
+      getRigChains: () => this.rigChains,
+      getDmxLightManager: () => this.dmxLightManager,
+      getEffectsController: () => this.effectsController,
+      getDmxPublisher: () => this.dmxPublisher,
+      getVenueFrameProcessor: () => this.venueFrameProcessor,
+      ensureInitialized: () => this.init(),
+      ensureChainsHaveHandlersForSimulation: (domain) =>
+        this.ensureChainsHaveHandlersForSimulation(domain),
+      setCueHandlerRef: (h) => {
+        this.cueHandler = h
       },
-      refreshAudioCueSelection: () => {
-        this.refreshAudioCueSelection()
+      setRb3CueHandlerRef: (h) => {
+        this.rb3CueHandler = h
       },
       getNodeCueLoader: () => this.nodeCueLoader,
       setNodeCueLoader: (l) => {
@@ -251,23 +208,19 @@ export class ControllerManager {
       setEffectLoader: (l) => {
         this.effectLoader = l
       },
-      runtimeBroadcaster: mainRuntimeBroadcaster,
-    })
-    this.consoleMode = new ConsoleModeController({
-      getConfig: () => this.config,
-      ensureInitialized: () => this.init(),
-      getDmxPublisher: () => this.dmxPublisher,
-      getListenerSnapshot: () => ({
-        yarg: this.listenerLifecycle.yargRb3.getIsYargEnabled(),
-        rb3: this.listenerLifecycle.yargRb3.getIsRb3Enabled(),
-      }),
+      pushValidationError: (e) => {
+        this.pendingValidationErrors.push(e)
+      },
+      refreshAudioCueSelection: () => {
+        this.refreshAudioCueSelection()
+      },
       getIsAudioEnabled: () => this.getIsAudioEnabled(),
       pauseYarg: () => this.disableYarg(),
       pauseRb3: () => this.disableRb3(),
       pauseAudio: () => this.disableAudio(),
       refreshActiveRigs: () => this.refreshActiveRigs(),
       restartControllers: () => this.restartControllers(),
-    })
+    }
   }
 
   public getLifecyclePhase(): LifecyclePhase {
