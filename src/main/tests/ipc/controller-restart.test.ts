@@ -14,7 +14,11 @@ jest.mock('../../utils/windowUtils', () => ({
 
 import { ControllerManager, LifecycleAbortedError } from '../../controllers/ControllerManager'
 import type { ControllerLifecycle } from '../../controllers/ControllerLifecycle'
-import { lifecycleAt, lifecycleBlockedOn } from '../controllers/lifecycleStub'
+import {
+  lifecycleAt,
+  lifecycleBlockedOn,
+  lifecycleShuttingDownOn,
+} from '../controllers/lifecycleStub'
 import { SenderLifecycleController } from '../../controllers/SenderLifecycleController'
 import { sendToAllWindows } from '../../utils/windowUtils'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
@@ -862,11 +866,7 @@ describe('ControllerManager lifecycle and sender restore', () => {
     })
     const yargDisable = jest.fn().mockImplementation(() => Promise.resolve())
     const fake = Object.assign(Object.create(ControllerManager.prototype), {
-      lifecycle: (() => {
-        const lc = lifecycleAt('running')
-        lc.shutdownPromise = shutdownBarrier
-        return lc
-      })(),
+      lifecycle: lifecycleShuttingDownOn(shutdownBarrier, 'running'),
       listenerLifecycle: { yargRb3: { disableYarg: yargDisable } },
     })
 
@@ -911,7 +911,7 @@ describe('ControllerManager lifecycle and sender restore', () => {
     await Promise.all([pToggle, pRestart])
 
     expect(order).toEqual(['toggle', 'restart'])
-    expect(fake.lifecycle.restartInFlight).toBeNull()
+    expect(fake.lifecycle.isRestartInFlight()).toBe(false)
   })
 
   it('shutdown.call against fresh stub uses the in-flight promise (no double shutdown)', async () => {

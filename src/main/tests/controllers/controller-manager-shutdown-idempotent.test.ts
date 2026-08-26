@@ -125,13 +125,13 @@ describe('ControllerManager.shutdown idempotency', () => {
 
     expect(disableYarg).toHaveBeenCalledTimes(1)
     expect(stub.lifecycle.phase).toBe('stopped')
-    expect(stub.lifecycle.shutdownCompleted).toBe(true)
+    expect(stub.lifecycle.isShutdownComplete()).toBe(true)
   })
 
-  it('a rejected inner shutdown leaves shutdownCompleted false and clears the in-flight promise so a retry can run', async () => {
-    // The fix moves `shutdownCompleted = true` out of `finally` and inside the success branch. To
-    // exercise the rejection path (per-step try/catch wrappers swallow normal teardown errors) we
-    // force a rejection from the phase transition itself.
+  it('a phase-broadcast failure after teardown still marks completion and clears the in-flight promise', async () => {
+    // Completion is marked before the terminal 'stopped' transition, so a failing phase broadcast
+    // still short-circuits the retry. Per-step try/catch wrappers swallow normal teardown errors,
+    // so the rejection is forced from the phase transition itself.
     const senderShutdown = jest.fn().mockImplementation(() => Promise.resolve())
     const stub = makeShutdownStub({ senderShutdown })
     let throwOnce = true
@@ -148,12 +148,12 @@ describe('ControllerManager.shutdown idempotency', () => {
       ControllerManager.prototype.shutdown.call(stub as unknown as ControllerManager),
     ).rejects.toThrow(/phase emit failed/)
 
-    expect(stub.lifecycle.shutdownCompleted).toBe(true)
-    expect(stub.lifecycle.shutdownPromise ?? null).toBeNull()
+    expect(stub.lifecycle.isShutdownComplete()).toBe(true)
+    expect(stub.lifecycle.isShutdownInFlight()).toBe(false)
 
-    // The retry short-circuits because shutdownCompleted was set just before the throw.
-    // This is the documented contract: in-process state is consistent (work done) even though
-    // the trailing notification failed. Crucially the in-flight promise is cleared either way.
+    // The retry short-circuits because completion was marked just before the throw. This is the
+    // documented contract: in-process state is consistent (work done) even though the trailing
+    // notification failed. Crucially the in-flight promise is cleared either way.
     await ControllerManager.prototype.shutdown.call(stub as unknown as ControllerManager)
     expect(senderShutdown).toHaveBeenCalledTimes(1)
   })

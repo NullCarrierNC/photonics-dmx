@@ -77,8 +77,9 @@ const log = createLogger('ControllerManager')
  * - YARG/RB3 toggles and `restartControllers()` serialize on one lifecycle queue (`runLifecycleOp`),
  *   so no two of them ever interleave. Queued ops additionally await any in-flight shutdown.
  * - Audio toggles run off the queue and await any in-flight restart/shutdown (one-directional).
- * - `shutdown()` runs off the queue and must NEVER drain it: queued ops await `controllerShutdownPromise`,
- *   so a shutdown that waited on the queue would deadlock against them.
+ * - `shutdown()` runs off the queue and must NEVER drain it: queued ops await the in-flight
+ *   shutdown via `awaitShutdownWork`, so a shutdown that waited on the queue would deadlock
+ *   against them.
  * - `init()` rejects with a `LifecycleAbortedError` if called while shutting down.
  */
 // LifecyclePhase is owned by `shared/ipcTypes` so the renderer hook can reference the same union.
@@ -535,29 +536,21 @@ export class ControllerManager {
 
   /**
    * Shutdown all controllers and systems.
-   * Idempotent: subsequent calls return the in-flight promise (or resolve immediately when
-   * teardown has already completed). A teardown rejection leaves `controllerShutdownCompleted`
-   * unset so `shutdown()` can be retried; only a successful teardown is "completed".
-   *
-   * Runs off the lifecycle queue and must NOT be changed to drain it: queued toggles await
-   * `controllerShutdownPromise` (assigned below), so waiting on the queue here would deadlock.
+   * Idempotent via the lifecycle's exclusive-shutdown operation: subsequent calls share the
+   * in-flight attempt (or resolve immediately when teardown has already completed), a teardown
+   * rejection stays retryable, and the terminal 'stopped' transition follows a successful
+   * teardown. The operation runs off the lifecycle queue; queued toggles await it through
+   * `awaitShutdownWork`, so draining the queue here would deadlock.
    */
   public async shutdown(): Promise<void> {
-    if (this.lifecycle.shutdownCompleted) {
-      return
-    }
-    if (this.lifecycle.shutdownPromise) {
-      return this.lifecycle.shutdownPromise
-    }
+    return this.lifecycle.runExclusiveShutdown(async () => {
+      this.lifecycle.assertPhase(
+        ['initializing', 'running', 'restarting', 'consoleMode', 'failed'],
+        'shutdown',
+      )
+      this.lifecycle.setPhase('shuttingDown')
+      log.info('ControllerManager shutdown: starting')
 
-    this.lifecycle.assertPhase(
-      ['initializing', 'running', 'restarting', 'consoleMode', 'failed'],
-      'shutdown',
-    )
-    this.lifecycle.setPhase('shuttingDown')
-    log.info('ControllerManager shutdown: starting')
-
-    this.lifecycle.shutdownPromise = (async () => {
       // Shutdown in reverse order of initialization
       try {
         await this.listenerLifecycle.yargRb3.disableYarg()
@@ -644,16 +637,8 @@ export class ControllerManager {
       }
 
       this.isInitialized = false
-      this.lifecycle.shutdownCompleted = true
-      this.lifecycle.setPhase('stopped')
       log.info('ControllerManager shutdown: completed')
-    })()
-
-    try {
-      await this.lifecycle.shutdownPromise
-    } finally {
-      this.lifecycle.shutdownPromise = null
-    }
+    })
   }
 
   // Getters for controllers
@@ -846,18 +831,10 @@ export class ControllerManager {
    * This shuts down existing controllers and reinitializes them
    */
   public async restartControllers(): Promise<void> {
-    if (this.lifecycle.restartInFlight) {
-      return this.lifecycle.restartInFlight
-    }
     // A restart is a peer on the lifecycle queue with the listener toggles, so teardown never runs
-    // while a toggle is mid-flight (and vice versa). The memo dedupes overlapping calls and gates
-    // the off-queue audio toggles. Assigned synchronously so a same-tick second call shares it.
-    this.lifecycle.restartInFlight = this.lifecycle
-      .runOp(() => this.runRestartControllers())
-      .finally(() => {
-        this.lifecycle.restartInFlight = null
-      })
-    return this.lifecycle.restartInFlight
+    // while a toggle is mid-flight (and vice versa). The shared-restart operation dedupes
+    // overlapping calls and gates the off-queue audio toggles.
+    return this.lifecycle.runSharedRestart(() => this.runRestartControllers())
   }
 
   private async runRestartControllers(): Promise<void> {
@@ -868,7 +845,7 @@ export class ControllerManager {
     if (
       phaseAtDequeue === 'shuttingDown' ||
       phaseAtDequeue === 'stopped' ||
-      this.lifecycle.shutdownPromise
+      this.lifecycle.isShutdownInFlight()
     ) {
       throw new LifecycleAbortedError('restartControllers aborted: shutdown in progress')
     }
@@ -959,7 +936,7 @@ export class ControllerManager {
     if (
       this.lifecycle.phase === 'shuttingDown' ||
       this.lifecycle.phase === 'stopped' ||
-      this.lifecycle.shutdownPromise
+      this.lifecycle.isShutdownInFlight()
     ) {
       log.info('Restart aborted: shutdown started during teardown')
       throw new LifecycleAbortedError(

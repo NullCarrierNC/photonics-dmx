@@ -23,3 +23,16 @@ export function lifecycleBlockedOn(
   void lifecycle.runOp(() => barrier)
   return lifecycle
 }
+
+/**
+ * A lifecycle with a shutdown in flight until `barrier` settles, so a test can observe how a
+ * caller yields to (or aborts against) an ongoing shutdown.
+ */
+export function lifecycleShuttingDownOn(
+  barrier: Promise<void>,
+  phase: LifecyclePhase = 'shuttingDown',
+): ControllerLifecycle {
+  const lifecycle = lifecycleAt(phase)
+  lifecycle.runExclusiveShutdown(() => barrier).catch(() => {})
+  return lifecycle
+}
