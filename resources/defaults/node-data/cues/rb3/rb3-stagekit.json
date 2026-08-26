@@ -1,11 +1,12 @@
 {
   "version": 1,
-  "cueVersion": 5,
+  "cueVersion": 6,
   "mode": "rb3",
   "group": {
     "id": "rb3-stagekit",
     "name": "RB3 Stage Kit",
     "description": "Replicates the traditional Stage Kit look. Includes the strobes cues.",
+    "isDefault": true,
     "isStageKit": true
   },
   "cues": [
