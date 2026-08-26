@@ -102,8 +102,8 @@ export class CueGroupCatalog {
   }
 
   /**
-   * Set the group serving fallback motion programs. Tracked separately from the lighting default
-   * so a motion-only group cannot leave lighting cues without a fallback.
+   * Set the group serving fallback motion programs. Tracked separately from the lighting default,
+   * so each surface falls back to a group that serves it.
    * @throws Error if the group doesn't exist
    */
   public setDefaultMotionGroup(groupId: string): void {

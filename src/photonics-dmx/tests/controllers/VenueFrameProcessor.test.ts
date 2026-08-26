@@ -19,9 +19,14 @@ function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
  * `colorFor` writes into a buffer the caller owns and reuses, so each case takes its own copy and
  * results captured across several fixtures stay independent.
  */
-function colorOf(view: PublisherFrameRigView, lightId: string, input: RGBIO): ProcessedLightColor {
+function colorOf(
+  view: PublisherFrameRigView,
+  lightId: string,
+  input: RGBIO,
+  strobeFlash?: boolean,
+): ProcessedLightColor {
   const out: ProcessedLightColor = { r: 0, g: 0, b: 0, intensity: 0 }
-  view.colorFor(lightId, input, out)
+  view.colorFor(lightId, input, out, strobeFlash)
   return out
 }
 
@@ -91,6 +96,22 @@ describe('VenueFrameProcessor', () => {
     const view = proc.prepareRigFrame(rig.config, manager, lights, { nowMs: 0, rigId: rig.id })
     expect(view.isActive()).toBe(true)
     expect(colorOf(view, 'f1', RED)).toEqual({ r: 76, g: 76, b: 76, intensity: 255 })
+  })
+
+  it('grades a fixture but skips its trail on request', () => {
+    const proc = new VenueFrameProcessor()
+    proc.setVenuePostProcessing('Trails_Desaturated')
+    const rig = makeRig('rig-1', [{ id: 'f1', group: 'front', base: 1 }])
+    const manager = new DmxLightManager(rig.config)
+    const lights = new Map([['f1', RED]])
+
+    const lit = proc.prepareRigFrame(rig.config, manager, lights, { nowMs: 0, rigId: rig.id })
+    const graded = colorOf(lit, 'f1', RED, true)
+    expect(graded.r).toBeGreaterThan(graded.g)
+    expect(graded.g).toBeGreaterThan(0)
+
+    const dark = proc.prepareRigFrame(rig.config, manager, lights, { nowMs: 60, rigId: rig.id })
+    expect(colorOf(dark, 'f1', rgbio(), true)).toEqual({ r: 0, g: 0, b: 0, intensity: 0 })
   })
 
   it('preserves observed state while clearing temporal history on disable', () => {

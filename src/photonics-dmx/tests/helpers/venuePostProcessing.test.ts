@@ -249,6 +249,88 @@ describe('venue post-processing temporal effects', () => {
     expect(out.r).not.toBe(held)
   })
 
+  it('leaves no afterglow when the trail is skipped', () => {
+    const proc = new VenuePostProcessor()
+    proc.setState('Trails')
+    const out = newColor()
+
+    proc.transform('light-1', 255, 255, 255, 255, 0, out, true)
+    expect(out.r).toBe(255)
+
+    proc.transform('light-1', 0, 0, 0, 255, 33.3, out, true)
+    expect(out.r).toBe(0)
+  })
+
+  it('re-samples every frame when the choppy hold is skipped', () => {
+    const proc = new VenuePostProcessor()
+    proc.setState('Choppy_BlackAndWhite')
+    const out = newColor()
+
+    proc.transform('light-1', 255, 255, 255, 255, 0, out, true)
+    proc.transform('light-1', 0, 0, 0, 255, 60, out, true)
+
+    expect(out.r).toBe(0)
+  })
+
+  it('still applies the colour transform to a flashing light', () => {
+    const proc = new VenuePostProcessor()
+    proc.setState('Choppy_BlackAndWhite')
+    const graded = newColor()
+    proc.transform('light-1', 255, 0, 0, 255, 0, graded, true)
+
+    // The greyscale matrix and contrast curve still reach a red cue colour.
+    expect(graded.r).toBe(graded.g)
+    expect(graded.r).toBe(graded.b)
+    expect(graded.r).toBeGreaterThan(0)
+    expect(graded.r).toBeLessThan(255)
+  })
+})
+
+describe('venue post-processing colours that put a flash out', () => {
+  it.each(['PhotoNegative', 'PhotoNegative_RedAndBlack'] as const)(
+    'leaves a flash alone under %s',
+    (state) => {
+      const proc = new VenuePostProcessor()
+      proc.setState(state)
+      const out = newColor()
+
+      proc.transform('light-1', 255, 255, 255, 255, 0, out, true)
+
+      expect(out).toEqual({ r: 255, g: 255, b: 255, intensity: 255 })
+    },
+  )
+
+  it('still inverts a light no strobe is driving', () => {
+    const proc = new VenuePostProcessor()
+    proc.setState('PhotoNegative')
+    const out = newColor()
+
+    proc.transform('light-1', 255, 255, 255, 255, 0, out)
+
+    expect([out.r, out.g, out.b]).toEqual([0, 0, 0])
+  })
+
+  it('greys a flash under a colour that leaves it visible', () => {
+    const proc = new VenuePostProcessor()
+    proc.setState('BlackAndWhite')
+    const out = newColor()
+
+    proc.transform('light-1', 255, 0, 0, 255, 0, out, true)
+
+    expect([out.r, out.g, out.b]).toEqual([76, 76, 76])
+  })
+
+  it('dims a flash under the darkest colour that still reads as one', () => {
+    const proc = new VenuePostProcessor()
+    proc.setState('Grainy_Film')
+    const out = newColor()
+
+    proc.transform('light-1', 255, 255, 255, 255, 0, out, true)
+
+    expect(out.r).toBeLessThan(255)
+    expect(out.r).toBeGreaterThan(0)
+  })
+
   it('varies grain over time but repeats for the same light and moment', () => {
     const proc = new VenuePostProcessor()
     proc.setState('Trails_Flickery')
