@@ -39,7 +39,7 @@ export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: Contro
         buffer[ch] = v
       }
     }
-    controllerManager.sendConsoleDmx(buffer)
+    controllerManager.getConsoleModeController().sendConsoleDmx(buffer)
   })
 
   ipcMain.handle(LIGHT.CONSOLE_UPDATE_CHANNEL, async (_, data: unknown) => {
@@ -54,7 +54,7 @@ export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: Contro
       return { success: false as const, error: 'Invalid console channel update payload' }
     }
     try {
-      return await controllerManager.updateConsoleChannel({
+      return await controllerManager.getConsoleModeController().updateConsoleChannel({
         rigId: data.rigId,
         lightId: data.lightId,
         fixtureId: data.fixtureId,
@@ -78,7 +78,7 @@ export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: Contro
       return { success: false as const, error: 'Invalid console set home payload' }
     }
     try {
-      return await controllerManager.setConsoleHome({
+      return await controllerManager.getConsoleModeController().setConsoleHome({
         rigId: data.rigId,
         lightId: data.lightId,
         fixtureId: data.fixtureId,
@@ -103,7 +103,7 @@ export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: Contro
     try {
       // setConsoleFixtureConfig restarts controllers internally; the CONTROLLERS_RESTARTED broadcast
       // is fired centrally by restartControllers().
-      const result = await controllerManager.setConsoleFixtureConfig({
+      const result = await controllerManager.getConsoleModeController().setConsoleFixtureConfig({
         rigId: data.rigId,
         lightId: data.lightId,
         fixtureId: data.fixtureId,

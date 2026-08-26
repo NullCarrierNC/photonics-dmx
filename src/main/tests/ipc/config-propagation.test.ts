@@ -8,6 +8,7 @@
  *   - Bug 3: setConsoleFixtureConfig only called refreshActiveRigs, leaving sequencer stale
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { withCollaboratorGetters } from './managerFacades'
 import { ConfigStrobeType } from '../../../photonics-dmx/types'
 import { CONFIG } from '../../../shared/ipcChannels'
 import { LIGHT } from '../../../shared/ipcChannels'
@@ -44,7 +45,7 @@ const mockVenueFrameProcessor = {
   setVenuePostProcessingEnabled: jest.fn(),
 }
 
-const mockControllerManager = {
+const mockControllerManager = withCollaboratorGetters({
   getConfig: jest.fn().mockReturnValue(mockConfig),
   restartControllers: jest.fn().mockImplementation(() => Promise.resolve()),
   refreshActiveRigs: jest.fn(),
@@ -53,7 +54,7 @@ const mockControllerManager = {
   getIsInitialized: jest.fn().mockReturnValue(true),
   getDmxPublisher: jest.fn().mockReturnValue(mockPublisher),
   getVenueFrameProcessor: jest.fn().mockReturnValue(mockVenueFrameProcessor),
-}
+})
 
 const mockSendToAllWindows = jest.fn()
 

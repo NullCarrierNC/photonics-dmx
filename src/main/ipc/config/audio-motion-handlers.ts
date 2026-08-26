@@ -16,15 +16,22 @@ import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('audio-motion-handlers')
 
+/** Shorthand for the audio listener surface every handler below drives. */
+function audioOf(
+  manager: ControllerManager,
+): ReturnType<ControllerManager['getListenerLifecycle']>['audio'] {
+  return manager.getListenerLifecycle().audio
+}
+
 export function registerAudioMotionConfigHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
 ): void {
   ipcMain.handle(CONFIG.GET_AUDIO_REACTIVE_CUES, async () => {
     try {
-      const cues = controllerManager.getAudioCueOptions()
-      const activeCueType = controllerManager.getActiveAudioCueType()
-      const secondaryCueType = controllerManager.getActiveSecondaryCueType()
+      const cues = audioOf(controllerManager).getAudioCueOptions()
+      const activeCueType = audioOf(controllerManager).getActiveAudioCueType()
+      const secondaryCueType = audioOf(controllerManager).getActiveSecondaryCueType()
       return {
         success: true,
         activeCueType,
@@ -50,7 +57,7 @@ export function registerAudioMotionConfigHandlers(
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
-      const result = controllerManager.setActiveAudioCueType(validation.value)
+      const result = audioOf(controllerManager).setActiveAudioCueType(validation.value)
       if (!result.success) {
         return result
       }
@@ -62,17 +69,17 @@ export function registerAudioMotionConfigHandlers(
   })
 
   ipcMain.handle(CONFIG.GET_AUDIO_GAME_MODE, async () => {
-    return controllerManager.getAudioGameModeConfig()
+    return audioOf(controllerManager).getAudioGameModeConfig()
   })
 
   ipcMain.handle(CONFIG.SET_AUDIO_GAME_MODE, async (_, updates: unknown) => {
     try {
-      const base = controllerManager.getAudioGameModeConfig()
+      const base = audioOf(controllerManager).getAudioGameModeConfig()
       const validation = validateAudioGameModePayload(updates, base)
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
-      await controllerManager.setAudioGameModeConfig(validation.value)
+      await audioOf(controllerManager).setAudioGameModeConfig(validation.value)
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, validation.value)
       return { success: true, config: validation.value }
     } catch (error) {
@@ -115,7 +122,7 @@ export function registerAudioMotionConfigHandlers(
       await controllerManager
         .getConfig()
         .updateCueDomain('audioMotion', { activeCueRef: validation.value })
-      controllerManager.setActiveAudioMotionCueRef(validation.value)
+      audioOf(controllerManager).setActiveAudioMotionCueRef(validation.value)
       return { success: true }
     } catch (error) {
       log.error('Error setting active audio motion cue:', error)
@@ -258,7 +265,7 @@ export function registerAudioMotionConfigHandlers(
             log.error('Failed to restart audio with new device:', error)
           }
         } else {
-          controllerManager.updateAudioConfig(updatedConfig)
+          audioOf(controllerManager).updateAudioConfig(updatedConfig)
         }
       }
 

@@ -26,7 +26,9 @@ export class Application {
 
     // Set up sender error tracking callback
     // This allows SenderManager to clear error state when senders are re-enabled
-    this.controllerManager.setSenderErrorTrackingCallback(clearSenderErrorTracking)
+    this.controllerManager
+      .getSenderLifecycle()
+      .setSenderErrorTrackingCallback(clearSenderErrorTracking)
 
     // Initialize global brightness configuration
     const brightnessConfig = this.controllerManager.getConfig().getPreference('brightness')

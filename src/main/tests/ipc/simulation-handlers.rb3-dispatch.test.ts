@@ -5,6 +5,7 @@
  * ChainCueRuntime tests.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { withCollaboratorGetters } from './managerFacades'
 
 jest.mock('../../utils/windowUtils', () => ({
   sendToAllWindows: jest.fn(),
@@ -33,7 +34,7 @@ describe('START_RB3_TEST_EFFECT while RB3E is disabled', () => {
     const fanout = new ChainFanout()
     fanout.setChains([{ rigId: 'a', isPrimary: true } as unknown as RigChain])
     const motionCueSimulator = new MotionCueSimulator({ getChainFanout: () => fanout })
-    const controllerManager = {
+    const controllerManager = withCollaboratorGetters({
       setOnConsoleEnter: jest.fn(),
       setOnSimulationPreempt: jest.fn(),
       ensureChainsHaveHandlersForSimulation: jest.fn(),
@@ -43,7 +44,7 @@ describe('START_RB3_TEST_EFFECT while RB3E is disabled', () => {
       getIsRb3Enabled: () => false,
       startRb3TestEffect,
       init: jest.fn(),
-    }
+    })
     setupSimulationHandlers(
       ipc as never,
       controllerManager as unknown as Parameters<typeof setupSimulationHandlers>[1],

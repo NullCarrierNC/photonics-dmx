@@ -1,4 +1,5 @@
 import { CueRegistry as CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
+import { withCollaboratorGetters } from './managerFacades'
 import { INetCue, CueStyle } from '../../../photonics-dmx/cues/interfaces/INetCue'
 import { ICueGroup } from '../../../photonics-dmx/cues/interfaces/INetCueGroup'
 import { CueData, CueType } from '../../../photonics-dmx/cues/types/cueTypes'
@@ -24,7 +25,7 @@ const stubChainFanout = {
   getChains: jest.fn().mockReturnValue([]),
 }
 
-const mockControllerManager = {
+const mockControllerManager = withCollaboratorGetters({
   getSenderManager: jest.fn().mockReturnValue({
     enableSender: jest.fn(),
     disableSender: jest.fn(),
@@ -52,7 +53,7 @@ const mockControllerManager = {
   stopTestEffect: jest.fn(),
   setOnConsoleEnter: jest.fn(),
   setOnSimulationPreempt: jest.fn(),
-}
+})
 
 // Mock implementation with descriptions
 class MockCueImplementation implements INetCue {
