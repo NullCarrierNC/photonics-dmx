@@ -57,7 +57,7 @@ export class MotionCueAccess {
   public getRandomMotionCue(): INetCue | null {
     return this.motionState.getRandomMotionCue(
       (id) => this.catalog.getGroup(id),
-      this.catalog.getDefaultGroupId(),
+      this.catalog.getDefaultMotionGroupId(),
     )
   }
 

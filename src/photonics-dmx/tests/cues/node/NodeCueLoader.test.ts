@@ -204,6 +204,20 @@ describe('NodeCueLoader', () => {
     expect(loader.getAvailableCueTypes('yarg', 'motion')).toEqual([])
   })
 
+  it('routes a motion-only default claim to the motion default group', async () => {
+    const file = yargMotionOnlyFile()
+    file.group = { ...file.group, isDefault: true }
+
+    const yargDir = path.join(tmpDir, 'node-data', 'cues', 'yarg')
+    fs.mkdirSync(yargDir, { recursive: true })
+    fs.writeFileSync(path.join(yargDir, 'motion-only.json'), JSON.stringify(file), 'utf-8')
+
+    await loader.loadAll()
+
+    expect(yargRegistry.getDefaultMotionGroupId()).toBe('loader-test-yarg-motion')
+    expect(yargRegistry.getDefaultGroupId()).toBeNull()
+  })
+
   it('unregisters a cue file that vanished from disk on reload (C-11)', async () => {
     const file = yargMotionOnlyFile()
     const yargDir = path.join(tmpDir, 'node-data', 'cues', 'yarg')

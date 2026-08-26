@@ -16,7 +16,7 @@ type MotionSelectionMode = 'oncePerSong' | 'perCueChange' | 'none'
 interface MotionCueRegistryView {
   getMotionGroupsInfo(): Array<{ id: string; name: string; description?: string; cueCount: number }>
   getMotionCueDetails(groupId: string): Array<{ id: string; name: string; description: string }>
-  getDefaultGroupId(): string | null
+  getDefaultMotionGroupId(): string | null
   getEnabledMotionGroups(): string[]
   setMotionSelectionMode(mode: MotionSelectionMode): void
 }
@@ -99,7 +99,9 @@ export function setupMotionGroupHandlers(
         const registry = spec.registry()
         const resolvedGroupId = typeof groupId === 'string' ? groupId : undefined
         const targetGroupId =
-          resolvedGroupId || registry.getDefaultGroupId() || registry.getEnabledMotionGroups()[0]
+          resolvedGroupId ||
+          registry.getDefaultMotionGroupId() ||
+          registry.getEnabledMotionGroups()[0]
         if (!targetGroupId) {
           return []
         }

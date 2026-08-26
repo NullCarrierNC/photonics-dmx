@@ -5,7 +5,7 @@ import { CueData, CueType } from '../../cues/types/cueTypes'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { setLogSink } from '../../../shared/logger'
-import { beforeEach, describe, it, expect } from '@jest/globals'
+import { afterEach, beforeEach, describe, it, expect } from '@jest/globals'
 
 // Mock implementations
 class MockCueImplementation implements INetCue {
@@ -190,6 +190,89 @@ describe('CueRegistry', () => {
     it('should ignore non-existent group names', () => {
       registry.setActiveGroups(['custom', 'non-existent'])
       expect(registry.getActiveGroups()).toEqual(['custom'])
+    })
+  })
+
+  describe('applyGroupDesignations', () => {
+    const motionOnlyGroup = (id: string): ICueGroup => ({
+      id,
+      name: id,
+      cues: new Map(),
+      motionCues: new Map([['m1', new MockCueImplementation(`${id}-m1`)]]),
+    })
+
+    // The registry is a singleton whose groups outlive reset(), so each case drops what it added.
+    afterEach(() => {
+      for (const id of ['motion-default', 'mixed', 'stagekit', 'no-strobes']) {
+        registry.unregisterGroup(id)
+      }
+    })
+
+    it('routes a motion-only group to the motion default and leaves the lighting default alone', () => {
+      registry.reset()
+      const motion = motionOnlyGroup('motion-default')
+      registry.registerGroup(motion)
+
+      registry.applyGroupDesignations({ isDefault: true }, motion)
+
+      expect(registry.getDefaultMotionGroupId()).toBe('motion-default')
+      expect(registry.getDefaultGroupId()).toBeNull()
+    })
+
+    it('routes a lighting group to the lighting default', () => {
+      registry.reset()
+      registry.registerGroup(customGroup)
+
+      registry.applyGroupDesignations({ isDefault: true }, customGroup)
+
+      expect(registry.getDefaultGroupId()).toBe('custom')
+      expect(registry.getDefaultMotionGroupId()).toBeNull()
+    })
+
+    it('serves both defaults from a group holding lighting and motion cues', () => {
+      registry.reset()
+      const mixed: ICueGroup = {
+        id: 'mixed',
+        name: 'mixed',
+        cues: new Map([[CueType.Chorus, new MockCueImplementation('mixed-chorus')]]),
+        motionCues: new Map([['m1', new MockCueImplementation('mixed-m1')]]),
+      }
+      registry.registerGroup(mixed)
+
+      registry.applyGroupDesignations({ isDefault: true, isStageKit: true }, mixed)
+
+      expect(registry.getDefaultGroupId()).toBe('mixed')
+      expect(registry.getDefaultMotionGroupId()).toBe('mixed')
+      expect(registry.getStageKitGroupId()).toBe('mixed')
+    })
+
+    it('serves a strobe from the stage kit group when a motion group claims the default', () => {
+      registry.reset()
+      const stageKit: ICueGroup = {
+        id: 'stagekit',
+        name: 'stagekit',
+        cues: new Map([[CueType.Strobe_Fast, new MockCueImplementation('stagekit-strobe-fast')]]),
+      }
+      const noStrobes: ICueGroup = {
+        id: 'no-strobes',
+        name: 'no-strobes',
+        cues: new Map([[CueType.Chorus, new MockCueImplementation('no-strobes-chorus')]]),
+      }
+      const motion = motionOnlyGroup('motion-default')
+
+      registry.registerGroup(stageKit)
+      registry.registerGroup(noStrobes)
+      registry.registerGroup(motion)
+      registry.applyGroupDesignations({ isDefault: true, isStageKit: true }, stageKit)
+      registry.applyGroupDesignations({ isDefault: true }, motion)
+      registry.setEnabledGroups(['no-strobes'])
+      registry.setActiveGroups(['no-strobes'])
+      registry.setStageKitPriority('random')
+
+      const strobe = registry.getCueImplementation(CueType.Strobe_Fast, 'tracked')
+
+      expect(strobe).toBeTruthy()
+      expect(strobe!.cueId).toBe('stagekit-strobe-fast')
     })
   })
 

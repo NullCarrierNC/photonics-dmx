@@ -29,9 +29,9 @@ Entries may only shrink. Regenerate after a split with: node scripts/size-budget
 619 src/renderer/src/components/LightsDmxPreview3D.tsx
 617 src/renderer/src/components/DmxOutputSettings.tsx
 616 src/photonics-dmx/helpers/venuePostProcessing.ts
-615 src/photonics-dmx/cues/node/loader/NodeCueLoader.ts
 615 src/renderer/src/ipcApi.ts
 611 src/photonics-dmx/controllers/sequencer/MotionPatternEngine.ts
+609 src/photonics-dmx/cues/node/loader/NodeCueLoader.ts
 602 src/photonics-dmx/cueHandlers/CueHandler.ts
 602 src/renderer/src/components/LightChannelsConfig.tsx
 602 src/services/configuration/ConfigurationManager.ts

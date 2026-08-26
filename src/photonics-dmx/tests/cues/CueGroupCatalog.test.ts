@@ -50,18 +50,47 @@ describe('CueGroupCatalog', () => {
   it('unregister drops the group and any default or stage kit designation', () => {
     catalog.register(group('a', [CueType.Chorus]))
     catalog.setDefaultGroup('a')
+    catalog.setDefaultMotionGroup('a')
     catalog.setStageKitGroup('a')
 
     expect(catalog.unregister('a')).toBe(true)
     expect(catalog.getAllGroups()).toEqual([])
     expect(catalog.getDefaultGroupId()).toBeNull()
+    expect(catalog.getDefaultMotionGroupId()).toBeNull()
     expect(catalog.getStageKitGroupId()).toBeNull()
     expect(catalog.unregister('a')).toBe(false)
   })
 
   it('setDefaultGroup and setStageKitGroup reject unknown groups', () => {
     expect(() => catalog.setDefaultGroup('missing')).toThrow("group 'missing' not found")
+    expect(() => catalog.setDefaultMotionGroup('missing')).toThrow("group 'missing' not found")
     expect(() => catalog.setStageKitGroup('missing')).toThrow("group 'missing' not found")
+  })
+
+  it('tracks the lighting and motion defaults independently', () => {
+    catalog.register(group('lighting', [CueType.Chorus]))
+    catalog.register(group('motion', [CueType.Verse]))
+
+    catalog.setDefaultGroup('lighting')
+    catalog.setDefaultMotionGroup('motion')
+
+    expect(catalog.getDefaultGroupId()).toBe('lighting')
+    expect(catalog.getDefaultMotionGroupId()).toBe('motion')
+
+    catalog.unregister('motion')
+    expect(catalog.getDefaultGroupId()).toBe('lighting')
+    expect(catalog.getDefaultMotionGroupId()).toBeNull()
+  })
+
+  it('clearPreferences drops both default designations', () => {
+    catalog.register(group('a', [CueType.Chorus]))
+    catalog.setDefaultGroup('a')
+    catalog.setDefaultMotionGroup('a')
+
+    catalog.clearPreferences()
+
+    expect(catalog.getDefaultGroupId()).toBeNull()
+    expect(catalog.getDefaultMotionGroupId()).toBeNull()
   })
 
   it('enable activates a newly enabled group but leaves a re-enabled one alone', () => {

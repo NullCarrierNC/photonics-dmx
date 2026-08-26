@@ -300,13 +300,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       const registry = this.options.registries[mode]
       const group = await this.buildNetGroup(file as NetNodeCueFile, compileErrors)
       registry.registerGroup(group)
-      const groupMeta = file.group
-      if (groupMeta.isDefault) {
-        registry.setDefaultGroup(group.id)
-      }
-      if (groupMeta.isStageKit) {
-        registry.setStageKitGroup(group.id)
-      }
+      registry.applyGroupDesignations(file.group, group)
     } else {
       const group = await this.buildAudioGroup(file as AudioNodeCueFile, compileErrors)
       this.options.registries.audio.registerGroup(group)

@@ -110,12 +110,43 @@ export class CueRegistry {
   }
 
   /**
-   * Set the default group.
+   * Set the group serving fallback lighting cues.
    * @param groupId The name of the group to set as default
    * @throws Error if the group doesn't exist
    */
   public setDefaultGroup(groupId: string): void {
     this.catalog.setDefaultGroup(groupId)
+  }
+
+  /**
+   * Set the group serving fallback motion programs.
+   * @param groupId The name of the group to set as motion default
+   * @throws Error if the group doesn't exist
+   */
+  public setDefaultMotionGroup(groupId: string): void {
+    this.catalog.setDefaultMotionGroup(groupId)
+  }
+
+  /**
+   * Apply a cue file's group designations to a registered group. A group's default claim is routed
+   * by what it actually holds, so a motion-only group becomes the motion fallback and leaves the
+   * lighting fallback to a group that serves lighting cues. A group holding both serves both.
+   */
+  public applyGroupDesignations(
+    meta: { isDefault?: boolean; isStageKit?: boolean },
+    group: ICueGroup,
+  ): void {
+    if (meta.isDefault) {
+      if (group.cues.size > 0) {
+        this.catalog.setDefaultGroup(group.id)
+      }
+      if (group.motionCues && group.motionCues.size > 0) {
+        this.catalog.setDefaultMotionGroup(group.id)
+      }
+    }
+    if (meta.isStageKit) {
+      this.catalog.setStageKitGroup(group.id)
+    }
   }
 
   /**
@@ -347,6 +378,10 @@ export class CueRegistry {
     return this.catalog.getDefaultGroupId()
   }
 
+  public getDefaultMotionGroupId(): string | null {
+    return this.catalog.getDefaultMotionGroupId()
+  }
+
   /**
    * Get the ID of the stage kit group.
    * @returns The stage kit group ID or null if no stage kit group is set
@@ -399,6 +434,7 @@ export class CueRegistry {
     activeGroups: string[]
     enabledGroups: string[]
     defaultGroup: string | null
+    defaultMotionGroup: string | null
     stageKitGroup: string | null
     stageKitPriority: 'prefer-for-tracked' | 'random' | 'never'
   } {
@@ -407,6 +443,7 @@ export class CueRegistry {
       activeGroups: this.catalog.getActiveGroups(),
       enabledGroups: this.catalog.getEnabledGroups(),
       defaultGroup: this.catalog.getDefaultGroupId(),
+      defaultMotionGroup: this.catalog.getDefaultMotionGroupId(),
       stageKitGroup: this.catalog.getStageKitGroupId(),
       stageKitPriority: this.selection.getStageKitPriority(),
     }

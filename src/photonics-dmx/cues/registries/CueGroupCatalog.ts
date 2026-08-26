@@ -26,8 +26,11 @@ export class CueGroupCatalog {
   /** Per-group disabled cue types (user preferences) */
   private readonly disabledCues = new DisabledCueStore()
 
-  /** Name of the default group that provides fallback implementations */
+  /** Name of the default group that provides fallback lighting cue implementations */
   private defaultGroup: string | null = null
+
+  /** Name of the default group that provides fallback motion programs */
+  private defaultMotionGroup: string | null = null
 
   /** Name of the stage kit group for special stage kit handling */
   private stageKitGroup: string | null = null
@@ -41,6 +44,7 @@ export class CueGroupCatalog {
     this.activeGroups.clear()
     this.disabledCues.clear()
     this.defaultGroup = null
+    this.defaultMotionGroup = null
     this.stageKitGroup = null
   }
 
@@ -68,6 +72,9 @@ export class CueGroupCatalog {
     if (this.defaultGroup === groupId) {
       this.defaultGroup = null
     }
+    if (this.defaultMotionGroup === groupId) {
+      this.defaultMotionGroup = null
+    }
     if (this.stageKitGroup === groupId) {
       this.stageKitGroup = null
     }
@@ -75,18 +82,44 @@ export class CueGroupCatalog {
   }
 
   /**
-   * Set the default group.
+   * Set the group serving fallback lighting cues.
    * @throws Error if the group doesn't exist
    */
   public setDefaultGroup(groupId: string): void {
     if (!this.groups.has(groupId)) {
       throw new Error(`Cannot set default group: group '${groupId}' not found`)
     }
+    if (this.defaultGroup !== null && this.defaultGroup !== groupId) {
+      log.warn(
+        `Default group '${this.defaultGroup}' replaced by '${groupId}': only one group can serve fallback cues`,
+      )
+    }
     this.defaultGroup = groupId
   }
 
   public getDefaultGroupId(): string | null {
     return this.defaultGroup
+  }
+
+  /**
+   * Set the group serving fallback motion programs. Tracked separately from the lighting default
+   * so a motion-only group cannot leave lighting cues without a fallback.
+   * @throws Error if the group doesn't exist
+   */
+  public setDefaultMotionGroup(groupId: string): void {
+    if (!this.groups.has(groupId)) {
+      throw new Error(`Cannot set default motion group: group '${groupId}' not found`)
+    }
+    if (this.defaultMotionGroup !== null && this.defaultMotionGroup !== groupId) {
+      log.warn(
+        `Default motion group '${this.defaultMotionGroup}' replaced by '${groupId}': only one group can serve fallback motion programs`,
+      )
+    }
+    this.defaultMotionGroup = groupId
+  }
+
+  public getDefaultMotionGroupId(): string | null {
+    return this.defaultMotionGroup
   }
 
   /**
