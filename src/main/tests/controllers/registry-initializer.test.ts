@@ -20,6 +20,7 @@ describe('RegistryInitializer', () => {
       setCueConsistencyWindow: jest.fn(),
       setCueGroupSelectionMode: jest.fn(),
       setDisabledCues: jest.fn(),
+      setStageKitPriority: jest.fn(),
     }
     const getInstance = jest.spyOn(CueRegistry, 'getInstance').mockReturnValue(registry as never)
 
@@ -30,6 +31,7 @@ describe('RegistryInitializer', () => {
         }
       }
       if (k === 'cueConsistencyWindow') return 120
+      if (k === 'stageKitPrefs') return { yargPriority: 'never' }
       throw new Error(`unexpected key ${k}`)
     })
     const getCueGroupSelectionMode = jest.fn().mockReturnValue('oncePerSong' as const)
@@ -62,5 +64,56 @@ describe('RegistryInitializer', () => {
     expect(registry.setEnabledGroups).toHaveBeenCalledWith(['a'])
     expect(registry.setCueConsistencyWindow).toHaveBeenCalledWith(120)
     expect(registry.setCueGroupSelectionMode).toHaveBeenCalledWith('oncePerSong')
+    expect(registry.setStageKitPriority).toHaveBeenCalledWith('never')
+  })
+
+  it('initializeCueRegistry falls back to random when no stage kit priority is stored', async () => {
+    const registry = {
+      setEnabledGroups: jest.fn(),
+      getAllGroups: jest.fn().mockReturnValue(['g1', 'g2']),
+      setCueConsistencyWindow: jest.fn(),
+      setCueGroupSelectionMode: jest.fn(),
+      setDisabledCues: jest.fn(),
+      setStageKitPriority: jest.fn(),
+    }
+    jest.spyOn(CueRegistry, 'getInstance').mockReturnValue(registry as never)
+
+    const getPreference = jest.fn((k: string) => {
+      if (k === 'cueDomains') {
+        return {
+          yarg: { enabledGroups: ['a'], knownGroups: [], disabledCues: { m: [] } },
+        }
+      }
+      if (k === 'cueConsistencyWindow') return 120
+      if (k === 'stageKitPrefs') return undefined
+      throw new Error(`unexpected key ${k}`)
+    })
+    const getCueGroupSelectionMode = jest.fn().mockReturnValue('withinSong' as const)
+    const config = { getPreference, getCueGroupSelectionMode } as never
+    const init = new RegistryInitializer({
+      getConfig: () => config,
+      runtimeBroadcaster: noopRuntimeBroadcaster(),
+      sendToAllWindows: () => {
+        // noop
+      },
+      pushValidationError: () => {
+        // noop
+      },
+      refreshAudioCueSelection: () => {
+        // noop
+      },
+      getNodeCueLoader: () => null,
+      setNodeCueLoader: () => {
+        // noop
+      },
+      getEffectLoader: () => null,
+      setEffectLoader: () => {
+        // noop
+      },
+    })
+
+    await init.initializeCueRegistry('yarg')
+
+    expect(registry.setStageKitPriority).toHaveBeenCalledWith('random')
   })
 })

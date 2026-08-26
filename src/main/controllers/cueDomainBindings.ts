@@ -87,6 +87,7 @@ const bindings: CueDomainRegistryBinding[] = [
       registry.setCueConsistencyWindow(consistencyWindow)
       registry.setCueGroupSelectionMode(config.getCueGroupSelectionMode())
       registry.setDisabledCues(config.getPreference('cueDomains').yarg.disabledCues)
+      registry.setStageKitPriority(config.getPreference('stageKitPrefs')?.yargPriority ?? 'random')
     },
   },
   {
