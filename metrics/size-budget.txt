@@ -7,7 +7,6 @@ Entries may only shrink. Regenerate after a split with: node scripts/size-budget
 1022 src/photonics-dmx/cues/node/runtime/logicNodeEvaluator.ts
 982 src/photonics-dmx/controllers/sequencer/LightTransitionController.ts
 912 src/photonics-dmx/cues/types/nodeCueTypes.ts
-901 src/renderer/src/pages/CueEditor.tsx
 867 src/renderer/src/components/cue-editor/components/node-editors/EventNodeEditor.tsx
 861 src/photonics-dmx/listeners/RB3/Rb3eNetworkListener.ts
 854 src/renderer/src/components/CueConsistencySettings.tsx
