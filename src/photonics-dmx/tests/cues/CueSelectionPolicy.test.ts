@@ -1,3 +1,9 @@
+// Controllable monotonic clock (the `mock`-prefixed binding is read on every call).
+let mockNowMs = 100000
+jest.mock('../../../shared/time', () => ({
+  monotonicNowMs: () => mockNowMs,
+}))
+
 import { CueGroupCatalog } from '../../cues/registries/CueGroupCatalog'
 import { CueSelectionPolicy, CueStateUpdate } from '../../cues/registries/CueSelectionPolicy'
 import { INetCue, CueStyle } from '../../cues/interfaces/INetCue'
@@ -5,7 +11,7 @@ import { ICueGroup } from '../../cues/interfaces/INetCueGroup'
 import { CueData, CueType } from '../../cues/types/cueTypes'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
-import { beforeEach, describe, it, expect } from '@jest/globals'
+import { afterEach, beforeEach, describe, it, expect, jest } from '@jest/globals'
 
 class MockCue implements INetCue {
   constructor(
@@ -45,10 +51,15 @@ describe('CueSelectionPolicy', () => {
   }
 
   beforeEach(() => {
+    mockNowMs = 100000
     catalog = new CueGroupCatalog()
     policy = new CueSelectionPolicy(catalog)
     seen = []
     policy.setStateUpdateCallback((state) => seen.push(state))
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
   })
 
   describe('selection ladder', () => {
@@ -227,6 +238,52 @@ describe('CueSelectionPolicy', () => {
 
       expect(seen.every((u) => u.groupId === 'kit')).toBe(true)
       expect(seen[50].counter).toBe(51)
+    })
+
+    it('keeps the pin alive while resolutions keep arriving', () => {
+      registerPair(CueStyle.Primary)
+      policy.setCueConsistencyWindow(2000)
+
+      policy.selectCue(CueType.Chorus)
+      for (let i = 0; i < 5; i++) {
+        mockNowMs += 1500
+        policy.selectCue(CueType.Chorus)
+      }
+
+      expect(seen.every((u) => u.groupId === seen[0].groupId)).toBe(true)
+    })
+
+    it('allows a re-roll once the window expires without a resolution', () => {
+      registerPair(CueStyle.Primary)
+      policy.setCueConsistencyWindow(2000)
+
+      jest.spyOn(Math, 'random').mockReturnValue(0)
+      policy.selectCue(CueType.Chorus)
+      const pinned = seen[0].groupId
+      const candidates = catalog.getActiveGroupsImplementing(CueType.Chorus)
+      const otherIndex = candidates.findIndex((groupId) => groupId !== pinned)
+
+      mockNowMs += 2001
+      jest.spyOn(Math, 'random').mockReturnValue(otherIndex / candidates.length)
+      policy.selectCue(CueType.Chorus)
+
+      expect(seen[1].groupId).toBe(candidates[otherIndex])
+    })
+
+    it('stays on the current group when the stage kit priority changes', () => {
+      registerPair(CueStyle.Primary)
+      policy.setCueConsistencyWindow(2000)
+      jest.spyOn(Math, 'random').mockReturnValue(0)
+
+      for (let i = 0; i < 100; i++) {
+        policy.selectCue(CueType.Chorus)
+      }
+      const held = seen[0].groupId
+
+      policy.setStageKitPriority('never')
+      policy.selectCue(CueType.Chorus)
+
+      expect(seen[100].groupId).toBe(held)
     })
   })
 
