@@ -21,6 +21,53 @@ describe('Rb3GameModeManager', () => {
     mockNowMs = 0
   })
 
+  it('never arms a switch when rotation is disabled, but still picks a starting group', () => {
+    const onSwitchDue = jest.fn()
+    const onPrimaryChange = jest.fn()
+    const mgr = new Rb3GameModeManager(
+      () => ['g1', 'g2'],
+      () => ({ min: 5, max: 5 }),
+      onSwitchDue,
+      () => false,
+    )
+    mgr.setOnPrimaryCueChange(onPrimaryChange)
+
+    mockNowMs = 1000
+    mgr.start()
+    expect(['g1', 'g2']).toContain(mgr.getActivePrimaryGroupId())
+    expect(onPrimaryChange).toHaveBeenCalledTimes(1)
+
+    // Well past the countdown: the tick must not arm, so no edge can ever switch the group.
+    mockNowMs = 999999
+    mgr.tick()
+    mgr.notifyLight1Edge()
+    expect(onSwitchDue).not.toHaveBeenCalled()
+    expect(onPrimaryChange).toHaveBeenCalledTimes(1)
+  })
+
+  it('resumes arming when rotation is re-enabled mid-song', () => {
+    const onSwitchDue = jest.fn()
+    let rotate = false
+    const mgr = new Rb3GameModeManager(
+      () => ['g1'],
+      () => ({ min: 5, max: 5 }),
+      onSwitchDue,
+      () => rotate,
+    )
+
+    mockNowMs = 1000
+    mgr.start()
+    mockNowMs = 9000
+    mgr.tick()
+    mgr.notifyLight1Edge()
+    expect(onSwitchDue).not.toHaveBeenCalled()
+
+    rotate = true
+    mgr.tick()
+    mgr.notifyLight1Edge()
+    expect(onSwitchDue).toHaveBeenCalledTimes(1)
+  })
+
   it('arms on the countdown then fires on the next Light-1 edge, and re-arms', () => {
     const onSwitchDue = jest.fn()
     const mgr = new Rb3GameModeManager(

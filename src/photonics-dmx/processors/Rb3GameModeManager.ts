@@ -22,10 +22,16 @@ export class Rb3GameModeManager {
   private onPrimaryCueChange: ((groupId: string | null) => void) | null = null
   private onScheduleChange: ((info: Rb3GameModeSchedulePayload) => void) | null = null
 
+  /**
+   * @param getRotationEnabled Read live on every tick: false is the RB3 lighting domain's
+   *   `oncePerSong` mode, where `start()` still picks a group but no switch is ever armed. Reading
+   *   it per tick rather than per song means a change mid-song takes effect without a restart.
+   */
   constructor(
     private readonly getPrimaryGroupPool: () => string[],
     private readonly getDurationRangeSec: () => { min: number; max: number },
     private readonly onSwitchDue: () => void,
+    private readonly getRotationEnabled: () => boolean = () => true,
   ) {}
 
   public setOnPrimaryCueChange(cb: ((groupId: string | null) => void) | null): void {
@@ -60,6 +66,7 @@ export class Rb3GameModeManager {
   /** Run on the ~30 Hz keepalive tick: arm a pending switch once the countdown has elapsed. */
   public tick(): void {
     if (!this.started || this.pendingSwitch) return
+    if (!this.getRotationEnabled()) return
     if (monotonicNowMs() >= this.switchDeadlineMs) {
       this.pendingSwitch = true
       this.emitScheduleChange()

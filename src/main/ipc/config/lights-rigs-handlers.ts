@@ -126,7 +126,12 @@ export function registerLightsRigsConfigHandlers(
       const existingRig = config.getDmxRig(rig.id)
       const previousActiveState = existingRig?.active ?? false
 
-      await config.saveDmxRig(rig)
+      // With multiple active rigs disallowed, activating one deactivates the rest. New Rig, import,
+      // duplicate and the settings screen all save through this handler, so the invariant holds
+      // whichever path created the rig.
+      await config.saveDmxRig(rig, {
+        deactivateOthers: config.getPreference('allowMultipleActiveRigs') !== true,
+      })
 
       const isNowOrWasActive = rig.active || previousActiveState
       if (isNowOrWasActive) {

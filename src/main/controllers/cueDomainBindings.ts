@@ -36,6 +36,12 @@ export interface CueDomainRegistryBinding {
    * {@link reconcileAndApplyGroups} settles that once the groups exist.
    */
   applyStartupSettings?: (config: ConfigurationManager) => Promise<void> | void
+  /**
+   * Push the shared cue consistency window into this domain's registry. Declared by the domains
+   * whose registry throttles cue re-selection, so startup and the preferences handler both drive
+   * that set of registries from this one list.
+   */
+  applyConsistencyWindow?: (windowMs: number) => void
 }
 
 /** Default storage: the domain's own slot under the `cueDomains` preference. */
@@ -65,6 +71,13 @@ function motionSelectionMode(
     : fallback
 }
 
+/** The consistency window belongs to the lighting registries; motion and audio have no throttle. */
+const applyYargConsistencyWindow = (windowMs: number): void =>
+  CueRegistry.getInstance().setCueConsistencyWindow(windowMs)
+
+const applyRb3ConsistencyWindow = (windowMs: number): void =>
+  getCueRegistry('rb3').setCueConsistencyWindow(windowMs)
+
 const bindings: CueDomainRegistryBinding[] = [
   {
     domain: 'yarg',
@@ -72,6 +85,7 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => CueRegistry.getInstance().setEnabledGroups(ids),
     setDisabled: (map) => CueRegistry.getInstance().setDisabledCues(map),
     ...cueDomainStorage('yarg'),
+    applyConsistencyWindow: applyYargConsistencyWindow,
     applyStartupSettings: (config) => {
       const registry = CueRegistry.getInstance()
       const enabledGroupIds = config.getPreference('cueDomains').yarg.enabledGroups ?? []
@@ -83,8 +97,7 @@ const bindings: CueDomainRegistryBinding[] = [
         registry.setEnabledGroups(allGroups)
         log.info('CueRegistry initialized with all groups (no preference set):', allGroups)
       }
-      const consistencyWindow = config.getPreference('cueConsistencyWindow')
-      registry.setCueConsistencyWindow(consistencyWindow)
+      applyYargConsistencyWindow(config.getPreference('cueConsistencyWindow'))
       registry.setCueGroupSelectionMode(config.getCueGroupSelectionMode())
       registry.setDisabledCues(config.getPreference('cueDomains').yarg.disabledCues)
       registry.setStageKitPriority(config.getPreference('stageKitPrefs')?.yargPriority ?? 'random')
@@ -146,14 +159,16 @@ const bindings: CueDomainRegistryBinding[] = [
     setEnabled: (ids) => getCueRegistry('rb3').setEnabledGroups(ids),
     setDisabled: (map) => getCueRegistry('rb3').setDisabledCues(map),
     ...cueDomainStorage('rb3'),
+    applyConsistencyWindow: applyRb3ConsistencyWindow,
     applyStartupSettings: (config) => {
       const registry = getCueRegistry('rb3')
-      registry.setCueConsistencyWindow(config.getPreference('cueConsistencyWindow'))
-      registry.setCueGroupSelectionMode(
-        config.getPreference('cueDomains').rb3.selectionMode === 'oncePerSong'
-          ? 'oncePerSong'
-          : 'withinSong',
-      )
+      applyRb3ConsistencyWindow(config.getPreference('cueConsistencyWindow'))
+      registry.setCueGroupSelectionMode(config.getRb3CueGroupSelectionMode())
+      // RB3E carries no autogen track, so every RB3 dispatch is 'tracked' and stage kit priority
+      // has nothing to discriminate on. Group choice belongs to the game-mode rotation, which
+      // forces its own group, so 'never' leaves the pre-song and strobe fallback selecting across
+      // active groups the same way the rotation does.
+      registry.setStageKitPriority('never')
     },
   },
   {
@@ -194,6 +209,17 @@ export function cueDomainBinding(domain: CueDomain): CueDomainRegistryBinding {
     throw new Error(`No cue-domain registry binding for '${domain}'`)
   }
   return binding
+}
+
+/**
+ * Apply the cue consistency window to every registry that consumes it. Startup reaches each
+ * registry through its own binding and a preference change reaches all of them through here, so
+ * both paths land on the same set of registries.
+ */
+export function applyCueConsistencyWindow(windowMs: number): void {
+  for (const binding of CUE_DOMAIN_BINDINGS) {
+    binding.applyConsistencyWindow?.(windowMs)
+  }
 }
 
 /**
