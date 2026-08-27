@@ -4,6 +4,7 @@
  * handler returns its error shape and touches no chain. Stop handlers stay available.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { withCollaboratorGetters } from './managerFacades'
 
 jest.mock('../../utils/windowUtils', () => ({
   sendToAllWindows: jest.fn(),
@@ -53,7 +54,7 @@ describe('simulation IPC handlers while RB3E is enabled', () => {
       } as unknown as RigChain,
     ])
     const motionCueSimulator = new MotionCueSimulator({ getChainFanout: () => fanout })
-    const controllerManager = {
+    const controllerManager = withCollaboratorGetters({
       setOnConsoleEnter: jest.fn(),
       setOnSimulationPreempt: jest.fn(),
       ensureChainsHaveHandlersForSimulation: jest.fn(),
@@ -65,7 +66,7 @@ describe('simulation IPC handlers while RB3E is enabled', () => {
       startRb3TestEffect,
       setRb3SimulationLedState,
       init: jest.fn(),
-    }
+    })
     setupSimulationHandlers(
       ipc as never,
       controllerManager as unknown as Parameters<typeof setupSimulationHandlers>[1],

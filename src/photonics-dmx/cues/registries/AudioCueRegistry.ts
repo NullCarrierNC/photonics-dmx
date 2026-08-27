@@ -331,6 +331,14 @@ export class AudioCueRegistry {
   }
 
   /**
+   * Get the group serving fallback motion programs. Audio keeps a single default group for both
+   * surfaces, since audio cue files carry no group designations.
+   */
+  public getDefaultMotionGroupId(): string | null {
+    return this.defaultGroup
+  }
+
+  /**
    * Reset the registry to its initial state.
    */
   public reset(): void {

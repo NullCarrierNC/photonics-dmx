@@ -1,11 +1,12 @@
 {
   "version": 1,
-  "cueVersion": 9,
+  "cueVersion": 10,
   "mode": "yarg",
   "group": {
     "id": "yarg-stagekit",
     "name": "Stage Kit",
     "description": "The RockBand Stage Kit styled effects, rendering on a DMX light array: the same colours, step sequences and Large/Small venue branches, mapped onto a virtual 8-LED ring so chases keep their shape across 4 - 16+ light rigs, with live BPM. 8 is most common.",
+    "isDefault": true,
     "isStageKit": true
   },
   "cues": [

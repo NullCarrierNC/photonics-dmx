@@ -1,12 +1,11 @@
 {
   "version": 1,
-  "cueVersion": 1,
+  "cueVersion": 2,
   "mode": "yarg",
   "group": {
     "id": "yarg-alt1",
     "name": "YARG Alt 1",
-    "description": "YARG Alternative 1 cues as node cue definitions",
-    "isDefault": true
+    "description": "YARG Alternative 1 cues as node cue definitions"
   },
   "cues": [
     {

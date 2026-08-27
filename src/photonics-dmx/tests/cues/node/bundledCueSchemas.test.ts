@@ -41,6 +41,50 @@ describe('bundled cue files', () => {
   }
 })
 
+describe('bundled default group designations', () => {
+  // A group's default claim is routed by what it holds, so at most one group per mode can serve
+  // fallback lighting cues and at most one can serve fallback motion programs.
+  const holdsLighting = (parsed: { cues?: { kind?: string }[] }): boolean =>
+    (parsed.cues ?? []).some((cue) => cue.kind !== 'motion')
+
+  const claimsByMode = (): Map<string, { lighting: string[]; motion: string[] }> => {
+    const byMode = new Map<string, { lighting: string[]; motion: string[] }>()
+    for (const { mode, full } of bundledFiles()) {
+      const parsed = JSON.parse(fs.readFileSync(full, 'utf8'))
+      if (!parsed.group?.isDefault) {
+        continue
+      }
+      const entry = byMode.get(mode) ?? { lighting: [], motion: [] }
+      if (holdsLighting(parsed)) {
+        entry.lighting.push(parsed.group.id)
+      }
+      if ((parsed.cues ?? []).some((cue: { kind?: string }) => cue.kind === 'motion')) {
+        entry.motion.push(parsed.group.id)
+      }
+      byMode.set(mode, entry)
+    }
+    return byMode
+  }
+
+  it('claims at most one lighting and one motion default per mode', () => {
+    const overClaimed = [...claimsByMode()].flatMap(([mode, entry]) => [
+      ...(entry.lighting.length > 1 ? [`${mode} lighting: ${entry.lighting.join(', ')}`] : []),
+      ...(entry.motion.length > 1 ? [`${mode} motion: ${entry.motion.join(', ')}`] : []),
+    ])
+    expect(overClaimed).toEqual([])
+  })
+
+  it('serves yarg and rb3 fallback lighting cues from the stage kit group', () => {
+    for (const mode of ['yarg', 'rb3']) {
+      const lightingDefault = bundledFiles()
+        .filter((entry) => entry.mode === mode)
+        .map((entry) => JSON.parse(fs.readFileSync(entry.full, 'utf8')))
+        .find((parsed) => parsed.group?.isDefault && holdsLighting(parsed))
+      expect(lightingDefault?.group).toMatchObject({ isStageKit: true })
+    }
+  })
+})
+
 describe('the assembled cue schema still demands a lighting cue key', () => {
   const lightingCueFrom = (mode: string): Record<string, unknown> => {
     const source = bundledFiles().find((f) => f.mode === mode)

@@ -84,6 +84,22 @@ export class SenderLifecycleController {
     }
   }
 
+  /** Enabled-state of each output sender, for status displays and diagnostics. */
+  public getOutputSenderStatus(): {
+    sacn: boolean
+    artnet: boolean
+    enttecpro: boolean
+    ipc: boolean
+  } {
+    const sm = this.getSenderManager()
+    return {
+      sacn: sm.isSenderEnabled('sacn'),
+      artnet: sm.isSenderEnabled('artnet'),
+      enttecpro: sm.isSenderEnabled('enttecpro'),
+      ipc: sm.isSenderEnabled('ipc'),
+    }
+  }
+
   public setSenderErrorTrackingCallback(callback: (senderId: string) => void): void {
     this.senderErrorTrackingCallback = callback
     this.ensureSenderManager()

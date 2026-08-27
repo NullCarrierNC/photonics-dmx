@@ -9,6 +9,7 @@
  *  - STOP_MOTION_CUE_SIMULATION clears pan/tilt on every chain via the fanout.
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { withCollaboratorGetters } from './managerFacades'
 
 jest.mock('../../utils/windowUtils', () => ({
   sendToAllWindows: jest.fn(),
@@ -105,7 +106,7 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
     fanout.setChains(chains)
     ipc = makeIpcMain()
     const motionCueSimulator = new MotionCueSimulator({ getChainFanout: () => fanout })
-    controllerManager = {
+    controllerManager = withCollaboratorGetters({
       setOnConsoleEnter: jest.fn(),
       setOnSimulationPreempt: jest.fn(),
       ensureChainsHaveHandlersForSimulation: jest.fn(),
@@ -116,7 +117,7 @@ describe('simulation IPC handlers fan out to every active rig chain', () => {
       getDmxPublisher: () => null,
       getVenueFrameProcessor: () => ({ getVenuePostProcessing: () => 'Default' }),
       init: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-    }
+    })
     setupSimulationHandlers(ipc as never, asControllerManager(controllerManager))
   })
 

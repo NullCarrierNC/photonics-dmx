@@ -45,7 +45,7 @@ export function setupSimulationHandlers(
     }
   }
 
-  controllerManager.setOnConsoleEnter(stopMotionSimAndNotify)
+  controllerManager.getConsoleModeController().setOnConsoleEnter(stopMotionSimAndNotify)
   // Enabling RB3E hands the rig chains to the listener; stop any running simulation with the
   // same teardown so the renderer's motion-sim state clears too.
   controllerManager.setOnSimulationPreempt(stopMotionSimAndNotify)
@@ -146,7 +146,8 @@ export function setupSimulationHandlers(
           log.info('System not initialized, initializing now before testing effect')
           await controllerManager.init()
         }
-        controllerManager.startTestEffect(effectId, venueSize, bpm, cueGroup)
+        const runner = controllerManager.getTestEffectRunner('yarg')
+        runner.startTestEffect(effectId, venueSize, bpm, cueGroup)
         return { success: true }
       } catch (error) {
         log.error('Error starting test effect:', error)
@@ -179,7 +180,8 @@ export function setupSimulationHandlers(
         if (!getCueTypeFromId(effectId)) {
           return { success: false, error: `Unknown RB3 cue: ${effectId}` }
         }
-        controllerManager.startRb3TestEffect(effectId, venueSize, bpm, cueGroup)
+        const runner = controllerManager.getTestEffectRunner('rb3')
+        runner.startTestEffect(effectId, venueSize, bpm, cueGroup)
         return { success: true }
       } catch (error) {
         log.error('Error starting RB3 test effect:', error)
@@ -203,7 +205,7 @@ export function setupSimulationHandlers(
           const n = typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : 0
           return Math.max(0, Math.min(255, n))
         }
-        controllerManager.setRb3SimulationLedState({
+        controllerManager.getTestEffectRunner('rb3').setRb3LedState({
           red: mask(data?.red),
           green: mask(data?.green),
           blue: mask(data?.blue),
@@ -652,7 +654,7 @@ export function setupSimulationHandlers(
         success: true,
         isYargEnabled: controllerManager.getIsYargEnabled(),
         isRb3Enabled: controllerManager.getIsRb3Enabled(),
-        senderStatus: controllerManager.getSenderStatus(),
+        senderStatus: controllerManager.getSenderLifecycle().getOutputSenderStatus(),
       }
     } catch (error) {
       log.error('Error getting system status:', error)

@@ -2,6 +2,7 @@
  * Lightweight IPC tests for motion preference channels registered in config-handlers.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { withCollaboratorGetters } from './managerFacades'
 import { ConfigStrobeType } from '../../../photonics-dmx/types'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
@@ -56,7 +57,7 @@ const mockConfig = {
   getAllPreferences: jest.fn().mockReturnValue({}),
 }
 
-const mockControllerManager = {
+const mockControllerManager = withCollaboratorGetters({
   getConfig: jest.fn().mockReturnValue(mockConfig),
   restartControllers: jest.fn(async () => {}),
   refreshActiveRigs: jest.fn(),
@@ -66,7 +67,7 @@ const mockControllerManager = {
   setActiveRb3MotionCueRef: jest.fn(),
   flushValidationErrors: jest.fn().mockReturnValue([]),
   getIsInitialized: jest.fn().mockReturnValue(true),
-}
+})
 
 const mockSendToAllWindows = jest.fn()
 

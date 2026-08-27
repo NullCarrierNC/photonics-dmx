@@ -11,7 +11,11 @@ jest.mock('../../utils/windowUtils', () => ({
   mainRuntimeBroadcaster: { emit: jest.fn() },
 }))
 
-import { ControllerManager } from '../../controllers/ControllerManager'
+import { ControllerGraph } from '../../controllers/ControllerGraph'
+import type { ControllerGraphDeps } from '../../controllers/ControllerGraph'
+import { ChainFanout } from '../../controllers/ChainFanout'
+import { VenueFrameProcessor } from '../../../photonics-dmx/controllers/VenueFrameProcessor'
+import type { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
 import { CueHandler } from '../../../photonics-dmx/cueHandlers/CueHandler'
 import { RigChain } from '../../../photonics-dmx/controllers/RigChain'
 import type { NetCueMode } from '../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -39,14 +43,14 @@ interface MotionPrefsStub {
   activeCueRef?: unknown
 }
 
-function makeStubController(
+function makeGraph(
   chains: RigChain[],
   prefs: {
     motionEnabled?: boolean
     yargMotion?: MotionPrefsStub
     rb3Motion?: MotionPrefsStub
   } = {},
-): ControllerManager {
+): ControllerGraph {
   const motion = (p: MotionPrefsStub = {}) => ({
     minimumHoldMs: p.minimumHoldMs ?? 5000,
     probabilityPercent: p.probabilityPercent ?? 100,
@@ -63,23 +67,27 @@ function makeStubController(
       }
       return undefined
     },
+  } as unknown as ConfigurationManager
+  const deps: ControllerGraphDeps = {
+    getConfig: () => config,
+    getSenderManager: jest.fn() as unknown as ControllerGraphDeps['getSenderManager'],
+    chainFanout: new ChainFanout(),
+    venueFrameProcessor: new VenueFrameProcessor(),
   }
-  // Prototype-stub controller manager with just enough state for the helper to run.
-  const stub = Object.create(ControllerManager.prototype) as Record<string, unknown>
-  stub.config = config
-  stub.rigChains = chains
-  return stub as unknown as ControllerManager
+  const graph = new ControllerGraph(deps)
+  Object.assign(graph as unknown as Record<string, unknown>, { rigChains: chains })
+  return graph
 }
 
 describe.each<NetCueMode>(['yarg', 'rb3'])(
-  'ControllerManager.ensureChainsHaveHandlersForSimulation (%s)',
+  'ControllerGraph.ensureChainsHaveHandlersForSimulation (%s)',
   (domain) => {
     const other: NetCueMode = domain === 'yarg' ? 'rb3' : 'yarg'
 
     it('installs a cue handler on every chain that has none', () => {
       const a = makeChainStub('a', true)
       const b = makeChainStub('b', false)
-      const cm = makeStubController([a, b])
+      const cm = makeGraph([a, b])
 
       cm.ensureChainsHaveHandlersForSimulation(domain)
 
@@ -92,7 +100,7 @@ describe.each<NetCueMode>(['yarg', 'rb3'])(
     it('is idempotent: existing handlers are preserved on second call', () => {
       const a = makeChainStub('a', true)
       const b = makeChainStub('b', false)
-      const cm = makeStubController([a, b])
+      const cm = makeGraph([a, b])
 
       cm.ensureChainsHaveHandlersForSimulation(domain)
       const handlerA = a.cueHandlers[domain]
@@ -109,7 +117,7 @@ describe.each<NetCueMode>(['yarg', 'rb3'])(
       const b = makeChainStub('b', false)
       const preExisting = { shutdown: jest.fn() } as unknown as CueHandler
       a.cueHandlers[domain] = preExisting
-      const cm = makeStubController([a, b])
+      const cm = makeGraph([a, b])
 
       cm.ensureChainsHaveHandlersForSimulation(domain)
 
@@ -119,7 +127,7 @@ describe.each<NetCueMode>(['yarg', 'rb3'])(
 
     it('seeds each new handler with the domain motion preferences from config', () => {
       const a = makeChainStub('a', true)
-      const cm = makeStubController([a], {
+      const cm = makeGraph([a], {
         motionEnabled: false,
         [`${domain === 'yarg' ? 'yarg' : 'rb3'}Motion`]: {
           activeCueRef: { groupId: 'g', cueId: 'c' },
@@ -133,7 +141,7 @@ describe.each<NetCueMode>(['yarg', 'rb3'])(
     })
 
     it('no-ops on an empty rigChains list', () => {
-      const cm = makeStubController([])
+      const cm = makeGraph([])
       expect(() => cm.ensureChainsHaveHandlersForSimulation(domain)).not.toThrow()
     })
   },

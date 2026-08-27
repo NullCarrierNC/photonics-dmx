@@ -3,6 +3,7 @@
  * validates the requested effect, and stays blocked while RB3E owns the lights.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { withCollaboratorGetters } from './managerFacades'
 
 jest.mock('../../utils/windowUtils', () => ({
   sendToAllWindows: jest.fn(),
@@ -45,7 +46,7 @@ function setup(
   }
   const fanout = new ChainFanout()
   fanout.setChains([])
-  const controllerManager = {
+  const controllerManager = withCollaboratorGetters({
     setOnConsoleEnter: jest.fn(),
     setOnSimulationPreempt: jest.fn(),
     ensureChainsHaveHandlersForSimulation: jest.fn(),
@@ -56,7 +57,7 @@ function setup(
     getIsYargEnabled: () => options.yargEnabled ?? false,
     getVenueFrameProcessor: () => venueFrameProcessor,
     init: jest.fn(),
-  }
+  })
   setupSimulationHandlers(
     ipc as never,
     controllerManager as unknown as Parameters<typeof setupSimulationHandlers>[1],

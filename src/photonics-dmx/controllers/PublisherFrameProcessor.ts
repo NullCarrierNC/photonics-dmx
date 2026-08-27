@@ -26,8 +26,16 @@ export interface PublisherFrameRigView {
   /**
    * Writes processed colour for one fixture into `out`, which the publisher owns and reuses across
    * every fixture in the frame. Implementations must not retain it.
+   *
+   * `strobeFlash` says a strobe is driving this fixture, so the stages a flash cannot survive are
+   * skipped: the time-based ones, and any colour that leaves it too dark to read.
    */
-  colorFor(lightId: string, input: Readonly<RGBIO>, out: ProcessedLightColor): void
+  colorFor(
+    lightId: string,
+    input: Readonly<RGBIO>,
+    out: ProcessedLightColor,
+    strobeFlash?: boolean,
+  ): void
 }
 
 /**

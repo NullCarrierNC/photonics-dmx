@@ -582,12 +582,8 @@ export class DmxPublisher {
         )
       }
 
-      // Only `strobe-rgbw` needs to know which lights a strobe drives; the other modes are
-      // unconditional.
-      const strobeLightIds =
-        this._whiteChannelMixMode === 'strobe-rgbw' && activeStrobeSlot != null
-          ? manager.getStrobeLightIds()
-          : null
+      // Lights a strobe drives: the venue bypass below needs them, and so does `strobe-rgbw`.
+      const strobeLightIds = activeStrobeSlot != null ? manager.getStrobeLightIds() : null
 
       // Fixtures reached below via the light-states map. Anything left over (a fixture no cue has
       // addressed, or a strobe-group light excluded from cue targeting) gets its pinned `fixed`
@@ -624,10 +620,14 @@ export class DmxPublisher {
         let { red: r, green: g, blue: b, intensity } = lightValue
         const { pan, tilt } = lightValue
 
+        // A light the strobe drives takes the venue colour minus the stages a flash cannot survive.
+        // Hardware-strobe fixtures latch steady, so they keep every stage.
+        const strobeFlashActive = strobeLightIds?.has(lightId) === true && !strobeChannelActive
+
         // Ahead of the strobe latch and the mixer so a latched colour and any derived white /
         // amber / UV emitter follow the venue effect too.
         if (frameView !== null && frameView.isActive()) {
-          frameView.colorFor(lightId, lightValue, this._frameColor)
+          frameView.colorFor(lightId, lightValue, this._frameColor, strobeFlashActive)
           r = this._frameColor.r
           g = this._frameColor.g
           b = this._frameColor.b

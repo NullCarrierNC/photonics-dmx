@@ -57,12 +57,12 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
 
   // Get RB3 current mode
   ipcMain.handle(CUE.RB3E_GET_MODE, () => {
-    return controllerManager.getRb3Mode()
+    return controllerManager.getListenerLifecycle().yargRb3.getRb3Mode()
   })
 
   // Get RB3 processor statistics
   ipcMain.handle(CUE.RB3E_GET_STATS, () => {
-    return controllerManager.getRb3ProcessorStats()
+    return controllerManager.getListenerLifecycle().yargRb3.getRb3ProcessorStats()
   })
 
   // Send handled cue data to renderer

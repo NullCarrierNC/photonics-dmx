@@ -1,13 +1,12 @@
 import type { PostProcessing } from '../cues/types/cueTypes'
 import type { RGBIO, LightingConfiguration } from '../types'
 import { DmxLightManager } from './DmxLightManager'
+import { VenuePostProcessor, type VenueColor } from '../helpers/venuePostProcessing'
 import {
   applyVenueBleed,
-  VenuePostProcessor,
   type VenueBleedChain,
   type VenueBloomSpec,
-  type VenueColor,
-} from '../helpers/venuePostProcessing'
+} from '../helpers/venueBloomBleed'
 import {
   PASSTHROUGH_FRAME_RIG_VIEW,
   type ProcessedLightColor,
@@ -145,7 +144,8 @@ export class VenueFrameProcessor implements PublisherFrameProcessor {
     // stage inside it allocates nothing.
     return {
       isActive: () => true,
-      colorFor: (lightId, input, out) => this._colorFor(lightId, input, bleedRig, ctx.nowMs, out),
+      colorFor: (lightId, input, out, strobeFlash) =>
+        this._colorFor(lightId, input, bleedRig, ctx.nowMs, out, strobeFlash),
     }
   }
 
@@ -155,7 +155,10 @@ export class VenueFrameProcessor implements PublisherFrameProcessor {
     bleedRig: VenueBleedRig | null,
     nowMs: number,
     out: ProcessedLightColor,
+    strobeFlash = false,
   ): void {
+    // Bloom is the one spec carrying a bleed. It declares no trail, choppy or grain and it leaves a
+    // flash at full, so the bled colour needs neither exemption.
     if (bleedRig) {
       const bleedIndex = bleedRig.indexById.get(lightId)
       if (bleedIndex !== undefined) {
@@ -175,6 +178,7 @@ export class VenueFrameProcessor implements PublisherFrameProcessor {
       input.intensity,
       nowMs,
       this._scratch,
+      strobeFlash,
     )
     out.r = this._scratch.r
     out.g = this._scratch.g

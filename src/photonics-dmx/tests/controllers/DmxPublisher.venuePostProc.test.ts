@@ -292,6 +292,111 @@ describe('DmxPublisher venue post-processing', () => {
   )
 })
 
+describe('DmxPublisher strobe punch-through', () => {
+  const SOFT_STROBE: LightSpec = {
+    id: 's1',
+    channels: RGB,
+    group: 'strobe',
+    isStrobeEnabled: true,
+  }
+  const WHITE = rgbio({ red: 255, green: 255, blue: 255, intensity: 255 })
+
+  it('lets a flash go dark again inside a choppy hold', () => {
+    const ctx = setup([SOFT_STROBE])
+    ctx.venue.setVenuePostProcessing('Choppy_BlackAndWhite')
+    ctx.strobe.setActive('fast')
+
+    expect(ctx.publish({ s1: WHITE })[1]).toBe(255)
+
+    // Well inside the 8 Hz hold that captured the flash.
+    ctx.setNow(50)
+    expect(ctx.publish({ s1: rgbio() })[1]).toBe(0)
+  })
+
+  it('lets a flash go dark again under a trail', () => {
+    const ctx = setup([SOFT_STROBE])
+    ctx.venue.setVenuePostProcessing('Trails')
+    ctx.strobe.setActive('fast')
+
+    expect(ctx.publish({ s1: WHITE })[1]).toBe(255)
+
+    ctx.setNow(60)
+    expect(ctx.publish({ s1: rgbio() })[1]).toBe(0)
+  })
+
+  it('greys a strobe light with the rest of the rig', () => {
+    const ctx = setup([SOFT_STROBE])
+    ctx.venue.setVenuePostProcessing('BlackAndWhite')
+    ctx.strobe.setActive('fast')
+
+    const buf = ctx.publish({ s1: RED })
+    expect([buf[2], buf[3], buf[4]]).toEqual([76, 76, 76])
+  })
+
+  it('keeps a white flash white through a greyscale venue effect', () => {
+    const ctx = setup([SOFT_STROBE])
+    ctx.venue.setVenuePostProcessing('BlackAndWhite')
+    ctx.strobe.setActive('fast')
+
+    const buf = ctx.publish({ s1: WHITE })
+    expect([buf[2], buf[3], buf[4]]).toEqual([255, 255, 255])
+  })
+
+  it('keeps a flash white under a photo negative venue effect', () => {
+    const ctx = setup([SOFT_STROBE])
+    ctx.venue.setVenuePostProcessing('PhotoNegative')
+    ctx.strobe.setActive('fast')
+
+    const buf = ctx.publish({ s1: WHITE })
+    expect([buf[2], buf[3], buf[4]]).toEqual([255, 255, 255])
+  })
+
+  it('still inverts a light the strobe does not drive', () => {
+    const ctx = setup([
+      SOFT_STROBE,
+      { id: 'f1', channels: { masterDimmer: 5, red: 6, green: 7, blue: 8 } },
+    ])
+    ctx.venue.setVenuePostProcessing('PhotoNegative')
+    ctx.strobe.setActive('fast')
+
+    const buf = ctx.publish({ s1: WHITE, f1: WHITE })
+    expect([buf[2], buf[3], buf[4]]).toEqual([255, 255, 255])
+    expect([buf[6], buf[7], buf[8]]).toEqual([0, 0, 0])
+  })
+
+  it('resumes the trail once the strobe ends', () => {
+    const ctx = setup([SOFT_STROBE])
+    ctx.venue.setVenuePostProcessing('Trails')
+    ctx.strobe.setActive('fast')
+    ctx.publish({ s1: WHITE })
+
+    ctx.setNow(60)
+    expect(ctx.publish({ s1: rgbio() })[1]).toBe(0)
+
+    ctx.strobe.setActive(null)
+    ctx.setNow(120)
+    ctx.publish({ s1: WHITE })
+    ctx.setNow(180)
+    expect(ctx.publish({ s1: rgbio() })[1]).toBeGreaterThan(0)
+  })
+
+  it('keeps the temporal stage for a light the strobe does not drive', () => {
+    // Outside the strobe group, so no flash reaches it and its trail still decays.
+    const ctx = setup([
+      SOFT_STROBE,
+      { id: 'f1', channels: { masterDimmer: 5, red: 6, green: 7, blue: 8 } },
+    ])
+    ctx.venue.setVenuePostProcessing('Trails')
+    ctx.strobe.setActive('fast')
+    ctx.publish({ s1: WHITE, f1: WHITE })
+
+    ctx.setNow(60)
+    const buf = ctx.publish({ s1: rgbio(), f1: rgbio() })
+    expect(buf[1]).toBe(0)
+    expect(buf[5]).toBeGreaterThan(0)
+  })
+})
+
 /** Three fixtures across the front row, each on its own channel block. */
 const ROW: LightSpec[] = [
   { id: 'f1', channels: { masterDimmer: 1, red: 2, green: 3, blue: 4 } },

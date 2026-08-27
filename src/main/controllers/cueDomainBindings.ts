@@ -87,6 +87,7 @@ const bindings: CueDomainRegistryBinding[] = [
       registry.setCueConsistencyWindow(consistencyWindow)
       registry.setCueGroupSelectionMode(config.getCueGroupSelectionMode())
       registry.setDisabledCues(config.getPreference('cueDomains').yarg.disabledCues)
+      registry.setStageKitPriority(config.getPreference('stageKitPrefs')?.yargPriority ?? 'random')
     },
   },
   {
@@ -223,4 +224,25 @@ export async function reconcileAndApplyGroups(
   binding.setEnabled(reconciled.enabled)
   binding.setDisabled(binding.readStored(config).disabledCues)
   return reconciled
+}
+
+/**
+ * Re-apply every cue domain's enabled groups and disabled cues from configuration after all groups
+ * are registered. Node cue groups are registered in initializeNodeCueLoader(), and each
+ * registerGroup() adds the group to enabled by default, which would overwrite a saved "disabled"
+ * preference; running this after the loader ensures the persisted preference wins. Auto-enables
+ * groups never seen before (vs the known set); user-disabled groups stay disabled because they
+ * remain in the known set, and deregistered groups are dropped.
+ * @param refreshAudioCueSelection Called once at the end: audio selection reads the freshly-applied
+ *   enabled/disabled state
+ */
+export async function applyAllEnabledGroupsFromConfig(
+  config: ConfigurationManager,
+  refreshAudioCueSelection: () => void,
+): Promise<void> {
+  for (const binding of CUE_DOMAIN_BINDINGS) {
+    const reconciled = await reconcileAndApplyGroups(binding, config)
+    log.info(`${binding.domain} enabled groups re-applied from config:`, reconciled.enabled)
+  }
+  refreshAudioCueSelection()
 }

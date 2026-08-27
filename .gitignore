@@ -106,4 +106,10 @@ license.data
 public.key 
 
 docs/
-scripts/
+# Everything in scripts/ is local-only except the shared build tooling named below. The
+# directory's contents are excluded rather than the directory itself, so these can be re-included.
+scripts/*
+!scripts/any-budget.mjs
+!scripts/node-graph-prettier.mjs
+!scripts/size-budget.mjs
+!scripts/sizeBudgetCore.cjs

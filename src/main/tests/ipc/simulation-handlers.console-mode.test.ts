@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals'
+import { withCollaboratorGetters } from './managerFacades'
 import { setupSimulationHandlers } from '../../ipc/simulation-handlers'
 import { MotionCueSimulator } from '../../controllers/MotionCueSimulator'
 
@@ -15,13 +16,13 @@ describe('simulation handlers console integration', () => {
     const motionCueSimulator = new MotionCueSimulator({
       getChainFanout: getChainFanout as never,
     })
-    const controllerManager = {
+    const controllerManager = withCollaboratorGetters({
       setOnConsoleEnter: jest.fn(),
       setOnSimulationPreempt: jest.fn(),
       getChainFanout,
       getMotionCueSimulator: () => motionCueSimulator,
       getIsRb3Enabled: () => false,
-    } as any
+    } as any)
 
     setupSimulationHandlers(ipcMain, controllerManager)
 
