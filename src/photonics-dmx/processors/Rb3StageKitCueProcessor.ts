@@ -65,6 +65,8 @@ export interface Rb3StageKitCueProcessorOptions {
   /** Enabled primary-cue groups to rotate among (RB3 has one cueType, so rotation is by group).
    *  Defaults to none, i.e. no visible rotation — the timer then only re-rolls motion. */
   getPrimaryGroupPool?: () => string[]
+  /** False pins the primary group for the whole song (the RB3 lighting `oncePerSong` mode). */
+  getRotationEnabled?: () => boolean
   /** Renderer push: the active primary-cue group changed (game mode). */
   onPrimaryCueChange?: (groupId: string | null) => void
   /** Renderer push: the primary-cue countdown schedule changed (game mode). */
@@ -124,6 +126,7 @@ export class Rb3StageKitCueProcessor {
           options.getPrimaryGroupPool ?? (() => []),
           options.getMotionSwitchDurationRangeSec,
           () => this.runtime.requestMotionRepick?.(),
+          options.getRotationEnabled ?? (() => true),
         )
       : null
     if (this.gameModeManager) {

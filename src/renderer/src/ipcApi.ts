@@ -101,6 +101,12 @@ export const getCueGroupSelectionMode = () =>
 export const setCueGroupSelectionMode = (mode: 'oncePerSong' | 'withinSong') =>
   window.api.invoke(LIGHT.SET_CUE_GROUP_SELECTION_MODE, mode)
 
+export const getRb3CueGroupSelectionMode = () =>
+  window.api.invoke(LIGHT.GET_RB3_CUE_GROUP_SELECTION_MODE, undefined)
+
+export const setRb3CueGroupSelectionMode = (mode: 'oncePerSong' | 'withinSong') =>
+  window.api.invoke(LIGHT.SET_RB3_CUE_GROUP_SELECTION_MODE, mode)
+
 export const getYargMotionGroupSelectionMode = () =>
   window.api.invoke(LIGHT.GET_YARG_MOTION_GROUP_SELECTION_MODE, undefined)
 

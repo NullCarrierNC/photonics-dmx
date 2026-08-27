@@ -4,6 +4,8 @@ import {
   setCueConsistencyWindow,
   getCueGroupSelectionMode,
   setCueGroupSelectionMode,
+  getRb3CueGroupSelectionMode,
+  setRb3CueGroupSelectionMode,
   getYargMotionGroupSelectionMode,
   setYargMotionGroupSelectionMode,
   getAudioMotionGroupSelectionMode,
@@ -42,6 +44,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
 }) => {
   const [consistencyWindow, setConsistencyWindow] = useState(10000)
   const [selectionMode, setSelectionMode] = useState<CueGroupSelectionMode>('withinSong')
+  const [rb3SelectionMode, setRb3SelectionMode] = useState<CueGroupSelectionMode>('withinSong')
   const [yargMotionSelectionMode, setYargMotionSelectionModeState] =
     useState<MotionGroupSelectionMode>('perCueChange')
   const [audioMotionSelectionMode, setAudioMotionSelectionModeState] =
@@ -89,6 +92,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           rb3ProbabilityResult,
           rb3MinHoldResult,
           rb3DurationResult,
+          rb3ModeResult,
         ] = await Promise.all([
           getCueConsistencyWindow(),
           getCueGroupSelectionMode(),
@@ -101,9 +105,11 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           getRb3MotionCueProbabilityPercent(),
           getRb3MotionCueMinHoldMs(),
           getRb3MotionCueDuration(),
+          getRb3CueGroupSelectionMode(),
         ])
         if (windowResult.success) setConsistencyWindow(windowResult.windowMs)
         if (modeResult.success) setSelectionMode(modeResult.mode)
+        if (rb3ModeResult.success) setRb3SelectionMode(rb3ModeResult.mode)
         if (yargMotionResult?.success === true && yargMotionResult.mode) {
           setYargMotionSelectionModeState(yargMotionResult.mode)
         }
@@ -701,6 +707,46 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
             Minimum time to hold a motion cue after it starts. Prevents thrashing if the lighting
             cue flip-flops very rapidly. Changes faster than this value will be ignored, and the
             next change will be used.
+          </p>
+        </div>
+        <div>
+          <label
+            htmlFor="rb3-cue-group-selection-mode"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            RB3 Cue Group Selection Mode
+          </label>
+          <select
+            id="rb3-cue-group-selection-mode"
+            value={rb3SelectionMode}
+            onChange={async (e) => {
+              const mode = e.target.value as CueGroupSelectionMode
+              if (mode !== 'oncePerSong' && mode !== 'withinSong') return
+              setRb3SelectionMode(mode)
+              if (isSaving) return
+              try {
+                setIsSaving(true)
+                const result = await setRb3CueGroupSelectionMode(mode)
+                if (!result.success) {
+                  log.error('Failed to save RB3 cue group selection mode:', result.error)
+                  setRb3SelectionMode(rb3SelectionMode)
+                }
+              } catch (error) {
+                log.error('Failed to save RB3 cue group selection mode:', error)
+                setRb3SelectionMode(rb3SelectionMode)
+              } finally {
+                setIsSaving(false)
+              }
+            }}
+            className="block w-full max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading || isSaving}>
+            <option value="withinSong">Within a Song</option>
+            <option value="oncePerSong">Once Per Song</option>
+          </select>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            RB3 has no cue-change signal, so the lighting group rotates on a switch timer instead.
+            Within a Song: the group rotates among the enabled RB3 groups as the timer fires. Once
+            Per Song: one group is picked when the song starts and held for the whole song. Applies
+            to RB3 cue mode only.
           </p>
         </div>
         <div>

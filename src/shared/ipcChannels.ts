@@ -111,6 +111,8 @@ export const LIGHT = {
   SET_RB3_MOTION_CUE_DURATION: 'set-rb3-motion-cue-duration',
   SET_CUE_GROUP_SELECTION_MODE: 'set-cue-group-selection-mode',
   GET_CUE_GROUP_SELECTION_MODE: 'get-cue-group-selection-mode',
+  SET_RB3_CUE_GROUP_SELECTION_MODE: 'set-rb3-cue-group-selection-mode',
+  GET_RB3_CUE_GROUP_SELECTION_MODE: 'get-rb3-cue-group-selection-mode',
   GET_CONSISTENCY_STATUS: 'get-consistency-status',
   GET_YARG_MOTION_CUE_GROUPS: 'get-yarg-motion-cue-groups',
   GET_AUDIO_MOTION_CUE_GROUPS: 'get-audio-motion-cue-groups',

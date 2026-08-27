@@ -31,6 +31,8 @@ export interface ListenerCoordinatorDeps {
   getRb3MotionCueMinimumHoldMs: () => number
   getRb3MotionCueProbabilityPercent: () => number
   getRb3MotionCueDurationRangeSec: () => { min: number; max: number }
+  /** False is the RB3 lighting `oncePerSong` mode: hold one primary group for the whole song. */
+  getRb3RotationEnabled: () => boolean
   getFallbackCueTimeMs: () => number
   /** Applies the venue effect YARG reports to DMX output. */
   setVenuePostProcessing: (state: PostProcessing) => void
@@ -268,6 +270,7 @@ export class ListenerCoordinator {
       cueRuntime,
       getRb3MotionCueDurationRangeSec: this.deps.getRb3MotionCueDurationRangeSec,
       getRb3PrimaryGroupPool: () => getCueRegistry('rb3').getActiveGroupsImplementing(CueType.RB3),
+      getRb3RotationEnabled: this.deps.getRb3RotationEnabled,
       onRb3PrimaryCueChange: (p) =>
         this.deps.sendToAllWindows(RENDERER_RECEIVE.RB3_GAME_MODE_CUE_CHANGE, { groupId: p }),
       onRb3GameModeScheduleChange: (p) =>

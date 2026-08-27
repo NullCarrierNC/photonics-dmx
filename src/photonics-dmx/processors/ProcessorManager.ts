@@ -38,6 +38,7 @@ export interface ProcessorManagerConfig {
   getRb3MotionCueDurationRangeSec?: () => { min: number; max: number }
   /** Enabled RB3 primary-cue groups to rotate among (game mode). */
   getRb3PrimaryGroupPool?: () => string[]
+  getRb3RotationEnabled?: () => boolean
   /** Renderer push: the active RB3 primary-cue group changed. */
   onRb3PrimaryCueChange?: (groupId: string | null) => void
   /** Renderer push: the RB3 primary-cue countdown schedule changed. */
@@ -196,6 +197,7 @@ export class ProcessorManager extends EventEmitter {
           menuDispatch: this.chainFanout,
           getMotionSwitchDurationRangeSec: this.config.getRb3MotionCueDurationRangeSec,
           getPrimaryGroupPool: this.config.getRb3PrimaryGroupPool,
+          getRotationEnabled: this.config.getRb3RotationEnabled,
           onPrimaryCueChange: this.config.onRb3PrimaryCueChange,
           onGameModeScheduleChange: this.config.onRb3GameModeScheduleChange,
         },

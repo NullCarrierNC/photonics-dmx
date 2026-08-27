@@ -126,6 +126,8 @@ export function buildControllerCollaborators(
         getRb3MotionCueMinimumHoldMs: () => readMotionPrefs(host.getConfig(), 'rb3').minimumHoldMs,
         getRb3MotionCueProbabilityPercent: () =>
           readMotionPrefs(host.getConfig(), 'rb3').probabilityPercent,
+        getRb3RotationEnabled: () =>
+          host.getConfig().getRb3CueGroupSelectionMode() !== 'oncePerSong',
         getRb3MotionCueDurationRangeSec: () => {
           const d = readMotionPrefs(host.getConfig(), 'rb3')
           return { min: d.cueDurationMin, max: d.cueDurationMax }

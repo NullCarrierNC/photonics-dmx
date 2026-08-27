@@ -1,6 +1,7 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
-import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
+import type { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
+import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import { applyCueConsistencyWindow } from '../controllers/cueDomainBindings'
 import { ipcError } from './ipcResult'
 import { LIGHT } from '../../shared/ipcChannels'
@@ -91,6 +92,44 @@ const MOTION_NUMBER_PREFS: readonly MotionNumberPrefSpec[] = [
     channels: {
       get: LIGHT.GET_RB3_MOTION_CUE_PROBABILITY_PERCENT,
       set: LIGHT.SET_RB3_MOTION_CUE_PROBABILITY_PERCENT,
+    },
+  },
+]
+
+/**
+ * One lighting domain's cue-group selection mode. Both domains validate, persist and push to their
+ * own registry the same way, so they are registered from this table rather than as a handler pair
+ * apiece. Motion selection modes have their own table in motion-group-handlers.
+ */
+interface LightingSelectionModeSpec {
+  /** Used in log lines only. */
+  label: string
+  prefsDomain: Extract<CueDomain, 'yarg' | 'rb3'>
+  /** Coerces the stored value, so the UI and the runtime never disagree about an invalid one. */
+  read: (config: ConfigurationManager) => 'oncePerSong' | 'withinSong'
+  registry: () => CueRegistry
+  channels: { get: string; set: string }
+}
+
+const LIGHTING_SELECTION_MODES: readonly LightingSelectionModeSpec[] = [
+  {
+    label: 'YARG',
+    prefsDomain: 'yarg',
+    read: (config) => config.getCueGroupSelectionMode(),
+    registry: () => getCueRegistry('yarg'),
+    channels: {
+      get: LIGHT.GET_CUE_GROUP_SELECTION_MODE,
+      set: LIGHT.SET_CUE_GROUP_SELECTION_MODE,
+    },
+  },
+  {
+    label: 'RB3',
+    prefsDomain: 'rb3',
+    read: (config) => config.getRb3CueGroupSelectionMode(),
+    registry: () => getCueRegistry('rb3'),
+    channels: {
+      get: LIGHT.GET_RB3_CUE_GROUP_SELECTION_MODE,
+      set: LIGHT.SET_RB3_CUE_GROUP_SELECTION_MODE,
     },
   },
 ]
@@ -218,31 +257,31 @@ export function setupCueSelectionPrefsHandlers(
     }
   })
 
-  ipcMain.handle(LIGHT.SET_CUE_GROUP_SELECTION_MODE, async (_, mode: unknown) => {
-    try {
-      const validated = validateCueGroupSelectionMode(mode)
-      if (!validated.ok) {
-        return ipcError(new Error(validated.error))
+  for (const spec of LIGHTING_SELECTION_MODES) {
+    ipcMain.handle(spec.channels.get, async () => {
+      try {
+        return { success: true, mode: spec.read(controllerManager.getConfig()) }
+      } catch (error) {
+        log.error(`Error getting ${spec.label} cue group selection mode:`, error)
+        return ipcError(error)
       }
-      await controllerManager
-        .getConfig()
-        .updateCueDomain('yarg', { selectionMode: validated.value })
-      const registry = CueRegistry.getInstance()
-      registry.setCueGroupSelectionMode(validated.value)
-      return { success: true, mode: validated.value }
-    } catch (error) {
-      log.error('Error setting cue group selection mode:', error)
-      return ipcError(error)
-    }
-  })
+    })
 
-  ipcMain.handle(LIGHT.GET_CUE_GROUP_SELECTION_MODE, async () => {
-    try {
-      const mode = controllerManager.getConfig().getCueGroupSelectionMode()
-      return { success: true, mode }
-    } catch (error) {
-      log.error('Error getting cue group selection mode:', error)
-      return ipcError(error)
-    }
-  })
+    ipcMain.handle(spec.channels.set, async (_, mode: unknown) => {
+      try {
+        const validated = validateCueGroupSelectionMode(mode)
+        if (!validated.ok) {
+          return ipcError(new Error(validated.error))
+        }
+        await controllerManager
+          .getConfig()
+          .updateCueDomain(spec.prefsDomain, { selectionMode: validated.value })
+        spec.registry().setCueGroupSelectionMode(validated.value)
+        return { success: true, mode: validated.value }
+      } catch (error) {
+        log.error(`Error setting ${spec.label} cue group selection mode:`, error)
+        return ipcError(error)
+      }
+    })
+  }
 }

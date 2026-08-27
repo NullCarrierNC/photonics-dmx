@@ -324,6 +324,16 @@ export class ConfigurationManager {
     return 'withinSong'
   }
 
+  /**
+   * RB3 *lighting* mode: coerces invalid stored values the same way the YARG getter does. RB3 has
+   * no `none` option, so anything unrecognised runs `withinSong`.
+   */
+  getRb3CueGroupSelectionMode(): 'oncePerSong' | 'withinSong' {
+    return this.preferences.get().cueDomains.rb3.selectionMode === 'oncePerSong'
+      ? 'oncePerSong'
+      : 'withinSong'
+  }
+
   getMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
     const m = this.preferences.get().cueDomains.yargMotion.selectionMode
     if (m === 'oncePerSong' || m === 'perCueChange' || m === 'none') {

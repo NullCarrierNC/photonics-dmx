@@ -22,16 +22,23 @@ const yargRegistry = {
 const rb3Registry = {
   setCueConsistencyWindow: jest.fn(),
   setCueGroupSelectionMode: jest.fn(),
+  setStageKitPriority: jest.fn(),
 }
 
 let storedWindow = 10000
+
+let rb3SelectionMode: 'oncePerSong' | 'withinSong' = 'withinSong'
 
 const mockConfig = {
   getPreference: jest.fn((key: unknown) => (key === 'cueConsistencyWindow' ? storedWindow : {})),
   setPreference: jest.fn(async (_key: unknown, value: unknown) => {
     storedWindow = value as number
   }) as jest.MockedFunction<(key: unknown, value: unknown) => Promise<void>>,
+  updateCueDomain: jest.fn(async (_domain: string, patch: Record<string, unknown>) => {
+    if (patch.selectionMode) rb3SelectionMode = patch.selectionMode as typeof rb3SelectionMode
+  }) as jest.MockedFunction<(d: string, p: Record<string, unknown>) => Promise<void>>,
   getCueGroupSelectionMode: jest.fn(() => 'withinSong' as const),
+  getRb3CueGroupSelectionMode: jest.fn(() => rb3SelectionMode),
 }
 
 const mockControllerManager = { getConfig: jest.fn().mockReturnValue(mockConfig) }
@@ -52,6 +59,7 @@ describe('SET_CUE_CONSISTENCY_WINDOW', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     storedWindow = 10000
+    rb3SelectionMode = 'withinSong'
     handlers = new Map()
     mockIpcMain.handle.mockImplementation((channel: string, handler: any) => {
       handlers.set(channel, handler)
@@ -81,5 +89,44 @@ describe('SET_CUE_CONSISTENCY_WINDOW', () => {
     await handlers.get(LIGHT.SET_CUE_CONSISTENCY_WINDOW)!({}, 3000)
     const get = await handlers.get(LIGHT.GET_CUE_CONSISTENCY_WINDOW)!({})
     expect(get).toEqual({ success: true, windowMs: 3000 })
+  })
+})
+
+describe('RB3 cue group selection mode', () => {
+  let handlers: Map<string, (event: unknown, ...args: any[]) => Promise<any>>
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    rb3SelectionMode = 'withinSong'
+    handlers = new Map()
+    mockIpcMain.handle.mockImplementation((channel: string, handler: any) => {
+      handlers.set(channel, handler)
+    })
+    setupCueSelectionPrefsHandlers(mockIpcMain as never, mockControllerManager as never)
+  })
+
+  it('persists to the rb3 domain and pushes to the RB3 registry, not the YARG one', async () => {
+    const result = await handlers.get(LIGHT.SET_RB3_CUE_GROUP_SELECTION_MODE)!({}, 'oncePerSong')
+
+    expect(result).toEqual({ success: true, mode: 'oncePerSong' })
+    expect(mockConfig.updateCueDomain).toHaveBeenCalledWith('rb3', {
+      selectionMode: 'oncePerSong',
+    })
+    expect(rb3Registry.setCueGroupSelectionMode).toHaveBeenCalledWith('oncePerSong')
+    expect(yargRegistry.setCueGroupSelectionMode).not.toHaveBeenCalled()
+  })
+
+  it('reads the stored mode back through the coercing getter', async () => {
+    await handlers.get(LIGHT.SET_RB3_CUE_GROUP_SELECTION_MODE)!({}, 'oncePerSong')
+    const get = await handlers.get(LIGHT.GET_RB3_CUE_GROUP_SELECTION_MODE)!({})
+    expect(get).toEqual({ success: true, mode: 'oncePerSong' })
+  })
+
+  it('rejects an unknown mode without persisting or applying it', async () => {
+    const result = await handlers.get(LIGHT.SET_RB3_CUE_GROUP_SELECTION_MODE)!({}, 'sometimes')
+
+    expect(result.success).toBe(false)
+    expect(mockConfig.updateCueDomain).not.toHaveBeenCalled()
+    expect(rb3Registry.setCueGroupSelectionMode).not.toHaveBeenCalled()
   })
 })

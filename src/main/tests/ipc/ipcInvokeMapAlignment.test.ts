@@ -53,6 +53,12 @@ type ValidatorMapAlignment = [
   >,
   AssertTrue<
     Assignable<
+      ValidatorOk<typeof validateCueGroupSelectionMode>,
+      IpcInvokeMap[typeof LIGHT.SET_RB3_CUE_GROUP_SELECTION_MODE]['request']
+    >
+  >,
+  AssertTrue<
+    Assignable<
       ValidatorOk<typeof validateStageKitPriority>,
       IpcInvokeMap[typeof CONFIG.SET_STAGE_KIT_PRIORITY]['request']
     >
@@ -131,7 +137,8 @@ describe('IpcInvokeMap ↔ inputValidation contract', () => {
       true,
       true,
       true,
+      true,
     ]
-    expect(_alignmentProof).toHaveLength(13)
+    expect(_alignmentProof).toHaveLength(14)
   })
 })

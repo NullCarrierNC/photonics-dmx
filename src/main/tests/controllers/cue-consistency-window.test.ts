@@ -48,6 +48,7 @@ const config = {
     throw new Error(`unexpected key ${key}`)
   },
   getCueGroupSelectionMode: () => 'withinSong' as const,
+  getRb3CueGroupSelectionMode: () => 'withinSong' as const,
 } as never
 
 /** Which mocked registry a binding's applier writes to, discovered rather than assumed. */
