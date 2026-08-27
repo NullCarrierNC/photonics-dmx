@@ -1,6 +1,7 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
+import { applyCueConsistencyWindow } from '../controllers/cueDomainBindings'
 import { ipcError } from './ipcResult'
 import { LIGHT } from '../../shared/ipcChannels'
 import { validateCueGroupSelectionMode, validateNumberInRange } from './inputValidation'
@@ -110,8 +111,7 @@ export function setupCueSelectionPrefsHandlers(
       }
       const rounded = Math.round(validated.value)
       await controllerManager.getConfig().setPreference('cueConsistencyWindow', rounded)
-      const registry = CueRegistry.getInstance()
-      registry.setCueConsistencyWindow(rounded)
+      applyCueConsistencyWindow(rounded)
       return { success: true, windowMs: rounded }
     } catch (error) {
       log.error('Error setting cue consistency window:', error)
