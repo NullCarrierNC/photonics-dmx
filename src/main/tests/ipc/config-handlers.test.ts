@@ -47,7 +47,9 @@ const mockConfig = {
   >,
   getDmxRig: jest.fn(),
   drainConfigCorruptRecovery: jest.fn().mockReturnValue([]),
-  saveDmxRig: jest.fn(async () => {}) as jest.MockedFunction<(rig: object) => Promise<void>>,
+  saveDmxRig: jest.fn(async () => {}) as jest.MockedFunction<
+    (rig: object, opts?: { deactivateOthers?: boolean }) => Promise<void>
+  >,
   deleteDmxRig: jest.fn(async () => {}),
   getDmxRigs: jest.fn(async () => []),
   getLightLibrary: jest.fn().mockReturnValue([]),
@@ -340,7 +342,21 @@ describe('CONFIG motion IPC (config-handlers)', () => {
       expect(result).toEqual({ success: true })
       expect(mockConfig.saveDmxRig).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'r1', name: 'My rig', active: true, config: validLayout }),
+        // Multiple active rigs are off by default, so activating this one deactivates the rest.
+        { deactivateOthers: true },
       )
+    })
+
+    it('leaves the other rigs active when multiple active rigs are allowed', async () => {
+      mockConfig.getDmxRig.mockReturnValue(null)
+      mockConfig.getPreference.mockImplementation((key: unknown) =>
+        key === 'allowMultipleActiveRigs' ? true : undefined,
+      )
+      const handler = handlers.get(CONFIG.SAVE_DMX_RIG)!
+      await handler({}, { id: 'r1', name: 'My rig', active: true, config: validLayout })
+      expect(mockConfig.saveDmxRig).toHaveBeenCalledWith(expect.anything(), {
+        deactivateOthers: false,
+      })
     })
   })
 })

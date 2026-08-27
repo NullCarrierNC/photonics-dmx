@@ -578,9 +578,18 @@ export class ConfigurationManager {
   /**
    * Saves or updates a DMX rig
    */
-  async saveDmxRig(rig: DmxRig): Promise<void> {
+  /**
+   * @param opts.deactivateOthers Clear `active` on every other rig when the saved one is active,
+   *   enforcing the single-active-rig invariant in the same write. Callers that are editing an
+   *   already-selected rig (console-mode channel and fixture edits) leave this off, so a routine
+   *   edit never changes which rigs are active as a side effect.
+   */
+  async saveDmxRig(rig: DmxRig, opts: { deactivateOthers?: boolean } = {}): Promise<void> {
     const current = this.dmxRigs.get()
-    const rigs = [...current.rigs]
+    const exclusive = opts.deactivateOthers === true && rig.active === true
+    const rigs = current.rigs.map((r) =>
+      exclusive && r.id !== rig.id && r.active ? { ...r, active: false } : r,
+    )
     const existingIndex = rigs.findIndex((r) => r.id === rig.id)
 
     if (existingIndex >= 0) {
