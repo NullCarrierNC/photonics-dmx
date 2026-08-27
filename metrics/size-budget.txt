@@ -23,7 +23,6 @@ Entries may only shrink. Regenerate after a split with: node scripts/size-budget
 687 src/photonics-dmx/cues/node/compiler/ActionEffectFactory.ts
 687 src/renderer/src/components/MovingHeadCalibrationWizard.tsx
 670 src/renderer/src/pages/DmxConsole.tsx
-665 src/photonics-dmx/helpers/venuePostProcessing.ts
 664 src/main/ipc/simulation-handlers.ts
 625 src/renderer/src/services/AudioCaptureManager.ts
 620 src/photonics-dmx/processors/AudioCueProcessor.ts

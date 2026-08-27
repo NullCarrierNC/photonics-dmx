@@ -1,13 +1,12 @@
 import type { PostProcessing } from '../cues/types/cueTypes'
 import type { RGBIO, LightingConfiguration } from '../types'
 import { DmxLightManager } from './DmxLightManager'
+import { VenuePostProcessor, type VenueColor } from '../helpers/venuePostProcessing'
 import {
   applyVenueBleed,
-  VenuePostProcessor,
   type VenueBleedChain,
   type VenueBloomSpec,
-  type VenueColor,
-} from '../helpers/venuePostProcessing'
+} from '../helpers/venueBloomBleed'
 import {
   PASSTHROUGH_FRAME_RIG_VIEW,
   type ProcessedLightColor,
