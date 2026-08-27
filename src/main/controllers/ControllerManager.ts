@@ -537,6 +537,14 @@ export class ControllerManager {
   }
 
   /**
+   * Re-validate RB3 cue mode's rotating primary group after the enabled RB3 groups change, so a
+   * group the user just disabled stops being forced. No-op unless RB3 cue mode is running.
+   */
+  public refreshRb3CueSelection(): void {
+    this.listenerLifecycle.yargRb3.getProcessorManager()?.refreshRb3PrimaryGroup()
+  }
+
+  /**
    * Get audio enabled state
    */
   public getIsAudioEnabled(): boolean {

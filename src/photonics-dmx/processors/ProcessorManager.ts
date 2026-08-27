@@ -226,6 +226,11 @@ export class ProcessorManager extends EventEmitter {
   /**
    * Get StageKit direct processor (for direct access if needed)
    */
+  /** Re-validate cue mode's primary group after the enabled RB3 groups change. No-op in direct mode. */
+  public refreshRb3PrimaryGroup(): void {
+    this.stageKitCueProcessor?.ensureValidPrimaryGroup()
+  }
+
   public getStageKitDirectProcessor(): Rb3StageKitDirectProcessor | null {
     return this.stageKitDirectProcessor
   }

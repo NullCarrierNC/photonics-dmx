@@ -207,6 +207,15 @@ export class Rb3StageKitCueProcessor {
     this.syncSongSpan()
   }
 
+  /**
+   * Re-validate the running primary group against the current pool, e.g. after the user toggles
+   * RB3 cue groups. Leaves a still-eligible group and its countdown running; only re-picks when the
+   * active group has left the pool, so an incidental refresh never re-rolls the look.
+   */
+  public ensureValidPrimaryGroup(): void {
+    this.gameModeManager?.ensureValidPrimary()
+  }
+
   /** Song span = gameplay evidence seen and not in a menu. Fires the runtime's song notifications
    *  on the span's edges so shared once-per-song state (cue-group and motion locks, consistency
    *  tracking) follows RB3 songs the way it follows YARG songs. Called after every mutation of

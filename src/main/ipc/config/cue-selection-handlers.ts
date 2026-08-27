@@ -197,7 +197,11 @@ export function registerCueSelectionConfigHandlers(
       },
       disabledLabel: 'disabledRb3Cues',
       changedEvent: RENDERER_RECEIVE.RB3_CUE_GROUPS_CHANGED,
-      afterSetEnabled: activateRb3Groups,
+      afterSetEnabled: (cm) => {
+        activateRb3Groups()
+        cm.refreshRb3CueSelection()
+      },
+      afterSetDisabled: (cm) => cm.refreshRb3CueSelection(),
     },
     {
       binding: cueDomainBinding('rb3Motion'),
