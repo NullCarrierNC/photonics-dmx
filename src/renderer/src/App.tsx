@@ -309,30 +309,12 @@ export const App = (): JSX.Element => {
 
       if (!config) return
 
-      // Update lightingPrefsAtom so preview components can react to color changes
-      // Merge with existing audioConfig to preserve fields like sampleRate and updateIntervalMs
+      // Update lightingPrefsAtom so preview components can react to colour changes. The main
+      // process sends the whole merged config, so the stored config is replaced outright. `bands`
+      // is copied so the atom never shares the array the IPC payload came in on.
       setPrefs((prev) => ({
         ...prev,
-        audioConfig: {
-          ...prev.audioConfig,
-          // Update all compatible fields from config (exclude deviceId which has type mismatch)
-          fftSize: config.fftSize,
-          sensitivity: config.sensitivity,
-          noiseFloor: config.noiseFloor,
-          bands: config.bands ? [...config.bands] : prev.audioConfig?.bands,
-          beatDetection: config.beatDetection,
-          smoothing: config.smoothing,
-          enabled: config.enabled,
-          linearResponse: config.linearResponse,
-          strobeEnabled: config.strobeEnabled,
-          strobeTriggerThreshold: config.strobeTriggerThreshold,
-          strobeProbability: config.strobeProbability,
-          // Preserve fields that exist in frontend but not in backend config
-          sampleRate: prev.audioConfig?.sampleRate,
-          updateIntervalMs: prev.audioConfig?.updateIntervalMs,
-          // Preserve deviceId from frontend (number) rather than backend (string)
-          deviceId: prev.audioConfig?.deviceId,
-        } as LightingPreferences['audioConfig'],
+        audioConfig: { ...config, bands: [...config.bands] },
       }))
       log.info('Lighting preferences updated with new audio config')
     },
