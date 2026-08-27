@@ -168,6 +168,11 @@ const bindings: CueDomainRegistryBinding[] = [
           ? 'oncePerSong'
           : 'withinSong',
       )
+      // RB3E carries no autogen track, so every RB3 dispatch is 'tracked' and stage kit priority
+      // has nothing to discriminate on. Group choice belongs to the game-mode rotation, which
+      // forces its own group, so 'never' leaves the pre-song and strobe fallback selecting across
+      // active groups the same way the rotation does.
+      registry.setStageKitPriority('never')
     },
   },
   {

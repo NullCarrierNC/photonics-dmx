@@ -17,6 +17,7 @@ const yargRegistry = {
 const rb3Registry = {
   setCueConsistencyWindow: jest.fn(),
   setCueGroupSelectionMode: jest.fn(),
+  setStageKitPriority: jest.fn(),
 }
 
 jest.mock('../../../photonics-dmx/cues/registries/CueRegistry', () => ({
@@ -91,5 +92,17 @@ describe('cue consistency window', () => {
   it('applies the stored window to the RB3 registry at startup', async () => {
     await cueDomainBinding('rb3').applyStartupSettings?.(config)
     expect(rb3Registry.setCueConsistencyWindow).toHaveBeenCalledWith(STORED_WINDOW)
+  })
+
+  // RB3E has no autogen track, so every RB3 dispatch is 'tracked' and stage kit priority has
+  // nothing to discriminate on. The game-mode rotation owns RB3 group choice.
+  it('turns stage kit priority off for RB3 at startup', async () => {
+    await cueDomainBinding('rb3').applyStartupSettings?.(config)
+    expect(rb3Registry.setStageKitPriority).toHaveBeenCalledWith('never')
+  })
+
+  it('leaves the YARG stage kit priority coming from preferences', async () => {
+    await cueDomainBinding('yarg').applyStartupSettings?.(config)
+    expect(yargRegistry.setStageKitPriority).toHaveBeenCalledWith('random')
   })
 })
