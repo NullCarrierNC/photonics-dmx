@@ -1,16 +1,14 @@
 import { atom, getDefaultStore } from 'jotai'
 import { atomFamily, atomWithStorage, createJSONStorage } from 'jotai/utils'
-import type { CueDomain, CueDomainPrefs } from '../../services/configuration/cueDomainTypes'
-import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
+import type { CueDomain } from '../../services/configuration/cueDomainTypes'
+import type { AppPreferences } from '../../services/configuration/configurationDefaults'
 import {
   DmxFixture,
   LightingConfiguration,
   DmxRig,
   normalizeFixtureConfig,
-  type WhiteChannelMixMode,
 } from '../../photonics-dmx/types'
 import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
-import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { Pages } from './types'
 import {
   clampDmxOutputRefreshRateHz,
@@ -264,103 +262,11 @@ export const sacnConfigAtom = atom((get) => {
 })
 
 /**
- * Interface for lighting preferences stored in the frontend
- * This extends the backend AppPreferences with frontend-specific properties
+ * Loaded preferences as the renderer holds them: the backend shape, all-optional because the atom
+ * starts empty and is filled once GET_PREFS resolves. An alias, so a preference added to
+ * AppPreferences is visible here with no second declaration to keep in step.
  */
-export interface LightingPreferences {
-  // Backend preferences
-  effectDebounce?: number
-  complex?: boolean
-  enttecProConfig?: {
-    port: string
-  }
-  openDmxConfig?: {
-    port: string
-    dmxSpeed: number
-  }
-  artNetConfig?: {
-    host: string
-    universe: number
-    net: number
-    subnet: number
-    subuni: number
-    port: number
-    refreshRateHz?: number
-  }
-  sacnConfig?: {
-    universe: number
-    networkInterface?: string
-    unicastDestination?: string
-    useUnicast: boolean
-    refreshRateHz?: number
-  }
-  brightness?: {
-    low: number
-    medium: number
-    high: number
-    max: number
-  }
-  cueDomains?: Record<CueDomain, CueDomainPrefs>
-  activeAudioCueType?: AudioCueType
-  cueConsistencyWindow?: number
-  /** Global publisher output cap (Hz); upstream of per-sender refresh rates. */
-  globalDmxPublishingRateHz?: number
-  allowMultipleActiveRigs?: boolean
-  advancedModeEnabled?: boolean
-  /** How RGB fixtures carrying a White channel drive that emitter. */
-  whiteChannelMixMode?: WhiteChannelMixMode
-  /** When false, YARG's venue post-processing leaves light colour untouched. */
-  venuePostProcessingEnabled?: boolean
-
-  // Frontend-specific preferences
-  dmxOutputConfig?: {
-    sacnEnabled: boolean
-    artNetEnabled: boolean
-    enttecProEnabled: boolean
-    openDmxEnabled: boolean
-  }
-  stageKitPrefs?: {
-    yargPriority: 'prefer-for-tracked' | 'random' | 'never'
-  }
-  rb3Prefs?: {
-    processingMode: ProcessingMode
-  }
-  dmxSettingsPrefs?: {
-    artNetExpanded: boolean
-    enttecProExpanded: boolean
-    sacnExpanded: boolean
-    openDmxExpanded: boolean
-  }
-  audioConfig?: {
-    deviceId?: number | string
-    sampleRate?: number
-    fftSize: number
-    updateIntervalMs?: number
-    sensitivity: number
-    noiseFloor?: number
-    bands?: Array<{
-      id: string
-      name: string
-      minHz: number
-      maxHz: number
-      gain: number
-    }>
-    beatDetection: {
-      threshold: number
-      decayRate: number
-      minInterval: number
-    }
-    smoothing: {
-      enabled: boolean
-      alpha: number
-    }
-    enabled: boolean
-    linearResponse?: boolean
-    strobeEnabled?: boolean
-    strobeTriggerThreshold?: number
-    strobeProbability?: number
-  }
-}
+export type LightingPreferences = Partial<AppPreferences>
 
 export const lightingPrefsAtom = atom<LightingPreferences>({})
 
@@ -384,7 +290,8 @@ export const audioConfigAtom = atom((get) => {
   return prefs.audioConfig
 })
 
-export const audioDevicesAtom = atom<Array<{ deviceId: number; label: string }>>([])
+/** Enumerated audio input devices. `deviceId` is the string `MediaDeviceInfo.deviceId`. */
+export const audioDevicesAtom = atom<Array<{ deviceId: string; label: string }>>([])
 
 export const audioEnabledAtom = atom((get) => {
   const config = get(audioConfigAtom)

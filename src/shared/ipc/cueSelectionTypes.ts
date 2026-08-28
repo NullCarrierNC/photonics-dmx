@@ -81,6 +81,14 @@ export interface CueSelectionInvokeMap {
     request: void
     response: { success: true; mode: 'oncePerSong' | 'withinSong' } | IpcErrorResult
   }
+  [LIGHT.SET_RB3_CUE_GROUP_SELECTION_MODE]: {
+    request: 'oncePerSong' | 'withinSong'
+    response: { success: true; mode: 'oncePerSong' | 'withinSong' } | IpcErrorResult
+  }
+  [LIGHT.GET_RB3_CUE_GROUP_SELECTION_MODE]: {
+    request: void
+    response: { success: true; mode: 'oncePerSong' | 'withinSong' } | IpcErrorResult
+  }
   [LIGHT.GET_CONSISTENCY_STATUS]: {
     request: void
     response: { success: true; status: unknown } | IpcErrorResult

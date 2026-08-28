@@ -11,7 +11,6 @@ import {
 import { ipcError } from '../ipcResult'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { validateOptionalStringArray, validateDisabledCuesMap } from '../inputValidation'
-import type { AppPreferences } from '../../../services/configuration/configurationDefaults'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('cue-selection-handlers')
 
@@ -32,8 +31,6 @@ interface CueGroupDomainSpec {
   afterSetEnabled?: (controllerManager: ControllerManager) => void
   /** SET-disabled side effect (refresh selection); runs after disabled is applied. */
   afterSetDisabled?: (controllerManager: ControllerManager) => void
-  /** GET tail applied once reconciled (e.g. YARG StageKit priority). */
-  afterGet?: (prefs: AppPreferences) => void
 }
 
 /**
@@ -67,7 +64,6 @@ function registerCueGroupDomain(
     serialize(async () => {
       const config = controllerManager.getConfig()
       const reconciled = await reconcileAndApplyGroups(binding, config)
-      spec.afterGet?.(config.getAllPreferences())
       return reconciled.enabled
     }),
   )
@@ -155,13 +151,6 @@ export function registerCueSelectionConfigHandlers(
       },
       disabledLabel: 'disabledYargCues',
       afterSetEnabled: activateYargGroups,
-      afterGet: (prefs) => {
-        const registry = CueRegistry.getInstance()
-        const configPriority = prefs.stageKitPrefs?.yargPriority || 'random'
-        if (registry.getStageKitPriority() !== configPriority) {
-          registry.setStageKitPriority(configPriority)
-        }
-      },
     },
     {
       binding: cueDomainBinding('audio'),
@@ -208,7 +197,11 @@ export function registerCueSelectionConfigHandlers(
       },
       disabledLabel: 'disabledRb3Cues',
       changedEvent: RENDERER_RECEIVE.RB3_CUE_GROUPS_CHANGED,
-      afterSetEnabled: activateRb3Groups,
+      afterSetEnabled: (cm) => {
+        activateRb3Groups()
+        cm.refreshRb3CueSelection()
+      },
+      afterSetDisabled: (cm) => cm.refreshRb3CueSelection(),
     },
     {
       binding: cueDomainBinding('rb3Motion'),

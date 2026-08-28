@@ -159,37 +159,46 @@ function validateWindowStatePayload(
   return { ok: true, value: out }
 }
 
-const APP_PREFERENCES_KEYS = new Set<keyof AppPreferences>([
-  'effectDebounce',
-  'complex',
-  'enttecProConfig',
-  'openDmxConfig',
-  'artNetConfig',
-  'sacnConfig',
-  'brightness',
-  'cueDomains',
-  'cueConsistencyWindow',
-  'clockRate',
-  'yargFallbackCueTimeMs',
-  'globalDmxPublishingRateHz',
-  'dmxOutputConfig',
-  'stageKitPrefs',
-  'rb3Prefs',
-  'dmxSettingsPrefs',
-  'allowMultipleActiveRigs',
-  'advancedModeEnabled',
-  'audioConfig',
-  'activeAudioCueType',
-  'audioGameMode',
-  'motionEnabled',
-  'simulationSettings',
-  'leftMenuCollapsed',
-  'windowState',
-  'cueEditorWindowState',
-  'audioPreviewWindowState',
-  'whiteChannelMixMode',
-  'venuePostProcessingEnabled',
-])
+/**
+ * Every AppPreferences key. `Record` over the full key union makes each one required, so a
+ * preference added without a line here fails the compile. The allowlist built from it strips any
+ * key it does not carry, so every preference that persists is listed here.
+ */
+const APP_PREFERENCES_KEY_MAP: Record<keyof AppPreferences, true> = {
+  effectDebounce: true,
+  complex: true,
+  enttecProConfig: true,
+  openDmxConfig: true,
+  artNetConfig: true,
+  sacnConfig: true,
+  brightness: true,
+  cueDomains: true,
+  cueConsistencyWindow: true,
+  clockRate: true,
+  yargFallbackCueTimeMs: true,
+  globalDmxPublishingRateHz: true,
+  dmxOutputConfig: true,
+  stageKitPrefs: true,
+  rb3Prefs: true,
+  dmxSettingsPrefs: true,
+  allowMultipleActiveRigs: true,
+  advancedModeEnabled: true,
+  audioConfig: true,
+  activeAudioCueType: true,
+  audioGameMode: true,
+  motionEnabled: true,
+  simulationSettings: true,
+  leftMenuCollapsed: true,
+  windowState: true,
+  cueEditorWindowState: true,
+  audioPreviewWindowState: true,
+  whiteChannelMixMode: true,
+  venuePostProcessingEnabled: true,
+}
+
+const APP_PREFERENCES_KEYS = new Set(
+  Object.keys(APP_PREFERENCES_KEY_MAP) as (keyof AppPreferences)[],
+)
 
 /**
  * Validates a preferences update payload, stripping any keys that are not
