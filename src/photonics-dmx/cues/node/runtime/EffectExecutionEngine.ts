@@ -184,8 +184,12 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     cancelled = false,
   ): void {
     if (cancelled) {
-      // Effect force-cleared: release the action so the context can settle, without advancing.
+      // Effect force-cleared or displaced: release the action so the context can settle, without
+      // advancing. A context with nothing left in flight is finished here rather than held.
       context.completeActionSilent(nodeId)
+      if (context.tryComplete()) {
+        context.dispose()
+      }
       this.maybeFireIdle()
       return
     }

@@ -356,9 +356,14 @@ export abstract class BaseNodeExecutionEngine {
     cancelled = false,
   ): void {
     if (cancelled) {
-      // The effect was force-cleared (cue switch): release the active action so the context can
-      // complete, but do NOT advance the graph — the cue is being replaced, not stepped forward.
+      // The effect was force-cleared (cue switch) or displaced by a newer submission: release the
+      // active action so the context can complete, but do NOT advance the graph, since the run is
+      // being replaced rather than stepped forward. A context with nothing left in flight is
+      // finished here, otherwise it and its state machine are held for the life of the engine.
       context.completeActionSilent(nodeId)
+      if (context.tryComplete()) {
+        context.dispose()
+      }
       return
     }
     context.completeAction(nodeId)
@@ -1094,20 +1099,36 @@ export abstract class BaseNodeExecutionEngine {
     const useSetEffect = this.getAndConsumeInitialClearPolicy()
 
     if (shouldBlock) {
-      context.registerActiveAction(actionNode.id, actionNode)
-      this.markPendingCallbackEffect(effectName)
       const callback = (cancelled = false): void => {
         this.clearPendingCallbackEffect(effectName)
         this.submittedEffects.delete(effectName)
-        this.setPositionSubmissionFingerprint.set(effectName, positionFp)
+        // A displaced or cancelled move never reached its target, so it must not record one. The
+        // fingerprint means "the position this light was last moved to and settled at".
+        if (!cancelled) {
+          this.setPositionSubmissionFingerprint.set(effectName, positionFp)
+        }
         this.emitNodeExecution('deactivated', actionNode.id)
         this.onBlockingActionComplete(actionNode.id, context, cancelled)
       }
-      this.submittedEffects.set(effectName, resolvedLayer)
       if (useSetEffect) {
+        context.registerActiveAction(actionNode.id, actionNode)
+        this.markPendingCallbackEffect(effectName)
+        this.submittedEffects.set(effectName, resolvedLayer)
         this.sequencer.setEffectUnblockedNameWithCallback(effectName, effect, callback)
       } else {
-        this.sequencer.addEffectUnblockedNameWithCallback(effectName, effect, callback)
+        // The submission replaces any in-flight move of this name, and the sequencer cancel-fires
+        // the displaced callback during the call. The records below are therefore written after it
+        // returns, so that callback sees the state its own submission wrote rather than this one's.
+        if (!this.sequencer.replaceEffectWithCallback(effectName, effect, callback)) {
+          this.emitNodeExecution('deactivated', actionNode.id)
+          this.continueToNextNodes(actionNode.id, context)
+          return
+        }
+        context.registerActiveAction(actionNode.id, actionNode)
+        this.markPendingCallbackEffect(effectName)
+        this.submittedEffects.set(effectName, resolvedLayer)
+        // This light is moving again, so the last settled position no longer describes it.
+        this.setPositionSubmissionFingerprint.delete(effectName)
       }
     } else {
       this.submittedEffects.set(effectName, resolvedLayer)
