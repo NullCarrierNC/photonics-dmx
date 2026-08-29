@@ -41,6 +41,7 @@ export type UseCueCrudParams = {
   effectFiles: EffectFileSummary[]
   setValidationErrors: (errors: string[]) => void
   setIsDirty: (dirty: boolean) => void
+  setCueKind: React.Dispatch<React.SetStateAction<NodeCueKind>>
   loadCueIntoFlow: (
     cue:
       | NetNodeCueDefinition
@@ -66,6 +67,7 @@ export function useCueCrud({
   effectFiles,
   setValidationErrors,
   setIsDirty,
+  setCueKind,
   loadCueIntoFlow,
   refreshFiles,
   refreshEffectFiles,
@@ -268,19 +270,35 @@ export function useCueCrud({
 
       setEditorDoc(updatedDoc)
 
-      let nextCueId = selectedCueId
+      // Only the removal of the open cue moves the selection. The flow holds unsaved canvas
+      // edits, so any other deletion leaves it alone rather than reloading the persisted copy.
       if (cueId === selectedCueId) {
-        const firstCue = firstByName(updatedCues)
-        nextCueId = firstCue?.id ?? null
-        setSelectedCueId(nextCueId)
+        const sameKindCues = updatedCues.filter(
+          (cue): cue is NetNodeCueDefinition | AudioNodeCueDefinition =>
+            'kind' in cue && cue.kind === cueKind,
+        )
+        // The cross-kind fallback is unreachable from the sidebar, which disables delete at the
+        // last cue of a kind, but it keeps the hook correct for any other caller.
+        const nextCue = firstByName(sameKindCues) ?? firstByName(updatedCues)
+        if (nextCue?.kind === 'lighting' || nextCue?.kind === 'motion') {
+          setCueKind(nextCue.kind)
+        }
+        setSelectedCueId(nextCue?.id ?? null)
+        loadCueIntoFlow((nextCue as NetNodeCueDefinition | AudioNodeCueDefinition) ?? null)
       }
 
-      const nextCue =
-        updatedCues.find((cue) => cue.id === nextCueId) ?? firstByName(updatedCues) ?? null
-      loadCueIntoFlow(nextCue as NetNodeCueDefinition | AudioNodeCueDefinition | null)
       setIsDirty(true)
     },
-    [editorDoc, loadCueIntoFlow, selectedCueId, setEditorDoc, setSelectedCueId, setIsDirty],
+    [
+      editorDoc,
+      cueKind,
+      loadCueIntoFlow,
+      selectedCueId,
+      setEditorDoc,
+      setSelectedCueId,
+      setCueKind,
+      setIsDirty,
+    ],
   )
 
   const removeEffect = useCallback(
@@ -304,18 +322,13 @@ export function useCueCrud({
 
       setEditorDoc(updatedDoc)
 
-      let nextEffectId = selectedCueId
+      // As with removeCue, leave the canvas alone unless the open effect is the one going away.
       if (effectId === selectedCueId) {
-        const firstEffect = firstByName(updatedEffects)
-        nextEffectId = firstEffect?.id ?? null
-        setSelectedCueId(nextEffectId)
+        const nextEffect = firstByName(updatedEffects)
+        setSelectedCueId(nextEffect?.id ?? null)
+        loadCueIntoFlow((nextEffect as YargEffectDefinition | AudioEffectDefinition) ?? null)
       }
 
-      const nextEffect =
-        updatedEffects.find((effect) => effect.id === nextEffectId) ??
-        firstByName(updatedEffects) ??
-        null
-      loadCueIntoFlow(nextEffect as YargEffectDefinition | AudioEffectDefinition | null)
       setIsDirty(true)
     },
     [editorDoc, loadCueIntoFlow, selectedCueId, setEditorDoc, setSelectedCueId, setIsDirty],

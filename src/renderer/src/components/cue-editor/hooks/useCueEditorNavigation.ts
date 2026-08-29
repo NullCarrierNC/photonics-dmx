@@ -126,6 +126,8 @@ export function useCueEditorNavigation({
     if (!pendingNavigation) return
     // Edits live in the in-memory editorDoc (Add Cue / JSON Apply / metadata), so truly
     // discarding them means reverting to the on-disk copy before performing the navigation.
+    // The revert also restores kind, selection and flow, since the discarded edit may have
+    // been the cue that was open.
     await revertCurrentFileToDisk()
     pendingNavigation()
     setPendingNavigation(null)

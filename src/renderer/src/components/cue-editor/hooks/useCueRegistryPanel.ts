@@ -11,7 +11,7 @@ import type {
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { enrichAvailableVariables } from '../lib/availableVariables'
-import { collectEventReferences, collectVariableReferences } from '../lib/graphReferences'
+import { collectEventReferencesFromFlow, collectVariableReferences } from '../lib/graphReferences'
 
 type EditorDoc = EditorDocument | null
 type EffectDefinition = YargEffectDefinition | AudioEffectDefinition | null
@@ -127,10 +127,10 @@ export function useCueRegistryPanel({
 
   const getEventReferences = useCallback(
     (eventName: string): string[] =>
-      editorDoc && selectedCueId && editorDoc.mode === 'cue'
-        ? collectEventReferences(editorDoc.file as NodeCueFile, selectedCueId, eventName)
+      editorDoc && editorDoc.mode === 'cue' && selectedCueId
+        ? collectEventReferencesFromFlow(nodes, eventName)
         : [],
-    [editorDoc, selectedCueId],
+    [editorDoc, selectedCueId, nodes],
   )
 
   const availableVariables = useMemo(() => {

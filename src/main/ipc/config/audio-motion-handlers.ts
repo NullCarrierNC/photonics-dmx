@@ -244,9 +244,11 @@ export function registerAudioMotionConfigHandlers(
 
       const currentConfig = controllerManager.getConfig().getAudioConfig()
       const currentDeviceId = currentConfig?.deviceId
-      const newDeviceId = validatedUpdates.deviceId as string | undefined
+      const hasDeviceIdUpdate = 'deviceId' in validatedUpdates
+      const newDeviceId = validatedUpdates.deviceId
 
-      const deviceChanged = newDeviceId !== undefined && newDeviceId !== currentDeviceId
+      const deviceChanged =
+        hasDeviceIdUpdate && (newDeviceId ?? undefined) !== (currentDeviceId ?? undefined)
 
       await controllerManager.getConfig().updateAudioConfig(validatedUpdates)
 
@@ -255,6 +257,7 @@ export function registerAudioMotionConfigHandlers(
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, updatedConfig)
       log.info('Sent audio:config-update to renderer')
 
+      let warning: string | undefined
       if (controllerManager.getIsAudioEnabled()) {
         if (deviceChanged) {
           log.info('Device changed, restarting audio capture...')
@@ -263,6 +266,11 @@ export function registerAudioMotionConfigHandlers(
             await controllerManager.enableAudio()
           } catch (error) {
             log.error('Failed to restart audio with new device:', error)
+            // The selection is saved, so keep it rather than reverting, but tell the renderer
+            // that capture is not running on it.
+            warning = `Saved, but audio capture failed to restart: ${
+              error instanceof Error ? error.message : String(error)
+            }`
           }
         } else {
           audioOf(controllerManager).updateAudioConfig(updatedConfig)
@@ -277,7 +285,7 @@ export function registerAudioMotionConfigHandlers(
         }
       }
 
-      return { success: true }
+      return warning ? { success: true, warning } : { success: true }
     } catch (error) {
       log.error('Error saving audio configuration:', error)
       return ipcError(error)

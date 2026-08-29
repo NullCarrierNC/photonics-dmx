@@ -2,7 +2,7 @@ import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { LIGHT } from '../../shared/ipcChannels'
 import { ipcError } from './ipcResult'
-import { isPlainObject } from './validation/primitives'
+import { isPlainObject } from './inputValidation'
 import type { FixtureConfig } from '../../photonics-dmx/types'
 
 /**
