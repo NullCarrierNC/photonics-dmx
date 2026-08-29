@@ -176,6 +176,18 @@ export interface IEffectManager {
    * would otherwise produce desynchronised motion.
    */
   replaceEffect(name: string, effect: Effect, isPersistent?: boolean): void
+  /**
+   * `replaceEffect` for a caller that parks on a completion callback. The callback held for the
+   * displaced run is fired with `cancelled = true`, so a blocking node waiting on it is released.
+   *
+   * @returns True when the effect was applied, false when a gate refused it.
+   */
+  replaceEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: (cancelled: boolean) => void,
+    isPersistent?: boolean,
+  ): boolean
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   addEffectUnblockedNameWithCallback(
@@ -326,6 +338,16 @@ export interface ILightingController {
    * effect and starts the new transitions immediately. See {@link IEffectManager.replaceEffect}.
    */
   replaceEffect(name: string, effect: Effect, isPersistent?: boolean): void
+  /**
+   * `replaceEffect` for a caller that parks on a completion callback.
+   * See {@link IEffectManager.replaceEffectWithCallback}.
+   */
+  replaceEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: (cancelled: boolean) => void,
+    isPersistent?: boolean,
+  ): boolean
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   addEffectUnblockedNameWithCallback(

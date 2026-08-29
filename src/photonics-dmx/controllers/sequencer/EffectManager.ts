@@ -40,7 +40,8 @@ const log = createLogger('EffectManager')
  * - replaceEffect: Per-(layer, light) replace; cancels active/queued for the same
  *   targets and starts the new transitions immediately, easing from current state.
  *   Use for state-target effects like non-blocking set-position where the latest
- *   submission must win.
+ *   submission must win. replaceEffectWithCallback is the variant for a caller
+ *   that parks on completion.
  * - addEffectUnblockedName: Discards if effect with same name exists anywhere
  * - setEffectUnblockedName: Like addEffectUnblockedName but cancels existing effects
  */
@@ -234,6 +235,28 @@ export class EffectManager implements IEffectManager {
    */
   public replaceEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
     this.submitEffect(name, effect, isPersistent, REPLACE_EFFECT)
+  }
+
+  /**
+   * {@link replaceEffect} for a caller that parks on a completion callback. Replaced slots are
+   * cancelled without firing their callbacks, so the callback held for `name` is fired here with
+   * `cancelled = true` before the new one is registered, releasing the displaced waiter once.
+   *
+   * @returns True when the effect was applied. A refusal leaves the running effect and its
+   * callback untouched and registers nothing.
+   */
+  public replaceEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: (cancelled: boolean) => void,
+    isPersistent: boolean = false,
+  ): boolean {
+    const applied = this.submitEffect(name, effect, isPersistent, REPLACE_EFFECT)
+    if (applied) {
+      this.effectCallbacks.fire(name, true)
+      this.effectCallbacks.set(name, onComplete)
+    }
+    return applied
   }
 
   /**

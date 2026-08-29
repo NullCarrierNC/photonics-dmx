@@ -417,6 +417,83 @@ describe('EffectManager', () => {
     })
   })
 
+  describe('replaceEffectWithCallback', () => {
+    const positionEffect = (id: string): Effect => ({
+      id,
+      description: id,
+      transitions: [
+        {
+          lights: [createMockTrackedLight()],
+          layer: 120,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: {
+            color: createMockRGBIP(),
+            easing: 'linear',
+            duration: 1000,
+          },
+          waitUntilCondition: 'measure',
+          waitUntilTime: 0,
+        },
+      ],
+    })
+
+    const registryOf = (manager: EffectManager): EffectCallbackRegistry =>
+      (manager as unknown as { effectCallbacks: EffectCallbackRegistry }).effectCallbacks
+
+    it('registers the callback and reports the submission applied', () => {
+      const onComplete = jest.fn()
+
+      const applied = effectManager.replaceEffectWithCallback(
+        'pos:0',
+        positionEffect('pos'),
+        onComplete,
+      )
+
+      expect(applied).toBe(true)
+      expect(registryOf(effectManager).get('pos:0')).toBe(onComplete)
+      expect(onComplete).not.toHaveBeenCalled()
+    })
+
+    it('cancel-fires the displaced callback exactly once and holds only the new one', () => {
+      const first = jest.fn()
+      const second = jest.fn()
+      effectManager.replaceEffectWithCallback('pos:0', positionEffect('first'), first)
+
+      effectManager.replaceEffectWithCallback('pos:0', positionEffect('second'), second)
+
+      expect(first).toHaveBeenCalledTimes(1)
+      expect(first).toHaveBeenCalledWith(true)
+      expect(second).not.toHaveBeenCalled()
+      expect(registryOf(effectManager).get('pos:0')).toBe(second)
+    })
+
+    it('does not fire a callback when no effect held the name', () => {
+      const onComplete = jest.fn()
+
+      effectManager.replaceEffectWithCallback('pos:0', positionEffect('only'), onComplete)
+
+      expect(onComplete).not.toHaveBeenCalled()
+    })
+
+    it('leaves the held callback alone when the submission is refused', () => {
+      const held = jest.fn()
+      effectManager.replaceEffectWithCallback('pos:0', positionEffect('held'), held)
+      const rejected = jest.fn()
+
+      const applied = effectManager.replaceEffectWithCallback(
+        'pos:0',
+        { id: 'empty', description: 'empty', transitions: [] },
+        rejected,
+      )
+
+      expect(applied).toBe(false)
+      expect(held).not.toHaveBeenCalled()
+      expect(rejected).not.toHaveBeenCalled()
+      expect(registryOf(effectManager).get('pos:0')).toBe(held)
+    })
+  })
+
   describe('setEffect', () => {
     it('should add new effect after clearing existing effects', async () => {
       // Setup mock effect
