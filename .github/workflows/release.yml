@@ -9,8 +9,14 @@ permissions:
   contents: read
 
 jobs:
+  # Same checks ci.yml runs. The builds depend on it, so a tag cut from an unverified commit
+  # fails here instead of publishing an installer.
+  verify:
+    uses: ./.github/workflows/verify.yml
+
   build-macos:
     name: Build macOS
+    needs: [verify]
     runs-on: macos-latest
     steps:
       - name: Checkout repository
@@ -40,6 +46,7 @@ jobs:
 
   build-windows:
     name: Build Windows
+    needs: [verify]
     runs-on: windows-latest
     steps:
       - name: Checkout repository
