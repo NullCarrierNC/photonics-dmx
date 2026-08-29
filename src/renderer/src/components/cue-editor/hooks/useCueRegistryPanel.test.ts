@@ -191,4 +191,71 @@ describe('useCueRegistryPanel', () => {
       expect(updateCueMetadata).not.toHaveBeenCalled()
     })
   })
+
+  describe('reference helpers', () => {
+    it('finds unsaved event references from live flow nodes', () => {
+      const raiser = { id: 'r-live', eventName: 'drop', label: 'Live Drop' }
+      const { rendered } = setup({
+        nodes: [
+          {
+            id: 'r-live',
+            position: { x: 0, y: 0 },
+            data: { kind: 'event-raiser', label: 'Live Drop', payload: raiser },
+          },
+        ] as Args['nodes'],
+      })
+
+      expect(rendered.result.current.getEventReferences('drop')).toEqual([
+        'Event Raiser: Live Drop',
+      ])
+    })
+
+    it('returns no event references outside cue mode', () => {
+      const { rendered } = setup({ editorDoc: effectDoc() })
+      expect(rendered.result.current.getEventReferences('drop')).toEqual([])
+    })
+
+    it('returns no event references without a selected cue', () => {
+      const raiser = { id: 'r-live', eventName: 'drop', label: 'Live Drop' }
+      const { rendered } = setup({
+        selectedCueId: null,
+        nodes: [
+          {
+            id: 'r-live',
+            position: { x: 0, y: 0 },
+            data: { kind: 'event-raiser', label: 'Live Drop', payload: raiser },
+          },
+        ] as Args['nodes'],
+      })
+
+      expect(rendered.result.current.getEventReferences('drop')).toEqual([])
+    })
+
+    it('finds live listener references even when the persisted graph has no event nodes', () => {
+      const listener = { id: 'l-live', eventName: 'drop' }
+      const docWithoutPersistedEvents = (): EditorDocument =>
+        ({
+          mode: 'cue',
+          path: '/cues/file.json',
+          file: {
+            mode: 'yarg',
+            group: { id: 'g', name: 'Group' },
+            cues: [{ id: 'cue-1', kind: 'lighting', nodes: {} }],
+          },
+        }) as unknown as EditorDocument
+
+      const { rendered } = setup({
+        editorDoc: docWithoutPersistedEvents(),
+        nodes: [
+          {
+            id: 'l-live',
+            position: { x: 0, y: 0 },
+            data: { kind: 'event-listener', payload: listener },
+          },
+        ] as Args['nodes'],
+      })
+
+      expect(rendered.result.current.getEventReferences('drop')).toEqual(['Event Listener: l-live'])
+    })
+  })
 })

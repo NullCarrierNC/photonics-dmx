@@ -1,10 +1,11 @@
-import { collectEventReferences, collectVariableReferences } from './graphReferences'
+import { collectEventReferencesFromFlow, collectVariableReferences } from './graphReferences'
 import type { EditorNode, EditorNodeData } from './types'
 import type {
   ActionNode,
   EffectRaiserNode,
+  EventListenerNode,
+  EventRaiserNode,
   LogicNode,
-  NodeCueFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 function node(
@@ -110,36 +111,25 @@ describe('collectVariableReferences', () => {
   })
 })
 
-describe('collectEventReferences', () => {
-  const cueFile = (): NodeCueFile =>
-    ({
-      cues: [
-        {
-          id: 'cue-1',
-          nodes: {
-            eventRaisers: [
-              { id: 'r1', eventName: 'drop', label: 'The Drop' },
-              { id: 'r2', eventName: 'other' },
-            ],
-            eventListeners: [{ id: 'l1', eventName: 'drop' }],
-          },
-        },
-      ],
-    }) as unknown as NodeCueFile
+describe('collectEventReferencesFromFlow', () => {
+  it('reports unsaved raisers and listeners on the live canvas', () => {
+    const raiser = { id: 'r-live', eventName: 'drop', label: 'Live Drop' } as EventRaiserNode
+    const listener = { id: 'l-live', eventName: 'drop' } as EventListenerNode
+    const nodes = [
+      node('r-live', { kind: 'event-raiser', payload: raiser }),
+      node('l-live', { kind: 'event-listener', payload: listener }),
+    ]
 
-  it('reports raisers and listeners naming the event, preferring the label', () => {
-    expect(collectEventReferences(cueFile(), 'cue-1', 'drop')).toEqual([
-      'Event Raiser: The Drop',
-      'Event Listener: l1',
+    expect(collectEventReferencesFromFlow(nodes, 'drop')).toEqual([
+      'Event Raiser: Live Drop',
+      'Event Listener: l-live',
     ])
   })
 
-  it('falls back to the node id when a raiser has no label', () => {
-    expect(collectEventReferences(cueFile(), 'cue-1', 'other')).toEqual(['Event Raiser: r2'])
-  })
+  it('returns nothing when the canvas has no matching event nodes', () => {
+    const raiser = { id: 'r1', eventName: 'other' } as EventRaiserNode
+    const nodes = [node('r1', { kind: 'event-raiser', payload: raiser })]
 
-  it('returns nothing for an unknown cue or an unreferenced event', () => {
-    expect(collectEventReferences(cueFile(), 'missing-cue', 'drop')).toEqual([])
-    expect(collectEventReferences(cueFile(), 'cue-1', 'never-raised')).toEqual([])
+    expect(collectEventReferencesFromFlow(nodes, 'drop')).toEqual([])
   })
 })

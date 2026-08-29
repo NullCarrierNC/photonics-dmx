@@ -50,7 +50,7 @@ export interface ConfigInvokeMap {
     response: DmxRig[]
   }
   [CONFIG.SAVE_DMX_RIG]: {
-    request: unknown
+    request: DmxRig
     response: IpcSuccessResult | IpcErrorResult
   }
   [CONFIG.DELETE_DMX_RIG]: {
@@ -99,7 +99,9 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.SAVE_AUDIO_CONFIG]: {
     request: Partial<AudioConfig>
-    response: IpcSuccessResult | IpcErrorResult
+    // success reports persistence. `warning` carries a runtime problem that did not stop the
+    // save, such as capture failing to restart on the newly selected device.
+    response: (IpcSuccessResult & { warning?: string }) | IpcErrorResult
   }
   [CONFIG.GET_AUDIO_ENABLED]: {
     request: void

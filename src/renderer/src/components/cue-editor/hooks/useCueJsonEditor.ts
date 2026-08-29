@@ -5,6 +5,7 @@ import type {
   EffectFile,
   NetNodeCueDefinition,
   AudioNodeCueDefinition,
+  NodeCueKind,
   YargEffectDefinition,
   AudioEffectDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -27,6 +28,7 @@ interface UseCueJsonEditorArgs {
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>
   setEditorDoc(doc: EditorDoc): void
   setSelectedCueId(id: string | null): void
+  setCueKind: React.Dispatch<React.SetStateAction<NodeCueKind>>
   setIsDirty(dirty: boolean): void
   loadCueIntoFlow(definition: unknown): void
 }
@@ -47,6 +49,7 @@ export function useCueJsonEditor({
   setNodes,
   setEditorDoc,
   setSelectedCueId,
+  setCueKind,
   setIsDirty,
   loadCueIntoFlow,
 }: UseCueJsonEditorArgs) {
@@ -74,6 +77,9 @@ export function useCueJsonEditor({
   const handleJsonEditorSave = useCallback(
     (updatedCue: NetNodeCueDefinition | AudioNodeCueDefinition) => {
       if (!editorDoc || editorDoc.mode !== 'cue' || !selectedCueId) return
+      if (updatedCue.kind === 'lighting' || updatedCue.kind === 'motion') {
+        setCueKind(updatedCue.kind)
+      }
       const file = editorDoc.file as NodeCueFile
       const updatedFile: NodeCueFile = {
         ...file,
@@ -93,6 +99,7 @@ export function useCueJsonEditor({
       loadCueIntoFlow,
       setEditorDoc,
       setSelectedCueId,
+      setCueKind,
       setIsDirty,
       closeJsonEditor,
     ],

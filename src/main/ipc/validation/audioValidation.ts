@@ -3,7 +3,12 @@
  */
 
 import type { Brightness, Color } from '../../../photonics-dmx/types'
-import type { AudioGameModeConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
+import type {
+  AudioBandDefinition,
+  AudioConfig,
+  AudioGameModeConfig,
+  AudioIdleDetectionConfig,
+} from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import type { ValidationResult } from './primitives'
 import {
   AUDIO_BAND_GAIN_MAX,
@@ -48,58 +53,109 @@ const VALID_AUDIO_IDLE_COLORS = new Set<Color>([
 
 const VALID_AUDIO_IDLE_BRIGHTNESS = new Set<Brightness>(['low', 'medium', 'high', 'max', 'linear'])
 
-function validateIdleDetectionPayload(data: unknown): ValidationResult<Record<string, unknown>> {
+const WEB_AUDIO_FFT_MIN = 32
+const WEB_AUDIO_FFT_MAX = 32768
+
+function isPowerOfTwo(value: number): boolean {
+  return Number.isInteger(value) && value > 0 && (value & (value - 1)) === 0
+}
+
+function validateFftSize(value: unknown): ValidationResult<number> {
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    return { ok: false, error: 'fftSize must be an integer' }
+  }
+  if (value < WEB_AUDIO_FFT_MIN || value > WEB_AUDIO_FFT_MAX) {
+    return {
+      ok: false,
+      error: `fftSize must be between ${WEB_AUDIO_FFT_MIN} and ${WEB_AUDIO_FFT_MAX}`,
+    }
+  }
+  if (!isPowerOfTwo(value)) {
+    return { ok: false, error: 'fftSize must be a power of 2' }
+  }
+  return { ok: true, value }
+}
+
+function validateBeatDetectionPayload(
+  data: unknown,
+): ValidationResult<AudioConfig['beatDetection']> {
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'beatDetection must be an object' }
+  }
+  const o = data as Record<string, unknown>
+  const threshold = validateNumberInRange(o.threshold, 0.1, 1.0, 'beatDetection.threshold')
+  if (!threshold.ok) return threshold
+  const decayRate = validateNumberInRange(o.decayRate, 0.8, 0.99, 'beatDetection.decayRate')
+  if (!decayRate.ok) return decayRate
+  const minInterval = validateNumberInRange(o.minInterval, 50, 500, 'beatDetection.minInterval')
+  if (!minInterval.ok) return minInterval
+  return {
+    ok: true,
+    value: {
+      threshold: threshold.value,
+      decayRate: decayRate.value,
+      minInterval: Math.round(minInterval.value),
+    },
+  }
+}
+
+function validateSmoothingPayload(data: unknown): ValidationResult<AudioConfig['smoothing']> {
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'smoothing must be an object' }
+  }
+  const o = data as Record<string, unknown>
+  if (typeof o.enabled !== 'boolean') {
+    return { ok: false, error: 'smoothing.enabled must be a boolean' }
+  }
+  const alpha = validateNumberInRange(o.alpha, 0.1, 0.95, 'smoothing.alpha')
+  if (!alpha.ok) return alpha
+  return { ok: true, value: { enabled: o.enabled, alpha: alpha.value } }
+}
+
+function validateCompleteIdleDetectionPayload(
+  data: unknown,
+): ValidationResult<AudioIdleDetectionConfig> {
   if (!isPlainObject(data)) {
     return { ok: false, error: 'idleDetection must be an object' }
   }
   const o = data as Record<string, unknown>
-  const out: Record<string, unknown> = {}
-
-  if ('enabled' in o) {
-    if (typeof o.enabled !== 'boolean') {
-      return { ok: false, error: 'idleDetection.enabled must be a boolean' }
-    }
-    out.enabled = o.enabled
+  if (typeof o.enabled !== 'boolean') {
+    return { ok: false, error: 'idleDetection.enabled must be a boolean' }
   }
-  if ('thresholdPct' in o) {
-    const t = validateNumberInRange(o.thresholdPct, 0, 100, 'idleDetection.thresholdPct')
-    if (!t.ok) return t
-    out.thresholdPct = t.value
+  const thresholdPct = validateNumberInRange(o.thresholdPct, 0, 100, 'idleDetection.thresholdPct')
+  if (!thresholdPct.ok) return thresholdPct
+  const minIdleSeconds = validateNumberInRange(
+    o.minIdleSeconds,
+    0,
+    600,
+    'idleDetection.minIdleSeconds',
+  )
+  if (!minIdleSeconds.ok) return minIdleSeconds
+  const resumeSeconds = validateNumberInRange(o.resumeSeconds, 0, 60, 'idleDetection.resumeSeconds')
+  if (!resumeSeconds.ok) return resumeSeconds
+  if (!VALID_AUDIO_IDLE_COLORS.has(o.idleColor as Color)) {
+    return { ok: false, error: 'idleDetection.idleColor is not a valid color' }
   }
-  if ('minIdleSeconds' in o) {
-    const t = validateNumberInRange(o.minIdleSeconds, 0, 600, 'idleDetection.minIdleSeconds')
-    if (!t.ok) return t
-    out.minIdleSeconds = t.value
+  if (!VALID_AUDIO_IDLE_BRIGHTNESS.has(o.idleBrightness as Brightness)) {
+    return { ok: false, error: 'idleDetection.idleBrightness is not a valid brightness' }
   }
-  if ('resumeSeconds' in o) {
-    const t = validateNumberInRange(o.resumeSeconds, 0, 60, 'idleDetection.resumeSeconds')
-    if (!t.ok) return t
-    out.resumeSeconds = t.value
+  return {
+    ok: true,
+    value: {
+      enabled: o.enabled,
+      thresholdPct: thresholdPct.value,
+      minIdleSeconds: minIdleSeconds.value,
+      resumeSeconds: resumeSeconds.value,
+      idleColor: o.idleColor as Color,
+      idleBrightness: o.idleBrightness as Brightness,
+    },
   }
-  if ('idleColor' in o) {
-    if (!VALID_AUDIO_IDLE_COLORS.has(o.idleColor as Color)) {
-      return { ok: false, error: 'idleDetection.idleColor is not a valid color' }
-    }
-    out.idleColor = o.idleColor
-  }
-  if ('idleBrightness' in o) {
-    if (!VALID_AUDIO_IDLE_BRIGHTNESS.has(o.idleBrightness as Brightness)) {
-      return { ok: false, error: 'idleDetection.idleBrightness is not a valid brightness' }
-    }
-    out.idleBrightness = o.idleBrightness
-  }
-
-  if (Object.keys(out).length === 0) {
-    return { ok: false, error: 'idleDetection contains no valid keys' }
-  }
-
-  return { ok: true, value: out }
 }
 
 /**
  * Validates a single audio band definition
  */
-function validateAudioBand(band: unknown): ValidationResult<Record<string, unknown>> {
+function validateAudioBand(band: unknown): ValidationResult<AudioBandDefinition> {
   if (!isPlainObject(band)) {
     return { ok: false, error: 'Audio band must be an object' }
   }
@@ -153,26 +209,25 @@ function validateAudioBand(band: unknown): ValidationResult<Record<string, unkno
 /**
  * Validates an audio configuration update payload, stripping unknown keys.
  */
-export function validateAudioConfigPayload(
-  data: unknown,
-): ValidationResult<Record<string, unknown>> {
+export function validateAudioConfigPayload(data: unknown): ValidationResult<Partial<AudioConfig>> {
   if (!isPlainObject(data)) {
     return { ok: false, error: 'Audio configuration payload must be an object' }
   }
 
-  const cleaned: Record<string, unknown> = {}
+  const cleaned: Partial<AudioConfig> = {}
   for (const key of Object.keys(data)) {
     if (AUDIO_CONFIG_KEYS.has(key)) {
+      const value = data[key]
       // Special validation for bands array
       if (key === 'bands') {
-        if (!Array.isArray(data[key])) {
+        if (!Array.isArray(value)) {
           return { ok: false, error: 'Audio bands must be an array' }
         }
-        const bandsArray = data[key] as unknown[]
+        const bandsArray = value as unknown[]
         if (bandsArray.length !== 8) {
           return { ok: false, error: 'Audio bands must contain exactly 8 bands' }
         }
-        const validatedBands: Record<string, unknown>[] = []
+        const validatedBands: AudioBandDefinition[] = []
         for (let i = 0; i < bandsArray.length; i++) {
           const bandResult = validateAudioBand(bandsArray[i])
           if (!bandResult.ok) {
@@ -180,33 +235,72 @@ export function validateAudioConfigPayload(
           }
           validatedBands.push(bandResult.value)
         }
-        cleaned[key] = validatedBands
+        cleaned.bands = validatedBands
       } else if (key === 'strobeEnabled') {
-        const v = data[key]
-        if (typeof v !== 'boolean') {
+        if (typeof value !== 'boolean') {
           return { ok: false, error: 'strobeEnabled must be a boolean' }
         }
-        cleaned[key] = v
+        cleaned.strobeEnabled = value
       } else if (key === 'strobeTriggerThreshold') {
-        const t = validateNumberInRange(data[key], 0, 1, 'strobeTriggerThreshold')
+        const t = validateNumberInRange(value, 0, 1, 'strobeTriggerThreshold')
         if (!t.ok) {
           return t
         }
-        cleaned[key] = t.value
+        cleaned.strobeTriggerThreshold = t.value
       } else if (key === 'strobeProbability') {
-        const t = validateNumberInRange(data[key], 0, 100, 'strobeProbability')
+        const t = validateNumberInRange(value, 0, 100, 'strobeProbability')
         if (!t.ok) {
           return t
         }
-        cleaned[key] = t.value
+        cleaned.strobeProbability = t.value
       } else if (key === 'idleDetection') {
-        const idResult = validateIdleDetectionPayload(data[key])
+        const idResult = validateCompleteIdleDetectionPayload(value)
         if (!idResult.ok) {
           return idResult
         }
-        cleaned[key] = idResult.value
-      } else {
-        cleaned[key] = data[key]
+        cleaned.idleDetection = idResult.value
+      } else if (key === 'deviceId') {
+        // undefined is the system default device. An empty string is not a device the capture
+        // layer can resolve, and the UI renders it as the default while prefs disagree.
+        if (value !== undefined && !isNonEmptyString(value)) {
+          return { ok: false, error: 'deviceId must be a non-empty string or undefined' }
+        }
+        cleaned.deviceId = value as string | undefined
+      } else if (key === 'fftSize') {
+        const t = validateFftSize(value)
+        if (!t.ok) {
+          return t
+        }
+        cleaned.fftSize = t.value
+      } else if (key === 'sensitivity') {
+        const t = validateNumberInRange(value, 0.1, 5.0, 'sensitivity')
+        if (!t.ok) {
+          return t
+        }
+        cleaned.sensitivity = t.value
+      } else if (key === 'noiseFloor') {
+        const t = validateNumberInRange(value, 0, 255, 'noiseFloor')
+        if (!t.ok) {
+          return t
+        }
+        cleaned.noiseFloor = Math.round(t.value)
+      } else if (key === 'enabled' || key === 'linearResponse') {
+        if (typeof value !== 'boolean') {
+          return { ok: false, error: `${key} must be a boolean` }
+        }
+        cleaned[key] = value
+      } else if (key === 'beatDetection') {
+        const beatResult = validateBeatDetectionPayload(value)
+        if (!beatResult.ok) {
+          return beatResult
+        }
+        cleaned.beatDetection = beatResult.value
+      } else if (key === 'smoothing') {
+        const smoothingResult = validateSmoothingPayload(value)
+        if (!smoothingResult.ok) {
+          return smoothingResult
+        }
+        cleaned.smoothing = smoothingResult.value
       }
     }
   }

@@ -169,14 +169,16 @@ export class AudioController {
     log.info('Audio disabled successfully')
   }
 
+  /**
+   * Applies an already-persisted config to the running processor. Persistence belongs to the
+   * caller: a write here races the caller's write and puts the runtime-only `enabled` flag on
+   * disk, which setAudioConfig does not strip.
+   */
   public updateAudioConfig(config: AudioConfig): void {
     if (!this.isAudioEnabled || !this.audioProcessor) {
       return
     }
-    const currentConfig = this.deps.config.getAudioConfig()
-    const mergedConfig = { ...currentConfig, ...config }
-    this.deps.config.setAudioConfig(mergedConfig)
-    this.audioProcessor.updateConfig(mergedConfig)
+    this.audioProcessor.updateConfig(config)
     log.info('AudioCueProcessor configuration updated')
   }
 

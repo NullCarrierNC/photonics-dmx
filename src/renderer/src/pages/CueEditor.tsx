@@ -148,6 +148,7 @@ const CueEditor: React.FC = () => {
     setNodes,
     setEditorDoc,
     setSelectedCueId,
+    setCueKind,
     setIsDirty,
     loadCueIntoFlow,
   })
@@ -177,34 +178,6 @@ const CueEditor: React.FC = () => {
     revertCurrentFileToDisk,
     setIsDirty,
   })
-
-  useEffect(() => {
-    if (editorMode !== 'cue' || !editorDoc || editorDoc.mode !== 'cue') return
-    const cueFile = editorDoc.file as NodeCueFile
-    const matchingCues = cueFile.cues.filter((c) => c.kind === cueKind)
-    if (matchingCues.length === 0) {
-      setEditorDoc(null)
-      setSelectedCueId(null)
-      loadCueIntoFlow(null)
-      setIsDirty(false)
-      return
-    }
-    const selectedOk = selectedCueId != null && matchingCues.some((c) => c.id === selectedCueId)
-    if (!selectedOk) {
-      const first = matchingCues[0]
-      setSelectedCueId(first.id)
-      loadCueIntoFlow(first as EditorCueOrEffect)
-    }
-  }, [
-    cueKind,
-    editorDoc,
-    selectedCueId,
-    editorMode,
-    setEditorDoc,
-    setSelectedCueId,
-    loadCueIntoFlow,
-    setIsDirty,
-  ])
 
   const currentGraphId =
     editorDoc?.mode === 'effect'

@@ -29,6 +29,32 @@ export const modeKeyFor = (
   return kind === 'motion' ? 'yarg-motion-cue' : 'yarg-cue'
 }
 
+/** What a sidebar mode selection resolves to: the platform, the cue kind and the storage key. */
+export type ModeTarget = {
+  isEffect: boolean
+  cueMode: NodeCueMode
+  nextKind: NodeCueKind
+  modeKey: EditorModeKey
+}
+
+/** Splits a sidebar mode string into the platform, kind and storage key it selects. */
+export const resolveModeTarget = (nextMode: string): ModeTarget => {
+  const isEffect = nextMode === 'yarg-effect' || nextMode === 'audio-effect'
+  const cueMode: NodeCueMode =
+    nextMode === 'rb3-cue' || nextMode === 'rb3-motion-cue'
+      ? 'rb3'
+      : nextMode === 'yarg-effect' || nextMode === 'yarg-cue' || nextMode === 'yarg-motion-cue'
+        ? 'yarg'
+        : 'audio'
+  const nextKind: NodeCueKind =
+    nextMode === 'yarg-motion-cue' ||
+    nextMode === 'audio-motion-cue' ||
+    nextMode === 'rb3-motion-cue'
+      ? 'motion'
+      : 'lighting'
+  return { isEffect, cueMode, nextKind, modeKey: modeKeyFor(cueMode, nextKind, isEffect) }
+}
+
 /**
  * The cue-file mode a stored key belongs to. Stored paths are checked against this before being
  * restored, so a path left behind by another platform is ignored rather than loaded.

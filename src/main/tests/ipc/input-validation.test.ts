@@ -3,6 +3,7 @@ import * as os from 'os'
 import * as path from 'path'
 import {
   isPlainObject,
+  validateAudioConfigPayload,
   validateCueGroupSelectionMode,
   validateCueRefPayload,
   validateCueType,
@@ -1047,6 +1048,146 @@ describe('inputValidation', () => {
         expect(validatePreferencesPayload({ activeAudioCueType: 42 }).ok).toBe(false)
         expect(validatePreferencesPayload({ activeAudioCueType: 'x'.repeat(201) }).ok).toBe(false)
       })
+
+      it('rejects a malformed nested audioConfig update', () => {
+        expect(
+          validatePreferencesPayload({
+            audioConfig: { sensitivity: 'loud' },
+          }).ok,
+        ).toBe(false)
+        expect(
+          validatePreferencesPayload({
+            audioConfig: {
+              beatDetection: { threshold: 0.3, decayRate: 0.8, minInterval: 100 },
+            },
+          }).ok,
+        ).toBe(true)
+      })
+    })
+  })
+
+  describe('validateAudioConfigPayload', () => {
+    const validBeatDetection = { threshold: 0.3, decayRate: 0.8, minInterval: 100 }
+    const validSmoothing = { enabled: true, alpha: 0.7 }
+    const validIdleDetection = {
+      enabled: true,
+      thresholdPct: 20,
+      minIdleSeconds: 5,
+      resumeSeconds: 3,
+      idleColor: 'blue',
+      idleBrightness: 'low',
+    }
+
+    it('accepts a valid partial scalar update', () => {
+      const result = validateAudioConfigPayload({ sensitivity: 2.5 })
+      expect(result.ok).toBe(true)
+      if (result.ok) expect(result.value.sensitivity).toBe(2.5)
+    })
+
+    it('rejects non-object payloads', () => {
+      expect(validateAudioConfigPayload(null).ok).toBe(false)
+      expect(validateAudioConfigPayload([]).ok).toBe(false)
+    })
+
+    it('rejects out-of-range sensitivity and noiseFloor', () => {
+      expect(validateAudioConfigPayload({ sensitivity: 0.05 }).ok).toBe(false)
+      expect(validateAudioConfigPayload({ noiseFloor: 256 }).ok).toBe(false)
+    })
+
+    it('rejects fftSize values that are not a power of two', () => {
+      expect(validateAudioConfigPayload({ fftSize: 4096 }).ok).toBe(true)
+      expect(validateAudioConfigPayload({ fftSize: 999 }).ok).toBe(false)
+    })
+
+    it('requires fftSize to be an integer without rounding', () => {
+      expect(validateAudioConfigPayload({ fftSize: 4095.6 }).ok).toBe(false)
+      expect(validateAudioConfigPayload({ fftSize: '4096' }).ok).toBe(false)
+      expect(validateAudioConfigPayload({ fftSize: 32 }).ok).toBe(true)
+      expect(validateAudioConfigPayload({ fftSize: 32768 }).ok).toBe(true)
+    })
+
+    it('accepts an explicit deviceId clear for the system default', () => {
+      const result = validateAudioConfigPayload({ deviceId: undefined })
+      expect(result.ok).toBe(true)
+      if (result.ok) expect(result.value.deviceId).toBeUndefined()
+    })
+
+    it('rejects a non-string or empty deviceId when provided', () => {
+      expect(validateAudioConfigPayload({ deviceId: 42 }).ok).toBe(false)
+      // The UI represents the default device as undefined, so '' is never a real selection.
+      expect(validateAudioConfigPayload({ deviceId: '' }).ok).toBe(false)
+    })
+
+    it('accepts the boolean flags and rejects non-booleans', () => {
+      expect(validateAudioConfigPayload({ enabled: true }).ok).toBe(true)
+      expect(validateAudioConfigPayload({ linearResponse: false }).ok).toBe(true)
+      expect(validateAudioConfigPayload({ strobeEnabled: true }).ok).toBe(true)
+      expect(validateAudioConfigPayload({ strobeEnabled: 'yes' }).ok).toBe(false)
+    })
+
+    it('range-checks the strobe scalars', () => {
+      // threshold is a 0-1 fraction, probability is a 0-100 percentage.
+      expect(validateAudioConfigPayload({ strobeTriggerThreshold: 0.5 }).ok).toBe(true)
+      expect(validateAudioConfigPayload({ strobeTriggerThreshold: 1.5 }).ok).toBe(false)
+      expect(validateAudioConfigPayload({ strobeProbability: 60 }).ok).toBe(true)
+      expect(validateAudioConfigPayload({ strobeProbability: 101 }).ok).toBe(false)
+    })
+
+    describe('bands', () => {
+      const band = (i: number, overrides: Record<string, unknown> = {}) => ({
+        id: `band-${i}`,
+        name: `Band ${i}`,
+        minHz: 20 + i * 100,
+        maxHz: 100 + i * 100,
+        gain: 1,
+        ...overrides,
+      })
+      const eightBands = (overrides: Record<string, unknown> = {}, at = 0) =>
+        Array.from({ length: 8 }, (_, i) => (i === at ? band(i, overrides) : band(i)))
+
+      it('accepts a complete set of eight bands', () => {
+        const result = validateAudioConfigPayload({ bands: eightBands() })
+        expect(result.ok).toBe(true)
+        if (result.ok) expect(result.value.bands).toHaveLength(8)
+      })
+
+      it('rejects a non-array or a set that is not exactly eight bands', () => {
+        expect(validateAudioConfigPayload({ bands: 'nope' }).ok).toBe(false)
+        expect(validateAudioConfigPayload({ bands: eightBands().slice(0, 7) }).ok).toBe(false)
+      })
+
+      it('rejects a malformed band member', () => {
+        expect(validateAudioConfigPayload({ bands: eightBands({ id: '' }) }).ok).toBe(false)
+        expect(validateAudioConfigPayload({ bands: eightBands({ name: '' }) }).ok).toBe(false)
+      })
+
+      it('rejects out-of-range or inverted frequency bounds', () => {
+        expect(validateAudioConfigPayload({ bands: eightBands({ minHz: 10 }) }).ok).toBe(false)
+        expect(validateAudioConfigPayload({ bands: eightBands({ maxHz: 20001 }) }).ok).toBe(false)
+        expect(
+          validateAudioConfigPayload({ bands: eightBands({ minHz: 500, maxHz: 400 }) }).ok,
+        ).toBe(false)
+      })
+    })
+
+    it('requires a complete beatDetection object', () => {
+      expect(validateAudioConfigPayload({ beatDetection: validBeatDetection }).ok).toBe(true)
+      expect(validateAudioConfigPayload({ beatDetection: {} }).ok).toBe(false)
+      expect(validateAudioConfigPayload({ beatDetection: { threshold: 2 } }).ok).toBe(false)
+    })
+
+    it('requires a complete smoothing object', () => {
+      expect(validateAudioConfigPayload({ smoothing: validSmoothing }).ok).toBe(true)
+      expect(validateAudioConfigPayload({ smoothing: { enabled: true } }).ok).toBe(false)
+    })
+
+    it('requires a complete idleDetection object', () => {
+      expect(validateAudioConfigPayload({ idleDetection: validIdleDetection }).ok).toBe(true)
+      expect(validateAudioConfigPayload({ idleDetection: { enabled: true } }).ok).toBe(false)
+    })
+
+    it('rejects payloads with no recognised keys', () => {
+      expect(validateAudioConfigPayload({ bogus: true }).ok).toBe(false)
     })
   })
 })

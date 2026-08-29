@@ -2,8 +2,9 @@ import type { EditorNode } from './types'
 import type {
   ActionNode,
   EffectRaiserNode,
+  EventListenerNode,
+  EventRaiserNode,
   LogicNode,
-  NodeCueFile,
   ValueSource,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { expressionVariables } from '../../../../../photonics-dmx/cues/node/runtime/expressionEvaluator'
@@ -254,29 +255,21 @@ export function collectVariableReferences(nodes: EditorNode[], varName: string):
   return references
 }
 
-/** Every event raiser and listener in `cueId` that names `eventName`. */
-export function collectEventReferences(
-  cueFile: NodeCueFile,
-  cueId: string,
-  eventName: string,
-): string[] {
+/** Every event raiser and listener on the live canvas that names `eventName`. */
+export function collectEventReferencesFromFlow(nodes: EditorNode[], eventName: string): string[] {
   const references: string[] = []
-  const currentCue = cueFile.cues.find((c) => c.id === cueId)
-  if (!currentCue) return []
 
-  // Check event raiser nodes
-  const eventRaisers = currentCue.nodes.eventRaisers ?? []
-  for (const raiser of eventRaisers) {
-    if (raiser.eventName === eventName) {
-      references.push(`Event Raiser: ${raiser.label ?? raiser.id}`)
-    }
-  }
-
-  // Check event listener nodes
-  const eventListeners = currentCue.nodes.eventListeners ?? []
-  for (const listener of eventListeners) {
-    if (listener.eventName === eventName) {
-      references.push(`Event Listener: ${listener.label ?? listener.id}`)
+  for (const node of nodes) {
+    if (node.data.kind === 'event-raiser') {
+      const raiser = node.data.payload as EventRaiserNode
+      if (raiser.eventName === eventName) {
+        references.push(`Event Raiser: ${raiser.label ?? raiser.id}`)
+      }
+    } else if (node.data.kind === 'event-listener') {
+      const listener = node.data.payload as EventListenerNode
+      if (listener.eventName === eventName) {
+        references.push(`Event Listener: ${listener.label ?? listener.id}`)
+      }
     }
   }
 
