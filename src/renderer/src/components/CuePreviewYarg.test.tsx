@@ -6,7 +6,7 @@
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
 import { act, render, screen, cleanup } from '@testing-library/react'
 import { Provider, createStore } from 'jotai'
-import { yargListenerEnabledAtom } from '../atoms'
+import { lightingPrefsAtom, yargListenerEnabledAtom } from '../atoms'
 import type { CueData } from '../../../photonics-dmx/cues/types/cueTypes'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
@@ -61,9 +61,15 @@ function cueData(overrides: Partial<CueData> = {}): CueData {
   } as CueData
 }
 
-async function renderWithCueData(data: CueData): Promise<void> {
+async function renderWithCueData(
+  data: CueData,
+  venuePostProcessingEnabled?: boolean,
+): Promise<void> {
   const store = createStore()
   store.set(yargListenerEnabledAtom, true)
+  if (venuePostProcessingEnabled !== undefined) {
+    store.set(lightingPrefsAtom, { venuePostProcessingEnabled })
+  }
   render(
     <Provider store={store}>
       <CuePreviewYarg />
@@ -101,5 +107,46 @@ describe('CuePreviewYarg post-processing field', () => {
 
     expect(screen.queryByText('Auto-Gen:')).toBeNull()
     expect(screen.getByText('Auto-Generated')).toBeTruthy()
+  })
+})
+
+describe('CuePreviewYarg post-processing chip', () => {
+  beforeEach(() => {
+    listeners.clear()
+    jest.clearAllMocks()
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('goes green while a look alters the rig', async () => {
+    await renderWithCueData(cueData({ postProcessing: 'SepiaTone' }), true)
+
+    const chip = screen.getByText('Sepia Tone').parentElement
+    expect(chip?.className).toContain('bg-emerald-200')
+  })
+
+  it('stays on the light background with no look running', async () => {
+    await renderWithCueData(cueData({ postProcessing: 'Default' }), true)
+
+    const chip = screen.getByText('Default').parentElement
+    expect(chip?.className).toContain('bg-gray-100')
+    expect(chip?.className).not.toContain('bg-emerald-200')
+  })
+
+  it('stays light for a look with no lighting analogue, while still naming it', async () => {
+    await renderWithCueData(cueData({ postProcessing: 'Mirror' }), true)
+
+    const chip = screen.getByText('Mirror').parentElement
+    expect(chip?.className).toContain('bg-gray-100')
+  })
+
+  it('drops the chip when the lights ignore post-processing', async () => {
+    await renderWithCueData(cueData({ postProcessing: 'SepiaTone' }), false)
+
+    const value = screen.getByText('Sepia Tone')
+    expect(value.parentElement?.className).not.toContain('rounded')
+    expect(value.parentElement?.className).not.toContain('bg-emerald-200')
   })
 })

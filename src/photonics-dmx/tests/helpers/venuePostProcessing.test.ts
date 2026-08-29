@@ -46,13 +46,10 @@ describe('venue post-processing colour transforms', () => {
     }
   })
 
-  it.each(['Default', 'Unknown', 'Mirror', 'Scanlines'] as const)(
-    'leaves colour untouched for %s',
-    (state) => {
-      expect(isVenueEffectActive(state)).toBe(false)
-      expect(apply(state, 200, 100, 50)).toEqual({ r: 200, g: 100, b: 50 })
-    },
-  )
+  it.each(['Default', 'Unknown', 'Mirror'] as const)('leaves colour untouched for %s', (state) => {
+    expect(isVenueEffectActive(state)).toBe(false)
+    expect(apply(state, 200, 100, 50)).toEqual({ r: 200, g: 100, b: 50 })
+  })
 
   it('leaves a single light untouched for Bloom, which acts between fixtures', () => {
     expect(isVenueEffectActive('Bloom')).toBe(true)
@@ -78,7 +75,30 @@ describe('venue post-processing colour transforms', () => {
   it('drops red and pushes blue for Scanlines_Blue', () => {
     const out = apply('Scanlines_Blue', 200, 200, 200)
     expect(out.r).toBe(0)
-    expect(out.b).toBe(255)
+    // Blue is driven past the ceiling, so it only leaves it by as much as the flicker swings.
+    expect(out.b).toBeGreaterThan(239)
+  })
+
+  it('flickers the level for Scanlines without shifting hue', () => {
+    const levels = new Set<number>()
+    for (let bucket = 0; bucket < 12; bucket++) {
+      const out = applyFull('Scanlines', 200, 100, 50, 255, bucket * 40)
+      levels.add(out.r)
+      expect(out.g / out.r).toBeCloseTo(0.5, 1)
+      expect(out.b / out.r).toBeCloseTo(0.25, 1)
+    }
+    expect(levels.size).toBeGreaterThan(1)
+  })
+
+  it('reports the whole scan line family as active', () => {
+    for (const state of [
+      'Scanlines',
+      'Scanlines_BlackAndWhite',
+      'Scanlines_Blue',
+      'Scanlines_Security',
+    ] as const) {
+      expect(isVenueEffectActive(state)).toBe(true)
+    }
   })
 
   it('ramps luma between the duotone endpoints for Polarized_RedAndBlue', () => {
