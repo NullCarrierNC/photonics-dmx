@@ -3,8 +3,6 @@ import { WindowManager } from './WindowManager'
 import { setupIpcHandlers } from './ipc/index'
 import { ControllerManager } from './controllers/ControllerManager'
 import { setupMenu } from './menu'
-import { setGlobalBrightnessConfig } from '../photonics-dmx/helpers/dmxHelpers'
-import { clearSenderErrorTracking } from './senderErrorTracking'
 import { createLogger } from '../shared/logger'
 
 const log = createLogger('Application')
@@ -20,22 +18,19 @@ export class Application {
     this.controllerManager = new ControllerManager()
   }
 
+  /**
+   * Brings the window and IPC up first, then the controller graph.
+   *
+   * The window is what reports a controller failure, so it has to exist before one can happen:
+   * building it after `controllerManager.init()` means a bad config file or an unreadable appData
+   * directory leaves a running process with no window and no IPC, and nothing for the user to act
+   * on. Both surfaces read the configuration the manager built in its constructor, so neither
+   * depends on init having run.
+   *
+   * Rejects only when the window or IPC could not be set up, which the caller treats as fatal. A
+   * controller failure resolves instead, leaving the app on the `failed` phase with a retry.
+   */
   public async init(): Promise<void> {
-    // Initialize controllers
-    await this.controllerManager.init()
-
-    // Set up sender error tracking callback
-    // This allows SenderManager to clear error state when senders are re-enabled
-    this.controllerManager
-      .getSenderLifecycle()
-      .setSenderErrorTrackingCallback(clearSenderErrorTracking)
-
-    // Initialize global brightness configuration
-    const brightnessConfig = this.controllerManager.getConfig().getPreference('brightness')
-    if (brightnessConfig) {
-      setGlobalBrightnessConfig(brightnessConfig)
-    }
-
     // Set controller manager in window manager for window state persistence
     this.windowManager.setControllerManager(this.controllerManager)
 
@@ -47,6 +42,13 @@ export class Application {
 
     // Set up application menu
     setupMenu()
+
+    // Initialize controllers
+    try {
+      await this.controllerManager.init()
+    } catch (error) {
+      log.error('Controller initialization failed, continuing so the window can report it:', error)
+    }
   }
 
   public handleAllWindowsClosed(): void {

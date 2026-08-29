@@ -51,6 +51,8 @@ export const SHELL = {
 /** Controller-manager runtime lifecycle channels (used by renderer to disable actions outside `running`). */
 export const LIFECYCLE = {
   GET_PHASE: 'lifecycle:get-phase',
+  /** Re-run controller initialization after it failed, so the user can recover without relaunching. */
+  RETRY_INIT: 'lifecycle:retry-init',
 } as const
 
 // ---- Cue / listeners ----

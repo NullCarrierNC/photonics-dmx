@@ -7,6 +7,8 @@ import { CueHandler } from '../../photonics-dmx/cueHandlers/CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
 import { app } from 'electron'
 import { sendToAllWindows } from '../utils/windowUtils'
+import { clearSenderErrorTracking } from '../senderErrorTracking'
+import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers'
 import { copyDefaultData } from '../utils/copyDefaultData'
 import * as path from 'path'
 import { EffectLoader } from '../../photonics-dmx/cues/node/loader/EffectLoader'
@@ -199,17 +201,40 @@ export class ControllerManager {
     }
     this.lifecycle.assertPhase(['initializing', 'restarting', 'failed'], 'init')
 
-    this.senderLifecycle.ensureSenderManager()
-    this.graph.buildChains()
-    for (const binding of CUE_DOMAIN_BINDINGS) {
-      await this.registryInit.initializeCueRegistry(binding.domain)
+    try {
+      this.senderLifecycle.ensureSenderManager()
+      this.graph.buildChains()
+      for (const binding of CUE_DOMAIN_BINDINGS) {
+        await this.registryInit.initializeCueRegistry(binding.domain)
+      }
+      const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
+      await copyDefaultData(process.resourcesPath, baseDir)
+      await this.registryInit.initializeEffectLoader() // effects before node cues
+      await this.registryInit.initializeNodeCueLoader()
+      await applyAllEnabledGroupsFromConfig(this.config, () => this.refreshAudioCueSelection())
+      this.graph.buildPrimaryYargHandler()
+    } catch (error) {
+      // A restart records its own outcome, but a cold init has nothing above it to do so, so mark
+      // the phase here. The renderer reads it to offer a retry instead of leaving the user with a
+      // graph that never came up. An abort is a shutdown racing init, not a fault, so it is left
+      // to the shutdown to own the phase.
+      if (!(error instanceof LifecycleAbortedError)) {
+        this.isInitialized = false
+        this.lifecycle.setPhase('failed')
+      }
+      throw error
     }
-    const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
-    await copyDefaultData(process.resourcesPath, baseDir)
-    await this.registryInit.initializeEffectLoader() // effects before node cues
-    await this.registryInit.initializeNodeCueLoader()
-    await applyAllEnabledGroupsFromConfig(this.config, () => this.refreshAudioCueSelection())
-    this.graph.buildPrimaryYargHandler()
+
+    // Applied on every init path (cold start, restart reinit, retry after a failure) so a graph
+    // that comes up late is wired the same as one that came up first time. The callback is what
+    // lets SenderManager clear its error state when senders are re-enabled, and it has to be
+    // re-attached because a restart can hand the lifecycle a fresh SenderManager. Both setters
+    // are idempotent.
+    this.senderLifecycle.setSenderErrorTrackingCallback(clearSenderErrorTracking)
+    const brightnessConfig = this.config.getPreference('brightness')
+    if (brightnessConfig) {
+      setGlobalBrightnessConfig(brightnessConfig)
+    }
 
     this.isInitialized = true
     this.lifecycle.setPhase('running')

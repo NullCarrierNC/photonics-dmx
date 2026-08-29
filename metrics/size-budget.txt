@@ -23,14 +23,14 @@ Entries may only shrink. Regenerate after a split with: node scripts/size-budget
 687 src/renderer/src/components/MovingHeadCalibrationWizard.tsx
 670 src/renderer/src/pages/DmxConsole.tsx
 664 src/main/ipc/simulation-handlers.ts
+632 src/main/controllers/ControllerManager.ts
 625 src/renderer/src/services/AudioCaptureManager.ts
-621 src/renderer/src/ipcApi.ts
+623 src/renderer/src/ipcApi.ts
 621 src/services/configuration/ConfigurationManager.ts
 620 src/photonics-dmx/processors/AudioCueProcessor.ts
 619 src/renderer/src/components/LightsDmxPreview3D.tsx
 617 src/renderer/src/components/DmxOutputSettings.tsx
 611 src/photonics-dmx/controllers/sequencer/MotionPatternEngine.ts
 609 src/photonics-dmx/cues/node/loader/NodeCueLoader.ts
-607 src/main/controllers/ControllerManager.ts
 602 src/photonics-dmx/cueHandlers/CueHandler.ts
 602 src/renderer/src/components/LightChannelsConfig.tsx
