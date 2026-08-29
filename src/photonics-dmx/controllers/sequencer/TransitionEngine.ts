@@ -173,7 +173,22 @@ export class TransitionEngine implements ITransitionEngine {
       })
     })
 
-    // Process completed effects
+    this.finalizeCompletedEffects(effectsToRemove)
+
+    // Clean up unused layers
+    this.layerManager.cleanupUnusedLayers(currentTime)
+  }
+
+  /**
+   * Removes each given effect from the active map, fires its completion callback, and starts
+   * any queued successor. A slot left empty on a layer above 0 defers its layer state removal
+   * through {@link _pendingLayerRemovals}.
+   *
+   * @param effectsToRemove The (layer, light) pairs whose effect has finished
+   */
+  private finalizeCompletedEffects(
+    effectsToRemove: Array<{ layer: number; lightId: string }>,
+  ): void {
     for (const { layer, lightId } of effectsToRemove) {
       const justFinishedEffect = this.layerManager.getActiveEffect(layer, lightId)
       if (!justFinishedEffect) continue
@@ -209,9 +224,30 @@ export class TransitionEngine implements ITransitionEngine {
         }
       }
     }
+  }
 
-    // Clean up unused layers
-    this.layerManager.cleanupUnusedLayers(currentTime)
+  /**
+   * Removes and completes every active effect that has advanced past its last transition.
+   *
+   * A song event releases an effect parked on `waitUntilCondition` by advancing it past its
+   * last transition, and a cue reacting to that same event raises the effect again in the
+   * same synchronous pass. Running on release keeps the name free for that submission.
+   */
+  public reapCompletedEffects(): void {
+    const effectsToRemove: Array<{ layer: number; lightId: string }> = []
+
+    // Collect before mutating: completion callbacks can synchronously add new effects.
+    this.layerManager.getActiveEffects().forEach((layerMap, layer) => {
+      layerMap.forEach((lightEffect, lightId) => {
+        if (lightEffect.currentTransitionIndex >= lightEffect.transitions.length) {
+          effectsToRemove.push({ layer, lightId })
+        }
+      })
+    })
+
+    if (effectsToRemove.length === 0) return
+
+    this.finalizeCompletedEffects(effectsToRemove)
   }
 
   /**

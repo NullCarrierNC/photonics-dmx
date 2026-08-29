@@ -161,6 +161,7 @@ export class ControllerGraph {
         (rig, index) =>
           new RigChain({
             rigId: rig.id,
+            rigLabel: rig.name,
             config: rig.config,
             clock: this.clock!,
             isPrimary: index === 0,

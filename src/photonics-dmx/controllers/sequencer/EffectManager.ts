@@ -57,6 +57,8 @@ export class EffectManager implements IEffectManager {
   private readonly effectCallbacks = new EffectCallbackRegistry()
   /** Runs and retires accepted effects across lights, layers and persistent runs. */
   private readonly scheduler: EffectScheduler
+  /** Name of the rig this manager drives, appended to the duplicate-name warning. */
+  private readonly rigLabel: string
 
   /**
    * @constructor
@@ -64,13 +66,16 @@ export class EffectManager implements IEffectManager {
    * @param transitionEngine The transition engine
    * @param effectTransformer The effect transformer
    * @param systemEffects The system effects controller
+   * @param rigLabel Rig name appended to warnings; empty when there is no rig to name
    */
   constructor(
     layerManager: ILayerManager,
     transitionEngine: ITransitionEngine,
     effectTransformer: IEffectTransformer,
     systemEffects: ISystemEffectsController,
+    rigLabel = '',
   ) {
+    this.rigLabel = rigLabel
     this.layerManager = layerManager
     this.transitionEngine = transitionEngine
     this.effectTransformer = effectTransformer
@@ -266,8 +271,9 @@ export class EffectManager implements IEffectManager {
     }
 
     if (policy.blockDuplicateName && this.isEffectRunning(name)) {
+      const rigSuffix = this.rigLabel ? ` [rig: ${this.rigLabel}]` : ''
       log.warn(
-        `Not ${policy.verb.progressive} effect "${name}" because an effect with the same name is already running. Preventing timing issues.`,
+        `Not ${policy.verb.progressive} effect "${name}" because an effect with the same name is already running. Preventing timing issues.${rigSuffix}`,
       )
       return false
     }

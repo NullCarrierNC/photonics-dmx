@@ -252,6 +252,11 @@ export class SongEventHandler implements ISongEventHandler {
       return
     }
 
+    // Set when this event releases any effect. Starting or advancing a transition can run a
+    // synchronous chain of zero-duration transitions that carries the effect past its last one,
+    // so the reap scan below decides what actually finished rather than each landing site here.
+    let released = false
+
     this.layerManager.getActiveEffects().forEach((layerMap, _layer) => {
       layerMap.forEach((activeEffect, _lightId) => {
         const currentTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
@@ -262,6 +267,7 @@ export class SongEventHandler implements ISongEventHandler {
           activeEffect.state === 'waitingFor' &&
           currentTransition.waitForCondition === eventType
         ) {
+          released = true
           // Check if we need to decrement the count
           if (
             currentTransition.waitForConditionCount !== undefined &&
@@ -287,6 +293,7 @@ export class SongEventHandler implements ISongEventHandler {
           activeEffect.state === 'waitingUntil' &&
           currentTransition.waitUntilCondition === eventType
         ) {
+          released = true
           // Check if we need to decrement the count
           if (
             currentTransition.waitUntilConditionCount !== undefined &&
@@ -335,5 +342,9 @@ export class SongEventHandler implements ISongEventHandler {
         }
       })
     })
+
+    if (released) {
+      this.transitionEngine.reapCompletedEffects()
+    }
   }
 }

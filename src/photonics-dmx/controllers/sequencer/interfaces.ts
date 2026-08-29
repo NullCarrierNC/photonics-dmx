@@ -122,6 +122,12 @@ export interface ITransitionEngine {
   setEffectManager(effectManager: IEffectManager): void
   advanceFrame(frame: FrameContext): void
   updateTransitions(frame?: FrameContext): void
+  /**
+   * Removes and completes every active effect that has advanced past its last transition, so
+   * a song event that releases an effect and prompts its re-raise leaves the name free for
+   * the new submission.
+   */
+  reapCompletedEffects(): void
   prepareTransition(
     activeEffect: LightEffectState,
     transition: EffectTransition,
