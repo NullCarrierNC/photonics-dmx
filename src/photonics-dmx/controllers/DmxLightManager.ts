@@ -34,7 +34,18 @@ export class DmxLightManager {
   private _dmxLights: Map<string, DmxFixture> = new Map<string, DmxFixture>()
   private _lightsCache: Map<string, TrackedLight[]> = new Map<string, TrackedLight[]>()
 
-  constructor(private config: LightingConfiguration) {
+  /** Name of the rig this manager resolves lights for. Empty when there is no rig to name. */
+  public readonly rigLabel: string
+  /** Id of that rig. Unique across rigs, unlike the name, so it keys per-rig runtime state. */
+  public readonly rigId: string
+
+  constructor(
+    private config: LightingConfiguration,
+    rigLabel = '',
+    rigId = '',
+  ) {
+    this.rigLabel = rigLabel
+    this.rigId = rigId
     this.initializeLights()
     this.initializeDmxLights()
   }

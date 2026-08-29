@@ -32,6 +32,11 @@ export interface RigChainOptions {
    * row for `horiz`; front/back swapped for `vert`). See `helpers/mirrorRig.ts` for details.
    */
   mirror?: RigMirror
+  /**
+   * Rig name carried into this chain's runtime warnings, so a log line from one of several
+   * chains running the same cue names the rig it came from.
+   */
+  rigLabel?: string
 }
 
 /**
@@ -69,10 +74,11 @@ export class RigChain {
     this.rigId = options.rigId
     this.isPrimary = options.isPrimary ?? true
     const effectiveConfig = applyMirrorToConfig(options.config, options.mirror ?? {})
-    this.dmxLightManager = new DmxLightManager(effectiveConfig)
+    const rigLabel = options.rigLabel ?? ''
+    this.dmxLightManager = new DmxLightManager(effectiveConfig, rigLabel, this.rigId)
     this.lightStateManager = new LightStateManager()
     this.lightTransitionController = new LightTransitionController(this.lightStateManager)
-    this.sequencer = new Sequencer(this.lightTransitionController, options.clock)
+    this.sequencer = new Sequencer(this.lightTransitionController, options.clock, rigLabel)
   }
 
   /**

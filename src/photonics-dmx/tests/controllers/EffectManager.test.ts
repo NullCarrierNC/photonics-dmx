@@ -517,6 +517,61 @@ describe('EffectManager', () => {
   })
 
   describe('addEffectUnblockedName', () => {
+    it('names the rig in the duplicate-name warning when the manager drives one', () => {
+      const effectName = 'test-effect'
+      const effect: Effect = {
+        id: 'test-effect',
+        description: 'Test effect',
+        transitions: [
+          {
+            lights: [createMockTrackedLight()],
+            layer: 1,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: {
+              color: createMockRGBIP(),
+              easing: 'linear',
+              duration: 1000,
+            },
+            waitUntilCondition: 'none',
+            waitUntilTime: 0,
+          },
+        ],
+      }
+
+      const activeEffectsMap = new Map()
+      const lightMap = new Map()
+      lightMap.set('test-light-1', {
+        name: effectName,
+        effect: { id: 'other', description: 'Other Effect', transitions: [] },
+        transitions: [],
+        layer: 2,
+        lightId: 'test-light-1',
+        currentTransitionIndex: 0,
+        state: 'idle',
+        transitionStartTime: 0,
+        waitEndTime: 0,
+        lastEndState: undefined,
+        isPersistent: false,
+      })
+      activeEffectsMap.set(2, lightMap)
+      layerManager.getActiveEffects.mockReturnValue(activeEffectsMap)
+
+      const labelled = new EffectManager(
+        layerManager as unknown as ILayerManager,
+        transitionEngine as unknown as ITransitionEngine,
+        effectTransformer as unknown as IEffectTransformer,
+        systemEffects as unknown as ISystemEffectsController,
+        'Mix RGB&MH',
+      )
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+      expect(labelled.addEffectUnblockedName(effectName, effect)).toBe(false)
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('[rig: Mix RGB&MH]'))
+
+      warn.mockRestore()
+    })
+
     it('should not add effect if one with the same name exists on any layer', () => {
       const effectName = 'test-effect'
 

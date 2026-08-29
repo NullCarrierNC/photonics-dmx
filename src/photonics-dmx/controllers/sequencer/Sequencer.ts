@@ -48,8 +48,9 @@ export class Sequencer implements ILightingController {
    * @constructor
    * @param lightTransitionController The underlying light transition controller
    * @param clock The shared Clock instance for timing synchronization
+   * @param rigLabel Rig name passed to the effect manager for warning attribution
    */
-  constructor(lightTransitionController: LightTransitionController, clock: Clock) {
+  constructor(lightTransitionController: LightTransitionController, clock: Clock, rigLabel = '') {
     this.clock = clock
     this.lightTransitionController = lightTransitionController
     this.effectTransformer = new EffectTransformer()
@@ -64,6 +65,7 @@ export class Sequencer implements ILightingController {
       this.transitionEngine,
       this.effectTransformer,
       this.systemEffectsController,
+      rigLabel,
     )
     this.eventHandler = new SongEventHandler(this.layerManager, this.transitionEngine)
     this.debugMonitor = new DebugMonitor(this.lightTransitionController, this.layerManager)

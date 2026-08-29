@@ -46,6 +46,19 @@ function zeroForType(t: VariableType): number | boolean | string | TrackedLight[
  *  `${nodeId}:${expression}`, so a malformed formula logs once instead of every frame. */
 const warnedExpressionParseErrors = new Set<string>()
 
+/** Nodes whose input resolved to nothing usable (an empty source array, an empty palette, no
+ *  valid indices, a variable of the wrong type) and have already been warned about, keyed by
+ *  `${rigId}:${cueId}:${nodeId}:${reason}`. A rig with no lights in a group is a valid setup,
+ *  so such a node logs once per rig. */
+const warnedDegenerateInputNodes = new Set<string>()
+
+/** Logs `message` the first time a given key is seen. */
+function warnOncePerNode(key: string, message: string): void {
+  if (warnedDegenerateInputNodes.has(key)) return
+  warnedDegenerateInputNodes.add(key)
+  log.warn(message)
+}
+
 export interface LogicNodeEvaluatorContext {
   cueId: string
   /**
@@ -83,6 +96,13 @@ export function evaluateLogicNode(
 
   const getVarStore = (varName: string) =>
     getVariableStore(varName, variableDefinitions, cueLevelVarStore, groupLevelVarStore)
+
+  // Rigs resolve their own lights, so a node can be fine on one rig and degenerate on another.
+  // The once-only key carries the rig id, which is unique across rigs; the name is for display.
+  const rigLabel = lightManager?.rigLabel ?? ''
+  const rigSuffix = rigLabel ? ` [rig: ${rigLabel}]` : ''
+  const degenerateKey = (suffix: string) =>
+    `${lightManager?.rigId ?? ''}:${cueId}:${nodeId}:${suffix}`
 
   switch (logicNode.logicType) {
     case 'variable': {
@@ -463,8 +483,9 @@ export function evaluateLogicNode(
       const sourceVar = sourceVarStore.get(logicNode.sourceVariable)
 
       if (!sourceVar || sourceVar.type !== 'light-array') {
-        log.warn(
-          `lights-from-index node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array`,
+        warnOncePerNode(
+          degenerateKey('source-type'),
+          `lights-from-index node ${nodeId}: source variable "${logicNode.sourceVariable}" is not a light-array${rigSuffix}`,
         )
         return edges.map((edge) => edge.to)
       }
@@ -472,7 +493,10 @@ export function evaluateLogicNode(
       const lightsArray = sourceVar.value as TrackedLight[]
 
       if (lightsArray.length === 0) {
-        log.warn(`lights-from-index node ${nodeId}: source array is empty`)
+        warnOncePerNode(
+          degenerateKey('source-empty'),
+          `lights-from-index node ${nodeId}: source array is empty${rigSuffix}`,
+        )
         return edges.map((edge) => edge.to)
       }
 
@@ -554,7 +578,10 @@ export function evaluateLogicNode(
 
       // If no valid indices found, return early
       if (indices.length === 0) {
-        log.warn(`lights-from-index node ${nodeId}: no valid indices found`)
+        warnOncePerNode(
+          degenerateKey('no-indices'),
+          `lights-from-index node ${nodeId}: no valid indices found${rigSuffix}`,
+        )
         return edges.map((edge) => edge.to)
       }
 
@@ -586,7 +613,10 @@ export function evaluateLogicNode(
         variableDefinitions,
       ) as Color[]
       if (!colors || colors.length === 0) {
-        log.warn(`color-from-index node ${nodeId}: colors palette is empty`)
+        warnOncePerNode(
+          degenerateKey('palette-empty'),
+          `color-from-index node ${nodeId}: colors palette is empty${rigSuffix}`,
+        )
         return edges.map((edge) => edge.to)
       }
 
@@ -746,8 +776,9 @@ export function evaluateLogicNode(
         if (sourceVar && sourceVar.type === 'light-array') {
           concatResult.push(...(sourceVar.value as TrackedLight[]))
         } else {
-          log.warn(
-            `concat-lights node ${nodeId}: variable "${varName}" is not a light-array, skipping`,
+          warnOncePerNode(
+            degenerateKey(`concat:${varName}`),
+            `concat-lights node ${nodeId}: variable "${varName}" is not a light-array, skipping${rigSuffix}`,
           )
         }
       }
