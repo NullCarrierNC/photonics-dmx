@@ -5,7 +5,7 @@ import {
   DrumNoteType,
 } from '../../../photonics-dmx/cues/types/cueTypes'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
-import { postProcessingLabel } from '../utils/postProcessingLabel'
+import PostProcessingStatus from './PostProcessingStatus'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import {
   getActiveYargMotionCue,
@@ -489,9 +489,12 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
               <p>{currentCueData.beatsPerMinute}</p>
             </div>
 
+            {/* Venue Size holds all song, so it sits on the card rather than in a chip. */}
             <div>
-              <p className="font-medium">Post-Processing:</p>
-              <p>{postProcessingLabel(currentCueData.postProcessing)}</p>
+              <p className="font-medium">Venue Size:</p>
+              <div className="p-2 rounded">
+                <p>{currentCueData.venueSize || 'Unknown'}</p>
+              </div>
             </div>
 
             {/* Second row - 4 columns */}
@@ -537,13 +540,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
               </div>
             </div>
 
-            {/* Venue Size */}
-            <div>
-              <p className="font-medium">Venue Size:</p>
-              <div className="p-2 rounded bg-gray-100 dark:bg-gray-600">
-                <p>{currentCueData.venueSize || 'Unknown'}</p>
-              </div>
-            </div>
+            <PostProcessingStatus state={currentCueData.postProcessing} />
           </div>
 
           {/* Instrument Notes Section */}

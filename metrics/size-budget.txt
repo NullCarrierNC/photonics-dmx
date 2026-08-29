@@ -12,7 +12,7 @@ Entries may only shrink. Regenerate after a split with: node scripts/size-budget
 794 src/photonics-dmx/cues/types/cueTypes.ts
 788 src/renderer/src/pages/LightsLayout.tsx
 770 src/renderer/src/components/cue-editor/hooks/useNodeCreation.ts
-767 src/renderer/src/components/CuePreviewYarg.tsx
+764 src/renderer/src/components/CuePreviewYarg.tsx
 741 src/renderer/src/components/AudioCueSelectorPanel.tsx
 726 src/photonics-dmx/cues/node/runtime/NodeExecutionEngine.ts
 726 src/renderer/src/components/cue-editor/lib/graphPrettier.ts

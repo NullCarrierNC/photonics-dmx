@@ -32,6 +32,9 @@ const TRAIL_FLOOR = 0.1
  */
 const MIN_VISIBLE_FLASH = 32
 
+/** How deep the flicker standing in for scan lines swings. */
+const SCANLINE_FLICKER = 0.06
+
 export interface VenueColor {
   r: number
   g: number
@@ -193,15 +196,15 @@ const BLUE: readonly [number, number, number] = [0, 0, 255]
 
 /**
  * How each state YARG reports is rendered on the rig. Sourced from the game's own effect
- * composition, with the parts that have no lighting analogue (bloom, scanlines, mirror,
- * chromatic aberration) dropped.
+ * composition. A band pattern has nowhere to land on a rig, so the scan line states read as a level
+ * flicker. Mirror and chromatic aberration have no analogue at all and are dropped.
  */
 export const VENUE_EFFECT_SPECS: Readonly<Record<PostProcessing, VenueEffectSpec>> = {
   Default: {},
   Unknown: {},
   Mirror: {},
   Bloom: { bloom: { threshold: 0.25, selfGain: 0.5, spill: 0.35 } },
-  Scanlines: {},
+  Scanlines: { grainAmount: SCANLINE_FLICKER },
   Bright: { brightness: 1.15 },
   Contrast: { contrast: 1.35 },
   Posterize: { posterize: 4 },
@@ -223,9 +226,17 @@ export const VENUE_EFFECT_SPECS: Readonly<Record<PostProcessing, VenueEffectSpec
   Contrast_Red: { matrix: channelGain(1.25, 0.8, 0.8), contrast: 1.3 },
   Contrast_Green: { matrix: channelGain(0.8, 1.25, 0.8), contrast: 1.3 },
   Contrast_Blue: { matrix: channelGain(0.8, 0.8, 1.25), contrast: 1.3 },
-  Scanlines_BlackAndWhite: { matrix: greyscale() },
-  Scanlines_Blue: { matrix: lumaTint(0, 0.7, 2.0), contrast: 1.2 },
-  Scanlines_Security: { matrix: lumaTint(0, 1.0, 0.65), contrast: 1.2, grainAmount: 0.06 },
+  Scanlines_BlackAndWhite: { matrix: greyscale(), grainAmount: SCANLINE_FLICKER },
+  Scanlines_Blue: {
+    matrix: lumaTint(0, 0.7, 2.0),
+    contrast: 1.2,
+    grainAmount: SCANLINE_FLICKER,
+  },
+  Scanlines_Security: {
+    matrix: lumaTint(0, 1.0, 0.65),
+    contrast: 1.2,
+    grainAmount: SCANLINE_FLICKER,
+  },
   Grainy_Film: { exposure: -0.75, grainAmount: 0.05 },
   Grainy_ChromaticAbberation: { matrix: desaturate(0.35), grainAmount: 0.05 },
   Trails: { trailMs: 450 },
