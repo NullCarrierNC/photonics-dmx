@@ -28,6 +28,7 @@ import HeaderProjects from './components/Header'
 import StatusBar from './components/StatusBar'
 import { AppPageRouter } from './components/AppPageRouter'
 import SenderErrorIndicator from './components/SenderErrorIndicator'
+import LifecycleFailedBanner from './components/LifecycleFailedBanner'
 import { useTimeout } from './utils/useTimeout'
 import { useAppIpcListeners } from './hooks/useAppIpcListeners'
 import { AudioCaptureManager } from './services/AudioCaptureManager'
@@ -480,6 +481,9 @@ export const App = (): JSX.Element => {
         <div className="h-16 bg-gray-800 dark:bg-gray-950 text-white flex items-center justify-center z-10">
           <HeaderProjects />
         </div>
+
+        {/* Controller-failure notice, above the page so it shows whichever page is open */}
+        <LifecycleFailedBanner />
 
         {/* Scrollable Content Area - Using flex-grow to fill available space */}
         <div className="flex-grow overflow-y-auto bg-gray-200 dark:bg-gray-800">

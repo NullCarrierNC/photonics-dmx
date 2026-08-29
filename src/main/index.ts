@@ -1,5 +1,5 @@
 import * as path from 'path'
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { installDefaultSessionContentSecurityPolicy } from './rendererSessionSecurity'
 import { Application } from './application'
@@ -110,9 +110,16 @@ app.whenReady().then(() => {
   // Set app name
   app.name = 'Photonics'
 
-  // Initialize application
+  // Initialize application. A controller failure resolves and leaves the window reporting the
+  // failed phase, so a rejection here means the window or IPC could not be set up and there is
+  // nothing left to report through. Say so and stop rather than idling with no interface.
   application.init().catch((err) => {
     log.error('Failed to initialize application:', err)
+    dialog.showErrorBox(
+      'Photonics could not start',
+      `${err instanceof Error ? err.message : String(err)}\n\nLogs: ${path.join(app.getPath('appData'), 'Photonics.rocks', 'logs')}`,
+    )
+    app.exit(1)
   })
 
   // Default session handlers

@@ -26,6 +26,10 @@ export interface AppShellInvokeMap {
     request: void
     response: LifecyclePhase
   }
+  [LIFECYCLE.RETRY_INIT]: {
+    request: void
+    response: IpcSuccessResult | IpcErrorResult
+  }
 
   // ---- Window ----
   [WINDOW.OPEN_CUE_EDITOR]: {

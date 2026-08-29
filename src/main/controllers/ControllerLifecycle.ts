@@ -21,7 +21,7 @@ export class LifecycleAbortedError extends Error {
  * surface in the log instead of silently rewriting history.
  */
 const PHASE_TRANSITIONS: Record<LifecyclePhase, readonly LifecyclePhase[]> = {
-  initializing: ['running', 'shuttingDown'],
+  initializing: ['running', 'failed', 'shuttingDown'],
   running: ['restarting', 'consoleMode', 'shuttingDown'],
   restarting: ['running', 'failed', 'shuttingDown'],
   consoleMode: ['running', 'restarting', 'shuttingDown'],

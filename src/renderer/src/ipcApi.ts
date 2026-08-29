@@ -43,6 +43,8 @@ import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorMan
 
 export const getLifecyclePhase = () => window.api.invoke(LIFECYCLE.GET_PHASE, undefined)
 
+export const retryControllerInit = () => window.api.invoke(LIFECYCLE.RETRY_INIT, undefined)
+
 // ---------------------------------------------------------------------------
 // Cue consistency window
 // ---------------------------------------------------------------------------
