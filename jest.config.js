@@ -30,14 +30,14 @@ module.exports = {
     '!src/**/*.d.ts',
   ],
   // Ratcheted from a Jest --coverage run over ALL source (global totals); floor(percent) - 1.
-  // These are the TRUE numbers now that every file counts (previously the config only measured
-  // tested files, inflating the headline to ~68%). Ratchet upward as coverage improves.
+  // Every file counts, tested or not, so these cover the whole source rather than only the files a
+  // test happens to import. Ratchet upward as coverage improves.
   coverageThreshold: {
     global: {
-      statements: 51,
-      branches: 73,
-      functions: 62,
-      lines: 51,
+      statements: 61,
+      branches: 75,
+      functions: 65,
+      lines: 61,
     },
   },
   setupFilesAfterEnv: ['<rootDir>/src/photonics-dmx/tests/jest.setup.ts'],

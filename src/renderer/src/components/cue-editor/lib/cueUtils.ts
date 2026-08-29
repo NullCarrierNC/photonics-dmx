@@ -1,12 +1,67 @@
 import type {
   AudioEventNode,
   AudioNodeCueDefinition,
+  EffectFile,
+  NodeCueFile,
   ValueSource,
   NetNodeCueDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { NetEventType } from '../../../../../photonics-dmx/types'
 import { AUDIO_EVENT_OPTIONS, YARG_EVENT_OPTIONS } from './options'
 import { createId } from './cueDefaults'
+
+/**
+ * Run `update` over the cue with id `cueId`, keeping the file's own net-or-audio shape.
+ *
+ * `NodeCueFile` is a union whose branches hold different cue families, so mapping `file.cues`
+ * widens to `(Net | Audio)[]`, which fits neither branch: by type alone a mapped array could mix
+ * the two. The generic pins the result to whichever file came in, and the assertion sits here
+ * rather than at every call site.
+ *
+ * The cue is addressed by `cueId` rather than by the updated cue's own id, because saving can
+ * regenerate an id (collision resolution) and the replacement then no longer names the cue it
+ * replaces.
+ */
+export function updateCueInFile<F extends NodeCueFile>(
+  file: F,
+  cueId: string,
+  update: (cue: F['cues'][number]) => F['cues'][number],
+): F {
+  return {
+    ...file,
+    cues: file.cues.map((cue) => (cue.id === cueId ? update(cue) : cue)),
+  } as F
+}
+
+/** {@link updateCueInFile} for callers that already hold the finished cue. */
+export function replaceCueInFile<F extends NodeCueFile>(
+  file: F,
+  cueId: string,
+  updated: F['cues'][number],
+): F {
+  return updateCueInFile(file, cueId, () => updated)
+}
+
+/** Effect twin of {@link updateCueInFile}, over the `YargEffectFile | AudioEffectFile` union. */
+export function updateEffectInFile<F extends EffectFile>(
+  file: F,
+  effectId: string,
+  update: (effect: F['effects'][number]) => F['effects'][number],
+): F {
+  return {
+    ...file,
+    effects: file.effects.map((effect) => (effect.id === effectId ? update(effect) : effect)),
+  } as F
+}
+
+/** {@link updateEffectInFile} for callers that already hold the finished effect. */
+export function replaceEffectInFile<F extends EffectFile>(
+  file: F,
+  effectId: string,
+  updated: F['effects'][number],
+): F {
+  return updateEffectInFile(file, effectId, () => updated)
+}
 
 // Helper to display ValueSource as text
 const displayValueSource = (vs: ValueSource | undefined, defaultValue: string = ''): string => {

@@ -55,9 +55,15 @@ export class GraphExecutionEngine {
   private nodeEngine: NodeExecutionEngine | null = null
   /** Per-context state-machine tracking (cue graph only, when delegating to nodeEngine). */
   private readonly esmLifecycle = createExecutionStateMachineLifecycle()
-  /** Cue queuing: when a cue-started/cue-called run is in progress, queue incoming execute params. */
+  /** Cue queuing: when a cue-started/cue-called run is in progress, hold incoming execute params. */
   private isExecutingCueStarted = false
-  private queuedParameters: ExecutionParameters[] = []
+  /**
+   * The parameters waiting behind an in-flight lifecycle run, or null.
+   *
+   * One slot, not a queue: a later arrival replaces the waiting one, so the run that follows uses
+   * the newest frame and the frames in between are dropped.
+   */
+  private pendingParameters: ExecutionParameters | null = null
 
   private get compiled(): CompiledNetCue {
     if (!this.compiledCue) {
@@ -232,7 +238,7 @@ export class GraphExecutionEngine {
     const hasCueEvent = cueStartedNodes.length > 0 || cueCalledNodes.length > 0
 
     if (this.policy.queuing && hasCueEvent && this.isExecutingCueStarted) {
-      this.queuedParameters = [parameters]
+      this.pendingParameters = parameters
       return
     }
 
@@ -309,8 +315,9 @@ export class GraphExecutionEngine {
 
   private onCueEventComplete(): void {
     this.isExecutingCueStarted = false
-    if (this.queuedParameters.length > 0) {
-      const next = this.queuedParameters.shift()!
+    if (this.pendingParameters) {
+      const next = this.pendingParameters
+      this.pendingParameters = null
       const hasCueStartedFired = this.session.hasCueStartedFired?.() ?? false
       const compiled = this.compiled
       const entryNodes = this.policy.getEntryNodes(compiled, next, { hasCueStartedFired })
@@ -325,7 +332,7 @@ export class GraphExecutionEngine {
    * @param skipEffectRemoval When true, leave effects on sequencer (e.g. primary cue stop).
    */
   cancelAll(skipEffectRemoval = false): void {
-    this.queuedParameters.length = 0
+    this.pendingParameters = null
     this.isExecutingCueStarted = false
     this.esmLifecycle.cancelAll()
     if (this.nodeEngine) {

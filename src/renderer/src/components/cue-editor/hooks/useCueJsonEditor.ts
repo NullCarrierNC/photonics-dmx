@@ -12,6 +12,7 @@ import type {
 import type { EditorDocument } from '../lib/types'
 import { updateDocumentFromFlow, updateEffectDocumentFromFlow } from '../lib/cueTransforms'
 import { layoutGraph } from '../lib/graphPrettier'
+import { replaceCueInFile, replaceEffectInFile } from '../lib/cueUtils'
 
 type EditorDoc = EditorDocument | null
 type CueDefinition = NetNodeCueDefinition | AudioNodeCueDefinition | null
@@ -81,10 +82,7 @@ export function useCueJsonEditor({
         setCueKind(updatedCue.kind)
       }
       const file = editorDoc.file as NodeCueFile
-      const updatedFile: NodeCueFile = {
-        ...file,
-        cues: file.cues.map((c) => (c.id === selectedCueId ? updatedCue : c)),
-      }
+      const updatedFile = replaceCueInFile(file, selectedCueId, updatedCue)
       setEditorDoc({ mode: 'cue', file: updatedFile, path: editorDoc.path })
       // Collision resolution may have regenerated the cue's id; follow it so the editor
       // keeps the same cue selected instead of falling back to another one.
@@ -109,10 +107,7 @@ export function useCueJsonEditor({
     (updatedEffect: YargEffectDefinition | AudioEffectDefinition) => {
       if (!editorDoc || editorDoc.mode !== 'effect' || !selectedCueId) return
       const file = editorDoc.file as EffectFile
-      const updatedFile: EffectFile = {
-        ...file,
-        effects: file.effects.map((e) => (e.id === selectedCueId ? updatedEffect : e)),
-      }
+      const updatedFile = replaceEffectInFile(file, selectedCueId, updatedEffect)
       setEditorDoc({ mode: 'effect', file: updatedFile, path: editorDoc.path })
       setSelectedCueId(updatedEffect.id)
       loadCueIntoFlow(updatedEffect)
