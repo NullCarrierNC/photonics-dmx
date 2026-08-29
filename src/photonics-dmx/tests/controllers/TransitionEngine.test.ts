@@ -499,6 +499,54 @@ describe('TransitionEngine', () => {
       expect(startNextEffectInQueue).toHaveBeenCalledWith(1, 'test-light-1')
     })
 
+    it('frees every finished name in the batch before the first completion callback runs', () => {
+      const siblingA = createMockActiveEffect({
+        name: 'motion:pos:0',
+        lightId: 'test-light-1',
+        currentTransitionIndex: 1,
+        state: 'idle',
+      })
+      const siblingB = createMockActiveEffect({
+        name: 'motion:pos:1',
+        lightId: 'test-light-2',
+        currentTransitionIndex: 1,
+        state: 'idle',
+      })
+      const lightMap = new Map<string, LightEffectState>([
+        [siblingA.lightId, siblingA],
+        [siblingB.lightId, siblingB],
+      ])
+      const active = new Map<number, Map<string, LightEffectState>>([[1, lightMap]])
+      layerManager.getActiveEffects.mockReturnValue(active)
+      // Removal takes the entry out of the map the way the real layer manager does, so the
+      // callback below observes what is actually still held.
+      layerManager.removeActiveEffect.mockImplementation((_layer: number, lightId: string) => {
+        lightMap.delete(lightId)
+      })
+      layerManager.getActiveEffect.mockImplementation((_layer: number, lightId: string) =>
+        lightMap.get(lightId),
+      )
+
+      // The first completion asks whether its sibling's name is still taken.
+      let siblingStillHeld: boolean | undefined
+      const effectManager = {
+        onLightEffectComplete: jest.fn(() => {
+          if (siblingStillHeld === undefined) {
+            siblingStillHeld = Array.from(lightMap.values()).some(
+              (held) => held.name === 'motion:pos:1',
+            )
+          }
+        }),
+        startNextEffectInQueue: jest.fn().mockReturnValue(false),
+      } as unknown as IEffectManager
+      transitionEngine.setEffectManager(effectManager)
+
+      transitionEngine.reapCompletedEffects()
+
+      expect(siblingStillHeld).toBe(false)
+      expect(effectManager.onLightEffectComplete).toHaveBeenCalledTimes(2)
+    })
+
     it('leaves an effect that still has transitions to run', () => {
       const effectManager = {
         onLightEffectComplete: jest.fn(),

@@ -184,18 +184,24 @@ export class TransitionEngine implements ITransitionEngine {
    * any queued successor. A slot left empty on a layer above 0 defers its layer state removal
    * through {@link _pendingLayerRemovals}.
    *
+   * Removal runs as its own pass over the whole batch before any callback fires. A completion
+   * callback can re-enter the graph and submit again, and every name in the batch is free by
+   * then, so a submission naming a sibling of the effect that triggered it is accepted.
+   *
    * @param effectsToRemove The (layer, light) pairs whose effect has finished
    */
   private finalizeCompletedEffects(
     effectsToRemove: Array<{ layer: number; lightId: string }>,
   ): void {
+    const finished: Array<{ layer: number; lightId: string; effect: LightEffectState }> = []
     for (const { layer, lightId } of effectsToRemove) {
       const justFinishedEffect = this.layerManager.getActiveEffect(layer, lightId)
       if (!justFinishedEffect) continue
-
-      // Remove the effect from active effects
       this.layerManager.removeActiveEffect(layer, lightId)
+      finished.push({ layer, lightId, effect: justFinishedEffect })
+    }
 
+    for (const { layer, lightId, effect: justFinishedEffect } of finished) {
       if (this.effectManager && typeof this.effectManager.onLightEffectComplete === 'function') {
         this.effectManager.onLightEffectComplete(justFinishedEffect)
       }
