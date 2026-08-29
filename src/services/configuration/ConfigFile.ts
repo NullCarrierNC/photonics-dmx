@@ -11,6 +11,12 @@ import { createLogger } from '../../shared/logger'
 
 const log = createLogger('ConfigFile')
 
+declare global {
+  /** Set by the first ConfigFile constructed in the process, so the storage directory is logged once
+   *  however many config files are opened. */
+  var __PHOTONICS_CONFIG_LOGGED__: boolean | undefined
+}
+
 /**
  * In-memory result of config validation after load/migration.
  * (`false` and error strings, not a thrown error.)
@@ -67,9 +73,9 @@ export class ConfigFile<T> {
     const configDir = path.join(app.getPath('appData'), 'Photonics.rocks')
 
     // Log the storage directory (only once per process)
-    if (!global.__PHOTONICS_CONFIG_LOGGED__) {
+    if (!globalThis.__PHOTONICS_CONFIG_LOGGED__) {
       log.info(`[Photonics Config] JSON storage directory: ${configDir}`)
-      global.__PHOTONICS_CONFIG_LOGGED__ = true
+      globalThis.__PHOTONICS_CONFIG_LOGGED__ = true
     }
 
     this.filePath = path.join(configDir, filename)

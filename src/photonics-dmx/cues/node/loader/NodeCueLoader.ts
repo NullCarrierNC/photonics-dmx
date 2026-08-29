@@ -302,12 +302,16 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       registry.registerGroup(group)
       registry.applyGroupDesignations(file.group, group)
     } else {
-      const group = await this.buildAudioGroup(file as AudioNodeCueFile, compileErrors)
+      // Narrowed once for the whole branch: `mode` decides the file shape, but it is a separate
+      // parameter, so nothing else here narrows `file` off the union. The cue loop needs it too,
+      // because `cueTypeId` is the audio cue's identifier and the net cues have no such field.
+      const audioFile = file as AudioNodeCueFile
+      const group = await this.buildAudioGroup(audioFile, compileErrors)
       this.options.registries.audio.registerGroup(group)
       if (wasAudioGroupEnabled) {
         this.options.registries.audio.enableGroup(group.id)
       }
-      file.cues.forEach((cue) => {
+      audioFile.cues.forEach((cue) => {
         if (cue.kind === 'lighting') {
           this.customAudioCueTypes.add(cue.cueTypeId)
         }

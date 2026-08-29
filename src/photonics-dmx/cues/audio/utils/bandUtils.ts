@@ -10,7 +10,11 @@ const DEFAULT_BRIGHTNESS_MAP = {
   max: 255,
 }
 
-const DISCRETE_LEVELS: Brightness[] = ['low', 'medium', 'high', 'max']
+/** The brightness levels the map holds a value for. 'linear' is the unquantized response, so it has
+ *  no step and cannot index the map. */
+type DiscreteBrightness = Exclude<Brightness, 'linear'>
+
+const DISCRETE_LEVELS: DiscreteBrightness[] = ['low', 'medium', 'high', 'max']
 
 /**
  * Map a normalized value (0–1) to an intensity scale.

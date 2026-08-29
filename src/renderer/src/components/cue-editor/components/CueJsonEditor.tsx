@@ -13,7 +13,7 @@ import type {
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { validateNodeCue } from '../../../ipcApi'
-import { resolveCueCollisions } from '../lib/cueUtils'
+import { replaceCueInFile, resolveCueCollisions } from '../lib/cueUtils'
 
 /**
  * Resolve a JSON Pointer path (e.g. ["nodes", "events", "0", "type"]) to character
@@ -117,10 +117,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
   const buildFileWithCue = useCallback(
     (cue: NetNodeCueDefinition | AudioNodeCueDefinition): NodeCueFile => {
       const file = editorDoc.file as NodeCueFile
-      return {
-        ...file,
-        cues: file.cues.map((c) => (c.id === selectedCueId ? cue : c)),
-      }
+      return replaceCueInFile(file, selectedCueId, cue)
     },
     [editorDoc.file, selectedCueId],
   )

@@ -8,7 +8,9 @@ import { FiHelpCircle } from 'react-icons/fi'
 const Header: React.FC = () => {
   const [currentPage] = useAtom(currentPageAtom)
 
-  const pageTitles = {
+  // Total over Pages, so a new page cannot reach the header with no title. CueSequencer routes to
+  // the Cue Editor (see AppPageRouter), so it carries that page's title.
+  const pageTitles: Record<Pages, string> = {
     [Pages.Status]: 'Status',
     [Pages.MyLights]: 'My Lights',
     [Pages.LightLayout]: 'Light Layout',
@@ -16,6 +18,7 @@ const Header: React.FC = () => {
     [Pages.NetworkDebug]: 'Network Debug',
     [Pages.CuePreview]: 'DMX Preview',
     [Pages.CueSimulation]: 'Cue Simulation',
+    [Pages.CueSequencer]: 'Cue Editor',
     [Pages.CueEditor]: 'Cue Editor',
     [Pages.Preferences]: 'Preferences',
     [Pages.About]: 'About Photonics (ALPHA VERSION)',

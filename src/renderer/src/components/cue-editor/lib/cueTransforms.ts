@@ -21,7 +21,12 @@ import type {
   NotesNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument, EditorNode } from './types'
-import { getAudioEventLabel, getYargEventLabel } from './cueUtils'
+import {
+  getAudioEventLabel,
+  getYargEventLabel,
+  replaceCueInFile,
+  replaceEffectInFile,
+} from './cueUtils'
 import { isValidEditorEdge } from './edgeValidation'
 import type { EditorMode } from './edgeValidation'
 
@@ -396,13 +401,10 @@ const updateDocumentFromFlow = (
         : currentCueDefinition.layout?.viewport,
     },
   }
-  const updatedCues = (editorDoc.file as NodeCueFile).cues.map((cue) =>
-    cue.id === updatedCue.id ? updatedCue : cue,
-  )
-  return {
-    ...(editorDoc.file as NodeCueFile),
-    cues: updatedCues,
-  }
+  // The flow canvas is mode-agnostic, so `payload.events` is the net-or-audio union rather than one
+  // family's array, and the rebuilt cue matches neither branch. A canvas only holds the events of
+  // the cue loaded into it, so the family is whatever `currentCueDefinition` already was.
+  return replaceCueInFile(editorDoc.file as NodeCueFile, updatedCue.id, updatedCue as CueDefinition)
 }
 
 export { cueToFlow, updateDocumentFromFlow }
@@ -462,13 +464,13 @@ const updateEffectDocumentFromFlow = (
         : currentEffectDefinition.layout?.viewport,
     },
   }
-  const updatedEffects = (editorDoc.file as EffectFile).effects.map((eff) =>
-    eff.id === updatedEffect.id ? updatedEffect : eff,
+  // Same mode-agnostic canvas payload as updateDocumentFromFlow, so the family is whatever
+  // `currentEffectDefinition` already was.
+  return replaceEffectInFile(
+    editorDoc.file as EffectFile,
+    updatedEffect.id,
+    updatedEffect as EffectDefinition,
   )
-  return {
-    ...(editorDoc.file as EffectFile),
-    effects: updatedEffects,
-  }
 }
 
 export { effectToFlow, updateEffectDocumentFromFlow }

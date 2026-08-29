@@ -6,10 +6,12 @@ import { listEffectFiles, readEffectFile } from '../../../ipcApi'
 import { createLogger } from '../../../../../shared/logger'
 const log = createLogger('EffectRegistry')
 
-type EffectDefinition = {
+/** What the picker reads out of an effect file. Not the full `EffectDefinition` from the cue types:
+ *  only these three fields are loaded, and a file's effects need not carry a description. */
+type EffectSummary = {
   id: string
   name: string
-  description: string
+  description?: string
 }
 
 type Props = {
@@ -27,7 +29,7 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
     name: '',
   })
   const [availableFiles, setAvailableFiles] = useState<EffectFileSummary[]>([])
-  const [availableEffects, setAvailableEffects] = useState<EffectDefinition[]>([])
+  const [availableEffects, setAvailableEffects] = useState<EffectSummary[]>([])
   const [selectedFile, setSelectedFile] = useState<string>('')
   const [loadingEffects, setLoadingEffects] = useState(false)
 
@@ -87,7 +89,9 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
       ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cue file shape
         (editorDoc.file as any).cues?.find((c: any) => c.id === selectedCueId)
       : null
-  const cueEffects = currentCue?.effects ?? []
+  // `currentCue` comes off the untyped cue-file shape above, so without the annotation this list
+  // and everything mapped over it is `any`.
+  const cueEffects: EffectReference[] = currentCue?.effects ?? []
 
   const openDialog = (existing?: EffectReference) => {
     if (existing) {
