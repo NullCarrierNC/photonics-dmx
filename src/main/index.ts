@@ -8,6 +8,10 @@ import { consoleLogSink, createLogger, setLogSink, setMinLogLevel } from '../sha
 
 const log = createLogger('Main')
 
+if (!app.isPackaged) {
+  app.commandLine.appendSwitch('disable-http-cache')
+}
+
 let closeFileLog: (() => Promise<void>) | null = null
 
 function closeFileLogWithTimeout(): Promise<void> {
