@@ -409,9 +409,10 @@ export class EffectScheduler {
    * Also fires completion callbacks if all lights in an effect have completed.
    */
   public onLightEffectComplete(effectState: LightEffectState): void {
-    // Fire the completion callback for this effect (if no other lights are still running it)
-    if (!this.isEffectRunningOnAnotherLight(effectState.name, effectState.lightId)) {
-      // This was the last light for this effect - fire the callback
+    // Fire the completion callback once the name is running on no light at all. That covers this
+    // light too: an earlier callback in the same pass can have resubmitted the name onto it, and
+    // the fresh callback belongs to the fresh effect.
+    if (!this.isEffectRunningAnywhere(effectState.name)) {
       this.deps.fireCompletionCallback(effectState.name)
     }
 
@@ -443,12 +444,10 @@ export class EffectScheduler {
     this.applyEffectTransitions(run.name, run.effect, run.transitionsByLayerAndLight, true, run.id)
   }
 
-  /** Whether an effect of this name is active for any light other than the given one. */
-  private isEffectRunningOnAnotherLight(name: string, lightId: string): boolean {
+  /** Whether an effect of this name is active for any light on any layer. */
+  private isEffectRunningAnywhere(name: string): boolean {
     return Array.from(this.layerManager.getActiveEffects().values()).some((layerMap) =>
-      Array.from(layerMap.values()).some(
-        (activeEffect) => activeEffect.name === name && activeEffect.lightId !== lightId,
-      ),
+      Array.from(layerMap.values()).some((activeEffect) => activeEffect.name === name),
     )
   }
 }

@@ -252,9 +252,11 @@ export class SongEventHandler implements ISongEventHandler {
       return
     }
 
-    // Set when this event releases any effect. Starting or advancing a transition can run a
-    // synchronous chain of zero-duration transitions that carries the effect past its last one,
-    // so the reap scan below decides what actually finished rather than each landing site here.
+    // Set when this event takes an effect out of its wait, meaning an uncounted match or a
+    // counted match whose count reached zero. A match that only decrements a count leaves every
+    // effect where it was. Starting or advancing a transition can run a synchronous chain of
+    // zero-duration transitions that carries the effect past its last one, so the reap scan below
+    // decides what actually finished rather than each landing site here.
     let released = false
 
     this.layerManager.getActiveEffects().forEach((layerMap, _layer) => {
@@ -267,7 +269,6 @@ export class SongEventHandler implements ISongEventHandler {
           activeEffect.state === 'waitingFor' &&
           currentTransition.waitForCondition === eventType
         ) {
-          released = true
           // Check if we need to decrement the count
           if (
             currentTransition.waitForConditionCount !== undefined &&
@@ -278,13 +279,16 @@ export class SongEventHandler implements ISongEventHandler {
             // If count reaches 0, start the transition
             if (currentTransition.waitForConditionCount === 0) {
               this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
+              released = true
             }
           } else if (currentTransition.waitForConditionCount === 0) {
             // Count is explicitly 0: start transition immediately (no event like beat or keyframe consumed)
             this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
+            released = true
           } else {
             // No count specified, start transition immediately
             this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
+            released = true
           }
         }
 
@@ -293,7 +297,6 @@ export class SongEventHandler implements ISongEventHandler {
           activeEffect.state === 'waitingUntil' &&
           currentTransition.waitUntilCondition === eventType
         ) {
-          released = true
           // Check if we need to decrement the count
           if (
             currentTransition.waitUntilConditionCount !== undefined &&
@@ -315,6 +318,7 @@ export class SongEventHandler implements ISongEventHandler {
                 // If no more transitions, just set to idle
                 activeEffect.state = 'idle'
               }
+              released = true
             }
           } else if (currentTransition.waitUntilConditionCount === 0) {
             // Count is explicitly 0: advance immediately (no beat consumed)
@@ -327,6 +331,7 @@ export class SongEventHandler implements ISongEventHandler {
             } else {
               activeEffect.state = 'idle'
             }
+            released = true
           } else {
             // No count specified, move to next transition immediately
             activeEffect.currentTransitionIndex += 1
@@ -338,6 +343,7 @@ export class SongEventHandler implements ISongEventHandler {
             } else {
               activeEffect.state = 'idle'
             }
+            released = true
           }
         }
       })

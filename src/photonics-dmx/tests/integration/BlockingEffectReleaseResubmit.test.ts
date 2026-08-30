@@ -147,7 +147,7 @@ describe('blocking effect released by a song event', () => {
     harness.cleanup()
   })
 
-  it('blocks a re-submission while the effect is mid-move', () => {
+  it('blocks a re-submission on the add path while the effect is mid-move', () => {
     const harness = createSequencerHarness({ frontCount: 2, backCount: 0 })
     const lights = harness.lightManager.getLights(['front'], ['all'])
 
@@ -161,6 +161,39 @@ describe('blocking effect released by a song event', () => {
     )
 
     expect(accepted).toBe(false)
+
+    harness.cleanup()
+  })
+
+  it('replaces a mid-move submission and cancel-fires the displaced callback', () => {
+    const harness = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const lights = harness.lightManager.getLights(['front'], ['all'])
+    const first: boolean[] = []
+    const second: boolean[] = []
+
+    harness.sequencer.replaceEffectWithCallback(
+      'motion:pos',
+      buildParkedEffect(lights, 'measure'),
+      (cancelled) => first.push(cancelled),
+    )
+
+    // Part way through the move, where the add path would refuse.
+    harness.advanceBy(40)
+    const applied = harness.sequencer.replaceEffectWithCallback(
+      'motion:pos',
+      buildParkedEffect(lights, 'measure'),
+      (cancelled) => second.push(cancelled),
+    )
+
+    expect(applied).toBe(true)
+    expect(first).toEqual([true])
+    expect(second).toEqual([])
+
+    // The replacement runs its own move and parks, then the measure completes it.
+    harness.advanceBy(150)
+    fireMeasureFrame(harness)
+
+    expect(second).toEqual([false])
 
     harness.cleanup()
   })

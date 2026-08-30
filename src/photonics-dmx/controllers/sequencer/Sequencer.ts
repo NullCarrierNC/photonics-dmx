@@ -116,6 +116,25 @@ export class Sequencer implements ILightingController {
   }
 
   /**
+   * Per-(layer, light) replace with a completion callback. The callback held for the displaced
+   * run is fired with `cancelled = true` so a blocking node waiting on it is released.
+   *
+   * @param name The name of the effect
+   * @param effect The effect configuration
+   * @param onComplete Callback fired when the effect completes or is displaced
+   * @param isPersistent If true, the effect re-queues itself after completing
+   * @returns True when the effect was applied, false when a gate refused it
+   */
+  public replaceEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: (cancelled: boolean) => void,
+    isPersistent: boolean = false,
+  ): boolean {
+    return this.effectManager.replaceEffectWithCallback(name, effect, onComplete, isPersistent)
+  }
+
+  /**
    * Adds a new effect with a completion callback.
    * The callback will be fired when all lights in the effect complete their transitions.
    *
