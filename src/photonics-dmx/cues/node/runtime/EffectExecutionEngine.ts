@@ -9,6 +9,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../types/cueTypes'
 import { AudioCueData } from '../../types/audioCueTypes'
 import { CompiledEffect } from '../compiler/EffectCompiler'
+import type { NodeCueMode } from '../../types/nodeCueTypes'
 import {
   ActionNode,
   BaseEventNode,
@@ -22,7 +23,6 @@ import { VariableValue, NodeRuntimeCallbacks } from './executionTypes'
 import { BaseNodeExecutionEngine, CompiledGraph } from './BaseNodeExecutionEngine'
 import { RevisitPolicy } from './GraphExecutionPolicy'
 import { resolveValue } from './valueResolver'
-import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('EffectExecutionEngine')
@@ -34,6 +34,12 @@ export interface EffectExecutionEngineOptions {
   consumeInitialClearPolicy?: () => boolean
   /** Re-entry policy; defaults to 'relaxed'. */
   revisitPolicy?: RevisitPolicy
+  /**
+   * The domain of the cue that raised this effect. Required: an effect reads cue data from the
+   * frame that triggered it, so it must resolve against the raiser's family rather than the effect
+   * tree's own EffectMode.
+   */
+  callerMode: NodeCueMode
 }
 
 export class EffectExecutionEngine extends BaseNodeExecutionEngine {
@@ -50,6 +56,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
   /** Callback-backed effects still running in sequencer for this engine instance. */
   private pendingCallbackEffects: Set<string> = new Set()
   private readonly revisitPolicyValue: RevisitPolicy
+  private readonly callerMode: NodeCueMode
 
   private maybeFireIdle(): void {
     if (
@@ -74,7 +81,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     broadcaster: RuntimeBroadcaster,
     parameterValues: Record<string, any>,
     callerCueData: CueData | AudioCueData,
-    options: EffectExecutionEngineOptions = {},
+    options: EffectExecutionEngineOptions,
   ) {
     super({
       sequencer,
@@ -90,6 +97,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     this.parameterValues = parameterValues
     this.callerCueData = callerCueData
     this.revisitPolicyValue = options.revisitPolicy ?? 'relaxed'
+    this.callerMode = options.callerMode
 
     // Initialize effect-local variable store
     this.effectVarStore = new Map()
@@ -101,6 +109,15 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
 
   protected get compiled(): CompiledGraph {
     return this.compiledEffect
+  }
+
+  /**
+   * The raising cue's domain, not the effect tree's: RB3 cues raise effects from the yarg effect
+   * tree, and cue data read inside such an effect resolves against the rb3 frame that raised it.
+   * Reading the effect's own EffectMode would send rb3 frames through the yarg extractor.
+   */
+  protected get mode(): NodeCueMode {
+    return this.callerMode
   }
 
   protected get revisitPolicy(): RevisitPolicy {
@@ -146,7 +163,7 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     return {
       onNodeError: (nodeId, error) => {
         const msg = error instanceof Error ? error.message : String(error)
-        this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
+        this.emitRuntimeError(nodeId, msg)
         log.error(`Error executing node ${nodeId}:`, error)
       },
     }
@@ -161,7 +178,21 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
    * Effect contexts have no onNodeComplete callback, so completing a blocking action must
    * advance the phase, continue downstream, and fire the idle check inline.
    */
-  protected override onBlockingActionComplete(nodeId: string, context: ExecutionContext): void {
+  protected override onBlockingActionComplete(
+    nodeId: string,
+    context: ExecutionContext,
+    cancelled = false,
+  ): void {
+    if (cancelled) {
+      // Effect force-cleared or displaced: release the action so the context can settle, without
+      // advancing. A context with nothing left in flight is finished here rather than held.
+      context.completeActionSilent(nodeId)
+      if (context.tryComplete()) {
+        context.dispose()
+      }
+      this.maybeFireIdle()
+      return
+    }
     context.advancePhase()
     context.completeAction(nodeId)
     this.continueToNextNodes(nodeId, context)
@@ -184,46 +215,49 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
    * Trigger the effect by starting execution from the effect listener.
    */
   public triggerEffect(cueData: CueData | AudioCueData): void {
-    // Get the effect listener (entry point)
-    const effectListener = Array.from(this.compiledEffect.effectListenerMap.values())[0]
-    if (!effectListener) {
+    // An effect may declare more than one effect-listener (the compiler allows it); trigger every
+    // one, each from its own execution context, so all authored entry points run.
+    const effectListeners = Array.from(this.compiledEffect.effectListenerMap.values())
+    if (effectListeners.length === 0) {
       log.warn('No effect listener found in effect')
       return
     }
 
-    // Apply parameter values to effect variables
-    this.applyParameterValues(effectListener)
+    for (const effectListener of effectListeners) {
+      // Apply parameter values to effect variables
+      this.applyParameterValues(effectListener)
 
-    // Create execution context with caller's cue data. cueLevelVarStore is the effect's
-    // var store so resolveActionTiming() reads waitUntilCondition/waitUntilTime from it.
-    const context = new ExecutionContext(
-      { id: effectListener.id, type: 'event', outputs: effectListener.outputs } as any,
-      cueData, // Pass caller's cue data
-      this.effectVarStore, // Use effect-local variables as "cue-level"
-      new Map(), // No group-level variables for effects
-    )
+      // Create execution context with caller's cue data. cueLevelVarStore is the effect's
+      // var store so resolveActionTiming() reads waitUntilCondition/waitUntilTime from it.
+      const context = new ExecutionContext(
+        { id: effectListener.id, type: 'event', outputs: effectListener.outputs } as any,
+        cueData, // Pass caller's cue data
+        this.effectVarStore, // Use effect-local variables as "cue-level"
+        new Map(), // No group-level variables for effects
+      )
 
-    context.setOnContextComplete(() => {
-      this.activeContexts.delete(context.id)
-      this.maybeFireIdle()
-    })
+      context.setOnContextComplete(() => {
+        this.activeContexts.delete(context.id)
+        this.maybeFireIdle()
+      })
 
-    this.activeContexts.set(context.id, context)
+      this.activeContexts.set(context.id, context)
 
-    this.emitNodeExecution('activated', effectListener.id)
-    this.emitNodeExecution('deactivated', effectListener.id)
+      this.emitNodeExecution('activated', effectListener.id)
+      this.emitNodeExecution('deactivated', effectListener.id)
 
-    // Get outgoing edges from effect listener and start execution
-    const { adjacency } = this.compiledEffect
-    const outgoing = adjacency.get(effectListener.id) ?? []
-    const nextNodes = outgoing.map((conn) => conn.to)
+      // Get outgoing edges from effect listener and start execution
+      const { adjacency } = this.compiledEffect
+      const outgoing = adjacency.get(effectListener.id) ?? []
+      const nextNodes = outgoing.map((conn) => conn.to)
 
-    if (nextNodes.length > 0) {
-      this.continueExecution(nextNodes, context)
-    } else {
-      // No children - context completes immediately
-      this.activeContexts.delete(context.id)
-      this.maybeFireIdle()
+      if (nextNodes.length > 0) {
+        this.continueExecution(nextNodes, context)
+      } else {
+        // No children - context completes immediately
+        this.activeContexts.delete(context.id)
+        this.maybeFireIdle()
+      }
     }
   }
 

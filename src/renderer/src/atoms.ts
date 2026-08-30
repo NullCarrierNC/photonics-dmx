@@ -1,6 +1,7 @@
 import { atom, getDefaultStore } from 'jotai'
 import { atomFamily, atomWithStorage, createJSONStorage } from 'jotai/utils'
-import type { CueDomain, CueDomainPrefs } from '../../services/configuration/cueDomainTypes'
+import type { CueDomain } from '../../services/configuration/cueDomainTypes'
+import type { AppPreferences } from '../../services/configuration/configurationDefaults'
 import {
   DmxFixture,
   LightingConfiguration,
@@ -8,7 +9,6 @@ import {
   normalizeFixtureConfig,
 } from '../../photonics-dmx/types'
 import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
-import { AudioCueType } from '../../photonics-dmx/cues/types/audioCueTypes'
 import { Pages } from './types'
 import {
   clampDmxOutputRefreshRateHz,
@@ -52,6 +52,13 @@ export const myValidDmxLightsAtom = atom((get) => {
 
     // Check if all channel values in the channels object are greater than 0
     const areChannelsValid = Object.values(channels).every((value) => value > 0)
+
+    // Added channels count too: an unassigned (channel 0) extra makes the light unusable in a rig,
+    // matching the base-channel rule (a fixed channel's *value* of 0 is fine — only the number).
+    const areExtraChannelsValid = (DmxLight.extraChannels ?? []).every((ec) => ec.channel > 0)
+    if (!areExtraChannelsValid) {
+      return false
+    }
 
     // Include configChannels if they exist and ensure their values are valid
     if (DmxLight.config) {
@@ -144,6 +151,12 @@ export const dmxPreviewDimensionAtom = atomWithStorage<'2d' | '3d'>(
 )
 
 /**
+ * DMX preview: draw each fixture's brightness scaling. Not persisted, since it is a demonstration
+ * mode rather than a display preference.
+ */
+export const previewBrightnessScalingAtom = atom<boolean>(false)
+
+/**
  * Atom for last-known DMX values (channel -> value).
  * Persists across page navigation so persistent cues (e.g. YARG menu) remain visible in preview.
  */
@@ -168,8 +181,6 @@ export const audioDataAtom = atom<AudioLightingData | null>(null)
 export const isSenderErrorAtom = atom<boolean>(false)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error message or serialized error
 export const senderErrorAtom = atom<any>('')
-
-export const effectDebounceTimeAtom = atom<number>(1600)
 
 export const senderEnttecProEnabledAtom = atom<boolean>(false)
 export const enttecProComPortAtom = atom<string>('')
@@ -251,96 +262,11 @@ export const sacnConfigAtom = atom((get) => {
 })
 
 /**
- * Interface for lighting preferences stored in the frontend
- * This extends the backend AppPreferences with frontend-specific properties
+ * Loaded preferences as the renderer holds them: the backend shape, all-optional because the atom
+ * starts empty and is filled once GET_PREFS resolves. An alias, so a preference added to
+ * AppPreferences is visible here with no second declaration to keep in step.
  */
-export interface LightingPreferences {
-  // Backend preferences
-  effectDebounce?: number
-  complex?: boolean
-  enttecProConfig?: {
-    port: string
-  }
-  openDmxConfig?: {
-    port: string
-    dmxSpeed: number
-  }
-  artNetConfig?: {
-    host: string
-    universe: number
-    net: number
-    subnet: number
-    subuni: number
-    port: number
-    refreshRateHz?: number
-  }
-  sacnConfig?: {
-    universe: number
-    networkInterface?: string
-    unicastDestination?: string
-    useUnicast: boolean
-    refreshRateHz?: number
-  }
-  brightness?: {
-    low: number
-    medium: number
-    high: number
-    max: number
-  }
-  cueDomains?: Record<CueDomain, CueDomainPrefs>
-  activeAudioCueType?: AudioCueType
-  cueConsistencyWindow?: number
-  /** Global publisher output cap (Hz); upstream of per-sender refresh rates. */
-  globalDmxPublishingRateHz?: number
-  allowMultipleActiveRigs?: boolean
-  advancedModeEnabled?: boolean
-
-  // Frontend-specific preferences
-  dmxOutputConfig?: {
-    sacnEnabled: boolean
-    artNetEnabled: boolean
-    enttecProEnabled: boolean
-    openDmxEnabled: boolean
-  }
-  stageKitPrefs?: {
-    yargPriority: 'prefer-for-tracked' | 'random' | 'never'
-  }
-  dmxSettingsPrefs?: {
-    artNetExpanded: boolean
-    enttecProExpanded: boolean
-    sacnExpanded: boolean
-    openDmxExpanded: boolean
-  }
-  audioConfig?: {
-    deviceId?: number | string
-    sampleRate?: number
-    fftSize: number
-    updateIntervalMs?: number
-    sensitivity: number
-    noiseFloor?: number
-    bands?: Array<{
-      id: string
-      name: string
-      minHz: number
-      maxHz: number
-      gain: number
-    }>
-    beatDetection: {
-      threshold: number
-      decayRate: number
-      minInterval: number
-    }
-    smoothing: {
-      enabled: boolean
-      alpha: number
-    }
-    enabled: boolean
-    linearResponse?: boolean
-    strobeEnabled?: boolean
-    strobeTriggerThreshold?: number
-    strobeProbability?: number
-  }
-}
+export type LightingPreferences = Partial<AppPreferences>
 
 export const lightingPrefsAtom = atom<LightingPreferences>({})
 
@@ -364,7 +290,8 @@ export const audioConfigAtom = atom((get) => {
   return prefs.audioConfig
 })
 
-export const audioDevicesAtom = atom<Array<{ deviceId: number; label: string }>>([])
+/** Enumerated audio input devices. `deviceId` is the string `MediaDeviceInfo.deviceId`. */
+export const audioDevicesAtom = atom<Array<{ deviceId: string; label: string }>>([])
 
 export const audioEnabledAtom = atom((get) => {
   const config = get(audioConfigAtom)

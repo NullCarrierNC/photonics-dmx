@@ -381,8 +381,13 @@ export class Rb3StageKitRigProcessor {
       this.pendingUpdates.set(lightIndex, { colors: new Set([color]), timeout: null })
     }
     const timeout = setTimeout(async () => {
-      await this.applyAccumulatedColors(lightIndex)
-      this.pendingUpdates.delete(lightIndex)
+      try {
+        await this.applyAccumulatedColors(lightIndex)
+      } catch (err) {
+        log.error(`Failed to apply accumulated colors for light ${lightIndex}:`, err)
+      } finally {
+        this.pendingUpdates.delete(lightIndex)
+      }
     }, ACCUMULATION_DELAY_MS)
     this.pendingUpdates.get(lightIndex)!.timeout = timeout
   }
@@ -402,8 +407,13 @@ export class Rb3StageKitRigProcessor {
       this.pendingUpdates.set(lightIndex, { colors: remainingColors, timeout: null })
     }
     const timeout = setTimeout(async () => {
-      await this.applyAccumulatedColors(lightIndex)
-      this.pendingUpdates.delete(lightIndex)
+      try {
+        await this.applyAccumulatedColors(lightIndex)
+      } catch (err) {
+        log.error(`Failed to apply accumulated colors for light ${lightIndex}:`, err)
+      } finally {
+        this.pendingUpdates.delete(lightIndex)
+      }
     }, ACCUMULATION_DELAY_MS)
     this.pendingUpdates.get(lightIndex)!.timeout = timeout
   }

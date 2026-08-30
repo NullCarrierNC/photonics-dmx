@@ -20,6 +20,7 @@ import {
   openDmxComPortAtom,
   syncOutputSenderAtoms,
   yargListenerEnabledAtom,
+  rb3eListenerEnabledAtom,
 } from './atoms'
 import squareLogo from './assets/images/photonics-icon.png'
 import LeftMenu from './components/LeftMenu'
@@ -27,16 +28,18 @@ import HeaderProjects from './components/Header'
 import StatusBar from './components/StatusBar'
 import { AppPageRouter } from './components/AppPageRouter'
 import SenderErrorIndicator from './components/SenderErrorIndicator'
+import LifecycleFailedBanner from './components/LifecycleFailedBanner'
 import { useTimeout } from './utils/useTimeout'
 import { useAppIpcListeners } from './hooks/useAppIpcListeners'
 import { AudioCaptureManager } from './services/AudioCaptureManager'
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { useToast } from './hooks/useToast'
+import { useYargErrorHandler } from './hooks/useYargErrorHandler'
 import ToastContainer from './components/Toast'
 import { ConfirmModalHost } from './components/ConfirmModalHost'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useDarkMode } from './DarkModeProvider'
-import type { CueStateUpdatePayload } from '../../shared/ipcTypes'
+import type { CueStateUpdatePayload, NodeCueRuntimeErrorPayload } from '../../shared/ipcTypes'
 import {
   setAudioEnabled,
   savePrefs,
@@ -79,6 +82,7 @@ export const App = (): JSX.Element => {
   const setOpenDmxEnabled = useSetAtom(senderOpenDmxEnabledAtom)
   const setIpcEnabled = useSetAtom(senderIpcEnabledAtom)
   const setYargEnabled = useSetAtom(yargListenerEnabledAtom)
+  const setRb3Enabled = useSetAtom(rb3eListenerEnabledAtom)
   const [appVer, setAppVer] = useState('')
   const { toasts, showToast, hideToast } = useToast()
 
@@ -102,21 +106,24 @@ export const App = (): JSX.Element => {
     [showToast],
   )
 
-  const handleYargError = useCallback(
+  const handleYargError = useYargErrorHandler({ showToast, setYargEnabled })
+
+  const handleRb3Error = useCallback(
     (payload: { type: string; message: string; autoDisabled?: boolean }): void => {
-      log.error('YARG error:', payload)
+      log.error('RB3E error:', payload)
       if (payload.autoDisabled) {
-        setYargEnabled(false)
+        setRb3Enabled(false)
       }
-      showToast(`YARG: ${payload.message}`, 'error', 5000)
+      showToast(`RB3E: ${payload.message}`, 'error', 5000)
     },
-    [showToast, setYargEnabled],
+    [showToast, setRb3Enabled],
   )
 
   const handleNodeCueRuntimeError = useCallback(
-    (msg: string): void => {
-      log.error('Node cue runtime error:', msg)
-      showToast(msg, 'error', 5000)
+    (payload: NodeCueRuntimeErrorPayload): void => {
+      const text = payload?.nodeId ? `${payload.nodeId}: ${payload.message}` : payload?.message
+      log.error('Node cue runtime error:', text)
+      showToast(text ?? 'Node cue runtime error', 'error', 5000)
     },
     [showToast],
   )
@@ -303,30 +310,12 @@ export const App = (): JSX.Element => {
 
       if (!config) return
 
-      // Update lightingPrefsAtom so preview components can react to color changes
-      // Merge with existing audioConfig to preserve fields like sampleRate and updateIntervalMs
+      // Update lightingPrefsAtom so preview components can react to colour changes. The main
+      // process sends the whole merged config, so the stored config is replaced outright. `bands`
+      // is copied so the atom never shares the array the IPC payload came in on.
       setPrefs((prev) => ({
         ...prev,
-        audioConfig: {
-          ...prev.audioConfig,
-          // Update all compatible fields from config (exclude deviceId which has type mismatch)
-          fftSize: config.fftSize,
-          sensitivity: config.sensitivity,
-          noiseFloor: config.noiseFloor,
-          bands: config.bands ? [...config.bands] : prev.audioConfig?.bands,
-          beatDetection: config.beatDetection,
-          smoothing: config.smoothing,
-          enabled: config.enabled,
-          linearResponse: config.linearResponse,
-          strobeEnabled: config.strobeEnabled,
-          strobeTriggerThreshold: config.strobeTriggerThreshold,
-          strobeProbability: config.strobeProbability,
-          // Preserve fields that exist in frontend but not in backend config
-          sampleRate: prev.audioConfig?.sampleRate,
-          updateIntervalMs: prev.audioConfig?.updateIntervalMs,
-          // Preserve deviceId from frontend (number) rather than backend (string)
-          deviceId: prev.audioConfig?.deviceId,
-        } as LightingPreferences['audioConfig'],
+        audioConfig: { ...config, bands: [...config.bands] },
       }))
       log.info('Lighting preferences updated with new audio config')
     },
@@ -398,7 +387,7 @@ export const App = (): JSX.Element => {
   useEffect(() => {
     const loadLightLayout = async (): Promise<void> => {
       try {
-        const data = await getLightLayout('myLayout.json')
+        const data = await getLightLayout()
         setActiveLightsConfig(data || null)
       } catch (error) {
         log.error('Failed to load light layout:', error)
@@ -432,6 +421,7 @@ export const App = (): JSX.Element => {
     setIsLeftMenuCollapsed,
     handleSenderError,
     handleYargError,
+    handleRb3Error,
     handleNodeCueRuntimeError,
     handleSenderNetworkError,
     handleCueStateUpdate,
@@ -491,6 +481,9 @@ export const App = (): JSX.Element => {
         <div className="h-16 bg-gray-800 dark:bg-gray-950 text-white flex items-center justify-center z-10">
           <HeaderProjects />
         </div>
+
+        {/* Controller-failure notice, above the page so it shows whichever page is open */}
+        <LifecycleFailedBanner />
 
         {/* Scrollable Content Area - Using flex-grow to fill available space */}
         <div className="flex-grow overflow-y-auto bg-gray-200 dark:bg-gray-800">

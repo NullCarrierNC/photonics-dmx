@@ -35,6 +35,10 @@ jest.mock('../components/BrightnessSettings', () => ({
   __esModule: true,
   default: () => <div data-testid="prefs-brightness" />,
 }))
+jest.mock('../components/WhiteChannelMixModeSettings', () => ({
+  __esModule: true,
+  default: () => <div data-testid="prefs-white-mix-mode" />,
+}))
 jest.mock('../components/YargEnabledCueGroups', () => ({
   __esModule: true,
   default: () => <div data-testid="prefs-yarg-cues" />,
@@ -90,6 +94,7 @@ describe('Preferences', () => {
     expect(screen.queryByTestId('prefs-active-rigs')).toBeNull()
     expect(screen.getByTestId('prefs-dmx-output')).toBeTruthy()
     expect(screen.getByTestId('prefs-brightness')).toBeTruthy()
+    expect(screen.getByTestId('prefs-white-mix-mode')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Advanced' }))
     expect(screen.getByTestId('prefs-advanced-mode')).toBeTruthy()

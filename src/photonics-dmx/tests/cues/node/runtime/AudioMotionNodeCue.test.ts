@@ -108,7 +108,7 @@ describe('AudioMotionNodeCue', () => {
 
   it('omits lighting style (not primary/secondary/strobe)', () => {
     const def = minimalMotionDefinition()
-    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
     const cue = new AudioMotionNodeCue('g1', compiled)
     expect('style' in cue).toBe(false)
     expect((cue as { style?: string }).style).toBeUndefined()
@@ -116,7 +116,7 @@ describe('AudioMotionNodeCue', () => {
 
   it('uses motion id as cueType', () => {
     const def = minimalMotionDefinition()
-    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
     const cue = new AudioMotionNodeCue('g1', compiled)
     expect(cue.cueType).toBe('motion-test-1')
   })
@@ -174,7 +174,7 @@ describe('AudioMotionNodeCue', () => {
       layout: { nodePositions: {} },
       variables: [{ name: 'bpmVar', type: 'number', scope: 'cue', initialValue: 0 }],
     }
-    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
     const cue = new AudioMotionNodeCue('g1', compiled)
     const data: AudioCueData = {
       timestamp: 0,
@@ -249,7 +249,7 @@ describe('AudioMotionNodeCue', () => {
       layout: { nodePositions: {} },
       variables: [{ name: 'beatMs', type: 'number', scope: 'cue', initialValue: 0 }],
     }
-    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
     const cue = new AudioMotionNodeCue('g1', compiled)
 
     const dataZero: AudioCueData = {
@@ -283,7 +283,7 @@ describe('AudioMotionNodeCue', () => {
 
   it('does not call removeAllEffects on execute', async () => {
     const def = minimalMotionDefinition()
-    const compiled = NodeCueCompiler.compileAudioCue(def)
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
     const cue = new AudioMotionNodeCue('g1', compiled)
     const data: AudioCueData = {
       timestamp: 0,
@@ -361,7 +361,7 @@ describe('AudioMotionNodeCue', () => {
 
     it('fires cue-called downstream action on the first execute (no cue-started gating)', async () => {
       const def = buildCueCalledMotionDefinition()
-      const compiled = NodeCueCompiler.compileAudioCue(def)
+      const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
       const cue = new AudioMotionNodeCue('g1', compiled)
       await cue.execute(audioCueData(1), sequencer, lightManager)
       expect(sequencer.addMotionPattern).toHaveBeenCalledTimes(1)
@@ -369,7 +369,7 @@ describe('AudioMotionNodeCue', () => {
 
     it('re-enters cue-called every execute; motion-pattern idempotency still applies', async () => {
       const def = buildCueCalledMotionDefinition()
-      const compiled = NodeCueCompiler.compileAudioCue(def)
+      const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
       const cue = new AudioMotionNodeCue('g1', compiled)
       ;(sequencer.getMotionPattern as jest.Mock).mockReturnValue(undefined)
 
@@ -471,7 +471,7 @@ describe('AudioMotionNodeCue', () => {
         ],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileAudioCue(def)
+      const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
       const cue = new AudioMotionNodeCue('g1', compiled)
 
       ;(sequencer.getMotionPattern as jest.Mock).mockReturnValue(undefined)
@@ -551,7 +551,7 @@ describe('AudioMotionNodeCue with real Sequencer', () => {
         connections: [{ from: 'ev-called', to: 'sp1' }],
         layout: { nodePositions: {} },
       }
-      const compiled = NodeCueCompiler.compileAudioCue(def)
+      const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio')
       const cue = new AudioMotionNodeCue('g1', compiled)
       const data: AudioCueData = {
         timestamp: 0,

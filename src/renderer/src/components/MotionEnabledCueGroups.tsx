@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   getYargMotionCueGroups,
   getAudioMotionCueGroups,
@@ -12,6 +12,12 @@ import {
   getAvailableAudioMotionCues,
   getDisabledAudioMotionCues,
   setDisabledAudioMotionCues,
+  getRb3MotionCueGroups,
+  getEnabledRb3MotionCueGroups,
+  setEnabledRb3MotionCueGroups,
+  getAvailableRb3MotionCues,
+  getDisabledRb3MotionCues,
+  setDisabledRb3MotionCues,
 } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
 import { CueGroupEnableList } from './cue-groups/CueGroupEnableList'
@@ -37,8 +43,54 @@ interface MotionCueGroupDetails {
 }
 
 export interface MotionEnabledCueGroupsProps {
-  /** YARG motion runs with YARG lighting; audio motion runs alongside audio-reactive lighting. */
-  platform: 'yarg' | 'audio'
+  /**
+   * YARG motion runs with YARG lighting; audio motion runs alongside audio-reactive lighting;
+   * rb3 motion runs with the RB3 StageKit cue-mode look.
+   */
+  platform: 'yarg' | 'audio' | 'rb3'
+}
+
+/** Per-platform IPC + copy binding; the three motion domains share identical channel shapes. */
+const motionPlatformBinding = (platform: 'yarg' | 'audio' | 'rb3') => {
+  switch (platform) {
+    case 'yarg':
+      return {
+        getGroups: getYargMotionCueGroups,
+        getEnabled: getEnabledYargMotionCueGroups,
+        getDisabled: getDisabledYargMotionCues,
+        setEnabled: setEnabledYargMotionCueGroups,
+        setDisabled: setDisabledYargMotionCues,
+        getAvailable: getAvailableYargMotionCues,
+        title: 'YARG Motion Cue Groups',
+        description:
+          'YARG motion programs run in parallel with YARG lighting cues and control pan/tilt on moving heads. Enable the groups you want in the random pool. You can disable individual motion programs within an enabled group; the group stays enabled if at least one program remains on.',
+      }
+    case 'rb3':
+      return {
+        getGroups: getRb3MotionCueGroups,
+        getEnabled: getEnabledRb3MotionCueGroups,
+        getDisabled: getDisabledRb3MotionCues,
+        setEnabled: setEnabledRb3MotionCueGroups,
+        setDisabled: setDisabledRb3MotionCues,
+        getAvailable: getAvailableRb3MotionCues,
+        title: 'RB3 Motion Cue Groups',
+        description:
+          'RB3 motion programs run alongside the RB3 StageKit cue-mode look and control pan/tilt on moving heads. Enable the groups you want in the random pool. You can disable individual motion programs within an enabled group; the group stays enabled if at least one program remains on.',
+      }
+    case 'audio':
+    default:
+      return {
+        getGroups: getAudioMotionCueGroups,
+        getEnabled: getEnabledAudioMotionCueGroups,
+        getDisabled: getDisabledAudioMotionCues,
+        setEnabled: setEnabledAudioMotionCueGroups,
+        setDisabled: setDisabledAudioMotionCues,
+        getAvailable: getAvailableAudioMotionCues,
+        title: 'Audio Motion Cue Groups',
+        description:
+          'Audio motion programs run alongside audio-reactive lighting cues (same timing as your primary/secondary/strobe layers) and control pan/tilt on moving heads. Enable the groups you want in the random pool. You can disable individual motion programs within an enabled group; the group stays enabled if at least one program remains on.',
+      }
+  }
 }
 
 type RowError = { message: string; onRetry: () => void }
@@ -53,20 +105,17 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
   const [persistErrorByGroup, setPersistErrorByGroup] = useState<Record<string, RowError>>({})
   const persistGeneration = useLatestGenerationGate()
   const roving = useCueGroupRovingTabIndex(allGroups.map((g) => g.id))
+  const api = useMemo(() => motionPlatformBinding(platform), [platform])
 
   const fetchGroups = useCallback(async () => {
     try {
       setLoading(true)
       setLoadError(null)
-      const [groups, enabled, disabled] = await Promise.all(
-        platform === 'yarg'
-          ? [getYargMotionCueGroups(), getEnabledYargMotionCueGroups(), getDisabledYargMotionCues()]
-          : [
-              getAudioMotionCueGroups(),
-              getEnabledAudioMotionCueGroups(),
-              getDisabledAudioMotionCues(),
-            ],
-      )
+      const [groups, enabled, disabled] = await Promise.all([
+        api.getGroups(),
+        api.getEnabled(),
+        api.getDisabled(),
+      ])
 
       const mappedGroups: MotionCueGroupDetails[] = groups.map((group) => ({
         ...group,
@@ -86,7 +135,7 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
     } finally {
       setLoading(false)
     }
-  }, [platform])
+  }, [api])
 
   useEffect(() => {
     fetchGroups()
@@ -107,10 +156,7 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
   ): Promise<{ ok: true } | { ok: false; error: string } | { stale: true }> => {
     const token = persistGeneration.nextGeneration()
     try {
-      const enabledResult =
-        platform === 'yarg'
-          ? await setEnabledYargMotionCueGroups(nextEnabled)
-          : await setEnabledAudioMotionCueGroups(nextEnabled)
+      const enabledResult = await api.setEnabled(nextEnabled)
       if (!persistGeneration.isCurrentGeneration(token)) {
         return { stale: true }
       }
@@ -121,10 +167,7 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
           error: enabledResult.error || 'Failed to save enabled motion cue groups',
         }
       }
-      const disabledResult =
-        platform === 'yarg'
-          ? await setDisabledYargMotionCues(nextDisabled)
-          : await setDisabledAudioMotionCues(nextDisabled)
+      const disabledResult = await api.setDisabled(nextDisabled)
       if (!persistGeneration.isCurrentGeneration(token)) {
         return { stale: true }
       }
@@ -205,11 +248,9 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
 
   const fetchCuesForGroup = useCallback(
     async (groupId: string): Promise<MotionCueInfo[]> => {
-      return platform === 'yarg'
-        ? getAvailableYargMotionCues(groupId)
-        : getAvailableAudioMotionCues(groupId)
+      return api.getAvailable(groupId)
     },
-    [platform],
+    [api],
   )
 
   const handleAccordionToggle = async (groupId: string) => {
@@ -301,11 +342,8 @@ const MotionEnabledCueGroups: React.FC<MotionEnabledCueGroupsProps> = ({ platfor
     }
   }
 
-  const title = platform === 'yarg' ? 'YARG Motion Cue Groups' : 'Audio Motion Cue Groups'
-  const description =
-    platform === 'yarg'
-      ? 'YARG motion programs run in parallel with YARG lighting cues and control pan/tilt on moving heads. Enable the groups you want in the random pool. You can disable individual motion programs within an enabled group; the group stays enabled if at least one program remains on.'
-      : 'Audio motion programs run alongside audio-reactive lighting cues (same timing as your primary/secondary/strobe layers) and control pan/tilt on moving heads. Enable the groups you want in the random pool. You can disable individual motion programs within an enabled group; the group stays enabled if at least one program remains on.'
+  const title = api.title
+  const description = api.description
 
   return (
     <CueGroupEnableList

@@ -1,5 +1,12 @@
 import React from 'react'
-import { DmxFixture, normalizeFixtureConfig } from '../../../photonics-dmx/types'
+import {
+  DMX_CHANNEL_MAX,
+  DmxFixture,
+  FixtureConfig,
+  fixtureConfigFieldBounds,
+  normalizeFixtureConfig,
+} from '../../../photonics-dmx/types'
+import { sortBaseChannelEntries } from './lightChannelDisplay'
 
 function fixtureConfigLabel(key: string): string {
   if (key === 'panDirectionCW') {
@@ -41,28 +48,20 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
     title?: string,
     allowZero: boolean = false,
   ) => {
-    // Define the desired order of channel names
-    const channelOrder = [
-      'masterDimmer',
-      'red',
-      'green',
-      'blue',
-      'white',
-      'strobeChannel',
-      'pan',
-      'tilt',
-    ]
+    const sortedChannels = sortBaseChannelEntries(Object.entries(channels))
 
-    const sortedChannels = Object.entries(channels).sort((a, b) => {
-      const indexA = channelOrder.indexOf(a[0])
-      const indexB = channelOrder.indexOf(b[0])
-
-      // If the channel is not in the predefined order, place it at the end
-      return (
-        (indexA === -1 ? channelOrder.length : indexA) -
-        (indexB === -1 ? channelOrder.length : indexB)
-      )
-    })
+    /**
+     * The two callers below edit different quantities, so each gets its own bound: DMX channel
+     * *numbers* run 1–512, while config fields are degrees/percent/raw-DMX with their own per-field
+     * ranges.
+     */
+    const boundsFor = (channelName: string): { min: number; max: number } =>
+      allowZero
+        ? fixtureConfigFieldBounds(
+            channelName as keyof FixtureConfig,
+            normalizeFixtureConfig(light.config),
+          )
+        : { min: 1, max: DMX_CHANNEL_MAX }
 
     return (
       <div>
@@ -80,19 +79,20 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
               <input
                 id={channelName}
                 type="number"
-                min={allowZero ? 0 : 1} // Set min based on allowZero
-                max={255}
+                min={boundsFor(channelName).min}
+                max={boundsFor(channelName).max}
                 value={value}
                 onChange={(e) => {
+                  const { min, max } = boundsFor(channelName)
                   let newValue = Number(e.target.value)
 
                   // Handle invalid inputs (e.g., empty string)
                   if (isNaN(newValue)) {
-                    newValue = allowZero ? 0 : 1
+                    newValue = min
                   }
 
                   // Clamp the value within the allowed range
-                  newValue = Math.min(255, Math.max(allowZero ? 0 : 1, newValue))
+                  newValue = Math.min(max, Math.max(min, Math.round(newValue)))
 
                   onChannelChange(channelName, newValue)
                 }}

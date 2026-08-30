@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 1,
+  "cueVersion": 2,
   "mode": "yarg",
   "group": {
     "id": "yarg-motion-default",
@@ -12,7 +12,7 @@
     {
       "id": "motion-vogue-slow",
       "name": "Vogue (Slow)",
-      "description": "Slow: On each measure, every light moves to its own random stage bearing over 1600ms (set-position).",
+      "description": "On each measure, every light moves to its own random stage bearing over 600ms.",
       "variables": [
         {
           "name": "vogueSlowLights",
@@ -89,7 +89,7 @@
               },
               "duration": {
                 "source": "literal",
-                "value": 1600
+                "value": 600
               },
               "waitUntilCondition": {
                 "source": "literal",
@@ -240,9 +240,9 @@
           }
         },
         "viewport": {
-          "x": 428.1338908588483,
-          "y": 168.49347352175772,
-          "zoom": 0.5333139538450561
+          "x": 613.3711982967812,
+          "y": 149.59090909090918,
+          "zoom": 0.934662153491357
         }
       },
       "kind": "motion"

@@ -9,11 +9,11 @@ import { ensureSyntaxTree } from '@codemirror/language'
 import type {
   AudioNodeCueDefinition,
   NodeCueFile,
-  YargNodeCueDefinition,
+  NetNodeCueDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { validateNodeCue } from '../../../ipcApi'
-import { resolveCueCollisions } from '../lib/cueUtils'
+import { replaceCueInFile, resolveCueCollisions } from '../lib/cueUtils'
 
 /**
  * Resolve a JSON Pointer path (e.g. ["nodes", "events", "0", "type"]) to character
@@ -77,11 +77,11 @@ function resolveJsonPath(
 }
 
 type CueJsonEditorProps = {
-  cueDefinition: YargNodeCueDefinition | AudioNodeCueDefinition
+  cueDefinition: NetNodeCueDefinition | AudioNodeCueDefinition
   editorDoc: EditorDocument
   selectedCueId: string
   availableCueTypes: string[]
-  onSave: (updatedCue: YargNodeCueDefinition | AudioNodeCueDefinition) => void
+  onSave: (updatedCue: NetNodeCueDefinition | AudioNodeCueDefinition) => void
   onCancel: () => void
   onDirtyChange?: (dirty: boolean) => void
 }
@@ -115,12 +115,9 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
   const showSaveButton = validationPassed && !contentChangedAfterValidation
 
   const buildFileWithCue = useCallback(
-    (cue: YargNodeCueDefinition | AudioNodeCueDefinition): NodeCueFile => {
+    (cue: NetNodeCueDefinition | AudioNodeCueDefinition): NodeCueFile => {
       const file = editorDoc.file as NodeCueFile
-      return {
-        ...file,
-        cues: file.cues.map((c) => (c.id === selectedCueId ? cue : c)),
-      }
+      return replaceCueInFile(file, selectedCueId, cue)
     },
     [editorDoc.file, selectedCueId],
   )
@@ -134,9 +131,9 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
     setNotices([])
     view.dispatch(setDiagnostics(view.state, []))
 
-    let parsed: YargNodeCueDefinition | AudioNodeCueDefinition
+    let parsed: NetNodeCueDefinition | AudioNodeCueDefinition
     try {
-      parsed = JSON.parse(raw) as YargNodeCueDefinition | AudioNodeCueDefinition
+      parsed = JSON.parse(raw) as NetNodeCueDefinition | AudioNodeCueDefinition
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Invalid JSON'
       setValidationErrors([`Parse error: ${message}`])
@@ -202,6 +199,12 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
 
     view.dispatch(setDiagnostics(view.state, []))
     setValidationErrors([])
+    // Warnings do not block a save: the cue is valid, but something in it will not fire. Surfaced on
+    // the same notice line as the collision messages so the author sees it before saving.
+    const warnings = (result as { warnings?: string[] }).warnings ?? []
+    if (warnings.length > 0) {
+      setNotices((current) => [...current, ...warnings])
+    }
     setValidationPassed(true)
     setContentChangedAfterValidation(false)
   }, [buildFileWithCue, selectedCueId, editorDoc.file, availableCueTypes])
@@ -212,7 +215,7 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
 
     const raw = view.state.doc.toString()
     try {
-      const parsed = JSON.parse(raw) as YargNodeCueDefinition | AudioNodeCueDefinition
+      const parsed = JSON.parse(raw) as NetNodeCueDefinition | AudioNodeCueDefinition
       onSave(parsed)
     } catch {
       setValidationErrors(['Parse error: cannot save invalid JSON'])

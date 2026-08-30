@@ -2,6 +2,16 @@ import { AudioCueType, AudioMotionCueRef } from '../types/audioCueTypes'
 import type { MotionGroupSelectionMode } from '../types/nodeCueTypes'
 import { IAudioCue } from '../interfaces/IAudioCue'
 import { MotionSelectionState } from './MotionSelectionState'
+import {
+  DisabledCueStore,
+  findMotionCueRefIn,
+  motionCueDetailsFor,
+  motionGroupsInfoFor,
+  releaseSequencersFor,
+  resolveMotionCue,
+  type MotionCueDetail,
+  type MotionGroupInfo,
+} from './cueRegistrySupport'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('AudioCueRegistry')
 
@@ -34,7 +44,7 @@ export class AudioCueRegistry {
   private enabledGroups: Set<string> = new Set()
 
   /** Per-group disabled audio cue type IDs (user preferences) */
-  private disabledCues: Map<string, Set<string>> = new Map()
+  private readonly disabledCues = new DisabledCueStore()
 
   private readonly motionState = new MotionSelectionState<IAudioCue>()
 
@@ -201,16 +211,7 @@ export class AudioCueRegistry {
   public releaseSequencerFromAllCues(
     sequencer: import('../../controllers/sequencer/interfaces').ILightingController,
   ): void {
-    for (const group of this.groups.values()) {
-      for (const cue of group.cues.values()) {
-        cue.releaseSequencer?.(sequencer)
-      }
-      if (group.motionCues) {
-        for (const motionCue of group.motionCues.values()) {
-          motionCue.releaseSequencer?.(sequencer)
-        }
-      }
-    }
+    releaseSequencersFor(this.groups.values(), sequencer)
   }
 
   /**
@@ -287,10 +288,9 @@ export class AudioCueRegistry {
    * Replace per-group disabled cue sets from preferences.
    */
   public setDisabledCues(disabled: Record<string, string[]>): void {
-    this.disabledCues.clear()
-    for (const [groupId, ids] of Object.entries(disabled)) {
-      this.disabledCues.set(groupId, new Set(ids))
-    }
+    this.disabledCues.setAll(disabled)
+    // Audio-specific: the cue-details cache is keyed by group and does not track disabled state, so
+    // clear it here to stay consistent. This is the one line that differs from the net registry.
     this.cueDetailsCache.clear()
   }
 
@@ -298,7 +298,7 @@ export class AudioCueRegistry {
    * Whether this cue type is disabled for the given group in preferences.
    */
   public isCueDisabled(groupId: string, cueType: AudioCueType): boolean {
-    return this.disabledCues.get(groupId)?.has(cueType) ?? false
+    return this.disabledCues.isDisabled(groupId, cueType)
   }
 
   /**
@@ -326,7 +326,15 @@ export class AudioCueRegistry {
   /**
    * Get the default group ID.
    */
-  public getDefaultGroup(): string | null {
+  public getDefaultGroupId(): string | null {
+    return this.defaultGroup
+  }
+
+  /**
+   * Get the group serving fallback motion programs. Audio keeps a single default group for both
+   * surfaces, since audio cue files carry no group designations.
+   */
+  public getDefaultMotionGroupId(): string | null {
     return this.defaultGroup
   }
 
@@ -368,70 +376,25 @@ export class AudioCueRegistry {
    * Returns null if the group is not motion-enabled, the cue is disabled, or the id is unknown.
    */
   public getMotionCueImplementation(ref: AudioMotionCueRef): IAudioCue | null {
-    const group = this.groups.get(ref.groupId)
-    const motionMap = group?.motionCues
-    if (!motionMap || motionMap.size === 0) {
-      return null
-    }
-    if (!this.motionState.getEnabledMotionGroups().includes(ref.groupId)) {
-      return null
-    }
-    if (this.isMotionCueDisabled(ref.groupId, ref.cueId)) {
-      return null
-    }
-    return motionMap.get(ref.cueId) ?? null
+    return resolveMotionCue(
+      this.groups.get(ref.groupId),
+      ref,
+      (groupId) => this.motionState.getEnabledMotionGroups().includes(groupId),
+      (groupId, cueId) => this.isMotionCueDisabled(groupId, cueId),
+    )
   }
 
   /** Locate group/cue ids for a motion cue instance (for UI / IPC metadata). */
-  public findAudioMotionCueRef(cue: IAudioCue): AudioMotionCueRef | null {
-    for (const group of this.groups.values()) {
-      const motionMap = group.motionCues
-      if (!motionMap) continue
-      for (const [cueId, impl] of motionMap) {
-        if (impl === cue) {
-          return { groupId: group.id, cueId }
-        }
-      }
-    }
-    return null
+  public findMotionCueRef(cue: IAudioCue): AudioMotionCueRef | null {
+    return findMotionCueRefIn(this.groups.values(), cue)
   }
 
-  public getAudioMotionGroupsInfo(): Array<{
-    id: string
-    name: string
-    description?: string
-    cueCount: number
-  }> {
-    const rows: Array<{
-      id: string
-      name: string
-      description?: string
-      cueCount: number
-    }> = []
-    for (const group of this.groups.values()) {
-      const n = group.motionCues?.size ?? 0
-      if (n === 0) {
-        continue
-      }
-      rows.push({
-        id: group.id,
-        name: group.name,
-        description: group.description,
-        cueCount: n,
-      })
-    }
-    return rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  public getMotionGroupsInfo(): MotionGroupInfo[] {
+    return motionGroupsInfoFor(this.groups.values())
   }
 
-  public getAudioMotionCueDetails(
-    groupId: string,
-  ): Array<{ id: string; name: string; description: string }> {
-    const group = this.groups.get(groupId)
-    const motionMap = group?.motionCues
-    if (!motionMap) {
-      return []
-    }
-    return Array.from(motionMap.values()).map((cue) => ({
+  public getMotionCueDetails(groupId: string): MotionCueDetail[] {
+    return motionCueDetailsFor(this.groups.get(groupId)?.motionCues, (cue) => ({
       id: String(cue.cueType),
       name: cue.name,
       description: cue.description ?? '',

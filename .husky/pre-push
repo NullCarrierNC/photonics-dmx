@@ -1,1 +1,1 @@
-npm run typecheck
+npm run typecheck && npm run any:budget && npm run size:budget && npm test

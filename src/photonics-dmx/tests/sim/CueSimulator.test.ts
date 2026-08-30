@@ -1,10 +1,14 @@
-import { describe, it, expect } from '@jest/globals'
+import { describe, it, expect, jest } from '@jest/globals'
 import { CueSimulator } from '../../sim/CueSimulator'
 import type { SimSample, SimTimeline } from '../../sim/types'
 
+// Loads a cue library and runs many virtual frames, and the first test also absorbs the library
+// load, which is over the 5s default on a slower CI runner.
+jest.setTimeout(30000)
+
 /**
  * Self-verification for the cue simulation harness. These exercise the real loader, registry,
- * YargCueHandler, Sequencer and LightStateManager against the bundled Stage Kit v2 library, so
+ * CueHandler, Sequencer and LightStateManager against the bundled Stage Kit v2 library, so
  * they double as the first automated cue-behaviour regression tests.
  */
 

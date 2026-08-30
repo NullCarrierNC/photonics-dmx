@@ -6,14 +6,12 @@
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../types/cueTypes'
-import type { CompiledYargCue } from '../compiler/NodeCueCompiler'
-import type { CompiledEffect } from '../compiler/EffectCompiler'
+import type { CompiledNetCue } from '../compiler/NodeCueCompiler'
 import type { BaseEventNode } from '../../types/nodeCueTypes'
 import type { VariableDefinition } from '../../types/nodeCueTypes'
 import type { VariableValue } from './executionTypes'
 import type { NodeRuntimeCallbacks } from './executionTypes'
 import { NodeExecutionEngine } from './NodeExecutionEngine'
-import { EffectExecutionEngine } from './EffectExecutionEngine'
 import { EffectRegistry } from './EffectRegistry'
 import { createExecutionStateMachineLifecycle } from './executionStateMachineLifecycle'
 import type { GraphExecutionPolicy } from './GraphExecutionPolicy'
@@ -52,21 +50,26 @@ export class GraphExecutionEngine {
   private readonly variableDefinitions: VariableDefinition[]
   private readonly runtimeBroadcaster: RuntimeBroadcaster
   private effectRegistry?: EffectRegistry
-  private compiledCue?: CompiledYargCue
-  private compiledEffect?: CompiledEffect<BaseEventNode>
+  private compiledCue?: CompiledNetCue
   private readonly cueId: string
   private nodeEngine: NodeExecutionEngine | null = null
-  private effectEngine: EffectExecutionEngine | null = null
   /** Per-context state-machine tracking (cue graph only, when delegating to nodeEngine). */
   private readonly esmLifecycle = createExecutionStateMachineLifecycle()
-  /** Cue queuing: when a cue-started/cue-called run is in progress, queue incoming execute params. */
+  /** Cue queuing: when a cue-started/cue-called run is in progress, hold incoming execute params. */
   private isExecutingCueStarted = false
-  private queuedParameters: ExecutionParameters[] = []
+  /**
+   * The parameters waiting behind an in-flight lifecycle run, or null.
+   *
+   * One slot, not a queue: a later arrival replaces the waiting one, so the run that follows uses
+   * the newest frame and the frames in between are dropped.
+   */
+  private pendingParameters: ExecutionParameters | null = null
 
-  private get compiledCueOrEffect(): CompiledYargCue | CompiledEffect<BaseEventNode> {
-    if (this.compiledCue) return this.compiledCue
-    if (this.compiledEffect) return this.compiledEffect
-    throw new Error('GraphExecutionEngine: neither compiledCue nor compiledEffect set')
+  private get compiled(): CompiledNetCue {
+    if (!this.compiledCue) {
+      throw new Error('GraphExecutionEngine: compiledCue not set')
+    }
+    return this.compiledCue
   }
 
   /**
@@ -74,7 +77,7 @@ export class GraphExecutionEngine {
    * Effect registry required for effect-raiser nodes.
    */
   static forCue(
-    compiledCue: CompiledYargCue,
+    compiledCue: CompiledNetCue,
     cueId: string,
     policy: GraphExecutionPolicy,
     session: IGraphExecutionSession,
@@ -97,37 +100,6 @@ export class GraphExecutionEngine {
     )
     engine.compiledCue = compiledCue
     engine.effectRegistry = effectRegistry
-    return engine
-  }
-
-  /**
-   * Create engine for an effect graph (CompiledEffect).
-   * Used when invoking an effect from a cue's effect-raiser (nested).
-   */
-  static forEffect(
-    compiledEffect: CompiledEffect<BaseEventNode>,
-    effectId: string,
-    instanceId: number,
-    policy: GraphExecutionPolicy,
-    session: IGraphExecutionSession,
-    sequencer: ILightingController,
-    lightManager: DmxLightManager,
-    runtimeBroadcaster: RuntimeBroadcaster,
-    variableDefinitions: VariableDefinition[],
-    callbacks?: NodeRuntimeCallbacks,
-  ): GraphExecutionEngine {
-    const cueId = `effect:${effectId}:${instanceId}`
-    const engine = new GraphExecutionEngine(
-      policy,
-      session,
-      sequencer,
-      lightManager,
-      runtimeBroadcaster,
-      variableDefinitions,
-      callbacks,
-      cueId,
-    )
-    engine.compiledEffect = compiledEffect
     return engine
   }
 
@@ -176,30 +148,6 @@ export class GraphExecutionEngine {
     return this.nodeEngine
   }
 
-  private getOrCreateEffectEngine(
-    parameterValues: Record<string, unknown>,
-    callerCueData: CueData | Record<string, unknown>,
-  ): EffectExecutionEngine {
-    if (this.effectEngine) return this.effectEngine
-    if (!this.compiledEffect) {
-      throw new Error('GraphExecutionEngine: effect graph requires compiledEffect')
-    }
-    this.effectEngine = new EffectExecutionEngine(
-      this.compiledEffect,
-      this.sequencer,
-      this.lightManager,
-      this.runtimeBroadcaster,
-      parameterValues as Record<string, unknown>,
-      callerCueData as CueData,
-      {
-        runtimeCallbacks: this.callbacks,
-        consumeInitialClearPolicy: () => this.session.consumeInitialClearPolicy(),
-        revisitPolicy: this.policy.revisitPolicy,
-      },
-    )
-    return this.effectEngine
-  }
-
   /**
    * Run a cue graph: get entry nodes from policy, optionally queue, then start execution.
    * Caller must pass entryContext.hasCueStartedFired from session when policy uses queuing.
@@ -211,7 +159,7 @@ export class GraphExecutionEngine {
     parameters: ExecutionParameters,
     entryContext?: { hasCueStartedFired?: boolean },
   ): void {
-    const compiled = this.compiledCueOrEffect as CompiledYargCue
+    const compiled = this.compiled
     const entryNodes = this.policy.getEntryNodes(compiled, parameters, entryContext)
     const { cueStartedNodes, cueCalledNodes, nonLifecycleNodes } =
       this.splitLifecycleEntryNodes(entryNodes)
@@ -290,7 +238,7 @@ export class GraphExecutionEngine {
     const hasCueEvent = cueStartedNodes.length > 0 || cueCalledNodes.length > 0
 
     if (this.policy.queuing && hasCueEvent && this.isExecutingCueStarted) {
-      this.queuedParameters = [parameters]
+      this.pendingParameters = parameters
       return
     }
 
@@ -367,10 +315,11 @@ export class GraphExecutionEngine {
 
   private onCueEventComplete(): void {
     this.isExecutingCueStarted = false
-    if (this.queuedParameters.length > 0) {
-      const next = this.queuedParameters.shift()!
+    if (this.pendingParameters) {
+      const next = this.pendingParameters
+      this.pendingParameters = null
       const hasCueStartedFired = this.session.hasCueStartedFired?.() ?? false
-      const compiled = this.compiledCueOrEffect as CompiledYargCue
+      const compiled = this.compiled
       const entryNodes = this.policy.getEntryNodes(compiled, next, { hasCueStartedFired })
       const { cueStartedNodes, cueCalledNodes } = this.splitLifecycleEntryNodes(entryNodes)
       this.applyActivationSetup(cueStartedNodes, cueCalledNodes)
@@ -379,37 +328,19 @@ export class GraphExecutionEngine {
   }
 
   /**
-   * Run an effect graph (single entry: effect listener).
-   * Apply parameter values and trigger.
-   */
-  triggerEffectRun(
-    parameterValues: Record<string, unknown>,
-    callerCueData: CueData | Record<string, unknown>,
-  ): void {
-    const engine = this.getOrCreateEffectEngine(parameterValues, callerCueData)
-    engine.triggerEffect(callerCueData as CueData)
-  }
-
-  /**
    * Cancel all active executions.
    * @param skipEffectRemoval When true, leave effects on sequencer (e.g. primary cue stop).
    */
   cancelAll(skipEffectRemoval = false): void {
-    this.queuedParameters.length = 0
+    this.pendingParameters = null
     this.isExecutingCueStarted = false
     this.esmLifecycle.cancelAll()
     if (this.nodeEngine) {
       this.nodeEngine.cancelAll(skipEffectRemoval)
     }
-    if (this.effectEngine) {
-      this.effectEngine.cancelAll(skipEffectRemoval)
-    }
   }
 
   hasActiveContexts(): boolean {
-    return (
-      this.esmLifecycle.hasActiveContexts() ||
-      (this.effectEngine != null && this.effectEngine.hasActiveContexts())
-    )
+    return this.esmLifecycle.hasActiveContexts()
   }
 }

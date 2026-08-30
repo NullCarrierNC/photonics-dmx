@@ -1,22 +1,31 @@
 import { JSONSchemaType } from 'ajv'
+import { VARIABLE_TYPES } from '../../types/nodeCueTypes'
 import {
-  YARG_CUE_DATA_PROPERTIES,
+  NET_CUE_DATA_PROPERTIES,
   AUDIO_CUE_DATA_PROPERTIES,
   ALL_CONFIG_DATA_PROPERTIES,
 } from '../../../constants/nodeConstants'
 import type {
   ArrayLengthLogicNode,
   BuildRingLogicNode,
+  ClampLogicNode,
+  ExpressionLogicNode,
   ColorFromIndexLogicNode,
+  SelectFromListLogicNode,
+  PulseLogicNode,
   ConcatColorsLogicNode,
   ConcatLightsLogicNode,
   ConditionalLogicNode,
+  FrameGateLogicNode,
+  TempoLogicNode,
   ConfigDataLogicNode,
   CueDataLogicNode,
   CreatePairsLogicNode,
   DebuggerLogicNode,
   DelayLogicNode,
   ForEachLightLogicNode,
+  IndexedVariableLogicNode,
+  LedChangedLogicNode,
   LightsFromIndexLogicNode,
   LogicNode,
   MathLogicNode,
@@ -31,9 +40,7 @@ import { LOGIC_COMPARATORS, MATH_OPERATORS } from './helpers'
 import { stringIdSchema, valueSourceSchema, colorArrayValueSourceSchema } from './primitives'
 
 // Combine cue data properties without duplicates (dedupe overlapping properties like 'cue-name', 'bpm', 'execution-count')
-const CUE_DATA_PROPERTIES = [
-  ...new Set([...YARG_CUE_DATA_PROPERTIES, ...AUDIO_CUE_DATA_PROPERTIES]),
-]
+const CUE_DATA_PROPERTIES = [...new Set([...NET_CUE_DATA_PROPERTIES, ...AUDIO_CUE_DATA_PROPERTIES])]
 
 // Use shared config data properties
 const CONFIG_DATA_PROPERTIES = ALL_CONFIG_DATA_PROPERTIES
@@ -56,18 +63,26 @@ const variableLogicSchema = {
     varName: { type: 'string' },
     valueType: {
       type: 'string',
-      enum: [
-        'number',
-        'boolean',
-        'string',
-        'color',
-        'light-array',
-        'color-array',
-        'cue-type',
-        'event',
-      ] as const,
+      enum: VARIABLE_TYPES,
     },
     value: { ...valueSourceSchema, nullable: true },
+    assignments: {
+      type: 'array',
+      nullable: true,
+      items: {
+        type: 'object',
+        required: ['varName', 'valueType'],
+        additionalProperties: false,
+        properties: {
+          varName: { type: 'string' },
+          valueType: {
+            type: 'string',
+            enum: VARIABLE_TYPES,
+          },
+          value: { ...valueSourceSchema, nullable: true },
+        },
+      },
+    },
   },
 } as unknown as JSONSchemaType<VariableLogicNode>
 
@@ -92,6 +107,87 @@ const mathLogicSchema = {
   },
 } as unknown as JSONSchemaType<MathLogicNode>
 
+const expressionLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'expression', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'expression' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    expression: { type: 'string', minLength: 1 },
+    assignTo: { type: 'string', minLength: 1 },
+  },
+} as unknown as JSONSchemaType<ExpressionLogicNode>
+
+const clampLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'value', 'min', 'max', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'clamp' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    value: valueSourceSchema,
+    min: valueSourceSchema,
+    max: valueSourceSchema,
+    assignTo: { type: 'string' },
+  },
+} as unknown as JSONSchemaType<ClampLogicNode>
+
+const selectFromListLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'list', 'index', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'select-from-list' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    list: { type: 'array', items: { type: 'number' } },
+    index: valueSourceSchema,
+    assignTo: { type: 'string' },
+  },
+} as unknown as JSONSchemaType<SelectFromListLogicNode>
+
+const pulseLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'interval', 'anchorVar', 'assignTo'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'pulse' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    interval: valueSourceSchema,
+    anchorVar: { type: 'string' },
+    assignTo: { type: 'string' },
+    assignPhase: { type: 'string', nullable: true },
+  },
+} as unknown as JSONSchemaType<PulseLogicNode>
+
 const conditionalLogicSchema = {
   type: 'object',
   required: ['id', 'type', 'logicType', 'comparator', 'left', 'right'],
@@ -111,6 +207,60 @@ const conditionalLogicSchema = {
     right: valueSourceSchema,
   },
 } as unknown as JSONSchemaType<ConditionalLogicNode>
+
+const frameGateLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'divisor'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'frame-gate' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    divisor: valueSourceSchema,
+  },
+} as unknown as JSONSchemaType<FrameGateLogicNode>
+
+const tempoLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'assignBeatMs'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'tempo' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    assignBeatMs: { type: 'string' },
+    assignBarMs: { type: 'string', nullable: true },
+    assignPhraseMs: { type: 'string', nullable: true },
+    beatsPerBar: { ...valueSourceSchema, nullable: true },
+    barsPerPhrase: { ...valueSourceSchema, nullable: true },
+    minBeatMs: { ...valueSourceSchema, nullable: true },
+    maxBeatMs: { ...valueSourceSchema, nullable: true },
+    fallbackBeatMs: { ...valueSourceSchema, nullable: true },
+    assignCycles: { type: 'string', nullable: true },
+    cycleBands: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'number' },
+    },
+    cycleValues: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'number' },
+    },
+  },
+} as unknown as JSONSchemaType<TempoLogicNode>
 
 const cueDataLogicSchema = {
   type: 'object',
@@ -402,6 +552,31 @@ const randomLogicSchema = {
     sourceVariable: { type: 'string', nullable: true },
     count: { ...valueSourceSchema, nullable: true },
     assignTo: { type: 'string' },
+    rolls: {
+      type: 'array',
+      nullable: true,
+      items: {
+        type: 'object',
+        required: ['mode', 'assignTo'],
+        additionalProperties: false,
+        properties: {
+          mode: {
+            type: 'string',
+            enum: ['random-integer', 'random-choice', 'random-light'] as const,
+          },
+          min: { ...valueSourceSchema, nullable: true },
+          max: { ...valueSourceSchema, nullable: true },
+          choices: {
+            type: 'array',
+            nullable: true,
+            items: { type: 'string' },
+          },
+          sourceVariable: { type: 'string', nullable: true },
+          count: { ...valueSourceSchema, nullable: true },
+          assignTo: { type: 'string' },
+        },
+      },
+    },
   },
 } as unknown as JSONSchemaType<RandomLogicNode>
 
@@ -452,11 +627,63 @@ const forEachLightLogicSchema = {
   },
 } as unknown as JSONSchemaType<ForEachLightLogicNode>
 
+const indexedVariableLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'mode', 'varName', 'index', 'valueType'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'indexed-variable' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    mode: { type: 'string', enum: ['get', 'set'] as const },
+    varName: { type: 'string' },
+    index: valueSourceSchema,
+    valueType: {
+      type: 'string',
+      enum: VARIABLE_TYPES,
+    },
+    value: { ...valueSourceSchema, nullable: true },
+    assignTo: { type: 'string', nullable: true },
+  },
+} as unknown as JSONSchemaType<IndexedVariableLogicNode>
+
+const ledChangedLogicSchema = {
+  type: 'object',
+  required: ['id', 'type', 'logicType', 'assignIndex'],
+  additionalProperties: false,
+  properties: {
+    id: stringIdSchema,
+    type: { type: 'string', const: 'logic' },
+    logicType: { type: 'string', const: 'led-changed' },
+    label: { type: 'string', nullable: true },
+    outputs: {
+      type: 'array',
+      nullable: true,
+      items: { type: 'string' },
+    },
+    assignIndex: { type: 'string' },
+    assignColor: { type: 'string', nullable: true },
+    assignEdge: { type: 'string', nullable: true },
+  },
+} as unknown as JSONSchemaType<LedChangedLogicNode>
+
 export const logicNodeSchema = {
   oneOf: [
     variableLogicSchema,
     mathLogicSchema,
+    expressionLogicSchema,
+    clampLogicSchema,
+    selectFromListLogicSchema,
+    pulseLogicSchema,
     conditionalLogicSchema,
+    frameGateLogicSchema,
+    tempoLogicSchema,
     cueDataLogicSchema,
     configDataLogicSchema,
     lightsFromIndexLogicSchema,
@@ -474,5 +701,7 @@ export const logicNodeSchema = {
     randomLogicSchema,
     shuffleLightsLogicSchema,
     forEachLightLogicSchema,
+    indexedVariableLogicSchema,
+    ledChangedLogicSchema,
   ],
 } as unknown as JSONSchemaType<LogicNode>

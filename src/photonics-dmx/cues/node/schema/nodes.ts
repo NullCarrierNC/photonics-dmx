@@ -13,10 +13,10 @@ import {
   NodePositionSetting,
   NotesNode,
   ValueSource,
-  YargEventNode,
+  NetEventNode,
 } from '../../types/nodeCueTypes'
 import { NODE_EFFECT_TYPES } from '../../types/nodeCueTypes'
-import { YARG_EVENT_TYPES, AUDIO_EVENT_TYPES } from './helpers'
+import { NET_EVENT_TYPES, AUDIO_EVENT_TYPES } from './helpers'
 import {
   colorSchema,
   motionPatternSchema,
@@ -195,7 +195,7 @@ export const actionSchema = {
   ],
 } as unknown as JSONSchemaType<ActionNode>
 
-export const yargEventSchema: JSONSchemaType<YargEventNode> = {
+export const netEventSchema: JSONSchemaType<NetEventNode> = {
   type: 'object',
   required: ['id', 'type', 'eventType'],
   additionalProperties: false,
@@ -208,9 +208,11 @@ export const yargEventSchema: JSONSchemaType<YargEventNode> = {
       nullable: true,
       items: { type: 'string' },
     },
-    // Uses YARG_EVENT_TYPES which includes both system events (cue-started, cue-called)
+    // Uses NET_EVENT_TYPES which includes both system events (cue-started, cue-called)
     // and song events (beat, measure, keyframe, instruments, etc.)
-    eventType: { type: 'string', enum: YARG_EVENT_TYPES },
+    eventType: { type: 'string', enum: NET_EVENT_TYPES },
+    // RB3 led-N gates: also fire on a colour change while the position stays lit (see NetEventNode).
+    triggerOnColorChange: { type: 'boolean', nullable: true },
   },
 }
 

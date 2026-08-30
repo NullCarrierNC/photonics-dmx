@@ -1,9 +1,12 @@
 import { AudioCueType, AudioMotionCueRef } from '../cues/types/audioCueTypes'
 import { AudioConfig, AudioLightingData } from '../listeners/Audio/AudioTypes'
 import { CueData, CueType, DrumNoteType, InstrumentNoteType } from '../cues/types/cueTypes'
-import { YargCueRuntime } from '../listeners/YARG/YargNetworkListener'
+import type { CueRuntime } from '../cueHandlers/CueRuntime'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
+import type { SongEventCondition } from './sequencer/interfaces'
 import { RigChain } from './RigChain'
+import { ChainCueRuntime } from './ChainCueRuntime'
+import type { NetCueMode } from '../cues/types/nodeCueTypes'
 
 /**
  * Listener / processor surface that dispatches the same incoming event to every active rig
@@ -11,7 +14,7 @@ import { RigChain } from './RigChain'
  * definition, but each chain's handler runs the cue against its own sequencer and light
  * manager, so the cue scales to the rig it lives on.
  *
- * Implements {@link YargCueRuntime} (the contract `YargNetworkListener` consumes) and
+ * Implements {@link CueRuntime} (the contract `YargNetworkListener` consumes) and
  * {@link Rb3MenuCueDispatch} (the contract the RB3 StageKit processor consumes) directly.
  * Audio is exposed via a dedicated set of `audio*` methods because the `AudioCueHandler`
  * surface is broader than the cue-handler interface the YARG side uses.
@@ -19,7 +22,7 @@ import { RigChain } from './RigChain'
  * Chains without a handler for a given event class (e.g. a chain whose YARG listener hasn't
  * been enabled yet) are skipped silently for that event.
  */
-export class ChainFanout implements YargCueRuntime, Rb3MenuCueDispatch {
+export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
   private chains: RigChain[] = []
 
   public setChains(chains: RigChain[]): void {
@@ -30,62 +33,86 @@ export class ChainFanout implements YargCueRuntime, Rb3MenuCueDispatch {
     return this.chains
   }
 
-  // ── YARG (YargCueRuntime) ─────────────────────────────────────────────────────────────
+  // ── Game domains (CueRuntime) ────────────────────────────────────────────────────────
+  //
+  // One runtime per net domain, each fanning to that domain's handler slot on every chain.
+  // The fanout itself implements CueRuntime for the YARG domain, which is what the YARG
+  // network listener and the simulation paths consume.
+
+  private readonly runtimes: Record<NetCueMode, ChainCueRuntime> = {
+    yarg: new ChainCueRuntime(this, 'yarg'),
+    rb3: new ChainCueRuntime(this, 'rb3'),
+  }
+
+  /** The dispatch surface for one net domain. */
+  public cueRuntime(domain: NetCueMode): ChainCueRuntime {
+    return this.runtimes[domain]
+  }
 
   public notifySongStart(): void {
-    for (const c of this.chains) c.yargCueHandler?.notifySongStart()
+    this.runtimes.yarg.notifySongStart()
   }
 
   public notifySongEnd(): void {
-    for (const c of this.chains) c.yargCueHandler?.notifySongEnd()
+    this.runtimes.yarg.notifySongEnd()
   }
 
   public handleBeat(): void {
-    for (const c of this.chains) c.yargCueHandler?.handleBeat()
+    this.runtimes.yarg.handleBeat()
   }
 
   public handleMeasure(): void {
-    for (const c of this.chains) c.yargCueHandler?.handleMeasure()
+    this.runtimes.yarg.handleMeasure()
   }
 
   public handleKeyframeFirst(): void {
-    for (const c of this.chains) c.yargCueHandler?.handleKeyframeFirst()
+    this.runtimes.yarg.handleKeyframeFirst()
   }
 
   public handleKeyframeNext(): void {
-    for (const c of this.chains) c.yargCueHandler?.handleKeyframeNext()
+    this.runtimes.yarg.handleKeyframeNext()
   }
 
   public handleKeyframePrevious(): void {
-    for (const c of this.chains) c.yargCueHandler?.handleKeyframePrevious()
+    this.runtimes.yarg.handleKeyframePrevious()
   }
 
   public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
-    // Fire all chain handlers concurrently; each chain awaits its own cue's effect chain.
-    // Errors on any chain are isolated so a rig with an unloadable cue doesn't block siblings.
-    await Promise.allSettled(
-      this.chains.map((c) => c.yargCueHandler?.handleCue(cueType, parameters)),
-    )
+    await this.runtimes.yarg.handleCue(cueType, parameters)
   }
 
   public handleDrumNote(noteType: DrumNoteType, data: CueData): void {
-    for (const c of this.chains) c.yargCueHandler?.handleDrumNote(noteType, data)
+    this.runtimes.yarg.handleDrumNote(noteType, data)
   }
 
   public handleGuitarNote(noteType: InstrumentNoteType, data: CueData): void {
-    for (const c of this.chains) c.yargCueHandler?.handleGuitarNote(noteType, data)
+    this.runtimes.yarg.handleGuitarNote(noteType, data)
   }
 
   public handleBassNote(noteType: InstrumentNoteType, data: CueData): void {
-    for (const c of this.chains) c.yargCueHandler?.handleBassNote(noteType, data)
+    this.runtimes.yarg.handleBassNote(noteType, data)
   }
 
   public handleKeysNote(noteType: InstrumentNoteType, data: CueData): void {
-    for (const c of this.chains) c.yargCueHandler?.handleKeysNote(noteType, data)
+    this.runtimes.yarg.handleKeysNote(noteType, data)
   }
 
   public handleVocalNote(data: CueData): void {
-    for (const c of this.chains) c.yargCueHandler?.handleVocalNote(data)
+    this.runtimes.yarg.handleVocalNote(data)
+  }
+
+  public stopActiveStrobe(): void {
+    this.runtimes.yarg.stopActiveStrobe()
+  }
+
+  public resetSessionState(): void {
+    this.runtimes.yarg.resetSessionState()
+  }
+
+  /** Advance every chain's action-timing waits gated on a song-event condition (RB3 led/fog edges).
+   *  Goes straight to each sequencer - the condition is already resolved, so no cue handler is needed. */
+  public handleSongEvent(condition: SongEventCondition): void {
+    for (const c of this.chains) c.sequencer.handleSongEvent(condition)
   }
 
   // ── Audio ─────────────────────────────────────────────────────────────────────────────
@@ -170,42 +197,41 @@ export class ChainFanout implements YargCueRuntime, Rb3MenuCueDispatch {
     for (const c of this.chains) c.sequencer.removeEffectByLayer(layer, shouldRemoveTransitions)
   }
 
-  // ── YARG direct-sequencer fanout (used by simulation / test-effect paths) ─────────────
+  // ── Direct-sequencer fanout (used by simulation / test-effect paths) ─────────────────
   //
-  // These methods bypass the cue handler and drive each chain's sequencer directly. They
-  // exist because the simulation IPC path historically ticked the primary sequencer (e.g.
-  // `lighting.onBeat()`) without going through a handler — to keep those callers
-  // multi-rig-correct without forcing them to also wire up handlers, the fanout offers a
+  // These methods bypass the cue handler and drive each chain's sequencer directly, so they
+  // serve every domain. They exist because the simulation IPC path ticks the primary sequencer
+  // (e.g. `lighting.onBeat()`) without going through a handler; the fanout offers a
   // direct-sequencer surface that mirrors the audio path's `audioOnBeat` / `audioRemove*`.
 
-  public yargOnBeat(): void {
+  public onBeat(): void {
     for (const c of this.chains) c.sequencer.onBeat()
   }
 
-  public yargOnMeasure(): void {
+  public onMeasure(): void {
     for (const c of this.chains) c.sequencer.onMeasure()
   }
 
-  public yargOnKeyframe(): void {
+  public onKeyframe(): void {
     for (const c of this.chains) c.sequencer.onKeyframe()
   }
 
   /** Schedule the next-frame pan/tilt clear on every chain's sequencer. Used when a motion
    *  cue stops without a replacement so fixtures fall back to their home position. */
-  public yargSchedulePanTiltClear(): void {
+  public schedulePanTiltClear(): void {
     for (const c of this.chains) c.sequencer.schedulePanTiltClear()
   }
 
   /** Cancel a pending pan/tilt clear on every chain's sequencer. Used when a new motion
    *  cue starts before the deferred clear fires. */
-  public yargCancelPanTiltClear(): void {
+  public cancelPanTiltClear(): void {
     for (const c of this.chains) c.sequencer.cancelPanTiltClear()
   }
 
-  /** Stop the currently-active YARG cue on every chain's handler (no-op for chains
-   *  without a handler attached). Mirrors `YargCueHandler.stopActiveCue`. */
-  public yargStopActiveCue(): void {
-    for (const c of this.chains) c.yargCueHandler?.stopActiveCue()
+  /** Stop the currently-active cue for one domain on every chain's handler (no-op for chains
+   *  without a handler attached). Mirrors `CueHandler.stopActiveCue`. */
+  public stopActiveCue(domain: NetCueMode = 'yarg'): void {
+    for (const c of this.chains) c.cueHandlers[domain]?.stopActiveCue()
   }
 
   /**
@@ -213,8 +239,20 @@ export class ChainFanout implements YargCueRuntime, Rb3MenuCueDispatch {
    * and don't race each other. Errors on any chain don't block the others (mirrors the
    * `Promise.allSettled` pattern used elsewhere in the fanout).
    */
-  public async yargBlackout(durationMs: number): Promise<void> {
+  public async blackout(durationMs: number): Promise<void> {
     await Promise.allSettled(this.chains.map((c) => c.sequencer.blackout(durationMs)))
+  }
+
+  /**
+   * Mute / unmute the DMX lights on every chain with a held occluding overlay.
+   *
+   * Unlike a blackout this leaves the running cue alone: it keeps advancing on its own layers and
+   * reappears at its natural state the instant the overlay is released. The overlay is owned by each
+   * sequencer's system-effects controller rather than submitted as an ordinary effect, so it sits
+   * above every cue layer and survives the blackout paths that wipe layers underneath it.
+   */
+  public muteLighting(on: boolean): void {
+    for (const c of this.chains) c.sequencer.holdOcclusion(on)
   }
 
   // ── RB3 menu (Rb3MenuCueDispatch) ─────────────────────────────────────────────────────

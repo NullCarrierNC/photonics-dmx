@@ -6,7 +6,6 @@ import {
   LightingConfiguration,
   normalizeFixtureConfig,
   RgbMovingHeadDmxChannels,
-  RgbwMovingHeadDmxChannels,
 } from '../../../photonics-dmx/types'
 import {
   mirrorDmxForMovingHeadInvert,
@@ -17,6 +16,7 @@ import {
   motorDegFromTiltDmx,
   rawDmxToLogicalHomePercent,
 } from '../../../photonics-dmx/helpers/movingHeadCalibration'
+import { getDmxPreviewLightColorCss } from './dmxPreviewLightColor'
 import {
   enableConsole,
   disableConsole,
@@ -87,6 +87,12 @@ function buildInitialConsoleBuffer(light: DmxLight): Record<number, number> {
         buf[addr] = 0
     }
   }
+  // Added channels also run in console manual mode: hold fixed/mode channels at their value so a
+  // moving head that needs a pinned mode channel lights up, and park colour extras dark.
+  for (const extra of light.extraChannels ?? []) {
+    if (typeof extra.channel !== 'number' || extra.channel < 1 || extra.channel > 512) continue
+    buf[extra.channel] = extra.type === 'fixed' ? Math.max(0, Math.min(255, extra.value ?? 0)) : 0
+  }
   return buf
 }
 
@@ -131,7 +137,7 @@ function WizardBeamPreview({
   config: FixtureConfig
   step: number
 }) {
-  const ch = light.channels as RgbMovingHeadDmxChannels | RgbwMovingHeadDmxChannels
+  const ch = light.channels as RgbMovingHeadDmxChannels
   const pan = buffer[ch.pan] ?? 0
   const tilt = buffer[ch.tilt] ?? 0
 
@@ -142,24 +148,12 @@ function WizardBeamPreview({
       ? panTiltDmxToWizardMotorSpaceXY(pan, tilt, rawConsoleConfig)
       : panTiltDmxToSphericalXY(pan, tilt, config)
 
-  let bg = 'rgb(40,40,40)'
-  if (light.fixture === FixtureTypes.RGBMH) {
-    const r = buffer[ch.red] ?? 0
-    const g = buffer[ch.green] ?? 0
-    const b = buffer[ch.blue] ?? 0
-    const d = buffer[ch.masterDimmer] ?? 0
-    const s = d / 255
-    bg = `rgb(${Math.round(r * s)}, ${Math.round(g * s)}, ${Math.round(b * s)})`
-  } else if (light.fixture === FixtureTypes.RGBWMH) {
-    const wch = ch as RgbwMovingHeadDmxChannels
-    const r = buffer[ch.red] ?? 0
-    const g = buffer[ch.green] ?? 0
-    const b = buffer[ch.blue] ?? 0
-    const w = buffer[wch.white] ?? 0
-    const d = buffer[ch.masterDimmer] ?? 0
-    const s = d / 255
-    bg = `rgb(${Math.round((r + w) * s)}, ${Math.round((g + w) * s)}, ${Math.round((b + w) * s)})`
-  }
+  // Shared with the DMX previews, so added colour channels (white, amber, UV) tint the wizard
+  // swatch the same way they tint the stage preview.
+  const bg =
+    light.fixture === FixtureTypes.RGBMH
+      ? getDmxPreviewLightColorCss(light, buffer)
+      : 'rgb(40,40,40)'
 
   const baseCircleClasses =
     'w-14 h-14 rounded-full flex items-center justify-center text-sm font-semibold shadow-md relative overflow-hidden'
@@ -230,7 +224,7 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
   const [saving, setSaving] = useState(false)
   const [stepsConfirmed, setStepsConfirmed] = useState<Set<number>>(() => new Set())
 
-  const ch = light.channels as RgbMovingHeadDmxChannels | RgbwMovingHeadDmxChannels
+  const ch = light.channels as RgbMovingHeadDmxChannels
 
   const wizard3dLightingConfig = useMemo<LightingConfiguration>(() => {
     const derivedMount: 'floor' | 'ceiling' =

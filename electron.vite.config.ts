@@ -11,6 +11,9 @@ export default defineConfig({
       },
     },
     build: {
+      // electron-vite's built-in version table stops at Electron 34 and falls back to its
+      // oldest entry, so pin what Electron 43 actually ships: Chromium 150 / Node 24.18.
+      target: 'node24.18',
       watch: {}, // Enable watch mode for hot reload,
       minify: 'terser',
       terserOptions: {
@@ -48,6 +51,9 @@ export default defineConfig({
         '@photonics-dmx': resolve('src/photonics-dmx'),
       },
     },
+    build: {
+      target: 'node24.18',
+    },
   },
   renderer: {
     resolve: {
@@ -57,5 +63,8 @@ export default defineConfig({
       },
     },
     plugins: [react()],
+    build: {
+      target: 'chrome150',
+    },
   },
 })

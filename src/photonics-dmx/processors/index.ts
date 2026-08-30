@@ -10,4 +10,4 @@ export { ProcessorManager } from './ProcessorManager'
 
 // Export types
 export type { ProcessingMode, ProcessorManagerConfig } from './ProcessorManager'
-export type { StageKitData } from './Rb3StageKitDirectProcessor'
+export type { StageKitData } from '../listeners/RB3/rb3eTypes'

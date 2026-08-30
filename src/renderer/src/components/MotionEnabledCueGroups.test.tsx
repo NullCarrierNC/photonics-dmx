@@ -14,6 +14,12 @@ jest.mock('../ipcApi', () => {
     setEnabledYargMotionCueGroups: jest.fn(),
     setDisabledYargMotionCues: jest.fn(),
     getAvailableYargMotionCues: jest.fn(),
+    getRb3MotionCueGroups: jest.fn(),
+    getEnabledRb3MotionCueGroups: jest.fn(),
+    getDisabledRb3MotionCues: jest.fn(),
+    setEnabledRb3MotionCueGroups: jest.fn(),
+    setDisabledRb3MotionCues: jest.fn(),
+    getAvailableRb3MotionCues: jest.fn(),
   }
 })
 
@@ -75,5 +81,33 @@ describe('MotionEnabledCueGroups (yarg)', () => {
 
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('persist failed')
+  })
+})
+
+describe('MotionEnabledCueGroups (rb3)', () => {
+  const getRb3MotionCueGroups = jest.mocked(ipcApi.getRb3MotionCueGroups)
+  const getEnabledRb3MotionCueGroups = jest.mocked(ipcApi.getEnabledRb3MotionCueGroups)
+  const getDisabledRb3MotionCues = jest.mocked(ipcApi.getDisabledRb3MotionCues)
+  const getAvailableRb3MotionCues = jest.mocked(ipcApi.getAvailableRb3MotionCues)
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('routes to the RB3 motion IPC wrappers and titles the list for RB3', async () => {
+    getRb3MotionCueGroups.mockResolvedValue([{ id: 'rmg1', name: 'RB3 Motion 1', cueCount: 1 }])
+    getEnabledRb3MotionCueGroups.mockResolvedValue(['rmg1'])
+    getDisabledRb3MotionCues.mockResolvedValue({})
+    getAvailableRb3MotionCues.mockResolvedValue([
+      { id: 'rm1', name: 'RB3 Prog 1', description: 'd' },
+    ])
+
+    render(<MotionEnabledCueGroups platform="rb3" />)
+
+    expect(screen.getByRole('heading', { name: /RB3 Motion Cue Groups/i })).toBeTruthy()
+    await screen.findByRole('button', { name: /RB3 Motion 1/ })
+    // The rb3 platform must not fall through to the YARG wrappers.
+    expect(getRb3MotionCueGroups).toHaveBeenCalled()
+    expect(jest.mocked(ipcApi.getYargMotionCueGroups)).not.toHaveBeenCalled()
   })
 })

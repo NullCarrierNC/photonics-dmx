@@ -5,6 +5,7 @@ import type {
 } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
+import MultiItemSummary from './MultiItemSummary'
 
 export interface RandomLogicEditorProps extends LogicEditorCommonProps {
   node: RandomLogicNode
@@ -140,6 +141,13 @@ const RandomLogicEditor: React.FC<RandomLogicEditorProps> = ({
         {mode === 'random-choice' && 'Picks one string from the list at random.'}
         {mode === 'random-light' && 'Picks count lights at random from the source array.'}
       </p>
+      {node.rolls && node.rolls.length > 0 && (
+        <MultiItemSummary
+          header={`Multi-roll: ${node.rolls.length} rolls`}
+          rows={node.rolls.map((r) => `${r.mode} → ${r.assignTo}`)}
+          ignoredFieldsLabel="single-roll"
+        />
+      )}
     </div>
   )
 }

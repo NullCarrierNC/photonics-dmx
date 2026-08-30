@@ -13,6 +13,7 @@ import type {
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { validateEffect } from '../../../ipcApi'
+import { replaceEffectInFile } from '../lib/cueUtils'
 
 /**
  * Resolve a JSON Pointer path (e.g. ["nodes", "events", "0", "type"]) to character
@@ -113,10 +114,7 @@ const EffectJsonEditor: React.FC<EffectJsonEditorProps> = ({
   const buildFileWithEffect = useCallback(
     (effect: YargEffectDefinition | AudioEffectDefinition): EffectFile => {
       const file = editorDoc.file as EffectFile
-      return {
-        ...file,
-        effects: file.effects.map((e) => (e.id === selectedEffectId ? effect : e)),
-      }
+      return replaceEffectInFile(file, selectedEffectId, effect)
     },
     [editorDoc.file, selectedEffectId],
   )

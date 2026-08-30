@@ -27,7 +27,8 @@ export function setupShellHandlers(ipcMain: IpcMain): void {
     if (!validatedPath.ok) {
       return ipcError(validatedPath.error)
     }
+    // shell.openPath resolves to a non-empty message string when the open FAILED.
     const result = await shell.openPath(validatedPath.value)
-    return { success: true, result } as const
+    return result ? ipcError(result) : ipcSuccess()
   })
 }

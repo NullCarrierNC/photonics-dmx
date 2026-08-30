@@ -1,5 +1,6 @@
 import {
   NODE_EFFECT_TYPES,
+  NODE_LOGIC_TYPES,
   type LogicNode,
   type NodeEffectType,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
@@ -18,28 +19,10 @@ export type NodeDragPayload =
   | { kind: 'logic'; logicType: LogicNode['logicType'] }
   | { kind: 'notes'; variant: NotesVariant }
 
-const LOGIC_TYPES: ReadonlyArray<LogicNode['logicType']> = [
-  'variable',
-  'math',
-  'conditional',
-  'cue-data',
-  'config-data',
-  'lights-from-index',
-  'color-from-index',
-  'reverse-colors',
-  'concat-colors',
-  'shuffle-colors',
-  'array-length',
-  'reverse-lights',
-  'create-pairs',
-  'concat-lights',
-  'build-ring',
-  'delay',
-  'debugger',
-  'random',
-  'shuffle-lights',
-  'for-each-light',
-]
+// Membership set for validating dropped logic payloads, derived from the canonical NODE_LOGIC_TYPES so it
+// stays in lockstep with the LogicNode union. A type absent from this set makes parseNodeDrag reject the
+// drop, so the drag silently produces no node.
+const LOGIC_TYPES = new Set<string>(NODE_LOGIC_TYPES)
 
 const NOTES_VARIANTS: ReadonlyArray<NotesVariant> = ['notes', 'info', 'important']
 
@@ -77,10 +60,7 @@ export const parseNodeDrag = (raw: string): NodeDragPayload | null => {
     }
     case 'logic': {
       const logicType = (parsed as { logicType?: unknown }).logicType
-      if (
-        typeof logicType !== 'string' ||
-        !(LOGIC_TYPES as readonly string[]).includes(logicType)
-      ) {
+      if (typeof logicType !== 'string' || !LOGIC_TYPES.has(logicType)) {
         return null
       }
       return { kind: 'logic', logicType: logicType as LogicNode['logicType'] }

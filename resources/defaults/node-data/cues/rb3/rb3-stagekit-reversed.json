@@ -1,0 +1,966 @@
+{
+  "version": 1,
+  "cueVersion": 1,
+  "mode": "rb3",
+  "group": {
+    "id": "rb3-stagekit-reversed",
+    "name": "RB3 Stage Kit Reversed",
+    "description": "The Stage Kit mirrored with the LED ring reversed, so light 8 plays light 1 and light 1 plays light 8. Same colours and blending, opposite direction."
+  },
+  "cues": [
+    {
+      "id": "cue-rb3-stagekit-reversed",
+      "name": "Stage Kit Reversed",
+      "description": "The Stage Kit mirrored with the LED ring reversed, so light 8 plays light 1 and light 1 plays light 8. Same colours and blending, opposite direction.",
+      "cueType": "RB3",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "rb3-skrev-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "rb3-skrev-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [
+          {
+            "id": "rb3-skrev-black",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "rb3-skrev-red-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "colRed"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layRed"
+            }
+          },
+          {
+            "id": "rb3-skrev-green-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "colGreen"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layGreen"
+            }
+          },
+          {
+            "id": "rb3-skrev-blue-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "colBlue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layBlue"
+            }
+          },
+          {
+            "id": "rb3-skrev-yellow-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "variable",
+                "name": "colYellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layYellow"
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "rb3-skrev-ring",
+            "type": "logic",
+            "logicType": "build-ring",
+            "assignTo": "ringLights",
+            "assignGroupSize": "ringGroupSize"
+          },
+          {
+            "id": "rb3-skrev-cd-red",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-red-states",
+            "assignTo": "mRed"
+          },
+          {
+            "id": "rb3-skrev-cd-green",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-green-states",
+            "assignTo": "mGreen"
+          },
+          {
+            "id": "rb3-skrev-cd-blue",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-blue-states",
+            "assignTo": "mBlue"
+          },
+          {
+            "id": "rb3-skrev-cd-yellow",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-yellow-states",
+            "assignTo": "mYellow"
+          },
+          {
+            "id": "rb3-skrev-each",
+            "type": "logic",
+            "logicType": "for-each-light",
+            "sourceVariable": "ringLights",
+            "currentLightVariable": "curCell",
+            "currentIndexVariable": "j"
+          },
+          {
+            "id": "rb3-skrev-jg",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "j / ringGroupSize",
+            "assignTo": "jg"
+          },
+          {
+            "id": "rb3-skrev-cell",
+            "type": "logic",
+            "logicType": "select-from-list",
+            "list": [0, 1, 2, 3, 4, 5, 6, 7],
+            "index": {
+              "source": "variable",
+              "name": "jg"
+            },
+            "assignTo": "cellIdx"
+          },
+          {
+            "id": "rb3-skrev-led",
+            "type": "logic",
+            "logicType": "select-from-list",
+            "list": [7, 6, 5, 4, 3, 2, 1, 0],
+            "index": {
+              "source": "variable",
+              "name": "jg"
+            },
+            "assignTo": "ledIdx"
+          },
+          {
+            "id": "rb3-skrev-red-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mRed / pow(2, ledIdx)) % 2",
+            "assignTo": "bitRed"
+          },
+          {
+            "id": "rb3-skrev-red-col",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "literal",
+              "value": ["transparent", "red"]
+            },
+            "index": {
+              "source": "variable",
+              "name": "bitRed"
+            },
+            "assignTo": "colRed"
+          },
+          {
+            "id": "rb3-skrev-red-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "10 + cellIdx",
+            "assignTo": "layRed"
+          },
+          {
+            "id": "rb3-skrev-green-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mGreen / pow(2, ledIdx)) % 2",
+            "assignTo": "bitGreen"
+          },
+          {
+            "id": "rb3-skrev-green-col",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "literal",
+              "value": ["transparent", "green"]
+            },
+            "index": {
+              "source": "variable",
+              "name": "bitGreen"
+            },
+            "assignTo": "colGreen"
+          },
+          {
+            "id": "rb3-skrev-green-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "20 + cellIdx",
+            "assignTo": "layGreen"
+          },
+          {
+            "id": "rb3-skrev-blue-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mBlue / pow(2, ledIdx)) % 2",
+            "assignTo": "bitBlue"
+          },
+          {
+            "id": "rb3-skrev-blue-col",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "literal",
+              "value": ["transparent", "blue"]
+            },
+            "index": {
+              "source": "variable",
+              "name": "bitBlue"
+            },
+            "assignTo": "colBlue"
+          },
+          {
+            "id": "rb3-skrev-blue-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "30 + cellIdx",
+            "assignTo": "layBlue"
+          },
+          {
+            "id": "rb3-skrev-yellow-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mYellow / pow(2, ledIdx)) % 2",
+            "assignTo": "bitYellow"
+          },
+          {
+            "id": "rb3-skrev-yellow-col",
+            "type": "logic",
+            "logicType": "color-from-index",
+            "colors": {
+              "source": "literal",
+              "value": ["transparent", "yellow"]
+            },
+            "index": {
+              "source": "variable",
+              "name": "bitYellow"
+            },
+            "assignTo": "colYellow"
+          },
+          {
+            "id": "rb3-skrev-yellow-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "40 + cellIdx",
+            "assignTo": "layYellow"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": [
+          {
+            "id": "rb3-skrev-note-1",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Stage Kit, ring reversed",
+            "style": "notes",
+            "note": "Renders the same effects as Stage Kit, but with the light order reversed. Instead of the lights acting as 1->8 they act as 8->1."
+          }
+        ]
+      },
+      "connections": [
+        {
+          "from": "rb3-skrev-start",
+          "to": "rb3-skrev-ring"
+        },
+        {
+          "from": "rb3-skrev-ring",
+          "to": "rb3-skrev-black"
+        },
+        {
+          "from": "rb3-skrev-called",
+          "to": "rb3-skrev-cd-red"
+        },
+        {
+          "from": "rb3-skrev-cd-red",
+          "to": "rb3-skrev-cd-green"
+        },
+        {
+          "from": "rb3-skrev-cd-green",
+          "to": "rb3-skrev-cd-blue"
+        },
+        {
+          "from": "rb3-skrev-cd-blue",
+          "to": "rb3-skrev-cd-yellow"
+        },
+        {
+          "from": "rb3-skrev-cd-yellow",
+          "to": "rb3-skrev-each"
+        },
+        {
+          "from": "rb3-skrev-each",
+          "to": "rb3-skrev-jg",
+          "fromPort": "each"
+        },
+        {
+          "from": "rb3-skrev-jg",
+          "to": "rb3-skrev-cell"
+        },
+        {
+          "from": "rb3-skrev-cell",
+          "to": "rb3-skrev-led"
+        },
+        {
+          "from": "rb3-skrev-led",
+          "to": "rb3-skrev-red-bit"
+        },
+        {
+          "from": "rb3-skrev-red-bit",
+          "to": "rb3-skrev-red-col"
+        },
+        {
+          "from": "rb3-skrev-red-col",
+          "to": "rb3-skrev-red-lay"
+        },
+        {
+          "from": "rb3-skrev-red-lay",
+          "to": "rb3-skrev-red-act"
+        },
+        {
+          "from": "rb3-skrev-red-act",
+          "to": "rb3-skrev-green-bit"
+        },
+        {
+          "from": "rb3-skrev-green-bit",
+          "to": "rb3-skrev-green-col"
+        },
+        {
+          "from": "rb3-skrev-green-col",
+          "to": "rb3-skrev-green-lay"
+        },
+        {
+          "from": "rb3-skrev-green-lay",
+          "to": "rb3-skrev-green-act"
+        },
+        {
+          "from": "rb3-skrev-green-act",
+          "to": "rb3-skrev-blue-bit"
+        },
+        {
+          "from": "rb3-skrev-blue-bit",
+          "to": "rb3-skrev-blue-col"
+        },
+        {
+          "from": "rb3-skrev-blue-col",
+          "to": "rb3-skrev-blue-lay"
+        },
+        {
+          "from": "rb3-skrev-blue-lay",
+          "to": "rb3-skrev-blue-act"
+        },
+        {
+          "from": "rb3-skrev-blue-act",
+          "to": "rb3-skrev-yellow-bit"
+        },
+        {
+          "from": "rb3-skrev-yellow-bit",
+          "to": "rb3-skrev-yellow-col"
+        },
+        {
+          "from": "rb3-skrev-yellow-col",
+          "to": "rb3-skrev-yellow-lay"
+        },
+        {
+          "from": "rb3-skrev-yellow-lay",
+          "to": "rb3-skrev-yellow-act"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rb3-skrev-start": {
+            "x": -5.291836084797978,
+            "y": -1.1329739093780518
+          },
+          "rb3-skrev-called": {
+            "x": 266.518996944651,
+            "y": -1.2988374829292297
+          },
+          "rb3-skrev-black": {
+            "x": 4.668336069211364,
+            "y": 209.98809607699513
+          },
+          "rb3-skrev-red-act": {
+            "x": 642.4284331258386,
+            "y": 211.26777920871973
+          },
+          "rb3-skrev-green-act": {
+            "x": 649.4285320229828,
+            "y": 687.3536964580417
+          },
+          "rb3-skrev-blue-act": {
+            "x": 1046.985668366775,
+            "y": 1.9470088593661785
+          },
+          "rb3-skrev-yellow-act": {
+            "x": 1028.1929746288806,
+            "y": 477.0315349549055
+          },
+          "rb3-skrev-ring": {
+            "x": -8.76114253140986,
+            "y": 106.49817583709955
+          },
+          "rb3-skrev-cd-red": {
+            "x": 253.89909186586738,
+            "y": 92.18408508971334
+          },
+          "rb3-skrev-cd-green": {
+            "x": 257.05033215507865,
+            "y": 218.0988031923771
+          },
+          "rb3-skrev-cd-blue": {
+            "x": 263.2855247762054,
+            "y": 371.670070592314
+          },
+          "rb3-skrev-cd-yellow": {
+            "x": 253.55477225221694,
+            "y": 484.1026725359261
+          },
+          "rb3-skrev-each": {
+            "x": 248.0636485684663,
+            "y": 596.2575071193278
+          },
+          "rb3-skrev-jg": {
+            "x": 257.5780772026628,
+            "y": 722.6660617552698
+          },
+          "rb3-skrev-cell": {
+            "x": 269.8595143202692,
+            "y": 832.9682345874608
+          },
+          "rb3-skrev-led": {
+            "x": 269.5576075334102,
+            "y": 939.4108778275549
+          },
+          "rb3-skrev-red-bit": {
+            "x": 269.2490862682462,
+            "y": 1055.859744105488
+          },
+          "rb3-skrev-red-col": {
+            "x": 660.6160225551575,
+            "y": 1.7743141390383244
+          },
+          "rb3-skrev-red-lay": {
+            "x": 646.7254183571786,
+            "y": 108.8393811173737
+          },
+          "rb3-skrev-green-bit": {
+            "x": 657.7684380039573,
+            "y": 358.73516891896725
+          },
+          "rb3-skrev-green-col": {
+            "x": 639.765636453405,
+            "y": 473.0613754056394
+          },
+          "rb3-skrev-green-lay": {
+            "x": 645.9415604136884,
+            "y": 577.7005227766931
+          },
+          "rb3-skrev-blue-bit": {
+            "x": 651.0426845308393,
+            "y": 828.1778694875538
+          },
+          "rb3-skrev-blue-col": {
+            "x": 656.3728524502367,
+            "y": 950.6517830193043
+          },
+          "rb3-skrev-blue-lay": {
+            "x": 657.99170759134,
+            "y": 1046.306446056813
+          },
+          "rb3-skrev-yellow-bit": {
+            "x": 1050.6498626172543,
+            "y": 154.88803593069315
+          },
+          "rb3-skrev-yellow-col": {
+            "x": 1050.4634426366538,
+            "y": 254.09987967461348
+          },
+          "rb3-skrev-yellow-lay": {
+            "x": 1045.9439333602786,
+            "y": 363.68755124881864
+          },
+          "rb3-skrev-note-1": {
+            "x": -1.8876556476830046,
+            "y": -140.16451544033623
+          }
+        },
+        "viewport": {
+          "x": 76.2929407082703,
+          "y": 190.2376196100049,
+          "zoom": 0.6399783709725961
+        }
+      },
+      "variables": [
+        {
+          "name": "ringLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "ringGroupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "curCell",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "j",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "jg",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "mRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "mGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "mBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "mYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "cellIdx",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "ledIdx",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "bitRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "colRed",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "isParameter": false
+        },
+        {
+          "name": "layRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 10,
+          "isParameter": false
+        },
+        {
+          "name": "bitGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "colGreen",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "isParameter": false
+        },
+        {
+          "name": "layGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 20,
+          "isParameter": false
+        },
+        {
+          "name": "bitBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "colBlue",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "isParameter": false
+        },
+        {
+          "name": "layBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 30,
+          "isParameter": false
+        },
+        {
+          "name": "bitYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "colYellow",
+          "type": "color",
+          "scope": "cue",
+          "initialValue": "transparent",
+          "isParameter": false
+        },
+        {
+          "name": "layYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 40,
+          "isParameter": false
+        }
+      ]
+    }
+  ],
+  "bundled": true
+}

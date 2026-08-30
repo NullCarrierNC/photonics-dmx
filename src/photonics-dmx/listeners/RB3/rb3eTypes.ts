@@ -35,6 +35,30 @@ export enum Rb3ePacketType {
   EVENT_DX_DATA = 10, // RB3E_EventModData struct
 }
 
+/**
+ * RB3E screen names (EVENT_SCREEN_NAME payloads) that map to the main menu; both StageKit
+ * processors drive their menu look from these.
+ */
+export const RB3_MAIN_HUB_SCREEN = 'main_hub_screen'
+export const RB3_SONG_SELECT_SCREEN = 'song_select_screen'
+
+/**
+ * The parsed StageKit packet emitted on the listener's `stagekit:data` event — the single shared
+ * shape consumed by both the direct processor and the RB3 cue-mode processor. `leftChannel` /
+ * `rightChannel` are the raw RB3E bytes (`positions` is the derived bit list; `rightChannel` lets a
+ * consumer tell DisableAll 0xFF from StrobeOff 0x07).
+ */
+export interface StageKitData {
+  positions: number[] // LED positions derived from leftChannel: [0..7]
+  color: string // colour bank: 'red' | 'green' | 'blue' | 'yellow' | 'off'
+  brightness: 'low' | 'medium' | 'high'
+  fog: boolean
+  strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off'
+  leftChannel: number // raw 8-bit LED position mask
+  rightChannel: number // raw colour-bank / effect byte
+  timestamp: number
+}
+
 export enum Rb3RightChannel {
   FogOn = 0x01,
   FogOff = 0x02,

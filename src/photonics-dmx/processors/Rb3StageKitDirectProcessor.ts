@@ -11,28 +11,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from 'events'
 import { StageKitConfig, DEFAULT_STAGEKIT_CONFIG } from '../listeners/RB3/StageKitTypes'
-import { CueData } from '../cues/types/cueTypes'
+import { CueData, defaultCueData, positionsToMask } from '../cues/types/cueTypes'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import { Rb3StageKitRigProcessor } from './Rb3StageKitRigProcessor'
 import { ChainFanout } from '../controllers/ChainFanout'
+import { RB3_MAIN_HUB_SCREEN, RB3_SONG_SELECT_SCREEN } from '../listeners/RB3/rb3eTypes'
+import type { StageKitData } from '../listeners/RB3/rb3eTypes'
+import { Rb3MenuFramePump } from './rb3MenuAnimation'
 import { createLogger } from '../../shared/logger'
 import { monotonicNowMs } from '../../shared/time'
 const log = createLogger('Rb3StageKitDirectProcessor')
-
-const RB3_MAIN_HUB_SCREEN = 'main_hub_screen'
-const RB3_SONG_SELECT_SCREEN = 'song_select_screen'
-
-/**
- * StageKit data structure
- */
-export interface StageKitData {
-  positions: number[] // LED positions [0,1,2,3,4,5,6,7]
-  color: string // Color: 'red', 'green', 'blue', 'yellow', 'off'
-  brightness: 'low' | 'medium' | 'high'
-  fog?: boolean // StageKit FogOn/FogOff state (no DMX fog output yet; see fogState propagation)
-  strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off' // Strobe effect type
-  timestamp: number
-}
 
 export class Rb3StageKitDirectProcessor extends EventEmitter {
   private config: StageKitConfig
@@ -53,8 +41,20 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   // Track if we're currently in a song (using direct control)
   private _inSong: boolean = false
 
-  // Menu animation timer
-  private menuAnimationTimer: NodeJS.Timeout | null = null
+  // Accumulated StageKit LED bank masks (bit i = position i lit). The incoming StageKit events are
+  // per-bank, so we accumulate here and emit a full `ledBanks` snapshot each frame, the same shape the
+  // cue-mode processor emits. This keeps the preview a single render path (no per-packet direct mode).
+  // Reset on menu/clear/off.
+  private ledBankMasks = { red: 0, green: 0, blue: 0, yellow: 0 }
+
+  // Menu-look pump: no immediate first frame (the first paint lands one interval after Menus),
+  // start() restarts the interval, frames gated on the Menus game state.
+  private readonly menuFramePump = new Rb3MenuFramePump({
+    getDispatch: () => this.cueHandler ?? null,
+    isActive: () => this._currentGameState === 'Menus',
+    immediateFirstFrame: false,
+    restartOnStart: true,
+  })
 
   /**
    * Builds one `Rb3StageKitRigProcessor` per active rig in the supplied `ChainFanout`.
@@ -171,7 +171,11 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     platform: string,
     rb3ScreenNameOverride?: string,
   ): CueData {
+    // A menu has no StageKit LEDs lit, so the accumulated snapshot resets and defaultCueData's empty
+    // ledBanks is emitted.
+    this.resetLedBanks()
     return {
+      ...defaultCueData,
       datagramVersion: realCueData?.datagramVersion || 1,
       platform: realCueData?.platform || 'RB3E',
       currentScene: 'Menu',
@@ -220,7 +224,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   private isDefaultMenuCueRunning(): boolean {
-    return this._currentGameState === 'Menus' && this.menuAnimationTimer !== null
+    return this._currentGameState === 'Menus' && this.menuFramePump.isRunning()
   }
 
   /**
@@ -338,9 +342,12 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       const previousState = this._currentGameState
       this._currentGameState = gameState
 
+      // Clearing the lights resets the accumulated snapshot, so defaultCueData's empty ledBanks is emitted.
+      this.resetLedBanks()
       const clearCueData: CueData =
         gameState === 'InGame'
           ? {
+              ...defaultCueData,
               datagramVersion: realCueData?.datagramVersion || 1,
               platform: realCueData?.platform || 'RB3E',
               currentScene: 'Gameplay',
@@ -560,10 +567,28 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Create and emit CueData for network debugging
    * @param event The StageKit event data
    */
+  private resetLedBanks(): void {
+    this.ledBankMasks = { red: 0, green: 0, blue: 0, yellow: 0 }
+  }
+
+  /** Fold one per-bank StageKit event into the accumulated snapshot (matches the old preview logic:
+   *  a colour sets that bank to its positions, empty positions clear it, and `off` clears everything). */
+  private updateLedBanks(color: string, positions: number[]): void {
+    if (color === 'off') {
+      this.resetLedBanks()
+      return
+    }
+    if (color === 'red' || color === 'green' || color === 'blue' || color === 'yellow') {
+      this.ledBankMasks[color] = positionsToMask(positions)
+    }
+  }
+
   private emitCueDataForStageKit(event: StageKitData): void {
     const { positions, color, strobeEffect, fog } = event
+    this.updateLedBanks(color, positions)
 
     const cueData: CueData = {
+      ...defaultCueData,
       datagramVersion: 1,
       platform: 'RB3E',
       currentScene: 'Gameplay',
@@ -603,6 +628,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       bonusEffect: false,
       ledColor: color === 'off' ? '' : color,
       ledPositions: positions,
+      ledBanks: { ...this.ledBankMasks },
       rb3Platform: 'RB3E',
       rb3BuildTag: '',
       rb3SongName: '',
@@ -636,45 +662,19 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   /**
-   * Start the menu animation timer to drive RB3E-only menu frame every 1000ms
+   * Start the menu animation pump to drive the RB3E-only menu frame every 1000ms
    */
   private startMenuAnimationTimer(): void {
-    log.info('StageKitDirectProcessor: startMenuAnimationTimer called')
-    this.clearMenuAnimationTimer()
-
-    if (!this.cueHandler || typeof this.cueHandler.playMenuFrame !== 'function') {
-      log.warn(
-        'StageKitDirectProcessor: Cannot start menu animation - no menu cue handler available',
-      )
-      return
-    }
-
-    log.info('StageKitDirectProcessor: Starting menu animation timer (1000ms interval)')
-
-    this.menuAnimationTimer = setInterval(() => {
-      if (this._currentGameState === 'Menus' && this.cueHandler) {
-        try {
-          this.cueHandler.playMenuFrame()
-        } catch (error) {
-          log.error('StageKitDirectProcessor: Error in menu cue playMenuFrame:', error)
-        }
-      }
-    }, 1000)
+    log.info('StageKitDirectProcessor: Starting the menu animation pump')
+    this.menuFramePump.start()
   }
 
   /**
-   * Clear the menu animation timer and any RB3E menu-layer effects
+   * Stop the menu animation pump, clearing any RB3E menu-layer effects
    */
   private clearMenuAnimationTimer(): void {
-    log.info('StageKitDirectProcessor: clearMenuAnimationTimer called')
-    if (this.menuAnimationTimer) {
-      log.info('StageKitDirectProcessor: Clearing menu animation timer')
-      clearInterval(this.menuAnimationTimer)
-      this.menuAnimationTimer = null
-    } else {
-      log.info('StageKitDirectProcessor: No menu animation timer to clear')
-    }
-    this.cueHandler?.clear()
+    log.info('StageKitDirectProcessor: Stopping the menu animation pump')
+    this.menuFramePump.stop()
   }
 
   /**

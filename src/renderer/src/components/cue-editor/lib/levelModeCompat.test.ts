@@ -92,6 +92,11 @@ describe('findIncompatibleTimingNodes — level-mode events', () => {
     expect(findIncompatibleTimingNodes(nodes, [edge('e', 'f')]).nodeIds.has('f')).toBe(true)
   })
 
+  it('flags led-changed under a level event (a fan-out node like for-each-light)', () => {
+    const nodes = [audioEvent('e', 'audio-energy', 'level'), logic('lc', 'led-changed')]
+    expect(findIncompatibleTimingNodes(nodes, [edge('e', 'lc')]).nodeIds.has('lc')).toBe(true)
+  })
+
   it('flags a delay reachable from BOTH an edge and a level event (warn-only)', () => {
     const nodes = [
       audioEvent('lvl', 'audio-energy', 'level'),

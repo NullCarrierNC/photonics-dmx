@@ -142,6 +142,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -206,6 +207,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       // Should not throw
@@ -320,6 +322,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -414,6 +417,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -538,6 +542,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -705,6 +710,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -815,6 +821,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         parameterValues,
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -912,6 +919,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -1010,6 +1018,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       await engine.triggerEffect(createCueData())
@@ -1082,6 +1091,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       const startTime = Date.now()
@@ -1155,6 +1165,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
       const cueData = createCueData()
       const onIdle = jest.fn(() => {
@@ -1243,7 +1254,7 @@ describe('EffectExecutionEngine', () => {
     })
 
     it('does not fire idle until all pending callback-backed submissions complete', () => {
-      const callbacks: Array<() => void> = []
+      const callbacks: Array<(cancelled: boolean) => void> = []
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, _effect, callback) => {
           callbacks.push(callback)
@@ -1258,6 +1269,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
       const onIdle = jest.fn()
       engine.setOnIdle(onIdle)
@@ -1267,15 +1279,15 @@ describe('EffectExecutionEngine', () => {
       expect(callbacks).toHaveLength(2)
       expect(onIdle).not.toHaveBeenCalled()
 
-      callbacks[0]()
+      callbacks[0](false)
       expect(onIdle).not.toHaveBeenCalled()
 
-      callbacks[1]()
+      callbacks[1](false)
       expect(onIdle).toHaveBeenCalledTimes(1)
     })
 
     it('cancelAll clears submitted callback-backed effects and prevents idle retrigger', () => {
-      const callbacks: Array<() => void> = []
+      const callbacks: Array<(cancelled: boolean) => void> = []
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, _effect, callback) => {
           callbacks.push(callback)
@@ -1290,6 +1302,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
       const onIdle = jest.fn()
       engine.setOnIdle(onIdle)
@@ -1310,13 +1323,13 @@ describe('EffectExecutionEngine', () => {
       }
 
       // Simulate stale callback invocations after cancel: idle callback should already be detached.
-      callbacks[0]()
-      callbacks[1]()
+      callbacks[0](false)
+      callbacks[1](false)
       expect(onIdle).not.toHaveBeenCalled()
     })
 
     it('cancelAll(true) leaves effects on sequencer so lights stay lit during cue transition', () => {
-      const callbacks: Array<() => void> = []
+      const callbacks: Array<(cancelled: boolean) => void> = []
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, _effect, callback) => {
           callbacks.push(callback)
@@ -1331,6 +1344,7 @@ describe('EffectExecutionEngine', () => {
         noopRuntimeBroadcaster(),
         {},
         createCueData(),
+        { callerMode: 'yarg' },
       )
 
       engine.triggerEffect(createCueData())
@@ -1344,6 +1358,83 @@ describe('EffectExecutionEngine', () => {
 
       expect(mockSequencer.removeEffectCallback).toHaveBeenCalledTimes(removeCallbackBefore + 2)
       expect(mockSequencer.removeEffect).toHaveBeenCalledTimes(removeEffectBefore)
+    })
+  })
+
+  describe('multiple effect-listeners (C-30)', () => {
+    const setColorAction = (id: string) => ({
+      id,
+      type: 'action' as const,
+      effectType: 'set-color' as const,
+      target: {
+        groups: { source: 'literal' as const, value: 'front' },
+        filter: { source: 'literal' as const, value: 'all' },
+      },
+      color: {
+        name: { source: 'literal' as const, value: 'white' },
+        brightness: { source: 'literal' as const, value: 'medium' },
+        blendMode: { source: 'literal' as const, value: 'replace' },
+      },
+      timing: {
+        waitForCondition: { source: 'literal' as const, value: 'none' },
+        waitForTime: { source: 'literal' as const, value: 0 },
+        duration: { source: 'literal' as const, value: 100 },
+        waitUntilCondition: { source: 'literal' as const, value: 'none' },
+        waitUntilTime: { source: 'literal' as const, value: 0 },
+        easing: { source: 'literal' as const, value: 'linear' },
+        level: { source: 'literal' as const, value: 1 },
+      },
+      layer: { source: 'literal' as const, value: 0 },
+    })
+
+    it('triggers every effect-listener, not just the first', async () => {
+      const effect: YargEffectDefinition = {
+        id: 'multi-listener',
+        mode: 'yarg',
+        name: 'Multi Listener',
+        description: '',
+        variables: [],
+        nodes: {
+          events: [],
+          actions: [setColorAction('action-a'), setColorAction('action-b')],
+          logic: [],
+          eventRaisers: [],
+          eventListeners: [],
+          effectListeners: [
+            { id: 'listener-a', type: 'effect-listener', label: 'A', outputs: ['action-a'] },
+            { id: 'listener-b', type: 'effect-listener', label: 'B', outputs: ['action-b'] },
+          ],
+        },
+        connections: [
+          { from: 'listener-a', to: 'action-a' },
+          { from: 'listener-b', to: 'action-b' },
+        ],
+        layout: { nodePositions: {} },
+      }
+
+      const activated: string[] = []
+      const broadcaster = {
+        emit: (channel: string, payload: unknown): void => {
+          if (channel.includes('node-execution')) {
+            const p = payload as { type: string; nodeId: string }
+            if (p.type === 'activated') activated.push(p.nodeId)
+          }
+        },
+      }
+      const engine = new EffectExecutionEngine(
+        EffectCompiler.compile(effect),
+        mockSequencer,
+        mockLightManager,
+        broadcaster,
+        {},
+        createCueData(),
+        { callerMode: 'yarg' },
+      )
+
+      await engine.triggerEffect(createCueData())
+
+      // Both listeners' downstream actions ran (the old code only ran the first listener).
+      expect(activated).toEqual(expect.arrayContaining(['action-a', 'action-b']))
     })
   })
 })

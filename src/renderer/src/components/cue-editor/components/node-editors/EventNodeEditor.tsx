@@ -1,6 +1,6 @@
 import React from 'react'
 import type {
-  YargEventNode,
+  NetEventNode,
   AudioEventNode,
   AudioEventType,
   AudioEventNodeUnion,
@@ -9,8 +9,12 @@ import type {
   SpectralGateRange,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
-import type { YargEventType } from '../../../../../../photonics-dmx/types'
-import { YARG_EVENT_OPTIONS_CATEGORIZED, AUDIO_EVENT_OPTIONS } from '../../lib/options'
+import type { NetEventType } from '../../../../../../photonics-dmx/types'
+import {
+  YARG_EVENT_OPTIONS_CATEGORIZED,
+  RB3_EVENT_OPTIONS_CATEGORIZED,
+  AUDIO_EVENT_OPTIONS,
+} from '../../lib/options'
 import {
   getInstrumentTriggerPreset,
   INSTRUMENT_TRIGGER_PRESETS,
@@ -210,9 +214,9 @@ function mergeSpectralGates(
 }
 
 interface EventNodeEditorProps {
-  node: YargEventNode | AudioEventNodeUnion
+  node: NetEventNode | AudioEventNodeUnion
   activeMode: NodeCueMode
-  updateYargNode: (updates: Partial<YargEventNode>) => void
+  updateYargNode: (updates: Partial<NetEventNode>) => void
   updateAudioNode: (updates: Partial<AudioEventNode | AudioTriggerNode>) => void
 }
 
@@ -222,10 +226,11 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
   updateYargNode,
   updateAudioNode,
 }) => {
+  // RB3 nodes are YARG-shaped, so anything that isn't audio reads/writes the YARG event fields.
   const eventType =
-    activeMode === 'yarg'
-      ? (node as YargEventNode).eventType
-      : (node as AudioEventNodeUnion).eventType
+    activeMode === 'audio'
+      ? (node as AudioEventNodeUnion).eventType
+      : (node as NetEventNode).eventType
   const isTrigger = activeMode === 'audio' && eventType === 'audio-trigger'
   const trigger = isTrigger ? (node as AudioTriggerNode) : null
 
@@ -254,8 +259,8 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={eventType}
           onChange={(event) => {
-            if (activeMode === 'yarg') {
-              updateYargNode({ eventType: event.target.value as YargEventType })
+            if (activeMode !== 'audio') {
+              updateYargNode({ eventType: event.target.value as NetEventType })
             } else {
               const newType = event.target.value as AudioEventType
               if (newType === 'audio-trigger') {
@@ -272,8 +277,16 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
               }
             }
           }}>
-          {activeMode === 'yarg'
-            ? YARG_EVENT_OPTIONS_CATEGORIZED.map((category) => (
+          {activeMode === 'audio'
+            ? AUDIO_EVENT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))
+            : (activeMode === 'rb3'
+                ? RB3_EVENT_OPTIONS_CATEGORIZED
+                : YARG_EVENT_OPTIONS_CATEGORIZED
+              ).map((category) => (
                 <optgroup key={category.category} label={category.category}>
                   {category.events.map((event) => (
                     <option key={event.value} value={event.value}>
@@ -281,11 +294,6 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
                     </option>
                   ))}
                 </optgroup>
-              ))
-            : AUDIO_EVENT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
               ))}
         </select>
         {activeMode === 'audio' && AUDIO_EVENT_TYPE_DOCS[eventType as AudioEventType] && (
@@ -301,6 +309,23 @@ const EventNodeEditor: React.FC<EventNodeEditorProps> = ({
           </div>
         )}
       </label>
+      {activeMode !== 'audio' && /^led-[1-8]$/.test(eventType) && (
+        <div className="space-y-1">
+          <label className="flex items-center gap-2 font-medium cursor-pointer">
+            <input
+              type="checkbox"
+              checked={(node as NetEventNode).triggerOnColorChange ?? false}
+              onChange={(e) => updateYargNode({ triggerOnColorChange: e.target.checked })}
+              className="rounded"
+            />
+            Trigger on colour change
+          </label>
+          <p className="text-[10px] text-gray-500 dark:text-gray-400">
+            Also fire while this LED stays lit but its colour changes, not just on the on-edge.
+            Useful for lighting that holds every LED on and only swaps colours.
+          </p>
+        </div>
+      )}
       {activeMode === 'audio' && isTrigger && trigger && (
         <>
           <label className="flex flex-col font-medium">

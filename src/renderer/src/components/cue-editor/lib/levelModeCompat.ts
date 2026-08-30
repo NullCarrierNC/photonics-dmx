@@ -4,6 +4,10 @@ import type {
   AudioEventNode,
   LogicNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import {
+  LOGIC_NODE_META,
+  NODE_LOGIC_TYPES,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorNode } from './types'
 
 /**
@@ -20,16 +24,11 @@ const LEVEL_CAPABLE_AUDIO_EVENT_TYPES: ReadonlySet<AudioEventType> = new Set<Aud
   'audio-hfc',
 ])
 
-/** Logic nodes that need an engine-stepped path; inert under level mode and re-fired under "during". */
-const TIMING_LOGIC_TYPES: ReadonlySet<LogicNode['logicType']> = new Set<LogicNode['logicType']>([
-  'delay',
-  'for-each-light',
-])
-
-const LOGIC_TYPE_LABELS: Partial<Record<LogicNode['logicType'], string>> = {
-  'delay': 'Delay',
-  'for-each-light': 'For Each Light',
-}
+/** Logic nodes that need an engine-stepped path; inert under level mode and re-fired under "during".
+ *  Derived from the shared registry's `timing` flag (delay, for-each-light, led-changed). */
+const TIMING_LOGIC_TYPES: ReadonlySet<LogicNode['logicType']> = new Set(
+  NODE_LOGIC_TYPES.filter((t) => LOGIC_NODE_META[t].timing),
+)
 
 export interface TimingCompatResult {
   /** Ids of timing/iteration nodes wired into a context that fires them incorrectly (highlight these). */
@@ -41,7 +40,7 @@ export interface TimingCompatResult {
 function isLevelModeEvent(node: EditorNode): boolean {
   if (node.data.kind !== 'event') return false
   const payload = node.data.payload
-  // Only AudioEventNode carries triggerMode; YargEventNode and the audio-trigger node do not.
+  // Only AudioEventNode carries triggerMode; NetEventNode and the audio-trigger node do not.
   if (!('triggerMode' in payload)) return false
   const audioEvent = payload as AudioEventNode
   return (
@@ -68,7 +67,7 @@ function timingLogicType(node: EditorNode): LogicNode['logicType'] | null {
 }
 
 function nodeLabel(node: EditorNode, logicType: LogicNode['logicType']): string {
-  return node.data.label || LOGIC_TYPE_LABELS[logicType] || logicType
+  return node.data.label || LOGIC_NODE_META[logicType].label
 }
 
 /**

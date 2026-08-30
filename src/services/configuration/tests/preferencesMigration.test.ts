@@ -3,8 +3,15 @@ import {
   applyLegacySenderFlatToNested,
   migratePrefsV3ToV4,
   migratePrefsV4ToV5,
+  migratePrefsV5ToV6,
+  seedMissingCueDomains,
 } from '../preferencesMigration'
-import { createDefaultCueDomains } from '../cueDomainTypes'
+import type { AppPreferences } from '../configurationDefaults'
+import {
+  CUE_DOMAINS,
+  createDefaultCueDomainPrefs,
+  createDefaultCueDomains,
+} from '../cueDomainTypes'
 
 describe('migratePrefsV3ToV4', () => {
   it('maps flat v3 keys into cueDomains and drops legacy top-level fields', () => {
@@ -156,6 +163,112 @@ describe('migratePrefsV4ToV5', () => {
     const once = migratePrefsV4ToV5(DEFAULT_PREFERENCES, DEFAULT_PREFERENCES)
     const again = migratePrefsV4ToV5(once, DEFAULT_PREFERENCES)
     expect(again).toEqual(once)
+  })
+
+  it('does not throw on cueDomains that predate the rb3 domains', () => {
+    const all = createDefaultCueDomains()
+    const v4 = {
+      ...DEFAULT_PREFERENCES,
+      cueDomains: {
+        yarg: all.yarg,
+        audio: all.audio,
+        yargMotion: all.yargMotion,
+        audioMotion: all.audioMotion,
+      },
+    } as unknown
+    const out = migratePrefsV4ToV5(v4, DEFAULT_PREFERENCES)
+    for (const d of CUE_DOMAINS) {
+      expect(out.cueDomains[d]).toBeDefined()
+    }
+  })
+})
+
+describe('migratePrefsV5ToV6', () => {
+  const fourOldDomains = () => {
+    const all = createDefaultCueDomains()
+    return {
+      yarg: all.yarg,
+      audio: all.audio,
+      yargMotion: all.yargMotion,
+      audioMotion: all.audioMotion,
+    }
+  }
+
+  it('seeds rb3 and rb3Motion for a v5 file that predates them, preserving everything else', () => {
+    const all = createDefaultCueDomains()
+    const v5 = {
+      ...DEFAULT_PREFERENCES,
+      effectDebounce: 33,
+      cueDomains: {
+        ...fourOldDomains(),
+        yarg: { ...all.yarg, enabledGroups: ['stagekit', 'custom'] },
+      },
+    } as unknown
+    const out = migratePrefsV5ToV6(v5, DEFAULT_PREFERENCES)
+    expect(out.cueDomains.rb3).toEqual(createDefaultCueDomainPrefs('rb3'))
+    expect(out.cueDomains.rb3Motion).toEqual(createDefaultCueDomainPrefs('rb3Motion'))
+    expect(out.cueDomains.yarg.enabledGroups).toEqual(['stagekit', 'custom'])
+    expect(out.effectDebounce).toBe(33)
+  })
+
+  it('leaves an already-populated rb3 domain untouched', () => {
+    const all = createDefaultCueDomains()
+    const v5 = {
+      ...DEFAULT_PREFERENCES,
+      cueDomains: {
+        ...all,
+        rb3: { ...all.rb3, enabledGroups: ['stagekit'], disabledCues: { g: ['c'] } },
+      },
+    }
+    const out = migratePrefsV5ToV6(v5, DEFAULT_PREFERENCES)
+    expect(out.cueDomains.rb3.enabledGroups).toEqual(['stagekit'])
+    expect(out.cueDomains.rb3.disabledCues).toEqual({ g: ['c'] })
+  })
+
+  it('falls back to default domains when cueDomains is missing', () => {
+    const out = migratePrefsV5ToV6({ effectDebounce: 5 } as unknown, DEFAULT_PREFERENCES)
+    for (const d of CUE_DOMAINS) {
+      expect(out.cueDomains[d]).toBeDefined()
+    }
+    expect(out.cueDomains.rb3).toEqual(createDefaultCueDomainPrefs('rb3'))
+  })
+
+  it('is idempotent once already at v6', () => {
+    const once = migratePrefsV5ToV6(DEFAULT_PREFERENCES, DEFAULT_PREFERENCES)
+    const again = migratePrefsV5ToV6(once, DEFAULT_PREFERENCES)
+    expect(again).toEqual(once)
+  })
+})
+
+describe('seedMissingCueDomains', () => {
+  it('returns the same object when every cue domain is present', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, cueDomains: createDefaultCueDomains() }
+    expect(seedMissingCueDomains(prefs)).toBe(prefs)
+  })
+
+  it('seeds only the missing domains and preserves the rest', () => {
+    const all = createDefaultCueDomains()
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      effectDebounce: 9,
+      cueDomains: {
+        yarg: { ...all.yarg, enabledGroups: ['stagekit', 'mine'] },
+        audio: all.audio,
+        yargMotion: all.yargMotion,
+        audioMotion: all.audioMotion,
+      },
+    } as unknown as AppPreferences
+    const out = seedMissingCueDomains(prefs)
+    expect(out).not.toBe(prefs)
+    expect(out.effectDebounce).toBe(9)
+    expect(out.cueDomains.yarg.enabledGroups).toEqual(['stagekit', 'mine'])
+    expect(out.cueDomains.rb3).toEqual(createDefaultCueDomainPrefs('rb3'))
+    expect(out.cueDomains.rb3Motion).toEqual(createDefaultCueDomainPrefs('rb3Motion'))
+  })
+
+  it('leaves a malformed cueDomains untouched for validation to reject', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, cueDomains: null } as unknown as AppPreferences
+    expect(seedMissingCueDomains(prefs)).toBe(prefs)
   })
 })
 

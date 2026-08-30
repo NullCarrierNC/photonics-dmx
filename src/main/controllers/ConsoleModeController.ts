@@ -177,7 +177,7 @@ export class ConsoleModeController {
     if (!light) {
       return { success: false, error: 'Light not found in rig' }
     }
-    if (light.fixture !== FixtureTypes.RGBMH && light.fixture !== FixtureTypes.RGBWMH) {
+    if (light.fixture !== FixtureTypes.RGBMH) {
       return { success: false, error: 'Light is not a moving head fixture' }
     }
     const baseConfig: FixtureConfig = normalizeFixtureConfig(light.config)
@@ -206,7 +206,7 @@ export class ConsoleModeController {
       return { success: false, error: 'Fixture template not found in My Lights' }
     }
     const fixture = userLights[fi]
-    if (fixture.fixture !== FixtureTypes.RGBMH && fixture.fixture !== FixtureTypes.RGBWMH) {
+    if (fixture.fixture !== FixtureTypes.RGBMH) {
       return { success: false, error: 'Fixture template is not a moving head' }
     }
     const fBase: FixtureConfig = normalizeFixtureConfig(fixture.config)
@@ -250,7 +250,7 @@ export class ConsoleModeController {
     if (!light) {
       return { success: false, error: 'Light not found in rig' }
     }
-    if (light.fixture !== FixtureTypes.RGBMH && light.fixture !== FixtureTypes.RGBWMH) {
+    if (light.fixture !== FixtureTypes.RGBMH) {
       return { success: false, error: 'Light is not a moving head fixture' }
     }
     if (light.fixtureId !== fixtureId) {
@@ -268,7 +268,7 @@ export class ConsoleModeController {
       return { success: false, error: 'Fixture template not found in My Lights' }
     }
     const fixture = userLights[fi]
-    if (fixture.fixture !== FixtureTypes.RGBMH && fixture.fixture !== FixtureTypes.RGBWMH) {
+    if (fixture.fixture !== FixtureTypes.RGBMH) {
       return { success: false, error: 'Fixture template is not a moving head' }
     }
     const fBase = normalizeFixtureConfig(fixture.config)

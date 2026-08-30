@@ -8,6 +8,7 @@ import { createLogger } from '../../../../../shared/logger'
 const log = createLogger('DebugPanel')
 
 type DebugLogEntry = IpcEventMap['node-cues:debug-log']
+type RuntimeErrorPayload = IpcEventMap['node-cue:runtime-error']
 
 const MAX_ENTRIES = 200
 
@@ -51,8 +52,9 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ className }) => {
   )
 
   const handleRuntimeError = useCallback(
-    (message: string) => {
-      if (typeof message !== 'string') return
+    (payload: RuntimeErrorPayload) => {
+      if (!payload || typeof payload.message !== 'string') return
+      const message = payload.nodeId ? `${payload.nodeId}: ${payload.message}` : payload.message
       appendEntry({ message, variables: [], timestamp: Date.now() })
     },
     [appendEntry],

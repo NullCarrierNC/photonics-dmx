@@ -100,7 +100,10 @@ function makeChain(
       isPrimary,
       dmxLightManager: lightManager,
       sequencer: ctrl,
-      yargCueHandler: null,
+      cueHandlers: {
+        yarg: null,
+        rb3: null,
+      },
       audioCueHandler: null,
       rb3MenuCueHandler: null,
     } as unknown as RigChain,

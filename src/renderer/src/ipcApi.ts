@@ -35,12 +35,15 @@ import type {
   AudioLightingData,
 } from '../../shared/ipcTypes'
 import type { FixtureConfig } from '../../photonics-dmx/types'
+import type { ProcessingMode } from '../../photonics-dmx/processors/ProcessorManager'
 
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
 
 export const getLifecyclePhase = () => window.api.invoke(LIFECYCLE.GET_PHASE, undefined)
+
+export const retryControllerInit = () => window.api.invoke(LIFECYCLE.RETRY_INIT, undefined)
 
 // ---------------------------------------------------------------------------
 // Cue consistency window
@@ -76,11 +79,35 @@ export const getAudioMotionCueProbabilityPercent = () =>
 export const setAudioMotionCueProbabilityPercent = (percent: number) =>
   window.api.invoke(LIGHT.SET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT, percent)
 
+export const getRb3MotionCueProbabilityPercent = () =>
+  window.api.invoke(LIGHT.GET_RB3_MOTION_CUE_PROBABILITY_PERCENT, undefined)
+
+export const setRb3MotionCueProbabilityPercent = (percent: number) =>
+  window.api.invoke(LIGHT.SET_RB3_MOTION_CUE_PROBABILITY_PERCENT, percent)
+
+export const getRb3MotionCueMinHoldMs = () =>
+  window.api.invoke(LIGHT.GET_RB3_MOTION_CUE_MIN_HOLD_MS, undefined)
+
+export const setRb3MotionCueMinHoldMs = (minHoldMs: number) =>
+  window.api.invoke(LIGHT.SET_RB3_MOTION_CUE_MIN_HOLD_MS, minHoldMs)
+
+export const getRb3MotionCueDuration = () =>
+  window.api.invoke(LIGHT.GET_RB3_MOTION_CUE_DURATION, undefined)
+
+export const setRb3MotionCueDuration = (range: { min: number; max: number }) =>
+  window.api.invoke(LIGHT.SET_RB3_MOTION_CUE_DURATION, range)
+
 export const getCueGroupSelectionMode = () =>
   window.api.invoke(LIGHT.GET_CUE_GROUP_SELECTION_MODE, undefined)
 
 export const setCueGroupSelectionMode = (mode: 'oncePerSong' | 'withinSong') =>
   window.api.invoke(LIGHT.SET_CUE_GROUP_SELECTION_MODE, mode)
+
+export const getRb3CueGroupSelectionMode = () =>
+  window.api.invoke(LIGHT.GET_RB3_CUE_GROUP_SELECTION_MODE, undefined)
+
+export const setRb3CueGroupSelectionMode = (mode: 'oncePerSong' | 'withinSong') =>
+  window.api.invoke(LIGHT.SET_RB3_CUE_GROUP_SELECTION_MODE, mode)
 
 export const getYargMotionGroupSelectionMode = () =>
   window.api.invoke(LIGHT.GET_YARG_MOTION_GROUP_SELECTION_MODE, undefined)
@@ -94,6 +121,12 @@ export const getAudioMotionGroupSelectionMode = () =>
 export const setAudioMotionGroupSelectionMode = (mode: 'oncePerSong' | 'perCueChange' | 'none') =>
   window.api.invoke(LIGHT.SET_AUDIO_MOTION_GROUP_SELECTION_MODE, mode)
 
+export const getRb3MotionGroupSelectionMode = () =>
+  window.api.invoke(LIGHT.GET_RB3_MOTION_GROUP_SELECTION_MODE, undefined)
+
+export const setRb3MotionGroupSelectionMode = (mode: 'oncePerSong' | 'perCueChange' | 'none') =>
+  window.api.invoke(LIGHT.SET_RB3_MOTION_GROUP_SELECTION_MODE, mode)
+
 export const getYargMotionCueGroups = () =>
   window.api.invoke(LIGHT.GET_YARG_MOTION_CUE_GROUPS, undefined)
 
@@ -106,11 +139,17 @@ export const getAvailableYargMotionCues = (groupId?: string) =>
 export const getAvailableAudioMotionCues = (groupId?: string) =>
   window.api.invoke(LIGHT.GET_AVAILABLE_AUDIO_MOTION_CUES, groupId)
 
+export const getAvailableRb3MotionCues = (groupId?: string) =>
+  window.api.invoke(LIGHT.GET_AVAILABLE_RB3_MOTION_CUES, groupId)
+
 export const startYargMotionCueSimulation = (groupId: string, cueId: string) =>
   window.api.invoke(LIGHT.START_YARG_MOTION_CUE_SIMULATION, { groupId, cueId })
 
 export const startAudioMotionCueSimulation = (groupId: string, cueId: string) =>
   window.api.invoke(LIGHT.START_AUDIO_MOTION_CUE_SIMULATION, { groupId, cueId })
+
+export const startRb3MotionCueSimulation = (groupId: string, cueId: string) =>
+  window.api.invoke(LIGHT.START_RB3_MOTION_CUE_SIMULATION, { groupId, cueId })
 
 export const stopMotionCueSimulation = () =>
   window.api.invoke(LIGHT.STOP_MOTION_CUE_SIMULATION, undefined)
@@ -145,6 +184,9 @@ export const getAudioCueGroups = () => window.api.invoke(LIGHT.GET_AUDIO_CUE_GRO
 export const getAvailableAudioCues = (groupId?: string) =>
   window.api.invoke(LIGHT.GET_AVAILABLE_AUDIO_CUES, groupId)
 
+export const getAvailableRb3Cues = (groupId?: string) =>
+  window.api.invoke(LIGHT.GET_AVAILABLE_RB3_CUES, groupId)
+
 // ---------------------------------------------------------------------------
 // Light management
 // ---------------------------------------------------------------------------
@@ -155,8 +197,7 @@ export const getMyLights = () => window.api.invoke(CONFIG.GET_MY_LIGHTS, undefin
 
 export const saveMyLights = (data: DmxFixture[]) => window.api.invoke(CONFIG.SAVE_MY_LIGHTS, data)
 
-export const getLightLayout = (filename: string) =>
-  window.api.invoke(CONFIG.GET_LIGHT_LAYOUT, filename)
+export const getLightLayout = () => window.api.invoke(CONFIG.GET_LIGHT_LAYOUT, undefined)
 
 export const saveLightLayout = (data: LightingConfiguration) =>
   window.api.invoke(CONFIG.SAVE_LIGHT_LAYOUT, data)
@@ -245,6 +286,34 @@ export const getDisabledAudioMotionCues = () =>
 export const setDisabledAudioMotionCues = (disabled: Record<string, string[]>) =>
   window.api.invoke(CONFIG.SET_DISABLED_AUDIO_MOTION_CUES, disabled)
 
+export const getRb3CueGroups = () => window.api.invoke(LIGHT.GET_RB3_CUE_GROUPS, undefined)
+
+export const getRb3MotionCueGroups = () =>
+  window.api.invoke(LIGHT.GET_RB3_MOTION_CUE_GROUPS, undefined)
+
+export const getEnabledRb3CueGroups = () =>
+  window.api.invoke(CONFIG.GET_ENABLED_RB3_CUE_GROUPS, undefined)
+
+export const setEnabledRb3CueGroups = (groupIds: string[]) =>
+  window.api.invoke(CONFIG.SET_ENABLED_RB3_CUE_GROUPS, groupIds)
+
+export const getDisabledRb3Cues = () => window.api.invoke(CONFIG.GET_DISABLED_RB3_CUES, undefined)
+
+export const setDisabledRb3Cues = (disabled: Record<string, string[]>) =>
+  window.api.invoke(CONFIG.SET_DISABLED_RB3_CUES, disabled)
+
+export const getEnabledRb3MotionCueGroups = () =>
+  window.api.invoke(CONFIG.GET_ENABLED_RB3_MOTION_CUE_GROUPS, undefined)
+
+export const setEnabledRb3MotionCueGroups = (groupIds: string[]) =>
+  window.api.invoke(CONFIG.SET_ENABLED_RB3_MOTION_CUE_GROUPS, groupIds)
+
+export const getDisabledRb3MotionCues = () =>
+  window.api.invoke(CONFIG.GET_DISABLED_RB3_MOTION_CUES, undefined)
+
+export const setDisabledRb3MotionCues = (disabled: Record<string, string[]>) =>
+  window.api.invoke(CONFIG.SET_DISABLED_RB3_MOTION_CUES, disabled)
+
 export const getAudioReactiveCues = () =>
   window.api.invoke(CONFIG.GET_AUDIO_REACTIVE_CUES, undefined)
 
@@ -273,6 +342,12 @@ export const getActiveYargMotionCue = () =>
 export const setActiveYargMotionCue = (ref: { groupId: string; cueId: string } | null) =>
   window.api.invoke(CONFIG.SET_ACTIVE_YARG_MOTION_CUE, ref)
 
+export const getActiveRb3MotionCue = () =>
+  window.api.invoke(CONFIG.GET_ACTIVE_RB3_MOTION_CUE, undefined)
+
+export const setActiveRb3MotionCue = (ref: { groupId: string; cueId: string } | null) =>
+  window.api.invoke(CONFIG.SET_ACTIVE_RB3_MOTION_CUE, ref)
+
 // ---------------------------------------------------------------------------
 // Stage kit
 // ---------------------------------------------------------------------------
@@ -281,6 +356,9 @@ export const getStageKitPriority = () => window.api.invoke(CONFIG.GET_STAGE_KIT_
 
 export const setStageKitPriority = (priority: 'prefer-for-tracked' | 'random' | 'never') =>
   window.api.invoke(CONFIG.SET_STAGE_KIT_PRIORITY, priority)
+
+export const setRb3ProcessingMode = (processingMode: ProcessingMode) =>
+  savePrefs({ rb3Prefs: { processingMode } })
 
 // ---------------------------------------------------------------------------
 // Clock rate
@@ -407,15 +485,6 @@ export const setListenCueData = (shouldListen: boolean) =>
 export const setCueStyle = (style: 'simple' | 'complex') => window.api.send(CUE.CUE_STYLE, style)
 
 // ---------------------------------------------------------------------------
-// Effect debounce
-// ---------------------------------------------------------------------------
-
-export const getEffectDebounce = () => window.api.invoke(CUE.GET_EFFECT_DEBOUNCE, undefined)
-
-export const updateEffectDebounce = (value: number) =>
-  window.api.send(CUE.UPDATE_EFFECT_DEBOUNCE, value)
-
-// ---------------------------------------------------------------------------
 // Test effects and simulation
 // ---------------------------------------------------------------------------
 
@@ -426,7 +495,25 @@ export const startTestEffect = (
   cueGroup?: string,
 ) => window.api.invoke(LIGHT.START_TEST_EFFECT, { effectId, venueSize, bpm, cueGroup })
 
+export const startRb3TestEffect = (
+  effectId: string,
+  venueSize?: 'NoVenue' | 'Small' | 'Large',
+  bpm?: number,
+  cueGroup?: string,
+) => window.api.invoke(LIGHT.START_RB3_TEST_EFFECT, { effectId, venueSize, bpm, cueGroup })
+
+export const setRb3SimLedState = (state: {
+  red: number
+  green: number
+  blue: number
+  yellow: number
+  fog: boolean
+}) => window.api.invoke(LIGHT.SET_RB3_SIM_LED_STATE, state)
+
 export const stopTestEffect = () => window.api.invoke(LIGHT.STOP_TEST_EFFECT, undefined)
+
+export const simulatePostProcessing = (state: string) =>
+  window.api.invoke(LIGHT.SIMULATE_POST_PROCESSING, { state })
 
 export const simulateBeat = (data?: {
   venueSize?: 'NoVenue' | 'Small' | 'Large'

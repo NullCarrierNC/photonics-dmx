@@ -1,12 +1,20 @@
 import equal from 'fast-deep-equal'
-import type { DmxFixture, DmxLight, DmxRig, DmxRigsConfig, LightingConfiguration } from '../types'
+import { clampDerivedDmxChannel, DMX_CHANNEL_MAX } from '../types'
+import type {
+  DmxFixture,
+  DmxLight,
+  DmxRig,
+  DmxRigsConfig,
+  ExtraChannel,
+  LightingConfiguration,
+} from '../types'
 
 /**
  * Reconciles rig-stored light snapshots with their source fixture templates from MyLights.
  *
  * Rig lights are stored as snapshot copies of the template they were created from, plus per-light
  * state (DMX position, calibration, etc.). When the user edits a template — adds a strobe channel,
- * switches RGB→RGBW, renames, tunes default strobe values — the rig's snapshot doesn't pick up the
+ * adds an amber channel, renames, tunes default strobe values — the rig's snapshot doesn't pick up the
  * change automatically. This module owns the reconciliation rules.
  *
  * A rig is an *implementation* of its template: a change to the root template propagates down.
@@ -18,6 +26,11 @@ import type { DmxFixture, DmxLight, DmxRig, DmxRigsConfig, LightingConfiguration
  *    {@link createDmxLightInstance} and LightChannelsConfig use. Re-laying-out channel offsets in
  *    a template therefore propagates to every rig light using it.
  *  - Default `strobeValues` (when the rig has no per-light override)
+ *  - `extraChannels`: user-added channels beyond the archetype map. `type`/`value`/`scale` are
+ *    copied verbatim; each `channel` is offset-derived from the template the same way the base
+ *    channels are (see {@link deriveExtraChannelsForMaster}).
+ *  - `brightnessScaling`: the colour trim. No per-rig override, so the template's value replaces
+ *    whatever the snapshot held.
  *  - `config` defaults when the rig has none and the template provides them (e.g. fixture-type
  *    change RGB→RGBMH adds moving-head defaults). Existing rig calibration is preserved.
  *
@@ -37,6 +50,90 @@ type ChannelRecord = Record<string, number>
 
 function channelsAsRecord(channels: DmxFixture['channels']): ChannelRecord {
   return channels as unknown as ChannelRecord
+}
+
+/**
+ * Derives a rig light's `extraChannels` from its template. `type`, `value` and `scale` are
+ * template-owned and copied verbatim; `channel` follows the same offset model as the base
+ * channels: `master + (templateChannel - templateMaster)`. A template channel of 0 means "unassigned" and
+ * stays 0 (never offset); a derived result outside 1–512 — off either end — collapses to 0 via
+ * {@link clampDerivedDmxChannel} so it can't fail the 0–512 validators. Returns `undefined` for a
+ * nullish *or empty* input — never `[]` — so callers can use the set/delete pattern and
+ * deep-equality never trips on `[]` vs absent.
+ */
+export function deriveExtraChannelsForMaster(
+  templateExtras: ExtraChannel[] | undefined,
+  templateMaster: number,
+  master: number,
+): ExtraChannel[] | undefined {
+  if (!templateExtras?.length) return undefined
+  return templateExtras.map((ec) => ({
+    ...ec,
+    channel: ec.channel === 0 ? 0 : clampDerivedDmxChannel(master + (ec.channel - templateMaster)),
+  }))
+}
+
+/**
+ * Widest offset above the master dimmer that a template occupies, counting base channels and added
+ * channels alike. An unassigned (0) extra occupies nothing.
+ */
+export function templateChannelSpan(template: DmxFixture): number {
+  const templateChannels = channelsAsRecord(template.channels)
+  const templateMaster = templateChannels.masterDimmer ?? 0
+  let span = 0
+  for (const [channelName, value] of Object.entries(templateChannels)) {
+    if (channelName === 'masterDimmer') continue
+    span = Math.max(span, value - templateMaster)
+  }
+  for (const extra of template.extraChannels ?? []) {
+    if (extra.channel === 0) continue
+    span = Math.max(span, extra.channel - templateMaster)
+  }
+  return Math.max(0, span)
+}
+
+/**
+ * Highest DMX address a fixture actually occupies, across its base channels and its added channels.
+ * Unassigned (0) channels occupy nothing, so a fixture with none returns 0.
+ */
+export function highestChannelUsed(fixture: DmxFixture): number {
+  const channels = channelsAsRecord(fixture.channels)
+  let highest = 0
+  for (const value of Object.values(channels)) highest = Math.max(highest, value)
+  for (const extra of fixture.extraChannels ?? []) highest = Math.max(highest, extra.channel)
+  return Math.max(0, highest)
+}
+
+/**
+ * Highest master dimmer that still leaves room for the whole fixture inside the universe.
+ *
+ * The master dimmer is the one address a rig owns; every other channel derives from it, so this is
+ * the value editors bound. Above it the fixture's upper channels fall outside 1–512, where the IPC
+ * validators reject the rig save citing a channel the user never typed directly.
+ */
+export function maxMasterDimmerForTemplate(template: DmxFixture): number {
+  return Math.max(1, DMX_CHANNEL_MAX - templateChannelSpan(template))
+}
+
+/**
+ * Derives every base channel from a master dimmer using the template's own offsets — the offset
+ * model this module documents. Results are normalised to the persisted 0/1–512 domain via
+ * {@link clampDerivedDmxChannel}.
+ */
+export function deriveBaseChannelsForMaster(
+  template: DmxFixture,
+  master: number,
+): Record<string, number> {
+  const templateChannels = channelsAsRecord(template.channels)
+  const templateMaster = templateChannels.masterDimmer ?? 0
+  const derived: Record<string, number> = {}
+  for (const [channelName, value] of Object.entries(templateChannels)) {
+    derived[channelName] =
+      channelName === 'masterDimmer'
+        ? clampDerivedDmxChannel(master)
+        : clampDerivedDmxChannel(master + (value - templateMaster))
+  }
+  return derived
 }
 
 /**
@@ -61,14 +158,10 @@ export function syncDmxLightWithTemplate(
   // dimmer. This makes template channel re-layouts propagate to existing rig lights. There is no
   // UI that persists an independent per-light channel number (LightChannelsConfig only edits
   // masterDimmer and recomputes the rest), so nothing legitimate is lost by always deriving.
-  const nextChannels: ChannelRecord = {}
-  for (const [name, templateValue] of Object.entries(templateChannels)) {
-    if (name === 'masterDimmer') {
-      nextChannels[name] = rigMaster
-    } else {
-      nextChannels[name] = rigMaster + (templateValue - templateMaster)
-    }
-  }
+  // Results land in the persisted 0/1–512 domain, so a fixture addressed near the top of the
+  // universe stays saveable; out-of-range channels read as unassigned rather than saturating onto
+  // one address (see {@link clampDerivedDmxChannel}).
+  const nextChannels: ChannelRecord = deriveBaseChannelsForMaster(template, rigMaster)
 
   // Track whether `strobeChannel` was dropped, so we can clear `strobeValues` accordingly. The
   // template either has a strobeChannel (RGB+S model) or doesn't; the rig's previous state may have
@@ -94,6 +187,20 @@ export function syncDmxLightWithTemplate(
     nextConfig = { ...template.config }
   }
 
+  // extraChannels: template-owned. Re-derive the channel numbers from this rig light's master
+  // dimmer every sync, so template edits (add/remove/renumber an extra) propagate to rig snapshots.
+  const nextExtraChannels = deriveExtraChannelsForMaster(
+    template.extraChannels,
+    templateMaster,
+    rigMaster,
+  )
+
+  // brightnessScaling: template-owned outright. It describes the emitters, which every rig using
+  // the template shares, so there is no per-light override to preserve.
+  const nextBrightnessScaling = template.brightnessScaling
+    ? { ...template.brightnessScaling }
+    : undefined
+
   // Build the synced light without explicit `undefined` values for optional fields, so deep
   // equality against the (potentially key-less) input doesn't trip on `{key: undefined}` vs absent.
   const synced: DmxLight = {
@@ -112,6 +219,16 @@ export function syncDmxLightWithTemplate(
     synced.config = nextConfig
   } else {
     delete synced.config
+  }
+  if (nextExtraChannels !== undefined) {
+    synced.extraChannels = nextExtraChannels
+  } else {
+    delete synced.extraChannels
+  }
+  if (nextBrightnessScaling !== undefined) {
+    synced.brightnessScaling = nextBrightnessScaling
+  } else {
+    delete synced.brightnessScaling
   }
 
   return equal(light, synced) ? { light, changed: false } : { light: synced, changed: true }

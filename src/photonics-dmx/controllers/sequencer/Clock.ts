@@ -1,6 +1,21 @@
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('Clock')
 
+/** A tick whose callbacks run longer than this multiple of the interval is flagged as an overrun. */
+const OVERRUN_FACTOR = 2
+
+/**
+ * Lag beyond this many tick intervals counts as a stall rather than jitter: the clock resyncs to the
+ * wall clock and drops the missed deadlines instead of firing one tick per missed interval at zero
+ * delay. A multiple rather than a fixed millisecond value because the interval is user-configurable
+ * (1-100ms), so a flat bound would be twitchy at one end and useless at the other. Five intervals is
+ * 50ms at the default rate, well clear of ordinary GC and event-loop jitter.
+ */
+const MAX_CATCHUP_TICKS = 5
+
+/** Tick interval used when the caller supplies a non-finite one. */
+const DEFAULT_INTERVAL_MS = 10
+
 /**
  * @class Clock
  * @description Centralized timing source for the lighting sequencer system.
@@ -17,9 +32,25 @@ export class Clock {
   private isRunning: boolean = false
   private tickCount: number = 0
   private intervalMs: number
+  /** True while a run of overrunning ticks is in progress, so we warn once per episode not per tick. */
+  private overrunActive: boolean = false
+  /** True while the clock is resyncing after a stall, so we warn once per episode not per tick. */
+  private resyncActive: boolean = false
+  /**
+   * Gap between the last two ticks. Debt accumulated across many ticks and one long gap both push
+   * drift past the resync threshold, but only the second is a stall, so this is what the warning
+   * keys off rather than the drift that triggered the resync.
+   */
+  private lastTickGapMs: number = 0
+  /** Set once the coarse-timer notice has been logged, so it reports per clock rather than per resync. */
+  private reportedCoarseTimer: boolean = false
 
   constructor(intervalMs: number = 10) {
-    this.intervalMs = Math.max(1, Math.min(100, intervalMs)) // Clamp between 1-100ms
+    // Math.min/max propagate NaN, and a NaN interval makes setTimeout fire on its 1ms floor, so the
+    // clock free-runs at roughly 840Hz and the overrun watchdog (a `>` against NaN) never reports it.
+    // The interval comes from the clockRate preference, so a non-finite value has to land somewhere.
+    const requested = Number.isFinite(intervalMs) ? intervalMs : DEFAULT_INTERVAL_MS
+    this.intervalMs = Math.max(1, Math.min(100, requested)) // Clamp between 1-100ms
     this.startTime = this.getCurrentTime()
     this.lastUpdateTime = this.startTime
   }
@@ -68,13 +99,47 @@ export class Clock {
   }
 
   /**
-   * Schedule the next tick with drift correction
+   * Schedule the next tick with drift correction.
+   *
+   * Small lag is repaid by shortening the next delay. Lag past {@link MAX_CATCHUP_TICKS} intervals
+   * is a stall (machine asleep, a long GC pause, the host under load) and is resynced instead: the
+   * missed deadlines are dropped rather than fired back-to-back at zero delay. Every tick runs the
+   * whole pipeline synchronously, so replaying a stall's worth of them costs one redundant pass per
+   * missed interval and starves the event loop while it drains. The lights want to be current, not
+   * to work through the past. Resyncing onto `now` (not `now + intervalMs`) keeps the steady-state
+   * invariant that `nextTargetTime` after its increment is the ideal time of the tick that just ran.
    */
   private scheduleNext(): void {
     if (!this.isRunning) return
 
     const now = this.getCurrentTime()
-    const drift = now - this.nextTargetTime
+    let drift = now - this.nextTargetTime
+    const threshold = this.intervalMs * MAX_CATCHUP_TICKS
+    if (drift > threshold) {
+      const missed = Math.max(1, Math.round(drift / this.intervalMs))
+      this.nextTargetTime = now
+      drift = 0
+      // Drift past the threshold has two causes and they warrant different reporting. One long gap
+      // between ticks is a stall (machine asleep, a long GC) and is worth a warning. Many small
+      // gaps are a timer whose resolution is coarser than the interval, which on some platforms is
+      // every tick, so warning per resync would be a constant stream. Dropping the debt is right
+      // either way, since the sequencer reads the clock rather than counting ticks.
+      if (this.lastTickGapMs > threshold) {
+        if (!this.resyncActive) {
+          this.resyncActive = true
+          log.warn(
+            `Clock stalled for ${Math.round(this.lastTickGapMs)}ms, dropped ${missed} missed ticks and resynced.`,
+          )
+        }
+      } else if (!this.reportedCoarseTimer) {
+        this.reportedCoarseTimer = true
+        log.info(
+          `Timer resolution is coarser than the ${this.intervalMs}ms tick interval (gaps around ${Math.round(this.lastTickGapMs)}ms), so the clock runs at the rate the platform can deliver.`,
+        )
+      }
+    } else {
+      this.resyncActive = false
+    }
     const delay = Math.max(0, this.intervalMs - drift)
 
     this.timeoutId = setTimeout(() => {
@@ -133,6 +198,12 @@ export class Clock {
     const currentTime = this.getCurrentTime()
     const deltaTime = currentTime - this.lastUpdateTime
     this.lastUpdateTime = currentTime
+    this.lastTickGapMs = deltaTime
+
+    // Watchdog: the callbacks run synchronously inside the timer handler, so a slow tick directly
+    // delays the next one and can stutter output. Measure the callback pass and warn once when an
+    // overrun episode starts, staying quiet until a clean tick so a sustained stall logs once.
+    const tickStart = performance.now()
 
     // Notify all registered callbacks
     this.updateCallbacks.forEach((callback) => {
@@ -142,6 +213,18 @@ export class Clock {
         log.error('Error in timing update callback:', error)
       }
     })
+
+    const tickDurationMs = performance.now() - tickStart
+    if (tickDurationMs > this.intervalMs * OVERRUN_FACTOR) {
+      if (!this.overrunActive) {
+        this.overrunActive = true
+        log.warn(
+          `Tick callbacks took ${tickDurationMs.toFixed(1)}ms, over the ${this.intervalMs}ms interval. Output may stutter.`,
+        )
+      }
+    } else {
+      this.overrunActive = false
+    }
   }
 
   /**

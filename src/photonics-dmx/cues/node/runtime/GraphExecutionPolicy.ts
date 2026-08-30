@@ -2,14 +2,37 @@
  * Policy that parameterizes GraphExecutionEngine behaviour for cue graphs vs effect graphs.
  */
 
-import type { BaseEventNode } from '../../types/nodeCueTypes'
-import type { CompiledYargCue } from '../compiler/NodeCueCompiler'
+import type { BaseEventNode, NetEventNode, NodeCueMode } from '../../types/nodeCueTypes'
+import type { CompiledNetCue } from '../compiler/NodeCueCompiler'
 import type { CompiledEffect } from '../compiler/EffectCompiler'
 import type { CueData } from '../../types/cueTypes'
-import { isInstrumentEventTriggered, isVocalActive } from '../../types/cueTypes'
+import { getCueDomain } from '../../domains'
 
 /** Cue data or effect parameter payload. */
 export type ExecutionParameters = CueData | Record<string, unknown>
+
+/**
+ * Whether a per-frame `cueData`-derived condition fires this frame: beat / half-beat / measure,
+ * keyframe (any) and directional keyframe-first/next/previous, and the vocal-note, RB3 LED, fog and
+ * instrument-note edges. Excludes the entry-only `cue-started`/`cue-called`, which depend on
+ * session state rather than cueData. Shared by cue entry-node selection and by condition-based
+ * action waits, so an event node and a `waitUntil` on the same condition mean the identical thing.
+ * `triggerOnColorChange` is the per-node opt-in for led-N edges to also fire on a same-position
+ * bank-colour change; it defaults off, so a caller with no node keeps plain on/off edge semantics.
+ */
+export function evaluateEventCondition(
+  mode: NodeCueMode,
+  eventType: string,
+  cueData: CueData,
+  triggerOnColorChange = false,
+): boolean {
+  // The entry-only events depend on session state rather than cueData, so they are answered here
+  // rather than by a domain: no family gate can decide them from a frame alone.
+  if (eventType === 'cue-started' || eventType === 'cue-called') {
+    return false
+  }
+  return getCueDomain(mode).isEventTriggered(eventType, cueData, triggerOnColorChange)
+}
 
 /**
  * Policy aspect: which event types start execution.
@@ -41,7 +64,7 @@ export interface GraphExecutionPolicy {
    * Cue: event nodes from eventMap (triggered by params + entryContext.hasCueStartedFired); effect: single effect listener.
    */
   getEntryNodes(
-    compiled: CompiledYargCue | CompiledEffect<BaseEventNode>,
+    compiled: CompiledNetCue | CompiledEffect<BaseEventNode>,
     parameters: ExecutionParameters,
     entryContext?: { hasCueStartedFired?: boolean },
   ): BaseEventNode[]
@@ -63,64 +86,25 @@ function cueLikeGraphPolicy(
     canInvokeEffects: true,
     getLogPrefix: () => `cue:${groupId}:${cueId}`,
     getEntryNodes(compiled, parameters, entryContext): BaseEventNode[] {
-      const cue = compiled as CompiledYargCue
+      const cue = compiled as CompiledNetCue
       const hasCueStartedFired = entryContext?.hasCueStartedFired ?? false
       const cueData = parameters as CueData
 
-      const isEventTriggered = (eventType: string): boolean => {
+      const isEventTriggered = (event: NetEventNode): boolean => {
+        const eventType = event.eventType
         if (eventType === 'cue-started') {
           return !hasCueStartedFired
         }
         if (eventType === 'cue-called') {
           return true
         }
-        if (eventType === 'measure') {
-          return cueData.beat === 'Measure'
-        }
-        if (eventType === 'beat') {
-          return cueData.beat === 'Strong' || cueData.beat === 'Weak' || cueData.beat === 'Measure'
-        }
-        if (eventType === 'half-beat') {
-          return cueData.beat === 'Strong' || cueData.beat === 'Weak'
-        }
-        if (eventType === 'keyframe') {
-          return (
-            cueData.keyframe === 'First' ||
-            cueData.keyframe === 'Next' ||
-            cueData.keyframe === 'Previous'
-          )
-        }
-        if (eventType === 'keyframe-first') return cueData.keyframe === 'First'
-        if (eventType === 'keyframe-next') return cueData.keyframe === 'Next'
-        if (eventType === 'keyframe-previous') return cueData.keyframe === 'Previous'
-        // Vocal events are edge-triggered: compare singing state against the previous frame
-        // (stamped by YargCueHandler.addHistoryToCueData) so each node fires once per edge.
-        // A missing previousFrame (first frame of the cue) counts as not-singing. When a strobe
-        // is active these edges fire only in the primary cue's graph: handleCue updates the
-        // previous-frame snapshot on the primary call, so the strobe slot sees prev == current.
-        if (eventType === 'vocal-note') {
-          return isVocalActive(cueData) && !isVocalActive(cueData.previousFrame ?? {})
-        }
-        if (eventType === 'vocal-note-off') {
-          return !isVocalActive(cueData) && isVocalActive(cueData.previousFrame ?? {})
-        }
-        const instrumentResult = isInstrumentEventTriggered(
-          eventType,
-          cueData.guitarNotes,
-          cueData.bassNotes,
-          cueData.keysNotes,
-          cueData.drumNotes,
-        )
-        if (instrumentResult !== null) {
-          return instrumentResult
-        }
-        return false
+        return evaluateEventCondition(cue.mode, eventType, cueData, event.triggerOnColorChange)
       }
 
       const events = Array.from(cue.eventMap.values())
       const triggeredEvents = events.filter((e) => {
-        const eventType = (e as { eventType?: string }).eventType
-        return eventType ? isEventTriggered(eventType) : false
+        const event = e as NetEventNode
+        return event.eventType ? isEventTriggered(event) : false
       })
 
       const cueStarted = triggeredEvents.filter(
@@ -179,8 +163,8 @@ export function effectGraphPolicy(effectId: string, instanceId?: number): GraphE
     getLogPrefix: () => prefix,
     getEntryNodes(compiled, _parameters, _entryContext): BaseEventNode[] {
       const effect = compiled as CompiledEffect<BaseEventNode>
-      const listener = Array.from(effect.effectListenerMap.values())[0]
-      return listener ? [listener as unknown as BaseEventNode] : []
+      // Every effect-listener is an entry point (an effect may declare more than one).
+      return Array.from(effect.effectListenerMap.values()) as unknown as BaseEventNode[]
     },
   }
 }

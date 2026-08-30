@@ -6,8 +6,9 @@ import type {
 import type { NodeCueMode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import {
   YARG_CUE_DATA_PROPERTY_META,
+  RB3_CUE_DATA_PROPERTY_META,
   AUDIO_CUE_DATA_PROPERTY_META,
-  getYargCueDataPropertyMeta,
+  getNetCueDataPropertyMeta,
   getAudioCueDataPropertyMeta,
 } from '../../../../../../../photonics-dmx/constants/cueDataPropertyMeta'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
@@ -29,15 +30,21 @@ const CueDataLogicEditor: React.FC<CueDataLogicEditorProps> = ({
   updateNode,
   onSyncVariableValidValues,
 }) => {
+  // Each mode offers only its own cue-data vocabulary: RB3 gets the StageKit LED/effect properties,
+  // YARG gets the song properties. (The YARG lookup map is the union, so validValues still resolve.)
   const cueDataProperties =
-    activeMode === 'yarg' ? YARG_CUE_DATA_PROPERTY_META : AUDIO_CUE_DATA_PROPERTY_META
+    activeMode === 'audio'
+      ? AUDIO_CUE_DATA_PROPERTY_META
+      : activeMode === 'rb3'
+        ? RB3_CUE_DATA_PROPERTY_META
+        : YARG_CUE_DATA_PROPERTY_META
 
   useEffect(() => {
     if (!node.assignTo || !node.dataProperty || !onSyncVariableValidValues) return
     const meta =
-      activeMode === 'yarg'
-        ? getYargCueDataPropertyMeta(node.dataProperty)
-        : getAudioCueDataPropertyMeta(node.dataProperty)
+      activeMode === 'audio'
+        ? getAudioCueDataPropertyMeta(node.dataProperty)
+        : getNetCueDataPropertyMeta(node.dataProperty)
     if (!meta?.validValues?.length) return
     const varDef = availableVariables.find((v) => v.name === node.assignTo)
     if (!varDef) return

@@ -5,7 +5,7 @@ import type {
   NodeCueFile,
   NodeCueKind,
   NodeCueMode,
-  YargNodeCueDefinition,
+  NetNodeCueDefinition,
   EffectFile,
   EffectMode,
   YargEffectDefinition,
@@ -29,12 +29,16 @@ import {
   getLastActiveMode,
   getLastFilePathForMode,
   getLastItemIdForMode,
+  fileModeForModeKey,
   getStoredLastFilePath,
+  modeKeyFor,
+  resolveModeTarget,
   setLastActiveMode,
+  setLastFilePathForMode,
   setLastItemIdForMode,
   setStoredLastFilePath,
 } from './useLastCueFilePath'
-import type { EditorModeKey } from './useLastCueFilePath'
+import { resolveCueKindSelection } from '../lib/cueKindSync'
 import type { EditorDocument, EditorMode } from '../lib/types'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import { useCueFileIO } from './useCueFileIO'
@@ -63,7 +67,7 @@ export type PendingCueEditorImport =
 type UseCueFilesParams = {
   loadCueIntoFlow: (
     cue:
-      | YargNodeCueDefinition
+      | NetNodeCueDefinition
       | AudioNodeCueDefinition
       | YargEffectDefinition
       | AudioEffectDefinition
@@ -85,11 +89,16 @@ const useCueFiles = ({
   const [mode, setMode] = useState<NodeCueMode>(() => {
     const stored = getLastActiveMode()
     if (stored?.startsWith('audio')) return 'audio'
+    if (stored?.startsWith('rb3')) return 'rb3'
     return 'yarg'
   })
   const [cueKind, setCueKind] = useState<NodeCueKind>(() => {
     const stored = getLastActiveMode()
-    return stored === 'yarg-motion-cue' || stored === 'audio-motion-cue' ? 'motion' : 'lighting'
+    return stored === 'yarg-motion-cue' ||
+      stored === 'audio-motion-cue' ||
+      stored === 'rb3-motion-cue'
+      ? 'motion'
+      : 'lighting'
   })
   const [editorMode, setEditorMode] = useState<EditorMode>(() => {
     const stored = getLastActiveMode()
@@ -111,7 +120,7 @@ const useCueFiles = ({
   const refreshFiles = useCallback(async () => {
     try {
       const summary = await listNodeCueFiles()
-      setFiles([...summary.yarg, ...summary.audio])
+      setFiles([...summary.yarg, ...summary.audio, ...summary.rb3])
     } catch (error) {
       log.error('Failed to list node cue files', error)
     }
@@ -144,8 +153,9 @@ const useCueFiles = ({
     setFilename,
     selectedCueId,
     setSelectedCueId,
-    mode,
+    cueKind,
     setMode,
+    setCueKind,
     setValidationErrors,
     setIsDirty,
     loadCueIntoFlow,
@@ -171,6 +181,7 @@ const useCueFiles = ({
     effectFiles,
     setValidationErrors,
     setIsDirty,
+    setCueKind,
     loadCueIntoFlow,
     refreshFiles: fileIO.refreshFiles,
     refreshEffectFiles: fileIO.refreshEffectFiles,
@@ -274,6 +285,11 @@ const useCueFiles = ({
 
         if (pendingImport.kind === 'cue') {
           const cuePayload = raw as NodeCueFile
+          // Importing into the rb3 platform re-stamps the file mode so a YARG-shaped cue lands as
+          // an rb3 cue (rb3 reuses the YARG cue shape). yarg/audio imports keep the file's own mode.
+          if (pendingImport.saveMode === 'rb3') {
+            cuePayload.mode = 'rb3'
+          }
           const validation = await validateNodeCue({ content: cuePayload })
           if (!validation.valid) {
             onError?.(`Import validation failed: ${validation.errors.join(', ')}`)
@@ -290,7 +306,7 @@ const useCueFiles = ({
           }
           await refreshFiles()
           const summaryList = await listNodeCueFiles()
-          const flat = [...summaryList.yarg, ...summaryList.audio]
+          const flat = [...summaryList.yarg, ...summaryList.audio, ...summaryList.rb3]
           const summary = flat.find((s) => s.path === response.path)
           if (summary) {
             await fileIO.selectFile(summary)
@@ -343,14 +359,6 @@ const useCueFiles = ({
     return cueFile.cues.find((cue) => cue.id === selectedCueId) ?? null
   }, [editorDoc, selectedCueId])
 
-  useEffect(() => {
-    if (!currentCueDefinition || !('kind' in currentCueDefinition)) return
-    const k = currentCueDefinition.kind
-    if (k === 'lighting' || k === 'motion') {
-      setCueKind(k)
-    }
-  }, [currentCueDefinition])
-
   const currentEffectDefinition = useMemo(() => {
     if (!editorDoc || !selectedCueId || editorDoc.mode !== 'effect') return null
     const effectFile = editorDoc.file as EffectFile
@@ -361,6 +369,7 @@ const useCueFiles = ({
     () => ({
       yarg: files.filter((file) => file.mode === 'yarg'),
       audio: files.filter((file) => file.mode === 'audio'),
+      rb3: files.filter((file) => file.mode === 'rb3'),
     }),
     [files],
   )
@@ -375,24 +384,7 @@ const useCueFiles = ({
 
   const handleModeChange = useCallback(
     (nextMode: string) => {
-      const isEffect = nextMode === 'yarg-effect' || nextMode === 'audio-effect'
-      const cueMode: NodeCueMode =
-        nextMode === 'yarg-effect' || nextMode === 'yarg-cue' || nextMode === 'yarg-motion-cue'
-          ? 'yarg'
-          : 'audio'
-      const nextKind: NodeCueKind =
-        nextMode === 'yarg-motion-cue' || nextMode === 'audio-motion-cue' ? 'motion' : 'lighting'
-      const modeKey: EditorModeKey = isEffect
-        ? cueMode === 'yarg'
-          ? 'yarg-effect'
-          : 'audio-effect'
-        : nextMode === 'yarg-motion-cue'
-          ? 'yarg-motion-cue'
-          : nextMode === 'audio-motion-cue'
-            ? 'audio-motion-cue'
-            : cueMode === 'yarg'
-              ? 'yarg-cue'
-              : 'audio-cue'
+      const { isEffect, cueMode, nextKind, modeKey } = resolveModeTarget(nextMode)
 
       setMode(cueMode)
       if (!isEffect) {
@@ -403,41 +395,71 @@ const useCueFiles = ({
 
       const storedPath = getLastFilePathForMode(modeKey)
       const preferredItemId = getLastItemIdForMode(modeKey) ?? undefined
+      // The stored path must also belong to the mode we are switching to. `files` is flattened
+      // across every mode, so a path left behind by another platform would otherwise load here and
+      // drag the editor back to that platform. An unmatched entry falls through and clears instead.
+      const expectedFileMode = fileModeForModeKey(modeKey)
+
+      const clearEditor = () => {
+        setEditorDoc(null)
+        setSelectedCueId(null)
+        setFilename('untitled.json')
+        loadCueIntoFlow(null)
+        setValidationErrors([])
+        setIsDirty(false)
+      }
 
       if (isEffect) {
-        const summary = effectFiles.find((f) => f.path === storedPath)
+        const summary = effectFiles.find(
+          (f) => f.path === storedPath && f.mode === expectedFileMode,
+        )
         if (summary) {
-          fileIO.selectEffectFile(summary, preferredItemId)
-        } else {
-          setEditorDoc(null)
+          // Neutral interim state: the read installs document, selection and flow together, so
+          // nothing observes the new kind against the outgoing document.
           setSelectedCueId(null)
-          setFilename('untitled.json')
           loadCueIntoFlow(null)
-          setIsDirty(false)
+          void fileIO.selectEffectFile(summary, preferredItemId)
+        } else {
+          clearEditor()
         }
       } else {
-        const summary = files.find((f) => f.path === storedPath)
+        const summary = files.find((f) => f.path === storedPath && f.mode === expectedFileMode)
         if (summary) {
-          fileIO.selectFile(summary, preferredItemId)
-        } else {
-          setEditorDoc(null)
           setSelectedCueId(null)
-          setFilename('untitled.json')
           loadCueIntoFlow(null)
-          setIsDirty(false)
+          void fileIO.selectFile(summary, preferredItemId, nextKind)
+        } else if (editorDoc?.mode === 'cue' && editorDoc.file.mode === cueMode) {
+          // No stored file for this kind, so stay in the open file when it carries cues of the
+          // kind we are switching to. Resolving here keeps kind and selection in one batch.
+          const sync = resolveCueKindSelection('cue', editorDoc, nextKind, null)
+          if (sync.action === 'select') {
+            setSelectedCueId(sync.cue.id)
+            loadCueIntoFlow(sync.cue)
+            if (editorDoc.path) {
+              setLastFilePathForMode(modeKey, editorDoc.path)
+              rememberLastFilePath(editorDoc.path)
+            }
+          } else {
+            clearEditor()
+          }
+        } else {
+          clearEditor()
         }
       }
     },
     [
+      editorDoc,
       effectFiles,
       files,
       fileIO,
       loadCueIntoFlow,
+      rememberLastFilePath,
       setEditorDoc,
       setFilename,
       setMode,
       setCueKind,
       setSelectedCueId,
+      setValidationErrors,
       setIsDirty,
     ],
   )
@@ -445,8 +467,12 @@ const useCueFiles = ({
   useEffect(() => {
     fileIO.refreshFiles()
     fileIO.refreshEffectFiles()
-    const handler = (payload: { yarg: NodeCueFileSummary[]; audio: NodeCueFileSummary[] }) => {
-      setFiles([...payload.yarg, ...payload.audio])
+    const handler = (payload: {
+      yarg: NodeCueFileSummary[]
+      audio: NodeCueFileSummary[]
+      rb3: NodeCueFileSummary[]
+    }) => {
+      setFiles([...payload.yarg, ...payload.audio, ...payload.rb3])
     }
     const effectHandler = (payload: { yarg: EffectFileSummary[]; audio: EffectFileSummary[] }) => {
       setEffectFiles([...payload.yarg, ...payload.audio])
@@ -470,20 +496,10 @@ const useCueFiles = ({
     if (!selectedCueId || !editorDoc) return
     const isEffect = editorDoc.mode === 'effect'
     const cueMode = editorDoc.file.mode
-    const modeKey: EditorModeKey = isEffect
-      ? cueMode === 'yarg'
-        ? 'yarg-effect'
-        : 'audio-effect'
-      : (() => {
-          const currentCue = (editorDoc.file as NodeCueFile).cues.find(
-            (c) => c.id === selectedCueId,
-          )
-          const kind = currentCue?.kind
-          if (cueMode === 'yarg') {
-            return kind === 'motion' ? 'yarg-motion-cue' : 'yarg-cue'
-          }
-          return kind === 'motion' ? 'audio-motion-cue' : 'audio-cue'
-        })()
+    const selectedKind = isEffect
+      ? undefined
+      : (editorDoc.file as NodeCueFile).cues.find((c) => c.id === selectedCueId)?.kind
+    const modeKey = modeKeyFor(cueMode, selectedKind === 'motion' ? 'motion' : 'lighting', isEffect)
     setLastItemIdForMode(modeKey, selectedCueId)
   }, [selectedCueId, editorDoc])
 
@@ -505,14 +521,16 @@ const useCueFiles = ({
 
     const preferredItemId = getLastItemIdForMode(modeKey) ?? undefined
 
+    const expectedFileMode = fileModeForModeKey(modeKey)
+
     if (isEffect) {
       if (effectFiles.length === 0) return
-      const summary = effectFiles.find((f) => f.path === storedPath)
+      const summary = effectFiles.find((f) => f.path === storedPath && f.mode === expectedFileMode)
       restoredLastFileRef.current = true
       if (summary) fileIO.selectEffectFile(summary, preferredItemId)
     } else {
       if (files.length === 0) return
-      const summary = files.find((f) => f.path === storedPath)
+      const summary = files.find((f) => f.path === storedPath && f.mode === expectedFileMode)
       restoredLastFileRef.current = true
       if (summary) fileIO.selectFile(summary, preferredItemId)
     }

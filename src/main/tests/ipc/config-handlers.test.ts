@@ -2,6 +2,7 @@
  * Lightweight IPC tests for motion preference channels registered in config-handlers.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { withCollaboratorGetters } from './managerFacades'
 import { ConfigStrobeType } from '../../../photonics-dmx/types'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
@@ -18,6 +19,11 @@ const baseCueDomains = () => ({
     disabledCues: {} as Record<string, string[]>,
   },
   audioMotion: {
+    activeCueRef: null as { groupId: string; cueId: string } | null,
+    disabledCues: {} as Record<string, string[]>,
+  },
+  rb3: { disabledCues: {} as Record<string, string[]> },
+  rb3Motion: {
     activeCueRef: null as { groupId: string; cueId: string } | null,
     disabledCues: {} as Record<string, string[]>,
   },
@@ -41,7 +47,9 @@ const mockConfig = {
   >,
   getDmxRig: jest.fn(),
   drainConfigCorruptRecovery: jest.fn().mockReturnValue([]),
-  saveDmxRig: jest.fn(async () => {}) as jest.MockedFunction<(rig: object) => Promise<void>>,
+  saveDmxRig: jest.fn(async () => {}) as jest.MockedFunction<
+    (rig: object, opts?: { deactivateOthers?: boolean }) => Promise<void>
+  >,
   deleteDmxRig: jest.fn(async () => {}),
   getDmxRigs: jest.fn(async () => []),
   getLightLibrary: jest.fn().mockReturnValue([]),
@@ -51,16 +59,17 @@ const mockConfig = {
   getAllPreferences: jest.fn().mockReturnValue({}),
 }
 
-const mockControllerManager = {
+const mockControllerManager = withCollaboratorGetters({
   getConfig: jest.fn().mockReturnValue(mockConfig),
   restartControllers: jest.fn(async () => {}),
   refreshActiveRigs: jest.fn(),
   setMotionEnabledGlobal: jest.fn(),
   setActiveAudioMotionCueRef: jest.fn(),
   setActiveYargMotionCueRef: jest.fn(),
+  setActiveRb3MotionCueRef: jest.fn(),
   flushValidationErrors: jest.fn().mockReturnValue([]),
   getIsInitialized: jest.fn().mockReturnValue(true),
-}
+})
 
 const mockSendToAllWindows = jest.fn()
 
@@ -72,8 +81,8 @@ jest.mock('electron', () => ({
 jest.mock('../../utils/windowUtils', () => ({ sendToAllWindows: mockSendToAllWindows }))
 
 jest.mock('../../../photonics-dmx/cues', () => ({}))
-jest.mock('../../../photonics-dmx/cues/registries/YargCueRegistry', () => ({
-  YargCueRegistry: {
+jest.mock('../../../photonics-dmx/cues/registries/CueRegistry', () => ({
+  CueRegistry: {
     getInstance: jest.fn().mockReturnValue({
       getRegisteredMotionGroupIds: jest.fn().mockReturnValue([]),
       setEnabledMotionGroups: jest.fn(),
@@ -258,6 +267,48 @@ describe('CONFIG motion IPC (config-handlers)', () => {
     })
   })
 
+  describe('GET_ACTIVE_RB3_MOTION_CUE / SET_ACTIVE_RB3_MOTION_CUE', () => {
+    it('GET_ACTIVE_RB3_MOTION_CUE returns ref from ConfigurationManager', async () => {
+      const ref = { groupId: 'g-rb3', cueId: 'cue-m1' }
+      const cd = baseCueDomains()
+      cd.rb3Motion.activeCueRef = ref
+      mockConfig.getPreference.mockImplementation((key: unknown) =>
+        key === 'cueDomains' ? cd : undefined,
+      )
+      const handler = handlers.get(CONFIG.GET_ACTIVE_RB3_MOTION_CUE)!
+      const result = await handler({}, undefined)
+      expect(result).toEqual(ref)
+    })
+
+    it('SET_ACTIVE_RB3_MOTION_CUE persists valid ref and applies to the RB3 handler path', async () => {
+      const handler = handlers.get(CONFIG.SET_ACTIVE_RB3_MOTION_CUE)!
+      const result = await handler({}, { groupId: '  g1  ', cueId: ' c1 ' })
+      expect(result).toEqual({ success: true })
+      expect(mockConfig.updateCueDomain).toHaveBeenCalledWith('rb3Motion', {
+        activeCueRef: { groupId: 'g1', cueId: 'c1' },
+      })
+      expect(mockControllerManager.setActiveRb3MotionCueRef).toHaveBeenCalledWith({
+        groupId: 'g1',
+        cueId: 'c1',
+      })
+    })
+
+    it('SET_ACTIVE_RB3_MOTION_CUE clears ref when payload is null', async () => {
+      const handler = handlers.get(CONFIG.SET_ACTIVE_RB3_MOTION_CUE)!
+      const result = await handler({}, null)
+      expect(result).toEqual({ success: true })
+      expect(mockConfig.updateCueDomain).toHaveBeenCalledWith('rb3Motion', { activeCueRef: null })
+      expect(mockControllerManager.setActiveRb3MotionCueRef).toHaveBeenCalledWith(null)
+    })
+
+    it('SET_ACTIVE_RB3_MOTION_CUE rejects invalid shape', async () => {
+      const handler = handlers.get(CONFIG.SET_ACTIVE_RB3_MOTION_CUE)!
+      const result = await handler({}, 'not-an-object')
+      expect(result).toMatchObject({ success: false })
+      expect(mockConfig.updateCueDomain).not.toHaveBeenCalled()
+    })
+  })
+
   describe('SAVE_DMX_RIG', () => {
     const validLayout = {
       numLights: 0,
@@ -291,7 +342,21 @@ describe('CONFIG motion IPC (config-handlers)', () => {
       expect(result).toEqual({ success: true })
       expect(mockConfig.saveDmxRig).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'r1', name: 'My rig', active: true, config: validLayout }),
+        // Multiple active rigs are off by default, so activating this one deactivates the rest.
+        { deactivateOthers: true },
       )
+    })
+
+    it('leaves the other rigs active when multiple active rigs are allowed', async () => {
+      mockConfig.getDmxRig.mockReturnValue(null)
+      mockConfig.getPreference.mockImplementation((key: unknown) =>
+        key === 'allowMultipleActiveRigs' ? true : undefined,
+      )
+      const handler = handlers.get(CONFIG.SAVE_DMX_RIG)!
+      await handler({}, { id: 'r1', name: 'My rig', active: true, config: validLayout })
+      expect(mockConfig.saveDmxRig).toHaveBeenCalledWith(expect.anything(), {
+        deactivateOthers: false,
+      })
     })
   })
 })

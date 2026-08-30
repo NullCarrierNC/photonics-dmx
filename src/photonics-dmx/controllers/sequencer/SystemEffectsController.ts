@@ -13,6 +13,12 @@ export class SystemEffectsController implements ISystemEffectsController {
   private layerManager: ILayerManager
   private isBlackingOut: boolean = false
   private _blackoutLayersUnder: number = 255
+  /** Per-light fade timers of the in-flight blackout; cleared on cancel/dispose. */
+  private pendingTimers: Set<NodeJS.Timeout> = new Set()
+  /** Resolvers paired with {@link pendingTimers}, settled early on cancel so `blackout()` returns. */
+  private pendingResolvers: Set<() => void> = new Set()
+  /** Bumped at each blackout start; a continuation whose generation is stale must not touch state. */
+  private generation = 0
 
   // Callback for blackout completion events (both immediate and timed)
   private onBlackoutCompleteCallback: (() => void) | null = null
@@ -41,6 +47,23 @@ export class SystemEffectsController implements ISystemEffectsController {
    */
   public isBlackoutActive(): boolean {
     return this.isBlackingOut
+  }
+
+  /**
+   * Hold or release an occlusion over the whole rig: every light publishes dark while the running
+   * cue keeps advancing underneath, and reappears at its natural state the moment it is released.
+   *
+   * Delegated to the transition controller, which gates the published colour rather than stacking an
+   * overlay on a layer. A layer would not survive: `setEffect` clears every transition through
+   * `removeAllEffects`, as do the blackout paths, so the next cue to submit would drop it.
+   */
+  public holdOcclusion(on: boolean): void {
+    this.lightTransitionController.setOcclusionHeld(on)
+  }
+
+  /** Whether the occlusion is currently held. */
+  public isOcclusionHeld(): boolean {
+    return this.lightTransitionController.isOcclusionHeld()
   }
 
   /**
@@ -77,6 +100,7 @@ export class SystemEffectsController implements ISystemEffectsController {
     }
 
     this.isBlackingOut = true
+    const generation = ++this.generation
 
     log.info(`Initiating blackout for ${duration}ms.`)
 
@@ -129,13 +153,26 @@ export class SystemEffectsController implements ISystemEffectsController {
               blackoutTransition.transform.duration,
               blackoutTransition.transform.easing,
             )
-            // Ensure we resolve after the transition duration
-            setTimeout(resolve, duration + 16) // Add one frame time to ensure completion
+            // Resolve after the transition duration (plus one frame time to ensure completion).
+            // Tracked so cancelBlackout/dispose can clear the timer and settle the promise early.
+            const timer = setTimeout(() => {
+              this.pendingTimers.delete(timer)
+              this.pendingResolvers.delete(resolve)
+              resolve()
+            }, duration + 16)
+            this.pendingTimers.add(timer)
+            this.pendingResolvers.add(resolve)
           })
         })
 
         // Wait for all transitions to complete
         await Promise.all(transitionPromises)
+
+        // A cancelled or superseded blackout must not run the terminal wipe: cancelBlackout has
+        // already removed the fade transitions, and whatever cue started since owns the lights now.
+        if (this.generation !== generation || !this.isBlackingOut) {
+          return
+        }
 
         // Clear all effects and force black state
         const allLayers = this.layerManager.getAllLayers()
@@ -178,6 +215,8 @@ export class SystemEffectsController implements ISystemEffectsController {
           )
         })
 
+        // The terminal wipe cleared every layer's effects, so lay a held overlay back down before
+
         // Trigger the callback after timed blackout completes as well
         if (this.onBlackoutCompleteCallback) {
           this.onBlackoutCompleteCallback()
@@ -186,19 +225,46 @@ export class SystemEffectsController implements ISystemEffectsController {
     } catch (error) {
       log.error('An error occurred during blackout:', error)
     } finally {
-      this.isBlackingOut = false
+      // Only the current blackout may clear the flag — a stale continuation resuming after a
+      // cancel-then-restart would otherwise mark the NEW blackout as finished mid-fade.
+      if (this.generation === generation) {
+        this.isBlackingOut = false
+      }
     }
   }
 
   /**
    * Cancels a blackout mid-fade.
-   * We remove transitions from the blackout layer so new effects can override.
+   * We remove transitions from the blackout layer so new effects can override, clear the fade
+   * timers, and settle the in-flight `blackout()` promise (its terminal wipe is generation-gated).
    */
   public cancelBlackout(): void {
     if (this.isBlackingOut) {
       log.warn('Cancelling in-progress blackout.')
       this.isBlackingOut = false
+      this.clearPendingBlackout()
       this.lightTransitionController.removeTransitionsByLayer(255)
+      // The overlay lives above 255 so the sweep leaves it, but re-assert anyway: a cancel resumes
+    }
+  }
+
+  /**
+   * Releases blackout timers/promises on owner teardown so nothing fires after shutdown.
+   */
+  public dispose(): void {
+    this.isBlackingOut = false
+    this.clearPendingBlackout()
+  }
+
+  private clearPendingBlackout(): void {
+    for (const timer of this.pendingTimers) {
+      clearTimeout(timer)
+    }
+    this.pendingTimers.clear()
+    const resolvers = [...this.pendingResolvers]
+    this.pendingResolvers.clear()
+    for (const resolve of resolvers) {
+      resolve()
     }
   }
 

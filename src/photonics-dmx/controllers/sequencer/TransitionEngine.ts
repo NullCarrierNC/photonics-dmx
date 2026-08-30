@@ -127,7 +127,9 @@ export class TransitionEngine implements ITransitionEngine {
       const hasQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId) !== undefined
       if (!hasNewEffect && !hasQueuedEffect) {
         this.lightTransitionController.removeLightLayer(lightId, layer)
-        this.layerManager.clearLayerStates(layer)
+        // Clear only THIS light's stored state on the layer — other lights on the same layer may
+        // still be running and must keep their state.
+        this.layerManager.clearLightLayerState(layer, lightId)
       }
     }
     this._pendingLayerRemovals = []
@@ -171,14 +173,35 @@ export class TransitionEngine implements ITransitionEngine {
       })
     })
 
-    // Process completed effects
+    this.finalizeCompletedEffects(effectsToRemove)
+
+    // Clean up unused layers
+    this.layerManager.cleanupUnusedLayers(currentTime)
+  }
+
+  /**
+   * Removes each given effect from the active map, fires its completion callback, and starts
+   * any queued successor. A slot left empty on a layer above 0 defers its layer state removal
+   * through {@link _pendingLayerRemovals}.
+   *
+   * Removal runs as its own pass over the whole batch before any callback fires. A completion
+   * callback can re-enter the graph and submit again, and every name in the batch is free by
+   * then, so a submission naming a sibling of the effect that triggered it is accepted.
+   *
+   * @param effectsToRemove The (layer, light) pairs whose effect has finished
+   */
+  private finalizeCompletedEffects(
+    effectsToRemove: Array<{ layer: number; lightId: string }>,
+  ): void {
+    const finished: Array<{ layer: number; lightId: string; effect: LightEffectState }> = []
     for (const { layer, lightId } of effectsToRemove) {
       const justFinishedEffect = this.layerManager.getActiveEffect(layer, lightId)
       if (!justFinishedEffect) continue
-
-      // Remove the effect from active effects
       this.layerManager.removeActiveEffect(layer, lightId)
+      finished.push({ layer, lightId, effect: justFinishedEffect })
+    }
 
+    for (const { layer, lightId, effect: justFinishedEffect } of finished) {
       if (this.effectManager && typeof this.effectManager.onLightEffectComplete === 'function') {
         this.effectManager.onLightEffectComplete(justFinishedEffect)
       }
@@ -207,9 +230,30 @@ export class TransitionEngine implements ITransitionEngine {
         }
       }
     }
+  }
 
-    // Clean up unused layers
-    this.layerManager.cleanupUnusedLayers(currentTime)
+  /**
+   * Removes and completes every active effect that has advanced past its last transition.
+   *
+   * A song event releases an effect parked on `waitUntilCondition` by advancing it past its
+   * last transition, and a cue reacting to that same event raises the effect again in the
+   * same synchronous pass. Running on release keeps the name free for that submission.
+   */
+  public reapCompletedEffects(): void {
+    const effectsToRemove: Array<{ layer: number; lightId: string }> = []
+
+    // Collect before mutating: completion callbacks can synchronously add new effects.
+    this.layerManager.getActiveEffects().forEach((layerMap, layer) => {
+      layerMap.forEach((lightEffect, lightId) => {
+        if (lightEffect.currentTransitionIndex >= lightEffect.transitions.length) {
+          effectsToRemove.push({ layer, lightId })
+        }
+      })
+    })
+
+    if (effectsToRemove.length === 0) return
+
+    this.finalizeCompletedEffects(effectsToRemove)
   }
 
   /**

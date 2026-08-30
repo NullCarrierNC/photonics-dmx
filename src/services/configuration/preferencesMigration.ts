@@ -268,6 +268,52 @@ export function migratePrefsV4ToV5(legacy: unknown, defaults: AppPreferences): A
   return normalizeCueDomains(out)
 }
 
+/**
+ * Seeds cue-domain entries added after v5 (`rb3`, `rb3Motion`) when a stored prefs.json predates
+ * them. Every other field is preserved untouched. New installs never run this — they start at the
+ * current version with the full DEFAULT_PREFERENCES.
+ */
+export function migratePrefsV5ToV6(legacy: unknown, defaults: AppPreferences): AppPreferences {
+  const base =
+    legacy != null && typeof legacy === 'object' && !Array.isArray(legacy)
+      ? (legacy as AppPreferences)
+      : defaults
+
+  const currentDomains =
+    base.cueDomains != null &&
+    typeof base.cueDomains === 'object' &&
+    !Array.isArray(base.cueDomains)
+      ? base.cueDomains
+      : createDefaultCueDomains()
+
+  // normalizeCueDomains defaults any missing domain (including rb3 / rb3Motion) via its
+  // `?? createDefaultCueDomainPrefs(d)` fallback, so no separate seeding pass is needed here.
+  return normalizeCueDomains({ ...base, cueDomains: currentDomains })
+}
+
+/**
+ * Load-time repair: seed any cue-domain entry that a same-version prefs.json predates (a domain
+ * added to `CUE_DOMAINS` after the file was written) so the AJV `required: [...CUE_DOMAINS]` check
+ * can't fail and trip corrupt-recovery. Returns the same object when every domain is already
+ * present (no persist), otherwise a shallow copy with the missing domains defaulted. A malformed
+ * `cueDomains` is left untouched so a wholly-corrupt file still falls through to validation.
+ */
+export function seedMissingCueDomains(prefs: AppPreferences): AppPreferences {
+  const domains = prefs?.cueDomains as Record<string, unknown> | undefined
+  if (domains == null || typeof domains !== 'object' || Array.isArray(domains)) {
+    return prefs
+  }
+  const missing = CUE_DOMAINS.filter((d) => domains[d] == null)
+  if (missing.length === 0) {
+    return prefs
+  }
+  const seeded = { ...(domains as Record<CueDomain, CueDomainPrefs>) }
+  for (const d of missing) {
+    seeded[d] = createDefaultCueDomainPrefs(d)
+  }
+  return { ...prefs, cueDomains: seeded }
+}
+
 function pickNonLegacyTopLevel(src: Record<string, unknown>): Partial<AppPreferences> {
   const o: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(src)) {
@@ -400,14 +446,23 @@ function hasAnyFlatV3Key(src: Record<string, unknown>): boolean {
   return false
 }
 
+const MOTION_DOMAINS: readonly CueDomain[] = ['yargMotion', 'audioMotion', 'rb3Motion']
+
 function normalizeCueDomains(prefs: AppPreferences): AppPreferences {
   const m = mergePartialCueDomains(prefs.cueDomains, {})
   for (const d of CUE_DOMAINS) {
-    const c = m[d]
-    m[d] = {
+    const c = m[d] ?? createDefaultCueDomainPrefs(d)
+    const normalized = {
       ...c,
       disabledCues: c.disabledCues && typeof c.disabledCues === 'object' ? c.disabledCues : {},
     }
+    // Backfill the switch-timer range on motion domains for installs that predate it.
+    if (MOTION_DOMAINS.includes(d)) {
+      const defaults = createDefaultCueDomainPrefs(d)
+      normalized.cueDurationMin = normalized.cueDurationMin ?? defaults.cueDurationMin
+      normalized.cueDurationMax = normalized.cueDurationMax ?? defaults.cueDurationMax
+    }
+    m[d] = normalized
   }
   return { ...prefs, cueDomains: m }
 }

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from '@jest/globals'
 
-import { asymmetricEnvelopeStep } from '../../../../cues/node/runtime/BaseAudioNodeCue'
+import { asymmetricEnvelopeStep } from '../../../../cues/audio/bandReactivity'
 
 describe('asymmetricEnvelopeStep', () => {
   const FRAME_MS = 1000 / 60 // ~16.67ms, the audio analysis cadence

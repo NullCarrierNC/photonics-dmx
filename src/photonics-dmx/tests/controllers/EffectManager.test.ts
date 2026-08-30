@@ -14,6 +14,7 @@
 
 import '@jest/globals'
 import { EffectManager } from '../../controllers/sequencer/EffectManager'
+import { EffectCallbackRegistry } from '../../controllers/sequencer/EffectCallbackRegistry'
 import { LayerManager } from '../../controllers/sequencer/LayerManager'
 import { TransitionEngine } from '../../controllers/sequencer/TransitionEngine'
 import { EffectTransformer } from '../../controllers/sequencer/EffectTransformer'
@@ -290,6 +291,24 @@ describe('EffectManager', () => {
       expect(systemEffects.cancelBlackout).toHaveBeenCalled()
     })
 
+    it('should ignore an effect with no transitions during blackout without throwing', () => {
+      // Blackout active is the case that used to deref transitions[0] before the empty guard.
+      systemEffects.isBlackoutActive.mockReturnValue(true)
+
+      const empty: Effect = {
+        id: 'empty-effect',
+        description: 'Effect with no transitions',
+        transitions: [],
+      }
+
+      expect(() => effectManager.addEffect('empty', empty)).not.toThrow()
+      expect(() => effectManager.replaceEffect('empty', empty)).not.toThrow()
+      expect(() => effectManager.addEffectUnblockedName('empty', empty)).not.toThrow()
+      expect(() => effectManager.setEffectUnblockedName('empty', empty)).not.toThrow()
+      // The empty effect is ignored, so it never cancels the blackout.
+      expect(systemEffects.cancelBlackout).not.toHaveBeenCalled()
+    })
+
     it('should queue effects with the same name on the same layer', () => {
       const layer = 1
       const effectName = 'test-effect'
@@ -398,6 +417,83 @@ describe('EffectManager', () => {
     })
   })
 
+  describe('replaceEffectWithCallback', () => {
+    const positionEffect = (id: string): Effect => ({
+      id,
+      description: id,
+      transitions: [
+        {
+          lights: [createMockTrackedLight()],
+          layer: 120,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: {
+            color: createMockRGBIP(),
+            easing: 'linear',
+            duration: 1000,
+          },
+          waitUntilCondition: 'measure',
+          waitUntilTime: 0,
+        },
+      ],
+    })
+
+    const registryOf = (manager: EffectManager): EffectCallbackRegistry =>
+      (manager as unknown as { effectCallbacks: EffectCallbackRegistry }).effectCallbacks
+
+    it('registers the callback and reports the submission applied', () => {
+      const onComplete = jest.fn()
+
+      const applied = effectManager.replaceEffectWithCallback(
+        'pos:0',
+        positionEffect('pos'),
+        onComplete,
+      )
+
+      expect(applied).toBe(true)
+      expect(registryOf(effectManager).get('pos:0')).toBe(onComplete)
+      expect(onComplete).not.toHaveBeenCalled()
+    })
+
+    it('cancel-fires the displaced callback exactly once and holds only the new one', () => {
+      const first = jest.fn()
+      const second = jest.fn()
+      effectManager.replaceEffectWithCallback('pos:0', positionEffect('first'), first)
+
+      effectManager.replaceEffectWithCallback('pos:0', positionEffect('second'), second)
+
+      expect(first).toHaveBeenCalledTimes(1)
+      expect(first).toHaveBeenCalledWith(true)
+      expect(second).not.toHaveBeenCalled()
+      expect(registryOf(effectManager).get('pos:0')).toBe(second)
+    })
+
+    it('does not fire a callback when no effect held the name', () => {
+      const onComplete = jest.fn()
+
+      effectManager.replaceEffectWithCallback('pos:0', positionEffect('only'), onComplete)
+
+      expect(onComplete).not.toHaveBeenCalled()
+    })
+
+    it('leaves the held callback alone when the submission is refused', () => {
+      const held = jest.fn()
+      effectManager.replaceEffectWithCallback('pos:0', positionEffect('held'), held)
+      const rejected = jest.fn()
+
+      const applied = effectManager.replaceEffectWithCallback(
+        'pos:0',
+        { id: 'empty', description: 'empty', transitions: [] },
+        rejected,
+      )
+
+      expect(applied).toBe(false)
+      expect(held).not.toHaveBeenCalled()
+      expect(rejected).not.toHaveBeenCalled()
+      expect(registryOf(effectManager).get('pos:0')).toBe(held)
+    })
+  })
+
   describe('setEffect', () => {
     it('should add new effect after clearing existing effects', async () => {
       // Setup mock effect
@@ -498,6 +594,61 @@ describe('EffectManager', () => {
   })
 
   describe('addEffectUnblockedName', () => {
+    it('names the rig in the duplicate-name warning when the manager drives one', () => {
+      const effectName = 'test-effect'
+      const effect: Effect = {
+        id: 'test-effect',
+        description: 'Test effect',
+        transitions: [
+          {
+            lights: [createMockTrackedLight()],
+            layer: 1,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: {
+              color: createMockRGBIP(),
+              easing: 'linear',
+              duration: 1000,
+            },
+            waitUntilCondition: 'none',
+            waitUntilTime: 0,
+          },
+        ],
+      }
+
+      const activeEffectsMap = new Map()
+      const lightMap = new Map()
+      lightMap.set('test-light-1', {
+        name: effectName,
+        effect: { id: 'other', description: 'Other Effect', transitions: [] },
+        transitions: [],
+        layer: 2,
+        lightId: 'test-light-1',
+        currentTransitionIndex: 0,
+        state: 'idle',
+        transitionStartTime: 0,
+        waitEndTime: 0,
+        lastEndState: undefined,
+        isPersistent: false,
+      })
+      activeEffectsMap.set(2, lightMap)
+      layerManager.getActiveEffects.mockReturnValue(activeEffectsMap)
+
+      const labelled = new EffectManager(
+        layerManager as unknown as ILayerManager,
+        transitionEngine as unknown as ITransitionEngine,
+        effectTransformer as unknown as IEffectTransformer,
+        systemEffects as unknown as ISystemEffectsController,
+        'Mix RGB&MH',
+      )
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+      expect(labelled.addEffectUnblockedName(effectName, effect)).toBe(false)
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('[rig: Mix RGB&MH]'))
+
+      warn.mockRestore()
+    })
+
     it('should not add effect if one with the same name exists on any layer', () => {
       const effectName = 'test-effect'
 
@@ -772,6 +923,120 @@ describe('EffectManager', () => {
     })
   })
 
+  describe('startNextEffectInQueue', () => {
+    const lightA = createMockTrackedLight({ id: 'light-a', position: 1 })
+    const lightB = createMockTrackedLight({ id: 'light-b', position: 2 })
+
+    it('queues a persistent light with the run id it was counted into', () => {
+      // The run's light total is fixed when the run is registered and counts every light, including
+      // ones that end up queued. A queued light that starts without the id never reports against
+      // the run, so the run stays a completion short and no light in it ever restarts.
+      const effect: Effect = {
+        id: 'persistent-effect',
+        description: 'Persistent test effect',
+        transitions: [
+          {
+            lights: [lightA],
+            layer: 1,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: { color: createMockRGBIP(), easing: 'linear', duration: 100 },
+            waitUntilCondition: 'none',
+            waitUntilTime: 0,
+          },
+        ],
+      }
+      layerManager.getActiveEffect.mockReturnValue({
+        name: 'persistent-effect',
+        lightId: 'light-a',
+        layer: 1,
+      } as unknown as LightEffectState)
+
+      effectManager.addEffect('persistent-effect', effect, true)
+
+      expect(layerManager.addQueuedEffect).toHaveBeenCalledWith(
+        1,
+        'light-a',
+        expect.objectContaining({ isPersistent: true, effectRunId: expect.any(String) }),
+      )
+    })
+
+    const twoLightEffect = (layer: number): Effect => ({
+      id: 'queued-effect',
+      description: 'Queued test effect',
+      transitions: [
+        {
+          lights: [lightA, lightB],
+          layer,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: createMockRGBIP(), easing: 'linear', duration: 100 },
+          waitUntilCondition: 'none',
+          waitUntilTime: 0,
+        },
+      ],
+    })
+
+    it('starts the queued effect only for the light it was queued for', () => {
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'queued-effect',
+        effect: twoLightEffect(1),
+        lightId: 'light-a',
+        isPersistent: false,
+      })
+
+      expect(effectManager.startNextEffectInQueue(1, 'light-a')).toBe(true)
+
+      expect(layerManager.addActiveEffect).toHaveBeenCalledTimes(1)
+      const state = layerManager.addActiveEffect.mock.calls[0][2] as LightEffectState
+      expect(state.lightId).toBe('light-a')
+    })
+
+    it('discards an entry no transition on this layer targets, and reports no next effect', () => {
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'queued-effect',
+        effect: twoLightEffect(2),
+        lightId: 'light-a',
+        isPersistent: false,
+      })
+
+      expect(effectManager.startNextEffectInQueue(1, 'light-a')).toBe(false)
+
+      expect(layerManager.removeQueuedEffect).toHaveBeenCalledWith(1, 'light-a')
+      expect(layerManager.addActiveEffect).not.toHaveBeenCalled()
+    })
+
+    it('carries the queued run id through to the started effect', () => {
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'queued-effect',
+        effect: twoLightEffect(1),
+        lightId: 'light-a',
+        isPersistent: true,
+        effectRunId: 'run-1',
+      })
+
+      effectManager.startNextEffectInQueue(1, 'light-a')
+
+      const state = layerManager.addActiveEffect.mock.calls[0][2] as LightEffectState
+      expect(state.effectRunId).toBe('run-1')
+      expect(state.isPersistent).toBe(true)
+    })
+
+    it('discards an entry whose light no transition targets', () => {
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'queued-effect',
+        effect: twoLightEffect(1),
+        lightId: 'light-missing',
+        isPersistent: false,
+      })
+
+      expect(effectManager.startNextEffectInQueue(1, 'light-missing')).toBe(false)
+
+      expect(layerManager.removeQueuedEffect).toHaveBeenCalledWith(1, 'light-missing')
+      expect(layerManager.addActiveEffect).not.toHaveBeenCalled()
+    })
+  })
+
   describe('removeEffect', () => {
     it('should remove an effect by name and layer', () => {
       const effectName = 'test-effect'
@@ -885,15 +1150,59 @@ describe('EffectManager', () => {
         effectTransformer as unknown as IEffectTransformer,
         systemEffects as unknown as ISystemEffectsController,
       )
-      const callbacks = (effectManagerWithCallbacks as any).effectCallbacks as Map<
-        string,
-        () => void
-      >
+      const callbacks = (effectManagerWithCallbacks as any)
+        .effectCallbacks as EffectCallbackRegistry
       callbacks.set('orphan', () => {})
 
       effectManagerWithCallbacks.removeAllEffects()
 
       expect(callbacks.size).toBe(0)
+    })
+
+    it('removeAllEffects fires pending callbacks with cancelled=true instead of dropping them', () => {
+      const effectManagerWithCallbacks = new EffectManager(
+        layerManager as unknown as ILayerManager,
+        transitionEngine as unknown as ITransitionEngine,
+        effectTransformer as unknown as IEffectTransformer,
+        systemEffects as unknown as ISystemEffectsController,
+      )
+      const callbacks = (effectManagerWithCallbacks as any)
+        .effectCallbacks as EffectCallbackRegistry
+      const cb = jest.fn()
+      callbacks.set('pending', cb)
+
+      effectManagerWithCallbacks.removeAllEffects()
+
+      // The waiting graph node must be told its action ended (cancelled) rather than stranded.
+      expect(cb).toHaveBeenCalledWith(true)
+      expect(callbacks.size).toBe(0)
+    })
+
+    it('setEffectWithCallback keeps the callback registered after the internal clear', () => {
+      const effect: Effect = {
+        id: 'cb-effect',
+        description: 'callback effect',
+        transitions: [
+          {
+            layer: 1,
+            lights: [createMockTrackedLight()],
+            transform: {
+              color: createMockRGBIP(),
+              easing: 'linear',
+              duration: 100,
+              waitFor: 0,
+              waitUntil: 0,
+            },
+          } as unknown as EffectTransition,
+        ],
+      }
+      const onComplete = jest.fn()
+      effectManager.setEffectWithCallback('cb-effect', effect, onComplete)
+
+      const callbacks = (effectManager as any).effectCallbacks as EffectCallbackRegistry
+      // setEffect clears callbacks internally, so registering before it (the old order) would have
+      // left this empty; the callback must survive to fire on completion.
+      expect(callbacks.get('cb-effect')).toBe(onComplete)
     })
   })
 })

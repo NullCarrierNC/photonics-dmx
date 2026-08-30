@@ -149,6 +149,80 @@ describe('ActionEffectFactory', () => {
     expect(effect).toBeNull()
   })
 
+  it('floors a silent-frame intensityScale of 0 to a faint glow, not full black', () => {
+    // intensityScale carries the audio-reactive level; a silent frame (0) keeps a faint floor so
+    // the rig does not fully extinguish between beats.
+    const action: ActionNode = {
+      id: 'a1',
+      type: 'action',
+      effectType: 'set-color',
+      target: {
+        groups: { source: 'literal', value: 'front' },
+        filter: { source: 'literal', value: 'all' },
+      },
+      color: {
+        name: { source: 'literal', value: 'red' },
+        brightness: { source: 'literal', value: 'high' },
+        blendMode: { source: 'literal', value: 'replace' },
+      },
+      timing: createDefaultActionTiming(),
+    }
+    const full = ActionEffectFactory.buildEffect({ action, lights, intensityScale: 1 })
+    const silent = ActionEffectFactory.buildEffect({ action, lights, intensityScale: 0 })
+    const fullIntensity = full!.transitions[0].transform.color.intensity
+    const silentIntensity = silent!.transitions[0].transform.color.intensity
+    expect(silentIntensity).toBeGreaterThan(0)
+    expect(silentIntensity).toBeLessThan(fullIntensity)
+  })
+
+  it('falls back to a finite intensity when intensityScale is NaN', () => {
+    const action: ActionNode = {
+      id: 'a1',
+      type: 'action',
+      effectType: 'set-color',
+      target: {
+        groups: { source: 'literal', value: 'front' },
+        filter: { source: 'literal', value: 'all' },
+      },
+      color: {
+        name: { source: 'literal', value: 'red' },
+        brightness: { source: 'literal', value: 'high' },
+        blendMode: { source: 'literal', value: 'replace' },
+      },
+      timing: createDefaultActionTiming(),
+    }
+    const effect = ActionEffectFactory.buildEffect({ action, lights, intensityScale: NaN })
+    expect(effect).not.toBeNull()
+    expect(Number.isFinite(effect!.transitions[0].transform.color.intensity)).toBe(true)
+  })
+
+  it('resolves a non-numeric count literal to undefined, never NaN', () => {
+    const timing = createDefaultActionTiming()
+    ;(timing as unknown as { waitForConditionCount: unknown }).waitForConditionCount = {
+      source: 'literal',
+      value: 'not-a-number',
+    }
+    const action: ActionNode = {
+      id: 'a1',
+      type: 'action',
+      effectType: 'set-color',
+      target: {
+        groups: { source: 'literal', value: 'front' },
+        filter: { source: 'literal', value: 'all' },
+      },
+      color: {
+        name: { source: 'literal', value: 'blue' },
+        brightness: { source: 'literal', value: 'medium' },
+        blendMode: { source: 'literal', value: 'replace' },
+      },
+      timing,
+    }
+    // No resolvedTiming, so buildEffect runs resolveTiming internally.
+    const effect = ActionEffectFactory.buildEffect({ action, lights })
+    expect(effect).not.toBeNull()
+    expect(effect!.transitions[0].waitForConditionCount).toBeUndefined()
+  })
+
   it('resolveLights maps target groups to TrackedLight array', () => {
     const target = {
       groups: { source: 'literal', value: 'front' },

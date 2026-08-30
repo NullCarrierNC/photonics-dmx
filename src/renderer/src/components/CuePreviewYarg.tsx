@@ -5,6 +5,7 @@ import {
   DrumNoteType,
 } from '../../../photonics-dmx/cues/types/cueTypes'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
+import PostProcessingStatus from './PostProcessingStatus'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import {
   getActiveYargMotionCue,
@@ -314,8 +315,9 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
         prevBeatRef.current = cueData.beat
       }
 
-      // Measure detection - check if the measure number changed
-      if (cueData.measureOrBeat !== undefined) {
+      // Measure detection - check if the measure number changed. Measures are 1-indexed, so 0 (the
+      // default/unset value) is treated as "no measure" and not shown.
+      if (cueData.measureOrBeat) {
         // Check if it's a new measure (compare with our ref)
         if (cueData.measureOrBeat !== prevMeasureRef.current) {
           setLastMeasureType(`Measure ${cueData.measureOrBeat}`)
@@ -487,19 +489,16 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
               <p>{currentCueData.beatsPerMinute}</p>
             </div>
 
+            {/* Venue Size holds all song, so it sits on the card rather than in a chip. */}
             <div>
-              <p className="font-medium">Auto-Gen:</p>
-              <p>
-                {currentCueData.trackMode !== undefined
-                  ? currentCueData.trackMode === 'autogen'
-                    ? 'Yes'
-                    : 'No'
-                  : 'Unknown'}
-              </p>
+              <p className="font-medium">Venue Size:</p>
+              <div className="p-2 rounded">
+                <p>{currentCueData.venueSize || 'Unknown'}</p>
+              </div>
             </div>
 
             {/* Second row - 4 columns */}
-            {currentCueData.measureOrBeat !== undefined && (
+            {!!currentCueData.measureOrBeat && (
               <div>
                 <p className="font-medium">Current Measure:</p>
                 <p>Measure {currentCueData.measureOrBeat}</p>
@@ -541,13 +540,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
               </div>
             </div>
 
-            {/* Venue Size */}
-            <div>
-              <p className="font-medium">Venue Size:</p>
-              <div className="p-2 rounded bg-gray-100 dark:bg-gray-600">
-                <p>{currentCueData.venueSize || 'Unknown'}</p>
-              </div>
-            </div>
+            <PostProcessingStatus state={currentCueData.postProcessing} />
           </div>
 
           {/* Instrument Notes Section */}

@@ -6,6 +6,11 @@
  * in the same layout group are packed into a sqrt grid when multiple segments share one group.
  */
 
+import {
+  LOGIC_NODE_META,
+  type LogicNode,
+} from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+
 // ─── Types (minimal shape matching cue/effect nodes + connections) ─────────────
 
 export type NodePositions = Record<string, { x: number; y: number }>
@@ -103,7 +108,10 @@ function estimateNodeSize(meta: NodeMeta): { w: number; h: number } {
   }
   if (type === 'logic') {
     const lt = logicType ?? ''
-    if (lt === 'conditional' || lt === 'for-each-light') return { w: 200, h: 110 }
+    // Two-port nodes (conditional/frame-gate true-false, for-each-light/led-changed each-done) need the
+    // wider box so both bottom handle labels fit.
+    const ports = LOGIC_NODE_META[lt as LogicNode['logicType']]?.ports
+    if (ports === 'true-false' || ports === 'each-done') return { w: 200, h: 110 }
     if (lt === 'cue-data' || lt === 'config-data' || lt === 'build-ring') return { w: 200, h: 96 }
     return { w: 180, h: 88 }
   }

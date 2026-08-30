@@ -1,5 +1,6 @@
 import { IpcMain } from 'electron'
-import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
+import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
+import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import { ipcError } from './ipcResult'
 import { isNonEmptyString, validateCueType } from './inputValidation'
 import { LIGHT } from '../../shared/ipcChannels'
@@ -13,7 +14,7 @@ const log = createLogger('cue-group-handlers')
  */
 export function setupCueGroupHandlers(ipcMain: IpcMain): void {
   ipcMain.handle(LIGHT.GET_CUE_GROUPS, async () => {
-    const registry = YargCueRegistry.getInstance()
+    const registry = CueRegistry.getInstance()
     const groupIds = registry.getAllGroups()
     return groupIds
       .map((groupId) => {
@@ -31,12 +32,60 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
       .filter((row): row is NonNullable<typeof row> => row !== null)
   })
 
+  ipcMain.handle(LIGHT.GET_RB3_CUE_GROUPS, async () => {
+    const registry = getCueRegistry('rb3')
+    return registry
+      .getAllGroups()
+      .map((groupId) => {
+        const group = registry.getGroup(groupId)
+        if (!group || group.cues.size === 0) {
+          return null
+        }
+        return {
+          id: groupId,
+          name: group.name,
+          description: group.description,
+          cueTypes: Array.from(group.cues.keys()),
+        }
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null)
+  })
+
+  ipcMain.handle(LIGHT.GET_AVAILABLE_RB3_CUES, async (_, groupId?: unknown) => {
+    try {
+      const registry = getCueRegistry('rb3')
+      const resolvedGroupId =
+        typeof groupId === 'string' && groupId.trim() !== '' ? groupId : undefined
+      const targetGroupId =
+        resolvedGroupId ?? registry.getDefaultGroupId() ?? registry.getEnabledGroups()[0]
+      if (!targetGroupId) {
+        return []
+      }
+      const group = registry.getGroup(targetGroupId)
+      if (!group) {
+        return []
+      }
+      return Array.from(group.cues.keys()).map((cueType) => {
+        const implementation = group.cues.get(cueType)!
+        return {
+          id: cueType,
+          yargDescription: implementation.description,
+          rb3Description: implementation.description,
+          groupName: group.name,
+        }
+      })
+    } catch (error) {
+      log.error('Error getting available RB3 cues:', error)
+      return []
+    }
+  })
+
   ipcMain.handle(LIGHT.ENABLE_CUE_GROUP, async (_, groupId: unknown) => {
     if (!isNonEmptyString(groupId)) {
       return { success: false, error: 'groupId is required' }
     }
     try {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       const group = registry.getGroup(groupId)
       if (!group) {
         return { success: false, error: `Group '${groupId}' not found` }
@@ -59,7 +108,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
       return { success: false, error: 'groupId is required' }
     }
     try {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       const group = registry.getGroup(groupId)
       if (!group) {
         return { success: false, error: `Group '${groupId}' not found` }
@@ -86,7 +135,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
       return { success: false, error: validated.error }
     }
     try {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       const cueState = registry.getCueState(validated.value)
       if (cueState) {
         return {
@@ -108,7 +157,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
 
   ipcMain.handle(LIGHT.GET_CONSISTENCY_STATUS, async () => {
     try {
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       const status = registry.getConsistencyStatus()
       return { success: true, status }
     } catch (error) {

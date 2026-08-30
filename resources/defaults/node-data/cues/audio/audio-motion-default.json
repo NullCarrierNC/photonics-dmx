@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 1,
+  "cueVersion": 2,
   "mode": "audio",
   "group": {
     "id": "audio-motion-default",
@@ -12,7 +12,7 @@
     {
       "id": "motion-vogue-slow",
       "name": "Vogue (Slow)",
-      "description": "Slow: On each measure, every light moves to its own random stage bearing over 1600ms (set-position).",
+      "description": "On each measure, every light moves to its own random stage bearing over 600ms.",
       "variables": [
         {
           "name": "vogueSlowLights",
@@ -107,7 +107,7 @@
               },
               "duration": {
                 "source": "literal",
-                "value": 1600
+                "value": 600
               },
               "waitUntilCondition": {
                 "source": "literal",
@@ -367,9 +367,9 @@
           }
         },
         "viewport": {
-          "x": 461.4694324698272,
-          "y": 282.2413175148849,
-          "zoom": 0.6769198747236393
+          "x": 613.3711982967812,
+          "y": 149.59090909090918,
+          "zoom": 0.934662153491357
         }
       },
       "kind": "motion"

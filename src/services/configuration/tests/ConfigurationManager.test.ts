@@ -113,6 +113,70 @@ describe('ConfigurationManager', () => {
     })
   })
 
+  describe('Fixture schema migration on load', () => {
+    /** Boots a manager against an on-disk library + layout holding pre-collapse rgbw fixtures. */
+    const bootWithLegacyRgbw = (): ConfigurationManager => {
+      ;(fs.readFileSync as jest.Mock).mockImplementation((path: string) => {
+        if (path.includes('prefs.json')) {
+          return JSON.stringify({ effectDebounce: 0, complex: true })
+        }
+        if (path.includes('lights.json')) {
+          return JSON.stringify({
+            lights: [
+              {
+                id: 'tpl-rgbw',
+                position: 0,
+                fixture: 'rgbw',
+                label: 'RGBW',
+                name: 'RGBW',
+                isStrobeEnabled: false,
+                channels: { masterDimmer: 1, red: 2, green: 3, blue: 4, white: 5 },
+              },
+            ],
+          })
+        }
+        if (path.includes('lightsLayout.json')) {
+          return JSON.stringify({
+            numLights: 1,
+            lightLayout: { id: 'front', label: 'Front only' },
+            strobeType: ConfigStrobeType.None,
+            frontLights: [
+              {
+                id: 'l1',
+                fixtureId: 'tpl-rgbw',
+                position: 1,
+                fixture: 'rgbw',
+                label: 'RGBW',
+                name: 'RGBW',
+                isStrobeEnabled: false,
+                group: 'front',
+                mount: 'floor',
+                channels: { masterDimmer: 11, red: 12, green: 13, blue: 14, white: 15 },
+              },
+            ],
+            backLights: [],
+            strobeLights: [],
+          })
+        }
+        return '{}'
+      })
+      return new ConfigurationManager()
+    }
+
+    test('collapses a stored rgbw template onto rgb plus a white extra channel', () => {
+      const lights = bootWithLegacyRgbw().getUserLights()
+      expect(lights[0].fixture).toBe(FixtureTypes.RGB)
+      expect(lights[0].extraChannels).toEqual([{ type: 'white', channel: 5 }])
+      expect((lights[0].channels as unknown as Record<string, number>).white).toBeUndefined()
+    })
+
+    test('collapses rgbw lights in the stored lighting layout too', () => {
+      const layout = bootWithLegacyRgbw().getLightingLayout()
+      expect(layout.frontLights[0].fixture).toBe(FixtureTypes.RGB)
+      expect(layout.frontLights[0].extraChannels).toEqual([{ type: 'white', channel: 15 }])
+    })
+  })
+
   describe('Lighting Layout', () => {
     test('should get lighting layout', () => {
       const layout = configManager.getLightingLayout()
@@ -207,7 +271,7 @@ describe('ConfigurationManager', () => {
       const lastWriteCall = writeCalls[writeCalls.length - 1]
       const content = lastWriteCall[1]
       const savedData = JSON.parse(content)
-      expect(savedData).toHaveProperty('version', 5)
+      expect(savedData).toHaveProperty('version', 6)
       expect(savedData).toHaveProperty('data')
       expect(savedData.data).toHaveProperty('effectDebounce', 100)
     })

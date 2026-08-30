@@ -17,6 +17,18 @@ export interface ScenarioEntry {
   venue?: VenueSize
   /** Switch the cue under test from this point on (stops the previous cue first). */
   cue?: string
+  /** RB3 only: set the StageKit LED bank masks the cue mirrors from this point on. */
+  ledBanks?: LedBanks
+  /** RB3 only: set the fog machine state from this point on. */
+  fog?: boolean
+}
+
+/** The four StageKit LED bank masks, one bit per ring position. */
+export interface LedBanks {
+  red: number
+  green: number
+  blue: number
+  yellow: number
 }
 
 /** Per-light colour observation captured from the LightStateManager at a point in time. */

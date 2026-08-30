@@ -38,7 +38,7 @@ const Status = () => {
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           For a how-to guide on setting up your lights in Photonics, please visit the{' '}
           <a
-            href="https://photonics.rocks/quickstart-guide/"
+            href="https://photonics.rocks/docs/photonics-quick-start-guide/"
             className="text-blue-600 dark:text-blue-500 hover:underline"
             target="_blank">
             Quickstart Guide
@@ -49,7 +49,7 @@ const Status = () => {
           For more details about how Photoincs works, how many lights you need, and how things
           differ between YARG and RB3E, please visit the{' '}
           <a
-            href="https://photonics.rocks/documentation/"
+            href="https://photonics.rocks/docs/table-of-contents/"
             className="text-blue-600 dark:text-blue-500 hover:underline"
             target="_blank">
             Documentation

@@ -4,199 +4,27 @@
  */
 
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
-import { monotonicNowMs } from '../../../../shared/time'
 import { CueData } from '../../types/cueTypes'
 import { AudioCueData } from '../../types/audioCueTypes'
 import { TrackedLight, LightTarget } from '../../../types'
-import { YargCueDataProperty, AudioCueDataProperty } from '../../types/nodeCueTypes'
+import { NodeCueMode } from '../../types/nodeCueTypes'
 import { parsePatternPropertyId, configLightGroupToLocationGroups } from '../utils/patternUtils'
+import { getCueDomain } from '../../domains'
 
 /**
- * Extract cue data value based on property (YARG or Audio mode).
+ * Resolve a cue-data property against the family the running cue belongs to.
+ *
+ * `mode` is the cue's declared domain, carried from the file it was loaded from, so a frame missing
+ * an optional field still resolves against the right family and yarg is distinguishable from rb3.
+ * Adding a mode needs no edit here: the descriptor it registers supplies the extractor.
  */
 export function extractCueDataValue(
   property: string,
   cueData: CueData | AudioCueData,
   cueId: string,
+  mode: NodeCueMode,
 ): number | string | boolean {
-  // Mode detection (YARG vs Audio)
-  const isYargMode = 'lightingCue' in cueData
-
-  if (isYargMode) {
-    return extractYargCueDataValue(property as YargCueDataProperty, cueData as CueData, cueId)
-  } else {
-    return extractAudioCueDataValue(
-      property as AudioCueDataProperty,
-      cueData as AudioCueData,
-      cueId,
-    )
-  }
-}
-
-/**
- * Extract YARG-specific cue data.
- */
-export function extractYargCueDataValue(
-  property: YargCueDataProperty,
-  cueData: CueData,
-  cueId: string,
-): number | string | boolean {
-  switch (property) {
-    case 'cue-name':
-      return cueId
-    case 'cue-type':
-      return cueData.lightingCue
-    case 'previous-cue':
-      return cueData.previousCue ?? ''
-    case 'execution-count':
-      return cueData.executionCount ?? 0
-    case 'bpm':
-      return cueData.beatsPerMinute
-    case 'beat-duration-ms':
-      return cueData.beatsPerMinute > 0 ? Math.round(60000 / cueData.beatsPerMinute) : 500
-    case 'song-section':
-      return cueData.songSection
-    case 'current-scene':
-      return cueData.currentScene
-    case 'beat-type':
-      return cueData.beat
-    case 'keyframe':
-      return cueData.keyframe
-    case 'venue-size':
-      return cueData.venueSize
-    case 'guitar-note-count':
-      return cueData.guitarNotes.length
-    case 'bass-note-count':
-      return cueData.bassNotes.length
-    case 'drum-note-count':
-      return cueData.drumNotes.length
-    case 'keys-note-count':
-      return cueData.keysNotes.length
-    case 'total-score':
-      return cueData.totalScore ?? 0
-    case 'performer':
-      return cueData.performer
-    case 'bonus-effect':
-      return cueData.bonusEffect
-    case 'fog-state':
-      return cueData.fogState
-    case 'time-since-cue-start':
-      return monotonicNowMs() - (cueData.cueStartTime ?? monotonicNowMs())
-    case 'time-since-last-cue':
-      return cueData.timeSinceLastCue ?? 0
-    default:
-      return 0
-  }
-}
-
-/**
- * Extract Audio-specific cue data.
- */
-export function extractAudioCueDataValue(
-  property: AudioCueDataProperty,
-  cueData: AudioCueData,
-  cueId: string,
-): number | string | boolean {
-  switch (property) {
-    case 'cue-name':
-      return cueId
-    case 'cue-type-id':
-      return '' // Audio cues have cueTypeId
-    case 'execution-count':
-      return cueData.executionCount
-    case 'timestamp':
-      return cueData.timestamp
-    case 'overall-level':
-      return cueData.audioData.overallLevel
-    case 'bpm':
-      return cueData.audioData.bpm ?? 0
-    case 'beat-detected':
-      return cueData.audioData.beatDetected
-    case 'energy':
-      return cueData.audioData.energy
-    case 'enabled-band-count':
-      return cueData.enabledBandCount
-    case 'audio-amplitude':
-      return cueData.audioData.amplitude ?? cueData.audioData.overallLevel
-    case 'audio-energy':
-      return cueData.audioData.energy
-    case 'audio-peak-frequency':
-      return cueData.audioData.peakFrequency ?? 0
-    case 'audio-bpm':
-      return cueData.audioData.bpm ?? 0
-    case 'audio-beat-duration-ms': {
-      const bpm = cueData.audioData.bpm ?? 0
-      return bpm > 0 ? Math.round(60000 / bpm) : 500
-    }
-    case 'audio-beat-detected':
-      return cueData.audioData.beatDetected
-    case 'audio-overall-level':
-      return cueData.audioData.overallLevel
-    case 'trigger-level':
-      return cueData.triggerContext?.triggerLevel ?? 0
-    case 'trigger-frequency-min':
-      return cueData.triggerContext?.triggerFrequencyMin ?? 0
-    case 'trigger-frequency-max':
-      return cueData.triggerContext?.triggerFrequencyMax ?? 0
-    case 'trigger-peak-frequency':
-      return cueData.triggerContext?.triggerPeakFrequency ?? 0
-    case 'trigger-band-amplitude':
-      return cueData.triggerContext?.triggerBandAmplitude ?? 0
-    case 'trigger-band-flatness':
-      return cueData.triggerContext?.triggerBandFlatness ?? cueData.audioData.spectralFlatness ?? 0
-    case 'trigger-band-crest':
-      return cueData.triggerContext?.triggerBandCrest ?? cueData.audioData.spectralCrest ?? 0
-    case 'trigger-band-centroid':
-      return cueData.triggerContext?.triggerBandCentroid ?? 0
-    case 'trigger-band-onset':
-      return cueData.triggerContext?.triggerBandOnset ?? 0
-    case 'event-raw-value':
-      return cueData.eventContext?.eventRawValue ?? 0
-    case 'spectral-centroid':
-      return cueData.audioData.spectralCentroid ?? 0
-    case 'spectral-flatness':
-      return cueData.audioData.spectralFlatness ?? 0
-    case 'spectral-rolloff':
-      return cueData.audioData.spectralRolloff ?? 0
-    case 'spectral-crest':
-      return cueData.audioData.spectralCrest ?? 0
-    case 'spectral-spread':
-      return cueData.audioData.spectralSpread ?? 0
-    case 'hfc-onset':
-      return cueData.audioData.hfcOnset ?? 0
-    case 'zero-crossing-rate':
-      return cueData.audioData.zeroCrossingRate ?? 0
-    case 'chromagram-c':
-      return cueData.audioData.chromagram?.[0] ?? 0
-    case 'chromagram-cs':
-      return cueData.audioData.chromagram?.[1] ?? 0
-    case 'chromagram-d':
-      return cueData.audioData.chromagram?.[2] ?? 0
-    case 'chromagram-ds':
-      return cueData.audioData.chromagram?.[3] ?? 0
-    case 'chromagram-e':
-      return cueData.audioData.chromagram?.[4] ?? 0
-    case 'chromagram-f':
-      return cueData.audioData.chromagram?.[5] ?? 0
-    case 'chromagram-fs':
-      return cueData.audioData.chromagram?.[6] ?? 0
-    case 'chromagram-g':
-      return cueData.audioData.chromagram?.[7] ?? 0
-    case 'chromagram-gs':
-      return cueData.audioData.chromagram?.[8] ?? 0
-    case 'chromagram-a':
-      return cueData.audioData.chromagram?.[9] ?? 0
-    case 'chromagram-as':
-      return cueData.audioData.chromagram?.[10] ?? 0
-    case 'chromagram-b':
-      return cueData.audioData.chromagram?.[11] ?? 0
-    case 'detected-key':
-      return cueData.audioData.detectedKey ?? ''
-    case 'detected-key-strength':
-      return cueData.audioData.detectedKeyStrength ?? 0
-    default:
-      return 0
-  }
+  return getCueDomain(mode).extractCueData(property, cueData, cueId)
 }
 
 /**

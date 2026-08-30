@@ -3,17 +3,25 @@ import {
   DmxFixture,
   DmxLight,
   DEFAULT_STROBE_CHANNEL_VALUES,
+  DMX_CHANNEL_MAX,
+  ExtraChannel,
   FixtureTypes,
   RgbDmxChannels,
-  RgbwDmxChannels,
   StrobeChannelValues,
-  StrobeDmxChannels,
   FixtureConfig,
+  fixtureConfigFieldBounds,
   normalizeFixtureConfig,
   LightingConfiguration,
 } from '../../../photonics-dmx/types'
 import { LightIcon } from './LightIcon'
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
+import {
+  deriveBaseChannelsForMaster,
+  deriveExtraChannelsForMaster,
+  maxMasterDimmerForTemplate,
+  templateChannelSpan,
+} from '../../../photonics-dmx/helpers/rigTemplateSync'
+import { extraChannelDisplayLabel, sortBaseChannelEntries } from './lightChannelDisplay'
 import { BsArrowsMove, BsLightningFill } from 'react-icons/bs'
 import MovingHeadCalibrationWizard from './MovingHeadCalibrationWizard'
 import { createLogger } from '../../../shared/logger'
@@ -37,8 +45,6 @@ interface LightChannelsConfigProps {
     listeners?: DraggableSyntheticListeners | undefined
   }
 }
-
-const channelOrder = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeChannel']
 
 const STROBE_VALUE_FIELDS: ReadonlyArray<{ key: keyof StrobeChannelValues; label: string }> = [
   { key: 'slow', label: 'Strobe Slow' },
@@ -86,13 +92,28 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
   lightingConfig,
   dragHandle,
 }) => {
-  const [localChannels, setLocalChannels] = useState<
-    RgbDmxChannels | RgbwDmxChannels | StrobeDmxChannels | null
-  >(null)
+  const [localChannels, setLocalChannels] = useState<DmxFixture['channels'] | null>(null)
 
   // State for the light's config (if available)
   const [localConfig, setLocalConfig] = useState<FixtureConfig | null>(null)
+  // Added channels, offset-derived from the template like the base channels. Display-only here.
+  const [localExtraChannels, setLocalExtraChannels] = useState<ExtraChannel[] | null>(null)
   const [calibrationOpen, setCalibrationOpen] = useState(false)
+  /**
+   * Explains a master-dimmer entry that was capped to keep the fixture inside the universe. Tagged
+   * with the light it describes so selecting another light drops it without an effect writing state.
+   */
+  const [masterDimmerNotice, setMasterDimmerNotice] = useState<{
+    lightId: DmxLight['id']
+    message: string
+  } | null>(null)
+
+  const activeTemplate = light
+    ? myLights.find((fixture) => fixture.id === light.fixtureId)
+    : undefined
+  const maxMasterDimmer = activeTemplate
+    ? maxMasterDimmerForTemplate(activeTemplate)
+    : DMX_CHANNEL_MAX
 
   useEffect(() => {
     if (light) {
@@ -103,31 +124,27 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
         // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when fixture not found
         setLocalChannels(null)
         setLocalConfig(null)
+        setLocalExtraChannels(null)
         return
       }
 
       // Handle Main Channels
       const templateChannels = fixtureTemplate.channels
-      // Calculate offsets based on masterDimmer for main channels
-      const offsets: { [key: string]: number } = {}
-      Object.entries(templateChannels).forEach(([channelName, value]) => {
-        if (channelName !== 'masterDimmer') {
-          offsets[channelName] = value - templateChannels.masterDimmer
-        }
-      })
-
       const existingMasterDimmer = light.channels.masterDimmer
-      const recalculatedChannels: { [key: string]: number } = {}
-      Object.entries(templateChannels).forEach(([channelName, _]) => {
-        if (channelName === 'masterDimmer') {
-          recalculatedChannels[channelName] = existingMasterDimmer
-        } else {
-          recalculatedChannels[channelName] = existingMasterDimmer + (offsets[channelName] || 0)
-        }
-      })
+      const recalculatedChannels = deriveBaseChannelsForMaster(
+        fixtureTemplate,
+        existingMasterDimmer,
+      )
 
       const castChannels = castToChannelType(fixtureTemplate.fixture, recalculatedChannels)
       setLocalChannels(castChannels)
+      setLocalExtraChannels(
+        deriveExtraChannelsForMaster(
+          fixtureTemplate.extraChannels,
+          templateChannels.masterDimmer,
+          existingMasterDimmer,
+        ) ?? null,
+      )
 
       // Handle Config
       // Copy the config from the light (no master dimmer logic here)
@@ -139,6 +156,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
     } else {
       setLocalChannels(null)
       setLocalConfig(null)
+      setLocalExtraChannels(null)
     }
   }, [light, myLights])
 
@@ -159,32 +177,41 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
         return
       }
 
-      // Calculate offsets from the fixture template (not the current light)
-      const templateChannels = fixtureTemplate.channels
-      const offsets: { [key: string]: number } = {}
-      Object.entries(templateChannels).forEach(([channelName, value]) => {
-        if (channelName !== 'masterDimmer') {
-          offsets[channelName] = value - templateChannels.masterDimmer
-        }
-      })
+      // Cap so the whole fixture fits in the universe and the rig stays saveable. The cap is
+      // announced rather than applied silently: the user typed this number, so a value that comes
+      // back different needs a reason attached.
+      const maxMaster = maxMasterDimmerForTemplate(fixtureTemplate)
+      if (newMasterValue > maxMaster) {
+        newMasterValue = maxMaster
+        setMasterDimmerNotice({
+          lightId: light.id,
+          message: `Capped at ${maxMaster} so all ${templateChannelSpan(fixtureTemplate) + 1} channels fit within the ${DMX_CHANNEL_MAX}-channel universe.`,
+        })
+      } else {
+        setMasterDimmerNotice(null)
+      }
 
-      // Apply the new master dimmer value and recalculate all channels using template offsets
-      const updatedChannels: { [key: string]: number } = {}
-      Object.entries(templateChannels).forEach(([channelName, _]) => {
-        if (channelName === 'masterDimmer') {
-          updatedChannels[channelName] = newMasterValue
-        } else {
-          updatedChannels[channelName] = newMasterValue + (offsets[channelName] || 0)
-        }
-      })
+      const templateChannels = fixtureTemplate.channels
+      const updatedChannels = deriveBaseChannelsForMaster(fixtureTemplate, newMasterValue)
 
       const castChannels = castToChannelType(fixtureTemplate.fixture, updatedChannels)
       setLocalChannels({ ...castChannels })
+
+      const extras = deriveExtraChannelsForMaster(
+        fixtureTemplate.extraChannels,
+        templateChannels.masterDimmer,
+        newMasterValue,
+      )
+      setLocalExtraChannels(extras ?? null)
 
       const updatedLight: DmxLight = {
         ...light,
         channels: { ...castChannels },
       }
+      // Set/delete (not omit-on-spread): the spread copies the rig light's existing extraChannels,
+      // so we must explicitly drop them when the template now has none, or a stale key persists.
+      if (extras) updatedLight.extraChannels = extras
+      else delete updatedLight.extraChannels
       onChange(updatedLight)
     }
   }
@@ -199,24 +226,8 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- config value can be number or string
       let updatedValue: any = value
       if (key !== 'invertPan' && key !== 'invertTilt' && key !== 'panDirectionCW') {
-        if (key === 'panRangeDeg') {
-          const num = Number(value)
-          updatedValue = Math.max(1, Math.min(720, Math.round(num)))
-        } else if (key === 'tiltRangeDeg') {
-          const num = Number(value)
-          updatedValue = Math.max(1, Math.min(360, Math.round(num)))
-        } else if (key === 'panHome' || key === 'tiltHome') {
-          const num = Number(value)
-          updatedValue = Math.max(0, Math.min(100, Math.round(num)))
-        } else if (key === 'panStageDeg') {
-          const num = Number(value)
-          updatedValue = Math.max(0, Math.min(localConfig.panRangeDeg, Math.round(num)))
-        } else if (key === 'tiltStageDeg') {
-          const num = Number(value)
-          updatedValue = Math.max(0, Math.min(localConfig.tiltRangeDeg, Math.round(num)))
-        } else {
-          updatedValue = Number(value)
-        }
+        const { min, max } = fixtureConfigFieldBounds(key, localConfig)
+        updatedValue = Math.max(min, Math.min(max, Math.round(Number(value))))
       }
       const updatedConfig = { ...localConfig, [key]: updatedValue }
       setLocalConfig(updatedConfig)
@@ -249,27 +260,23 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
     const selectedFixture = myLights.find((fixture) => fixture.id === selectedFixtureId)
     if (!selectedFixture || !light) return
 
-    const existingMasterDimmer = light.channels.masterDimmer
     const templateChannels = selectedFixture.channels
-
-    const offsets: { [key: string]: number } = {}
-    Object.entries(templateChannels).forEach(([channelName, value]) => {
-      if (channelName !== 'masterDimmer') {
-        offsets[channelName] = value - templateChannels.masterDimmer
-      }
-    })
-
-    const recalculatedChannels: { [key: string]: number } = {}
-    Object.entries(templateChannels).forEach(([channelName, _]) => {
-      if (channelName === 'masterDimmer') {
-        recalculatedChannels[channelName] = existingMasterDimmer
-      } else {
-        recalculatedChannels[channelName] = existingMasterDimmer + (offsets[channelName] || 0)
-      }
-    })
+    // Switching to a wider template can push the existing address past the universe, so re-cap it.
+    const existingMasterDimmer = Math.min(
+      light.channels.masterDimmer,
+      maxMasterDimmerForTemplate(selectedFixture),
+    )
+    const recalculatedChannels = deriveBaseChannelsForMaster(selectedFixture, existingMasterDimmer)
 
     const castChannels = castToChannelType(selectedFixture.fixture, recalculatedChannels)
     setLocalChannels({ ...castChannels })
+
+    const extras = deriveExtraChannelsForMaster(
+      selectedFixture.extraChannels,
+      templateChannels.masterDimmer,
+      existingMasterDimmer,
+    )
+    setLocalExtraChannels(extras ?? null)
 
     const updatedLight: DmxLight = {
       ...light,
@@ -280,6 +287,9 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       isStrobeEnabled: selectedFixture.isStrobeEnabled,
       channels: { ...castChannels },
     }
+    // Set/delete so switching to a template with no extras drops the previous template's extras.
+    if (extras) updatedLight.extraChannels = extras
+    else delete updatedLight.extraChannels
 
     // For config, if the new fixture has a config template, use it.
     if (selectedFixture.config) {
@@ -324,11 +334,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
 
   const isFixtureInMyLights = myLights.some((fixture) => fixture.id === light?.fixtureId)
 
-  const showCalibrate =
-    !!light &&
-    !!rigId &&
-    !!light.id &&
-    (light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH)
+  const showCalibrate = !!light && !!rigId && !!light.id && light.fixture === FixtureTypes.RGBMH
 
   let dragHandleButton: React.ReactNode = null
   if (dragHandle) {
@@ -408,29 +414,44 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       {light && localChannels && (
         <div className="mt-2 w-full">
           <ul className="text-sm space-y-1">
-            {Object.entries(localChannels)
-              .sort(([keyA], [keyB]) => {
-                const indexA = channelOrder.indexOf(keyA)
-                const indexB = channelOrder.indexOf(keyB)
-                if (indexA !== -1 && indexB !== -1) return indexA - indexB
-                if (indexA !== -1) return -1
-                if (indexB !== -1) return 1
-                return keyA.localeCompare(keyB)
-              })
-              .map(([channelName, value]) => (
-                <li key={channelName} className="flex justify-between items-center">
-                  <span className="capitalize">{getDisplayName(channelName)}:</span>
-                  {channelName === 'masterDimmer' ? (
-                    <input
-                      type="number"
-                      min={1}
-                      value={value || 1}
-                      onChange={handleMasterDimmerChange}
-                      className="w-16 p-1 border border-gray-300 dark:border-gray-700 rounded text-black dark:text-white dark:bg-gray-700 text-right"
-                    />
-                  ) : (
-                    <span>{value}</span>
-                  )}
+            {sortBaseChannelEntries(Object.entries(localChannels)).map(([channelName, value]) => (
+              <li key={channelName} className="flex justify-between items-center">
+                <span className="capitalize">{getDisplayName(channelName)}:</span>
+                {channelName === 'masterDimmer' ? (
+                  <input
+                    type="number"
+                    min={1}
+                    max={maxMasterDimmer}
+                    value={value || 1}
+                    onChange={handleMasterDimmerChange}
+                    className="w-16 p-1 border border-gray-300 dark:border-gray-700 rounded text-black dark:text-white dark:bg-gray-700 text-right"
+                  />
+                ) : (
+                  <span>{value}</span>
+                )}
+              </li>
+            ))}
+            {masterDimmerNotice?.lightId === light.id && (
+              <li className="text-xs text-amber-600 dark:text-amber-400">
+                {masterDimmerNotice.message}
+              </li>
+            )}
+            {/* Added channels — read-only here (template-owned, offset-derived from masterDimmer). */}
+            {light &&
+              (localExtraChannels ?? []).map((extra, i) => (
+                <li key={`extra-${i}`} className="flex justify-between items-center">
+                  <span>
+                    {extraChannelDisplayLabel(
+                      { ...light, extraChannels: localExtraChannels ?? [] },
+                      i,
+                    )}
+                    :
+                  </span>
+                  <span>
+                    {extra.type === 'fixed'
+                      ? `${extra.channel} = ${extra.value ?? 0}`
+                      : extra.channel}
+                  </span>
                 </li>
               ))}
           </ul>
@@ -441,7 +462,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       {light && localConfig && (
         <div className="mt-2 w-full">
           <h3 className="text-lg font-bold">Config</h3>
-          {(light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH) && (
+          {light.fixture === FixtureTypes.RGBMH && (
             <>
               <p className="text-xs text-gray-600 dark:text-gray-200 mb-2">
                 Use the Calibrate button below to configure these fields interactively.
@@ -458,8 +479,6 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
               const inputType = typeof value === 'boolean' ? 'checkbox' : 'number'
               const isPanRangeDeg = key === 'panRangeDeg'
               const isTiltRangeDeg = key === 'tiltRangeDeg'
-              const isPanHome = key === 'panHome'
-              const isTiltHome = key === 'tiltHome'
               const isPanStageDeg = key === 'panStageDeg'
               const isTiltStageDeg = key === 'tiltStageDeg'
               const noCapitalize =
@@ -479,30 +498,8 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                   ) : (
                     <input
                       type="number"
-                      min={
-                        isPanRangeDeg
-                          ? 1
-                          : isTiltRangeDeg
-                            ? 1
-                            : isPanHome || isTiltHome
-                              ? 0
-                              : isPanStageDeg || isTiltStageDeg
-                                ? 0
-                                : undefined
-                      }
-                      max={
-                        isPanRangeDeg
-                          ? 720
-                          : isTiltRangeDeg
-                            ? 360
-                            : isPanHome || isTiltHome
-                              ? 100
-                              : isPanStageDeg
-                                ? localConfig?.panRangeDeg ?? 720
-                                : isTiltStageDeg
-                                  ? localConfig?.tiltRangeDeg ?? 360
-                                  : undefined
-                      }
+                      min={fixtureConfigFieldBounds(key as keyof FixtureConfig, localConfig).min}
+                      max={fixtureConfigFieldBounds(key as keyof FixtureConfig, localConfig).max}
                       value={value as number}
                       onChange={(e) =>
                         handleConfigChange(key as keyof FixtureConfig, e.target.value)
@@ -513,7 +510,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                 </li>
               )
             })}
-            {(light.fixture === FixtureTypes.RGBMH || light.fixture === FixtureTypes.RGBWMH) &&
+            {light.fixture === FixtureTypes.RGBMH &&
               localConfig.invertPan === localConfig.invertTilt && (
                 <li className="flex flex-col items-stretch pt-1">
                   <button
@@ -548,9 +545,7 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
       )}
 
       {/* Separator for moving head fixtures if present */}
-      {light?.fixture === FixtureTypes.RGBMH || light?.fixture === FixtureTypes.RGBWMH ? (
-        <hr />
-      ) : null}
+      {light?.fixture === FixtureTypes.RGBMH ? <hr /> : null}
 
       {/* Strobe Toggle */}
       {light && (

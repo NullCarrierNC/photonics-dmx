@@ -152,7 +152,10 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
         isPrimary: true,
         dmxLightManager: lightManager,
         sequencer: photonicsSequencer,
-        yargCueHandler: null,
+        cueHandlers: {
+          yarg: null,
+          rb3: null,
+        },
         audioCueHandler: null,
         rb3MenuCueHandler: menuHandler,
       } as unknown as RigChain,
@@ -183,6 +186,31 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     expect(handled[0].lightingCue).toBe('Default')
     expect(handled[0].currentScene).toBe('Menu')
     expect(handled[0].rb3ScreenName).toBe('song_select_screen')
+  })
+
+  it('accumulates a full ledBanks snapshot across per-bank StageKit events', () => {
+    emitGameState(networkListener, 'InGame')
+    const handled: CueData[] = []
+    processor.on('cueHandled', (d: CueData) => handled.push(d))
+    const stage = (color: string, positions: number[]): void => {
+      networkListener.emit('stagekit:data', {
+        positions,
+        color,
+        brightness: 'medium',
+        timestamp: Date.now(),
+      })
+    }
+    const lastBanks = (): CueData['ledBanks'] => handled[handled.length - 1].ledBanks
+
+    stage('red', [0, 2]) // bits 0 and 2
+    stage('green', [1]) // bit 1
+    expect(lastBanks()).toEqual({ red: 0b0101, green: 0b0010, blue: 0, yellow: 0 })
+
+    stage('green', []) // empty positions clears just green
+    expect(lastBanks()).toEqual({ red: 0b0101, green: 0, blue: 0, yellow: 0 })
+
+    stage('off', []) // global off clears everything
+    expect(lastBanks()).toEqual({ red: 0, green: 0, blue: 0, yellow: 0 })
   })
 
   it('song_select_screen does not re-emit Default menu when cue is already running (e.g. after main_hub)', () => {

@@ -55,6 +55,3 @@ linux:
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: true
-publish:
-  provider: generic
-  url: https://photonics.rocks

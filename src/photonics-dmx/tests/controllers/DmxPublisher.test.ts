@@ -72,6 +72,32 @@ describe('DmxPublisher', () => {
     expect(() => publisher.publish(new Map())).not.toThrow()
   })
 
+  it('skips out-of-range channel numbers instead of writing unbounded buffer keys', () => {
+    const { createMockDmxLight } =
+      jest.requireActual<typeof import('../helpers/testFixtures')>('../helpers/testFixtures')
+    // A bad config already on disk: red at DMX 5000, masterDimmer negative, green NaN. Blue is the
+    // only valid channel and must still publish.
+    const badLight = createMockDmxLight({
+      channels: { red: 5000, green: NaN, blue: 3, masterDimmer: -4 },
+    })
+    const config = createMockLightingConfig({ frontLights: [badLight] })
+    publisher.updateActiveRigs([{ id: 'r1', name: 'R1', active: true, config }])
+
+    const lights = new Map<string, RGBIO>()
+    lights.set('test-fixture-1', createMockRGBIP({ red: 255, green: 128, blue: 64 }))
+    publisher.publish(lights)
+    publisher.publish(lights) // repeat: the skip must not throw or accumulate keys per frame
+
+    expect(mockSenderManager.send).toHaveBeenCalled()
+    for (const call of jest.mocked(mockSenderManager.send).mock.calls) {
+      const buffer = call[1] as Record<number, number>
+      const keys = Object.keys(buffer).map(Number)
+      expect(keys.every((k) => Number.isInteger(k) && k >= 1 && k <= 512)).toBe(true)
+      expect(buffer[5000]).toBeUndefined()
+      expect(buffer[-4]).toBeUndefined()
+    }
+  })
+
   describe('moving head home fallback mirroring', () => {
     function makeMhRig(fixtureConfig: Partial<FixtureConfig>): DmxRig {
       const cfg: FixtureConfig = {

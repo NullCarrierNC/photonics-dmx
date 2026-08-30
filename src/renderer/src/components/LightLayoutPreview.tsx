@@ -48,6 +48,16 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
   )
 
   /**
+   * Helper function to render the back row of light circles in descending order, so lights
+   * stepping 1..N read as a continuous ring across both rows.
+   */
+  const renderBackLightRow = () => (
+    <div className="flex justify-center gap-x-4 mb-4">
+      {Array.from({ length: backCount }, (_, i) => renderLightCircle(frontCount + backCount - i))}
+    </div>
+  )
+
+  /**
    * Helper function to render the strobe indicator.
    * Highlights the indicator if any dedicated strobe light is selected.
    *
@@ -103,11 +113,7 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
               <div className="mb-2 text-lg font-semibold text-gray-700 dark:text-gray-300">
                 Bottom
               </div>
-              <div className="flex justify-center gap-x-4 mb-4">
-                {Array.from({ length: backCount }, (_, i) =>
-                  renderLightCircle(frontCount + backCount - i),
-                )}
-              </div>
+              {renderBackLightRow()}
             </div>
           )}
 
@@ -149,7 +155,7 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
                 <div className="mb-2 text-lg font-semibold text-gray-700 dark:text-gray-300">
                   Back
                 </div>
-                {renderLightRow(frontCount + 1, frontCount + backCount)}
+                {renderBackLightRow()}
               </div>
             )}
             {(frontCount > 0 || backCount > 0) && renderPeople()}
@@ -163,11 +169,7 @@ const LightLayoutPreview: React.FC<LightLayoutPreviewProps> = ({
                 <div className="mb-2 text-lg font-semibold text-gray-700 dark:text-gray-300">
                   Back
                 </div>
-                <div className="flex justify-center gap-x-4 mb-4">
-                  {Array.from({ length: backCount }, (_, i) =>
-                    renderLightCircle(frontCount + backCount - i),
-                  )}
-                </div>
+                {renderBackLightRow()}
               </div>
             )}
           </>

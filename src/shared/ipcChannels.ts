@@ -51,6 +51,8 @@ export const SHELL = {
 /** Controller-manager runtime lifecycle channels (used by renderer to disable actions outside `running`). */
 export const LIFECYCLE = {
   GET_PHASE: 'lifecycle:get-phase',
+  /** Re-run controller initialization after it failed, so the user can recover without relaunching. */
+  RETRY_INIT: 'lifecycle:retry-init',
 } as const
 
 // ---- Cue / listeners ----
@@ -67,8 +69,6 @@ export const CUE = {
   RB3E_LISTENER_DISABLED: 'rb3e-listener-disabled',
   SET_LISTEN_CUE_DATA: 'set-listen-cue-data',
   CUE_STYLE: 'cue-style',
-  UPDATE_EFFECT_DEBOUNCE: 'update-effect-debounce',
-  GET_EFFECT_DEBOUNCE: 'get-effect-debounce',
 } as const
 
 // ---- Light / senders / simulation ----
@@ -82,13 +82,17 @@ export const LIGHT = {
   DISABLE_CUE_GROUP: 'disable-cue-group',
   GET_NETWORK_INTERFACES: 'get-network-interfaces',
   START_TEST_EFFECT: 'start-test-effect',
+  START_RB3_TEST_EFFECT: 'start-rb3-test-effect',
+  SET_RB3_SIM_LED_STATE: 'set-rb3-sim-led-state',
   STOP_TEST_EFFECT: 'stop-test-effect',
   SIMULATE_BEAT: 'simulate-beat',
   SIMULATE_KEYFRAME: 'simulate-keyframe',
   SIMULATE_MEASURE: 'simulate-measure',
   SIMULATE_INSTRUMENT_NOTE: 'simulate-instrument-note',
+  SIMULATE_POST_PROCESSING: 'simulate-post-processing',
   GET_AVAILABLE_CUES: 'get-available-cues',
   GET_AVAILABLE_AUDIO_CUES: 'get-available-audio-cues',
+  GET_AVAILABLE_RB3_CUES: 'get-available-rb3-cues',
   GET_AUDIO_CUE_GROUPS: 'get-audio-cue-groups',
   GET_CUE_SOURCE_GROUP: 'get-cue-source-group',
   SET_CUE_CONSISTENCY_WINDOW: 'set-cue-consistency-window',
@@ -101,19 +105,33 @@ export const LIGHT = {
   SET_MOTION_CUE_PROBABILITY_PERCENT: 'set-motion-cue-probability-percent',
   GET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT: 'get-audio-motion-cue-probability-percent',
   SET_AUDIO_MOTION_CUE_PROBABILITY_PERCENT: 'set-audio-motion-cue-probability-percent',
+  GET_RB3_MOTION_CUE_PROBABILITY_PERCENT: 'get-rb3-motion-cue-probability-percent',
+  SET_RB3_MOTION_CUE_PROBABILITY_PERCENT: 'set-rb3-motion-cue-probability-percent',
+  GET_RB3_MOTION_CUE_MIN_HOLD_MS: 'get-rb3-motion-cue-min-hold-ms',
+  SET_RB3_MOTION_CUE_MIN_HOLD_MS: 'set-rb3-motion-cue-min-hold-ms',
+  GET_RB3_MOTION_CUE_DURATION: 'get-rb3-motion-cue-duration',
+  SET_RB3_MOTION_CUE_DURATION: 'set-rb3-motion-cue-duration',
   SET_CUE_GROUP_SELECTION_MODE: 'set-cue-group-selection-mode',
   GET_CUE_GROUP_SELECTION_MODE: 'get-cue-group-selection-mode',
+  SET_RB3_CUE_GROUP_SELECTION_MODE: 'set-rb3-cue-group-selection-mode',
+  GET_RB3_CUE_GROUP_SELECTION_MODE: 'get-rb3-cue-group-selection-mode',
   GET_CONSISTENCY_STATUS: 'get-consistency-status',
   GET_YARG_MOTION_CUE_GROUPS: 'get-yarg-motion-cue-groups',
   GET_AUDIO_MOTION_CUE_GROUPS: 'get-audio-motion-cue-groups',
+  GET_RB3_CUE_GROUPS: 'get-rb3-cue-groups',
+  GET_RB3_MOTION_CUE_GROUPS: 'get-rb3-motion-cue-groups',
   GET_AVAILABLE_YARG_MOTION_CUES: 'get-available-yarg-motion-cues',
   GET_AVAILABLE_AUDIO_MOTION_CUES: 'get-available-audio-motion-cues',
+  GET_AVAILABLE_RB3_MOTION_CUES: 'get-available-rb3-motion-cues',
   GET_YARG_MOTION_GROUP_SELECTION_MODE: 'get-yarg-motion-group-selection-mode',
   SET_YARG_MOTION_GROUP_SELECTION_MODE: 'set-yarg-motion-group-selection-mode',
   GET_AUDIO_MOTION_GROUP_SELECTION_MODE: 'get-audio-motion-group-selection-mode',
   SET_AUDIO_MOTION_GROUP_SELECTION_MODE: 'set-audio-motion-group-selection-mode',
+  GET_RB3_MOTION_GROUP_SELECTION_MODE: 'get-rb3-motion-group-selection-mode',
+  SET_RB3_MOTION_GROUP_SELECTION_MODE: 'set-rb3-motion-group-selection-mode',
   START_YARG_MOTION_CUE_SIMULATION: 'start-yarg-motion-cue-simulation',
   START_AUDIO_MOTION_CUE_SIMULATION: 'start-audio-motion-cue-simulation',
+  START_RB3_MOTION_CUE_SIMULATION: 'start-rb3-motion-cue-simulation',
   STOP_MOTION_CUE_SIMULATION: 'stop-motion-cue-simulation',
   UPDATE_SACN_CONFIG: 'update-sacn-config',
   UPDATE_ARTNET_CONFIG: 'update-artnet-config',
@@ -165,6 +183,14 @@ export const CONFIG = {
   SET_ENABLED_AUDIO_MOTION_CUE_GROUPS: 'set-enabled-audio-motion-cue-groups',
   GET_DISABLED_AUDIO_MOTION_CUES: 'get-disabled-audio-motion-cues',
   SET_DISABLED_AUDIO_MOTION_CUES: 'set-disabled-audio-motion-cues',
+  GET_ENABLED_RB3_CUE_GROUPS: 'get-enabled-rb3-cue-groups',
+  SET_ENABLED_RB3_CUE_GROUPS: 'set-enabled-rb3-cue-groups',
+  GET_DISABLED_RB3_CUES: 'get-disabled-rb3-cues',
+  SET_DISABLED_RB3_CUES: 'set-disabled-rb3-cues',
+  GET_ENABLED_RB3_MOTION_CUE_GROUPS: 'get-enabled-rb3-motion-cue-groups',
+  SET_ENABLED_RB3_MOTION_CUE_GROUPS: 'set-enabled-rb3-motion-cue-groups',
+  GET_DISABLED_RB3_MOTION_CUES: 'get-disabled-rb3-motion-cues',
+  SET_DISABLED_RB3_MOTION_CUES: 'set-disabled-rb3-motion-cues',
   GET_AUDIO_REACTIVE_CUES: 'get-audio-reactive-cues',
   SET_ACTIVE_AUDIO_CUE: 'set-active-audio-cue',
   GET_AUDIO_GAME_MODE: 'get-audio-game-mode',
@@ -175,11 +201,18 @@ export const CONFIG = {
   SET_ACTIVE_AUDIO_MOTION_CUE: 'set-active-audio-motion-cue',
   GET_ACTIVE_YARG_MOTION_CUE: 'get-active-yarg-motion-cue',
   SET_ACTIVE_YARG_MOTION_CUE: 'set-active-yarg-motion-cue',
+  GET_ACTIVE_RB3_MOTION_CUE: 'get-active-rb3-motion-cue',
+  SET_ACTIVE_RB3_MOTION_CUE: 'set-active-rb3-motion-cue',
   GET_STAGE_KIT_PRIORITY: 'get-stage-kit-priority',
   SET_STAGE_KIT_PRIORITY: 'set-stage-kit-priority',
 } as const
 
-/** All handle/invoke channel names in one object for lookup. */
+/**
+ * Handle/invoke channel names merged by KEY for lookup convenience. Groups share key names
+ * (LIST, EXPORT, SENDER_ENABLE, ...), so later spreads shadow earlier entries and this object's
+ * VALUES are an incomplete channel set. Any complete-set consumer (e.g. the preload's runtime
+ * allowlist) must use ALL_INVOKE_CHANNELS instead.
+ */
 export const CHANNELS = {
   ...NODE_CUES,
   ...EFFECTS,
@@ -194,12 +227,31 @@ export const CHANNELS = {
 
 export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS]
 
+/** Every invokable channel group. Kept next to CHANNELS so a new group is added to both. */
+const INVOKE_CHANNEL_GROUPS = [
+  NODE_CUES,
+  EFFECTS,
+  RIGS,
+  WINDOW,
+  SHELL,
+  LIFECYCLE,
+  CUE,
+  LIGHT,
+  CONFIG,
+] as const
+
+/** The complete, collision-proof set of invoke channel VALUES (union across all groups). */
+export const ALL_INVOKE_CHANNELS: readonly string[] = INVOKE_CHANNEL_GROUPS.flatMap((group) =>
+  Object.values(group),
+)
+
 /** Main process -> renderer (one-way send). Use when main calls webContents.send(). */
 export const RENDERER_RECEIVE = {
   SENDER_START_FAILED: 'sender-start-failed',
   SENDER_ERROR: 'sender-error',
   SENDER_NETWORK_ERROR: 'sender-network-error',
   YARG_ERROR: 'yarg-error',
+  RB3_ERROR: 'rb3-error',
   CONTROLLERS_RESTARTED: 'controllers-restarted',
   AUDIO_ENABLE: 'audio:enable',
   AUDIO_DISABLE: 'audio:disable',
@@ -213,12 +265,22 @@ export const RENDERER_RECEIVE = {
   YARG_MOTION_CUE_GROUPS_CHANGED: 'yarg-motion:cue-groups-changed',
   /** Audio motion enabled groups or per-cue disables changed (Preferences → all windows). */
   AUDIO_MOTION_CUE_GROUPS_CHANGED: 'audio-motion:cue-groups-changed',
+  /** RB3 enabled groups or per-cue disables changed (Preferences → all windows). */
+  RB3_CUE_GROUPS_CHANGED: 'rb3:cue-groups-changed',
+  /** RB3 motion enabled groups or per-cue disables changed (Preferences → all windows). */
+  RB3_MOTION_CUE_GROUPS_CHANGED: 'rb3-motion:cue-groups-changed',
   /** Global motion master toggle changed (YARG + audio motion handlers). */
   MOTION_ENABLED_CHANGED: 'motion:enabled-changed',
   /** Active audio motion program changed (manual/auto selection result). */
   AUDIO_MOTION_CUE_CHANGE: 'audio-motion:cue-active-change',
   /** Active YARG motion program changed (manual/auto selection result). */
   YARG_MOTION_CUE_CHANGE: 'yarg-motion:cue-active-change',
+  /** Active RB3 motion program changed (manual/auto selection result). */
+  RB3_MOTION_CUE_CHANGE: 'rb3-motion:cue-active-change',
+  /** RB3 game-mode primary cue group changed (main process → renderer). */
+  RB3_GAME_MODE_CUE_CHANGE: 'rb3:game-mode-cue-change',
+  /** RB3 game-mode primary-cue switch window (deadline + pending Light-1 edge) for countdown UI. */
+  RB3_GAME_MODE_DEADLINE: 'rb3:game-mode-deadline',
   /** Game Mode primary cue changed (main process → renderer). */
   AUDIO_GAME_MODE_CUE_CHANGE: 'audio:game-mode-cue-change',
   /** Game Mode next-cue switch window (deadline + pending beat) for countdown UI. */

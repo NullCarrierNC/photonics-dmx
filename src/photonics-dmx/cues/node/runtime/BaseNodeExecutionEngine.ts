@@ -15,8 +15,8 @@
  * - effect-raiser dispatch (cue-only) — `dispatchSpecialNode`
  * - debug logging (cue-only) — `debugLog`
  *
- * The shared `executeActionNode` dispatcher lives here; the genuine per-engine differences are
- * routed through the hooks above.
+ * The shared `executeActionNode` dispatcher lives here; per-engine differences route through the
+ * hooks above. The dispatcher is most of the length: one branch per action type, so it stays whole.
  */
 
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
@@ -28,9 +28,11 @@ import {
   LogicNode,
   ValueSource,
   VariableDefinition,
+  NodeCueMode,
 } from '../../types/nodeCueTypes'
 import type { Connection } from '../../types/nodeCueTypes'
 import type { CueData } from '../../types/cueTypes'
+import { runFanOut as runFanOutLoop, computeLedChanges } from './fanOut'
 import type { AudioCueData } from '../../types/audioCueTypes'
 import type { TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
@@ -57,7 +59,6 @@ import {
   resolveActionPosition,
 } from './actionResolver'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
-import { collectReachableNodes } from './engineUtils'
 import {
   runContextBatch,
   buildActionChain,
@@ -131,6 +132,13 @@ export abstract class BaseNodeExecutionEngine {
   /** The concrete compiled graph (cue or effect), viewed structurally. */
   protected abstract get compiled(): CompiledGraph
 
+  /**
+   * The domain this run resolves cue data against. A property of the execution rather than of the
+   * graph: a cue's is its own, intrinsic from the file it was loaded from, while an effect is
+   * family-agnostic and borrows the mode of whichever cue raised it.
+   */
+  protected abstract get mode(): NodeCueMode
+
   /** Re-entry policy: 'strict' (cues) skips any visited node; 'relaxed' (effects) lets actions/event-raisers re-enter. */
   protected abstract get revisitPolicy(): RevisitPolicy
 
@@ -201,6 +209,16 @@ export abstract class BaseNodeExecutionEngine {
     }
   }
 
+  /** Report a runtime error scoped to this graph so the editor can highlight the offending node and
+   *  filter the highlight to the open cue/effect (see NodeCueRuntimeErrorPayload). */
+  protected emitRuntimeError(nodeId: string, message: string): void {
+    this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, {
+      graphId: this.getEmitCueId(),
+      nodeId,
+      message,
+    })
+  }
+
   protected emitNodeExecution(type: 'activated' | 'deactivated', nodeId: string): void {
     this.trackActivation(type, nodeId)
     this.runtimeEmit(RENDERER_RECEIVE.NODE_EXECUTION, {
@@ -232,18 +250,6 @@ export abstract class BaseNodeExecutionEngine {
     const isAction = this.compiled.actionMap.has(nodeId)
     const isEventRaiser = this.compiled.eventRaiserMap.has(nodeId)
     return !(isAction || isEventRaiser)
-  }
-
-  /**
-   * Collect all node IDs reachable from startNodeIds, excluding excludeNodeId.
-   * Delegates to shared engineUtils for de-duplication.
-   */
-  protected collectReachableNodes(
-    adjacency: Map<string, Connection[]>,
-    startNodeIds: string[],
-    excludeNodeId: string,
-  ): Set<string> {
-    return collectReachableNodes(adjacency, startNodeIds, excludeNodeId)
   }
 
   /**
@@ -344,7 +350,22 @@ export abstract class BaseNodeExecutionEngine {
    * onNodeComplete callback advance the phase and continue. Effect overrides to advance
    * and continue inline (its contexts have no onNodeComplete callback).
    */
-  protected onBlockingActionComplete(nodeId: string, context: ExecutionContext): void {
+  protected onBlockingActionComplete(
+    nodeId: string,
+    context: ExecutionContext,
+    cancelled = false,
+  ): void {
+    if (cancelled) {
+      // The effect was force-cleared (cue switch) or displaced by a newer submission: release the
+      // active action so the context can complete, but do NOT advance the graph, since the run is
+      // being replaced rather than stepped forward. A context with nothing left in flight is
+      // finished here, otherwise it and its state machine are held for the life of the engine.
+      context.completeActionSilent(nodeId)
+      if (context.tryComplete()) {
+        context.dispose()
+      }
+      return
+    }
     context.completeAction(nodeId)
   }
 
@@ -449,7 +470,7 @@ export abstract class BaseNodeExecutionEngine {
       context.addTimer(timerId)
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
+      this.emitRuntimeError(nodeId, msg)
       log.error(`Error executing delay node ${nodeId}:`, error)
       this.emitNodeExecution('deactivated', nodeId)
     }
@@ -474,6 +495,33 @@ export abstract class BaseNodeExecutionEngine {
   }
 
   /**
+   * Reachable body-node set per fan-out node, keyed by node id. The compiled graph is immutable after
+   * construction (the engine is rebuilt when a cue is edited), so the set for a given node never changes
+   * and this memo saves a graph walk on every frame a fan-out node runs. Treat the value as read-only.
+   */
+  private fanOutBodyNodeIds = new Map<string, ReadonlySet<string>>()
+
+  /**
+   * Fan-out driver for the iteration nodes (for-each-light, led-changed). Delegates to the shared
+   * {@link runFanOutLoop} (also used by LaserGraphExecutor) so the loop protocol lives in one place; the
+   * body-set memo stays on the engine because the compiled graph it keys off is engine-owned.
+   */
+  protected runFanOut(
+    nodeId: string,
+    context: ExecutionContext,
+    iterationCount: number,
+    seedIteration: (i: number) => number,
+  ): void {
+    runFanOutLoop(nodeId, context, iterationCount, seedIteration, {
+      adjacency: this.compiled.adjacency,
+      bodyCache: this.fanOutBodyNodeIds,
+      continueExecution: (targets, ctx) => this.continueExecution(targets, ctx),
+      continueOrComplete: (targets, ctx) => this.continueOrComplete(targets, ctx),
+      emitDeactivated: (id) => this.emitNodeExecution('deactivated', id),
+    })
+  }
+
+  /**
    * Execute a for-each-light node by eagerly iterating the source light-array, running the
    * body for each light (or group of `groupSize` lights), then continuing the 'done' branch.
    */
@@ -482,15 +530,16 @@ export abstract class BaseNodeExecutionEngine {
     context: ExecutionContext,
   ): void {
     const nodeId = logicNode.id
-    const { adjacency } = this.compiled
-    const edges = adjacency.get(nodeId) ?? []
-    const eachTargets = edges.filter((e) => e.fromPort === 'each').map((e) => e.to)
-    const doneTargets = edges.filter((e) => e.fromPort === 'done').map((e) => e.to)
 
     const sourceVar = this.getVarStore(logicNode.sourceVariable, context).get(
       logicNode.sourceVariable,
     )
     if (!sourceVar || sourceVar.type !== 'light-array') {
+      // Bad source: skip the body and continue the done branch (this guard keeps its own emit-after-continue
+      // order, distinct from runFanOut's teardown, so leave it here rather than fold it into the helper).
+      const doneTargets = (this.compiled.adjacency.get(nodeId) ?? [])
+        .filter((e) => e.fromPort === 'done')
+        .map((e) => e.to)
       this.debugLog(
         `for-each-light ${nodeId}: source "${logicNode.sourceVariable}" is not a light-array`,
         { sourceVar: sourceVar ?? null },
@@ -507,10 +556,7 @@ export abstract class BaseNodeExecutionEngine {
     const groupSize = this.resolveForEachGroupSize(logicNode, context)
     const length = groupSize > 1 ? Math.floor(rawLength / groupSize) : rawLength
 
-    const bodyNodeIds = this.collectReachableNodes(adjacency, eachTargets, nodeId)
-    context.setForEachLightState(nodeId, { index: 0, length })
-
-    for (let i = 0; i < length; i++) {
+    this.runFanOut(nodeId, context, length, (i) => {
       const currentLightArray =
         groupSize > 1
           ? lightsArray.slice(i * groupSize, (i + 1) * groupSize)
@@ -525,19 +571,46 @@ export abstract class BaseNodeExecutionEngine {
         logicNode.currentIndexVariable,
         { type: 'number', value: i },
       )
-      context.setForEachIterationIndex(i)
-      for (const bodyId of bodyNodeIds) {
-        context.unmarkVisited(bodyId)
+      return i
+    })
+  }
+
+  /**
+   * Execute a led-changed node: diff the current frame's StageKit LED banks against the previous frame,
+   * then run the `each` body once per position whose colour changed (seeding its index / new colour /
+   * edge), and finally the `done` branch. Mirrors {@link executeForEachLight}: the per-firing iteration
+   * index is the LED POSITION (0..7), so each position's action gets a stable `${cueId}:${nodeId}:${pos}`
+   * effect name — re-firing a position (colour change or clear) overwrites its own effect rather than
+   * stacking a new one. Positions are edge-detected, so an unchanged frame runs zero bodies.
+   */
+  protected executeLedChanged(
+    logicNode: LogicNode & { logicType: 'led-changed' },
+    context: ExecutionContext,
+  ): void {
+    const nodeId = logicNode.id
+    const changed = computeLedChanges(context.cueData)
+
+    // Iteration index = LED position, so each cell's effect name is stable across frames.
+    this.runFanOut(nodeId, context, changed.length, (i) => {
+      const { index, edge, color } = changed[i]
+      this.getVarStore(logicNode.assignIndex, context).set(logicNode.assignIndex, {
+        type: 'number',
+        value: index,
+      })
+      if (logicNode.assignColor) {
+        this.getVarStore(logicNode.assignColor, context).set(logicNode.assignColor, {
+          type: 'string',
+          value: color,
+        })
       }
-      this.continueExecution(eachTargets, context)
-    }
-
-    context.clearForEachLightState(nodeId)
-    context.setForEachIterationIndex(-1)
-    context.markVisited(nodeId)
-
-    this.emitNodeExecution('deactivated', nodeId)
-    this.continueOrComplete(doneTargets, context)
+      if (logicNode.assignEdge) {
+        this.getVarStore(logicNode.assignEdge, context).set(logicNode.assignEdge, {
+          type: 'string',
+          value: edge,
+        })
+      }
+      return index
+    })
   }
 
   /**
@@ -563,12 +636,17 @@ export abstract class BaseNodeExecutionEngine {
         this.executeForEachLight(logicNode, context)
         return
       }
+      if (logicNode.logicType === 'led-changed') {
+        this.executeLedChanged(logicNode, context)
+        return
+      }
 
       const { adjacency } = this.compiled
       const edges = adjacency.get(nodeId) ?? []
 
       const evaluatorContext: LogicNodeEvaluatorContext = {
         cueId: this.getEmitCueId(),
+        mode: this.mode,
         lightManager: this.lightManager,
         cueLevelVarStore: context.cueLevelVarStore,
         groupLevelVarStore: context.groupLevelVarStore,
@@ -587,7 +665,7 @@ export abstract class BaseNodeExecutionEngine {
       this.emitNodeExecution('deactivated', nodeId)
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${nodeId}: ${msg}`)
+      this.emitRuntimeError(nodeId, msg)
       log.error(`Error executing logic node ${nodeId}:`, error)
       this.emitNodeExecution('deactivated', nodeId)
     }
@@ -615,7 +693,7 @@ export abstract class BaseNodeExecutionEngine {
       this.continueToNextNodes(raiserNode.id, context)
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${raiserNode.id}: ${msg}`)
+      this.emitRuntimeError(raiserNode.id, msg)
       log.error(`Error executing event raiser node ${raiserNode.id}:`, error)
       this.emitNodeExecution('deactivated', raiserNode.id)
     }
@@ -811,11 +889,11 @@ export abstract class BaseNodeExecutionEngine {
         if (shouldBlock) {
           context.registerActiveAction(actionNode.id, actionNode)
           this.markPendingCallbackEffect(effectName)
-          const callback = (): void => {
+          const callback = (cancelled = false): void => {
             this.clearPendingCallbackEffect(effectName)
             this.submittedEffects.delete(effectName)
             this.emitNodeExecution('deactivated', actionNode.id)
-            this.onBlockingActionComplete(actionNode.id, context)
+            this.onBlockingActionComplete(actionNode.id, context, cancelled)
           }
           this.submittedEffects.set(effectName, resolvedLayer)
           if (useSetEffect) {
@@ -898,13 +976,13 @@ export abstract class BaseNodeExecutionEngine {
       if (chainHasBlockingStep) {
         context.registerActiveAction(lastChainNode.id, lastChainNode)
         this.markPendingCallbackEffect(chainEffectName)
-        const callback = (): void => {
+        const callback = (cancelled = false): void => {
           this.clearPendingCallbackEffect(chainEffectName)
           this.submittedEffects.delete(chainEffectName)
           for (const a of actionChain) {
             this.emitNodeExecution('deactivated', a.id)
           }
-          this.onBlockingActionComplete(lastChainNode.id, context)
+          this.onBlockingActionComplete(lastChainNode.id, context, cancelled)
         }
         this.submittedEffects.set(chainEffectName, chainData.baseLayer)
         if (useSetEffectChain) {
@@ -934,7 +1012,7 @@ export abstract class BaseNodeExecutionEngine {
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      this.runtimeEmit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, `${actionNode.id}: ${msg}`)
+      this.emitRuntimeError(actionNode.id, msg)
       log.error(`Error executing action node ${actionNode.id}:`, error)
       this.emitNodeExecution('deactivated', actionNode.id)
     }
@@ -1021,20 +1099,36 @@ export abstract class BaseNodeExecutionEngine {
     const useSetEffect = this.getAndConsumeInitialClearPolicy()
 
     if (shouldBlock) {
-      context.registerActiveAction(actionNode.id, actionNode)
-      this.markPendingCallbackEffect(effectName)
-      const callback = (): void => {
+      const callback = (cancelled = false): void => {
         this.clearPendingCallbackEffect(effectName)
         this.submittedEffects.delete(effectName)
-        this.setPositionSubmissionFingerprint.set(effectName, positionFp)
+        // A displaced or cancelled move never reached its target, so it must not record one. The
+        // fingerprint means "the position this light was last moved to and settled at".
+        if (!cancelled) {
+          this.setPositionSubmissionFingerprint.set(effectName, positionFp)
+        }
         this.emitNodeExecution('deactivated', actionNode.id)
-        this.onBlockingActionComplete(actionNode.id, context)
+        this.onBlockingActionComplete(actionNode.id, context, cancelled)
       }
-      this.submittedEffects.set(effectName, resolvedLayer)
       if (useSetEffect) {
+        context.registerActiveAction(actionNode.id, actionNode)
+        this.markPendingCallbackEffect(effectName)
+        this.submittedEffects.set(effectName, resolvedLayer)
         this.sequencer.setEffectUnblockedNameWithCallback(effectName, effect, callback)
       } else {
-        this.sequencer.addEffectUnblockedNameWithCallback(effectName, effect, callback)
+        // The submission replaces any in-flight move of this name, and the sequencer cancel-fires
+        // the displaced callback during the call. The records below are therefore written after it
+        // returns, so that callback sees the state its own submission wrote rather than this one's.
+        if (!this.sequencer.replaceEffectWithCallback(effectName, effect, callback)) {
+          this.emitNodeExecution('deactivated', actionNode.id)
+          this.continueToNextNodes(actionNode.id, context)
+          return
+        }
+        context.registerActiveAction(actionNode.id, actionNode)
+        this.markPendingCallbackEffect(effectName)
+        this.submittedEffects.set(effectName, resolvedLayer)
+        // This light is moving again, so the last settled position no longer describes it.
+        this.setPositionSubmissionFingerprint.delete(effectName)
       }
     } else {
       this.submittedEffects.set(effectName, resolvedLayer)

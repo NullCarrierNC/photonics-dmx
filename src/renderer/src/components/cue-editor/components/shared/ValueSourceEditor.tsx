@@ -8,12 +8,15 @@ import ColorListEditor from './ColorListEditor'
 import type { Color } from '../../../../../../photonics-dmx/types'
 import {
   COLOR_OPTIONS,
-  YARG_EVENT_OPTIONS,
   AUDIO_EVENT_OPTIONS,
 } from '../../../../../../photonics-dmx/constants/options'
 import { CueType } from '../../../../../../photonics-dmx/cues/types/cueTypes'
+import { YARG_EVENT_TYPES, RB3_EVENT_OPTIONS } from '../../lib/options'
 
 const CUE_TYPE_VALUES = Object.values(CueType) as string[]
+// Per-mode event value lists: YARG (RB3 conditions filtered out) and the curated RB3 set.
+const YARG_EVENT_VALUES = [...YARG_EVENT_TYPES]
+const RB3_EVENT_VALUES = RB3_EVENT_OPTIONS.map((o) => o.value)
 
 interface ValueSourceEditorProps {
   label: string
@@ -61,7 +64,9 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
     if (expected === 'color') return COLOR_OPTIONS
     if (expected === 'cue-type') return CUE_TYPE_VALUES
     if (expected === 'event' && activeMode) {
-      return activeMode === 'yarg' ? [...YARG_EVENT_OPTIONS] : [...AUDIO_EVENT_OPTIONS]
+      if (activeMode === 'audio') return [...AUDIO_EVENT_OPTIONS]
+      if (activeMode === 'rb3') return [...RB3_EVENT_VALUES]
+      return [...YARG_EVENT_VALUES]
     }
     return undefined
   })()
@@ -194,10 +199,12 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
 
   const handleToggleVar = (checked: boolean) => {
     if (checked) {
-      // Switch to variable mode
+      // Switch to variable mode. Default to an empty (unselected) name rather than a phantom "var1"
+      // that references a variable which usually doesn't exist — the empty state is shown as invalid
+      // so the author must pick a real variable before saving.
       onChange({
         source: 'variable',
-        name: isVariableSource(source) ? source.name ?? 'var1' : 'var1',
+        name: isVariableSource(source) ? source.name ?? '' : '',
       })
     } else {
       // Switch to literal mode
@@ -286,7 +293,7 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
               onChange={(event) =>
                 onChange({
                   source: 'variable',
-                  name: event.target.value || 'var1',
+                  name: event.target.value,
                 })
               }>
               <option value="">-- Select --</option>
@@ -296,6 +303,9 @@ const ValueSourceEditor: React.FC<ValueSourceEditorProps> = ({
                 </option>
               ))}
             </select>
+            {!(isVariableSource(source) && source.name) && (
+              <span className="text-[10px] text-red-500">Select a variable</span>
+            )}
           </label>
         </div>
       )}

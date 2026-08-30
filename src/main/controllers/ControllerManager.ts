@@ -1,28 +1,22 @@
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
-import { getStrobeStateManager } from '../../photonics-dmx/controllers/StrobeStateManager'
+import { VenueFrameProcessor } from '../../photonics-dmx/controllers/VenueFrameProcessor'
 import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
-import { LightingConfiguration, ConfigStrobeType, FixtureConfig } from '../../photonics-dmx/types'
-import { YargCueHandler } from '../../photonics-dmx/cueHandlers/YargCueHandler'
+import { CueHandler } from '../../photonics-dmx/cueHandlers/CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
-import {
-  AudioConfig,
-  AudioGameModeConfig,
-  AudioLightingData,
-} from '../../photonics-dmx/listeners/Audio/AudioTypes'
-import { Clock } from '../../photonics-dmx/controllers/sequencer/Clock'
 import { app } from 'electron'
-import { sendToAllWindows, mainRuntimeBroadcaster, hasBrowserWindows } from '../utils/windowUtils'
+import { sendToAllWindows } from '../utils/windowUtils'
+import { clearSenderErrorTracking } from '../senderErrorTracking'
+import { setGlobalBrightnessConfig } from '../../photonics-dmx/helpers/dmxHelpers'
 import { copyDefaultData } from '../utils/copyDefaultData'
 import * as path from 'path'
 import { EffectLoader } from '../../photonics-dmx/cues/node/loader/EffectLoader'
 
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
-import { noopRuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
-import { RigChain } from './RigChain'
 import { ChainFanout } from './ChainFanout'
 import { TestEffectRunner } from './TestEffectRunner'
+import { MotionCueSimulator } from './MotionCueSimulator'
 import { ListenerLifecycleController } from './ListenerLifecycleController'
 import {
   SenderLifecycleController,
@@ -30,20 +24,23 @@ import {
 } from './SenderLifecycleController'
 import { ConsoleModeController } from './ConsoleModeController'
 import { RegistryInitializer } from './RegistryInitializer'
+import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycle'
+import { ControllerGraph } from './ControllerGraph'
+import { runControllerRestart } from './controllerRestart'
+import {
+  buildControllerCollaborators,
+  type ControllerCollaborators,
+  type ControllerHost,
+} from './controllerWiring'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { LifecyclePhase } from '../../shared/ipcTypes'
-import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
-import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
-import {
-  AudioCueType,
-  AudioMotionCueRef,
-  YargMotionCueRef,
-} from '../../photonics-dmx/cues/types/audioCueTypes'
+import { CUE_DOMAIN_BINDINGS, applyAllEnabledGroupsFromConfig } from './cueDomainBindings'
+import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
+import type { MotionCueRef } from '../../photonics-dmx/cues/types/cueTypes'
 import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues'
 import { createLogger } from '../../shared/logger'
-import { DMX_OUTPUT_REFRESH_RATE_HZ_MAX } from '../../shared/dmxOutputRefresh'
 
 const log = createLogger('ControllerManager')
 
@@ -63,32 +60,36 @@ const log = createLogger('ControllerManager')
  * - `failed`: reinitialization after teardown did not complete; call `restartControllers()` or `init()` to recover.
  *
  * Concurrency:
- * - `enable*` / `disable*` listener-lifecycle methods await any in-flight restart before proceeding.
+ * - YARG/RB3 toggles and `restartControllers()` serialize on one lifecycle queue (`runLifecycleOp`),
+ *   so no two of them ever interleave. Queued ops additionally await any in-flight shutdown.
+ * - Audio toggles run off the queue and await any in-flight restart/shutdown (one-directional).
+ * - `shutdown()` runs off the queue and must NEVER drain it: queued ops await the in-flight
+ *   shutdown via `awaitShutdownWork`, so a shutdown that waited on the queue would deadlock
+ *   against them.
  * - `init()` rejects with a `LifecycleAbortedError` if called while shutting down.
  */
 // LifecyclePhase is owned by `shared/ipcTypes` so the renderer hook can reference the same union.
 export type { LifecyclePhase } from '../../shared/ipcTypes'
 
+export { LifecycleAbortedError } from './ControllerLifecycle'
+
 /**
- * Thrown when a lifecycle method (typically `init()` invoked from a restart) is called against a
- * controller that has already begun shutting down. Restart routines treat this as a clean abort
- * rather than a reinit failure.
+ * Collaborators a caller can supply instead of the ones this builds for itself.
+ *
+ * Production passes nothing. Tests pass a configuration store so constructing a manager does not
+ * reach the real config files, plus any subset of collaborators (fakes for the sender, listener,
+ * console, registry or simulator controllers) and a lifecycle, which is what lets them drive a
+ * normally constructed instance rather than assembling one field by field off the prototype.
  */
-export class LifecycleAbortedError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'LifecycleAbortedError'
-  }
+export interface ControllerManagerDeps {
+  config?: ConfigurationManager
+  collaborators?: Partial<ControllerCollaborators>
+  lifecycle?: ControllerLifecycle
+  graph?: ControllerGraph
 }
 
 export class ControllerManager {
   private config: ConfigurationManager
-  /**
-   * Per-rig sequencer chains. Order is significant: `rigChains[0]` is the primary chain,
-   * whose handlers own user-visible renderer broadcasts so the UI sees one event per
-   * logical cue rather than one per rig.
-   */
-  private rigChains: RigChain[] = []
   /**
    * Listener / processor surface that dispatches each incoming event to every chain's
    * matching cue handler. Held here so listener controllers can read the up-to-date chain
@@ -96,156 +97,94 @@ export class ControllerManager {
    */
   private chainFanout = new ChainFanout()
   /**
-   * Shared tick source for every chain's `Sequencer`. Owned here (rather than inside a
-   * `Sequencer`) so chains can share one clock and tear down independently without
-   * stopping ticks for the others. Rebuilt on every `restartControllers`.
+   * The venue post-processing stage. Owned here rather than by the publisher so the effect YARG
+   * reported survives a controller restart, and so publisher rebuilds do not drop it.
    */
-  private clock: Clock | null = null
-  /**
-   * Shorthand accessors pointing at the same instances exposed by `rigChains[0]`. Provided
-   * for call sites (listener coordinators, audio controller, IPC handlers, test runner)
-   * that need a single light manager / effects controller reference without iterating
-   * chains.
-   */
-  private dmxLightManager: DmxLightManager | null = null
-  private effectsController: ILightingController | null = null
-  private dmxPublisher: DmxPublisher | null = null
-
-  private cueHandler: YargCueHandler | null = null
-  private nodeCueLoader: NodeCueLoader | null = null
-  private effectLoader: EffectLoader | null = null
+  private readonly venueFrameProcessor = new VenueFrameProcessor()
+  /** The built controller-object graph: chains, clock, publisher, cue handlers, loaders. */
+  private readonly graph: ControllerGraph
 
   private pendingValidationErrors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }> = []
+  private onSimulationPreempt: (() => void) | null = null
 
   private readonly testEffectRunner: TestEffectRunner
+  /** RB3 cue-mode twin of {@link testEffectRunner}: dispatches through the RB3 chain runtime. */
+  private readonly rb3TestEffectRunner: TestEffectRunner
+  private readonly motionCueSimulator: MotionCueSimulator
   private readonly senderLifecycle: SenderLifecycleController
   private readonly listenerLifecycle: ListenerLifecycleController
   private readonly registryInit: RegistryInitializer
   private readonly consoleMode: ConsoleModeController
 
   private isInitialized = false
-  private lifecyclePhase: LifecyclePhase = 'initializing'
-  private controllerShutdownPromise: Promise<void> | null = null
-  private controllerShutdownCompleted = false
-  private restartControllersInFlight: Promise<void> | null = null
+  /** Phase state, the op queue, and the in-flight restart and shutdown memos. */
+  private readonly lifecycle: ControllerLifecycle
+  /** Invoked during restart teardown so process-scoped consumers (e.g. laser sim) drop state tied to the
+   *  engine/registry being rebuilt. A list, not a single slot, so multiple consumers can register without
+   *  overwriting each other. */
+  private readonly onControllerRestartListeners: Array<() => void> = []
 
-  constructor() {
-    this.config = new ConfigurationManager()
-    this.senderLifecycle = new SenderLifecycleController(() => this.config, {
-      broadcaster: mainRuntimeBroadcaster,
-      hasReceivers: hasBrowserWindows,
-    })
-    this.testEffectRunner = new TestEffectRunner({
-      getChainFanout: () => this.chainFanout,
-      ensureChainsHaveYargHandlers: () => this.ensureChainsHaveYargHandlersForSimulation(),
-      ensureInitialized: () => this.init(),
-    })
-    this.listenerLifecycle = new ListenerLifecycleController(
-      {
-        getDmxLightManager: () => this.dmxLightManager,
-        getEffectsController: () => this.effectsController,
-        getRigChains: () => this.rigChains,
-        getChainFanout: () => this.chainFanout,
-        getMotionEnabled: () => this.config.getPreference('motionEnabled') ?? true,
-        getActiveYargMotionCueRef: () =>
-          this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
-        getMotionCueMinimumHoldMs: () =>
-          this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
-        getMotionCueProbabilityPercent: () =>
-          this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
-        getFallbackCueTimeMs: () => this.config.getPreference('yargFallbackCueTimeMs') ?? 20000,
-        sendSenderError: (message: string) => {
-          sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, message)
-        },
-        sendToAllWindows,
-        runtimeBroadcaster: mainRuntimeBroadcaster,
-        setCueHandlerRef: (h) => {
-          this.cueHandler = h
-        },
-      },
-      {
-        getDmxLightManager: () => this.dmxLightManager,
-        getEffectsController: () => this.effectsController,
-        getRigChains: () => this.rigChains,
-        getChainFanout: () => this.chainFanout,
-        config: this.config,
-        sendToAllWindows,
-        runtimeBroadcaster: mainRuntimeBroadcaster,
-      },
-    )
-    this.registryInit = new RegistryInitializer({
+  constructor(deps: ControllerManagerDeps = {}) {
+    this.config = deps.config ?? new ConfigurationManager()
+    this.lifecycle =
+      deps.lifecycle ??
+      new ControllerLifecycle((phase) => {
+        sendToAllWindows(RENDERER_RECEIVE.LIFECYCLE_PHASE_CHANGED, phase)
+      })
+    const collaborators = buildControllerCollaborators(this.asControllerHost(), deps.collaborators)
+    this.senderLifecycle = collaborators.senderLifecycle
+    this.testEffectRunner = collaborators.testEffectRunner
+    this.rb3TestEffectRunner = collaborators.rb3TestEffectRunner
+    this.motionCueSimulator = collaborators.motionCueSimulator
+    this.listenerLifecycle = collaborators.listenerLifecycle
+    this.registryInit = collaborators.registryInit
+    this.consoleMode = collaborators.consoleMode
+    this.graph =
+      deps.graph ??
+      new ControllerGraph({
+        getConfig: () => this.config,
+        getSenderManager: () => this.senderLifecycle.getSenderManager(),
+        chainFanout: this.chainFanout,
+        venueFrameProcessor: this.venueFrameProcessor,
+      })
+  }
+
+  /** The host surface the collaborators are wired against. */
+  private asControllerHost(): ControllerHost {
+    return {
       getConfig: () => this.config,
-      sendToAllWindows,
+      getChainFanout: () => this.chainFanout,
+      getRigChains: () => this.graph.getChains(),
+      getDmxLightManager: () => this.graph.getDmxLightManager(),
+      getEffectsController: () => this.graph.getEffectsController(),
+      getDmxPublisher: () => this.graph.getDmxPublisher(),
+      getVenueFrameProcessor: () => this.venueFrameProcessor,
+      ensureInitialized: () => this.init(),
+      ensureChainsHaveHandlersForSimulation: (domain) =>
+        this.ensureChainsHaveHandlersForSimulation(domain),
+      setCueHandlerRef: (h) => this.graph.setCueHandler(h),
+      setRb3CueHandlerRef: (h) => this.graph.setRb3CueHandler(h),
+      getNodeCueLoader: () => this.graph.getNodeCueLoader(),
+      setNodeCueLoader: (l) => this.graph.setNodeCueLoader(l),
+      getEffectLoader: () => this.graph.getEffectLoader(),
+      setEffectLoader: (l) => this.graph.setEffectLoader(l),
       pushValidationError: (e) => {
         this.pendingValidationErrors.push(e)
       },
       refreshAudioCueSelection: () => {
         this.refreshAudioCueSelection()
       },
-      getNodeCueLoader: () => this.nodeCueLoader,
-      setNodeCueLoader: (l) => {
-        this.nodeCueLoader = l
-      },
-      getEffectLoader: () => this.effectLoader,
-      setEffectLoader: (l) => {
-        this.effectLoader = l
-      },
-      runtimeBroadcaster: mainRuntimeBroadcaster,
-    })
-    this.consoleMode = new ConsoleModeController({
-      getConfig: () => this.config,
-      ensureInitialized: () => this.init(),
-      getDmxPublisher: () => this.dmxPublisher,
-      getListenerSnapshot: () => ({
-        yarg: this.listenerLifecycle.yargRb3.getIsYargEnabled(),
-        rb3: this.listenerLifecycle.yargRb3.getIsRb3Enabled(),
-      }),
       getIsAudioEnabled: () => this.getIsAudioEnabled(),
       pauseYarg: () => this.disableYarg(),
       pauseRb3: () => this.disableRb3(),
       pauseAudio: () => this.disableAudio(),
       refreshActiveRigs: () => this.refreshActiveRigs(),
       restartControllers: () => this.restartControllers(),
-    })
-  }
-
-  private assertPhase(allowed: readonly LifecyclePhase[], context: string): void {
-    if (!allowed.includes(this.lifecyclePhase)) {
-      throw new Error(
-        `ControllerManager: invalid lifecycle for ${context} (phase=${this.lifecyclePhase}, allowed=[${allowed.join(
-          ', ',
-        )}])`,
-      )
-    }
-  }
-
-  /**
-   * Single point that mutates `lifecyclePhase`; emits LIFECYCLE_PHASE_CHANGED on every real
-   * transition so the renderer can disable actions outside `running` / `consoleMode`.
-   */
-  private setLifecyclePhase(next: LifecyclePhase): void {
-    if (this.lifecyclePhase === next) return
-    this.lifecyclePhase = next
-    sendToAllWindows(RENDERER_RECEIVE.LIFECYCLE_PHASE_CHANGED, next)
-  }
-
-  /**
-   * Wait for any in-flight restart (or shutdown) to settle before mutating listener lifecycle.
-   * Errors from the in-flight operation are swallowed here so that the caller can still attempt
-   * its own work; the operation that owns the promise is responsible for surfacing its error.
-   */
-  private async awaitInFlightLifecycleWork(): Promise<void> {
-    const pending = this.restartControllersInFlight ?? this.controllerShutdownPromise
-    if (!pending) return
-    try {
-      await pending
-    } catch {
-      // The owner already logged / rethrew; we just needed to wait.
     }
   }
 
   public getLifecyclePhase(): LifecyclePhase {
-    return this.lifecyclePhase
+    return this.lifecycle.phase
   }
 
   /**
@@ -255,305 +194,70 @@ export class ControllerManager {
     if (this.isInitialized) {
       return
     }
-    if (this.lifecyclePhase === 'shuttingDown' || this.lifecyclePhase === 'stopped') {
+    if (this.lifecycle.phase === 'shuttingDown' || this.lifecycle.phase === 'stopped') {
       throw new LifecycleAbortedError(
-        `ControllerManager.init aborted: shutdown in progress or already complete (phase=${this.lifecyclePhase})`,
+        `ControllerManager.init aborted: shutdown in progress or already complete (phase=${this.lifecycle.phase})`,
       )
     }
-    this.assertPhase(['initializing', 'restarting', 'failed'], 'init')
+    this.lifecycle.assertPhase(['initializing', 'restarting', 'failed'], 'init')
 
-    this.senderLifecycle.ensureSenderManager()
-    await this.initializeRigChains()
-    await this.registryInit.initializeCueRegistry()
-    await this.registryInit.initializeAudioCueRegistry()
-    await this.applyMotionPreferencesFromConfig()
-    const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
-    await copyDefaultData(process.resourcesPath, baseDir)
-    await this.registryInit.initializeEffectLoader() // effects before node cues
-    await this.registryInit.initializeNodeCueLoader()
-    await this.applyYargEnabledGroupsFromConfig()
-    await this.applyAudioEnabledGroupsFromConfig()
-    await this.applyYargMotionEnabledGroupsFromConfig()
-    await this.applyAudioMotionEnabledGroupsFromConfig()
-    await this.initializeListeners()
+    try {
+      this.senderLifecycle.ensureSenderManager()
+      this.graph.buildChains()
+      for (const binding of CUE_DOMAIN_BINDINGS) {
+        await this.registryInit.initializeCueRegistry(binding.domain)
+      }
+      const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
+      await copyDefaultData(process.resourcesPath, baseDir)
+      await this.registryInit.initializeEffectLoader() // effects before node cues
+      await this.registryInit.initializeNodeCueLoader()
+      await applyAllEnabledGroupsFromConfig(this.config, () => this.refreshAudioCueSelection())
+      this.graph.buildPrimaryYargHandler()
+    } catch (error) {
+      // A restart records its own outcome, but a cold init has nothing above it to do so, so mark
+      // the phase here. The renderer reads it to offer a retry instead of leaving the user with a
+      // graph that never came up. An abort is a shutdown racing init, not a fault, so it is left
+      // to the shutdown to own the phase.
+      if (!(error instanceof LifecycleAbortedError)) {
+        this.isInitialized = false
+        this.lifecycle.setPhase('failed')
+      }
+      throw error
+    }
+
+    // Applied on every init path (cold start, restart reinit, retry after a failure) so a graph
+    // that comes up late is wired the same as one that came up first time. The callback is what
+    // lets SenderManager clear its error state when senders are re-enabled, and it has to be
+    // re-attached because a restart can hand the lifecycle a fresh SenderManager. Both setters
+    // are idempotent.
+    this.senderLifecycle.setSenderErrorTrackingCallback(clearSenderErrorTracking)
+    const brightnessConfig = this.config.getPreference('brightness')
+    if (brightnessConfig) {
+      setGlobalBrightnessConfig(brightnessConfig)
+    }
 
     this.isInitialized = true
-    this.setLifecyclePhase('running')
+    this.lifecycle.setPhase('running')
   }
 
   /**
-   * Build one `RigChain` per active rig and wire up the DMX publisher. Each chain owns its
-   * own sequencer, light manager, and (later) cue handlers; the same listener event fans
-   * out to every chain so the cue resolves against each rig's own lights independently.
-   *
-   * If no rigs are active, a single empty chain is built so the rest of the system has a
-   * sequencer/light-state plumbing to reference (cue handlers never get installed; nothing
-   * makes it to the wire).
-   *
-   * `Clock` is rebuilt every time we initialise so a stale clock from a previous lifecycle
-   * never drives a fresh sequencer.
-   */
-  private async initializeRigChains(): Promise<void> {
-    const activeRigs = this.config.getActiveRigs()
-
-    const clockRate = this.config.getPreference('clockRate')
-    this.clock = new Clock(clockRate)
-
-    if (activeRigs.length === 0) {
-      log.warn('No active DMX rigs found. DMX output will be disabled.')
-      const emptyConfig: LightingConfiguration = {
-        numLights: 0,
-        lightLayout: { id: 'default-layout', label: 'Default Layout' },
-        strobeType: ConfigStrobeType.None,
-        frontLights: [],
-        backLights: [],
-        strobeLights: [],
-      }
-      this.rigChains = [
-        new RigChain({
-          rigId: 'empty',
-          config: emptyConfig,
-          clock: this.clock,
-          isPrimary: true,
-        }),
-      ]
-    } else {
-      log.info(`Initializing ${activeRigs.length} active DMX rig(s)`)
-      // One chain per active rig. The first chain is marked primary so its handlers own
-      // user-visible renderer broadcasts; secondary chains run silently.
-      this.rigChains = activeRigs.map(
-        (rig, index) =>
-          new RigChain({
-            rigId: rig.id,
-            config: rig.config,
-            clock: this.clock!,
-            isPrimary: index === 0,
-            mirror: { horiz: rig.mirrorHoriz, vert: rig.mirrorVert },
-          }),
-      )
-    }
-
-    const primaryChain = this.rigChains[0]
-    this.dmxLightManager = primaryChain.dmxLightManager
-    this.effectsController = primaryChain.sequencer
-
-    this.chainFanout.setChains(this.rigChains)
-
-    // Start the centralized timing system
-    this.clock.start()
-
-    // Set up DMX publisher. Govern wire output so the render tick rate (clockRate, up to
-    // 100 Hz) doesn't fire-hose cheap USB / low-end sACN adapters. The Global DMX Publishing
-    // Rate pref sits upstream of all enabled senders; per-sender refresh settings still pace
-    // individual slow links below this cap. Falls back to the absolute DMX ceiling when the
-    // pref is absent so the governor never throttles a sender below what it could output.
-    const globalDmxRateHz =
-      this.config.getPreference('globalDmxPublishingRateHz') ?? DMX_OUTPUT_REFRESH_RATE_HZ_MAX
-    this.dmxPublisher = new DmxPublisher(this.senderLifecycle.getSenderManager(), null, undefined, {
-      outputRateHz: globalDmxRateHz,
-    })
-    // Subscribe the publisher to every chain's LightStateManager. Each chain's emission
-    // writes its rig's lights into the publisher's aggregated map; a coalesced flush calls
-    // publishNow once per tick.
-    this.dmxPublisher.setRigChains(
-      this.rigChains.map((c) => ({ rigId: c.rigId, lightStateManager: c.lightStateManager })),
-    )
-
-    if (activeRigs.length > 0) {
-      this.dmxPublisher.updateActiveRigs(activeRigs)
-    }
-  }
-
-  /**
-   * Apply YARG and Audio motion preferences from configuration (groups register later via NodeCueLoader).
-   */
-  private async applyMotionPreferencesFromConfig(): Promise<void> {
-    const yarg = YargCueRegistry.getInstance()
-    const audio = AudioCueRegistry.getInstance()
-    yarg.setMotionSelectionMode(this.config.getMotionGroupSelectionMode())
-    yarg.setDisabledMotionCues(this.config.getPreference('cueDomains').yargMotion.disabledCues)
-    audio.setMotionSelectionMode(this.config.getAudioMotionGroupSelectionMode())
-    audio.setDisabledMotionCues(this.config.getPreference('cueDomains').audioMotion.disabledCues)
-    log.info('YARG + Audio motion registries initialized (selection modes from preferences).')
-  }
-
-  /**
-   * Re-apply Yarg enabled groups from configuration after all groups are registered.
-   * Node cue groups are registered in initializeNodeCueLoader(), and each registerGroup()
-   * adds the group to enabled by default, which would overwrite a saved "disabled" preference.
-   * Calling this after the node cue loader ensures the persisted preference wins.
-   * Auto-enables groups that were never seen before (vs knownYargCueGroups); user-disabled
-   * groups stay disabled because they remain in the known set.
-   */
-  private async applyYargEnabledGroupsFromConfig(): Promise<void> {
-    const registry = YargCueRegistry.getInstance()
-    const registeredIds = registry.getAllGroups()
-    const yargDomain = this.config.getPreference('cueDomains').yarg
-    let enabledGroupIds = yargDomain.enabledGroups ?? []
-    const knownGroups = yargDomain.knownGroups ?? []
-
-    if (!enabledGroupIds || enabledGroupIds.length === 0) {
-      enabledGroupIds = registeredIds
-      if (registeredIds.length > 0) {
-        await this.config.updateCueDomain('yarg', { enabledGroups: enabledGroupIds })
-      }
-    } else {
-      const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
-      if (newGroups.length > 0) {
-        enabledGroupIds = [...enabledGroupIds, ...newGroups]
-        await this.config.updateCueDomain('yarg', { enabledGroups: enabledGroupIds })
-      }
-    }
-
-    await this.config.updateCueDomain('yarg', { knownGroups: registeredIds })
-    const restricted = enabledGroupIds.filter((id) => registeredIds.includes(id))
-    registry.setEnabledGroups(restricted)
-    log.info('CueRegistry enabled groups re-applied from config:', restricted)
-
-    const disabledYarg = this.config.getPreference('cueDomains').yarg.disabledCues
-    registry.setDisabledCues(disabledYarg)
-  }
-
-  /**
-   * Re-apply audio enabled groups from configuration after all groups are registered.
-   * Auto-enables groups that were never seen before (vs knownAudioCueGroups); user-disabled
-   * groups stay disabled because they remain in the known set.
-   */
-  private async applyAudioEnabledGroupsFromConfig(): Promise<void> {
-    const registry = AudioCueRegistry.getInstance()
-    const registeredIds = registry.getRegisteredGroups()
-    const audioDomain = this.config.getPreference('cueDomains').audio
-    let enabledGroupIds = audioDomain.enabledGroups
-    const knownGroups = audioDomain.knownGroups ?? []
-
-    if (!enabledGroupIds || enabledGroupIds.length === 0) {
-      enabledGroupIds = registeredIds
-      if (registeredIds.length > 0) {
-        await this.config.updateCueDomain('audio', { enabledGroups: enabledGroupIds })
-      }
-    } else {
-      const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
-      if (newGroups.length > 0) {
-        enabledGroupIds = [...enabledGroupIds, ...newGroups]
-        await this.config.updateCueDomain('audio', { enabledGroups: enabledGroupIds })
-      }
-    }
-
-    await this.config.updateCueDomain('audio', { knownGroups: registeredIds })
-    registry.setEnabledGroups(enabledGroupIds)
-    const disabledAudio = this.config.getPreference('cueDomains').audio.disabledCues
-    registry.setDisabledCues(disabledAudio)
-    log.info('AudioCueRegistry enabled groups re-applied from config:', enabledGroupIds)
-    this.refreshAudioCueSelection()
-  }
-
-  /**
-   * Re-apply YARG motion enabled groups from configuration after node cues are registered.
-   */
-  private async applyYargMotionEnabledGroupsFromConfig(): Promise<void> {
-    const registry = YargCueRegistry.getInstance()
-    const registeredIds = registry.getRegisteredMotionGroupIds()
-    const motionDomain = this.config.getPreference('cueDomains').yargMotion
-    let enabledGroupIds = motionDomain.enabledGroups
-    const knownGroups = motionDomain.knownGroups ?? []
-
-    if (!enabledGroupIds || enabledGroupIds.length === 0) {
-      enabledGroupIds = registeredIds
-      if (registeredIds.length > 0) {
-        await this.config.updateCueDomain('yargMotion', { enabledGroups: enabledGroupIds })
-      }
-    } else {
-      const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
-      if (newGroups.length > 0) {
-        enabledGroupIds = [...enabledGroupIds, ...newGroups]
-        await this.config.updateCueDomain('yargMotion', { enabledGroups: enabledGroupIds })
-      }
-    }
-
-    await this.config.updateCueDomain('yargMotion', { knownGroups: registeredIds })
-    registry.setEnabledMotionGroups(enabledGroupIds)
-    const disabledMotion = this.config.getPreference('cueDomains').yargMotion.disabledCues
-    registry.setDisabledMotionCues(disabledMotion)
-    log.info('YARG motion enabled groups re-applied from config:', enabledGroupIds)
-  }
-
-  /**
-   * Re-apply audio motion enabled groups from configuration after node cues are registered.
-   */
-  private async applyAudioMotionEnabledGroupsFromConfig(): Promise<void> {
-    const registry = AudioCueRegistry.getInstance()
-    const registeredIds = registry.getRegisteredMotionGroupIds()
-    const audioMotionDomain = this.config.getPreference('cueDomains').audioMotion
-    let enabledGroupIds = audioMotionDomain.enabledGroups
-    const knownGroups = audioMotionDomain.knownGroups ?? []
-
-    if (!enabledGroupIds || enabledGroupIds.length === 0) {
-      enabledGroupIds = registeredIds
-      if (registeredIds.length > 0) {
-        await this.config.updateCueDomain('audioMotion', { enabledGroups: enabledGroupIds })
-      }
-    } else {
-      const newGroups = registeredIds.filter((id) => !knownGroups.includes(id))
-      if (newGroups.length > 0) {
-        enabledGroupIds = [...enabledGroupIds, ...newGroups]
-        await this.config.updateCueDomain('audioMotion', { enabledGroups: enabledGroupIds })
-      }
-    }
-
-    await this.config.updateCueDomain('audioMotion', { knownGroups: registeredIds })
-    registry.setEnabledMotionGroups(enabledGroupIds)
-    const disabledMotion = this.config.getPreference('cueDomains').audioMotion.disabledCues
-    registry.setDisabledMotionCues(disabledMotion)
-    log.info('Audio motion enabled groups re-applied from config:', enabledGroupIds)
-  }
-
-  /**
-   * Initialize network listeners
-   */
-  private async initializeListeners(): Promise<void> {
-    if (!this.dmxLightManager || !this.effectsController) return
-
-    // Create cue handler (default to YARG)
-    const yargHandler = new YargCueHandler(this.dmxLightManager, this.effectsController, {
-      getMotionCueMinimumHoldMs: () =>
-        this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
-      getMotionCueProbabilityPercent: () =>
-        this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
-      runtimeBroadcaster: mainRuntimeBroadcaster,
-    })
-    yargHandler.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
-    yargHandler.setManualMotionRef(
-      this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
-    )
-    this.cueHandler = yargHandler
-  }
-
-  /**
-   * Start a test effect
-   */
-  public startTestEffect(
-    effectId: string,
-    venueSize?: 'NoVenue' | 'Small' | 'Large',
-    bpm?: number,
-    cueGroup?: string,
-  ): void {
-    this.testEffectRunner.startTestEffect(effectId, venueSize, bpm, cueGroup)
-  }
-
-  /**
-   * Stop the currently running test effect
+   * Stop the currently running test effect. Both domain runners are stopped; the idle one
+   * early-returns, so this is a safe no-op for whichever domain isn't running.
    */
   public async stopTestEffect(): Promise<void> {
     await this.testEffectRunner.stopTestEffect()
+    await this.rb3TestEffectRunner.stopTestEffect()
   }
 
   /**
-   * Enable YARG listener.
-   * Awaits any in-flight restart so enable/disable cannot interleave with teardown/reinit.
+   * Enable YARG listener. Runs on the shared lifecycle queue with the other toggles and controller
+   * restarts, so enable/disable cannot interleave with each other or with teardown/reinit, and
+   * additionally yields to any in-flight shutdown.
    */
-  public enableYarg(): void {
-    void this.awaitInFlightLifecycleWork().then(() => {
-      this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
+  public async enableYarg(): Promise<void> {
+    await this.lifecycle.runOp(async () => {
+      await this.lifecycle.awaitShutdownWork()
+      await this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
     })
   }
 
@@ -561,59 +265,53 @@ export class ControllerManager {
    * Disable YARG listener
    */
   public async disableYarg(): Promise<void> {
-    await this.awaitInFlightLifecycleWork()
-    await this.listenerLifecycle.yargRb3.disableYarg()
+    await this.lifecycle.runOp(async () => {
+      await this.lifecycle.awaitShutdownWork()
+      await this.listenerLifecycle.yargRb3.disableYarg()
+    })
   }
 
   /**
-   * Enable Rb3 listener
+   * Enable Rb3 listener. Running simulations are stopped first — the listener owns the rig
+   * chains from here and simulation IPC is refused while RB3E is enabled.
    */
   public async enableRb3(): Promise<void> {
-    await this.awaitInFlightLifecycleWork()
-    await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
+    await this.lifecycle.runOp(async () => {
+      await this.lifecycle.awaitShutdownWork()
+      await this.stopTestEffect()
+      this.onSimulationPreempt?.()
+      await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
+    })
   }
 
   /**
    * Disable Rb3 listener
    */
   public async disableRb3(): Promise<void> {
-    await this.awaitInFlightLifecycleWork()
-    await this.listenerLifecycle.yargRb3.disableRb3()
-  }
-
-  /**
-   * Get current RB3 processing mode
-   */
-  public getRb3Mode(): 'direct' | 'none' {
-    return this.listenerLifecycle.yargRb3.getRb3Mode()
-  }
-
-  /**
-   * Get RB3 processor statistics
-   */
-  public getRb3ProcessorStats(): ReturnType<ProcessorManager['getProcessorStats']> | null {
-    return this.listenerLifecycle.yargRb3.getRb3ProcessorStats()
+    await this.lifecycle.runOp(async () => {
+      await this.lifecycle.awaitShutdownWork()
+      await this.listenerLifecycle.yargRb3.disableRb3()
+    })
   }
 
   /**
    * Shutdown all controllers and systems.
-   * Idempotent: subsequent calls return the in-flight promise (or resolve immediately when
-   * teardown has already completed). A teardown rejection leaves `controllerShutdownCompleted`
-   * unset so `shutdown()` can be retried; only a successful teardown is "completed".
+   * Idempotent via the lifecycle's exclusive-shutdown operation: subsequent calls share the
+   * in-flight attempt (or resolve immediately when teardown has already completed), a teardown
+   * rejection stays retryable, and the terminal 'stopped' transition follows a successful
+   * teardown. The operation runs off the lifecycle queue; queued toggles await it through
+   * `awaitShutdownWork`, so draining the queue here would deadlock.
    */
   public async shutdown(): Promise<void> {
-    if (this.controllerShutdownCompleted) {
-      return
-    }
-    if (this.controllerShutdownPromise) {
-      return this.controllerShutdownPromise
-    }
+    return this.lifecycle.runExclusiveShutdown(async () => {
+      // 'shuttingDown' is allowed so a retry after a failed teardown can run again.
+      this.lifecycle.assertPhase(
+        ['initializing', 'running', 'restarting', 'consoleMode', 'failed', 'shuttingDown'],
+        'shutdown',
+      )
+      this.lifecycle.setPhase('shuttingDown')
+      log.info('ControllerManager shutdown: starting')
 
-    this.assertPhase(['initializing', 'running', 'restarting', 'consoleMode', 'failed'], 'shutdown')
-    this.setLifecyclePhase('shuttingDown')
-    log.info('ControllerManager shutdown: starting')
-
-    this.controllerShutdownPromise = (async () => {
       // Shutdown in reverse order of initialization
       try {
         await this.listenerLifecycle.yargRb3.disableYarg()
@@ -636,69 +334,11 @@ export class ControllerManager {
         log.error('Error disabling Audio:', err)
       }
 
-      if (this.nodeCueLoader) {
-        try {
-          await this.nodeCueLoader.dispose()
-          this.nodeCueLoader.removeAllListeners()
-          this.nodeCueLoader = null
-          log.info('ControllerManager shutdown: node cue loader stopped')
-        } catch (err) {
-          log.error('Error shutting down node cue loader:', err)
-        }
-      }
-
-      if (this.effectLoader) {
-        try {
-          await this.effectLoader.dispose()
-          this.effectLoader.removeAllListeners()
-          this.effectLoader = null
-          log.info('ControllerManager shutdown: effect loader stopped')
-        } catch (err) {
-          log.error('Error shutting down effect loader:', err)
-        }
-      }
-
-      if (this.cueHandler) {
-        try {
-          this.cueHandler.shutdown()
-          this.cueHandler = null
-          log.info('ControllerManager shutdown: cue handler stopped')
-        } catch (err) {
-          log.error('Error shutting down cue handler:', err)
-        }
-      }
-
-      // Dispose every rig chain. The shared clock is stopped separately below so a chain
-      // tearing down can't take ticks away from any sibling chain.
-      for (const chain of this.rigChains) {
-        try {
-          await chain.dispose()
-        } catch (err) {
-          log.error(`Error disposing rig chain ${chain.rigId}:`, err)
-        }
-      }
-      this.rigChains = []
-      this.dmxLightManager = null
-      this.effectsController = null
-      log.info('ControllerManager shutdown: rig chains disposed')
-
-      if (this.dmxPublisher) {
-        try {
-          await this.dmxPublisher.shutdown()
-          log.info('ControllerManager shutdown: DMX publisher stopped')
-        } catch (err) {
-          log.error('Error shutting down DMX publisher:', err)
-        }
-      }
-
-      if (this.clock) {
-        try {
-          this.clock.destroy()
-        } catch (err) {
-          log.error('Error stopping shared clock:', err)
-        }
-        this.clock = null
-      }
+      await this.graph.disposeLoaders()
+      this.graph.shutdownDomainCueHandlerRefs()
+      await this.graph.disposeChainsForShutdown()
+      await this.graph.shutdownPublisherSafe()
+      this.graph.destroyClock()
 
       try {
         await this.senderLifecycle.shutdownSenderOnAppExit()
@@ -708,16 +348,8 @@ export class ControllerManager {
       }
 
       this.isInitialized = false
-      this.controllerShutdownCompleted = true
-      this.setLifecyclePhase('stopped')
       log.info('ControllerManager shutdown: completed')
-    })()
-
-    try {
-      await this.controllerShutdownPromise
-    } finally {
-      this.controllerShutdownPromise = null
-    }
+    })
   }
 
   // Getters for controllers
@@ -726,15 +358,35 @@ export class ControllerManager {
   }
 
   public getDmxLightManager(): DmxLightManager | null {
-    return this.dmxLightManager
+    return this.graph.getDmxLightManager()
   }
 
   public getLightingController(): ILightingController | null {
-    return this.effectsController
+    return this.graph.getEffectsController()
   }
 
   public getSenderManager(): SenderManager {
     return this.senderLifecycle.getSenderManager()
+  }
+
+  /** The sender lifecycle surface (status, error tracking, restore). */
+  public getSenderLifecycle(): SenderLifecycleController {
+    return this.senderLifecycle
+  }
+
+  /** The listener lifecycle surface: `yargRb3` for the net listeners, `audio` for audio. */
+  public getListenerLifecycle(): ListenerLifecycleController {
+    return this.listenerLifecycle
+  }
+
+  /** The DMX console surface (channel edits, manual buffers, console callbacks). */
+  public getConsoleModeController(): ConsoleModeController {
+    return this.consoleMode
+  }
+
+  /** The domain's test-effect runner, for simulation IPC. Stop both via stopTestEffect. */
+  public getTestEffectRunner(domain: NetCueMode): TestEffectRunner {
+    return domain === 'rb3' ? this.rb3TestEffectRunner : this.testEffectRunner
   }
 
   /**
@@ -745,16 +397,28 @@ export class ControllerManager {
     return this.senderLifecycle.handleUncaughtException(error, () => this.getIsInitialized())
   }
 
-  public setSenderErrorTrackingCallback(callback: (senderId: string) => void): void {
-    this.senderLifecycle.setSenderErrorTrackingCallback(callback)
+  /** Register a callback run during restart teardown. Returns an unregister function. */
+  public addOnControllerRestart(callback: () => void): () => void {
+    this.onControllerRestartListeners.push(callback)
+    return () => {
+      const i = this.onControllerRestartListeners.indexOf(callback)
+      if (i !== -1) {
+        this.onControllerRestartListeners.splice(i, 1)
+      }
+    }
   }
 
-  public setOnConsoleEnter(callback: (() => void) | null): void {
-    this.consoleMode.setOnConsoleEnter(callback)
+  /** Called when a listener takes over the rig chains (RB3E enable) so running simulations stop. */
+  public setOnSimulationPreempt(callback: (() => void) | null): void {
+    this.onSimulationPreempt = callback
   }
 
-  public getCueHandler(): YargCueHandler | null {
-    return this.cueHandler
+  public getCueHandler(): CueHandler | null {
+    return this.graph.getCueHandler()
+  }
+
+  public getRb3CueHandler(): CueHandler | null {
+    return this.graph.getRb3CueHandler()
   }
 
   /**
@@ -766,44 +430,31 @@ export class ControllerManager {
     return this.chainFanout
   }
 
+  /** The Cue-Simulation motion-cue state holder (reset on restart). */
+  public getMotionCueSimulator(): MotionCueSimulator {
+    return this.motionCueSimulator
+  }
+
   /**
-   * Idempotent: ensures every active rig chain has a `YargCueHandler` attached, creating
-   * one bound to the chain's own `(dmxLightManager, sequencer)` for any chain whose slot is
-   * still null. Used by the simulation IPC path and `TestEffectRunner` to bring secondary
-   * chains up to par with the primary so cues dispatched through `ChainFanout` reach every
-   * rig — even when no real network listener has run `enableYargInternal`.
+   * Idempotent: ensures every active rig chain has a cue handler in the domain's slot, creating one
+   * bound to the chain's own `(dmxLightManager, sequencer)` for any chain whose slot is still null.
+   * Used by the simulation IPC path and `TestEffectRunner` to bring secondary chains up to par with
+   * the primary so cues dispatched through `ChainFanout` reach every rig, even when no real network
+   * listener has run.
    *
-   * Handler construction mirrors `ListenerCoordinator.enableYargInternal`: same motion
-   * preferences, and only the primary chain's handler gets the main runtime broadcaster so
-   * renderer events stay deduped.
-   *
-   * Safe to call after `enableYargInternal` (no-op for chains that already have handlers)
-   * and after `disableYarg` (rebuilds the chain slots from scratch).
+   * Safe to call after a listener has enabled (no-op for chains that already have handlers) and
+   * after it is disabled (rebuilds the chain slots from scratch).
    */
-  public ensureChainsHaveYargHandlersForSimulation(): void {
-    for (const chain of this.rigChains) {
-      if (chain.yargCueHandler) continue
-      const handler = new YargCueHandler(chain.dmxLightManager, chain.sequencer, {
-        getMotionCueMinimumHoldMs: () =>
-          this.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
-        getMotionCueProbabilityPercent: () =>
-          this.config.getPreference('cueDomains').yargMotion.probabilityPercent ?? 100,
-        runtimeBroadcaster: chain.isPrimary ? mainRuntimeBroadcaster : noopRuntimeBroadcaster(),
-      })
-      handler.setMotionEnabled(this.config.getPreference('motionEnabled') ?? true)
-      handler.setManualMotionRef(
-        this.config.getPreference('cueDomains').yargMotion.activeCueRef ?? null,
-      )
-      chain.yargCueHandler = handler
-    }
+  public ensureChainsHaveHandlersForSimulation(domain: NetCueMode): void {
+    this.graph.ensureChainsHaveHandlersForSimulation(domain)
   }
 
   public getNodeCueLoader(): NodeCueLoader | null {
-    return this.nodeCueLoader
+    return this.graph.getNodeCueLoader()
   }
 
   public getEffectLoader(): EffectLoader | null {
-    return this.effectLoader
+    return this.graph.getEffectLoader()
   }
 
   public getProcessorManager(): ProcessorManager | null {
@@ -811,7 +462,12 @@ export class ControllerManager {
   }
 
   public getDmxPublisher(): DmxPublisher | null {
-    return this.dmxPublisher
+    return this.graph.getDmxPublisher()
+  }
+
+  /** The venue post-processing stage, for callers driving or reporting the effect. */
+  public getVenueFrameProcessor(): VenueFrameProcessor {
+    return this.venueFrameProcessor
   }
 
   public getIsInitialized(): boolean {
@@ -833,30 +489,14 @@ export class ControllerManager {
   }
 
   /**
-   * Get sender status information
-   * @returns Object containing status of each sender type
-   */
-  public getSenderStatus(): { sacn: boolean; artnet: boolean; enttecpro: boolean; ipc: boolean } {
-    const sm = this.senderLifecycle.getSenderManager()
-    return {
-      sacn: sm.isSenderEnabled('sacn'),
-      artnet: sm.isSenderEnabled('artnet'),
-      enttecpro: sm.isSenderEnabled('enttecpro'),
-      ipc: sm.isSenderEnabled('ipc'),
-    }
-  }
-
-  /**
    * Refresh which rigs are active for DMX output without restarting controllers.
    * Use this when only the active-rig set changes so senders stay running.
    */
   public refreshActiveRigs(): void {
-    if (!this.isInitialized || !this.dmxPublisher) {
+    if (!this.isInitialized) {
       return
     }
-    const activeRigs = this.config.getActiveRigs()
-    this.dmxPublisher.updateActiveRigs(activeRigs)
-    log.info('Refreshed active rigs for DMX output:', activeRigs.length, 'rig(s)')
+    this.graph.refreshActiveRigs()
   }
 
   /**
@@ -864,135 +504,27 @@ export class ControllerManager {
    * This shuts down existing controllers and reinitializes them
    */
   public async restartControllers(): Promise<void> {
-    if (this.restartControllersInFlight) {
-      return this.restartControllersInFlight
-    }
-    this.restartControllersInFlight = this.runRestartControllers().finally(() => {
-      this.restartControllersInFlight = null
-    })
-    return this.restartControllersInFlight
+    // A restart is a peer on the lifecycle queue with the listener toggles, so teardown never runs
+    // while a toggle is mid-flight (and vice versa). The shared-restart operation dedupes
+    // overlapping calls and gates the off-queue audio toggles.
+    return this.lifecycle.runSharedRestart(() => this.runRestartControllers())
   }
 
   private async runRestartControllers(): Promise<void> {
-    this.assertPhase(['running', 'consoleMode', 'failed'], 'restartControllers')
-    this.setLifecyclePhase('restarting')
-    log.info('Restarting controllers to apply configuration changes')
-
-    const wasYargEnabled = this.listenerLifecycle.yargRb3.getIsYargEnabled()
-    const wasRb3Enabled = this.listenerLifecycle.yargRb3.getIsRb3Enabled()
-    const wasAudioEnabled = this.listenerLifecycle.audio.getIsAudioEnabled()
-    const activeSendersBeforeRestart = this.senderLifecycle.getActiveOutputSenderSnapshotIfAny()
-    const wasConsoleMode = this.consoleMode.getConsoleRestore() !== null
-
-    let teardownSucceeded = false
-    try {
-      if (wasYargEnabled) {
-        await this.listenerLifecycle.yargRb3.disableYarg()
-      }
-      if (wasRb3Enabled) {
-        await this.listenerLifecycle.yargRb3.disableRb3()
-      }
-      if (wasAudioEnabled) {
-        await this.listenerLifecycle.audio.disableAudio()
-      }
-
-      for (const chain of this.rigChains) {
-        await chain.dispose()
-      }
-      this.rigChains = []
-
-      if (this.dmxPublisher) {
-        await this.dmxPublisher.shutdown()
-      }
-      await this.senderLifecycle.resetSenderForControllerRestart()
-
-      if (this.cueHandler) {
-        this.cueHandler.shutdown()
-      }
-
-      // Gguarantee the process-wide strobe state is cleared on every restart,
-      // even if no cue handler was active to clear it during its own shutdown.
-      // Prevents a stale strobe slot from driving hardware-strobe-channel
-      // lights after an input-platform switch.
-      getStrobeStateManager().setActive(null)
-
-      // Clear the shared tick source so `init()` builds a fresh one rather than reusing
-      // a clock whose tick callbacks have been unregistered.
-      if (this.clock) {
-        this.clock.destroy()
-        this.clock = null
-      }
-
-      this.dmxLightManager = null
-      this.effectsController = null
-      this.dmxPublisher = null
-      this.cueHandler = null
-
-      this.isInitialized = false
-
-      teardownSucceeded = true
-      log.info('Controllers shutdown completed, reinitializing')
-    } catch (error) {
-      log.error('Error shutting down controllers:', error)
-    }
-
-    // If shutdown began while we were tearing down, do not reinitialize. The shutdown promise
-    // owns the next phase transition; restartControllers exits with a typed abort.
-    if (
-      this.lifecyclePhase === 'shuttingDown' ||
-      this.lifecyclePhase === 'stopped' ||
-      this.controllerShutdownPromise
-    ) {
-      log.info('Restart aborted: shutdown started during teardown')
-      throw new LifecycleAbortedError(
-        'restartControllers aborted: shutdown started before reinitialization',
-      )
-    }
-
-    // A teardown failure (with no concurrent shutdown) leaves controllers partially torn down.
-    // Reinitializing on top of that risks dangling listeners/timers and double-published state,
-    // so fail the restart instead of building a fresh graph over a broken one.
-    if (!teardownSucceeded) {
-      log.error('Restart aborted: controller teardown did not complete; not reinitializing')
-      this.setLifecyclePhase('failed')
-      this.isInitialized = false
-      throw new Error('Controller teardown failed during restart; reinitialization aborted')
-    }
-
-    try {
-      await this.init()
-      this.setLifecyclePhase(wasConsoleMode ? 'consoleMode' : 'running')
-      this.consoleMode.onControllersReinitializedWhileConsoleOpen()
-
-      if (wasYargEnabled) {
-        // Use the listener directly to avoid re-entering the in-flight restart guard.
-        this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
-      } else if (wasRb3Enabled) {
-        await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
-      }
-
-      if (wasAudioEnabled) {
-        await this.listenerLifecycle.audio.enableAudio(this.isInitialized, () => this.init())
-      }
-
-      // Restore DMX output senders from persisted preferences so that output
-      // continues without requiring a manual toggle after any config change.
-      await this.senderLifecycle.restoreSenderOutputsFromPrefs(
-        activeSendersBeforeRestart ?? undefined,
-      )
-
-      log.info('Controllers restarted successfully')
-    } catch (error) {
-      if (error instanceof LifecycleAbortedError) {
-        // Shutdown raced reinit; let the shutdown promise own the final state.
-        log.info('Reinit aborted by concurrent shutdown')
-        throw error
-      }
-      log.error('Error reinitializing controllers:', error)
-      this.setLifecyclePhase('failed')
-      this.isInitialized = false
-      throw error
-    }
+    return runControllerRestart({
+      lifecycle: this.lifecycle,
+      graph: this.graph,
+      listenerLifecycle: this.listenerLifecycle,
+      senderLifecycle: this.senderLifecycle,
+      consoleMode: this.consoleMode,
+      motionCueSimulator: this.motionCueSimulator,
+      init: () => this.init(),
+      isInitialized: () => this.isInitialized,
+      setInitialized: (value) => {
+        this.isInitialized = value
+      },
+      restartTeardownListeners: () => [...(this.onControllerRestartListeners ?? [])],
+    })
   }
 
   /**
@@ -1010,7 +542,7 @@ export class ControllerManager {
    * Enable audio listener and processor
    */
   public async enableAudio(): Promise<void> {
-    await this.awaitInFlightLifecycleWork()
+    await this.lifecycle.awaitInFlightWork()
     await this.listenerLifecycle.audio.enableAudio(this.isInitialized, () => this.init())
   }
 
@@ -1018,15 +550,8 @@ export class ControllerManager {
    * Disable audio processing
    */
   public async disableAudio(): Promise<void> {
-    await this.awaitInFlightLifecycleWork()
+    await this.lifecycle.awaitInFlightWork()
     await this.listenerLifecycle.audio.disableAudio()
-  }
-
-  /**
-   * Update audio configuration while audio is running
-   */
-  public updateAudioConfig(config: AudioConfig): void {
-    this.listenerLifecycle.audio.updateAudioConfig(config)
   }
 
   /**
@@ -1037,38 +562,11 @@ export class ControllerManager {
   }
 
   /**
-   * Get the current audio cue selection
+   * Re-validate RB3 cue mode's rotating primary group after the enabled RB3 groups change, so a
+   * group the user just disabled stops being forced. No-op unless RB3 cue mode is running.
    */
-  public getActiveAudioCueType(): AudioCueType {
-    return this.listenerLifecycle.audio.getActiveAudioCueType()
-  }
-
-  /**
-   * Secondary cue driving the overlay slot (manual secondary or active strobe cue).
-   */
-  public getActiveSecondaryCueType(): AudioCueType | null {
-    return this.listenerLifecycle.audio.getActiveSecondaryCueType()
-  }
-
-  /**
-   * Persist and apply a new audio cue selection
-   */
-  public setActiveAudioCueType(cueType: AudioCueType): { success: boolean; error?: string } {
-    return this.listenerLifecycle.audio.setActiveAudioCueType(cueType)
-  }
-
-  /**
-   * Return cue options sourced from enabled audio cue groups
-   */
-  public getAudioCueOptions(): Array<{
-    id: AudioCueType
-    label: string
-    description: string
-    groupId: string
-    groupName: string
-    groupDescription: string
-  }> {
-    return this.listenerLifecycle.audio.getAudioCueOptions()
+  public refreshRb3CueSelection(): void {
+    this.listenerLifecycle.yargRb3.getProcessorManager()?.refreshRb3PrimaryGroup()
   }
 
   /**
@@ -1078,14 +576,6 @@ export class ControllerManager {
     return this.listenerLifecycle.audio.getIsAudioEnabled()
   }
 
-  public getAudioGameModeConfig(): AudioGameModeConfig {
-    return this.listenerLifecycle.audio.getAudioGameModeConfig()
-  }
-
-  public async setAudioGameModeConfig(config: AudioGameModeConfig): Promise<void> {
-    await this.listenerLifecycle.audio.setAudioGameModeConfig(config)
-  }
-
   /**
    * Apply the global motion master toggle to every active rig's YARG handler plus the audio
    * processor (audio's fanout is hidden behind `AudioCueProcessor`). Without the chain loop
@@ -1093,18 +583,8 @@ export class ControllerManager {
    * motion output until the next listener restart.
    */
   public setMotionEnabledGlobal(enabled: boolean): void {
-    for (const chain of this.rigChains) {
-      chain.yargCueHandler?.setMotionEnabled(enabled)
-    }
+    this.graph.setMotionEnabledOnChains(enabled)
     this.listenerLifecycle.audio.setMotionEnabled(enabled)
-  }
-
-  public setActiveAudioMotionCueRef(ref: AudioMotionCueRef | null): void {
-    this.listenerLifecycle.audio.setActiveAudioMotionCueRef(ref)
-  }
-
-  public isAudioGameModeActive(): boolean {
-    return this.listenerLifecycle.audio.isAudioGameModeActive()
   }
 
   /**
@@ -1112,29 +592,28 @@ export class ControllerManager {
    * pick up the new reference together. Only the primary chain emits the renderer
    * broadcast for the change (see Phase 4 dedup); the secondary chains apply silently.
    */
-  public setActiveYargMotionCueRef(ref: YargMotionCueRef | null): void {
-    for (const chain of this.rigChains) {
-      chain.yargCueHandler?.setManualMotionRef(ref)
-    }
+  public setActiveYargMotionCueRef(ref: MotionCueRef | null): void {
+    this.graph.setManualMotionRefOnChains('yarg', ref)
   }
 
   /**
-   * Routes analysed audio frames to the Audio Preview window (wired from IPC setup).
+   * Update the manual RB3 motion cue reference on every active rig's RB3 handler so all rigs
+   * pick up the new reference together.
    */
-  public setAudioMirrorBroadcaster(fn: (data: AudioLightingData) => void): void {
-    this.listenerLifecycle.audio.setBroadcastAudioMirror(fn)
+  public setActiveRb3MotionCueRef(ref: MotionCueRef | null): void {
+    this.graph.setManualMotionRefOnChains('rb3', ref)
   }
 
   public async enableConsoleMode(
     rigId: string,
   ): Promise<{ success: true } | { success: false; error: string }> {
     await this.init()
-    if (this.lifecyclePhase !== 'consoleMode') {
-      this.assertPhase(['running'], 'enableConsoleMode')
+    if (this.lifecycle.phase !== 'consoleMode') {
+      this.lifecycle.assertPhase(['running'], 'enableConsoleMode')
     }
     const r = await this.consoleMode.enableConsoleMode(rigId)
     if (r.success) {
-      this.setLifecyclePhase('consoleMode')
+      this.lifecycle.setPhase('consoleMode')
     }
     return r
   }
@@ -1143,43 +622,10 @@ export class ControllerManager {
     { success: true } | { success: false; error: string }
   > {
     const r = await this.consoleMode.disableConsoleMode()
-    if (r.success && this.lifecyclePhase === 'consoleMode') {
-      this.setLifecyclePhase('running')
+    if (r.success && this.lifecycle.phase === 'consoleMode') {
+      this.lifecycle.setPhase('running')
     }
     return r
-  }
-
-  public sendConsoleDmx(buffer: Record<number, number>): void {
-    this.consoleMode.sendConsoleDmx(buffer)
-  }
-
-  public async updateConsoleChannel(payload: {
-    rigId: string
-    lightId: string
-    fixtureId: string
-    channelName: string
-    channelNumber: number
-  }): Promise<{ success: true } | { success: false; error: string }> {
-    return this.consoleMode.updateConsoleChannel(payload)
-  }
-
-  public async setConsoleHome(payload: {
-    rigId: string
-    lightId: string
-    fixtureId: string
-    panHome: number
-    tiltHome: number
-  }): Promise<{ success: true } | { success: false; error: string }> {
-    return this.consoleMode.setConsoleHome(payload)
-  }
-
-  public async setConsoleFixtureConfig(payload: {
-    rigId: string
-    lightId: string
-    fixtureId: string
-    config: Partial<FixtureConfig>
-  }): Promise<{ success: true } | { success: false; error: string }> {
-    return this.consoleMode.setConsoleFixtureConfig(payload)
   }
 }
 

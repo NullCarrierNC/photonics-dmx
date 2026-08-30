@@ -2,10 +2,10 @@ import React from 'react'
 import type { NodeCueKind } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 type CueEditorToolbarProps = {
-  cuePlatform: 'yarg' | 'audio'
+  cuePlatform: 'yarg' | 'audio' | 'rb3'
   cueKind: NodeCueKind
   isEffectMode: boolean
-  onCuePlatformChange: (platform: 'yarg' | 'audio') => void
+  onCuePlatformChange: (platform: 'yarg' | 'audio' | 'rb3') => void
   onCueKindChange: (kind: NodeCueKind) => void
   onEffectToggle: (isEffect: boolean) => void
   onNewFile: () => void
@@ -52,6 +52,9 @@ const CueEditorToolbar: React.FC<CueEditorToolbarProps> = ({
   exportLabel,
   deleteLabel,
 }) => {
+  // rb3 lighting is the single fixed CueType.RB3 cue, and rb3 motion is its own cue library, so
+  // both kinds are authored here. rb3 cues reference YARG effects, so the Cues/Effects toggle
+  // stays available, and switching to Effects edits those effects under the YARG platform.
   const showCueEffectsToggle = cueKind === 'lighting' || isEffectMode
 
   return (
@@ -62,7 +65,7 @@ const CueEditorToolbar: React.FC<CueEditorToolbarProps> = ({
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-4">
-            <div className="flex w-56 shrink-0">
+            <div className={`flex ${isEffectMode ? 'w-56' : 'w-72'} shrink-0`}>
               <button
                 type="button"
                 className={`min-w-0 flex-1 ${cuePlatform === 'yarg' ? segmentActive : segmentInactive} ${segmentLeft}`}
@@ -71,10 +74,19 @@ const CueEditorToolbar: React.FC<CueEditorToolbarProps> = ({
               </button>
               <button
                 type="button"
-                className={`min-w-0 flex-1 ${cuePlatform === 'audio' ? segmentActive : segmentInactive} ${!isEffectMode ? segmentRight : 'border-l-0'}`}
+                className={`min-w-0 flex-1 ${cuePlatform === 'audio' ? segmentActive : segmentInactive} ${isEffectMode ? segmentRight : 'border-l-0'}`}
                 onClick={() => onCuePlatformChange('audio')}>
                 Audio
               </button>
+              {/* rb3 has no effects, so the RB3 platform is offered only in cue mode. */}
+              {!isEffectMode && (
+                <button
+                  type="button"
+                  className={`min-w-0 flex-1 ${cuePlatform === 'rb3' ? segmentActive : segmentInactive} border-l-0 ${segmentRight}`}
+                  onClick={() => onCuePlatformChange('rb3')}>
+                  RB3
+                </button>
+              )}
             </div>
             {showCueEffectsToggle && (
               <div className="flex items-center gap-2">

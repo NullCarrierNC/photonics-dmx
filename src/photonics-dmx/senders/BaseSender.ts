@@ -1,4 +1,5 @@
 // src/senders/BaseSender.ts
+import { EventEmitter } from 'events'
 
 /** Sender type identifier for error reporting and auto-disable behaviour. */
 export type SenderId = 'artnet' | 'sacn' | 'enttecpro' | 'opendmx' | 'ipc'
@@ -74,13 +75,30 @@ export abstract class BaseSender {
    */
   protected abstract verifySenderStarted(): void
 
+  /** Emits 'SenderError' events. Shared by every wire sender so each doesn't reimplement it. */
+  private readonly errorEmitter = new EventEmitter()
+
   /**
    * Registers an event listener for send errors.
    */
-  public abstract onSendError(listener: (error: SenderError) => void): void
+  public onSendError(listener: (error: SenderError) => void): void {
+    this.errorEmitter.on('SenderError', listener)
+  }
 
   /**
    * Removes an event listener for send errors.
    */
-  public abstract removeSendError(listener: (error: SenderError) => void): void
+  public removeSendError(listener: (error: SenderError) => void): void {
+    this.errorEmitter.off('SenderError', listener)
+  }
+
+  /** Emit a send error to registered listeners. */
+  protected emitSenderError(error: SenderError): void {
+    this.errorEmitter.emit('SenderError', error)
+  }
+
+  /** Remove all registered send-error listeners. Used on stop/teardown. */
+  protected removeAllSendErrorListeners(): void {
+    this.errorEmitter.removeAllListeners('SenderError')
+  }
 }

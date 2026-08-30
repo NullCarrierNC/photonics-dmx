@@ -77,6 +77,12 @@ const AudioDeviceSelector: React.FC = () => {
         // Revert on failure
         const config = await getAudioConfig()
         setSelectedDeviceId(config?.deviceId || 'default')
+      } else if (result.warning) {
+        // The device was saved, so the selection stands, but capture is not running on it.
+        log.warn('Audio device saved with a warning:', result.warning)
+        setError(result.warning)
+      } else {
+        setError(null)
       }
     } catch (error) {
       log.error('Failed to save audio device:', error)

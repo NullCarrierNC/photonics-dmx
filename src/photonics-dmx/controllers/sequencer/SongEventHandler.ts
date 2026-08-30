@@ -224,7 +224,25 @@ export class SongEventHandler implements ISongEventHandler {
       | 'keys-blue'
       | 'keys-orange'
       | 'vocal-note'
-      | 'vocal-note-off',
+      | 'vocal-note-off'
+      | 'led-1'
+      | 'led-2'
+      | 'led-3'
+      | 'led-4'
+      | 'led-5'
+      | 'led-6'
+      | 'led-7'
+      | 'led-8'
+      | 'led-1-off'
+      | 'led-2-off'
+      | 'led-3-off'
+      | 'led-4-off'
+      | 'led-5-off'
+      | 'led-6-off'
+      | 'led-7-off'
+      | 'led-8-off'
+      | 'fog-on'
+      | 'fog-off',
   ): void {
     const currentTime = performance.now()
 
@@ -233,6 +251,13 @@ export class SongEventHandler implements ISongEventHandler {
     if ('isClearing' in ltc && typeof ltc.isClearing === 'function' && ltc.isClearing()) {
       return
     }
+
+    // Set when this event takes an effect out of its wait, meaning an uncounted match or a
+    // counted match whose count reached zero. A match that only decrements a count leaves every
+    // effect where it was. Starting or advancing a transition can run a synchronous chain of
+    // zero-duration transitions that carries the effect past its last one, so the reap scan below
+    // decides what actually finished rather than each landing site here.
+    let released = false
 
     this.layerManager.getActiveEffects().forEach((layerMap, _layer) => {
       layerMap.forEach((activeEffect, _lightId) => {
@@ -254,13 +279,16 @@ export class SongEventHandler implements ISongEventHandler {
             // If count reaches 0, start the transition
             if (currentTransition.waitForConditionCount === 0) {
               this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
+              released = true
             }
           } else if (currentTransition.waitForConditionCount === 0) {
             // Count is explicitly 0: start transition immediately (no event like beat or keyframe consumed)
             this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
+            released = true
           } else {
             // No count specified, start transition immediately
             this.transitionEngine.startTransition(activeEffect, currentTransition, currentTime)
+            released = true
           }
         }
 
@@ -290,6 +318,7 @@ export class SongEventHandler implements ISongEventHandler {
                 // If no more transitions, just set to idle
                 activeEffect.state = 'idle'
               }
+              released = true
             }
           } else if (currentTransition.waitUntilConditionCount === 0) {
             // Count is explicitly 0: advance immediately (no beat consumed)
@@ -302,6 +331,7 @@ export class SongEventHandler implements ISongEventHandler {
             } else {
               activeEffect.state = 'idle'
             }
+            released = true
           } else {
             // No count specified, move to next transition immediately
             activeEffect.currentTransitionIndex += 1
@@ -313,9 +343,14 @@ export class SongEventHandler implements ISongEventHandler {
             } else {
               activeEffect.state = 'idle'
             }
+            released = true
           }
         }
       })
     })
+
+    if (released) {
+      this.transitionEngine.reapCompletedEffects()
+    }
   }
 }

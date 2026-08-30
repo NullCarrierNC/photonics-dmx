@@ -2,11 +2,9 @@
  * Tests for dataExtractors: YARG cue data properties and extractConfigDataValue.
  */
 
-import {
-  extractYargCueDataValue,
-  extractAudioCueDataValue,
-  extractConfigDataValue,
-} from '../../../../cues/node/runtime/dataExtractors'
+import { extractConfigDataValue } from '../../../../cues/node/runtime/dataExtractors'
+import { extractNetCueDataValue } from '../../../../cues/domains/net'
+import { extractAudioCueDataValue } from '../../../../cues/domains/audio'
 import type { AudioCueData } from '../../../../cues/types/audioCueTypes'
 import type { CueData } from '../../../../cues/types/cueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
@@ -49,73 +47,135 @@ function minimalCueData(overrides?: Partial<CueData>): CueData {
 }
 
 describe('dataExtractors', () => {
-  describe('extractYargCueDataValue', () => {
+  describe('extractNetCueDataValue', () => {
     it('extracts previous-cue', () => {
       const cueData = minimalCueData({ previousCue: 'Intro' as any })
-      expect(extractYargCueDataValue('previous-cue', cueData, 'my-cue')).toBe('Intro')
+      expect(extractNetCueDataValue('previous-cue', cueData, 'my-cue')).toBe('Intro')
     })
 
     it('extracts song-section', () => {
       const cueData = minimalCueData({ songSection: 'Chorus' as any })
-      expect(extractYargCueDataValue('song-section', cueData, 'my-cue')).toBe('Chorus')
+      expect(extractNetCueDataValue('song-section', cueData, 'my-cue')).toBe('Chorus')
     })
 
     it('extracts beat-type', () => {
       const cueData = minimalCueData({ beat: 'Strong' as any })
-      expect(extractYargCueDataValue('beat-type', cueData, 'my-cue')).toBe('Strong')
+      expect(extractNetCueDataValue('beat-type', cueData, 'my-cue')).toBe('Strong')
     })
 
     it('extracts keyframe', () => {
       const cueData = minimalCueData({ keyframe: 'Next' })
-      expect(extractYargCueDataValue('keyframe', cueData, 'my-cue')).toBe('Next')
+      expect(extractNetCueDataValue('keyframe', cueData, 'my-cue')).toBe('Next')
     })
 
     it('extracts venue-size', () => {
       const cueData = minimalCueData({ venueSize: 'Large' })
-      expect(extractYargCueDataValue('venue-size', cueData, 'my-cue')).toBe('Large')
+      expect(extractNetCueDataValue('venue-size', cueData, 'my-cue')).toBe('Large')
     })
 
     it('extracts bass-note-count', () => {
       const cueData = minimalCueData({ bassNotes: [1, 2, 3] as any })
-      expect(extractYargCueDataValue('bass-note-count', cueData, 'my-cue')).toBe(3)
+      expect(extractNetCueDataValue('bass-note-count', cueData, 'my-cue')).toBe(3)
     })
 
     it('extracts drum-note-count', () => {
       const cueData = minimalCueData({ drumNotes: [1, 2] as any })
-      expect(extractYargCueDataValue('drum-note-count', cueData, 'my-cue')).toBe(2)
+      expect(extractNetCueDataValue('drum-note-count', cueData, 'my-cue')).toBe(2)
     })
 
     it('extracts keys-note-count', () => {
       const cueData = minimalCueData({ keysNotes: [1, 2, 3, 4] as any })
-      expect(extractYargCueDataValue('keys-note-count', cueData, 'my-cue')).toBe(4)
+      expect(extractNetCueDataValue('keys-note-count', cueData, 'my-cue')).toBe(4)
     })
 
     it('extracts time-since-cue-start', () => {
       const start = monotonicNowMs() - 5000
       const cueData = minimalCueData({ cueStartTime: start })
-      const result = extractYargCueDataValue('time-since-cue-start', cueData, 'my-cue') as number
+      const result = extractNetCueDataValue('time-since-cue-start', cueData, 'my-cue') as number
       expect(result).toBeGreaterThanOrEqual(4000)
       expect(result).toBeLessThanOrEqual(6000)
     })
 
     it('extracts time-since-last-cue', () => {
       const cueData = minimalCueData({ timeSinceLastCue: 300 })
-      expect(extractYargCueDataValue('time-since-last-cue', cueData, 'my-cue')).toBe(300)
+      expect(extractNetCueDataValue('time-since-last-cue', cueData, 'my-cue')).toBe(300)
     })
 
     it('extracts fog-state', () => {
       const cueData = minimalCueData({ fogState: true })
-      expect(extractYargCueDataValue('fog-state', cueData, 'my-cue')).toBe(true)
+      expect(extractNetCueDataValue('fog-state', cueData, 'my-cue')).toBe(true)
     })
 
     it('extracts bonus-effect', () => {
       const cueData = minimalCueData({ bonusEffect: true })
-      expect(extractYargCueDataValue('bonus-effect', cueData, 'my-cue')).toBe(true)
+      expect(extractNetCueDataValue('bonus-effect', cueData, 'my-cue')).toBe(true)
     })
 
     it('extracts performer', () => {
       const cueData = minimalCueData({ performer: 2 })
-      expect(extractYargCueDataValue('performer', cueData, 'my-cue')).toBe(2)
+      expect(extractNetCueDataValue('performer', cueData, 'my-cue')).toBe(2)
+    })
+
+    describe('RB3 StageKit LED properties', () => {
+      // LEDs 1 and 3 lit in red, LED 5 lit in blue: bits 0, 2 (red) and 4 (blue).
+      const banks = { red: 0b00000101, green: 0, blue: 0b00010000, yellow: 0 }
+      const led = (overrides?: Partial<CueData>): CueData =>
+        minimalCueData({
+          ledBanks: banks,
+          ledColor: 'red',
+          strobeState: 'Strobe_Fast',
+          ...overrides,
+        })
+
+      it('led-color returns the current bank colour, or transparent when unset', () => {
+        expect(extractNetCueDataValue('led-color', led(), 'c')).toBe('red')
+        // Unlit → 'transparent' (a real palette colour) so a layered lower look shows through.
+        expect(extractNetCueDataValue('led-color', minimalCueData(), 'c')).toBe('transparent')
+        expect(extractNetCueDataValue('led-color', led({ ledColor: 'off' }), 'c')).toBe(
+          'transparent',
+        )
+      })
+
+      it('led-states is the aggregate any-bank mask', () => {
+        expect(extractNetCueDataValue('led-states', led(), 'c')).toBe(0b00010101)
+      })
+
+      it('led-count is the number of lit positions', () => {
+        expect(extractNetCueDataValue('led-count', led(), 'c')).toBe(3)
+      })
+
+      it('exposes per-bank masks', () => {
+        expect(extractNetCueDataValue('led-red-states', led(), 'c')).toBe(0b00000101)
+        expect(extractNetCueDataValue('led-blue-states', led(), 'c')).toBe(0b00010000)
+        expect(extractNetCueDataValue('led-green-states', led(), 'c')).toBe(0)
+      })
+
+      it('exposes per-position booleans', () => {
+        expect(extractNetCueDataValue('led-1-on', led(), 'c')).toBe(true)
+        expect(extractNetCueDataValue('led-2-on', led(), 'c')).toBe(false)
+        expect(extractNetCueDataValue('led-3-on', led(), 'c')).toBe(true)
+        expect(extractNetCueDataValue('led-5-on', led(), 'c')).toBe(true)
+      })
+
+      it('exposes each position OWN colour (not the single dominant led-color)', () => {
+        // LEDs 1 & 3 red, LED 5 blue at once: each position reports its own bank, unlit → transparent.
+        expect(extractNetCueDataValue('led-1-color', led(), 'c')).toBe('red')
+        expect(extractNetCueDataValue('led-3-color', led(), 'c')).toBe('red')
+        expect(extractNetCueDataValue('led-5-color', led(), 'c')).toBe('blue')
+        expect(extractNetCueDataValue('led-2-color', led(), 'c')).toBe('transparent')
+        expect(extractNetCueDataValue('led-1-color', minimalCueData(), 'c')).toBe('transparent')
+      })
+
+      it('strobe-state returns the current strobe', () => {
+        expect(extractNetCueDataValue('strobe-state', led(), 'c')).toBe('Strobe_Fast')
+      })
+
+      it('defaults to unlit when ledBanks is absent', () => {
+        const bare = minimalCueData()
+        expect(extractNetCueDataValue('led-states', bare, 'c')).toBe(0)
+        expect(extractNetCueDataValue('led-count', bare, 'c')).toBe(0)
+        expect(extractNetCueDataValue('led-1-on', bare, 'c')).toBe(false)
+      })
     })
   })
 

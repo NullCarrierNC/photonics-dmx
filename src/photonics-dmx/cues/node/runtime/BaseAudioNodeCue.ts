@@ -1,4 +1,4 @@
-import { AudioCueData, AudioCueType, EventContext, TriggerContext } from '../../types/audioCueTypes'
+import { AudioCueData, AudioCueType, EventContext } from '../../types/audioCueTypes'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CompiledAudioCue } from '../compiler/NodeCueCompiler'
@@ -6,7 +6,6 @@ import { ActionEffectFactory } from '../compiler/ActionEffectFactory'
 import {
   AudioEventNode,
   AudioTriggerNode,
-  AudioTriggerSpectralGates,
   BaseEventNode,
   AudioNodeCueDefinition,
 } from '../../types/nodeCueTypes'
@@ -18,86 +17,11 @@ import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluat
 import { createExecutionStateMachineLifecycle } from './executionStateMachineLifecycle'
 import { VariableValue } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
-import { findBestMatchingBandId, getBandEnergy } from '../../../listeners/Audio/bandEnergy'
+import { evaluateAudioEvent, type AudioEventState } from './audioEventEvaluator'
+import { evaluateBandTrigger } from '../../audio/bandReactivity'
 import { createLogger } from '../../../../shared/logger'
 import { monotonicNowMs } from '../../../../shared/time'
 const log = createLogger('BaseAudioNodeCue')
-
-interface AudioEventState {
-  previousValue: number
-  active: boolean
-}
-
-interface EdgeEvaluation {
-  mode: 'edge'
-  triggered: boolean
-  intensity: number
-}
-
-interface LevelEvaluation {
-  mode: 'level'
-  active: boolean
-  intensity: number
-}
-
-type AudioEventEvaluation = EdgeEvaluation | LevelEvaluation
-
-const clamp = (value: number, min: number, max: number): number =>
-  Math.max(min, Math.min(max, value))
-
-/** Default energy smoothing (0–1) when trigger.smoothing is omitted */
-const DEFAULT_EMA_SMOOTHING = 0.45
-
-/**
- * Default attack/release time constants (ms) used to fill in whichever of attackMs/releaseMs
- * is omitted once a trigger opts into asymmetric smoothing by setting either one. The attack
- * default is snappy and the release default is slow, matching 1970s light-organ decay.
- */
-const DEFAULT_ATTACK_MS = 20
-const DEFAULT_RELEASE_MS = 250
-
-/**
- * One step of a fast-attack / slow-release envelope follower. Rising targets use the attack
- * time constant, falling targets the release time constant; each is converted to a single-pole
- * coefficient from the actual frame delta `dtMs`, so the smoothing is frame-rate independent.
- * A zero time constant means "snap instantly" for that edge.
- */
-export function asymmetricEnvelopeStep(
-  prev: number,
-  target: number,
-  dtMs: number,
-  attackMs: number,
-  releaseMs: number,
-): number {
-  const rising = target >= prev
-  const tau = Math.max(0, rising ? attackMs : releaseMs)
-  const a = tau > 0 ? 1 - Math.exp(-Math.max(0, dtMs) / tau) : 1
-  return prev + a * (target - prev)
-}
-
-function checkSpectralGateRange(
-  range: { min?: number; max?: number } | undefined,
-  value: number,
-): boolean {
-  if (range === undefined) return true
-  if (range.min !== undefined && value < range.min) return false
-  if (range.max !== undefined && value > range.max) return false
-  return true
-}
-
-function spectralGatesPass(
-  gates: AudioTriggerSpectralGates,
-  flatness: number,
-  zcr: number,
-  hfc: number,
-  crest: number,
-): boolean {
-  if (!checkSpectralGateRange(gates.flatness, flatness)) return false
-  if (!checkSpectralGateRange(gates.zeroCrossingRate, zcr)) return false
-  if (!checkSpectralGateRange(gates.hfcOnset, hfc)) return false
-  if (!checkSpectralGateRange(gates.crest, crest)) return false
-  return true
-}
 
 /**
  * Per-rig (per-sequencer) runtime state for an audio node cue. Each rig running the same cue
@@ -299,7 +223,7 @@ export abstract class BaseAudioNodeCue {
         continue
       }
       const eventState = this.getEventState(state, event.id)
-      const evaluation = this.evaluateEvent(event as AudioEventNode, safeData, eventState)
+      const evaluation = evaluateAudioEvent(event as AudioEventNode, safeData, eventState)
       const effectKey = this.effectKey(event.id)
 
       if (evaluation.mode === 'edge') {
@@ -333,10 +257,11 @@ export abstract class BaseAudioNodeCue {
           actionId = this.findFirstAction(state, event, cueData, lightManager)
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error)
-          this.runtimeBroadcaster.emit(
-            RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR,
-            `${event.id}: ${msg}`,
-          )
+          this.runtimeBroadcaster.emit(RENDERER_RECEIVE.NODE_CUE_RUNTIME_ERROR, {
+            graphId: this.id,
+            nodeId: event.id,
+            message: msg,
+          })
           log.error(`Error in findFirstAction for event ${event.id}:`, error)
           continue
         }
@@ -391,8 +316,20 @@ export abstract class BaseAudioNodeCue {
   }
 
   onStop(): void {
-    const skipEffectRemoval = this.skipEffectRemovalOnStop()
-    for (const state of this.states.values()) {
+    this.stopEveryState(this.skipEffectRemovalOnStop())
+  }
+
+  /**
+   * Stop and take every effect off the sequencer regardless of style. A primary cue normally leaves
+   * its effects up so the next cue can take over from the running look, which is wrong when the
+   * audio look is ending rather than changing.
+   */
+  stopAndClearEffects(): void {
+    this.stopEveryState(false)
+  }
+
+  private stopEveryState(skipEffectRemoval: boolean): void {
+    for (const [sequencer, state] of this.states) {
       if (state.executionEngine) {
         state.executionEngine.cancelAll(skipEffectRemoval)
       }
@@ -403,6 +340,14 @@ export abstract class BaseAudioNodeCue {
       state.triggerPhase.clear()
       state.triggerEnterTime.clear()
       state.lastTriggerTime.clear()
+      // Level-mode effects are submitted straight to the sequencer rather than through the engine,
+      // so cancelAll never sees them. Take them off by the layer each was recorded against before
+      // dropping the tracking, or they stay lit with nothing left holding a reference to them.
+      if (!skipEffectRemoval) {
+        for (const [effectKey, layer] of state.activeLevelEffects) {
+          sequencer.removeEffect(effectKey, layer)
+        }
+      }
       state.activeLevelEffects.clear()
       state.smoothedBandEnergy.clear()
       state.bandSmoothTime.clear()
@@ -456,190 +401,31 @@ export abstract class BaseAudioNodeCue {
     }
   }
 
-  private getPeakFrequencyInRange(
-    rawData: number[],
-    sampleRate: number,
-    fftSize: number,
-    minHz: number,
-    maxHz: number,
-  ): number {
-    if (!rawData.length || sampleRate <= 0 || fftSize <= 0) return 0
-    const binSize = sampleRate / fftSize
-    const startBin = Math.floor(minHz / binSize)
-    const endBin = Math.min(Math.ceil(maxHz / binSize), rawData.length)
-    let peakBin = startBin
-    let maxVal = 0
-    for (let i = startBin; i < endBin; i++) {
-      if (rawData[i] > maxVal) {
-        maxVal = rawData[i]
-        peakBin = i
-      }
-    }
-    return peakBin * binSize
-  }
-
-  /**
-   * Envelope-follow a trigger's raw band energy. By default (no attackMs/releaseMs set) this
-   * is the legacy symmetric single-pole EMA driven by `smoothing`. When a trigger opts into
-   * asymmetric smoothing by setting attackMs and/or releaseMs, the rising edge uses the attack
-   * time constant and the falling edge the (typically slower) release time constant, giving the
-   * fast-up/slow-down "light organ" decay. Time constants are in ms and converted to a per-frame
-   * coefficient with the actual frame delta, so behaviour is independent of frame rate.
-   */
-  private smoothBandEnergy(
-    state: AudioCueRunState,
-    trigger: AudioTriggerNode,
-    bandEnergy: number,
-  ): number {
-    const prevSmoothed = state.smoothedBandEnergy.get(trigger.id) ?? bandEnergy
-
-    const asymmetric = trigger.attackMs != null || trigger.releaseMs != null
-    let smoothedEnergy: number
-    if (asymmetric) {
-      const now = monotonicNowMs()
-      const prevTime = state.bandSmoothTime.get(trigger.id)
-      // First frame (or after a stop): seed without decay, like the symmetric path's `?? bandEnergy`.
-      if (prevTime == null) {
-        smoothedEnergy = bandEnergy
-      } else {
-        smoothedEnergy = asymmetricEnvelopeStep(
-          prevSmoothed,
-          bandEnergy,
-          now - prevTime,
-          trigger.attackMs ?? DEFAULT_ATTACK_MS,
-          trigger.releaseMs ?? DEFAULT_RELEASE_MS,
-        )
-      }
-      state.bandSmoothTime.set(trigger.id, now)
-    } else {
-      const smoothing = clamp(trigger.smoothing ?? DEFAULT_EMA_SMOOTHING, 0, 1)
-      const alpha = 1 - smoothing
-      smoothedEnergy = alpha * bandEnergy + (1 - alpha) * prevSmoothed
-    }
-
-    state.smoothedBandEnergy.set(trigger.id, smoothedEnergy)
-    return smoothedEnergy
-  }
-
   private executeAudioTriggerNode(
     state: AudioCueRunState,
     trigger: AudioTriggerNode,
     data: AudioCueData,
   ): void {
-    const audioData = data.audioData
-    const { rawFrequencyData, sampleRate, fftSize } = audioData
-    if (!rawFrequencyData?.length || sampleRate == null || fftSize == null) return
-
-    const { frequencyRange, threshold } = trigger
-    const minHz = clamp(frequencyRange.minHz, 20, 20000)
-    const maxHz = clamp(frequencyRange.maxHz, 20, 20000)
-    const triggerThreshold = clamp(threshold, 0, 1)
-    const hysteresis = clamp(trigger.hysteresis ?? 0, 0, 1)
-    const holdMs = Math.max(0, trigger.holdMs ?? 0)
-    const releaseThreshold = Math.max(0, triggerThreshold - hysteresis)
-
-    const bandEnergy = getBandEnergy(rawFrequencyData, sampleRate, fftSize, minHz, maxHz)
-    const smoothedEnergy = this.smoothBandEnergy(state, trigger, bandEnergy)
-    const peakFreq = this.getPeakFrequencyInRange(
-      rawFrequencyData,
-      sampleRate,
-      fftSize,
-      minHz,
-      maxHz,
+    // Shared signal evaluation (smoothing, spectral gates, onset, phase machine) lives in
+    // bandReactivity so the laser runtime can reuse it. Here we just fire the graph on each port.
+    const result = evaluateBandTrigger(
+      trigger,
+      data.audioData,
+      data.config.bands,
+      state,
+      monotonicNowMs(),
     )
+    if (result === null) return
 
-    const matchedBandId = findBestMatchingBandId(data.config.bands, minHz, maxHz)
-    const bandFeat =
-      matchedBandId != null ? audioData.bandSpectralFeatures?.[matchedBandId] : undefined
-    const flatnessForGate = bandFeat?.flatness ?? audioData.spectralFlatness ?? 0
-    const crestForGate = bandFeat?.crest ?? audioData.spectralCrest ?? 0
-    const zcrGlobal = audioData.zeroCrossingRate ?? 0
-    const hfcGlobal = audioData.hfcOnset ?? 0
-
-    const gates = trigger.spectralGates
-    const spectralOk =
-      gates == null
-        ? true
-        : spectralGatesPass(gates, flatnessForGate, zcrGlobal, hfcGlobal, crestForGate)
-
-    const onsetThreshold = clamp(trigger.onsetThreshold ?? 0.3, 0, 1)
-    let onsetOk = true
-    if (trigger.useOnsetGating) {
-      if (matchedBandId != null && audioData.bandOnsets) {
-        const o = audioData.bandOnsets[matchedBandId] ?? 0
-        onsetOk = o >= onsetThreshold
-      }
-    }
-
-    const phase = state.triggerPhase.get(trigger.id) ?? 'idle'
-    const now = monotonicNowMs()
-    const enterTime = state.triggerEnterTime.get(trigger.id) ?? 0
-
-    let energyActive: boolean
-    if (phase === 'idle') {
-      energyActive = bandEnergy >= triggerThreshold
-    } else if (bandEnergy >= releaseThreshold) {
-      energyActive = true
-    } else {
-      energyActive = now - enterTime < holdMs
-    }
-
-    const shouldBeActive = energyActive && spectralOk && onsetOk
-
-    const triggerContext: TriggerContext = {
-      triggerLevel: smoothedEnergy,
-      triggerFrequencyMin: minHz,
-      triggerFrequencyMax: maxHz,
-      triggerPeakFrequency: peakFreq,
-      triggerBandAmplitude: smoothedEnergy,
-    }
-    if (matchedBandId != null) {
-      triggerContext.triggerMatchedBandId = matchedBandId
-    }
-    if (bandFeat) {
-      triggerContext.triggerBandFlatness = bandFeat.flatness
-      triggerContext.triggerBandCrest = bandFeat.crest
-      triggerContext.triggerBandCentroid = bandFeat.centroid
-    }
-    if (matchedBandId != null && audioData.bandOnsets) {
-      triggerContext.triggerBandOnset = audioData.bandOnsets[matchedBandId] ?? 0
-    }
-
-    if (!shouldBeActive) {
-      if (phase === 'active') {
-        state.triggerPhase.set(trigger.id, 'idle')
-        state.triggerEnterTime.delete(trigger.id)
-        const cueData: AudioCueData = { ...data, triggerContext }
-        state.executionEngine!.startExecutionWithCallback(
-          trigger,
-          cueData as unknown as import('../../types/cueTypes').CueData,
-          undefined,
-          { fromPort: 'exit' },
-        )
-      }
-      return
-    }
-
-    if (phase === 'idle') {
-      state.triggerPhase.set(trigger.id, 'active')
-      state.triggerEnterTime.set(trigger.id, now)
-      const cueData: AudioCueData = { ...data, triggerContext }
+    for (const port of result.fire) {
+      const cueData: AudioCueData = { ...data, triggerContext: result.context }
       state.executionEngine!.startExecutionWithCallback(
         trigger,
         cueData as unknown as import('../../types/cueTypes').CueData,
         undefined,
-        { fromPort: 'enter' },
+        { fromPort: port },
       )
     }
-
-    state.triggerPhase.set(trigger.id, 'active')
-    const cueDataDuring: AudioCueData = { ...data, triggerContext }
-    state.executionEngine!.startExecutionWithCallback(
-      trigger,
-      cueDataDuring as unknown as import('../../types/cueTypes').CueData,
-      undefined,
-      { fromPort: 'during' },
-    )
   }
 
   private getEventState(state: AudioCueRunState, eventId: string): AudioEventState {
@@ -647,73 +433,6 @@ export abstract class BaseAudioNodeCue {
       state.eventStates.set(eventId, { previousValue: 0, active: false })
     }
     return state.eventStates.get(eventId)!
-  }
-
-  private evaluateEvent(
-    event: AudioEventNode,
-    data: AudioCueData,
-    state: AudioEventState,
-  ): AudioEventEvaluation {
-    const threshold = clamp(event.threshold ?? 0.5, 0, 1)
-    const currentValue = clamp(this.getEventValue(event.eventType, data), 0, 1)
-
-    if (event.triggerMode === 'edge') {
-      let triggered = state.previousValue < threshold && currentValue >= threshold
-      if (triggered && event.useOnsetGating) {
-        const bandOnsets = data.audioData.bandOnsets
-        const onsetThreshold = clamp(event.onsetThreshold ?? 0.3, 0, 1)
-        let maxOnset = 0
-        if (bandOnsets && Object.keys(bandOnsets).length > 0) {
-          maxOnset = Math.max(...Object.values(bandOnsets))
-        }
-        if (maxOnset < onsetThreshold) {
-          triggered = false
-        }
-      }
-      state.previousValue = currentValue
-      state.active = triggered
-      return {
-        mode: 'edge',
-        triggered,
-        intensity: currentValue,
-      }
-    }
-
-    const isActive = currentValue >= threshold
-    const normalizedRange = threshold >= 1 ? 1 : (currentValue - threshold) / (1 - threshold)
-    const intensity = isActive ? clamp(normalizedRange, 0.05, 1) : 0
-    state.previousValue = currentValue
-    state.active = isActive
-
-    return {
-      mode: 'level',
-      active: isActive,
-      intensity,
-    }
-  }
-
-  private getEventValue(eventType: AudioEventNode['eventType'], data: AudioCueData): number {
-    const { audioData } = data
-    switch (eventType) {
-      case 'cue-started':
-        return 0
-      case 'cue-called':
-        return 0
-      case 'beat':
-        return audioData.beatDetected ? 1 : 0
-      case 'audio-energy':
-        return clamp(audioData.energy ?? 0, 0, 1)
-      case 'audio-trigger':
-        return 0
-      case 'audio-centroid':
-        return clamp(audioData.spectralCentroid ?? 0, 0, 1)
-      case 'audio-flatness':
-        return clamp(audioData.spectralFlatness ?? 0, 0, 1)
-      case 'audio-hfc':
-        return clamp(audioData.hfcOnset ?? 0, 0, 1)
-      default:
-        return 0
-    }
   }
 
   /**
@@ -737,6 +456,8 @@ export abstract class BaseAudioNodeCue {
     )
     const evaluatorContext: LogicNodeEvaluatorContext = {
       cueId: this.id,
+      // Audio cues are always the audio family; they never route through the net extractor.
+      mode: 'audio',
       lightManager,
       cueLevelVarStore: runState.cueLevelVarStore,
       groupLevelVarStore: runState.groupLevelVarStore,

@@ -1,0 +1,1330 @@
+{
+  "version": 1,
+  "cueVersion": 1,
+  "mode": "rb3",
+  "group": {
+    "id": "rb3-trail",
+    "name": "RB3 Trail",
+    "description": "Stage Kit rendering with a timed fade-out on every LED, tail chases instead of immediate black."
+  },
+  "cues": [
+    {
+      "id": "cue-rb3-trail",
+      "name": "Trail",
+      "description": "Stage Kit rendering with a timed fade-out on every LED, tail chases instead of immediate black.",
+      "cueType": "RB3",
+      "style": "primary",
+      "kind": "lighting",
+      "nodes": {
+        "events": [
+          {
+            "id": "rb3-trail-start",
+            "type": "event",
+            "eventType": "cue-started"
+          },
+          {
+            "id": "rb3-trail-called",
+            "type": "event",
+            "eventType": "cue-called"
+          }
+        ],
+        "actions": [
+          {
+            "id": "rb3-trail-black",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "literal",
+                "value": "front,back"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "black"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "replace"
+              },
+              "opacity": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 0
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "rb3-trail-red-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "red"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "opRed"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layRed"
+            }
+          },
+          {
+            "id": "rb3-trail-green-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "green"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "opGreen"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layGreen"
+            }
+          },
+          {
+            "id": "rb3-trail-blue-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "blue"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "opBlue"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layBlue"
+            }
+          },
+          {
+            "id": "rb3-trail-yellow-act",
+            "type": "action",
+            "effectType": "set-color",
+            "target": {
+              "groups": {
+                "source": "variable",
+                "name": "curCell"
+              },
+              "filter": {
+                "source": "literal",
+                "value": "all"
+              }
+            },
+            "color": {
+              "name": {
+                "source": "literal",
+                "value": "yellow"
+              },
+              "brightness": {
+                "source": "literal",
+                "value": "medium"
+              },
+              "blendMode": {
+                "source": "literal",
+                "value": "add"
+              },
+              "opacity": {
+                "source": "variable",
+                "name": "opYellow"
+              }
+            },
+            "timing": {
+              "waitForCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitForTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "duration": {
+                "source": "literal",
+                "value": 50
+              },
+              "waitUntilCondition": {
+                "source": "literal",
+                "value": "none"
+              },
+              "waitUntilTime": {
+                "source": "literal",
+                "value": 0
+              },
+              "easing": {
+                "source": "literal",
+                "value": "linear"
+              },
+              "level": {
+                "source": "literal",
+                "value": 1
+              }
+            },
+            "layer": {
+              "source": "variable",
+              "name": "layYellow"
+            }
+          }
+        ],
+        "logic": [
+          {
+            "id": "rb3-trail-ring",
+            "type": "logic",
+            "logicType": "build-ring",
+            "assignTo": "ringLights",
+            "assignGroupSize": "ringGroupSize"
+          },
+          {
+            "id": "rb3-trail-cd-red",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-red-states",
+            "assignTo": "mRed"
+          },
+          {
+            "id": "rb3-trail-cd-green",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-green-states",
+            "assignTo": "mGreen"
+          },
+          {
+            "id": "rb3-trail-cd-blue",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-blue-states",
+            "assignTo": "mBlue"
+          },
+          {
+            "id": "rb3-trail-cd-yellow",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "led-yellow-states",
+            "assignTo": "mYellow"
+          },
+          {
+            "id": "rb3-trail-now",
+            "type": "logic",
+            "logicType": "cue-data",
+            "dataProperty": "time-since-cue-start",
+            "assignTo": "nowMs"
+          },
+          {
+            "id": "rb3-trail-clock",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "nowMs + 1",
+            "assignTo": "t"
+          },
+          {
+            "id": "rb3-trail-each",
+            "type": "logic",
+            "logicType": "for-each-light",
+            "sourceVariable": "ringLights",
+            "currentLightVariable": "curCell",
+            "currentIndexVariable": "j"
+          },
+          {
+            "id": "rb3-trail-jg",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "j / ringGroupSize",
+            "assignTo": "jg"
+          },
+          {
+            "id": "rb3-trail-cell",
+            "type": "logic",
+            "logicType": "select-from-list",
+            "list": [0, 1, 2, 3, 4, 5, 6, 7],
+            "index": {
+              "source": "variable",
+              "name": "jg"
+            },
+            "assignTo": "cellIdx"
+          },
+          {
+            "id": "rb3-trail-led",
+            "type": "logic",
+            "logicType": "select-from-list",
+            "list": [0, 1, 2, 3, 4, 5, 6, 7],
+            "index": {
+              "source": "variable",
+              "name": "jg"
+            },
+            "assignTo": "ledIdx"
+          },
+          {
+            "id": "rb3-trail-red-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mRed / pow(2, cellIdx)) % 2",
+            "assignTo": "bitRed"
+          },
+          {
+            "id": "rb3-trail-red-last",
+            "type": "logic",
+            "logicType": "indexed-variable",
+            "mode": "get",
+            "varName": "lastRed",
+            "index": {
+              "source": "variable",
+              "name": "cellIdx"
+            },
+            "valueType": "number",
+            "assignTo": "prevRed"
+          },
+          {
+            "id": "rb3-trail-red-stamp",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "bitRed * t + (1 - bitRed) * prevRed",
+            "assignTo": "stampRed"
+          },
+          {
+            "id": "rb3-trail-red-store",
+            "type": "logic",
+            "logicType": "indexed-variable",
+            "mode": "set",
+            "varName": "lastRed",
+            "index": {
+              "source": "variable",
+              "name": "cellIdx"
+            },
+            "valueType": "number",
+            "value": {
+              "source": "variable",
+              "name": "stampRed"
+            }
+          },
+          {
+            "id": "rb3-trail-red-op",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "bitRed + (1 - bitRed) * clamp(stampRed, 0, 1) * sqrt(clamp(1 - (t - stampRed) / 350, 0, 1))",
+            "assignTo": "opRed"
+          },
+          {
+            "id": "rb3-trail-red-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "10 + cellIdx",
+            "assignTo": "layRed"
+          },
+          {
+            "id": "rb3-trail-green-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mGreen / pow(2, cellIdx)) % 2",
+            "assignTo": "bitGreen"
+          },
+          {
+            "id": "rb3-trail-green-last",
+            "type": "logic",
+            "logicType": "indexed-variable",
+            "mode": "get",
+            "varName": "lastGreen",
+            "index": {
+              "source": "variable",
+              "name": "cellIdx"
+            },
+            "valueType": "number",
+            "assignTo": "prevGreen"
+          },
+          {
+            "id": "rb3-trail-green-stamp",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "bitGreen * t + (1 - bitGreen) * prevGreen",
+            "assignTo": "stampGreen"
+          },
+          {
+            "id": "rb3-trail-green-store",
+            "type": "logic",
+            "logicType": "indexed-variable",
+            "mode": "set",
+            "varName": "lastGreen",
+            "index": {
+              "source": "variable",
+              "name": "cellIdx"
+            },
+            "valueType": "number",
+            "value": {
+              "source": "variable",
+              "name": "stampGreen"
+            }
+          },
+          {
+            "id": "rb3-trail-green-op",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "bitGreen + (1 - bitGreen) * clamp(stampGreen, 0, 1) * sqrt(clamp(1 - (t - stampGreen) / 350, 0, 1))",
+            "assignTo": "opGreen"
+          },
+          {
+            "id": "rb3-trail-green-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "20 + cellIdx",
+            "assignTo": "layGreen"
+          },
+          {
+            "id": "rb3-trail-blue-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mBlue / pow(2, cellIdx)) % 2",
+            "assignTo": "bitBlue"
+          },
+          {
+            "id": "rb3-trail-blue-last",
+            "type": "logic",
+            "logicType": "indexed-variable",
+            "mode": "get",
+            "varName": "lastBlue",
+            "index": {
+              "source": "variable",
+              "name": "cellIdx"
+            },
+            "valueType": "number",
+            "assignTo": "prevBlue"
+          },
+          {
+            "id": "rb3-trail-blue-stamp",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "bitBlue * t + (1 - bitBlue) * prevBlue",
+            "assignTo": "stampBlue"
+          },
+          {
+            "id": "rb3-trail-blue-store",
+            "type": "logic",
+            "logicType": "indexed-variable",
+            "mode": "set",
+            "varName": "lastBlue",
+            "index": {
+              "source": "variable",
+              "name": "cellIdx"
+            },
+            "valueType": "number",
+            "value": {
+              "source": "variable",
+              "name": "stampBlue"
+            }
+          },
+          {
+            "id": "rb3-trail-blue-op",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "bitBlue + (1 - bitBlue) * clamp(stampBlue, 0, 1) * sqrt(clamp(1 - (t - stampBlue) / 350, 0, 1))",
+            "assignTo": "opBlue"
+          },
+          {
+            "id": "rb3-trail-blue-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "30 + cellIdx",
+            "assignTo": "layBlue"
+          },
+          {
+            "id": "rb3-trail-yellow-bit",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "floor(mYellow / pow(2, cellIdx)) % 2",
+            "assignTo": "bitYellow"
+          },
+          {
+            "id": "rb3-trail-yellow-last",
+            "type": "logic",
+            "logicType": "indexed-variable",
+            "mode": "get",
+            "varName": "lastYellow",
+            "index": {
+              "source": "variable",
+              "name": "cellIdx"
+            },
+            "valueType": "number",
+            "assignTo": "prevYellow"
+          },
+          {
+            "id": "rb3-trail-yellow-stamp",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "bitYellow * t + (1 - bitYellow) * prevYellow",
+            "assignTo": "stampYellow"
+          },
+          {
+            "id": "rb3-trail-yellow-store",
+            "type": "logic",
+            "logicType": "indexed-variable",
+            "mode": "set",
+            "varName": "lastYellow",
+            "index": {
+              "source": "variable",
+              "name": "cellIdx"
+            },
+            "valueType": "number",
+            "value": {
+              "source": "variable",
+              "name": "stampYellow"
+            }
+          },
+          {
+            "id": "rb3-trail-yellow-op",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "bitYellow + (1 - bitYellow) * clamp(stampYellow, 0, 1) * sqrt(clamp(1 - (t - stampYellow) / 350, 0, 1))",
+            "assignTo": "opYellow"
+          },
+          {
+            "id": "rb3-trail-yellow-lay",
+            "type": "logic",
+            "logicType": "expression",
+            "expression": "40 + cellIdx",
+            "assignTo": "layYellow"
+          }
+        ],
+        "eventRaisers": [],
+        "eventListeners": [],
+        "effectRaisers": [],
+        "notes": [
+          {
+            "id": "rb3-trail-note-1",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Stage Kit with a tail",
+            "style": "notes",
+            "note": "Stage Kit, but lights fade out rather than turning off immediately.\nChases leave a trail."
+          },
+          {
+            "id": "rb3-trail-note-2",
+            "type": "notes",
+            "label": "Notes",
+            "title": "How the tail is timed",
+            "style": "notes",
+            "note": "Each bank keeps one indexed-variable slot per light, holding the time that light was last seen lit, stamped from time-since-cue-start (plus 1, so a stored 0 means the cell has never been lit and must stay dark). The opacity is 1 while lit, otherwise the square root of the remaining tail fraction, which evens out the fall because blend 'add' scales the DMX value linearly with opacity."
+          },
+          {
+            "id": "rb3-trail-note-3",
+            "type": "notes",
+            "label": "Notes",
+            "title": "Layers",
+            "style": "notes",
+            "note": "Black floor on layer 0 and per-bank cells on the 10/20/30/40 bands plus the ring cell, all blending with 'add'. An opacity of 0 under 'add' contributes nothing, so a faded cell passes straight through to the floor."
+          }
+        ]
+      },
+      "connections": [
+        {
+          "from": "rb3-trail-start",
+          "to": "rb3-trail-ring"
+        },
+        {
+          "from": "rb3-trail-ring",
+          "to": "rb3-trail-black"
+        },
+        {
+          "from": "rb3-trail-called",
+          "to": "rb3-trail-cd-red"
+        },
+        {
+          "from": "rb3-trail-cd-red",
+          "to": "rb3-trail-cd-green"
+        },
+        {
+          "from": "rb3-trail-cd-green",
+          "to": "rb3-trail-cd-blue"
+        },
+        {
+          "from": "rb3-trail-cd-blue",
+          "to": "rb3-trail-cd-yellow"
+        },
+        {
+          "from": "rb3-trail-cd-yellow",
+          "to": "rb3-trail-now"
+        },
+        {
+          "from": "rb3-trail-now",
+          "to": "rb3-trail-clock"
+        },
+        {
+          "from": "rb3-trail-clock",
+          "to": "rb3-trail-each"
+        },
+        {
+          "from": "rb3-trail-each",
+          "to": "rb3-trail-jg",
+          "fromPort": "each"
+        },
+        {
+          "from": "rb3-trail-jg",
+          "to": "rb3-trail-cell"
+        },
+        {
+          "from": "rb3-trail-cell",
+          "to": "rb3-trail-led"
+        },
+        {
+          "from": "rb3-trail-led",
+          "to": "rb3-trail-red-bit"
+        },
+        {
+          "from": "rb3-trail-red-bit",
+          "to": "rb3-trail-red-last"
+        },
+        {
+          "from": "rb3-trail-red-last",
+          "to": "rb3-trail-red-stamp"
+        },
+        {
+          "from": "rb3-trail-red-stamp",
+          "to": "rb3-trail-red-store"
+        },
+        {
+          "from": "rb3-trail-red-store",
+          "to": "rb3-trail-red-op"
+        },
+        {
+          "from": "rb3-trail-red-op",
+          "to": "rb3-trail-red-lay"
+        },
+        {
+          "from": "rb3-trail-red-lay",
+          "to": "rb3-trail-red-act"
+        },
+        {
+          "from": "rb3-trail-red-act",
+          "to": "rb3-trail-green-bit"
+        },
+        {
+          "from": "rb3-trail-green-bit",
+          "to": "rb3-trail-green-last"
+        },
+        {
+          "from": "rb3-trail-green-last",
+          "to": "rb3-trail-green-stamp"
+        },
+        {
+          "from": "rb3-trail-green-stamp",
+          "to": "rb3-trail-green-store"
+        },
+        {
+          "from": "rb3-trail-green-store",
+          "to": "rb3-trail-green-op"
+        },
+        {
+          "from": "rb3-trail-green-op",
+          "to": "rb3-trail-green-lay"
+        },
+        {
+          "from": "rb3-trail-green-lay",
+          "to": "rb3-trail-green-act"
+        },
+        {
+          "from": "rb3-trail-green-act",
+          "to": "rb3-trail-blue-bit"
+        },
+        {
+          "from": "rb3-trail-blue-bit",
+          "to": "rb3-trail-blue-last"
+        },
+        {
+          "from": "rb3-trail-blue-last",
+          "to": "rb3-trail-blue-stamp"
+        },
+        {
+          "from": "rb3-trail-blue-stamp",
+          "to": "rb3-trail-blue-store"
+        },
+        {
+          "from": "rb3-trail-blue-store",
+          "to": "rb3-trail-blue-op"
+        },
+        {
+          "from": "rb3-trail-blue-op",
+          "to": "rb3-trail-blue-lay"
+        },
+        {
+          "from": "rb3-trail-blue-lay",
+          "to": "rb3-trail-blue-act"
+        },
+        {
+          "from": "rb3-trail-blue-act",
+          "to": "rb3-trail-yellow-bit"
+        },
+        {
+          "from": "rb3-trail-yellow-bit",
+          "to": "rb3-trail-yellow-last"
+        },
+        {
+          "from": "rb3-trail-yellow-last",
+          "to": "rb3-trail-yellow-stamp"
+        },
+        {
+          "from": "rb3-trail-yellow-stamp",
+          "to": "rb3-trail-yellow-store"
+        },
+        {
+          "from": "rb3-trail-yellow-store",
+          "to": "rb3-trail-yellow-op"
+        },
+        {
+          "from": "rb3-trail-yellow-op",
+          "to": "rb3-trail-yellow-lay"
+        },
+        {
+          "from": "rb3-trail-yellow-lay",
+          "to": "rb3-trail-yellow-act"
+        }
+      ],
+      "layout": {
+        "nodePositions": {
+          "rb3-trail-start": {
+            "x": 10.478665703907609,
+            "y": -6.890065260231495
+          },
+          "rb3-trail-ring": {
+            "x": 10.843354353681207,
+            "y": 101.09950897097588
+          },
+          "rb3-trail-black": {
+            "x": 3.7218288872390985,
+            "y": 221.56491653248668
+          },
+          "rb3-trail-called": {
+            "x": 262.6780811958015,
+            "y": -5.026896484196186
+          },
+          "rb3-trail-cd-red": {
+            "x": 255.22507254220545,
+            "y": 99.8682973049581
+          },
+          "rb3-trail-cd-green": {
+            "x": 271.6056100651622,
+            "y": 222.53896009922028
+          },
+          "rb3-trail-cd-blue": {
+            "x": 248.7420912552625,
+            "y": 363.6447482071817
+          },
+          "rb3-trail-cd-yellow": {
+            "x": 269.9277850780636,
+            "y": 485.68670743331313
+          },
+          "rb3-trail-now": {
+            "x": 248.6254698522389,
+            "y": 588.8884752690792
+          },
+          "rb3-trail-clock": {
+            "x": 266.93315347470343,
+            "y": 719.3897348754108
+          },
+          "rb3-trail-each": {
+            "x": 266.9705808572471,
+            "y": 824.1999813169241
+          },
+          "rb3-trail-jg": {
+            "x": 270.72467346675694,
+            "y": 955.2618789449334
+          },
+          "rb3-trail-cell": {
+            "x": 263.71041855216026,
+            "y": 1057.0552756376565
+          },
+          "rb3-trail-led": {
+            "x": 658.4111813157797,
+            "y": 6.920250032097101
+          },
+          "rb3-trail-red-bit": {
+            "x": 642.300440877676,
+            "y": 110.00355100631714
+          },
+          "rb3-trail-red-last": {
+            "x": 659.626860236749,
+            "y": 215.78439240902662
+          },
+          "rb3-trail-red-stamp": {
+            "x": 649.6512897051871,
+            "y": 329.53008281067014
+          },
+          "rb3-trail-red-store": {
+            "x": 650.7369437217712,
+            "y": 428.2658093571663
+          },
+          "rb3-trail-red-op": {
+            "x": 576.569346048959,
+            "y": 553.4106393426387
+          },
+          "rb3-trail-red-lay": {
+            "x": 688.7487796901512,
+            "y": 682.4793294115575
+          },
+          "rb3-trail-red-act": {
+            "x": 665.8418268884857,
+            "y": 783.9212613707991
+          },
+          "rb3-trail-green-bit": {
+            "x": 646.9717642515898,
+            "y": 906.0583583898842
+          },
+          "rb3-trail-green-last": {
+            "x": 649.6126885656267,
+            "y": 1016.1121595650911
+          },
+          "rb3-trail-green-stamp": {
+            "x": 966.6406466926683,
+            "y": -0.36245637387037277
+          },
+          "rb3-trail-green-store": {
+            "x": 1040.4154759533703,
+            "y": 102.94608923792839
+          },
+          "rb3-trail-green-op": {
+            "x": 989.0304261746039,
+            "y": 191.85967527411833
+          },
+          "rb3-trail-green-lay": {
+            "x": 1083.6701218000198,
+            "y": 339.51754434249665
+          },
+          "rb3-trail-green-act": {
+            "x": 1050.3565833512694,
+            "y": 430.49735904857516
+          },
+          "rb3-trail-blue-bit": {
+            "x": 1046.2546581327915,
+            "y": 572.8988532088697
+          },
+          "rb3-trail-blue-last": {
+            "x": 1074.3190846519926,
+            "y": 696.3757498964599
+          },
+          "rb3-trail-blue-stamp": {
+            "x": 1042.7862250413746,
+            "y": 798.6342367716134
+          },
+          "rb3-trail-blue-store": {
+            "x": 1092.395255433945,
+            "y": 904.6241191185743
+          },
+          "rb3-trail-blue-op": {
+            "x": 1037.5357811469585,
+            "y": 1006.5701756849885
+          },
+          "rb3-trail-blue-lay": {
+            "x": 1429.9155738893896,
+            "y": 2.3653826005756855
+          },
+          "rb3-trail-blue-act": {
+            "x": 1437.9827503655106,
+            "y": 100.12938681617379
+          },
+          "rb3-trail-yellow-bit": {
+            "x": 1418.0877519548276,
+            "y": 242.00031724131202
+          },
+          "rb3-trail-yellow-last": {
+            "x": 1486.5650886269063,
+            "y": 358.1652653679387
+          },
+          "rb3-trail-yellow-stamp": {
+            "x": 1433.024812394753,
+            "y": 472.70096131041646
+          },
+          "rb3-trail-yellow-store": {
+            "x": 1514.4197078999696,
+            "y": 591.9607300280918
+          },
+          "rb3-trail-yellow-op": {
+            "x": 1441.4668038208038,
+            "y": 691.5169126726687
+          },
+          "rb3-trail-yellow-lay": {
+            "x": 1548.9073695987017,
+            "y": 839.4305124497153
+          },
+          "rb3-trail-yellow-act": {
+            "x": 1534.2981592390506,
+            "y": 967.135895850294
+          },
+          "rb3-trail-note-1": {
+            "x": 1705.3038924545476,
+            "y": -50.001689824874234
+          },
+          "rb3-trail-note-2": {
+            "x": 1723.3053054102838,
+            "y": 63.43242828207053
+          },
+          "rb3-trail-note-3": {
+            "x": 1752.4420196592905,
+            "y": 284.08422583913807
+          }
+        },
+        "viewport": {
+          "x": -906.8509681129858,
+          "y": 134.53345330656953,
+          "zoom": 1.0942937012607399
+        }
+      },
+      "variables": [
+        {
+          "name": "ringLights",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "ringGroupSize",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 1,
+          "isParameter": false
+        },
+        {
+          "name": "curCell",
+          "type": "light-array",
+          "scope": "cue",
+          "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "j",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "jg",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "mRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "mGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "mBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "mYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "nowMs",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "t",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "cellIdx",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "ledIdx",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "bitRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "prevRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "stampRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "opRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "layRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 10,
+          "isParameter": false
+        },
+        {
+          "name": "lastRed",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "bitGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "prevGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "stampGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "opGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "layGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 20,
+          "isParameter": false
+        },
+        {
+          "name": "lastGreen",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "bitBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "prevBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "stampBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "opBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "layBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 30,
+          "isParameter": false
+        },
+        {
+          "name": "lastBlue",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "bitYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "prevYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "stampYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "opYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        },
+        {
+          "name": "layYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 40,
+          "isParameter": false
+        },
+        {
+          "name": "lastYellow",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
+          "isParameter": false
+        }
+      ]
+    }
+  ],
+  "bundled": true
+}

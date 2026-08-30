@@ -15,6 +15,8 @@ import ReactFlow, {
 import type { EditorNode, EventOption, NotesVariant } from '../lib/types'
 import {
   getEffectTypesForCueKind,
+  LOGIC_NODE_META,
+  NODE_LOGIC_TYPES,
   type LogicNode,
   type NodeEffectType,
   type NodeCueKind,
@@ -22,7 +24,7 @@ import {
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type {
   AudioEventNode,
-  YargEventNode,
+  NetEventNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import { getDefaultEventOption } from '../lib/options'
 import { NODE_DRAG_MIME, parseNodeDrag, type NodeDragPayload } from '../lib/nodeDragPayload'
@@ -51,7 +53,7 @@ type Props = {
   activeCueKind?: NodeCueKind
   editorMode: 'cue' | 'effect'
   addEventNode: (
-    option?: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
+    option?: EventOption<NetEventNode['eventType'] | AudioEventNode['eventType']>,
     position?: { x: number; y: number },
   ) => void
   addActionNode: (effectType: NodeEffectType, position?: { x: number; y: number }) => void
@@ -368,31 +370,8 @@ const CueFlowCanvas: React.FC<Props> = ({
           <div className="px-3 py-1 font-semibold italic text-amber-800 dark:text-amber-100 bg-amber-50 dark:bg-amber-900/30 border-t border-b border-amber-400 dark:border-amber-600">
             Logic Nodes
           </div>
-          {(
-            [
-              'variable',
-              'math',
-              'conditional',
-              'cue-data',
-              'config-data',
-              'lights-from-index',
-              'color-from-index',
-              'reverse-colors',
-              'concat-colors',
-              'shuffle-colors',
-              'array-length',
-              'reverse-lights',
-              'create-pairs',
-              'concat-lights',
-              'build-ring',
-              'delay',
-              'debugger',
-              'random',
-              'shuffle-lights',
-              'for-each-light',
-            ] as LogicNode['logicType'][]
-          )
-            .sort()
+          {[...NODE_LOGIC_TYPES]
+            .sort((a, b) => LOGIC_NODE_META[a].label.localeCompare(LOGIC_NODE_META[b].label))
             .map((logicType) => (
               <button
                 key={logicType}
@@ -402,7 +381,7 @@ const CueFlowCanvas: React.FC<Props> = ({
                     addLogicNode(logicType, { x: paneContextMenu.flowX, y: paneContextMenu.flowY }),
                   )
                 }>
-                {logicType.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                {LOGIC_NODE_META[logicType].label}
               </button>
             ))}
           {addEventRaiserNode && (

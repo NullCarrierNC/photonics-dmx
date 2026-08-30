@@ -2,9 +2,10 @@ import React, { useCallback } from 'react'
 import { addEdge, type Connection, type Edge } from 'reactflow'
 import {
   createDefaultActionTiming,
+  LOGIC_NODE_META,
   type ActionNode,
   type AudioEventNode,
-  type YargEventNode,
+  type NetEventNode,
   type LogicNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorNode } from '../lib/types'
@@ -50,7 +51,7 @@ export function useEdgeManagement({
         if (targetNode.data.kind === 'action') {
           const targetAction = { ...(targetNode.data.payload as ActionNode) }
           if (sourceNode.data.kind === 'event') {
-            const sourceEvent = sourceNode.data.payload as YargEventNode | AudioEventNode
+            const sourceEvent = sourceNode.data.payload as NetEventNode | AudioEventNode
             const inheritedWaitForCondition =
               sourceEvent.eventType === 'cue-started' || sourceEvent.eventType === 'cue-called'
                 ? 'none'
@@ -86,7 +87,9 @@ export function useEdgeManagement({
           const sourceNode = nodes.find((n) => n.id === connection.source)
           if (sourceNode?.data.kind === 'logic') {
             const logicPayload = sourceNode.data.payload as LogicNode
-            if (logicPayload.logicType === 'conditional') {
+            // true/false-port nodes (conditional, frame-gate) default their first two edges to true then
+            // false when dropped without an explicit handle.
+            if (LOGIC_NODE_META[logicPayload.logicType].ports === 'true-false') {
               const existingEdges = prevEdges.filter((e) => e.source === sourceNode.id)
               if (existingEdges.length === 0) fromPort = 'true'
               else if (existingEdges.length === 1) fromPort = 'false'

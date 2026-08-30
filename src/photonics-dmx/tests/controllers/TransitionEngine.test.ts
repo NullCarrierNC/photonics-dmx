@@ -92,6 +92,7 @@ describe('TransitionEngine', () => {
       getQueuedEffect: jest.fn(),
       getLightState: jest.fn(),
       clearLayerStates: jest.fn(),
+      clearLightLayerState: jest.fn(),
       captureFinalStates: jest.fn(),
     } as unknown as jest.Mocked<LayerManager>
 
@@ -249,7 +250,8 @@ describe('TransitionEngine', () => {
       transitionEngine.updateTransitions()
 
       expect(lightTransitionController.removeLightLayer).toHaveBeenCalledWith('test-light-1', 1)
-      expect(layerManager.clearLayerStates).toHaveBeenCalledWith(1)
+      // Only this light's state is cleared, not the whole layer (other lights may still run there).
+      expect(layerManager.clearLightLayerState).toHaveBeenCalledWith(1, 'test-light-1')
     })
 
     it('skips deferred removeLightLayer when a new effect is active on the next frame', () => {
@@ -447,6 +449,134 @@ describe('TransitionEngine', () => {
       transitionEngine.prepareTransition(mockEffect, transition, currentTime)
       expect(mockEffect.state).toBe('waitingUntil')
       expect(mockEffect.waitEndTime).toBe(currentTime + 500) // treat as 1 step
+    })
+  })
+
+  describe('reapCompletedEffects', () => {
+    // Puts one effect in the active map and returns it.
+    const stageActiveEffect = (effect: LightEffectState): LightEffectState => {
+      const activeEffectsMap = new Map<number, Map<string, LightEffectState>>()
+      const lightMap = new Map<string, LightEffectState>()
+      lightMap.set(effect.lightId, effect)
+      activeEffectsMap.set(effect.layer, lightMap)
+      layerManager.getActiveEffects.mockReturnValue(activeEffectsMap)
+      layerManager.getActiveEffect.mockReturnValue(effect)
+      return effect
+    }
+
+    it('removes an effect that has advanced past its last transition and completes it', () => {
+      const effectManager = {
+        onLightEffectComplete: jest.fn(),
+        startNextEffectInQueue: jest.fn().mockReturnValue(false),
+      } as unknown as IEffectManager
+      transitionEngine.setEffectManager(effectManager)
+
+      const finished = stageActiveEffect(
+        createMockActiveEffect({ currentTransitionIndex: 1, state: 'idle' }),
+      )
+
+      transitionEngine.reapCompletedEffects()
+
+      expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(1, 'test-light-1')
+      expect(effectManager.onLightEffectComplete).toHaveBeenCalledWith(finished)
+    })
+
+    it('starts a queued successor for the freed light', () => {
+      const startNextEffectInQueue = jest.fn().mockReturnValue(true)
+      transitionEngine.setEffectManager({
+        onLightEffectComplete: jest.fn(),
+        startNextEffectInQueue,
+      } as unknown as IEffectManager)
+
+      const finished = stageActiveEffect(
+        createMockActiveEffect({ currentTransitionIndex: 1, state: 'idle' }),
+      )
+      // Found for the completion lookup, then gone: the light is free for the queued effect.
+      layerManager.getActiveEffect.mockReturnValueOnce(finished).mockReturnValue(undefined)
+
+      transitionEngine.reapCompletedEffects()
+
+      expect(startNextEffectInQueue).toHaveBeenCalledWith(1, 'test-light-1')
+    })
+
+    it('frees every finished name in the batch before the first completion callback runs', () => {
+      const siblingA = createMockActiveEffect({
+        name: 'motion:pos:0',
+        lightId: 'test-light-1',
+        currentTransitionIndex: 1,
+        state: 'idle',
+      })
+      const siblingB = createMockActiveEffect({
+        name: 'motion:pos:1',
+        lightId: 'test-light-2',
+        currentTransitionIndex: 1,
+        state: 'idle',
+      })
+      const lightMap = new Map<string, LightEffectState>([
+        [siblingA.lightId, siblingA],
+        [siblingB.lightId, siblingB],
+      ])
+      const active = new Map<number, Map<string, LightEffectState>>([[1, lightMap]])
+      layerManager.getActiveEffects.mockReturnValue(active)
+      // Removal takes the entry out of the map the way the real layer manager does, so the
+      // callback below observes what is actually still held.
+      layerManager.removeActiveEffect.mockImplementation((_layer: number, lightId: string) => {
+        lightMap.delete(lightId)
+      })
+      layerManager.getActiveEffect.mockImplementation((_layer: number, lightId: string) =>
+        lightMap.get(lightId),
+      )
+
+      // The first completion asks whether its sibling's name is still taken.
+      let siblingStillHeld: boolean | undefined
+      const effectManager = {
+        onLightEffectComplete: jest.fn(() => {
+          if (siblingStillHeld === undefined) {
+            siblingStillHeld = Array.from(lightMap.values()).some(
+              (held) => held.name === 'motion:pos:1',
+            )
+          }
+        }),
+        startNextEffectInQueue: jest.fn().mockReturnValue(false),
+      } as unknown as IEffectManager
+      transitionEngine.setEffectManager(effectManager)
+
+      transitionEngine.reapCompletedEffects()
+
+      expect(siblingStillHeld).toBe(false)
+      expect(effectManager.onLightEffectComplete).toHaveBeenCalledTimes(2)
+    })
+
+    it('leaves an effect that still has transitions to run', () => {
+      const effectManager = {
+        onLightEffectComplete: jest.fn(),
+        startNextEffectInQueue: jest.fn().mockReturnValue(false),
+      } as unknown as IEffectManager
+      transitionEngine.setEffectManager(effectManager)
+
+      stageActiveEffect(
+        createMockActiveEffect({ currentTransitionIndex: 0, state: 'transitioning' }),
+      )
+
+      transitionEngine.reapCompletedEffects()
+
+      expect(layerManager.removeActiveEffect).not.toHaveBeenCalled()
+      expect(effectManager.onLightEffectComplete).not.toHaveBeenCalled()
+    })
+
+    it('does nothing when no effect is active', () => {
+      const effectManager = {
+        onLightEffectComplete: jest.fn(),
+        startNextEffectInQueue: jest.fn().mockReturnValue(false),
+      } as unknown as IEffectManager
+      transitionEngine.setEffectManager(effectManager)
+
+      layerManager.getActiveEffects.mockReturnValue(new Map())
+
+      transitionEngine.reapCompletedEffects()
+
+      expect(layerManager.removeActiveEffect).not.toHaveBeenCalled()
+      expect(effectManager.onLightEffectComplete).not.toHaveBeenCalled()
     })
   })
 

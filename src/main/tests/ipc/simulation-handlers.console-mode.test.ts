@@ -1,5 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals'
+import { withCollaboratorGetters } from './managerFacades'
 import { setupSimulationHandlers } from '../../ipc/simulation-handlers'
+import { MotionCueSimulator } from '../../controllers/MotionCueSimulator'
 
 describe('simulation handlers console integration', () => {
   it('registers a console-enter callback that stops simulated motion state', () => {
@@ -7,13 +9,20 @@ describe('simulation handlers console integration', () => {
       handle: jest.fn(),
       on: jest.fn(),
     } as any
-    // The console-enter callback now drives the chain fanout so secondary rigs also get
-    // their pan/tilt cleared. Stub the fanout's `yargSchedulePanTiltClear` to verify it.
-    const yargSchedulePanTiltClear = jest.fn()
-    const controllerManager = {
+    // The console-enter callback stops the motion simulator, which drives the chain fanout so
+    // secondary rigs also get their pan/tilt cleared. Stub `schedulePanTiltClear` to verify it.
+    const schedulePanTiltClear = jest.fn()
+    const getChainFanout = jest.fn(() => ({ schedulePanTiltClear }))
+    const motionCueSimulator = new MotionCueSimulator({
+      getChainFanout: getChainFanout as never,
+    })
+    const controllerManager = withCollaboratorGetters({
       setOnConsoleEnter: jest.fn(),
-      getChainFanout: jest.fn(() => ({ yargSchedulePanTiltClear })),
-    } as any
+      setOnSimulationPreempt: jest.fn(),
+      getChainFanout,
+      getMotionCueSimulator: () => motionCueSimulator,
+      getIsRb3Enabled: () => false,
+    } as any)
 
     setupSimulationHandlers(ipcMain, controllerManager)
 
@@ -24,6 +33,6 @@ describe('simulation handlers console integration', () => {
     expect(typeof onConsoleEnter).toBe('function')
     onConsoleEnter?.()
 
-    expect(yargSchedulePanTiltClear).toHaveBeenCalledTimes(1)
+    expect(schedulePanTiltClear).toHaveBeenCalledTimes(1)
   })
 })

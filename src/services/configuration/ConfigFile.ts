@@ -11,6 +11,12 @@ import { createLogger } from '../../shared/logger'
 
 const log = createLogger('ConfigFile')
 
+declare global {
+  /** Set by the first ConfigFile constructed in the process, so the storage directory is logged once
+   *  however many config files are opened. */
+  var __PHOTONICS_CONFIG_LOGGED__: boolean | undefined
+}
+
 /**
  * In-memory result of config validation after load/migration.
  * (`false` and error strings, not a thrown error.)
@@ -24,6 +30,13 @@ export type ConfigFileHooks<T> = {
   onCorruptRecovery?: (info: ConfigCorruptInfo) => void
   /** If the file is legacy unversioned JSON, reshape before `migrateData` (e.g. lights array → `{ lights }`). */
   coerceUnversioned?: (raw: unknown) => T
+  /**
+   * Runs on every load after migration and before validation. Returns the data unchanged (same
+   * reference) when nothing needs fixing, or a repaired copy otherwise; a changed reference is
+   * persisted. Use to seed shape additions (e.g. new required keys) so a same-version file that
+   * predates them passes validation instead of triggering corrupt-recovery.
+   */
+  normalizeLoaded?: (data: T) => T
 }
 
 /**
@@ -46,6 +59,7 @@ export class ConfigFile<T> {
   private readonly validate: ConfigDataValidCheck<T> | undefined
   private readonly onCorruptRecovery: ((info: ConfigCorruptInfo) => void) | undefined
   private readonly coerceUnversioned: ((raw: unknown) => T) | undefined
+  private readonly normalizeLoaded: ((data: T) => T) | undefined
   // Serializes saves so only one writeFile+rename is in flight per file at a time,
   // avoiding concurrent renames racing the same destination.
   private saveChain: Promise<void> = Promise.resolve()
@@ -59,9 +73,9 @@ export class ConfigFile<T> {
     const configDir = path.join(app.getPath('appData'), 'Photonics.rocks')
 
     // Log the storage directory (only once per process)
-    if (!global.__PHOTONICS_CONFIG_LOGGED__) {
+    if (!globalThis.__PHOTONICS_CONFIG_LOGGED__) {
       log.info(`[Photonics Config] JSON storage directory: ${configDir}`)
-      global.__PHOTONICS_CONFIG_LOGGED__ = true
+      globalThis.__PHOTONICS_CONFIG_LOGGED__ = true
     }
 
     this.filePath = path.join(configDir, filename)
@@ -70,6 +84,7 @@ export class ConfigFile<T> {
     this.validate = hooks.validate
     this.onCorruptRecovery = hooks.onCorruptRecovery
     this.coerceUnversioned = hooks.coerceUnversioned
+    this.normalizeLoaded = hooks.normalizeLoaded
     this.ensureConfigDirectory(configDir)
     this.data = this.load()
   }
@@ -191,6 +206,15 @@ export class ConfigFile<T> {
       if (version < this.currentVersion) {
         data = this.migrateData(data, version, this.currentVersion)
         migratedNeedsPersist = true
+      }
+      if (this.normalizeLoaded) {
+        // Repair shape additions that a same-version file may predate (e.g. new required keys),
+        // so validation below never fails on them. Persist only when it actually changed the data.
+        const normalized = this.normalizeLoaded(data)
+        if (normalized !== data) {
+          data = normalized
+          migratedNeedsPersist = true
+        }
       }
     } catch (error) {
       log.error(
@@ -339,9 +363,29 @@ export class ConfigFile<T> {
   }
 
   /**
-   * Updates the data and saves to file
+   * Updates the data and saves to file.
+   *
+   * Data is validated before it reaches disk: an invalid value on disk fails {@link load}'s check on
+   * the next launch, and {@link recoverToDefault} then renames the whole file aside, so the user
+   * silently loses every setting in it.
+   *
+   * The check lives here rather than in {@link save} because `save` is also the write path for
+   * {@link recoverToDefault}, {@link load} and {@link applyLoadMigration}. Gating those would let a
+   * validator fault block corruption recovery itself, leaving the file moved aside with nothing
+   * written back. `update` is the only caller carrying user edits, so it is the only one that needs
+   * the gate. The throw happens before `this.data` is touched, so in-memory state is unchanged and
+   * the rollback below is not involved.
    */
   async update(newData: T): Promise<void> {
+    if (this.validate) {
+      const v = this.validate(newData)
+      if (!v.valid) {
+        const detail = v.errors.join('; ')
+        log.error(`[Photonics Config] Refusing to save invalid data to ${this.filePath}: ${detail}`)
+        throw new Error(`Invalid configuration for ${path.basename(this.filePath)}: ${detail}`)
+      }
+    }
+
     const previous = this.data
     try {
       await this.save(newData)
@@ -350,6 +394,21 @@ export class ConfigFile<T> {
       this.data = previous
       throw err
     }
+  }
+
+  /**
+   * Commits a load-time migration: the new shape becomes readable immediately, and the write to
+   * disk follows. {@link update} deliberately publishes only after a successful save, which is
+   * right for user edits (a failed write must not leave the app showing state it didn't persist)
+   * but wrong for a migration — every reader between startup and the write landing would get the
+   * legacy shape the rest of the app no longer understands. A failed write is logged and left for
+   * the next launch to retry, since the in-memory shape is the correct one either way.
+   */
+  applyLoadMigration(newData: T): void {
+    this.data = newData
+    this.save(newData).catch((err) =>
+      log.error(`Failed to persist migrated configuration to ${this.filePath}:`, err),
+    )
   }
 
   /**

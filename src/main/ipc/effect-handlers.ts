@@ -87,7 +87,12 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
 
     const sourcePath = result.filePaths[0]
     const raw = await fs.readFile(sourcePath, 'utf-8')
-    const parsed = JSON.parse(raw)
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      return { success: false, error: 'That file is not valid JSON.' }
+    }
     const validation = validateEffectFile(parsed)
     if (!validation.valid || !validation.data) {
       return { success: false, error: validation.errors.join(', ') || 'Invalid effect file' }

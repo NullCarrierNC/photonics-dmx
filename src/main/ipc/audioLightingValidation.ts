@@ -1,4 +1,5 @@
 import type { AudioLightingData } from '../../photonics-dmx/listeners/Audio/AudioTypes'
+import { isPlainObject } from './validation/primitives'
 
 /**
  * Permissive sanity caps for renderer-supplied audio frame payloads. These exist to bound memory
@@ -13,10 +14,6 @@ const MAX_BAND_RECORD_KEYS = 256 // bandSpectralFeatures / bandOnsets keyed by b
 export type AudioLightingValidationResult =
   | { ok: true; value: AudioLightingData }
   | { ok: false; error: string }
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
 
 function finiteNumber(value: unknown, _field: string): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) {

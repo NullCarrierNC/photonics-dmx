@@ -37,8 +37,8 @@ export const getEffectFadeInColorFadeOut = ({
   waitUntil = 'none',
 }: FadeInColorFadeOutEffectParams): Effect => {
   const effect: Effect = {
-    id: 'cross-fade-colors',
-    description: 'Cross-fades light from one colour to another.',
+    id: 'fade-in-color-fade-out',
+    description: 'Fades in to a colour, holds, then fades back to the start colour.',
     transitions: [
       {
         lights: lights,

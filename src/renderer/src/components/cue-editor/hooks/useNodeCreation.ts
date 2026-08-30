@@ -1,10 +1,16 @@
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback } from 'react'
 import {
   type AudioEventNode,
   type EventRaiserNode,
   type EventListenerNode,
   type LogicNode,
   type MathLogicNode,
+  type ExpressionLogicNode,
+  type FrameGateLogicNode,
+  type TempoLogicNode,
+  type ClampLogicNode,
+  type SelectFromListLogicNode,
+  type PulseLogicNode,
   type NodeCueKind,
   type NodeCueMode,
   type NodeEffectType,
@@ -27,7 +33,9 @@ import {
   type RandomLogicNode,
   type ShuffleLightsLogicNode,
   type ForEachLightLogicNode,
-  type YargEventNode,
+  type IndexedVariableLogicNode,
+  type LedChangedLogicNode,
+  type NetEventNode,
   type NotesNode,
   type EffectRaiserNode,
   type EffectEventListenerNode,
@@ -42,6 +50,310 @@ type UseNodeCreationParams = {
   activeMode: NodeCueMode
   cueKind: NodeCueKind
   setIsDirty: (dirty: boolean) => void
+}
+
+/** Factory defaults for every logic node type, keyed by logicType. Pure in `id` (no hook state), so
+ *  it lives at module scope and is reused by the palette hook and tests. */
+export const LOGIC_NODE_FACTORIES: Record<LogicNode['logicType'], (id: string) => LogicNode> = {
+  'variable': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'variable',
+      label: 'variable',
+      outputs: [],
+      mode: 'set',
+      varName: 'var1',
+      valueType: 'number',
+      value: { source: 'literal', value: 0 },
+    }) satisfies VariableLogicNode,
+  'math': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'math',
+      label: 'math',
+      outputs: [],
+      operator: 'add',
+      left: { source: 'literal', value: 0 },
+      right: { source: 'literal', value: 0 },
+      assignTo: 'result',
+    }) satisfies MathLogicNode,
+  'expression': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'expression',
+      label: 'expression',
+      outputs: [],
+      expression: '0',
+      assignTo: 'result',
+    }) satisfies ExpressionLogicNode,
+  'frame-gate': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'frame-gate',
+      label: 'frame-gate',
+      outputs: [],
+      divisor: { source: 'literal', value: 4 },
+    }) satisfies FrameGateLogicNode,
+  'tempo': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'tempo',
+      label: 'tempo',
+      outputs: [],
+      assignBeatMs: 'beat_ms',
+      assignBarMs: 'bar_ms',
+      assignPhraseMs: 'phrase_ms',
+    }) satisfies TempoLogicNode,
+  'clamp': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'clamp',
+      label: 'clamp',
+      outputs: [],
+      value: { source: 'literal', value: 0 },
+      min: { source: 'literal', value: 0 },
+      max: { source: 'literal', value: 1 },
+      assignTo: 'result',
+    }) satisfies ClampLogicNode,
+  'select-from-list': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'select-from-list',
+      label: 'select-from-list',
+      outputs: [],
+      list: [0, 1, 2],
+      index: { source: 'literal', value: 0 },
+      assignTo: 'result',
+    }) satisfies SelectFromListLogicNode,
+  'pulse': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'pulse',
+      label: 'pulse',
+      outputs: [],
+      interval: { source: 'literal', value: 500 },
+      anchorVar: 'pulseAnchor',
+      assignTo: 'pulseIndex',
+      assignPhase: 'pulsePhase',
+    }) satisfies PulseLogicNode,
+  'cue-data': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'cue-data',
+      label: 'cue-data',
+      outputs: [],
+      dataProperty: 'execution-count',
+      assignTo: undefined,
+    }) satisfies CueDataLogicNode as LogicNode,
+  'config-data': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'config-data',
+      label: 'config-data',
+      outputs: [],
+      dataProperty: 'total-lights',
+      assignTo: undefined,
+    }) satisfies ConfigDataLogicNode as LogicNode,
+  'lights-from-index': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'lights-from-index',
+      label: 'lights-from-index',
+      outputs: [],
+      sourceVariable: '',
+      index: { source: 'literal', value: 0 },
+      assignTo: '',
+    }) satisfies LightsFromIndexLogicNode as LogicNode,
+  'color-from-index': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'color-from-index',
+      label: 'color-from-index',
+      outputs: [],
+      colors: { source: 'literal', value: ['blue'] },
+      index: { source: 'literal', value: 0 },
+      assignTo: '',
+    }) satisfies ColorFromIndexLogicNode as LogicNode,
+  'reverse-colors': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'reverse-colors',
+      label: 'reverse-colors',
+      outputs: [],
+      sourceVariable: '',
+      assignTo: '',
+    }) satisfies ReverseColorsLogicNode as LogicNode,
+  'concat-colors': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'concat-colors',
+      label: 'concat-colors',
+      outputs: [],
+      sourceVariables: [],
+      assignTo: '',
+    }) satisfies ConcatColorsLogicNode as LogicNode,
+  'shuffle-colors': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'shuffle-colors',
+      label: 'shuffle-colors',
+      outputs: [],
+      sourceVariable: '',
+      assignTo: '',
+    }) satisfies ShuffleColorsLogicNode as LogicNode,
+  'array-length': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'array-length',
+      label: 'array-length',
+      outputs: [],
+      sourceVariable: '',
+      assignTo: '',
+    }) satisfies ArrayLengthLogicNode as LogicNode,
+  'reverse-lights': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'reverse-lights',
+      label: 'reverse-lights',
+      outputs: [],
+      sourceVariable: '',
+      assignTo: '',
+    }) satisfies ReverseLightsLogicNode as LogicNode,
+  'create-pairs': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'create-pairs',
+      label: 'create-pairs',
+      outputs: [],
+      pairType: 'opposite',
+      sourceVariable: '',
+      assignTo: '',
+    }) satisfies CreatePairsLogicNode as LogicNode,
+  'concat-lights': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'concat-lights',
+      label: 'concat-lights',
+      outputs: [],
+      sourceVariables: [],
+      assignTo: '',
+    }) satisfies ConcatLightsLogicNode as LogicNode,
+  'build-ring': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'build-ring',
+      label: 'build-ring',
+      outputs: [],
+      assignTo: '',
+      assignGroupSize: '',
+    }) satisfies BuildRingLogicNode as LogicNode,
+  'delay': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'delay',
+      label: 'delay',
+      outputs: [],
+      delayTime: { source: 'literal', value: 1000 },
+    }) satisfies DelayLogicNode as LogicNode,
+  'debugger': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'debugger',
+      label: 'debugger',
+      outputs: [],
+      message: { source: 'literal', value: 'Debug message' },
+      variablesToLog: [],
+    }) satisfies DebuggerLogicNode as LogicNode,
+  'conditional': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'conditional',
+      label: 'conditional',
+      outputs: [],
+      comparator: '>',
+      left: { source: 'literal', value: 0 },
+      right: { source: 'literal', value: 0 },
+    }) satisfies ConditionalLogicNode,
+  'random': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'random',
+      label: 'random',
+      outputs: [],
+      mode: 'random-integer',
+      min: { source: 'literal', value: 0 },
+      max: { source: 'literal', value: 1 },
+      assignTo: '',
+    }) satisfies RandomLogicNode as LogicNode,
+  'shuffle-lights': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'shuffle-lights',
+      label: 'shuffle-lights',
+      outputs: [],
+      sourceVariable: '',
+      assignTo: '',
+    }) satisfies ShuffleLightsLogicNode as LogicNode,
+  'for-each-light': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'for-each-light',
+      label: 'for-each-light',
+      outputs: [],
+      sourceVariable: '',
+      currentLightVariable: '',
+      currentIndexVariable: '',
+    }) satisfies ForEachLightLogicNode as LogicNode,
+  'indexed-variable': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'indexed-variable',
+      label: 'indexed-variable',
+      outputs: [],
+      mode: 'set',
+      varName: '',
+      index: { source: 'literal', value: 0 },
+      valueType: 'number',
+      value: { source: 'literal', value: 0 },
+    }) satisfies IndexedVariableLogicNode as LogicNode,
+  'led-changed': (id) =>
+    ({
+      id,
+      type: 'logic',
+      logicType: 'led-changed',
+      label: 'led-changed',
+      outputs: [],
+      assignIndex: 'ledIndex',
+      assignColor: 'ledColor',
+      assignEdge: 'ledEdge',
+    }) satisfies LedChangedLogicNode as LogicNode,
 }
 
 const useNodeCreation = ({
@@ -145,225 +457,11 @@ const useNodeCreation = ({
     [nodes],
   )
 
-  const logicNodeFactories: Record<LogicNode['logicType'], (id: string) => LogicNode> = useMemo(
-    () => ({
-      'variable': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'variable',
-          label: 'variable',
-          outputs: [],
-          mode: 'set',
-          varName: 'var1',
-          valueType: 'number',
-          value: { source: 'literal', value: 0 },
-        }) satisfies VariableLogicNode,
-      'math': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'math',
-          label: 'math',
-          outputs: [],
-          operator: 'add',
-          left: { source: 'literal', value: 0 },
-          right: { source: 'literal', value: 0 },
-          assignTo: 'result',
-        }) satisfies MathLogicNode,
-      'cue-data': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'cue-data',
-          label: 'cue-data',
-          outputs: [],
-          dataProperty: 'execution-count',
-          assignTo: undefined,
-        }) satisfies CueDataLogicNode as LogicNode,
-      'config-data': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'config-data',
-          label: 'config-data',
-          outputs: [],
-          dataProperty: 'total-lights',
-          assignTo: undefined,
-        }) satisfies ConfigDataLogicNode as LogicNode,
-      'lights-from-index': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'lights-from-index',
-          label: 'lights-from-index',
-          outputs: [],
-          sourceVariable: '',
-          index: { source: 'literal', value: 0 },
-          assignTo: '',
-        }) satisfies LightsFromIndexLogicNode as LogicNode,
-      'color-from-index': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'color-from-index',
-          label: 'color-from-index',
-          outputs: [],
-          colors: { source: 'literal', value: ['blue'] },
-          index: { source: 'literal', value: 0 },
-          assignTo: '',
-        }) satisfies ColorFromIndexLogicNode as LogicNode,
-      'reverse-colors': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'reverse-colors',
-          label: 'reverse-colors',
-          outputs: [],
-          sourceVariable: '',
-          assignTo: '',
-        }) satisfies ReverseColorsLogicNode as LogicNode,
-      'concat-colors': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'concat-colors',
-          label: 'concat-colors',
-          outputs: [],
-          sourceVariables: [],
-          assignTo: '',
-        }) satisfies ConcatColorsLogicNode as LogicNode,
-      'shuffle-colors': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'shuffle-colors',
-          label: 'shuffle-colors',
-          outputs: [],
-          sourceVariable: '',
-          assignTo: '',
-        }) satisfies ShuffleColorsLogicNode as LogicNode,
-      'array-length': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'array-length',
-          label: 'array-length',
-          outputs: [],
-          sourceVariable: '',
-          assignTo: '',
-        }) satisfies ArrayLengthLogicNode as LogicNode,
-      'reverse-lights': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'reverse-lights',
-          label: 'reverse-lights',
-          outputs: [],
-          sourceVariable: '',
-          assignTo: '',
-        }) satisfies ReverseLightsLogicNode as LogicNode,
-      'create-pairs': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'create-pairs',
-          label: 'create-pairs',
-          outputs: [],
-          pairType: 'opposite',
-          sourceVariable: '',
-          assignTo: '',
-        }) satisfies CreatePairsLogicNode as LogicNode,
-      'concat-lights': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'concat-lights',
-          label: 'concat-lights',
-          outputs: [],
-          sourceVariables: [],
-          assignTo: '',
-        }) satisfies ConcatLightsLogicNode as LogicNode,
-      'build-ring': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'build-ring',
-          label: 'build-ring',
-          outputs: [],
-          assignTo: '',
-          assignGroupSize: '',
-        }) satisfies BuildRingLogicNode as LogicNode,
-      'delay': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'delay',
-          label: 'delay',
-          outputs: [],
-          delayTime: { source: 'literal', value: 1000 },
-        }) satisfies DelayLogicNode as LogicNode,
-      'debugger': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'debugger',
-          label: 'debugger',
-          outputs: [],
-          message: { source: 'literal', value: 'Debug message' },
-          variablesToLog: [],
-        }) satisfies DebuggerLogicNode as LogicNode,
-      'conditional': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'conditional',
-          label: 'conditional',
-          outputs: [],
-          comparator: '>',
-          left: { source: 'literal', value: 0 },
-          right: { source: 'literal', value: 0 },
-        }) satisfies ConditionalLogicNode,
-      'random': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'random',
-          label: 'random',
-          outputs: [],
-          mode: 'random-integer',
-          min: { source: 'literal', value: 0 },
-          max: { source: 'literal', value: 1 },
-          assignTo: '',
-        }) satisfies RandomLogicNode as LogicNode,
-      'shuffle-lights': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'shuffle-lights',
-          label: 'shuffle-lights',
-          outputs: [],
-          sourceVariable: '',
-          assignTo: '',
-        }) satisfies ShuffleLightsLogicNode as LogicNode,
-      'for-each-light': (id) =>
-        ({
-          id,
-          type: 'logic',
-          logicType: 'for-each-light',
-          label: 'for-each-light',
-          outputs: [],
-          sourceVariable: '',
-          currentLightVariable: '',
-          currentIndexVariable: '',
-        }) satisfies ForEachLightLogicNode as LogicNode,
-    }),
-    [],
-  )
+  const logicNodeFactories = LOGIC_NODE_FACTORIES
 
   const addEventNode = useCallback(
     (
-      option?: EventOption<YargEventNode['eventType'] | AudioEventNode['eventType']>,
+      option?: EventOption<NetEventNode['eventType'] | AudioEventNode['eventType']>,
       position?: { x: number; y: number },
     ) => {
       const nodeMode = activeMode
@@ -388,11 +486,12 @@ const useNodeCreation = ({
               ? 'Audio Trigger'
               : defaultOption.label,
           payload:
-            nodeMode === 'yarg'
+            // RB3 nodes are YARG-shaped; only audio uses the threshold/triggerMode shape.
+            nodeMode !== 'audio'
               ? {
                   id: newEventId,
                   type: 'event',
-                  eventType: defaultOption.value as YargEventNode['eventType'],
+                  eventType: defaultOption.value as NetEventNode['eventType'],
                 }
               : defaultOption.value === 'audio-trigger'
                 ? buildDefaultAudioTrigger(newEventId)

@@ -6,6 +6,7 @@ import {
   Rb3PlatformID,
   Rb3TrackType,
   Rb3Difficulty,
+  StageKitData,
 } from './rb3eTypes'
 import { CueData, StrobeState } from '../../cues/types/cueTypes'
 import { createLogger } from '../../../shared/logger'
@@ -107,22 +108,36 @@ export class Rb3eNetworkListener extends EventEmitter {
     log.info('Rb3eNetworkListener initialized as event emitter.')
   }
 
-  public start() {
+  /**
+   * Binds the UDP socket. Resolves once the socket is listening; rejects if the bind fails
+   * (e.g. EADDRINUSE), so callers can surface the failure instead of assuming the listener is up.
+   * Post-bind runtime errors are handled by the listener registered in `setupServerEvents`.
+   */
+  public start(): Promise<void> {
     if (this.listening) {
       log.warn('RB3ENetworkListener is already running.')
-      return
+      return Promise.resolve()
     }
     log.info(`RB3ENetworkListener: Starting UDP server on port ${PORT}...`)
     this.server = dgram.createSocket('udp4')
     this.setupServerEvents()
-    this.server.bind(PORT, () => {
-      this.listening = true
-      log.info(`RB3ENetworkListener started and listening on port ${PORT}`)
-    })
-
-    // Add error handling for bind failures
-    this.server.on('error', (err) => {
-      log.error(`RB3ENetworkListener: Bind error:`, err)
+    return new Promise((resolve, reject) => {
+      const sock = this.server!
+      const onListening = (): void => {
+        sock.off('error', onBindError)
+        this.listening = true
+        log.info(`RB3ENetworkListener started and listening on port ${PORT}`)
+        resolve()
+      }
+      const onBindError = (err: Error): void => {
+        sock.off('listening', onListening)
+        this.server = null
+        this.listening = false
+        reject(err)
+      }
+      sock.once('listening', onListening)
+      sock.once('error', onBindError)
+      sock.bind(PORT)
     })
   }
 
@@ -167,7 +182,6 @@ export class Rb3eNetworkListener extends EventEmitter {
     })
 
     this.server.on('message', (msg) => {
-      ///  console.log(`RB3ENetworkListener: Received UDP message of ${msg.length} bytes`);
       try {
         this.deserializePacket(msg)
       } catch (error) {
@@ -338,7 +352,6 @@ export class Rb3eNetworkListener extends EventEmitter {
 
       // De‐duplicate repeated data
       if (this.lastData && this.isDataEqual(this.lastData, { header, payload, cueData })) {
-        //    console.log(`RB3E: Skipping duplicate data for packet type ${packetType}`);
         return
       }
       this.lastData = { header, payload, cueData }
@@ -630,17 +643,7 @@ export class Rb3eNetworkListener extends EventEmitter {
    * @param rightChannel The right channel value (color bank or effect control)
    * @returns Clean StageKit data structure
    */
-  private parseStageKitData(
-    leftChannel: number,
-    rightChannel: number,
-  ): {
-    positions: number[]
-    color: string
-    brightness: 'low' | 'medium' | 'high'
-    fog: boolean
-    strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off'
-    timestamp: number
-  } {
+  private parseStageKitData(leftChannel: number, rightChannel: number): StageKitData {
     // Parse left channel as LED position bitmask
     const positions: number[] = []
     for (let i = 0; i < 8; i++) {
@@ -667,7 +670,6 @@ export class Rb3eNetworkListener extends EventEmitter {
       case 3: // StrobeSlow
         strobeEffect = 'slow'
         if (this._currentStrobeState !== 'Strobe_Slow') {
-          //      console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Slow`);
           this._currentStrobeState = 'Strobe_Slow'
         }
         color = 'off'
@@ -675,7 +677,6 @@ export class Rb3eNetworkListener extends EventEmitter {
       case 4: // StrobeMedium
         strobeEffect = 'medium'
         if (this._currentStrobeState !== 'Strobe_Medium') {
-          //       console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Medium`);
           this._currentStrobeState = 'Strobe_Medium'
         }
         color = 'off'
@@ -683,7 +684,6 @@ export class Rb3eNetworkListener extends EventEmitter {
       case 5: // StrobeFast
         strobeEffect = 'fast'
         if (this._currentStrobeState !== 'Strobe_Fast') {
-          //       console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Fast`);
           this._currentStrobeState = 'Strobe_Fast'
         }
         color = 'off'
@@ -691,7 +691,6 @@ export class Rb3eNetworkListener extends EventEmitter {
       case 6: // StrobeFastest
         strobeEffect = 'fastest'
         if (this._currentStrobeState !== 'Strobe_Fastest') {
-          //       console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Fastest`);
           this._currentStrobeState = 'Strobe_Fastest'
         }
         color = 'off'
@@ -699,7 +698,6 @@ export class Rb3eNetworkListener extends EventEmitter {
       case 7: // StrobeOff
         strobeEffect = 'off'
         if (this._currentStrobeState !== 'Strobe_Off') {
-          //      console.log(`RB3E: Strobe state changed from ${this._currentStrobeState} to Strobe_Off`);
           this._currentStrobeState = 'Strobe_Off'
         }
         color = 'off'
@@ -719,6 +717,12 @@ export class Rb3eNetworkListener extends EventEmitter {
       case 0: // No color
         color = 'off'
         break
+      case 255: // DisableAll (0xFF): StageKit reset — clear strobe + fog and turn everything off.
+        strobeEffect = 'off'
+        this._currentStrobeState = 'Strobe_Off'
+        this._currentFogState = false
+        color = 'off'
+        break
       default:
         color = 'off'
         break
@@ -730,6 +734,8 @@ export class Rb3eNetworkListener extends EventEmitter {
       brightness: this._currentBrightness,
       fog: this._currentFogState,
       strobeEffect,
+      leftChannel,
+      rightChannel,
       timestamp: Date.now(),
     }
   }

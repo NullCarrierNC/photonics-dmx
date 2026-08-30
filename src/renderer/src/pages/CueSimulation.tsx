@@ -4,35 +4,46 @@ import {
   audioListenerEnabledAtom,
   lightingPrefsAtom,
   previewRigIdAtom,
+  rb3eListenerEnabledAtom,
+  yargListenerEnabledAtom,
   resolveLastUsedRigId,
 } from '@renderer/atoms'
 import { EffectSelector } from '../../../photonics-dmx/types'
+import type { PostProcessing } from '../../../photonics-dmx/cues/types/cueTypes'
 import EffectsDropdown from '../components/EffectSelector'
 import DmxSettingsAccordion from '@renderer/components/PhotonicsInputOutputToggles'
 import CuePreviewYarg from '@renderer/components/CuePreviewYarg'
 import CuePreviewAudio from '@renderer/components/CuePreviewAudio'
-import LightsDmxPreview from '@renderer/components/LightsDmxPreview'
 import StrobeChannelPreviewNotice from '@renderer/components/StrobeChannelPreviewNotice'
-import LightsDmxChannelsPreview from '@renderer/components/LightsDmxChannelsPreview'
+import {
+  LiveLightsDmxPreview,
+  LiveLightsDmxChannelsPreview,
+} from '@renderer/components/LiveDmxPreview'
 import DmxRigSelector from '@renderer/components/DmxRigSelector'
 import { useTimeoutEffect } from '../utils/useTimeout'
 import CueRegistrySelector from '@renderer/components/CueRegistrySelector'
+import StageKitLedPanel from '@renderer/components/StageKitLedPanel'
 import CueSimulationAbout from './CueSimulation/CueSimulationAbout'
 import CueSimulationActions from './CueSimulation/CueSimulationActions'
 import CueSimulationInstrument from './CueSimulation/CueSimulationInstrument'
 import CueSimulationMotion from './CueSimulation/CueSimulationMotion'
+import CueSimulationPostProcessing from './CueSimulation/CueSimulationPostProcessing'
 import {
   startTestEffect,
+  startRb3TestEffect,
   stopTestEffect,
   getPrefs,
   savePrefs,
   getCueGroups,
+  getRb3CueGroups,
   getAvailableCues,
+  getAvailableRb3Cues,
   getActiveRigs,
   simulateBeat,
   simulateKeyframe,
   simulateMeasure,
   simulateInstrumentNote,
+  simulatePostProcessing,
   stopMotionCueSimulation,
 } from '../ipcApi'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
@@ -50,10 +61,17 @@ type CueGroup = {
 
 const isYargVisualCueGroup = (g: CueGroup) => g.cueTypes.length > 0
 
+/** Cue groups come from the YARG registry or the separate RB3 cue registry, by selected game type. */
+const fetchCueGroupsForRegistry = (registryType: CueRegistryType) =>
+  registryType === 'RB3E' ? getRb3CueGroups() : getCueGroups()
+
 const CueSimulation: React.FC = () => {
   const [isAudioReactiveEnabled] = useAtom(audioListenerEnabledAtom)
+  const [isRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
+  const [isYargEnabled] = useAtom(yargListenerEnabledAtom)
   const [lightingPrefs] = useAtom(lightingPrefsAtom)
   const advancedModeEnabled = lightingPrefs.advancedModeEnabled ?? false
+  const venuePostProcessingEnabled = lightingPrefs.venuePostProcessingEnabled ?? true
   const [selectedEffect, setSelectedEffect] = useState<EffectSelector | null>(null)
   const [selectedRegistryType, setSelectedRegistryType] = useState<CueRegistryType>('YARG')
   const [selectedGroup, setSelectedGroup] = useState<string>('Select')
@@ -61,7 +79,7 @@ const CueSimulation: React.FC = () => {
   const [currentGroup, setCurrentGroup] = useState<CueGroup | null>(null)
   const [isAboutOpen, setIsAboutOpen] = useState(false)
   const [selectedRigId, setSelectedRigId] = useAtom(previewRigIdAtom)
-  const { selectedRig, rigConfig, dmxValues } = useDmxPreview()
+  const { selectedRig, rigConfig } = useDmxPreview()
   const [selectedVenueSize, setSelectedVenueSize] = useState<'NoVenue' | 'Small' | 'Large'>('Large')
   const [selectedBpm, setSelectedBpm] = useState<number>(120)
 
@@ -69,6 +87,8 @@ const CueSimulation: React.FC = () => {
   const [selectedInstrument, setSelectedInstrument] = useState<
     'guitar' | 'bass' | 'keys' | 'drums'
   >('guitar')
+
+  const [selectedPostProcessing, setSelectedPostProcessing] = useState<PostProcessing>('Default')
 
   // State for manual simulation indicators
   const [showBeatIndicator, setShowBeatIndicator] = useState(false)
@@ -93,6 +113,7 @@ const CueSimulation: React.FC = () => {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hasLoadedSavedEffect = useRef(false)
   const savedEffectIdRef = useRef<string | null>(null)
+  const postProcessingSimulationActiveRef = useRef(false)
 
   useEffect(() => {
     if (!advancedModeEnabled) {
@@ -101,6 +122,13 @@ const CueSimulation: React.FC = () => {
       })
     }
   }, [advancedModeEnabled])
+
+  // With the preference off the publisher stops applying the effect but keeps the one YARG last
+  // reported, so clear the picker rather than leave it naming an effect nothing is showing.
+  useEffect(() => {
+    if (venuePostProcessingEnabled) return
+    setSelectedPostProcessing('Default')
+  }, [venuePostProcessingEnabled])
 
   useEffect(() => {
     if (advancedModeEnabled) return
@@ -134,6 +162,12 @@ const CueSimulation: React.FC = () => {
       stopMotionCueSimulation().catch((error) => {
         log.error('Error stopping motion cue simulation on unmount:', error)
       })
+      // Only release a simulated effect this page successfully applied.
+      if (postProcessingSimulationActiveRef.current) {
+        simulatePostProcessing('Default').catch((error) => {
+          log.error('Error clearing simulated post-processing on unmount:', error)
+        })
+      }
       // Clear any pending save timeout
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
@@ -165,7 +199,9 @@ const CueSimulation: React.FC = () => {
           }
           if (savedSettings.groupId) {
             try {
-              const allGroups = await getCueGroups()
+              const allGroups = await fetchCueGroupsForRegistry(
+                savedSettings.registryType ?? 'YARG',
+              )
               const group = allGroups.find((g: CueGroup) => g.id === savedSettings.groupId)
               if (group && isYargVisualCueGroup(group)) {
                 if (savedSettings.effectId) {
@@ -244,7 +280,10 @@ const CueSimulation: React.FC = () => {
       // Wait for effects to be loaded by EffectsDropdown
       const checkForEffects = async (retries = 10) => {
         try {
-          const availableEffects = await getAvailableCues(selectedGroupId)
+          const availableEffects =
+            selectedRegistryType === 'RB3E'
+              ? await getAvailableRb3Cues(selectedGroupId)
+              : await getAvailableCues(selectedGroupId)
           if (availableEffects && availableEffects.length > 0) {
             const savedEffect = availableEffects.find(
               (e: EffectSelector) => e.id === savedEffectIdRef.current,
@@ -278,7 +317,7 @@ const CueSimulation: React.FC = () => {
     if (selectedGroupId && savedEffectIdRef.current) {
       loadSavedEffect()
     }
-  }, [selectedGroupId])
+  }, [selectedGroupId, selectedRegistryType])
 
   // Reset the hasLoadedSavedEffect flag when group changes (user-initiated change)
   useEffect(() => {
@@ -310,7 +349,8 @@ const CueSimulation: React.FC = () => {
     }
 
     try {
-      const result = await startTestEffect(
+      const fire = selectedRegistryType === 'RB3E' ? startRb3TestEffect : startTestEffect
+      const result = await fire(
         selectedEffect.id,
         selectedVenueSize,
         selectedBpm,
@@ -329,6 +369,23 @@ const CueSimulation: React.FC = () => {
       await stopTestEffect()
     } catch (error) {
       log.error('Error stopping test effect:', error)
+    }
+  }
+
+  const handlePostProcessingChange = async (state: PostProcessing) => {
+    const previous = selectedPostProcessing
+    setSelectedPostProcessing(state)
+    try {
+      const applied = await simulatePostProcessing(state)
+      if (applied === true) {
+        postProcessingSimulationActiveRef.current = state !== 'Default'
+      } else {
+        setSelectedPostProcessing(previous)
+        log.warn('Post-processing simulation refused while live input owns the lights')
+      }
+    } catch (error) {
+      setSelectedPostProcessing(previous)
+      log.error('Error simulating post-processing:', error)
     }
   }
 
@@ -379,8 +436,17 @@ const CueSimulation: React.FC = () => {
   }
 
   const handleRegistryChange = (type: CueRegistryType) => {
+    if (type === selectedRegistryType) return
+    // Switching registry invalidates the current group/effect (different registries, different
+    // group ids); clear so the selector re-inits against the newly chosen registry.
     setSelectedRegistryType(type)
-    // UI is currently YARG-only; registry type is not yet wired to a different backend.
+    setSelectedGroup('')
+    setSelectedGroupId('')
+    setSelectedEffect(null)
+    // RB3 mode hides the post-processing control, so clear the effect it was holding.
+    if (selectedPostProcessing !== 'Default') {
+      void handlePostProcessingChange('Default')
+    }
   }
 
   // Memoize handleGroupChange to prevent unnecessary re-renders/calls from CueRegistrySelector
@@ -393,7 +459,7 @@ const CueSimulation: React.FC = () => {
         setSelectedEffect(null)
 
         try {
-          const allGroups = await getCueGroups()
+          const allGroups = await fetchCueGroupsForRegistry(selectedRegistryType)
           const group = allGroups.find((g: CueGroup) => g.id === groupId && isYargVisualCueGroup(g))
           if (!group) {
             setSelectedGroup('')
@@ -421,7 +487,7 @@ const CueSimulation: React.FC = () => {
         setSelectedEffect(null)
       }
     },
-    [setSelectedGroup],
+    [setSelectedGroup, selectedRegistryType],
   )
 
   // Fetch current group info when selected group changes
@@ -439,7 +505,7 @@ const CueSimulation: React.FC = () => {
           setSelectedEffect(null) // Clear selected effect when no group is selected
         } else {
           // Single group selection
-          const groups = await getCueGroups()
+          const groups = await fetchCueGroupsForRegistry(selectedRegistryType)
           const group = groups.find(
             (g: CueGroup) => g.id === selectedGroupId && isYargVisualCueGroup(g),
           )
@@ -467,7 +533,7 @@ const CueSimulation: React.FC = () => {
     if (selectedGroup) {
       fetchGroupInfo()
     }
-  }, [selectedGroup, selectedGroupId])
+  }, [selectedGroup, selectedGroupId, selectedRegistryType])
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
@@ -505,18 +571,16 @@ const CueSimulation: React.FC = () => {
             <div className="flex flex-wrap gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Game Type: YARG
+                  Game Type
                 </label>
-                {/* <select
+                <select
                   value={selectedRegistryType}
-                  onChange={(e) => setSelectedRegistryType(e.target.value as CueRegistryType)}
+                  onChange={(e) => handleRegistryChange(e.target.value as CueRegistryType)}
                   className="p-2 pr-8 border rounded dark:bg-gray-700 dark:text-gray-200 h-10"
                   style={{ width: '150px' }}>
                   <option value="YARG">YARG</option>
-                  <option value="RB3E" disabled>
-                    RB3E (Uses direct)
-                  </option>
-                </select> */}
+                  <option value="RB3E">RB3E</option>
+                </select>
               </div>
             </div>
 
@@ -530,6 +594,7 @@ const CueSimulation: React.FC = () => {
                   selectedBpm={selectedBpm}
                   onBpmChange={setSelectedBpm}
                   selectedGroupId={selectedGroupId}
+                  selectedRegistryType={selectedRegistryType}
                 />
               </div>
               <div className="lg:w-64">
@@ -538,6 +603,7 @@ const CueSimulation: React.FC = () => {
                   groupId={selectedGroupId}
                   value={selectedEffect?.id}
                   disabled={!selectedGroupId}
+                  registryType={selectedRegistryType}
                 />
               </div>
             </div>
@@ -561,28 +627,54 @@ const CueSimulation: React.FC = () => {
 
       {!isAudioReactiveEnabled && (
         <>
+          {isRb3Enabled && (
+            <div className="mb-4 p-3 rounded border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 text-sm text-amber-800 dark:text-amber-300">
+              RB3E is enabled and owns the lights. Disable RB3E to simulate cues.
+            </div>
+          )}
+          {isYargEnabled && !isRb3Enabled && (
+            <div className="mb-4 p-3 rounded border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 text-sm text-amber-800 dark:text-amber-300">
+              YARG is enabled and owns venue post-processing. Disable YARG to simulate effects here.
+            </div>
+          )}
           <CueSimulationActions
-            disabled={!selectedEffect || !selectedGroupId}
+            disabled={!selectedEffect || !selectedGroupId || isRb3Enabled}
             onTestEffect={handleTestEffect}
             onStopTestEffect={handleStopTestEffect}
             onSimulateBeat={handleSimulateBeat}
             onSimulateMeasure={handleSimulateMeasure}
             onSimulateKeyframe={handleSimulateKeyframe}
+            showSongSimulation={selectedRegistryType !== 'RB3E'}
           />
-          <CueSimulationInstrument
-            selectedInstrument={selectedInstrument}
-            onInstrumentChange={setSelectedInstrument}
-            onSimulateNote={handleSimulateInstrumentNote}
-            disabled={!selectedGroupId}
-          />
-          {advancedModeEnabled && <CueSimulationMotion />}
+          {selectedRegistryType === 'RB3E' && !isRb3Enabled && <StageKitLedPanel />}
+          {/* RB3 mode has no instrument-note song events — LED state drives it instead. */}
+          {selectedRegistryType !== 'RB3E' && (
+            <CueSimulationInstrument
+              selectedInstrument={selectedInstrument}
+              onInstrumentChange={setSelectedInstrument}
+              onSimulateNote={handleSimulateInstrumentNote}
+              disabled={!selectedGroupId || isRb3Enabled}
+            />
+          )}
+          {/* Post-processing is a YARG venue signal, so RB3 mode has nothing to drive it, and the
+              preference being off means output would ignore whatever was picked. */}
+          {selectedRegistryType !== 'RB3E' && venuePostProcessingEnabled && (
+            <CueSimulationPostProcessing
+              selectedState={selectedPostProcessing}
+              onStateChange={(state) => void handlePostProcessingChange(state)}
+              disabled={isRb3Enabled || isYargEnabled}
+            />
+          )}
+          {advancedModeEnabled && (
+            <CueSimulationMotion platform={selectedRegistryType === 'RB3E' ? 'rb3' : 'yarg'} />
+          )}
         </>
       )}
 
-      {selectedRig !== null && rigConfig !== null && dmxValues !== null && (
+      {selectedRig !== null && rigConfig !== null && (
         <>
           <StrobeChannelPreviewNotice lightingConfig={rigConfig} className="mb-3" />
-          <LightsDmxPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
+          <LiveLightsDmxPreview lightingConfig={rigConfig} />
         </>
       )}
 
@@ -607,7 +699,7 @@ const CueSimulation: React.FC = () => {
 
       {selectedRig !== null && rigConfig !== null && (
         <>
-          <LightsDmxChannelsPreview lightingConfig={rigConfig} dmxValues={dmxValues} />
+          <LiveLightsDmxChannelsPreview lightingConfig={rigConfig} />
         </>
       )}
       {selectedRig === null && (

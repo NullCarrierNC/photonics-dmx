@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 3,
+  "cueVersion": 4,
   "mode": "yarg",
   "group": {
     "id": "yarg-fade",
@@ -3276,12 +3276,40 @@
             "assignTo": "backLights"
           },
           {
+            "id": "fade-frenzy-cfg-bcount",
+            "type": "logic",
+            "logicType": "config-data",
+            "dataProperty": "back-lights-count",
+            "assignTo": "backCount"
+          },
+          {
             "id": "fade-frenzy-each",
             "type": "logic",
             "logicType": "for-each-light",
             "sourceVariable": "frontLights",
             "currentLightVariable": "curF",
             "currentIndexVariable": "idxF"
+          },
+          {
+            "id": "fade-frenzy-has-back",
+            "type": "logic",
+            "logicType": "conditional",
+            "comparator": ">",
+            "left": {
+              "source": "variable",
+              "name": "backCount"
+            },
+            "right": {
+              "source": "literal",
+              "value": 0
+            }
+          },
+          {
+            "id": "fade-frenzy-pair-front",
+            "type": "logic",
+            "logicType": "concat-lights",
+            "sourceVariables": ["curF"],
+            "assignTo": "pair"
           },
           {
             "id": "fade-frenzy-bpick",
@@ -3380,13 +3408,31 @@
           "to": "fade-frenzy-cfg-b"
         },
         {
+          "from": "fade-frenzy-cfg-b",
+          "to": "fade-frenzy-cfg-bcount"
+        },
+        {
           "from": "fade-frenzy-called",
           "to": "fade-frenzy-each"
         },
         {
           "from": "fade-frenzy-each",
-          "to": "fade-frenzy-bpick",
+          "to": "fade-frenzy-has-back",
           "fromPort": "each"
+        },
+        {
+          "from": "fade-frenzy-has-back",
+          "to": "fade-frenzy-bpick",
+          "fromPort": "true"
+        },
+        {
+          "from": "fade-frenzy-has-back",
+          "to": "fade-frenzy-pair-front",
+          "fromPort": "false"
+        },
+        {
+          "from": "fade-frenzy-pair-front",
+          "to": "fade-frenzy-sum"
         },
         {
           "from": "fade-frenzy-bpick",
@@ -3428,6 +3474,14 @@
             "x": -140,
             "y": 16
           },
+          "fade-frenzy-set": {
+            "x": -341.8411068895161,
+            "y": 902.9572196086556
+          },
+          "fade-frenzy-gate": {
+            "x": 59.743580529844735,
+            "y": 573.3085689829081
+          },
           "fade-frenzy-init": {
             "x": 480,
             "y": 110
@@ -3440,47 +3494,51 @@
             "x": 480,
             "y": 350
           },
+          "fade-frenzy-cfg-bcount": {
+            "x": 480,
+            "y": 470
+          },
           "fade-frenzy-each": {
             "x": -140,
             "y": 130
           },
+          "fade-frenzy-has-back": {
+            "x": -263.8517633380594,
+            "y": 290.4252842009304
+          },
+          "fade-frenzy-pair-front": {
+            "x": -177.27824247518834,
+            "y": 540.2491037978511
+          },
           "fade-frenzy-bpick": {
-            "x": -360,
-            "y": 270
+            "x": -361.73147041725736,
+            "y": 415.44351504962333
           },
           "fade-frenzy-pair": {
-            "x": -360,
-            "y": 390
+            "x": -361.73147041725736,
+            "y": 535.4435150496233
           },
           "fade-frenzy-sum": {
-            "x": -360,
-            "y": 510
+            "x": -277.1974254243569,
+            "y": 670.3612876954294
           },
           "fade-frenzy-pick": {
-            "x": -360,
-            "y": 630
-          },
-          "fade-frenzy-set": {
-            "x": -360,
-            "y": 760
+            "x": -279.68372086532463,
+            "y": 780.4161059315586
           },
           "fade-frenzy-inc-add": {
-            "x": 240,
-            "y": 470
+            "x": 18.719705753878316,
+            "y": 318.33597810097285
           },
           "fade-frenzy-inc-mod": {
-            "x": 240,
-            "y": 590
-          },
-          "fade-frenzy-gate": {
-            "x": 240,
-            "y": 720
+            "x": 57.2572850888771,
+            "y": 429.63394405758595
           }
         },
         "viewport": {
-          "x": 300,
-          "y": -50,
-          "zoom": 0.7
+          "x": 460.1682447588667,
+          "y": 108.73691939973617,
+          "zoom": 0.8044096317136012
         }
       },
       "variables": [
@@ -3510,6 +3568,13 @@
           "type": "light-array",
           "scope": "cue",
           "initialValue": [],
+          "isParameter": false
+        },
+        {
+          "name": "backCount",
+          "type": "number",
+          "scope": "cue",
+          "initialValue": 0,
           "isParameter": false
         },
         {

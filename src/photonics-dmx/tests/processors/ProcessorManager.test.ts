@@ -1,12 +1,9 @@
 /**
- * ProcessorManager tests: direct mode lifecycle, getCurrentMode, getProcessorStats, destroy.
+ * ProcessorManager tests: direct/cue mode selection, getCurrentMode, getProcessorStats, destroy.
  */
+import { EventEmitter } from 'events'
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import {
-  ProcessorManager,
-  ProcessingMode,
-  DEFAULT_PROCESSOR_CONFIG,
-} from '../../processors/ProcessorManager'
+import { ProcessorManager, DEFAULT_PROCESSOR_CONFIG } from '../../processors/ProcessorManager'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { ChainFanout } from '../../controllers/ChainFanout'
@@ -65,7 +62,10 @@ describe('ProcessorManager', () => {
         isPrimary: true,
         dmxLightManager: mockLightManager,
         sequencer: mockSequencer,
-        yargCueHandler: null,
+        cueHandlers: {
+          yarg: null,
+          rb3: null,
+        },
         audioCueHandler: null,
         rb3MenuCueHandler: null,
       } as unknown as RigChain,
@@ -87,10 +87,9 @@ describe('ProcessorManager', () => {
 
   it('getProcessorStats returns expected shape', () => {
     const stats = manager.getProcessorStats()
-    expect(stats).toMatchObject({
+    expect(stats).toEqual({
       currentMode: 'direct',
       stageKitProcessorActive: false,
-      traditionalProcessorActive: false,
       networkListenerActive: false,
     })
   })
@@ -109,12 +108,23 @@ describe('ProcessorManager', () => {
     manager.destroy()
     const stats = manager.getProcessorStats()
     expect(stats.stageKitProcessorActive).toBe(false)
-    expect(stats.traditionalProcessorActive).toBe(false)
   })
 
-  it('throws on invalid mode in constructor', () => {
-    expect(() => {
-      new ProcessorManager(chainFanout, { mode: 'invalid' as ProcessingMode })
-    }).toThrow(/Invalid mode/)
+  it('reports cue as the current mode when constructed in cue mode', () => {
+    const cueManager = new ProcessorManager(chainFanout, { mode: 'cue' })
+    expect(cueManager.getCurrentMode()).toBe('cue')
+    expect(cueManager.isModeActive('cue')).toBe(true)
+  })
+
+  it('stats report the cue processor as active once cue mode is listening', () => {
+    const cueManager = new ProcessorManager(chainFanout, { mode: 'cue' })
+    expect(cueManager.getProcessorStats().stageKitProcessorActive).toBe(false)
+    cueManager.setNetworkListener(new EventEmitter())
+    expect(cueManager.getProcessorStats()).toEqual({
+      currentMode: 'cue',
+      stageKitProcessorActive: true,
+      networkListenerActive: true,
+    })
+    cueManager.destroy()
   })
 })

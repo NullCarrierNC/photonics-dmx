@@ -1,4 +1,5 @@
-import { YargCueRegistry as CueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
+import { CueRegistry as CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
+import { withCollaboratorGetters } from './managerFacades'
 import { INetCue, CueStyle } from '../../../photonics-dmx/cues/interfaces/INetCue'
 import { ICueGroup } from '../../../photonics-dmx/cues/interfaces/INetCueGroup'
 import { CueData, CueType } from '../../../photonics-dmx/cues/types/cueTypes'
@@ -16,15 +17,15 @@ const mockIpcMain = {
 // override these by replacing the mock function after import.
 const stubChainFanout = {
   handleCue: jest.fn(),
-  yargOnBeat: jest.fn(),
-  yargOnMeasure: jest.fn(),
-  yargOnKeyframe: jest.fn(),
-  yargSchedulePanTiltClear: jest.fn(),
-  yargCancelPanTiltClear: jest.fn(),
+  onBeat: jest.fn(),
+  onMeasure: jest.fn(),
+  onKeyframe: jest.fn(),
+  schedulePanTiltClear: jest.fn(),
+  cancelPanTiltClear: jest.fn(),
   getChains: jest.fn().mockReturnValue([]),
 }
 
-const mockControllerManager = {
+const mockControllerManager = withCollaboratorGetters({
   getSenderManager: jest.fn().mockReturnValue({
     enableSender: jest.fn(),
     disableSender: jest.fn(),
@@ -32,15 +33,27 @@ const mockControllerManager = {
   getCueHandler: jest.fn(),
   getLightingController: jest.fn(),
   getChainFanout: jest.fn(() => stubChainFanout),
-  ensureChainsHaveYargHandlersForSimulation: jest.fn(),
+  getMotionCueSimulator: jest.fn(() => ({
+    hasNetCueActive: () => false,
+    stop: jest.fn(),
+    clearActive: jest.fn(),
+    setNetCue: jest.fn(),
+    setAudioCue: jest.fn(),
+    run: jest.fn(() => Promise.resolve()),
+    runAll: jest.fn(() => Promise.resolve()),
+  })),
+  ensureChainsHaveHandlersForSimulation: jest.fn(),
   getIsInitialized: jest.fn().mockReturnValue(true),
+  getDmxPublisher: jest.fn().mockReturnValue(null),
+  getVenueFrameProcessor: jest.fn(() => ({ getVenuePostProcessing: () => 'Default' })),
   getIsYargEnabled: jest.fn().mockReturnValue(true),
   getIsRb3Enabled: jest.fn().mockReturnValue(false),
   init: jest.fn(),
   startTestEffect: jest.fn(),
   stopTestEffect: jest.fn(),
   setOnConsoleEnter: jest.fn(),
-}
+  setOnSimulationPreempt: jest.fn(),
+})
 
 // Mock implementation with descriptions
 class MockCueImplementation implements INetCue {

@@ -333,4 +333,24 @@ describe('LayerManager', () => {
       expect(threshold).toBe(255)
     })
   })
+
+  describe('clearLightLayerState', () => {
+    it('clears one light on a layer without wiping the others', () => {
+      const l1 = createMockTrackedLight({ id: 'l1' })
+      const l2 = createMockTrackedLight({ id: 'l2' })
+      // getLightState (from LTC) feeds the fallback capture path.
+      layerManager.captureFinalStates(3, [l1, l2])
+      expect(layerManager.getLightState(3, 'l1')).toBeDefined()
+      expect(layerManager.getLightState(3, 'l2')).toBeDefined()
+
+      layerManager.clearLightLayerState(3, 'l1')
+
+      expect(layerManager.getLightState(3, 'l1')).toBeUndefined()
+      expect(layerManager.getLightState(3, 'l2')).toBeDefined() // sibling survives
+    })
+
+    it('is a no-op for an unknown layer', () => {
+      expect(() => layerManager.clearLightLayerState(99, 'nope')).not.toThrow()
+    })
+  })
 })

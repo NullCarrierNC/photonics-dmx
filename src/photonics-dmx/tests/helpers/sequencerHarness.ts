@@ -3,7 +3,11 @@ import { Sequencer } from '../../controllers/sequencer/Sequencer'
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
-import { createMockDmxLight, createMockLightingConfig } from './testFixtures'
+import {
+  createMockDmxLight,
+  createMockMovingHeadDmxLight,
+  createMockLightingConfig,
+} from './testFixtures'
 import type { Clock } from '../../controllers/sequencer/Clock'
 import type { DmxLight, RGBIO } from '../../types'
 
@@ -69,15 +73,20 @@ type SequencerHarnessOptions = {
   frontCount?: number
   backCount?: number
   strobeCount?: number
+  /** When true, front/back lights are RGB moving heads (pan/tilt) so motion output is meaningful. */
+  movingHead?: boolean
 }
 
 const createLights = (
   count: number,
   group: 'front' | 'back' | 'strobe',
   startIndex: number,
+  movingHead: boolean,
 ): DmxLight[] => {
+  const factory =
+    movingHead && group !== 'strobe' ? createMockMovingHeadDmxLight : createMockDmxLight
   return Array.from({ length: count }, (_, index) =>
-    createMockDmxLight({
+    factory({
       id: `${group}-${startIndex + index + 1}`,
       group,
       position: startIndex + index + 1,
@@ -86,11 +95,11 @@ const createLights = (
 }
 
 export const createSequencerHarness = (options: SequencerHarnessOptions = {}): SequencerHarness => {
-  const { frontCount = 4, backCount = 4, strobeCount = 0 } = options
+  const { frontCount = 4, backCount = 4, strobeCount = 0, movingHead = false } = options
 
-  const frontLights = createLights(frontCount, 'front', 0)
-  const backLights = createLights(backCount, 'back', frontCount)
-  const strobeLights = createLights(strobeCount, 'strobe', frontCount + backCount)
+  const frontLights = createLights(frontCount, 'front', 0, movingHead)
+  const backLights = createLights(backCount, 'back', frontCount, movingHead)
+  const strobeLights = createLights(strobeCount, 'strobe', frontCount + backCount, movingHead)
 
   const config = createMockLightingConfig({
     numLights: frontCount + backCount + strobeCount,

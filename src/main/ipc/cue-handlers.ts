@@ -13,21 +13,24 @@ const log = createLogger('cue-handlers')
  * @param controllerManager The controller manager instance
  */
 export function setupCueHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  // Event listeners for YARG and RB3
+  // Event listeners for YARG and RB3. These are fire-and-forget: the lifecycle queue already logs
+  // any enable/disable failure once, so a no-op catch here just keeps an init-time rejection from
+  // surfacing as an unhandledRejection in the main process.
+  const ignoreToggleRejection = () => {}
   ipcMain.on(CUE.YARG_LISTENER_ENABLED, () => {
-    controllerManager.enableYarg()
+    controllerManager.enableYarg().catch(ignoreToggleRejection)
   })
 
-  ipcMain.on(CUE.YARG_LISTENER_DISABLED, async () => {
-    await controllerManager.disableYarg()
+  ipcMain.on(CUE.YARG_LISTENER_DISABLED, () => {
+    controllerManager.disableYarg().catch(ignoreToggleRejection)
   })
 
   ipcMain.on(CUE.RB3E_LISTENER_ENABLED, () => {
-    controllerManager.enableRb3()
+    controllerManager.enableRb3().catch(ignoreToggleRejection)
   })
 
-  ipcMain.on(CUE.RB3E_LISTENER_DISABLED, async () => {
-    await controllerManager.disableRb3()
+  ipcMain.on(CUE.RB3E_LISTENER_DISABLED, () => {
+    controllerManager.disableRb3().catch(ignoreToggleRejection)
   })
 
   // Disable YARG
@@ -54,12 +57,12 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
 
   // Get RB3 current mode
   ipcMain.handle(CUE.RB3E_GET_MODE, () => {
-    return controllerManager.getRb3Mode()
+    return controllerManager.getListenerLifecycle().yargRb3.getRb3Mode()
   })
 
   // Get RB3 processor statistics
   ipcMain.handle(CUE.RB3E_GET_STATS, () => {
-    return controllerManager.getRb3ProcessorStats()
+    return controllerManager.getListenerLifecycle().yargRb3.getRb3ProcessorStats()
   })
 
   // Send handled cue data to renderer
@@ -69,12 +72,11 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
 
   // Listen for cue data
   ipcMain.on(CUE.SET_LISTEN_CUE_DATA, (_, shouldListen: boolean) => {
+    // The YARG listener and RB3 cue mode expose the cue-mirror through separate handler refs;
+    // at most one is non-null at a time, so subscribing both covers whichever is active.
     if (shouldListen) {
-      // Listen to cue handler if it exists
-      const cueHandler = controllerManager.getCueHandler()
-      if (cueHandler) {
-        cueHandler.addCueHandledListener(sendCueHandledData)
-      }
+      controllerManager.getCueHandler()?.addCueHandledListener(sendCueHandledData)
+      controllerManager.getRb3CueHandler()?.addCueHandledListener(sendCueHandledData)
 
       // Also listen to ProcessorManager for RB3E direct mode
       const processorManager = controllerManager.getProcessorManager()
@@ -82,11 +84,8 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
         processorManager.on('cueHandled', sendCueHandledData)
       }
     } else {
-      // Remove listeners
-      const cueHandler = controllerManager.getCueHandler()
-      if (cueHandler) {
-        cueHandler.removeCueHandledListener(sendCueHandledData)
-      }
+      controllerManager.getCueHandler()?.removeCueHandledListener(sendCueHandledData)
+      controllerManager.getRb3CueHandler()?.removeCueHandledListener(sendCueHandledData)
 
       const processorManager = controllerManager.getProcessorManager()
       if (processorManager) {
@@ -95,23 +94,12 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
     }
   })
 
-  // Persist effect debounce preference (stored for compatibility; cue debouncing has been removed, so setEffectDebouncePeriod is a no-op).
-  ipcMain.on(CUE.UPDATE_EFFECT_DEBOUNCE, (_, debounceTime: number) => {
-    void (async () => {
-      try {
-        await controllerManager.getConfig().setPreference('effectDebounce', debounceTime)
-        const cueHandler = controllerManager.getCueHandler()
-        if (cueHandler && 'setEffectDebouncePeriod' in cueHandler) {
-          cueHandler.setEffectDebouncePeriod(debounceTime)
-        }
-      } catch (err) {
-        log.error('Failed to save effect debounce preference:', err)
-      }
-    })()
-  })
-
   // Set cue style
-  ipcMain.on(CUE.CUE_STYLE, (_, style: 'simple' | 'complex') => {
+  ipcMain.on(CUE.CUE_STYLE, (_, style: unknown) => {
+    if (style !== 'simple' && style !== 'complex') {
+      log.warn(`Ignoring invalid cue style payload: ${String(style)}`)
+      return
+    }
     void controllerManager
       .getConfig()
       .setPreference('complex', style === 'complex')

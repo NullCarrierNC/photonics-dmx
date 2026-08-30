@@ -71,26 +71,32 @@ export function isInstrumentEventTriggered(
   bassNotes: InstrumentNoteType[],
   keysNotes: InstrumentNoteType[],
   drumNotes: DrumNoteType[],
+  previousFrame?: Partial<CueData>,
 ): boolean | null {
+  const prevGuitar = previousFrame?.guitarNotes ?? []
+  const prevBass = previousFrame?.bassNotes ?? []
+  const prevKeys = previousFrame?.keysNotes ?? []
+  const prevDrums = previousFrame?.drumNotes ?? []
+
   // Guitar events
   if (eventType.startsWith('guitar-')) {
     const note = INSTRUMENT_NOTE_MAP[eventType.slice(7)]
-    return note ? guitarNotes.includes(note) : null
+    return note ? guitarNotes.includes(note) && !prevGuitar.includes(note) : null
   }
   // Bass events
   if (eventType.startsWith('bass-')) {
     const note = INSTRUMENT_NOTE_MAP[eventType.slice(5)]
-    return note ? bassNotes.includes(note) : null
+    return note ? bassNotes.includes(note) && !prevBass.includes(note) : null
   }
   // Keys events
   if (eventType.startsWith('keys-')) {
     const note = INSTRUMENT_NOTE_MAP[eventType.slice(5)]
-    return note ? keysNotes.includes(note) : null
+    return note ? keysNotes.includes(note) && !prevKeys.includes(note) : null
   }
   // Drum events
   if (eventType.startsWith('drum-')) {
     const note = DRUM_NOTE_MAP[eventType.slice(5)]
-    return note ? drumNotes.includes(note) : null
+    return note ? drumNotes.includes(note) && !prevDrums.includes(note) : null
   }
   // Not an instrument event
   return null
@@ -107,6 +113,88 @@ export function isVocalActive(frame: Partial<CueData>): boolean {
     (frame.harmony1Note ?? 0) > 0 ||
     (frame.harmony2Note ?? 0) > 0
   )
+}
+
+/**
+ * The aggregate RB3 StageKit LED mask: bit i (0..7) set when position i is lit in ANY colour bank.
+ * RB3 sends one colour bank per packet, so the cue-mode processor ORs each bank's 8-bit mask into
+ * `ledBanks`; this collapses them to "which positions are lit at all", used by the led-N events and
+ * the led-states / led-N-on cue-data properties.
+ */
+export function ledAggregateMask(frame: Partial<CueData> | undefined): number {
+  const b = frame?.ledBanks
+  if (!b) return 0
+  return (b.red | b.green | b.blue | b.yellow) & 0xff
+}
+
+/**
+ * Whether two frames carry the same StageKit LED state across ALL FOUR colour banks (absent `ledBanks` =
+ * all-zero). Stricter than comparing `ledAggregateMask`, which is colour-blind: a position that swaps banks
+ * (red→green) leaves the aggregate unchanged but changes a per-bank mask, so this returns false. Used to
+ * detect an un-ticked LED/colour edge the aggregate would miss (led-N triggerOnColorChange).
+ */
+export function ledBanksEqual(
+  a: Partial<CueData> | undefined,
+  b: Partial<CueData> | undefined,
+): boolean {
+  const x = a?.ledBanks
+  const y = b?.ledBanks
+  return (
+    ((x?.red ?? 0) & 0xff) === ((y?.red ?? 0) & 0xff) &&
+    ((x?.green ?? 0) & 0xff) === ((y?.green ?? 0) & 0xff) &&
+    ((x?.blue ?? 0) & 0xff) === ((y?.blue ?? 0) & 0xff) &&
+    ((x?.yellow ?? 0) & 0xff) === ((y?.yellow ?? 0) & 0xff)
+  )
+}
+
+/** Whether LED position `index` (0..7) is lit in any colour bank of `frame`. */
+export function isLedOn(frame: Partial<CueData> | undefined, index: number): boolean {
+  if (index < 0 || index > 7) return false
+  return (ledAggregateMask(frame) & (1 << index)) !== 0
+}
+
+/**
+ * The set of colour banks lighting LED position `index` (0..7), as a 4-bit nibble
+ * (bit0 red, bit1 green, bit2 blue, bit3 yellow); `0` when unlit or `ledBanks` is absent.
+ * Used by the led-N `triggerOnColorChange` gate to detect a colour change at a still-lit position.
+ */
+export function ledBankNibbleAt(frame: Partial<CueData> | undefined, index: number): number {
+  const b = frame?.ledBanks
+  if (!b || index < 0 || index > 7) return 0
+  const bit = 1 << index
+  return (
+    (b.red & bit ? 1 : 0) |
+    (b.green & bit ? 2 : 0) |
+    (b.blue & bit ? 4 : 0) |
+    (b.yellow & bit ? 8 : 0)
+  )
+}
+
+/** Bitmask (bit i = position i lit) from a list of LED positions 0..7. Inverse of maskToPositions. */
+export function positionsToMask(positions: number[]): number {
+  let mask = 0
+  for (const p of positions) {
+    if (p >= 0 && p < 8) mask |= 1 << p
+  }
+  return mask
+}
+
+/**
+ * The colour of LED position `index` (0..7) as a palette name — the per-position analogue of the global
+ * `led-color` (which reports only the dominant bank across all positions). Priority red > green > blue >
+ * yellow when a position is lit in more than one bank (the rare overlap case); `'transparent'` when unlit,
+ * so binding it to a laser/effect colour lets a dark position show through rather than paint black.
+ */
+export function ledColorAt(
+  frame: Partial<CueData> | undefined,
+  index: number,
+): 'red' | 'green' | 'blue' | 'yellow' | 'transparent' {
+  const nibble = ledBankNibbleAt(frame, index)
+  if (nibble & 1) return 'red'
+  if (nibble & 2) return 'green'
+  if (nibble & 4) return 'blue'
+  if (nibble & 8) return 'yellow'
+  return 'transparent'
 }
 
 // Import RB3E types
@@ -207,9 +295,21 @@ export type CueData = {
   trackMode?: 'tracked' | 'autogen' | 'simulated'
   /** When set with trackMode 'simulated', use this group for cue resolution instead of random active-group selection. */
   simulationCueGroup?: string
+  /**
+   * Force this group for cue resolution in any track mode (RB3 game-mode primary rotation stamps the
+   * chosen primary group here so the handler renders it deterministically). Honored ahead of the
+   * simulation group and normal selection; unset by YARG.
+   */
+  preferredCueGroup?: string
   beat: Beat
   keyframe: 'Off' | 'First' | 'Next' | 'Previous' | 'Unknown'
   bonusEffect: boolean
+  /** YARG v5+: fog time remaining in centiseconds; 0xffff = until an explicit fog-off. */
+  fogRemainingCentiseconds?: number
+  /** YARG v4+: per-player star power. amount 0-255 maps to 0-100%. */
+  playerStarPower?: ReadonlyArray<{ amount: number; isActive: boolean }>
+  starPowerActiveCount?: number
+  starPowerMaxPercent?: number
 
   // Cue history and context
   previousCue?: CueType
@@ -219,9 +319,14 @@ export type CueData = {
   timeSinceLastCue?: number
   previousFrame?: Partial<CueData>
 
-  // Optional RB3E-specific properties
+  // Optional RB3E-specific properties.
+  // `ledColor` / `ledPositions` describe the MOST RECENT StageKit packet (its colour bank + lit
+  // positions). `ledBanks` is the persistent per-colour-bank state the RB3 cue-mode processor
+  // maintains across packets (each value an 8-bit position mask), read by the led-* events and
+  // cue-data properties. See ledAggregateMask / isLedOn.
   ledColor?: string | null
   ledPositions?: number[]
+  ledBanks?: { red: number; green: number; blue: number; yellow: number }
 
   sustainDurationMs?: number
   measureOrBeat?: number
@@ -275,6 +380,10 @@ export const defaultCueData: CueData = {
   beat: 'Unknown',
   keyframe: 'Off',
   bonusEffect: false,
+  fogRemainingCentiseconds: 0xffff,
+  playerStarPower: [],
+  starPowerActiveCount: 0,
+  starPowerMaxPercent: 0,
 
   // Cue history defaults
   cueHistory: [],
@@ -282,6 +391,7 @@ export const defaultCueData: CueData = {
   cueStartTime: 0,
   timeSinceLastCue: 0,
   ledColor: null,
+  ledBanks: { red: 0, green: 0, blue: 0, yellow: 0 },
   rb3Platform: 'Unknown',
   rb3BuildTag: '',
   rb3SongName: '',
@@ -317,6 +427,15 @@ export const defaultCueData: CueData = {
     identifyValue: '',
     string: '',
   },
+  // Optional fields the RB3 StageKit direct processor also emits. Defaulted here so both RB3
+  // processors produce the same CueData shape and a new consumer never sees them undefined.
+  trackMode: 'tracked',
+  ledPositions: [],
+  sustainDurationMs: 0,
+  measureOrBeat: 0,
+  totalScore: 0,
+  memberScores: [],
+  stars: 0,
 }
 
 /**
@@ -361,6 +480,7 @@ export enum CueType {
   Unknown = 'UnknownCue',
   Strobe = 'Strobe', // RB3 has a discreet strobe cue
   DisableAll = 'DisableAll', // RB3 has a discreet disable all cue
+  RB3 = 'RB3', // RB3 cue mode: the always-active gameplay cue driven by StageKit LED state
 }
 
 /** All valid {@link CueType} string values, for membership checks against wire data. */
@@ -666,3 +786,9 @@ export const CueTypeDescriptions = [
 export function getCueTypeFromId(id: string): CueType | undefined {
   return Object.values(CueType).find((value) => value === id)
 }
+
+/**
+ * Reference to one registered motion program: the group it lives in and its cue id. Every domain
+ * (game and audio) picks motion the same way, so they all point at this shape.
+ */
+export type MotionCueRef = { groupId: string; cueId: string }

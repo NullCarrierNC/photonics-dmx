@@ -1,14 +1,16 @@
 /**
  * Config-propagation IPC tests: verifies that SAVE_DMX_RIG, setConsoleFixtureConfig, and
- * DELETE_DMX_RIG trigger the correct controller restart/refresh strategy.
+ * DELETE_DMX_RIG trigger the correct controller restart/refresh strategy, and that SAVE_PREFS
+ * hot-swaps the publisher settings that must apply without a restart.
  *
  * Regression coverage for the config-staleness bugs fixed alongside the inversion pipeline:
  *   - Bug 2: SAVE_DMX_RIG didn't call restartControllers when config fields changed
  *   - Bug 3: setConsoleFixtureConfig only called refreshActiveRigs, leaving sequencer stale
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { withCollaboratorGetters } from './managerFacades'
 import { ConfigStrobeType } from '../../../photonics-dmx/types'
-import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { CONFIG } from '../../../shared/ipcChannels'
 import { LIGHT } from '../../../shared/ipcChannels'
 
 // --- Mocks set up before any imports that use them ---
@@ -29,16 +31,31 @@ const mockConfig = {
   getLightingLayout: jest.fn().mockReturnValue(null),
   updateUserLights: jest.fn().mockImplementation(() => Promise.resolve()),
   getAllPreferences: jest.fn().mockReturnValue({}),
+  getPreference: jest.fn().mockReturnValue(undefined),
+  updatePreferences: jest.fn().mockImplementation(() => Promise.resolve()),
 }
 
-const mockControllerManager = {
+/** Publisher settings SAVE_PREFS applies live rather than through a controller restart. */
+const mockPublisher = {
+  setOutputRateHz: jest.fn(),
+  setWhiteChannelMixMode: jest.fn(),
+}
+
+/** The venue stage the preference drives, owned by ControllerManager rather than the publisher. */
+const mockVenueFrameProcessor = {
+  setVenuePostProcessingEnabled: jest.fn(),
+}
+
+const mockControllerManager = withCollaboratorGetters({
   getConfig: jest.fn().mockReturnValue(mockConfig),
   restartControllers: jest.fn().mockImplementation(() => Promise.resolve()),
   refreshActiveRigs: jest.fn(),
   setConsoleFixtureConfig: jest.fn().mockImplementation(() => Promise.resolve({ success: true })),
   flushValidationErrors: jest.fn().mockReturnValue([]),
   getIsInitialized: jest.fn().mockReturnValue(true),
-}
+  getDmxPublisher: jest.fn().mockReturnValue(mockPublisher),
+  getVenueFrameProcessor: jest.fn().mockReturnValue(mockVenueFrameProcessor),
+})
 
 const mockSendToAllWindows = jest.fn()
 
@@ -51,8 +68,8 @@ jest.mock('../../utils/windowUtils', () => ({ sendToAllWindows: mockSendToAllWin
 
 // These registries are imported inside config-handlers; mock them to avoid side effects
 jest.mock('../../../photonics-dmx/cues', () => ({}))
-jest.mock('../../../photonics-dmx/cues/registries/YargCueRegistry', () => ({
-  YargCueRegistry: {
+jest.mock('../../../photonics-dmx/cues/registries/CueRegistry', () => ({
+  CueRegistry: {
     getInstance: jest.fn().mockReturnValue({
       getRegisteredMotionGroupIds: jest.fn().mockReturnValue([]),
       setEnabledMotionGroups: jest.fn(),
@@ -121,10 +138,6 @@ describe('SAVE_DMX_RIG config propagation', () => {
     const rig = makeRig('rig-1', true)
     await handler({}, rig)
     expect(mockControllerManager.restartControllers).toHaveBeenCalledTimes(1)
-    expect(mockSendToAllWindows).toHaveBeenCalledWith(
-      RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
-      undefined,
-    )
   })
 
   it('calls restartControllers when deactivating a previously active rig', async () => {
@@ -185,10 +198,6 @@ describe('setConsoleFixtureConfig propagation', () => {
       config: { invertPan: true },
     })
     expect(result).toEqual({ success: true })
-    expect(mockSendToAllWindows).toHaveBeenCalledWith(
-      RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
-      undefined,
-    )
   })
 
   it('returns { success: false } for invalid payload', async () => {
@@ -214,10 +223,6 @@ describe('DELETE_DMX_RIG propagation', () => {
     const handler = handlers.get(CONFIG.DELETE_DMX_RIG)!
     await handler({}, 'rig-1')
     expect(mockControllerManager.restartControllers).toHaveBeenCalledTimes(1)
-    expect(mockSendToAllWindows).toHaveBeenCalledWith(
-      RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
-      undefined,
-    )
   })
 
   it('does not call restartControllers or refreshActiveRigs when deleting an inactive rig', async () => {
@@ -233,5 +238,81 @@ describe('DELETE_DMX_RIG propagation', () => {
     const handler = handlers.get(CONFIG.DELETE_DMX_RIG)!
     const result = await handler({}, 'rig-1')
     expect(result).toEqual({ success: true })
+  })
+})
+
+describe('SAVE_PREFS publisher hot-swap', () => {
+  let handlers: Map<string, (event: unknown, ...args: any[]) => Promise<any>>
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockControllerManager.getDmxPublisher.mockReturnValue(mockPublisher)
+    handlers = captureHandlers()
+    setupConfigHandlers(mockIpcMain as any, mockControllerManager as any)
+  })
+
+  it('persists a White Channel Mix Mode change and applies it without a restart', async () => {
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!(
+      {},
+      {
+        whiteChannelMixMode: 'always-rgbw',
+      },
+    )
+
+    expect(result).toEqual({ success: true })
+    expect(mockConfig.updatePreferences).toHaveBeenCalledWith({
+      whiteChannelMixMode: 'always-rgbw',
+    })
+    expect(mockPublisher.setWhiteChannelMixMode).toHaveBeenCalledWith('always-rgbw')
+    expect(mockControllerManager.restartControllers).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unknown mode without persisting or applying it', async () => {
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!({}, { whiteChannelMixMode: 'rgbw' })
+
+    expect(result.success).toBe(false)
+    expect(mockConfig.updatePreferences).not.toHaveBeenCalled()
+    expect(mockPublisher.setWhiteChannelMixMode).not.toHaveBeenCalled()
+  })
+
+  it('leaves the mode alone when the payload does not carry it', async () => {
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!({}, { effectDebounce: 5 })
+
+    expect(result).toEqual({ success: true })
+    expect(mockPublisher.setWhiteChannelMixMode).not.toHaveBeenCalled()
+    expect(mockVenueFrameProcessor.setVenuePostProcessingEnabled).not.toHaveBeenCalled()
+  })
+
+  it('persists a venue post-processing change and applies it without a restart', async () => {
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!({}, { venuePostProcessingEnabled: false })
+
+    expect(result).toEqual({ success: true })
+    expect(mockConfig.updatePreferences).toHaveBeenCalledWith({
+      venuePostProcessingEnabled: false,
+    })
+    expect(mockVenueFrameProcessor.setVenuePostProcessingEnabled).toHaveBeenCalledWith(false)
+    expect(mockControllerManager.restartControllers).not.toHaveBeenCalled()
+  })
+
+  it('rejects a non-boolean venue post-processing value', async () => {
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!({}, { venuePostProcessingEnabled: 'yes' })
+
+    expect(result.success).toBe(false)
+    expect(mockConfig.updatePreferences).not.toHaveBeenCalled()
+    expect(mockVenueFrameProcessor.setVenuePostProcessingEnabled).not.toHaveBeenCalled()
+  })
+
+  it('survives a publisher that has not been built yet', async () => {
+    mockControllerManager.getDmxPublisher.mockReturnValue(null)
+
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!(
+      {},
+      {
+        whiteChannelMixMode: 'w-only',
+      },
+    )
+
+    expect(result).toEqual({ success: true })
+    expect(mockConfig.updatePreferences).toHaveBeenCalled()
   })
 })

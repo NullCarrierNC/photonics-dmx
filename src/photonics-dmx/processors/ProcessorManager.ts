@@ -5,17 +5,22 @@
  */
 import { EventEmitter } from 'events'
 import { Rb3StageKitDirectProcessor } from './Rb3StageKitDirectProcessor'
+import { Rb3StageKitCueProcessor } from './Rb3StageKitCueProcessor'
+import type { Rb3GameModeSchedulePayload } from './Rb3GameModeManager'
 import { ChainFanout } from '../controllers/ChainFanout'
+import { ChainCueRuntime } from '../controllers/ChainCueRuntime'
 import { StageKitConfig } from '../listeners/RB3/StageKitTypes'
 import { CueData } from '../cues/types/cueTypes'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
+import type { CueRuntime } from '../cueHandlers/CueRuntime'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('ProcessorManager')
 
 /**
- * Available processing modes.
+ * Available processing modes. 'direct' drives the DMX sequencer straight from StageKit packets;
+ * 'cue' dispatches an always-active RB3 gameplay cue so node cues react to the LED state.
  */
-export type ProcessingMode = 'direct'
+export type ProcessingMode = 'direct' | 'cue'
 
 /**
  * Configuration for the processor manager
@@ -24,6 +29,20 @@ export interface ProcessorManagerConfig {
   mode: ProcessingMode
   stageKitConfig?: Partial<StageKitConfig>
   debug?: boolean
+  /** Cue-mode dispatch surface. Defaults to an RB3 chain runtime over the fanout so cue mode
+   *  drives the RB3 handler slot; the coordinator passes its own runtime and the laser branch
+   *  wraps it with its tee. */
+  cueRuntime?: CueRuntime
+  /** RB3 primary-cue dwell range (seconds) from the rb3Motion prefs; passed through to the cue
+   *  processor so it can drive the LED-1-gated primary-cue switch (which also re-rolls motion). */
+  getRb3MotionCueDurationRangeSec?: () => { min: number; max: number }
+  /** Enabled RB3 primary-cue groups to rotate among (game mode). */
+  getRb3PrimaryGroupPool?: () => string[]
+  getRb3RotationEnabled?: () => boolean
+  /** Renderer push: the active RB3 primary-cue group changed. */
+  onRb3PrimaryCueChange?: (groupId: string | null) => void
+  /** Renderer push: the RB3 primary-cue countdown schedule changed. */
+  onRb3GameModeScheduleChange?: (info: Rb3GameModeSchedulePayload) => void
 }
 
 /**
@@ -36,10 +55,10 @@ export const DEFAULT_PROCESSOR_CONFIG: ProcessorManagerConfig = {
 }
 
 export class ProcessorManager extends EventEmitter {
-  private currentMode: ProcessingMode = 'direct'
   private networkListener: EventEmitter | null = null
 
   private stageKitDirectProcessor: Rb3StageKitDirectProcessor | null = null
+  private stageKitCueProcessor: Rb3StageKitCueProcessor | null = null
 
   private readonly chainFanout: ChainFanout
   private cueHandler: Rb3MenuCueDispatch | null = null
@@ -51,10 +70,6 @@ export class ProcessorManager extends EventEmitter {
     this.chainFanout = chainFanout
     this.config = { ...DEFAULT_PROCESSOR_CONFIG, ...config }
 
-    if (config.mode && config.mode !== 'direct') {
-      throw new Error(`Invalid mode: ${config.mode}. Only 'direct' mode is supported.`)
-    }
-
     log.info('ProcessorManager initialized with config:', this.config)
   }
 
@@ -63,7 +78,6 @@ export class ProcessorManager extends EventEmitter {
    */
   public setNetworkListener(networkListener: EventEmitter): void {
     log.info('ProcessorManager: setNetworkListener called with:', networkListener.constructor.name)
-    log.info('ProcessorManager: Current mode is:', this.currentMode)
 
     // Stop listening to previous listener if any
     if (this.networkListener) {
@@ -72,13 +86,9 @@ export class ProcessorManager extends EventEmitter {
     }
 
     this.networkListener = networkListener
-    log.info('ProcessorManager: Network listener set')
 
-    // Start processors based on current mode
-    log.info('ProcessorManager: Starting processors for mode:', this.currentMode)
+    log.info('ProcessorManager: Starting processors for mode:', this.config.mode)
     this.startProcessors()
-
-    log.info('ProcessorManager: Network listener set and processors started')
   }
 
   /**
@@ -97,7 +107,7 @@ export class ProcessorManager extends EventEmitter {
    * Get current processing mode
    */
   public getCurrentMode(): ProcessingMode {
-    return this.currentMode
+    return this.config.mode
   }
 
   /**
@@ -133,7 +143,11 @@ export class ProcessorManager extends EventEmitter {
     // Set up event listeners for processors
     this.setupProcessorEventListeners()
 
-    this.startDirectMode()
+    if (this.config.mode === 'cue') {
+      this.startCueMode()
+    } else {
+      this.startDirectMode()
+    }
   }
 
   /**
@@ -169,12 +183,40 @@ export class ProcessorManager extends EventEmitter {
   }
 
   /**
+   * Start cue mode: turn the StageKit packet stream into RB3 node-cue dispatches. The processor
+   * dispatches through the RB3 cue runtime (the coordinator's RB3 handler fanout, or the chain
+   * fanout as a fallback), and the chain fanout dispatches the menu look to each rig.
+   */
+  private startCueMode(): void {
+    log.info('ProcessorManager: Starting cue mode...')
+
+    if (!this.stageKitCueProcessor) {
+      this.stageKitCueProcessor = new Rb3StageKitCueProcessor(
+        this.config.cueRuntime ?? new ChainCueRuntime(this.chainFanout, 'rb3'),
+        {
+          menuDispatch: this.chainFanout,
+          getMotionSwitchDurationRangeSec: this.config.getRb3MotionCueDurationRangeSec,
+          getPrimaryGroupPool: this.config.getRb3PrimaryGroupPool,
+          getRotationEnabled: this.config.getRb3RotationEnabled,
+          onPrimaryCueChange: this.config.onRb3PrimaryCueChange,
+          onGameModeScheduleChange: this.config.onRb3GameModeScheduleChange,
+        },
+      )
+    }
+    this.stageKitCueProcessor.startListening(this.networkListener!)
+    log.info('ProcessorManager: Cue mode started')
+  }
+
+  /**
    * Stop all processors
    */
   private stopAllProcessors(): void {
     if (this.networkListener) {
       if (this.stageKitDirectProcessor) {
         this.stageKitDirectProcessor.stopListening(this.networkListener)
+      }
+      if (this.stageKitCueProcessor) {
+        this.stageKitCueProcessor.stopListening()
       }
     }
 
@@ -184,6 +226,11 @@ export class ProcessorManager extends EventEmitter {
   /**
    * Get StageKit direct processor (for direct access if needed)
    */
+  /** Re-validate cue mode's primary group after the enabled RB3 groups change. No-op in direct mode. */
+  public refreshRb3PrimaryGroup(): void {
+    this.stageKitCueProcessor?.ensureValidPrimaryGroup()
+  }
+
   public getStageKitDirectProcessor(): Rb3StageKitDirectProcessor | null {
     return this.stageKitDirectProcessor
   }
@@ -192,22 +239,22 @@ export class ProcessorManager extends EventEmitter {
    * Check if a specific mode is active
    */
   public isModeActive(mode: ProcessingMode): boolean {
-    return this.currentMode === mode
+    return this.config.mode === mode
   }
 
   /**
-   * Get processor statistics
+   * Get processor statistics. `stageKitProcessorActive` reports whether the active mode's
+   * processor has been constructed.
    */
   public getProcessorStats(): {
     currentMode: ProcessingMode
     stageKitProcessorActive: boolean
-    traditionalProcessorActive: boolean
     networkListenerActive: boolean
   } {
     return {
-      currentMode: this.currentMode,
-      stageKitProcessorActive: !!this.stageKitDirectProcessor,
-      traditionalProcessorActive: false,
+      currentMode: this.config.mode,
+      stageKitProcessorActive:
+        this.config.mode === 'cue' ? !!this.stageKitCueProcessor : !!this.stageKitDirectProcessor,
       networkListenerActive: !!this.networkListener,
     }
   }
@@ -244,6 +291,10 @@ export class ProcessorManager extends EventEmitter {
     if (this.stageKitDirectProcessor) {
       this.stageKitDirectProcessor.destroy()
       this.stageKitDirectProcessor = null
+    }
+    if (this.stageKitCueProcessor) {
+      this.stageKitCueProcessor.destroy()
+      this.stageKitCueProcessor = null
     }
 
     // Remove all listeners

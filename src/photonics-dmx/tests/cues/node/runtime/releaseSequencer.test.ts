@@ -7,15 +7,15 @@ import { describe, expect, it, jest } from '@jest/globals'
 
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import { monotonicNowMs } from '../../../../../shared/time'
-import { YargNodeCue } from '../../../../cues/node/runtime/YargNodeCue'
-import { YargMotionNodeCue } from '../../../../cues/node/runtime/YargMotionNodeCue'
+import { LightingNodeCue } from '../../../../cues/node/runtime/LightingNodeCue'
+import { MotionNodeCue } from '../../../../cues/node/runtime/MotionNodeCue'
 import { AudioNodeCue } from '../../../../cues/node/runtime/AudioNodeCue'
 import type {
   ActionNode,
   AudioLightingNodeCueDefinition,
-  YargEventNode,
-  YargLightingNodeCueDefinition,
-  YargMotionNodeCueDefinition,
+  NetEventNode,
+  NetLightingNodeCueDefinition,
+  NetMotionNodeCueDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
@@ -23,6 +23,7 @@ import { createMockLightingConfig } from '../../../helpers/testFixtures'
 import type { CueData } from '../../../../cues/types/cueTypes'
 import type { AudioCueData } from '../../../../cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
+import type { AudioEventNodeUnion } from '../../../../cues/types/nodeCueTypes'
 
 function makeSequencerStub(): ILightingController {
   return {
@@ -146,8 +147,8 @@ function motionPatternAction(id: string): ActionNode {
   } as unknown as ActionNode
 }
 
-function trivialYargLightingCueDef(): YargLightingNodeCueDefinition {
-  const ev: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+function trivialYargLightingCueDef(): NetLightingNodeCueDefinition {
+  const ev: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   return {
     kind: 'lighting',
     id: 'trivial-yarg',
@@ -158,11 +159,11 @@ function trivialYargLightingCueDef(): YargLightingNodeCueDefinition {
     nodes: { events: [ev], actions: [setColorAction('sc1')], logic: [] },
     connections: [{ from: 'ev-called', to: 'sc1' }],
     layout: { nodePositions: {} },
-  } as unknown as YargLightingNodeCueDefinition
+  } as unknown as NetLightingNodeCueDefinition
 }
 
-function trivialYargMotionCueDef(): YargMotionNodeCueDefinition {
-  const ev: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+function trivialYargMotionCueDef(): NetMotionNodeCueDefinition {
+  const ev: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   return {
     kind: 'motion',
     id: 'trivial-motion',
@@ -171,7 +172,7 @@ function trivialYargMotionCueDef(): YargMotionNodeCueDefinition {
     nodes: { events: [ev], actions: [motionPatternAction('mp1')], logic: [] },
     connections: [{ from: 'ev-called', to: 'mp1' }],
     layout: { nodePositions: {} },
-  } as YargMotionNodeCueDefinition
+  } as NetMotionNodeCueDefinition
 }
 
 function trivialAudioLightingCueDef(): AudioLightingNodeCueDefinition {
@@ -195,9 +196,9 @@ function trivialAudioLightingCueDef(): AudioLightingNodeCueDefinition {
 describe('releaseSequencer drops per-sequencer state', () => {
   const lightManager = new DmxLightManager(createMockLightingConfig())
 
-  it('YargNodeCue: execute populates state, releaseSequencer drops it', () => {
-    const compiled = NodeCueCompiler.compileYargCue(trivialYargLightingCueDef())
-    const cue = new YargNodeCue('g1', compiled)
+  it('LightingNodeCue: execute populates state, releaseSequencer drops it', () => {
+    const compiled = NodeCueCompiler.compileCue(trivialYargLightingCueDef(), 'yarg')
+    const cue = new LightingNodeCue('g1', compiled)
     const seqA = makeSequencerStub()
     const seqB = makeSequencerStub()
     cue.execute(minimalYargCueData(), seqA, lightManager)
@@ -216,9 +217,9 @@ describe('releaseSequencer drops per-sequencer state', () => {
     expect(states.size).toBe(0)
   })
 
-  it('YargMotionNodeCue: releaseSequencer drops per-sequencer state', () => {
-    const compiled = NodeCueCompiler.compileYargCue(trivialYargMotionCueDef())
-    const cue = new YargMotionNodeCue('g1', compiled)
+  it('MotionNodeCue: releaseSequencer drops per-sequencer state', () => {
+    const compiled = NodeCueCompiler.compileCue(trivialYargMotionCueDef(), 'yarg')
+    const cue = new MotionNodeCue('g1', compiled)
     const seqA = makeSequencerStub()
     cue.execute(minimalYargCueData(), seqA, lightManager)
     const states = (cue as unknown as { states: Map<ILightingController, unknown> }).states
@@ -228,7 +229,10 @@ describe('releaseSequencer drops per-sequencer state', () => {
   })
 
   it('AudioNodeCue: releaseSequencer drops per-sequencer state and per-sequencer group store', async () => {
-    const compiled = NodeCueCompiler.compileAudioCue(trivialAudioLightingCueDef())
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(
+      trivialAudioLightingCueDef(),
+      'audio',
+    )
     const cue = new AudioNodeCue('g1', compiled)
     const seqA = makeSequencerStub()
     await cue.execute(minimalAudioCueData(), seqA, lightManager)
@@ -247,14 +251,17 @@ describe('releaseSequencer drops per-sequencer state', () => {
   })
 
   it('releaseSequencer for an unknown sequencer is a safe no-op', () => {
-    const compiled = NodeCueCompiler.compileYargCue(trivialYargLightingCueDef())
-    const cue = new YargNodeCue('g1', compiled)
+    const compiled = NodeCueCompiler.compileCue(trivialYargLightingCueDef(), 'yarg')
+    const cue = new LightingNodeCue('g1', compiled)
     const unrelated = makeSequencerStub()
     expect(() => cue.releaseSequencer(unrelated)).not.toThrow()
   })
 
   it('Audio group-var stores are per-sequencer, not shared across rigs', async () => {
-    const compiled = NodeCueCompiler.compileAudioCue(trivialAudioLightingCueDef())
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(
+      trivialAudioLightingCueDef(),
+      'audio',
+    )
     const cue = new AudioNodeCue('g1', compiled)
     const seqA = makeSequencerStub()
     const seqB = makeSequencerStub()

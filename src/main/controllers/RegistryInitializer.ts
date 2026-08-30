@@ -1,14 +1,16 @@
 import * as path from 'path'
 import { app } from 'electron'
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
-import { YargCueRegistry } from '../../photonics-dmx/cues/registries/YargCueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
+import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import {
   NodeCueLoader,
   NodeCueListSummary,
 } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type { RuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 import { EffectLoader, EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader'
+import { cueDomainBinding } from './cueDomainBindings'
+import type { CueDomain } from '../../services/configuration/cueDomainTypes'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('RegistryInitializer')
@@ -31,51 +33,13 @@ export interface RegistryInitializerContext {
 export class RegistryInitializer {
   constructor(private readonly ctx: RegistryInitializerContext) {}
 
-  public async initializeCueRegistry(): Promise<void> {
-    const registry = YargCueRegistry.getInstance()
-    const config = this.ctx.getConfig()
-
-    const enabledGroupIds = config.getPreference('cueDomains').yarg.enabledGroups ?? []
-    if (enabledGroupIds.length > 0) {
-      registry.setEnabledGroups(enabledGroupIds)
-      log.info('CueRegistry initialized with enabled groups:', enabledGroupIds)
-    } else {
-      const allGroups = registry.getAllGroups()
-      registry.setEnabledGroups(allGroups)
-      log.info('CueRegistry initialized with all groups (no preference set):', allGroups)
-    }
-
-    const consistencyWindow = config.getPreference('cueConsistencyWindow')
-    registry.setCueConsistencyWindow(consistencyWindow)
-    log.info('CueRegistry initialized with consistency window:', consistencyWindow, 'ms')
-
-    const selectionMode = config.getCueGroupSelectionMode()
-    registry.setCueGroupSelectionMode(selectionMode)
-    log.info('CueRegistry initialized with cue group selection mode:', selectionMode)
-
-    const disabledYarg = config.getPreference('cueDomains').yarg.disabledCues
-    registry.setDisabledCues(disabledYarg)
-  }
-
-  public async initializeAudioCueRegistry(): Promise<void> {
-    const registry = AudioCueRegistry.getInstance()
-    const config = this.ctx.getConfig()
-
-    const enabledGroupIds = config.getPreference('cueDomains').audio.enabledGroups
-    if (enabledGroupIds && enabledGroupIds.length > 0) {
-      registry.setEnabledGroups(enabledGroupIds)
-      log.info('AudioCueRegistry initialized with enabled groups:', enabledGroupIds)
-    } else {
-      const allGroups = registry.getRegisteredGroups()
-      registry.setEnabledGroups(allGroups)
-      if (allGroups.length > 0) {
-        void config.updateCueDomain('audio', { enabledGroups: allGroups })
-      }
-      log.info('AudioCueRegistry initialized with all groups (no preference set):', allGroups)
-    }
-
-    const disabledAudio = config.getPreference('cueDomains').audio.disabledCues
-    registry.setDisabledCues(disabledAudio)
+  /**
+   * Apply one cue domain's registry-wide settings from preferences. This runs before the node-cue
+   * loader registers any groups, so enabled and disabled state would land on an empty registry;
+   * ControllerManager reconciles those once the groups exist.
+   */
+  public async initializeCueRegistry(domain: CueDomain): Promise<void> {
+    await cueDomainBinding(domain).applyStartupSettings?.(this.ctx.getConfig())
   }
 
   public async initializeEffectLoader(): Promise<void> {
@@ -118,8 +82,11 @@ export class RegistryInitializer {
     const baseDir = path.join(app.getPath('appData'), 'Photonics.rocks')
     const nodeCueLoader = new NodeCueLoader({
       baseDir,
-      yargRegistry: YargCueRegistry.getInstance(),
-      audioRegistry: AudioCueRegistry.getInstance(),
+      registries: {
+        yarg: getCueRegistry('yarg'),
+        rb3: getCueRegistry('rb3'),
+        audio: AudioCueRegistry.getInstance(),
+      },
       effectLoader: this.ctx.getEffectLoader() ?? undefined,
       runtimeBroadcaster: this.ctx.runtimeBroadcaster,
     })

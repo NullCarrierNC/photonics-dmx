@@ -2,12 +2,13 @@ import React from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import type { EditorNodeData } from '../../lib/types'
 import { FONT_COURIER_NEW } from '../../lib/styles'
-import FlowNodeFrame from './FlowNodeFrame'
+import FlowNodeFrame, { NODE_WIDTH_STYLES } from './FlowNodeFrame'
 import type {
   ForEachLightLogicNode,
   LogicNode,
   ValueSource,
 } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { LOGIC_NODE_META } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 const formatValueSource = (value?: ValueSource): string => {
   if (!value) return ''
@@ -65,6 +66,91 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
           {logic.assignTo && (
             <div>
               To Var: <Mono>{logic.assignTo}</Mono>
+            </div>
+          )}
+        </>
+      )
+    }
+    if (logicType === 'expression') {
+      return (
+        <>
+          <div>
+            <Mono>{logic.expression}</Mono>
+          </div>
+          <div>
+            To Var: <Mono>{logic.assignTo}</Mono>
+          </div>
+        </>
+      )
+    }
+    if (logicType === 'frame-gate') {
+      return (
+        <div>
+          Every <Mono>{formatValueSource(logic.divisor)}</Mono> frames
+        </div>
+      )
+    }
+    if (logicType === 'tempo') {
+      return (
+        <>
+          <div>TEMPO</div>
+          <div>
+            beat → <Mono>{logic.assignBeatMs}</Mono>
+          </div>
+          {logic.assignBarMs && (
+            <div>
+              bar → <Mono>{logic.assignBarMs}</Mono>
+            </div>
+          )}
+          {logic.assignPhraseMs && (
+            <div>
+              phrase → <Mono>{logic.assignPhraseMs}</Mono>
+            </div>
+          )}
+          {logic.assignCycles && (
+            <div>
+              cycles → <Mono>{logic.assignCycles}</Mono>
+            </div>
+          )}
+        </>
+      )
+    }
+    if (logicType === 'indexed-variable') {
+      const indexText = formatValueSource(logic.index)
+      return (
+        <>
+          <div>
+            {(logic.mode as string).toUpperCase()} <Mono>{logic.varName || '?'}</Mono>#
+            <Mono>{indexText}</Mono>
+          </div>
+          {logic.mode === 'get' && logic.assignTo && (
+            <div>
+              To Var: <Mono>{logic.assignTo}</Mono>
+            </div>
+          )}
+          {logic.mode === 'set' && (
+            <div>
+              = <Mono>{formatValueSource(logic.value)}</Mono>
+            </div>
+          )}
+        </>
+      )
+    }
+    if (logicType === 'led-changed') {
+      return (
+        <>
+          <div>LED CHANGED</div>
+          <div>
+            index → <Mono>{logic.assignIndex}</Mono>
+          </div>
+          {logic.assignColor && (
+            <div>
+              colour → <Mono>{logic.assignColor}</Mono>
+            </div>
+          )}
+          {logic.assignEdge && (
+            <div>
+              edge → <Mono>{logic.assignEdge}</Mono>
             </div>
           )}
         </>
@@ -355,24 +441,17 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
     return logicType
   }
 
-  const isConditional = logicType === 'conditional'
-  const isForEachLight = logicType === 'for-each-light'
-  const isDataNode = logicType === 'cue-data' || logicType === 'config-data'
-  const isArrayNode =
-    logicType === 'array-length' ||
-    logicType === 'reverse-lights' ||
-    logicType === 'create-pairs' ||
-    logicType === 'build-ring' ||
-    logicType === 'concat-lights' ||
-    logicType === 'shuffle-lights' ||
-    logicType === 'for-each-light' ||
-    logicType === 'reverse-colors' ||
-    logicType === 'concat-colors' ||
-    logicType === 'shuffle-colors'
-  const isDebugNode = logicType === 'debugger'
+  const meta = LOGIC_NODE_META[logicType]
+  // Conditional and frame-gate route flow through `true`/`false` ports; for-each-light and led-changed
+  // fan out through `each`/`done` ports. Category drives the colour bucket.
+  const isConditional = meta.ports === 'true-false'
+  const isForEachLight = meta.ports === 'each-done'
+  const isDataNode = meta.category === 'data'
+  const isArrayNode = meta.category === 'array'
+  const isDebugNode = meta.category === 'debug'
 
   const nodeStyles = isDebugNode
-    ? 'border-red-400 bg-red-50 dark:bg-red-900/30 text-xs shadow-sm min-w-[150px] max-w-[320px]'
+    ? 'border-red-400 bg-red-50 dark:bg-red-900/30 text-xs shadow-sm min-w-[150px]'
     : isArrayNode
       ? 'border-teal-400 bg-teal-50 dark:bg-teal-900/30 text-xs shadow-sm min-w-[150px]'
       : isDataNode
@@ -390,10 +469,10 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
   const detailStyles = isDebugNode
     ? 'text-[11px] text-red-900 dark:text-red-50 opacity-90 text-center break-words'
     : isArrayNode
-      ? 'text-[11px] text-teal-900 dark:text-teal-50 opacity-90 text-center'
+      ? 'text-[11px] text-teal-900 dark:text-teal-50 opacity-90 text-center break-words'
       : isDataNode
-        ? 'text-[11px] text-orange-900 dark:text-orange-50 opacity-90 text-center'
-        : 'text-[11px] text-amber-900 dark:text-amber-50 opacity-90 text-center'
+        ? 'text-[11px] text-orange-900 dark:text-orange-50 opacity-90 text-center break-words'
+        : 'text-[11px] text-amber-900 dark:text-amber-50 opacity-90 text-center break-words'
 
   const handleStyles = isDebugNode
     ? 'text-red-700 dark:text-red-100'
@@ -410,7 +489,7 @@ const LogicNodeComponent: React.FC<NodeProps<EditorNodeData>> = ({ id, data, sel
   return (
     <FlowNodeFrame
       id={id}
-      className={`px-3 py-2 rounded-lg border-2 ${nodeStyles} ${selectedStyles}`}>
+      className={`px-3 py-2 rounded-lg border-2 ${NODE_WIDTH_STYLES} ${nodeStyles} ${selectedStyles}`}>
       <Handle type="target" position={Position.Top} />
       <div className={titleStyles}>{data.label}</div>
       <div className={detailStyles}>{renderDetails()}</div>

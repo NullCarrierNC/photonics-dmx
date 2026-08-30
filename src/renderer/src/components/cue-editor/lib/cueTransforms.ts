@@ -15,20 +15,25 @@ import type {
   NodeCueFile,
   NodeCueMode,
   LogicNode,
-  YargEventNode,
-  YargNodeCueDefinition,
+  NetEventNode,
+  NetNodeCueDefinition,
   YargEffectDefinition,
   NotesNode,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument, EditorNode } from './types'
-import { getAudioEventLabel, getYargEventLabel } from './cueUtils'
+import {
+  getAudioEventLabel,
+  getYargEventLabel,
+  replaceCueInFile,
+  replaceEffectInFile,
+} from './cueUtils'
 import { isValidEditorEdge } from './edgeValidation'
 import type { EditorMode } from './edgeValidation'
 
 /** Edge data for editor edges (port info for logic/conditional nodes). */
 export type EditorEdgeData = { fromPort?: string | null; toPort?: string | null }
 
-type CueDefinition = YargNodeCueDefinition | AudioNodeCueDefinition
+type CueDefinition = NetNodeCueDefinition | AudioNodeCueDefinition
 type EffectDefinition = YargEffectDefinition | AudioEffectDefinition
 
 const DEFAULT_POS = {
@@ -53,8 +58,8 @@ const AUDIO_TRIGGER_SAVE_DEFAULTS = {
 }
 
 function normalizeAudioEventForSave(
-  event: YargEventNode | AudioEventNodeUnion,
-): YargEventNode | AudioEventNodeUnion {
+  event: NetEventNode | AudioEventNodeUnion,
+): NetEventNode | AudioEventNodeUnion {
   if ('frequencyRange' in event && event.eventType === 'audio-trigger') {
     const t = event as AudioTriggerNode & { sensitivity?: number }
     const threshold =
@@ -112,7 +117,7 @@ function normalizeAudioEventForSave(
 }
 
 function buildEventNodes(
-  events: (YargEventNode | AudioEventNodeUnion)[],
+  events: (NetEventNode | AudioEventNodeUnion)[],
   nodePositions: NodePositions,
   mode: NodeCueMode,
 ): EditorNode[] {
@@ -124,7 +129,7 @@ function buildEventNodes(
       kind: 'event' as const,
       label:
         mode === 'yarg'
-          ? getYargEventLabel((event as YargEventNode).eventType)
+          ? getYargEventLabel((event as NetEventNode).eventType)
           : event.eventType === 'audio-trigger'
             ? (event as AudioTriggerNode).nodeLabel
             : getAudioEventLabel((event as AudioEventNode).eventType),
@@ -263,7 +268,7 @@ function connectionsToEdges(connections: ConnectionInput[]): Edge[] {
 
 /** Payloads extracted from flow nodes/edges for cue or effect document. */
 export type NodeGraphPayloads = {
-  events: (YargEventNode | AudioEventNodeUnion)[]
+  events: (NetEventNode | AudioEventNodeUnion)[]
   actions: ActionNode[]
   logic: LogicNode[]
   eventRaisers: EventRaiserNode[]
@@ -315,8 +320,8 @@ function flowToNodesAndConnections(
 
   const payload: NodeGraphPayloads = {
     events: eventNodes.map((n) =>
-      normalizeAudioEventForSave(n.data.payload as YargEventNode | AudioEventNodeUnion),
-    ) as (YargEventNode | AudioEventNodeUnion)[],
+      normalizeAudioEventForSave(n.data.payload as NetEventNode | AudioEventNodeUnion),
+    ) as (NetEventNode | AudioEventNodeUnion)[],
     actions: actionNodes.map((n) => n.data.payload as ActionNode),
     logic: logicNodes.map((n) => n.data.payload as LogicNode),
     eventRaisers: eventRaiserNodes.map((n) => n.data.payload as EventRaiserNode),
@@ -396,13 +401,10 @@ const updateDocumentFromFlow = (
         : currentCueDefinition.layout?.viewport,
     },
   }
-  const updatedCues = (editorDoc.file as NodeCueFile).cues.map((cue) =>
-    cue.id === updatedCue.id ? updatedCue : cue,
-  )
-  return {
-    ...(editorDoc.file as NodeCueFile),
-    cues: updatedCues,
-  }
+  // The flow canvas is mode-agnostic, so `payload.events` is the net-or-audio union rather than one
+  // family's array, and the rebuilt cue matches neither branch. A canvas only holds the events of
+  // the cue loaded into it, so the family is whatever `currentCueDefinition` already was.
+  return replaceCueInFile(editorDoc.file as NodeCueFile, updatedCue.id, updatedCue as CueDefinition)
 }
 
 export { cueToFlow, updateDocumentFromFlow }
@@ -462,13 +464,13 @@ const updateEffectDocumentFromFlow = (
         : currentEffectDefinition.layout?.viewport,
     },
   }
-  const updatedEffects = (editorDoc.file as EffectFile).effects.map((eff) =>
-    eff.id === updatedEffect.id ? updatedEffect : eff,
+  // Same mode-agnostic canvas payload as updateDocumentFromFlow, so the family is whatever
+  // `currentEffectDefinition` already was.
+  return replaceEffectInFile(
+    editorDoc.file as EffectFile,
+    updatedEffect.id,
+    updatedEffect as EffectDefinition,
   )
-  return {
-    ...(editorDoc.file as EffectFile),
-    effects: updatedEffects,
-  }
 }
 
 export { effectToFlow, updateEffectDocumentFromFlow }

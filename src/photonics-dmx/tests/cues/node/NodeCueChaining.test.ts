@@ -1,7 +1,7 @@
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
-import { YargNodeCue } from '../../../cues/node/runtime/YargNodeCue'
+import { LightingNodeCue } from '../../../cues/node/runtime/LightingNodeCue'
 import { ActionEffectFactory } from '../../../cues/node/compiler/ActionEffectFactory'
-import { YargNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
+import { NetNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { CueType } from '../../../cues/types/cueTypes'
 import { Effect, TrackedLight } from '../../../types'
@@ -12,7 +12,7 @@ describe('Node cue chaining', () => {
   })
 
   it('executes actions sequentially with execution engine', async () => {
-    const definition: YargNodeCueDefinition = {
+    const definition: NetNodeCueDefinition = {
       id: 'test-cue',
       name: 'Chained Beat',
       description: '',
@@ -78,8 +78,8 @@ describe('Node cue chaining', () => {
       ],
     }
 
-    const compiled = NodeCueCompiler.compileYargCue(definition)
-    const cue = new YargNodeCue('group-1', compiled)
+    const compiled = NodeCueCompiler.compileCue(definition, 'yarg')
+    const cue = new LightingNodeCue('group-1', compiled)
 
     const frontLight: TrackedLight = { id: 'front-1', position: 0 }
     const backLight: TrackedLight = { id: 'back-1', position: 1 }
@@ -96,13 +96,21 @@ describe('Node cue chaining', () => {
         callOrder.push(name)
       },
       setEffect: () => Promise.resolve(),
-      addEffectWithCallback: (name: string, _effect: Effect, callback: () => void) => {
+      addEffectWithCallback: (
+        name: string,
+        _effect: Effect,
+        callback: (cancelled: boolean) => void,
+      ) => {
         callOrder.push(name)
-        callback()
+        callback(false)
       },
-      setEffectWithCallback: (name: string, _effect: Effect, callback: () => void) => {
+      setEffectWithCallback: (
+        name: string,
+        _effect: Effect,
+        callback: (cancelled: boolean) => void,
+      ) => {
         callOrder.push(name)
-        callback()
+        callback(false)
       },
       addEffectUnblockedName: (name: string) => {
         callOrder.push(name)
@@ -112,13 +120,21 @@ describe('Node cue chaining', () => {
         callOrder.push(name)
         return true
       },
-      addEffectUnblockedNameWithCallback: (name: string, _effect: Effect, callback: () => void) => {
+      addEffectUnblockedNameWithCallback: (
+        name: string,
+        _effect: Effect,
+        callback: (cancelled: boolean) => void,
+      ) => {
         callOrder.push(name)
-        callback()
+        callback(false)
       },
-      setEffectUnblockedNameWithCallback: (name: string, _effect: Effect, callback: () => void) => {
+      setEffectUnblockedNameWithCallback: (
+        name: string,
+        _effect: Effect,
+        callback: (cancelled: boolean) => void,
+      ) => {
         callOrder.push(name)
-        callback()
+        callback(false)
       },
       removeEffectCallback: () => {},
       removeEffectByLayer: () => {},

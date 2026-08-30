@@ -2,9 +2,8 @@ import { IpcMain, dialog } from 'electron'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { ControllerManager } from '../../controllers/ControllerManager'
-import { sendToAllWindows } from '../../utils/windowUtils'
 import { ipcError, ipcSuccess } from '../ipcResult'
-import { CONFIG, RENDERER_RECEIVE, RIGS } from '../../../shared/ipcChannels'
+import { CONFIG, RIGS } from '../../../shared/ipcChannels'
 import {
   validateLightingConfiguration,
   validateDmxFixturesArray,
@@ -12,6 +11,7 @@ import {
 } from '../inputValidation'
 import {
   buildRigExportFile,
+  migrateRigExportFixtures,
   validateRigExportFile,
 } from '../../../photonics-dmx/helpers/rigImportExport'
 import { createLogger } from '../../../shared/logger'
@@ -54,7 +54,6 @@ export function registerLightsRigsConfigHandlers(
       const rigsChanged = await config.syncRigsWithUserLights()
       if (rigsChanged) {
         await controllerManager.restartControllers()
-        sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
       }
       return ipcSuccess()
     } catch (err) {
@@ -63,11 +62,11 @@ export function registerLightsRigsConfigHandlers(
     }
   })
 
-  ipcMain.handle(CONFIG.GET_LIGHT_LAYOUT, async (_, filename: string) => {
+  ipcMain.handle(CONFIG.GET_LIGHT_LAYOUT, async () => {
     try {
       return controllerManager.getConfig().getLightingLayout()
     } catch (error) {
-      log.error(`Error fetching light layout for ${filename}:`, error)
+      log.error('Error fetching light layout:', error)
       throw error
     }
   })
@@ -81,8 +80,6 @@ export function registerLightsRigsConfigHandlers(
       await controllerManager.getConfig().updateLightingLayout(validation.value)
 
       await controllerManager.restartControllers()
-
-      sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
 
       return { success: true }
     } catch (error) {
@@ -129,12 +126,16 @@ export function registerLightsRigsConfigHandlers(
       const existingRig = config.getDmxRig(rig.id)
       const previousActiveState = existingRig?.active ?? false
 
-      await config.saveDmxRig(rig)
+      // With multiple active rigs disallowed, activating one deactivates the rest. New Rig, import,
+      // duplicate and the settings screen all save through this handler, so the invariant holds
+      // whichever path created the rig.
+      await config.saveDmxRig(rig, {
+        deactivateOthers: config.getPreference('allowMultipleActiveRigs') !== true,
+      })
 
       const isNowOrWasActive = rig.active || previousActiveState
       if (isNowOrWasActive) {
         await controllerManager.restartControllers()
-        sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
       }
 
       return { success: true }
@@ -154,7 +155,6 @@ export function registerLightsRigsConfigHandlers(
 
       if (wasActive) {
         await controllerManager.restartControllers()
-        sendToAllWindows(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, undefined)
       }
 
       return { success: true }
@@ -221,11 +221,14 @@ export function registerLightsRigsConfigHandlers(
       if (!envelope.ok) {
         return { success: false, error: envelope.error }
       }
-      const rigValidation = validateDmxRigPayload(envelope.value.rig)
+      // A rig file exported by an older build can name fixture types this build has since collapsed
+      // (`rgbw`, `rgb/s`). Migrate before validation, which checks against the current type list.
+      const migrated = migrateRigExportFixtures(envelope.value)
+      const rigValidation = validateDmxRigPayload(migrated.rig)
       if (!rigValidation.ok) {
         return { success: false, error: `Rig: ${rigValidation.error}` }
       }
-      const templatesValidation = validateDmxFixturesArray(envelope.value.templates, 'templates')
+      const templatesValidation = validateDmxFixturesArray(migrated.templates, 'templates')
       if (!templatesValidation.ok) {
         return { success: false, error: `Templates: ${templatesValidation.error}` }
       }

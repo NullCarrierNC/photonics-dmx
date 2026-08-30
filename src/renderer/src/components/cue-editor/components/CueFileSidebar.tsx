@@ -5,7 +5,7 @@ import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/l
 import type {
   NodeCueMode,
   NodeCueKind,
-  YargNodeCueDefinition,
+  NetNodeCueDefinition,
   AudioNodeCueDefinition,
   YargEffectDefinition,
   AudioEffectDefinition,
@@ -31,7 +31,7 @@ type Props = {
   onRemoveEffect: (effectId: string) => void
   onSelectCue: (
     cue:
-      | YargNodeCueDefinition
+      | NetNodeCueDefinition
       | AudioNodeCueDefinition
       | YargEffectDefinition
       | AudioEffectDefinition

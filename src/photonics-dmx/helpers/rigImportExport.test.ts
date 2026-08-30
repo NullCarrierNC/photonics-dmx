@@ -9,6 +9,7 @@ import {
   countOrphanLights,
   duplicateRig,
   mapLightsToNewIdsForSave,
+  migrateRigExportFixtures,
   prepareImportedRig,
   reconcileImportedTemplates,
   suggestUniqueName,
@@ -33,16 +34,18 @@ const rgbTemplate: DmxFixture = {
   channels: { masterDimmer: 0, red: 1, green: 2, blue: 3 },
 }
 
+/** An RGB fixture carrying a white extra — what the discrete RGBW archetype migrates to. */
 const rgbwTemplate: DmxFixture = {
   id: 'tpl-rgbw',
   position: 0,
-  fixture: FixtureTypes.RGBW,
+  fixture: FixtureTypes.RGB,
   label: 'RGBW',
   name: 'RGBW',
   isStrobeEnabled: false,
   group: '',
   universe: 1,
-  channels: { masterDimmer: 0, red: 1, green: 2, blue: 3, white: 4 },
+  channels: { masterDimmer: 0, red: 1, green: 2, blue: 3 },
+  extraChannels: [{ type: 'white', channel: 4 }],
 }
 
 const strobeTemplate: DmxFixture = {
@@ -133,6 +136,54 @@ describe('buildRigExportFile', () => {
   })
 })
 
+describe('migrateRigExportFixtures', () => {
+  /** A rig file as an older build wrote it: discrete rgbw templates and rig lights. */
+  const legacyFile = () => {
+    const file = buildRigExportFile(makeRig(), [rgbTemplate, rgbwTemplate])
+    const legacy = JSON.parse(JSON.stringify(file)) as typeof file
+    legacy.templates = legacy.templates.map((t) =>
+      t.id === 'tpl-rgbw'
+        ? ({
+            ...t,
+            fixture: 'rgbw',
+            channels: { masterDimmer: 0, red: 1, green: 2, blue: 3, white: 4 },
+            extraChannels: undefined,
+          } as unknown as DmxFixture)
+        : t,
+    )
+    legacy.rig.config.frontLights = legacy.rig.config.frontLights.map((l) => {
+      if (l.fixtureId !== 'tpl-rgbw') return l
+      const legacyLight = {
+        ...l,
+        fixture: 'rgbw',
+        channels: { masterDimmer: 10, red: 11, green: 12, blue: 13, white: 14 },
+      } as unknown as DmxLight
+      // A file written before extras existed carries none.
+      delete legacyLight.extraChannels
+      return legacyLight
+    })
+    return legacy
+  }
+
+  it('brings legacy rgbw templates and rig lights onto the current fixture schema', () => {
+    const migrated = migrateRigExportFixtures(legacyFile())
+
+    const template = migrated.templates.find((t) => t.id === 'tpl-rgbw')!
+    expect(template.fixture).toBe(FixtureTypes.RGB)
+    expect(template.extraChannels).toEqual([{ type: 'white', channel: 4 }])
+
+    const light = migrated.rig.config.frontLights.find((l) => l.fixtureId === 'tpl-rgbw')!
+    expect(light.fixture).toBe(FixtureTypes.RGB)
+    expect(light.extraChannels).toEqual([{ type: 'white', channel: 14 }])
+    expect((light.channels as unknown as Record<string, number>).white).toBeUndefined()
+  })
+
+  it('returns the same reference for a file already on the current schema', () => {
+    const file = buildRigExportFile(makeRig(), [rgbTemplate, rgbwTemplate])
+    expect(migrateRigExportFixtures(file)).toBe(file)
+  })
+})
+
 describe('validateRigExportFile', () => {
   const valid = () => buildRigExportFile(makeRig(), [rgbTemplate, rgbwTemplate])
 
@@ -215,6 +266,65 @@ describe('reconcileImportedTemplates (de-dup policy)', () => {
     const result = reconcileImportedTemplates([a, b], [])
     expect(result.templatesToAdd.map((t) => t.id)).toEqual(['a'])
     expect(result.fixtureIdMap).toEqual({ a: 'a', b: 'a' })
+  })
+
+  it('treats an absent and an empty extraChannels array as identical content', () => {
+    const existing = [rgbTemplate] // no extraChannels key
+    const importedEmpty: DmxFixture = { ...rgbTemplate, id: 'tpl-rgb-2', extraChannels: [] }
+    const result = reconcileImportedTemplates([importedEmpty], existing)
+    expect(result.templatesToAdd).toEqual([])
+    expect(result.fixtureIdMap).toEqual({ 'tpl-rgb-2': 'tpl-rgb' })
+  })
+
+  it('keeps templates that differ only in their extra channels as distinct', () => {
+    const withAmber: DmxFixture = {
+      ...rgbTemplate,
+      id: 'tpl-rgb-amber',
+      extraChannels: [{ type: 'amber', channel: 5 }],
+    }
+    const result = reconcileImportedTemplates([withAmber], [rgbTemplate])
+    expect(result.templatesToAdd.map((t) => t.id)).toEqual(['tpl-rgb-amber'])
+    expect(result.reusedCount).toBe(0)
+  })
+
+  it('content-dedups templates with identical extra channels under different ids', () => {
+    const a: DmxFixture = {
+      ...rgbTemplate,
+      id: 'a',
+      extraChannels: [{ type: 'amber', channel: 5 }],
+    }
+    const b: DmxFixture = {
+      ...rgbTemplate,
+      id: 'b',
+      extraChannels: [{ type: 'amber', channel: 5 }],
+    }
+    const result = reconcileImportedTemplates([b], [a])
+    expect(result.templatesToAdd).toEqual([])
+    expect(result.fixtureIdMap).toEqual({ b: 'a' })
+  })
+
+  it('content-dedups a template whose scaling is spelled out at the 100% default', () => {
+    const local: DmxFixture = { ...rgbTemplate, id: 'a' }
+    const foreign: DmxFixture = {
+      ...rgbTemplate,
+      id: 'b',
+      brightnessScaling: { red: 100, green: 100 },
+      extraChannels: [{ type: 'amber', channel: 5, scale: 100 }],
+    }
+    const localWithAmber: DmxFixture = {
+      ...local,
+      extraChannels: [{ type: 'amber', channel: 5 }],
+    }
+    const result = reconcileImportedTemplates([foreign], [localWithAmber])
+    expect(result.templatesToAdd).toEqual([])
+    expect(result.fixtureIdMap).toEqual({ b: 'a' })
+  })
+
+  it('keeps a genuinely scaled template distinct from an unscaled one', () => {
+    const unscaled: DmxFixture = { ...rgbTemplate, id: 'a' }
+    const scaled: DmxFixture = { ...rgbTemplate, id: 'b', brightnessScaling: { green: 80 } }
+    const result = reconcileImportedTemplates([scaled], [unscaled])
+    expect(result.templatesToAdd.map((t) => t.id)).toEqual(['b'])
   })
 })
 

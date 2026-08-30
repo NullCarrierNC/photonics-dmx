@@ -52,6 +52,12 @@ export interface QueuedEffect {
   effect: Effect
   lightId: string
   isPersistent: boolean
+  /**
+   * Run this entry belongs to, carried so a light that starts from the queue still counts towards
+   * its run. The run's light total is fixed when the run is registered and includes queued lights,
+   * so an entry that starts without its id leaves the run one completion short forever.
+   */
+  effectRunId?: string
 }
 
 /**
@@ -93,6 +99,7 @@ export interface ILayerManager {
   captureFinalStates(layer: number, lights: TrackedLight[]): void
   getLightState(layer: number, lightId: string): RGBIO | undefined
   clearLayerStates(layer: number): void
+  clearLightLayerState(layer: number, lightId: string): void
   getLightTransitionController(): LightTransitionController
 
   // Per-light effect management
@@ -115,6 +122,12 @@ export interface ITransitionEngine {
   setEffectManager(effectManager: IEffectManager): void
   advanceFrame(frame: FrameContext): void
   updateTransitions(frame?: FrameContext): void
+  /**
+   * Removes and completes every active effect that has advanced past its last transition, so
+   * a song event that releases an effect and prompts its re-raise leaves the name free for
+   * the new submission.
+   */
+  reapCompletedEffects(): void
   prepareTransition(
     activeEffect: LightEffectState,
     transition: EffectTransition,
@@ -163,18 +176,30 @@ export interface IEffectManager {
    * would otherwise produce desynchronised motion.
    */
   replaceEffect(name: string, effect: Effect, isPersistent?: boolean): void
+  /**
+   * `replaceEffect` for a caller that parks on a completion callback. The callback held for the
+   * displaced run is fired with `cancelled = true`, so a blocking node waiting on it is released.
+   *
+   * @returns True when the effect was applied, false when a gate refused it.
+   */
+  replaceEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: (cancelled: boolean) => void,
+    isPersistent?: boolean,
+  ): boolean
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   addEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
   ): void
   setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
   ): void
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void
@@ -252,9 +277,31 @@ export interface ISongEventHandler {
       | 'keys-blue'
       | 'keys-orange'
       | 'vocal-note'
-      | 'vocal-note-off',
+      | 'vocal-note-off'
+      | 'led-1'
+      | 'led-2'
+      | 'led-3'
+      | 'led-4'
+      | 'led-5'
+      | 'led-6'
+      | 'led-7'
+      | 'led-8'
+      | 'led-1-off'
+      | 'led-2-off'
+      | 'led-3-off'
+      | 'led-4-off'
+      | 'led-5-off'
+      | 'led-6-off'
+      | 'led-7-off'
+      | 'led-8-off'
+      | 'fog-on'
+      | 'fog-off',
   ): void
 }
+
+/** The condition union accepted by {@link ISongEventHandler.handleEvent} — the single source shared by
+ *  every layer that forwards a song event (sequencer, ChainFanout, CueRuntime). */
+export type SongEventCondition = Parameters<ISongEventHandler['handleEvent']>[0]
 
 /**
  * @interface ISystemEffectsController
@@ -263,6 +310,8 @@ export interface ISongEventHandler {
 export interface ISystemEffectsController {
   isBlackoutActive(): boolean
   cancelBlackout(): void
+  holdOcclusion(on: boolean): void
+  isOcclusionHeld(): boolean
   setOnBlackoutCompleteCallback(callback: () => void): void
 }
 
@@ -289,23 +338,38 @@ export interface ILightingController {
    * effect and starts the new transitions immediately. See {@link IEffectManager.replaceEffect}.
    */
   replaceEffect(name: string, effect: Effect, isPersistent?: boolean): void
+  /**
+   * `replaceEffect` for a caller that parks on a completion callback.
+   * See {@link IEffectManager.replaceEffectWithCallback}.
+   */
+  replaceEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: (cancelled: boolean) => void,
+    isPersistent?: boolean,
+  ): boolean
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   addEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
   ): void
   setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
   ): void
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void
   removeEffect(name: string, layer: number): void
   removeAllEffects(): void
+  /**
+   * Hold or release an opaque overlay above every cue layer. Occludes the rig without stopping it:
+   * the running cue keeps advancing and reappears at its natural state when the overlay is released.
+   */
+  holdOcclusion(on: boolean): void
   getActiveEffectsForLight(lightId: string): Map<number, LightEffectState>
   isLayerFreeForLight(layer: number, lightId: string): boolean
   setState(lights: TrackedLight[], color: RGBIO, time: number): void
@@ -351,7 +415,7 @@ export interface ILightingController {
   addEffectWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
   ): void
 
@@ -362,7 +426,7 @@ export interface ILightingController {
   setEffectWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
   ): void
 
@@ -384,6 +448,9 @@ export interface ILightingController {
   onKeysNote(noteType: InstrumentNoteType): void
   /** Vocal note edge: true = note-on (singing started), false = note-off (singing stopped). */
   onVocalNote(active: boolean): void
+  /** Advance action-timing waits gated on a raw song-event condition (e.g. an RB3 `led-3` / `fog-on`
+   *  edge). The RB3 cue-mode processor produces these; instrument/beat events use the on* methods. */
+  handleSongEvent(condition: SongEventCondition): void
 
   // System effects methods
   blackout(duration: number): Promise<void>

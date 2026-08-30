@@ -1,5 +1,4 @@
 import { DMX, EnttecUSBDMXProDriver, IUniverseDriver } from 'dmx-ts'
-import { EventEmitter } from 'events'
 import { BaseSender, SenderError } from './BaseSender'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('EnttecProSender')
@@ -7,7 +6,6 @@ const log = createLogger('EnttecProSender')
 export class EnttecProSender extends BaseSender {
   private dmx: DMX = new DMX()
   private universe?: IUniverseDriver
-  private eventEmitter: EventEmitter
   private dmxUniverse: number
 
   constructor(
@@ -17,7 +15,6 @@ export class EnttecProSender extends BaseSender {
     universe: number = 0,
   ) {
     super()
-    this.eventEmitter = new EventEmitter()
     this.dmxUniverse = universe
   }
 
@@ -57,7 +54,7 @@ export class EnttecProSender extends BaseSender {
 
       // Clean up all event listeners first
       try {
-        this.eventEmitter.removeAllListeners()
+        this.removeAllSendErrorListeners()
         if (this.dmx) {
           this.dmx.removeAllListeners()
         }
@@ -107,7 +104,7 @@ export class EnttecProSender extends BaseSender {
       // errors (the SerialPort is private and not re-emitted), so this synchronous catch is
       // the only error signal available for the Enttec Pro.
       const errorEvent = new SenderError(err, { senderId: 'enttecpro', shouldDisable: true })
-      this.eventEmitter.emit('SenderError', errorEvent)
+      this.emitSenderError(errorEvent)
     }
   }
 
@@ -115,14 +112,6 @@ export class EnttecProSender extends BaseSender {
     if (!this.universe) {
       throw new Error("EnttecProSender isn't started.")
     }
-  }
-
-  public onSendError(listener: (error: SenderError) => void): void {
-    this.eventEmitter.on('SenderError', listener)
-  }
-
-  public removeSendError(listener: (error: SenderError) => void): void {
-    this.eventEmitter.off('SenderError', listener)
   }
 
   public getUniverse(): number {

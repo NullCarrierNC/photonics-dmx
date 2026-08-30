@@ -263,7 +263,15 @@ export interface BuildEffectChainStep {
 }
 
 const clamp = (value: number, min: number, max: number): number =>
-  Math.max(min, Math.min(max, value))
+  Math.max(min, Math.min(max, Number.isFinite(value) ? value : min))
+
+// Resolve a possibly non-numeric literal to a finite number, falling back when it isn't one.
+// A malformed cue param (e.g. a non-numeric duration literal) resolves to NaN through Number(),
+// which would otherwise flow straight into transition timings and light state.
+const finiteOr = <T>(value: unknown, fallback: T): number | T => {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : fallback
+}
 
 const safeDuration = (value: number | undefined, fallback: number, min = 0): number => {
   if (typeof value !== 'number' || Number.isNaN(value)) {
@@ -440,18 +448,19 @@ export class ActionEffectFactory {
     const defaults = createDefaultActionTiming()
     return {
       waitForCondition: timing.waitForCondition ?? defaults.waitForCondition,
-      waitForTime: timing.waitForTime?.source === 'literal' ? Number(timing.waitForTime.value) : 0,
+      waitForTime:
+        timing.waitForTime?.source === 'literal' ? finiteOr(timing.waitForTime.value, 0) : 0,
       waitForConditionCount:
         timing.waitForConditionCount?.source === 'literal'
-          ? Number(timing.waitForConditionCount.value)
+          ? finiteOr(timing.waitForConditionCount.value, undefined)
           : undefined,
-      duration: timing.duration?.source === 'literal' ? Number(timing.duration.value) : 200,
+      duration: timing.duration?.source === 'literal' ? finiteOr(timing.duration.value, 200) : 200,
       waitUntilCondition: timing.waitUntilCondition ?? defaults.waitUntilCondition,
       waitUntilTime:
-        timing.waitUntilTime?.source === 'literal' ? Number(timing.waitUntilTime.value) : 0,
+        timing.waitUntilTime?.source === 'literal' ? finiteOr(timing.waitUntilTime.value, 0) : 0,
       waitUntilConditionCount:
         timing.waitUntilConditionCount?.source === 'literal'
-          ? Number(timing.waitUntilConditionCount.value)
+          ? finiteOr(timing.waitUntilConditionCount.value, undefined)
           : undefined,
       easing: (() => {
         const e = timing.easing as string | { source?: string; value?: unknown } | undefined
@@ -460,7 +469,7 @@ export class ActionEffectFactory {
         if (e && typeof e === 'object' && e.source === 'literal') return String(e.value)
         return undefined
       })(),
-      level: timing.level?.source === 'literal' ? Number(timing.level.value) : 1,
+      level: timing.level?.source === 'literal' ? finiteOr(timing.level.value, 1) : 1,
     }
   }
 
@@ -579,6 +588,9 @@ export class ActionEffectFactory {
         if (!resolvedForColor) {
           return null
         }
+        // Floor at 0.01: intensityScale carries the audio-reactive level here, and a silent frame
+        // (intensity 0) keeps a faint glow rather than the rig going fully black between beats.
+        // clamp above already guarantees a finite value, so this only affects the genuine-zero case.
         const baseColor = resolveColor(resolvedForColor, intensityScale || 0.01)
         effect = createSingleColorEffect({
           lights,
@@ -648,6 +660,7 @@ export class ActionEffectFactory {
       const timingLevel = 1
       const intensityScale = clamp((step.intensityScale ?? 1) * timingLevel, 0, 1)
       const easing = resolveEasing(timing.easing)
+      // Floor at 0.01 to keep a faint glow on a silent audio frame (see the set-color case above).
       const color = resolveColor(primaryColor, intensityScale || 0.01)
 
       const { waitFor, waitForTime } = normalizeWaitFor(timing, 0)

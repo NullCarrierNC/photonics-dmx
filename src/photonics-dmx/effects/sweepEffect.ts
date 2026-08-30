@@ -88,6 +88,17 @@ export const getSweepEffect = ({
       : (lights as TrackedLight[]).map((light) => [light])
 
   const numGroups = groups.length
+
+  // No lights means no sweep. Return early so we never divide sweepTime by zero groups,
+  // which would push Infinity/NaN into the transition timings.
+  if (numGroups === 0) {
+    return {
+      id: 'SweepEffect',
+      description: 'No lights provided for sweep',
+      transitions: [],
+    }
+  }
+
   // Base slot time if there were no overlap (integerized).
   const slotTimeFloat = sweepTime / numGroups
   const slotTime = Math.round(slotTimeFloat)

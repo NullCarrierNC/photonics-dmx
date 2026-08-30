@@ -2,8 +2,11 @@ import React from 'react'
 import type {
   VariableLogicNode,
   NodeCueMode,
+  VariableType,
 } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import { VARIABLE_TYPES } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
+import MultiItemSummary from './MultiItemSummary'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
 
 export interface VariableLogicEditorProps extends LogicEditorCommonProps {
@@ -56,27 +59,12 @@ const VariableLogicEditor: React.FC<VariableLogicEditorProps> = ({
         <select
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={node.valueType}
-          onChange={(event) =>
-            updateNode({
-              valueType: event.target.value as
-                | 'number'
-                | 'boolean'
-                | 'string'
-                | 'color'
-                | 'cue-type'
-                | 'light-array'
-                | 'color-array'
-                | 'event',
-            })
-          }>
-          <option value="number">number</option>
-          <option value="boolean">boolean</option>
-          <option value="string">string</option>
-          <option value="color">color</option>
-          <option value="cue-type">cue-type</option>
-          <option value="light-array">light-array</option>
-          <option value="color-array">color-array</option>
-          <option value="event">event</option>
+          onChange={(event) => updateNode({ valueType: event.target.value as VariableType })}>
+          {VARIABLE_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
         </select>
       </label>
       {showValue && (
@@ -84,20 +72,17 @@ const VariableLogicEditor: React.FC<VariableLogicEditorProps> = ({
           label="Value"
           value={node.value}
           onChange={(next) => updateNode({ value: next })}
-          expected={
-            node.valueType as
-              | 'number'
-              | 'boolean'
-              | 'string'
-              | 'color'
-              | 'cue-type'
-              | 'light-array'
-              | 'color-array'
-              | 'event'
-          }
+          expected={node.valueType}
           validLiterals={validLiteralsFromVariable}
           activeMode={activeMode}
           availableVariables={availableVariables}
+        />
+      )}
+      {node.assignments && node.assignments.length > 0 && (
+        <MultiItemSummary
+          header={`Multi-set: ${node.assignments.length} assignments`}
+          rows={node.assignments.map((a) => `${node.mode} ${a.varName} (${a.valueType})`)}
+          ignoredFieldsLabel="single-variable"
         />
       )}
     </div>

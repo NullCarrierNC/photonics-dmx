@@ -1,0 +1,36 @@
+limit 600
+Auto-generated: non-test sources under src/ that exceed the line limit.
+Entries may only shrink. Regenerate after a split with: node scripts/size-budget.mjs --write
+1153 src/photonics-dmx/cues/node/runtime/BaseNodeExecutionEngine.ts
+1074 src/photonics-dmx/controllers/DmxPublisher.ts
+1027 src/photonics-dmx/types.ts
+982 src/photonics-dmx/controllers/sequencer/LightTransitionController.ts
+912 src/photonics-dmx/cues/types/nodeCueTypes.ts
+900 src/renderer/src/components/CueConsistencySettings.tsx
+867 src/renderer/src/components/cue-editor/components/node-editors/EventNodeEditor.tsx
+861 src/photonics-dmx/listeners/RB3/Rb3eNetworkListener.ts
+794 src/photonics-dmx/cues/types/cueTypes.ts
+788 src/renderer/src/pages/LightsLayout.tsx
+770 src/renderer/src/components/cue-editor/hooks/useNodeCreation.ts
+764 src/renderer/src/components/CuePreviewYarg.tsx
+741 src/renderer/src/components/AudioCueSelectorPanel.tsx
+726 src/photonics-dmx/cues/node/runtime/NodeExecutionEngine.ts
+726 src/renderer/src/components/cue-editor/lib/graphPrettier.ts
+716 src/renderer/src/pages/CueSimulation.tsx
+707 src/photonics-dmx/cues/node/schema/logic.ts
+696 src/photonics-dmx/processors/Rb3StageKitDirectProcessor.ts
+687 src/photonics-dmx/cues/node/compiler/ActionEffectFactory.ts
+687 src/renderer/src/components/MovingHeadCalibrationWizard.tsx
+670 src/renderer/src/pages/DmxConsole.tsx
+664 src/main/ipc/simulation-handlers.ts
+632 src/main/controllers/ControllerManager.ts
+625 src/renderer/src/services/AudioCaptureManager.ts
+623 src/renderer/src/ipcApi.ts
+621 src/services/configuration/ConfigurationManager.ts
+620 src/photonics-dmx/processors/AudioCueProcessor.ts
+619 src/renderer/src/components/LightsDmxPreview3D.tsx
+617 src/renderer/src/components/DmxOutputSettings.tsx
+613 src/photonics-dmx/cues/node/loader/NodeCueLoader.ts
+611 src/photonics-dmx/controllers/sequencer/MotionPatternEngine.ts
+602 src/photonics-dmx/cueHandlers/CueHandler.ts
+602 src/renderer/src/components/LightChannelsConfig.tsx

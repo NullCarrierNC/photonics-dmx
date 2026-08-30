@@ -11,6 +11,7 @@ import {
   FrameContext,
   ILightingController,
   LightEffectState,
+  SongEventCondition,
 } from './interfaces'
 import { LayerManager } from './LayerManager'
 import { SystemEffectsController } from './SystemEffectsController'
@@ -47,8 +48,9 @@ export class Sequencer implements ILightingController {
    * @constructor
    * @param lightTransitionController The underlying light transition controller
    * @param clock The shared Clock instance for timing synchronization
+   * @param rigLabel Rig name passed to the effect manager for warning attribution
    */
-  constructor(lightTransitionController: LightTransitionController, clock: Clock) {
+  constructor(lightTransitionController: LightTransitionController, clock: Clock, rigLabel = '') {
     this.clock = clock
     this.lightTransitionController = lightTransitionController
     this.effectTransformer = new EffectTransformer()
@@ -63,6 +65,7 @@ export class Sequencer implements ILightingController {
       this.transitionEngine,
       this.effectTransformer,
       this.systemEffectsController,
+      rigLabel,
     )
     this.eventHandler = new SongEventHandler(this.layerManager, this.transitionEngine)
     this.debugMonitor = new DebugMonitor(this.lightTransitionController, this.layerManager)
@@ -113,6 +116,25 @@ export class Sequencer implements ILightingController {
   }
 
   /**
+   * Per-(layer, light) replace with a completion callback. The callback held for the displaced
+   * run is fired with `cancelled = true` so a blocking node waiting on it is released.
+   *
+   * @param name The name of the effect
+   * @param effect The effect configuration
+   * @param onComplete Callback fired when the effect completes or is displaced
+   * @param isPersistent If true, the effect re-queues itself after completing
+   * @returns True when the effect was applied, false when a gate refused it
+   */
+  public replaceEffectWithCallback(
+    name: string,
+    effect: Effect,
+    onComplete: (cancelled: boolean) => void,
+    isPersistent: boolean = false,
+  ): boolean {
+    return this.effectManager.replaceEffectWithCallback(name, effect, onComplete, isPersistent)
+  }
+
+  /**
    * Adds a new effect with a completion callback.
    * The callback will be fired when all lights in the effect complete their transitions.
    *
@@ -124,7 +146,7 @@ export class Sequencer implements ILightingController {
   public addEffectWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
   ): void {
     this.effectManager.addEffectWithCallback(name, effect, onComplete, isPersistent)
@@ -133,7 +155,7 @@ export class Sequencer implements ILightingController {
   public setEffectWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
   ): void {
     this.effectManager.setEffectWithCallback(name, effect, onComplete, isPersistent)
@@ -208,7 +230,7 @@ export class Sequencer implements ILightingController {
   public addEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
   ): void {
     this.effectManager.addEffectUnblockedNameWithCallback(name, effect, onComplete, isPersistent)
@@ -221,7 +243,7 @@ export class Sequencer implements ILightingController {
   public setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
-    onComplete: () => void,
+    onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
   ): void {
     this.effectManager.setEffectUnblockedNameWithCallback(name, effect, onComplete, isPersistent)
@@ -401,6 +423,15 @@ export class Sequencer implements ILightingController {
   }
 
   /**
+   * Advance action-timing waits gated on a raw song-event condition (e.g. an RB3 `led-3` / `fog-on`
+   * edge). Forwards straight to the event handler; the RB3 processor is the semantic translator here,
+   * the way onDrumNote/onVocalNote are for their events.
+   */
+  public handleSongEvent(condition: SongEventCondition): void {
+    this.eventHandler.handleEvent(condition)
+  }
+
+  /**
    * Initiates a blackout effect that fades out all lights.
    *
    * @param duration The duration of the blackout fade in milliseconds.
@@ -415,6 +446,14 @@ export class Sequencer implements ILightingController {
    */
   public cancelBlackout(): void {
     this.systemEffectsController.cancelBlackout()
+  }
+
+  /**
+   * Holds or releases an opaque overlay above every cue layer, occluding the rig without stopping
+   * it. See {@link SystemEffectsController.holdOcclusion}.
+   */
+  public holdOcclusion(on: boolean): void {
+    this.systemEffectsController.holdOcclusion(on)
   }
 
   /**
@@ -447,6 +486,7 @@ export class Sequencer implements ILightingController {
       // ticking against the same Clock.
       this.clock.offTick(this.handleClockTick)
 
+      this.systemEffectsController.dispose()
       this.removeAllEffects()
 
       log.info('PhotonicsSequencer shutdown: completed')

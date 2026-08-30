@@ -24,6 +24,33 @@ export function clampTo255(value: number): number {
   return Math.max(0, Math.min(255, value))
 }
 
+/** Picks a uniformly random element, or undefined if the array is empty. */
+export function pickRandom<T>(items: T[]): T | undefined {
+  if (items.length === 0) return undefined
+  return items[Math.floor(Math.random() * items.length)]
+}
+
+/**
+ * A uniformly random float in [start, end). Unlike {@link randomInRange} this does NOT round, so
+ * it preserves sub-unit precision (used for second-based game-mode durations).
+ */
+export function randomFloatInRange(start: number, end: number): number {
+  return start + Math.random() * (end - start)
+}
+
+/**
+ * Returns a new array with the elements uniformly shuffled (Fisher-Yates). Does not mutate the input.
+ * Unbiased, unlike `sort(() => Math.random() - 0.5)` whose permutations are skewed by the sort.
+ */
+export function shuffle<T>(items: T[]): T[] {
+  const out = [...items]
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = randomBetween(0, i)
+    ;[out[i], out[j]] = [out[j], out[i]]
+  }
+  return out
+}
+
 /**
  * Shifts an array by half. For even-length arrays, it splits the array into two equal halves.
  * For odd-length arrays, the first half will have one fewer element than the second half.

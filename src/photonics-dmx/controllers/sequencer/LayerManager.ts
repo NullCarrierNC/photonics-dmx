@@ -368,6 +368,23 @@ export class LayerManager implements ILayerManager {
     this._layerStates.delete(layer)
   }
 
+  /**
+   * Clears the stored state for a single light on a layer, leaving other lights on that layer
+   * intact. Used when one light's effect on a shared layer ends and the whole layer must not be
+   * wiped out from under the lights still running there.
+   *
+   * @param layer The layer to clear the light's state on
+   * @param lightId The light whose stored state should be removed
+   */
+  public clearLightLayerState(layer: number, lightId: string): void {
+    const layerStates = this._layerStates.get(layer)
+    if (!layerStates) return
+    layerStates.delete(lightId)
+    if (layerStates.size === 0) {
+      this._layerStates.delete(layer)
+    }
+  }
+
   private transparentState(): RGBIO {
     return {
       red: 0,

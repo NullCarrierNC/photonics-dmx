@@ -1,5 +1,7 @@
 import equal from 'fast-deep-equal'
 import type { DmxFixture, DmxLight, DmxRig } from '../types'
+import { migrateFixtureSchema, migrateLightingConfiguration } from './lightingConfigMigration'
+import { isStorableBrightnessScale } from './brightnessScaling'
 
 /**
  * Pure, process-agnostic core for exporting, importing, and duplicating rigs. No Electron / IO so
@@ -40,6 +42,22 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function sameTemplateContent(a: DmxFixture, b: DmxFixture): boolean {
   const strip = (t: DmxFixture): Omit<DmxFixture, 'id' | 'position'> => {
     const { id: _id, position: _position, ...rest } = clone(t)
+    // "No extras" is canonically a missing key (never `[]`), but a hand-edited or foreign file may
+    // carry an empty array — normalise so absent and `[]` compare equal and don't defeat dedup.
+    if (!rest.extraChannels?.length) delete rest.extraChannels
+    // Same normalisation for brightness scaling, whose canonical form is "absent means 100%": a
+    // foreign file may spell an unscaled channel out as 100, which must still dedup against a
+    // template that simply omits it.
+    for (const ec of rest.extraChannels ?? []) {
+      if (!isStorableBrightnessScale(ec.scale)) delete ec.scale
+    }
+    const scaling = rest.brightnessScaling
+    if (scaling) {
+      for (const key of ['red', 'green', 'blue'] as const) {
+        if (!isStorableBrightnessScale(scaling[key])) delete scaling[key]
+      }
+      if (Object.keys(scaling).length === 0) delete rest.brightnessScaling
+    }
     return rest
   }
   return equal(strip(a), strip(b))
@@ -166,6 +184,40 @@ export function validateRigExportFile(
     }
   }
   return { ok: true, value: parsed as unknown as RigExportFile }
+}
+
+/**
+ * Brings an imported rig file's fixtures onto the current fixture schema, in place of the version
+ * the file was written with. A file exported by an older build can name fixture types this build has
+ * collapsed (`rgbw`/`rgbw/mh`, `rgb/s`/`rgbw/s`), and the import validators check against the
+ * current type list — so without this an old rig file would be rejected as invalid rather than
+ * upgraded. Returns the same references when nothing needed migrating.
+ *
+ * The legacy `front-back` layout rename is skipped for the same reason it is skipped elsewhere: that
+ * was a one-time v1 rig migration, and a file naming `front-back` today means the current semantic.
+ */
+export function migrateRigExportFixtures(file: RigExportFile): RigExportFile {
+  const { config, changed: rigChanged } = migrateLightingConfiguration(file.rig.config, {
+    skipLegacyRename: true,
+  })
+
+  let templatesChanged = false
+  const templates = file.templates.map((t) => {
+    const result = migrateFixtureSchema(t)
+    if (result.changed) {
+      templatesChanged = true
+    }
+    return result.fixture
+  })
+
+  if (!rigChanged && !templatesChanged) {
+    return file
+  }
+  return {
+    ...file,
+    rig: rigChanged ? { ...file.rig, config } : file.rig,
+    templates: templatesChanged ? templates : file.templates,
+  }
 }
 
 /**

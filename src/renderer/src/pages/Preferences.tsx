@@ -3,14 +3,17 @@ import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
 import YargEnabledCueGroups from '../components/YargEnabledCueGroups'
 import AudioEnabledCueGroups from '../components/AudioEnabledCueGroups'
+import Rb3EnabledCueGroups from '../components/Rb3EnabledCueGroups'
 import MotionEnabledCueGroups from '../components/MotionEnabledCueGroups'
 import MotionMasterToggle from '../components/MotionMasterToggle'
 import CueConsistencySettings from '../components/CueConsistencySettings'
 import DmxOutputSettings from '../components/DmxOutputSettings'
 import StageKitYargPrioritySettings from '../components/StageKitYargPrioritySettings'
+import VenuePostProcessingSettings from '../components/VenuePostProcessingSettings'
 import YargFallbackSettings from '../components/YargFallbackSettings'
 import StageKitRb3EnhancedSettings from '../components/StageKitRb3EnhancedSettings'
 import BrightnessSettings from '../components/BrightnessSettings'
+import WhiteChannelMixModeSettings from '../components/WhiteChannelMixModeSettings'
 import ClockRateSettings from '../components/ClockRateSettings'
 import ActiveRigsSettings from '../components/ActiveRigsSettings'
 import AudioPreferencesTabContent from '../components/AudioPreferencesTabContent'
@@ -117,6 +120,7 @@ const Preferences: React.FC = () => {
             {advancedModeEnabled && <ActiveRigsSettings />}
             <DmxOutputSettings />
             <BrightnessSettings />
+            <WhiteChannelMixModeSettings />
           </>
         )}
       </div>
@@ -132,6 +136,7 @@ const Preferences: React.FC = () => {
             <YargEnabledCueGroups />
             {motionMasterEnabled && <MotionEnabledCueGroups platform="yarg" />}
             <StageKitYargPrioritySettings />
+            <VenuePostProcessingSettings />
             <YargFallbackSettings />
           </>
         )}
@@ -143,7 +148,19 @@ const Preferences: React.FC = () => {
         aria-labelledby={tabId('rb3')}
         hidden={effectiveTab !== 'rb3'}
         className="space-y-2">
-        {effectiveTab === 'rb3' && <StageKitRb3EnhancedSettings />}
+        {effectiveTab === 'rb3' && (
+          <>
+            <StageKitRb3EnhancedSettings />
+            {/* The cue-group pickers only apply to RB3 cue mode; direct mode drives the rig
+                straight from LED state with no cue selection. */}
+            {prefs.rb3Prefs?.processingMode === 'cue' && (
+              <>
+                <Rb3EnabledCueGroups />
+                {motionMasterEnabled && <MotionEnabledCueGroups platform="rb3" />}
+              </>
+            )}
+          </>
+        )}
       </div>
 
       {advancedModeEnabled && (

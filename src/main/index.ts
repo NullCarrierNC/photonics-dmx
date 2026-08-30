@@ -1,5 +1,5 @@
 import * as path from 'path'
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { installDefaultSessionContentSecurityPolicy } from './rendererSessionSecurity'
 import { Application } from './application'
@@ -7,6 +7,10 @@ import { createFileLogSink } from './logging/fileLogSink'
 import { consoleLogSink, createLogger, setLogSink, setMinLogLevel } from '../shared/logger'
 
 const log = createLogger('Main')
+
+if (!app.isPackaged) {
+  app.commandLine.appendSwitch('disable-http-cache')
+}
 
 let closeFileLog: (() => Promise<void>) | null = null
 
@@ -56,8 +60,10 @@ process.on('SIGINT', async () => {
     clearTimeout(forceExitTimeout)
     app.quit()
   } catch (error) {
-    await closeFileLogWithTimeout()
+    // Log BEFORE closing the file log, or the one message explaining the failed shutdown never
+    // reaches the log file.
     log.error('Error during SIGINT shutdown:', error)
+    await closeFileLogWithTimeout()
     clearTimeout(forceExitTimeout)
     process.exit(1)
   }
@@ -78,8 +84,9 @@ process.on('SIGTERM', async () => {
     clearTimeout(forceExitTimeout)
     app.quit()
   } catch (error) {
-    await closeFileLogWithTimeout()
+    // Log BEFORE closing the file log so the shutdown-failure message is actually written.
     log.error('Error during SIGTERM shutdown:', error)
+    await closeFileLogWithTimeout()
     clearTimeout(forceExitTimeout)
     process.exit(1)
   }
@@ -107,9 +114,16 @@ app.whenReady().then(() => {
   // Set app name
   app.name = 'Photonics'
 
-  // Initialize application
+  // Initialize application. A controller failure resolves and leaves the window reporting the
+  // failed phase, so a rejection here means the window or IPC could not be set up and there is
+  // nothing left to report through. Say so and stop rather than idling with no interface.
   application.init().catch((err) => {
     log.error('Failed to initialize application:', err)
+    dialog.showErrorBox(
+      'Photonics could not start',
+      `${err instanceof Error ? err.message : String(err)}\n\nLogs: ${path.join(app.getPath('appData'), 'Photonics.rocks', 'logs')}`,
+    )
+    app.exit(1)
   })
 
   // Default session handlers
@@ -139,13 +153,15 @@ app.on('before-quit', async (event) => {
   log.info('Application is shutting down, cleaning up resources...')
   try {
     await application.shutdown()
-    await closeFileLogWithTimeout()
+    // Log the outcome BEFORE closing the file log, so both the success and failure messages are
+    // actually written rather than logged into an already-closed sink.
     log.info('Graceful shutdown completed.')
+    await closeFileLogWithTimeout()
     // Now we can actually quit
     app.exit(0)
   } catch (error) {
-    await closeFileLogWithTimeout()
     log.error('Error during shutdown:', error)
+    await closeFileLogWithTimeout()
     app.exit(1)
   }
 })

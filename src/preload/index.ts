@@ -9,9 +9,18 @@ import type {
   IpcRendererSendChannel,
   IpcRendererSendMap,
 } from '../shared/ipcTypes'
+import { ALL_INVOKE_CHANNELS, RENDERER_RECEIVE, RENDERER_SEND } from '../shared/ipcChannels'
 import { createLogger } from '../shared/logger'
 
 const log = createLogger('preload')
+
+// Runtime channel allowlists derived from the same constants the type maps are built on. The generic
+// signatures are compile-time only; these Sets reject any channel string a compromised or buggy
+// renderer might pass at runtime, per direction. The invoke allowlist comes from the value-complete
+// union (NOT Object.values(CHANNELS), whose key collisions drop channels like node-cues:list).
+const MAIN_CHANNELS = new Set<string>(ALL_INVOKE_CHANNELS)
+const EVENT_CHANNELS = new Set<string>(Object.values(RENDERER_RECEIVE))
+const RENDERER_SEND_CHANNELS = new Set<string>(Object.values(RENDERER_SEND))
 
 const api = {
   /**
@@ -22,6 +31,10 @@ const api = {
     channel: T,
     data: IpcInvokeMap[T]['request'],
   ): Promise<IpcInvokeMap[T]['response']> => {
+    if (!MAIN_CHANNELS.has(channel as string)) {
+      log.error(`Blocked invoke on unknown channel: ${String(channel)}`)
+      return Promise.reject(new Error(`Unknown IPC channel: ${String(channel)}`))
+    }
     return ipcRenderer.invoke(channel as string, data)
   },
 
@@ -30,6 +43,10 @@ const api = {
    * Typed via IpcSendMap: channel → payload.
    */
   send: <T extends IpcSendChannel>(channel: T, data: IpcSendMap[T]): void => {
+    if (!MAIN_CHANNELS.has(channel as string)) {
+      log.error(`Blocked send on unknown channel: ${String(channel)}`)
+      return
+    }
     ipcRenderer.send(channel as string, data)
   },
 
@@ -39,6 +56,10 @@ const api = {
    * CHANNELS aggregate (they use RENDERER_SEND constants).
    */
   sendToMain: <T extends IpcRendererSendChannel>(channel: T, data: IpcRendererSendMap[T]): void => {
+    if (!RENDERER_SEND_CHANNELS.has(channel as string)) {
+      log.error(`Blocked sendToMain on unknown channel: ${String(channel)}`)
+      return
+    }
     ipcRenderer.send(channel as string, data)
   },
 
@@ -51,6 +72,10 @@ const api = {
     channel: T,
     callback: (payload: IpcEventMap[T]) => void,
   ): (() => void) => {
+    if (!EVENT_CHANNELS.has(channel as string)) {
+      log.error(`Blocked receive on unknown channel: ${String(channel)}`)
+      return () => {}
+    }
     const listener = (_event: Electron.IpcRendererEvent, payload: IpcEventMap[T]): void => {
       callback(payload)
     }
@@ -59,6 +84,9 @@ const api = {
   },
 }
 
+// The app always runs context-isolated (WindowManager sets contextIsolation + sandbox). Expose via the
+// bridge only; a non-isolated fallback that assigns window.api directly is a security downgrade and is
+// intentionally absent.
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('api', api)
@@ -66,7 +94,7 @@ if (process.contextIsolated) {
     log.error('Failed to expose preload API', error)
   }
 } else {
-  // Preload not context-isolated; `tsconfig.node` may not apply `index.d.ts` global merge to this file
-  const w = window as typeof window & { api: typeof api }
-  w.api = api
+  log.error(
+    'Preload is not context-isolated; refusing to expose the API on window (misconfiguration)',
+  )
 }

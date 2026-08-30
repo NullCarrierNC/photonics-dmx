@@ -1,15 +1,22 @@
 /**
- * Shared types for per-domain cue configuration (YARG, audio, and motion layers).
+ * Shared types for per-domain cue configuration: the YARG, RB3 and audio lighting domains plus a
+ * motion domain for each.
  */
 
-export const CUE_DOMAINS = ['yarg', 'audio', 'yargMotion', 'audioMotion'] as const
+export const CUE_DOMAINS = [
+  'yarg',
+  'audio',
+  'rb3',
+  'yargMotion',
+  'audioMotion',
+  'rb3Motion',
+] as const
 
 export type CueDomain = (typeof CUE_DOMAINS)[number]
 
 /**
- * YARG and audio *lighting* use oncePerSong | withinSong.
- * YARG and audio *motion* use oncePerSong | perCueChange | none.
- * Storage uses one union; each domain only reads the subset it supports.
+ * Lighting domains use oncePerSong | withinSong; motion domains use oncePerSong | perCueChange |
+ * none. Storage uses one union; each domain only reads the subset it supports.
  */
 export type CueDomainSelectionMode = 'oncePerSong' | 'perCueChange' | 'withinSong' | 'none'
 
@@ -22,13 +29,17 @@ export interface CueDomainPrefs {
   enabledGroups: string[]
   knownGroups: string[]
   disabledCues: Record<string, string[]>
-  /** Meaning depends on domain (YARG lighting vs motion layers). */
+  /** Meaning depends on the domain (lighting vs motion), see CueDomainSelectionMode. */
   selectionMode?: CueDomainSelectionMode
   activeCueRef?: CueActiveRef | null
-  /** YARG motion and audio motion automatic picks only. */
+  /** Motion domains: chance (0-100) that an automatic pick plays on a new lighting cue. */
   probabilityPercent?: number
-  /** Shared min-hold (ms) for YARG and audio motion automatic picks. */
+  /** Motion domains: minimum time (ms) an automatic pick is held before another can replace it. */
   minimumHoldMs?: number
+  /** Motion domains: randomized switch-timer range (seconds). RB3 arms a switch when a countdown
+   *  drawn from [min, max] elapses, then fires on the next trigger edge. */
+  cueDurationMin?: number
+  cueDurationMax?: number
 }
 
 export function createDefaultCueDomainPrefs(
@@ -40,13 +51,15 @@ export function createDefaultCueDomainPrefs(
     knownGroups: [],
     disabledCues: {},
   }
-  if (domain === 'yarg') {
+  if (domain === 'yarg' || domain === 'rb3') {
     base.selectionMode = 'withinSong'
-  } else if (domain === 'yargMotion' || domain === 'audioMotion') {
+  } else if (domain === 'yargMotion' || domain === 'audioMotion' || domain === 'rb3Motion') {
     base.selectionMode = 'perCueChange'
     base.probabilityPercent = 50
     base.minimumHoldMs = 5000
     base.activeCueRef = null
+    base.cueDurationMin = 5
+    base.cueDurationMax = 20
   }
   return {
     ...base,
@@ -59,8 +72,10 @@ export function createDefaultCueDomains(): Record<CueDomain, CueDomainPrefs> {
   return {
     yarg: createDefaultCueDomainPrefs('yarg'),
     audio: createDefaultCueDomainPrefs('audio'),
+    rb3: createDefaultCueDomainPrefs('rb3'),
     yargMotion: createDefaultCueDomainPrefs('yargMotion'),
     audioMotion: createDefaultCueDomainPrefs('audioMotion'),
+    rb3Motion: createDefaultCueDomainPrefs('rb3Motion'),
   }
 }
 

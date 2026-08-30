@@ -4,11 +4,12 @@ import type {
   AudioEffectDefinition,
   NodeCueFile,
   NodeCueGroupMeta,
-  YargNodeCueDefinition,
+  NetNodeCueDefinition,
   YargEffectDefinition,
   EffectFile,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
+import { updateCueInFile, updateEffectInFile } from '../lib/cueUtils'
 
 export type UseCueMetadataParams = {
   editorDoc: EditorDocument | null
@@ -40,20 +41,18 @@ export function useCueMetadata({
   )
 
   const updateCueMetadata = useCallback(
-    (updates: Partial<YargNodeCueDefinition> | Partial<AudioNodeCueDefinition>) => {
+    (updates: Partial<NetNodeCueDefinition> | Partial<AudioNodeCueDefinition>) => {
       if (!editorDoc || !selectedCueId || editorDoc.mode !== 'cue') return
       const cueFile = editorDoc.file as NodeCueFile
-      const updatedCues = cueFile.cues.map((cue) =>
-        cue.id === selectedCueId ? { ...cue, ...updates } : cue,
+      // `updates` is a partial of either family, so spreading it over a cue widens the result past
+      // both branches. The form only ever edits the cue that is open, so the family is the one the
+      // cue already had.
+      const updatedFile = updateCueInFile(
+        cueFile,
+        selectedCueId,
+        (cue) => ({ ...cue, ...updates }) as NetNodeCueDefinition | AudioNodeCueDefinition,
       )
-      const updated = {
-        ...editorDoc,
-        file: {
-          ...cueFile,
-          cues: updatedCues,
-        },
-      }
-      setEditorDoc(updated)
+      setEditorDoc({ ...editorDoc, file: updatedFile })
       setIsDirty(true)
     },
     [editorDoc, selectedCueId, setEditorDoc, setIsDirty],
@@ -63,17 +62,11 @@ export function useCueMetadata({
     (updates: Partial<YargEffectDefinition> & Partial<AudioEffectDefinition>) => {
       if (!editorDoc || !selectedCueId || editorDoc.mode !== 'effect') return
       const effectFile = editorDoc.file as EffectFile
-      const updatedEffects = effectFile.effects.map((effect) =>
-        effect.id === selectedCueId ? { ...effect, ...updates } : effect,
-      )
-      const updated = {
-        ...editorDoc,
-        file: {
-          ...effectFile,
-          effects: updatedEffects,
-        },
-      }
-      setEditorDoc(updated)
+      const updatedFile = updateEffectInFile(effectFile, selectedCueId, (effect) => ({
+        ...effect,
+        ...updates,
+      }))
+      setEditorDoc({ ...editorDoc, file: updatedFile })
       setIsDirty(true)
     },
     [editorDoc, selectedCueId, setEditorDoc, setIsDirty],

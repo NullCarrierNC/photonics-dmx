@@ -5,11 +5,13 @@
  */
 
 import { beforeEach, describe, expect, it } from '@jest/globals'
+import type { CompiledNetCue } from '../../../cues/node/compiler/NodeCueCompiler'
 import { NodeCueCompiler } from '../../../cues/node/compiler/NodeCueCompiler'
 import type {
-  YargNodeCueDefinition,
-  YargEventNode,
+  NetNodeCueDefinition,
+  NetEventNode,
   ActionNode,
+  LogicNode,
   VariableDefinition,
 } from '../../../cues/types/nodeCueTypes'
 import { CueType, DrumNoteType } from '../../../cues/types/cueTypes'
@@ -26,8 +28,8 @@ import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
 
 const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
 
-function minimalCueDefinition(): YargNodeCueDefinition {
-  const eventNode: YargEventNode = {
+function minimalCueDefinition(): NetNodeCueDefinition {
+  const eventNode: NetEventNode = {
     id: 'event1',
     type: 'event',
     eventType: 'cue-started',
@@ -67,9 +69,9 @@ function minimalCueDefinition(): YargNodeCueDefinition {
 }
 
 /** Cue with cue-started (setup) and cue-called (action): setup runs once, cue-called runs every execute (sustain pattern). */
-function sustainPatternCueDefinition(): YargNodeCueDefinition {
-  const eventStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
-  const eventCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+function sustainPatternCueDefinition(): NetNodeCueDefinition {
+  const eventStart: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+  const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
   const actionNode: ActionNode = {
     id: 'action1',
     type: 'action',
@@ -112,10 +114,10 @@ function sustainPatternCueDefinition(): YargNodeCueDefinition {
 }
 
 /** cue-started + cue-called + beat on same tick: beat must consume setEffect before lifecycle submissions. */
-function firstTickClearPolicyOrderingCueDefinition(): YargNodeCueDefinition {
-  const eventStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
-  const eventCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
-  const eventBeat: YargEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
+function firstTickClearPolicyOrderingCueDefinition(): NetNodeCueDefinition {
+  const eventStart: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+  const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+  const eventBeat: NetEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
   const timing: ActionNode['timing'] = {
     waitForCondition: { source: 'literal', value: 'none' },
     waitForTime: { source: 'literal', value: 0 },
@@ -195,7 +197,7 @@ describe('GraphExecutionEngine', () => {
   let lightManager: DmxLightManager
   let sequencer: ILightingController
   let session: CueSession
-  let compiledCue: ReturnType<typeof NodeCueCompiler.compileYargCue>
+  let compiledCue: CompiledNetCue
   const cueId = 'group1:test-cue'
   const groupId = 'group1'
 
@@ -229,7 +231,7 @@ describe('GraphExecutionEngine', () => {
     session = new CueSession()
     const def = minimalCueDefinition()
     session.initializeVariables(def.variables ?? [], [])
-    compiledCue = NodeCueCompiler.compileYargCue(def)
+    compiledCue = NodeCueCompiler.compileCue(def, 'yarg')
   })
 
   describe('cue-graph policy', () => {
@@ -303,7 +305,7 @@ describe('GraphExecutionEngine', () => {
   describe('sustain behaviour (repeated same-cue)', () => {
     it('first run runs cue-started then cue-called; second run with hasCueStartedFired runs only cue-called', () => {
       const def = sustainPatternCueDefinition()
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, 'group1:sustain-cue')
       const engine = GraphExecutionEngine.forCue(
@@ -332,7 +334,7 @@ describe('GraphExecutionEngine', () => {
     it('when run is active, second startCueRun queues and replaces previous queue', async () => {
       jest.useFakeTimers()
       const def = sustainPatternCueDefinition()
-      const blockingDef: YargNodeCueDefinition = {
+      const blockingDef: NetNodeCueDefinition = {
         ...def,
         nodes: {
           ...def.nodes,
@@ -348,7 +350,7 @@ describe('GraphExecutionEngine', () => {
           ],
         },
       }
-      const compiled = NodeCueCompiler.compileYargCue(blockingDef)
+      const compiled = NodeCueCompiler.compileCue(blockingDef, 'yarg')
       session.initializeVariables(blockingDef.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, 'group1:sustain-cue')
       const engine = GraphExecutionEngine.forCue(
@@ -377,9 +379,9 @@ describe('GraphExecutionEngine', () => {
 
     it('dispatches instrument entry events inline while lifecycle is blocking (plain tick still replaces queue)', async () => {
       jest.useFakeTimers()
-      const eventStart: YargEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
-      const eventCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
-      const eventDrumRed: YargEventNode = {
+      const eventStart: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+      const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+      const eventDrumRed: NetEventNode = {
         id: 'ev-drum-red',
         type: 'event',
         eventType: 'drum-red',
@@ -430,7 +432,7 @@ describe('GraphExecutionEngine', () => {
           easing: { source: 'literal', value: 'linear' },
         },
       }
-      const def: YargNodeCueDefinition = {
+      const def: NetNodeCueDefinition = {
         id: 'drum-cue',
         name: 'Drum Cue',
         kind: 'lighting',
@@ -447,7 +449,7 @@ describe('GraphExecutionEngine', () => {
           { from: 'ev-drum-red', to: 'action2' },
         ],
       }
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, 'group1:drum-cue')
       const engine = GraphExecutionEngine.forCue(
@@ -495,8 +497,8 @@ describe('GraphExecutionEngine', () => {
 
     it('dispatches beat entry events while a blocking cue-called chain is in flight', async () => {
       jest.useFakeTimers()
-      const eventCalled: YargEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
-      const eventBeat: YargEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
+      const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+      const eventBeat: NetEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
       const actionBlocking: ActionNode = {
         id: 'action-blocking',
         type: 'action',
@@ -543,7 +545,7 @@ describe('GraphExecutionEngine', () => {
           easing: { source: 'literal', value: 'linear' },
         },
       }
-      const def: YargNodeCueDefinition = {
+      const def: NetNodeCueDefinition = {
         id: 'beat-during-called',
         name: 'Beat during cue-called',
         kind: 'lighting',
@@ -559,7 +561,7 @@ describe('GraphExecutionEngine', () => {
           { from: 'ev-beat', to: 'action-beat' },
         ],
       }
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, 'group1:beat-during-called')
       const engine = GraphExecutionEngine.forCue(
@@ -599,6 +601,517 @@ describe('GraphExecutionEngine', () => {
       await jest.runAllTimersAsync()
       jest.useRealTimers()
     })
+
+    it('preserves instrument pulse frames while a blocking cue-called chain is in flight', async () => {
+      jest.useFakeTimers()
+      const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+      const eventDrumRed: NetEventNode = {
+        id: 'ev-drum-red',
+        type: 'event',
+        eventType: 'drum-red',
+      }
+      const actionBlocking: ActionNode = {
+        id: 'action-blocking',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'high' },
+          blendMode: { source: 'literal', value: 'replace' },
+        },
+        layer: { source: 'literal', value: 0 },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 0 },
+          waitUntilCondition: { source: 'literal', value: 'delay' as const },
+          waitUntilTime: { source: 'literal', value: 10 },
+          easing: { source: 'literal', value: 'linear' },
+        },
+      }
+      const actionDrum: ActionNode = {
+        id: 'action-drum',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'yellow' },
+          brightness: { source: 'literal', value: 'medium' },
+          blendMode: { source: 'literal', value: 'replace' },
+        },
+        layer: { source: 'literal', value: 10 },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: { source: 'literal', value: 'linear' },
+        },
+      }
+      const def: NetNodeCueDefinition = {
+        id: 'drum-pulses-during-called',
+        name: 'Drum pulses during cue-called',
+        kind: 'lighting',
+        cueType: CueType.Sweep,
+        style: 'primary',
+        nodes: {
+          events: [eventCalled, eventDrumRed],
+          actions: [actionBlocking, actionDrum],
+          logic: [],
+        },
+        connections: [
+          { from: 'ev-called', to: 'action-blocking' },
+          { from: 'ev-drum-red', to: 'action-drum' },
+        ],
+      }
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
+      session.initializeVariables(def.variables ?? [], [])
+      const policy = cueGraphPolicy(groupId, 'group1:drum-pulses-during-called')
+      const engine = GraphExecutionEngine.forCue(
+        compiled,
+        'group1:drum-pulses-during-called',
+        policy,
+        session,
+        sequencer,
+        lightManager,
+        noopRuntimeBroadcaster(),
+        new EffectRegistry(),
+        compiled.definition.variables ?? [],
+        noopCallbacks,
+      )
+      const baseParams = {
+        beat: 'Off',
+        strobeState: 'Strobe_Off',
+        drumNotes: [] as DrumNoteType[],
+        guitarNotes: [],
+        bassNotes: [],
+        keysNotes: [],
+      } as unknown as CueData
+
+      const submissionCount = (): number =>
+        (sequencer.addEffect as jest.Mock).mock.calls.length +
+        (sequencer.setEffectUnblockedName as jest.Mock).mock.calls.length
+
+      engine.startCueRun(baseParams, { hasCueStartedFired: true })
+      engine.startCueRun(
+        {
+          ...baseParams,
+          drumNotes: [DrumNoteType.RedDrum],
+          previousFrame: { drumNotes: [] },
+        },
+        { hasCueStartedFired: true },
+      )
+      const afterFirstHit = submissionCount()
+      engine.startCueRun(
+        {
+          ...baseParams,
+          drumNotes: [],
+          previousFrame: { drumNotes: [DrumNoteType.RedDrum] },
+        },
+        { hasCueStartedFired: true },
+      )
+      engine.startCueRun(
+        {
+          ...baseParams,
+          drumNotes: [DrumNoteType.RedDrum],
+          previousFrame: { drumNotes: [] },
+        },
+        { hasCueStartedFired: true },
+      )
+      expect(afterFirstHit).toBeGreaterThan(0)
+      expect(submissionCount()).toBeGreaterThan(afterFirstHit)
+
+      await jest.runAllTimersAsync()
+      jest.useRealTimers()
+    })
+
+    it('preserves every adjacent duplicate Strong beat pulse while lifecycle work blocks', async () => {
+      jest.useFakeTimers()
+      const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+      const eventBeat: NetEventNode = { id: 'ev-beat', type: 'event', eventType: 'beat' }
+      const actionBlocking: ActionNode = {
+        id: 'action-blocking',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'high' },
+          blendMode: { source: 'literal', value: 'replace' },
+        },
+        layer: { source: 'literal', value: 0 },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 0 },
+          waitUntilCondition: { source: 'literal', value: 'delay' as const },
+          waitUntilTime: { source: 'literal', value: 10 },
+          easing: { source: 'literal', value: 'linear' },
+        },
+      }
+      const actionBeat: ActionNode = {
+        id: 'action-beat',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'yellow' },
+          brightness: { source: 'literal', value: 'medium' },
+          blendMode: { source: 'literal', value: 'replace' },
+        },
+        layer: { source: 'literal', value: 10 },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: { source: 'literal', value: 'linear' },
+        },
+      }
+      const def: NetNodeCueDefinition = {
+        id: 'duplicate-beats-during-called',
+        name: 'Duplicate beats during cue-called',
+        kind: 'lighting',
+        cueType: CueType.Sweep,
+        style: 'primary',
+        nodes: {
+          events: [eventCalled, eventBeat],
+          actions: [actionBlocking, actionBeat],
+          logic: [],
+        },
+        connections: [
+          { from: 'ev-called', to: 'action-blocking' },
+          { from: 'ev-beat', to: 'action-beat' },
+        ],
+      }
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
+      session.initializeVariables(def.variables ?? [], [])
+      const policy = cueGraphPolicy(groupId, 'group1:duplicate-beats-during-called')
+      const engine = GraphExecutionEngine.forCue(
+        compiled,
+        'group1:duplicate-beats-during-called',
+        policy,
+        session,
+        sequencer,
+        lightManager,
+        noopRuntimeBroadcaster(),
+        new EffectRegistry(),
+        compiled.definition.variables ?? [],
+        noopCallbacks,
+      )
+      const baseParams = {
+        beat: 'Off',
+        strobeState: 'Strobe_Off',
+        drumNotes: [] as DrumNoteType[],
+        guitarNotes: [],
+        bassNotes: [],
+        keysNotes: [],
+      } as unknown as CueData
+
+      engine.startCueRun(baseParams, { hasCueStartedFired: true })
+      const afterBlocking = (sequencer.addEffect as jest.Mock).mock.calls.length
+      engine.startCueRun({ ...baseParams, beat: 'Strong' }, { hasCueStartedFired: true })
+      const afterFirstBeat = (sequencer.addEffect as jest.Mock).mock.calls.length
+      engine.startCueRun({ ...baseParams, beat: 'Strong' }, { hasCueStartedFired: true })
+      expect(afterFirstBeat).toBeGreaterThan(afterBlocking)
+      expect((sequencer.addEffect as jest.Mock).mock.calls.length).toBeGreaterThan(afterFirstBeat)
+
+      await jest.runAllTimersAsync()
+      jest.useRealTimers()
+    })
+
+    it('preserves every adjacent duplicate keyframe-next pulse while lifecycle work blocks', async () => {
+      jest.useFakeTimers()
+      const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+      const eventKeyframeNext: NetEventNode = {
+        id: 'ev-keyframe-next',
+        type: 'event',
+        eventType: 'keyframe-next',
+      }
+      const actionBlocking: ActionNode = {
+        id: 'action-blocking',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'high' },
+          blendMode: { source: 'literal', value: 'replace' },
+        },
+        layer: { source: 'literal', value: 0 },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 0 },
+          waitUntilCondition: { source: 'literal', value: 'delay' as const },
+          waitUntilTime: { source: 'literal', value: 10 },
+          easing: { source: 'literal', value: 'linear' },
+        },
+      }
+      const actionKeyframe: ActionNode = {
+        id: 'action-keyframe',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'yellow' },
+          brightness: { source: 'literal', value: 'medium' },
+          blendMode: { source: 'literal', value: 'replace' },
+        },
+        layer: { source: 'literal', value: 10 },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 200 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+          easing: { source: 'literal', value: 'linear' },
+        },
+      }
+      const def: NetNodeCueDefinition = {
+        id: 'duplicate-keyframes-during-called',
+        name: 'Duplicate keyframes during cue-called',
+        kind: 'lighting',
+        cueType: CueType.Sweep,
+        style: 'primary',
+        nodes: {
+          events: [eventCalled, eventKeyframeNext],
+          actions: [actionBlocking, actionKeyframe],
+          logic: [],
+        },
+        connections: [
+          { from: 'ev-called', to: 'action-blocking' },
+          { from: 'ev-keyframe-next', to: 'action-keyframe' },
+        ],
+      }
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
+      session.initializeVariables(def.variables ?? [], [])
+      const policy = cueGraphPolicy(groupId, 'group1:duplicate-keyframes-during-called')
+      const engine = GraphExecutionEngine.forCue(
+        compiled,
+        'group1:duplicate-keyframes-during-called',
+        policy,
+        session,
+        sequencer,
+        lightManager,
+        noopRuntimeBroadcaster(),
+        new EffectRegistry(),
+        compiled.definition.variables ?? [],
+        noopCallbacks,
+      )
+      const baseParams = {
+        beat: 'Off',
+        keyframe: 'Off',
+        strobeState: 'Strobe_Off',
+        drumNotes: [] as DrumNoteType[],
+        guitarNotes: [],
+        bassNotes: [],
+        keysNotes: [],
+      } as unknown as CueData
+
+      engine.startCueRun(baseParams, { hasCueStartedFired: true })
+      const afterBlocking = (sequencer.addEffect as jest.Mock).mock.calls.length
+      engine.startCueRun({ ...baseParams, keyframe: 'Next' }, { hasCueStartedFired: true })
+      const afterFirstKeyframe = (sequencer.addEffect as jest.Mock).mock.calls.length
+      engine.startCueRun({ ...baseParams, keyframe: 'Next' }, { hasCueStartedFired: true })
+      expect(afterFirstKeyframe).toBeGreaterThan(afterBlocking)
+      expect((sequencer.addEffect as jest.Mock).mock.calls.length).toBeGreaterThan(
+        afterFirstKeyframe,
+      )
+
+      await jest.runAllTimersAsync()
+      jest.useRealTimers()
+    })
+
+    it('keeps lifecycle queue depth at one and runs only the latest queued tick after blocking completes', async () => {
+      jest.useFakeTimers()
+      const lifecycleCueId = 'group1:lifecycle-latest-wins'
+      const blockingTiming: ActionNode['timing'] = {
+        waitForCondition: { source: 'literal', value: 'none' },
+        waitForTime: { source: 'literal', value: 0 },
+        duration: { source: 'literal', value: 0 },
+        waitUntilCondition: { source: 'literal', value: 'delay' as const },
+        waitUntilTime: { source: 'literal', value: 10 },
+        easing: { source: 'literal', value: 'linear' },
+      }
+      const pulseTiming: ActionNode['timing'] = {
+        waitForCondition: { source: 'literal', value: 'none' },
+        waitForTime: { source: 'literal', value: 0 },
+        duration: { source: 'literal', value: 200 },
+        waitUntilCondition: { source: 'literal', value: 'none' },
+        waitUntilTime: { source: 'literal', value: 0 },
+        easing: { source: 'literal', value: 'linear' },
+      }
+      const eventStart: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
+      const eventCalled: NetEventNode = { id: 'ev-called', type: 'event', eventType: 'cue-called' }
+      const actionBlocking: ActionNode = {
+        id: 'action-blocking',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'red' },
+          brightness: { source: 'literal', value: 'high' },
+          blendMode: { source: 'literal', value: 'replace' },
+        },
+        layer: { source: 'literal', value: 0 },
+        timing: blockingTiming,
+      }
+      const actionMiddle: ActionNode = {
+        id: 'action-middle',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'yellow' },
+          brightness: { source: 'literal', value: 'medium' },
+          blendMode: { source: 'literal', value: 'replace' },
+        },
+        layer: { source: 'literal', value: 10 },
+        timing: pulseTiming,
+      }
+      const actionLatest: ActionNode = {
+        id: 'action-latest',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'green' },
+          brightness: { source: 'literal', value: 'medium' },
+          blendMode: { source: 'literal', value: 'replace' },
+        },
+        layer: { source: 'literal', value: 11 },
+        timing: pulseTiming,
+      }
+      const readBpm: LogicNode = {
+        id: 'read-bpm',
+        type: 'logic',
+        logicType: 'cue-data',
+        dataProperty: 'bpm',
+        assignTo: 'tickBpm',
+      }
+      const condMiddle: LogicNode = {
+        id: 'cond-middle',
+        type: 'logic',
+        logicType: 'conditional',
+        comparator: '==',
+        left: { source: 'variable', name: 'tickBpm' },
+        right: { source: 'literal', value: 200 },
+      }
+      const condLatest: LogicNode = {
+        id: 'cond-latest',
+        type: 'logic',
+        logicType: 'conditional',
+        comparator: '==',
+        left: { source: 'variable', name: 'tickBpm' },
+        right: { source: 'literal', value: 300 },
+      }
+      const def: NetNodeCueDefinition = {
+        id: 'lifecycle-latest-wins',
+        name: 'Lifecycle latest wins',
+        kind: 'lighting',
+        cueType: CueType.Sweep,
+        style: 'primary',
+        nodes: {
+          events: [eventStart, eventCalled],
+          actions: [actionBlocking, actionMiddle, actionLatest],
+          logic: [readBpm, condMiddle, condLatest],
+        },
+        connections: [
+          { from: 'ev-start', to: 'action-blocking' },
+          { from: 'ev-called', to: 'action-blocking' },
+          { from: 'ev-called', to: 'read-bpm' },
+          { from: 'read-bpm', to: 'cond-middle' },
+          { from: 'cond-middle', to: 'action-middle', fromPort: 'true' },
+          { from: 'read-bpm', to: 'cond-latest' },
+          { from: 'cond-latest', to: 'action-latest', fromPort: 'true' },
+        ],
+        variables: [{ name: 'tickBpm', type: 'number', scope: 'cue', initialValue: 0 }],
+      }
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
+      session.initializeVariables(def.variables ?? [], [])
+      const policy = cueGraphPolicy(groupId, lifecycleCueId)
+      const engine = GraphExecutionEngine.forCue(
+        compiled,
+        lifecycleCueId,
+        policy,
+        session,
+        sequencer,
+        lightManager,
+        noopRuntimeBroadcaster(),
+        new EffectRegistry(),
+        compiled.definition.variables ?? [],
+        noopCallbacks,
+      )
+      const firstTick: CueData = {
+        lightingCue: CueType.Sweep,
+        beat: 'Off',
+        strobeState: 'Strobe_Off',
+        beatsPerMinute: 100,
+      } as CueData
+      const middleTick: CueData = { ...firstTick, beatsPerMinute: 200 }
+      const latestTick: CueData = { ...firstTick, beatsPerMinute: 300 }
+
+      const submittedEffectNames = (): string[] => [
+        ...(sequencer.addEffect as jest.Mock).mock.calls.map((call) => String(call[0])),
+        ...(sequencer.addEffectUnblockedName as jest.Mock).mock.calls.map((call) =>
+          String(call[0]),
+        ),
+        ...(sequencer.addEffectUnblockedNameWithCallback as jest.Mock).mock.calls.map((call) =>
+          String(call[0]),
+        ),
+        ...(sequencer.setEffectUnblockedName as jest.Mock).mock.calls.map((call) =>
+          String(call[0]),
+        ),
+        ...(sequencer.setEffectUnblockedNameWithCallback as jest.Mock).mock.calls.map((call) =>
+          String(call[0]),
+        ),
+      ]
+
+      engine.startCueRun(firstTick, { hasCueStartedFired: false })
+      engine.startCueRun(middleTick, { hasCueStartedFired: true })
+      engine.startCueRun(latestTick, { hasCueStartedFired: true })
+      expect(sequencer.setEffectUnblockedNameWithCallback).toHaveBeenCalledTimes(1)
+
+      await jest.runAllTimersAsync()
+
+      const tickBpm = session.getCueLevelVarStore().get('tickBpm')?.value
+      const names = submittedEffectNames()
+      expect(tickBpm).toBe(300)
+      expect(names.some((name) => name.endsWith(':action-latest'))).toBe(true)
+      expect(names.some((name) => name.endsWith(':action-middle'))).toBe(false)
+      jest.useRealTimers()
+    })
   })
 
   describe('first activation clear policy vs non-lifecycle ordering', () => {
@@ -606,7 +1119,7 @@ describe('GraphExecutionEngine', () => {
 
     it('non-lifecycle entry event survives setEffect when triggered alongside cue-started on the first activation tick', () => {
       const def = firstTickClearPolicyOrderingCueDefinition()
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, orderingCueId)
       const engine = GraphExecutionEngine.forCue(
@@ -636,7 +1149,7 @@ describe('GraphExecutionEngine', () => {
 
     it('subsequent ticks do not re-trigger setEffect after the first activation tick', () => {
       const def = firstTickClearPolicyOrderingCueDefinition()
-      const compiled = NodeCueCompiler.compileYargCue(def)
+      const compiled = NodeCueCompiler.compileCue(def, 'yarg')
       session.initializeVariables(def.variables ?? [], [])
       const policy = cueGraphPolicy(groupId, orderingCueId)
       const engine = GraphExecutionEngine.forCue(

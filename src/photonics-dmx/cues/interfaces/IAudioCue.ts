@@ -39,6 +39,13 @@ export interface IAudioCue {
   onStop?(): void
 
   /**
+   * Stop the cue and take its effects off the sequencer, whatever its style says. Used where the
+   * audio look has to end rather than hand over to a replacement, so a primary cue (which normally
+   * leaves its effects up for the next cue) does not stay lit.
+   */
+  stopAndClearEffects?(): void
+
+  /**
    * Called when the cue is paused
    */
   onPause?(): void

@@ -1,13 +1,22 @@
 import { CueType } from './cueTypes'
 
-import type { YargEventType, TrackedLight, Color } from '../../types'
+import type { NetEventType, TrackedLight, Color } from '../../types'
 import {
   ALL_CONFIG_DATA_PROPERTIES,
-  YARG_CUE_DATA_PROPERTIES,
+  NET_CUE_DATA_PROPERTIES,
   AUDIO_CUE_DATA_PROPERTIES,
 } from '../../constants/nodeConstants'
 
-export type NodeCueMode = 'yarg' | 'audio'
+export type NodeCueMode = 'yarg' | 'audio' | 'rb3'
+
+/**
+ * The modes whose cue identity arrives from outside, keyed by `CueType` over a `CueData` frame and
+ * dispatched by a cue handler against a registry, as {@link INetCue} cues. Membership is the frame
+ * contract rather than the transport, so the cue simulator qualifies by synthesising the same frames
+ * and any future network trigger joins without widening anything. Audio is the other family, deriving
+ * its cue from signal analysis over audio frames.
+ */
+export type NetCueMode = Exclude<NodeCueMode, 'audio'>
 
 /** Lighting = colour/intensity cues; motion = pan/tilt / motion-pattern (parallel layer). */
 export type NodeCueKind = 'lighting' | 'motion'
@@ -41,15 +50,20 @@ export interface Connection {
   toPort?: string
 }
 
-export type VariableType =
-  | 'number'
-  | 'boolean'
-  | 'string'
-  | 'color'
-  | 'light-array'
-  | 'color-array'
-  | 'cue-type'
-  | 'event'
+/** Every variable/value type, the single source both the schema enums and the editor dropdowns derive
+ *  from so they cannot drift from the VariableType union. */
+export const VARIABLE_TYPES = [
+  'number',
+  'boolean',
+  'string',
+  'color',
+  'light-array',
+  'color-array',
+  'cue-type',
+  'event',
+] as const
+
+export type VariableType = (typeof VARIABLE_TYPES)[number]
 
 export type ValueSource =
   | { source: 'literal'; value: number | boolean | string | TrackedLight[] | Color[] }
@@ -72,7 +86,7 @@ export interface EventDefinition {
 }
 
 export type LogicComparator = '>' | '>=' | '<' | '<=' | '==' | '!='
-export type MathOperator = 'add' | 'subtract' | 'multiply' | 'divide' | 'modulus'
+export type MathOperator = 'add' | 'subtract' | 'multiply' | 'divide' | 'modulus' | 'wrap'
 
 export interface BaseLogicNode {
   id: string
@@ -81,12 +95,22 @@ export interface BaseLogicNode {
   outputs?: string[]
 }
 
+/** One target of a multi-set variable node. Same shape as the single-var fields, one per variable. */
+export interface VariableAssignment {
+  varName: string
+  valueType: VariableType
+  value?: ValueSource
+}
+
 export interface VariableLogicNode extends BaseLogicNode {
   logicType: 'variable'
   mode: 'set' | 'get' | 'init'
   varName: string
   valueType: VariableType
   value?: ValueSource
+  // When present and non-empty, set/init every listed variable in order (honouring `mode`), instead of the
+  // single varName/valueType/value above. Collapses a run of set nodes (e.g. a transparent-clear pair) into one.
+  assignments?: VariableAssignment[]
 }
 
 export interface MathLogicNode extends BaseLogicNode {
@@ -97,6 +121,41 @@ export interface MathLogicNode extends BaseLogicNode {
   assignTo?: string
 }
 
+export interface ClampLogicNode extends BaseLogicNode {
+  logicType: 'clamp'
+  value: ValueSource
+  min: ValueSource
+  max: ValueSource
+  assignTo: string
+}
+
+export interface ExpressionLogicNode extends BaseLogicNode {
+  logicType: 'expression'
+  // A single arithmetic formula over variables: numbers, the five operators (+ - * / %), parentheses,
+  // unary minus, and built-in functions (min/max/clamp/wrap/abs/floor/ceil/round/sign/sqrt/pow/sin/cos)
+  // plus the `pi` constant. Any other identifier is a variable resolved from the cue's variable store.
+  // Replaces a chain of math nodes with one readable line. Result is written to `assignTo` (type number).
+  expression: string
+  assignTo: string
+}
+
+export interface SelectFromListLogicNode extends BaseLogicNode {
+  logicType: 'select-from-list'
+  list: number[] // Inline numeric list to select from
+  index: ValueSource // Index into the list (with wraparound modulo list length)
+  assignTo: string // Variable written with type 'number'
+}
+
+export interface PulseLogicNode extends BaseLogicNode {
+  logicType: 'pulse'
+  interval: ValueSource // Cycle length in ms (e.g. beat-duration-ms, optionally divided); guarded to >= 1
+  anchorVar: string // Declared number var holding the cycle origin; captured on the first eval of the
+  //                   activation and reset with cue-level vars on cue-started, so the phase is
+  //                   activation-relative.
+  assignTo: string // Declared number var written with the monotonic integer cycle index
+  assignPhase?: string // Optional declared number var written with the fractional phase in [0, 1)
+}
+
 export interface ConditionalLogicNode extends BaseLogicNode {
   logicType: 'conditional'
   comparator: LogicComparator
@@ -104,13 +163,52 @@ export interface ConditionalLogicNode extends BaseLogicNode {
   right: ValueSource
 }
 
+export interface FrameGateLogicNode extends BaseLogicNode {
+  logicType: 'frame-gate'
+  // Fires the `true` port every `divisor`-th time this node is reached and the `false` port otherwise,
+  // using an internal per-node counter that resets each activation. Collapses the count++ / modulus /
+  // conditional trio a frame-rate strobe or self-driven step gate would otherwise need. divisor is
+  // guarded to >= 1.
+  divisor: ValueSource
+}
+
+export interface TempoLogicNode extends BaseLogicNode {
+  logicType: 'tempo'
+  // Reads the song tempo (beat-duration-ms / bpm cue data) and writes the derived timing variables that
+  // tempo-locked tweens breathe on, replacing the ~12-node read/guard/clamp/multiply/band chain every cue
+  // repeats. A song that reports no tempo (menus, practice) falls back to `fallbackBeatMs` before clamping.
+  assignBeatMs: string // Declared number var written with the clamped beat duration in ms
+  assignBarMs?: string // Optional: beat * beatsPerBar
+  assignPhraseMs?: string // Optional: bar * barsPerPhrase
+  beatsPerBar?: ValueSource // Beats per bar (default 4)
+  barsPerPhrase?: ValueSource // Bars per phrase (default 2)
+  minBeatMs?: ValueSource // Clamp floor for the beat (default 250)
+  maxBeatMs?: ValueSource // Clamp ceil for the beat (default 1000)
+  fallbackBeatMs?: ValueSource // Beat used when the song reports no tempo (default 461, ~130 BPM)
+  assignCycles?: string // Optional: number var written with a BPM-banded cycle count
+  cycleBands?: number[] // Ascending BPM thresholds for the cycle count (default [110, 150])
+  cycleValues?: number[] // Cycle count per band, length = cycleBands.length + 1 (default [2, 3, 5])
+}
+
+/** Default values the tempo node uses for its optional fields, shared by the runtime and the editor so the
+ *  two never disagree about what "unset" means. */
+export const TEMPO_DEFAULTS = {
+  beatsPerBar: 4,
+  barsPerPhrase: 2,
+  minBeatMs: 250,
+  maxBeatMs: 1000,
+  fallbackBeatMs: 461,
+  cycleBands: [110, 150],
+  cycleValues: [2, 3, 5],
+} as const
+
 // YARG Cue Data Properties - derived from shared constants
-export type YargCueDataProperty = (typeof YARG_CUE_DATA_PROPERTIES)[number]
+export type NetCueDataProperty = (typeof NET_CUE_DATA_PROPERTIES)[number]
 
 // Audio Cue Data Properties - derived from shared constants
 export type AudioCueDataProperty = (typeof AUDIO_CUE_DATA_PROPERTIES)[number]
 
-export type CueDataProperty = YargCueDataProperty | AudioCueDataProperty
+export type CueDataProperty = NetCueDataProperty | AudioCueDataProperty
 
 // Config Data Properties - derived from shared constants
 export type ConfigDataProperty = (typeof ALL_CONFIG_DATA_PROPERTIES)[number]
@@ -205,6 +303,18 @@ export interface DebuggerLogicNode extends BaseLogicNode {
 
 export type RandomMode = 'random-integer' | 'random-choice' | 'random-light'
 
+/** One roll of a multi-roll random node. Structurally a RandomLogicNode minus the node envelope, so the
+ *  node itself satisfies this shape and legacy single-roll nodes read as a one-element list. */
+export interface RandomRoll {
+  mode: RandomMode
+  min?: ValueSource // random-integer: inclusive min
+  max?: ValueSource // random-integer: inclusive max
+  choices?: string[] // random-choice: list of string options
+  sourceVariable?: string // random-light: light-array variable name
+  count?: ValueSource // random-light: number of lights to pick
+  assignTo: string // variable to store result
+}
+
 export interface RandomLogicNode extends BaseLogicNode {
   logicType: 'random'
   mode: RandomMode
@@ -214,6 +324,9 @@ export interface RandomLogicNode extends BaseLogicNode {
   sourceVariable?: string // random-light: light-array variable name
   count?: ValueSource // random-light: number of lights to pick
   assignTo: string // variable to store result
+  // When present and non-empty, perform each roll in order instead of the single roll above. Collapses a
+  // run of random nodes (e.g. strobe x/y/rotation, or preset + duration) into one node.
+  rolls?: RandomRoll[]
 }
 
 export interface ShuffleLightsLogicNode extends BaseLogicNode {
@@ -231,10 +344,39 @@ export interface ForEachLightLogicNode extends BaseLogicNode {
   groupSize?: ValueSource
 }
 
+export interface IndexedVariableLogicNode extends BaseLogicNode {
+  logicType: 'indexed-variable'
+  // Read or write one slot of a variable family stored as `${varName}#${index}`. Gives a cue a small
+  // per-position array (e.g. a `lit#i` latch per StageKit LED) without declaring eight separate variables.
+  // The slot lives in the same scope (cue vs cue-group) as the base `varName`, so it clears on activation.
+  mode: 'get' | 'set'
+  varName: string // base family name
+  index: ValueSource // which slot of the family
+  valueType: VariableType // the family's element type (set: type written; get: type of the empty-slot zero)
+  value?: ValueSource // set: value written to the slot
+  assignTo?: string // get: variable the slot's value is read into
+}
+
+export interface LedChangedLogicNode extends BaseLogicNode {
+  logicType: 'led-changed'
+  // A fan-out over the StageKit LED positions (0..7) whose colour changed since the previous frame. Runs
+  // the `each` branch once per changed position, seeding the position index / new colour / edge, then the
+  // `done` branch. Collapses the eight per-LED led-N event lanes an RB3 gameplay cue repeats into one.
+  assignIndex: string // number var: the 0-based position that changed
+  assignColor?: string // color var: the position's new colour (ledColorAt), 'transparent' when it turned off
+  assignEdge?: string // string var: 'on' (off→lit), 'off' (lit→off), or 'color' (stayed lit, banks changed)
+}
+
 export type LogicNode =
   | VariableLogicNode
   | MathLogicNode
+  | ClampLogicNode
+  | ExpressionLogicNode
+  | SelectFromListLogicNode
+  | PulseLogicNode
   | ConditionalLogicNode
+  | FrameGateLogicNode
+  | TempoLogicNode
   | CueDataLogicNode
   | ConfigDataLogicNode
   | LightsFromIndexLogicNode
@@ -252,6 +394,64 @@ export type LogicNode =
   | RandomLogicNode
   | ShuffleLightsLogicNode
   | ForEachLightLogicNode
+  | IndexedVariableLogicNode
+  | LedChangedLogicNode
+
+/** Presentation + wiring metadata for one logic node type. Plain data only (labels, semantic category and
+ *  port shape) so the main process can share it; the renderer maps `category` to its own colours. */
+export interface LogicNodeMeta {
+  /** Human label shown on palette buttons, the canvas, and menus. */
+  label: string
+  /** Colour/grouping bucket in the editor. */
+  category: 'general' | 'array' | 'data' | 'debug'
+  /** Output port shape: one plain out, a conditional true/false pair, or a fan-out each/done pair. */
+  ports: 'single' | 'true-false' | 'each-done'
+  /** Nodes that need an engine-stepped path and are inert under level mode / an audio "during" context. */
+  timing?: true
+}
+
+// Canonical metadata for every logic node type, the sibling of NODE_EFFECT_TYPES. The Record keeps it
+// exhaustive: adding a member to the LogicNode union without listing it here is a compile error, and an
+// unknown key is rejected by excess-property checking. Insertion order is the editor palette order, and
+// every consumer (palette, canvas, pane menu, drag parser, level-mode check, layout) derives from this so
+// nobody hand-maintains a second copy that can silently drift.
+export const LOGIC_NODE_META: Record<LogicNode['logicType'], LogicNodeMeta> = {
+  'config-data': { label: 'Config Data', category: 'data', ports: 'single' },
+  'cue-data': { label: 'Cue Data', category: 'data', ports: 'single' },
+  'conditional': { label: 'Conditional', category: 'general', ports: 'true-false' },
+  'delay': { label: 'Delay', category: 'general', ports: 'single', timing: true },
+  'lights-from-index': { label: 'Lights From Index', category: 'general', ports: 'single' },
+  'color-from-index': { label: 'Color From Index', category: 'general', ports: 'single' },
+  'math': { label: 'Math', category: 'general', ports: 'single' },
+  'expression': { label: 'Expression', category: 'general', ports: 'single' },
+  'clamp': { label: 'Clamp', category: 'general', ports: 'single' },
+  'frame-gate': { label: 'Frame Gate', category: 'general', ports: 'true-false' },
+  'tempo': { label: 'Tempo', category: 'general', ports: 'single' },
+  'indexed-variable': { label: 'Indexed Variable', category: 'general', ports: 'single' },
+  'led-changed': { label: 'LED Changed', category: 'general', ports: 'each-done', timing: true },
+  'select-from-list': { label: 'Select From List', category: 'general', ports: 'single' },
+  'pulse': { label: 'Pulse', category: 'general', ports: 'single' },
+  'random': { label: 'Random', category: 'general', ports: 'single' },
+  'variable': { label: 'Variable', category: 'general', ports: 'single' },
+  'array-length': { label: 'Array Length', category: 'array', ports: 'single' },
+  'concat-lights': { label: 'Concat Lights', category: 'array', ports: 'single' },
+  'create-pairs': { label: 'Create Pairs', category: 'array', ports: 'single' },
+  'build-ring': { label: 'Build Ring', category: 'array', ports: 'single' },
+  'reverse-lights': { label: 'Reverse Lights', category: 'array', ports: 'single' },
+  'shuffle-lights': { label: 'Shuffle Lights', category: 'array', ports: 'single' },
+  'for-each-light': {
+    label: 'For Each Light',
+    category: 'array',
+    ports: 'each-done',
+    timing: true,
+  },
+  'reverse-colors': { label: 'Reverse Colors', category: 'array', ports: 'single' },
+  'concat-colors': { label: 'Concat Colors', category: 'array', ports: 'single' },
+  'shuffle-colors': { label: 'Shuffle Colors', category: 'array', ports: 'single' },
+  'debugger': { label: 'Debugger', category: 'debug', ports: 'single' },
+}
+
+export const NODE_LOGIC_TYPES = Object.keys(LOGIC_NODE_META) as LogicNode['logicType'][]
 
 export interface EventRaiserNode {
   id: string
@@ -340,20 +540,20 @@ export interface EffectReference {
   name: string // Display name (cached for UI)
 }
 
-export interface YargLightingNodeCueDefinition extends BaseCueDefinition {
+export interface NetLightingNodeCueDefinition extends BaseCueDefinition {
   kind: 'lighting'
   cueType: CueType
   style: 'primary' | 'secondary'
-  nodes: NodeGraph<YargEventNode, ActionNode>
+  nodes: NodeGraph<NetEventNode, ActionNode>
 }
 
 /** YARG motion program: same event model as lighting; runs in parallel (random selection). */
-export interface YargMotionNodeCueDefinition extends BaseCueDefinition {
+export interface NetMotionNodeCueDefinition extends BaseCueDefinition {
   kind: 'motion'
-  nodes: NodeGraph<YargEventNode, ActionNode>
+  nodes: NodeGraph<NetEventNode, ActionNode>
 }
 
-export type YargNodeCueDefinition = YargLightingNodeCueDefinition | YargMotionNodeCueDefinition
+export type NetNodeCueDefinition = NetLightingNodeCueDefinition | NetMotionNodeCueDefinition
 
 /** Layering for audio node cues: primary = base look; secondary/strobe = overlay (addEffect). Strobe is excluded from Game Mode primary rotation. */
 export type AudioCueLayerStyle = 'primary' | 'secondary' | 'strobe'
@@ -374,14 +574,19 @@ export interface AudioMotionNodeCueDefinition extends BaseCueDefinition {
 
 export type AudioNodeCueDefinition = AudioLightingNodeCueDefinition | AudioMotionNodeCueDefinition
 
-export interface YargNodeCueFile {
+/**
+ * A cue file for either mode of the net family. The two differ only by the `mode` discriminant,
+ * so they share one interface: the file's directory is what pins the mode, and the vocabulary a mode
+ * may author lives in its domain descriptor rather than in the file shape.
+ */
+export interface NetNodeCueFile {
   /** Schema version. */
   version: 1
   /** Bundled content revision; used at startup to refresh defaults from the app bundle. */
   cueVersion?: number
-  mode: 'yarg'
+  mode: NetCueMode
   group: NodeCueGroupMeta
-  cues: YargNodeCueDefinition[]
+  cues: NetNodeCueDefinition[]
   bundled?: boolean
 }
 
@@ -396,7 +601,12 @@ export interface AudioNodeCueFile {
   bundled?: boolean
 }
 
-export type NodeCueFile = YargNodeCueFile | AudioNodeCueFile
+/**
+ * RB3 cue-mode file. Cues compile through the YARG path (RB3 cue mode reuses the YARG
+ * cue-selection machinery against its own registry instance), so `cues` are YARG cue
+ * definitions; only the `mode` discriminant and the target registry differ.
+ */
+export type NodeCueFile = NetNodeCueFile | AudioNodeCueFile
 
 export interface BaseEventNode {
   id: string
@@ -405,8 +615,14 @@ export interface BaseEventNode {
   outputs?: string[]
 }
 
-export interface YargEventNode extends BaseEventNode {
-  eventType: YargEventType
+export interface NetEventNode extends BaseEventNode {
+  eventType: NetEventType
+  /**
+   * RB3 led-N gates only: when true, the ON gate also fires while the position stays lit but the set
+   * of banks lighting it changes (a colour change), not just on the off→on edge. Ignored by led-N-off
+   * and non-led events.
+   */
+  triggerOnColorChange?: boolean
 }
 
 export type AudioEventType =
@@ -656,7 +872,7 @@ export interface BaseEffectDefinition {
 
 export interface YargEffectDefinition extends BaseEffectDefinition {
   mode: 'yarg'
-  nodes: NodeGraph<YargEventNode, ActionNode>
+  nodes: NodeGraph<NetEventNode, ActionNode>
 }
 
 export interface AudioEffectDefinition extends BaseEffectDefinition {

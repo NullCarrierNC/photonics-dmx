@@ -5,7 +5,7 @@ import type {
   AudioNodeCueDefinition,
   NodeCueMode,
   NodeCueGroupMeta,
-  YargNodeCueDefinition,
+  NetNodeCueDefinition,
   YargEffectDefinition,
   AudioEffectDefinition,
   EffectGroupMeta,
@@ -16,7 +16,7 @@ import type { EditorMode } from '../lib/types'
 type Props = {
   filename: string
   group: NodeCueGroupMeta | EffectGroupMeta | null
-  currentCue: YargNodeCueDefinition | AudioNodeCueDefinition | null
+  currentCue: NetNodeCueDefinition | AudioNodeCueDefinition | null
   currentEffect?: YargEffectDefinition | AudioEffectDefinition | null
   availableCueTypes: string[]
   usedCueTypes?: Set<string>
@@ -24,7 +24,7 @@ type Props = {
   editorMode: EditorMode
   onGroupChange: (updates: Partial<NodeCueGroupMeta | EffectGroupMeta>) => void
   onCueMetadataChange: (
-    updates: Partial<YargNodeCueDefinition> | Partial<AudioNodeCueDefinition>,
+    updates: Partial<NetNodeCueDefinition> | Partial<AudioNodeCueDefinition>,
   ) => void
   onEffectMetadataChange?: (
     updates: Partial<YargEffectDefinition> & Partial<AudioEffectDefinition>,
@@ -46,7 +46,7 @@ const CueMetadataForm: React.FC<Props> = ({
 }) => {
   const currentCueType =
     currentCue?.kind === 'lighting' && activeMode === 'yarg'
-      ? (currentCue as Extract<YargNodeCueDefinition, { kind: 'lighting' }>).cueType
+      ? (currentCue as Extract<NetNodeCueDefinition, { kind: 'lighting' }>).cueType
       : undefined
   const filteredCueTypes = availableCueTypes.filter(
     (type) => !usedCueTypes?.has(type) || type === currentCueType,
@@ -148,7 +148,7 @@ const CueMetadataForm: React.FC<Props> = ({
                 <select
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
                   value={
-                    (currentCue as Extract<YargNodeCueDefinition, { kind: 'lighting' }>).cueType
+                    (currentCue as Extract<NetNodeCueDefinition, { kind: 'lighting' }>).cueType
                   }
                   onChange={(event) =>
                     onCueMetadataChange({ cueType: event.target.value as CueType })
@@ -164,7 +164,31 @@ const CueMetadataForm: React.FC<Props> = ({
                 Cue Style
                 <select
                   className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={(currentCue as Extract<YargNodeCueDefinition, { kind: 'lighting' }>).style}
+                  value={(currentCue as Extract<NetNodeCueDefinition, { kind: 'lighting' }>).style}
+                  onChange={(event) =>
+                    onCueMetadataChange({ style: event.target.value as 'primary' | 'secondary' })
+                  }>
+                  <option value="primary">Primary</option>
+                  <option value="secondary">Secondary</option>
+                </select>
+              </label>
+            </>
+          )}
+          {!isEffectMode && activeMode === 'rb3' && currentCue?.kind === 'lighting' && (
+            <>
+              {/* rb3 authors the single fixed always-active gameplay cue; the trigger is not
+                  author-chosen, so it is shown as a static indicator instead of a selector. */}
+              <div className="flex flex-col font-medium">
+                Game Event Trigger
+                <div className="mt-1 rounded border px-2 py-1 bg-gray-100 dark:bg-gray-700 dark:border-gray-600 text-gray-600 dark:text-gray-400">
+                  RB3 (gameplay)
+                </div>
+              </div>
+              <label className="flex flex-col font-medium">
+                Cue Style
+                <select
+                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                  value={(currentCue as Extract<NetNodeCueDefinition, { kind: 'lighting' }>).style}
                   onChange={(event) =>
                     onCueMetadataChange({ style: event.target.value as 'primary' | 'secondary' })
                   }>

@@ -1,9 +1,8 @@
-# Photonics - DMX Sequencer for YARG, Rock Band 3 (Enhanced), and Music Visualization
+# Photonics - DMX Lights for YARG, Rock Band 3 (Enhanced), and Music Visualization
 
-https://github.com/user-attachments/assets/f05fe5a7-16ca-4fe5-8ea9-a44b3a4c7d22
+[https://github.com/user-attachments/assets/f05fe5a7-16ca-4fe5-8ea9-a44b3a4c7d22](https://github.com/user-attachments/assets/f05fe5a7-16ca-4fe5-8ea9-a44b3a4c7d22)
 
-Photonics is a purpose built DMX light sequencer / controller for use with YARG, Rock Band 3 Enhanced, or as a music visualizer.
-It uses in-game lighting data, or audio analysis, to drive DMX lights in time to the music.
+Photonics is a purpose built DMX light sequencer / controller for use with YARG, Rock Band 3 Enhanced, or as a music visualizer. It uses in-game lighting data, or audio analysis, to drive DMX lights in time to the music.
 
 It comes with a library of built-in lighting cues to create as close to a plug-and-play DMX experience as possible.
 For power users, there is also a cue editor for creating your own lighting effects.
@@ -15,11 +14,17 @@ For more information or the Quickstart guide, please visit the project site: [Ph
 
 If you have questions, feel free to reach out in our [Discord Server](https://discord.gg/2Vyqc2hYcK).
 
+## What Will I Need To Use It?
+
+To get a basic kit up-and-running, you'll need about $100 worth of gear! Please see the [DMX Buyers Guide](https://photonics.rocks/docs/hardware-prerequisites-dmx-buyers-guide/) for the details.
+
 ## DMX Output
 
 Photonics supports DMX output over sACN, ArtNet, Enttec Pro USB, OpenDMX (FTDI). There's also a live 2D & 3D DMX preview in the app.
 
 If you don't have the hardware already, we recommend you look at sACN network adapters over USB based solutions.
+
+New to DMX? See our [Understanding DMX Basics](https://photonics.rocks/docs/understanding-dmx-basics/) guide for an intro.
 
 ## Before You Begin…
 
@@ -51,9 +56,9 @@ You will need to be running [Rock Band 3 Enhanced](https://rb3e.rbenhanced.rocks
 
 Before you start playing, you will need to edit the `rb3e.ini` configuration file to enable lighting data over the network.
 
-Unlike YARG, RB3E specifies the specific colours of each of the LEDs found on the original Stage Kit. Photonics maps this data against the available DMX lights in your rig - using colour blending when two or more Stage Kit colour banks enable the same LED. E.g. Green 1 and Blue 1 on the Stage Kit will become Cyan on DMX Light 1.
+Unlike YARG, RB3E specifies the specific colours of each of the LEDs found on the original Stage Kit rather than lighting cue names. In previous versions, Photonics maps this data against the available DMX lights in your rig - using colour blending when two or more Stage Kit colour banks enable the same LED. E.g. Green 1 and Blue 1 on the Stage Kit will become Cyan on DMX Light 1.
 
-** If you are running RB3E you will need either 4 or 8 DMX lights ** - other combinations are unsupported.
+As of Alpha 7, Photonics' cue-editor supports RB3! This means there are now additional lighting effects available that go beyond the original Stage Kit look. The setup is the same, but now your lights will have an expanded range of effects.
 
 Please see [Playing RB3](https://photonics.rocks/docs/playing-rock-band-3-enhanced/) for more information.
 
@@ -78,6 +83,8 @@ Photonics also support moving head lights, specifically those that provide pan a
 There is an almost inifinte number of variations and unusual DMX lights. While Photonics won't support all of their possible features directly, they are almost always still usable with Photonics. They may look a little different, but still create an enjoyable light show.
 
 Moving Heads that spin in circles will be the most challenging to implement. You can either use them without motion as regular lights, or try setting up their motion capabilities. Photonics assumes discreet pan and tilt, so the results may be somewhat unpredictable, but may be worth trying.
+
+Alpha 7 also introduced DMX channels you can assign arbitrary values to. For something like a spinning head, you could assign a slow rotation value to the light's movement channel. This would cause the light to spin indefinitely while the Photonics is running.
 
 ## Cue Editor
 
@@ -150,7 +157,7 @@ Some libraries/assets that are packaged with the source code have licenses that 
 
 Photonics is built with [Electron-Vite](https://electron-vite.org/).
 
-To build it yourself, clone the Git repo at: https://github.com/NullCarrierNC/photonics-dmx.git
+To build it yourself, clone the Git repo at: [https://github.com/NullCarrierNC/photonics-dmx.git](https://github.com/NullCarrierNC/photonics-dmx.git)
 
 ### Install
 
@@ -163,6 +170,8 @@ $ npm install
 ```bash
 $ npm run dev
 ```
+
+Electron 42 and later no longer download their binary during `npm install`, so the first `npm run dev` fetches it (roughly 110 MB). Later runs skip the download.
 
 ### Build
 

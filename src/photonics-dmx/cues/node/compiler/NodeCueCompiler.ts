@@ -7,8 +7,9 @@ import {
   createDefaultActionTiming,
   EffectRaiserNode,
   VariableDefinition,
-  YargEventNode,
-  YargNodeCueDefinition,
+  NetEventNode,
+  NetNodeCueDefinition,
+  NodeCueMode,
   ValueSource,
 } from '../../types/nodeCueTypes'
 import { AbstractGraphBuilder, CompiledGraphBase } from './AbstractGraphBuilder'
@@ -27,13 +28,28 @@ export class NodeCueCompilationError extends CompilationError {
 }
 
 export interface CompiledNodeCue<TEvent extends BaseEventNode> extends CompiledGraphBase<TEvent> {
-  definition: YargNodeCueDefinition | AudioNodeCueDefinition
+  definition: NetNodeCueDefinition | AudioNodeCueDefinition
   effectRaiserMap: Map<string, EffectRaiserNode>
   /** Group-level variable definitions; set by loader from file.group.variables */
   groupVariables?: VariableDefinition[]
+  /**
+   * Which domain authored this cue, carried from the file's directory through compilation so the
+   * runtime can resolve its event gate and cue-data extractor. Definitions carry no mode of their
+   * own, only files do, so the compiler is told.
+   */
+  mode: NodeCueMode
 }
 
-export type CompiledYargCue = CompiledNodeCue<YargEventNode>
+/**
+ * How a cue definition is addressed: a lighting cue by whichever key its family uses, a motion cue by
+ * its own id. Used where a cue has to be named without knowing which family it came from.
+ */
+export function cueKeyOf(definition: NetNodeCueDefinition | AudioNodeCueDefinition): string {
+  if (definition.kind !== 'lighting') return definition.id
+  return 'cueType' in definition ? definition.cueType : definition.cueTypeId
+}
+
+export type CompiledNetCue = CompiledNodeCue<NetEventNode>
 export type CompiledAudioCue = CompiledNodeCue<AudioEventNodeUnion>
 
 const getActionTiming = (action: ActionNode): ActionTimingConfig => ({
@@ -62,16 +78,21 @@ export const calculateActionDuration = (action: ActionNode): number => {
 }
 
 export class NodeCueCompiler extends AbstractGraphBuilder {
-  public static compileYargCue(definition: YargNodeCueDefinition): CompiledYargCue {
-    return this.buildCompiled(definition)
-  }
-
-  public static compileAudioCue(definition: AudioNodeCueDefinition): CompiledAudioCue {
-    return this.buildCompiled(definition)
+  /**
+   * Compile a cue for a known mode. `mode` is required because a definition carries no mode of its
+   * own: yarg and rb3 share one definition shape and are told apart only by the directory the file
+   * came from, which the loader passes through.
+   */
+  public static compileCue<TEvent extends BaseEventNode = NetEventNode>(
+    definition: NetNodeCueDefinition | AudioNodeCueDefinition,
+    mode: NodeCueMode,
+  ): CompiledNodeCue<TEvent> {
+    return this.buildCompiled<TEvent>(definition, mode)
   }
 
   private static buildCompiled<TEvent extends BaseEventNode>(
-    definition: YargNodeCueDefinition | AudioNodeCueDefinition,
+    definition: NetNodeCueDefinition | AudioNodeCueDefinition,
+    mode: NodeCueMode,
   ): CompiledNodeCue<TEvent> {
     const events = definition.nodes.events as unknown as TEvent[]
     const actions = (definition.nodes.actions ?? []) as ActionNode[]
@@ -93,14 +114,8 @@ export class NodeCueCompiler extends AbstractGraphBuilder {
       !eventListeners.length &&
       !effectRaisers.length
     ) {
-      const cueId =
-        definition.kind === 'lighting'
-          ? 'cueType' in definition
-            ? definition.cueType
-            : definition.cueTypeId
-          : definition.id
       throw new NodeCueCompilationError(
-        `At least one action, event raiser, event listener, or effect raiser node is required. Cue '${definition.name}' (${cueId}) has none.`,
+        `At least one action, event raiser, event listener, or effect raiser node is required. Cue '${definition.name}' (${cueKeyOf(definition)}) has none.`,
       )
     }
 
@@ -126,6 +141,7 @@ export class NodeCueCompiler extends AbstractGraphBuilder {
 
     return {
       definition,
+      mode,
       eventMap: core.eventMap,
       actionMap: core.actionMap,
       logicMap: core.logicMap,

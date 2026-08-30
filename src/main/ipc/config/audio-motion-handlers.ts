@@ -1,7 +1,7 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../../controllers/ControllerManager'
 import { sendToAllWindows } from '../../utils/windowUtils'
-import { YargCueRegistry } from '../../../photonics-dmx/cues/registries/YargCueRegistry'
+import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
 import { ipcError } from '../ipcResult'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import {
@@ -16,15 +16,22 @@ import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('audio-motion-handlers')
 
+/** Shorthand for the audio listener surface every handler below drives. */
+function audioOf(
+  manager: ControllerManager,
+): ReturnType<ControllerManager['getListenerLifecycle']>['audio'] {
+  return manager.getListenerLifecycle().audio
+}
+
 export function registerAudioMotionConfigHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
 ): void {
   ipcMain.handle(CONFIG.GET_AUDIO_REACTIVE_CUES, async () => {
     try {
-      const cues = controllerManager.getAudioCueOptions()
-      const activeCueType = controllerManager.getActiveAudioCueType()
-      const secondaryCueType = controllerManager.getActiveSecondaryCueType()
+      const cues = audioOf(controllerManager).getAudioCueOptions()
+      const activeCueType = audioOf(controllerManager).getActiveAudioCueType()
+      const secondaryCueType = audioOf(controllerManager).getActiveSecondaryCueType()
       return {
         success: true,
         activeCueType,
@@ -50,7 +57,7 @@ export function registerAudioMotionConfigHandlers(
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
-      const result = controllerManager.setActiveAudioCueType(validation.value)
+      const result = audioOf(controllerManager).setActiveAudioCueType(validation.value)
       if (!result.success) {
         return result
       }
@@ -62,17 +69,17 @@ export function registerAudioMotionConfigHandlers(
   })
 
   ipcMain.handle(CONFIG.GET_AUDIO_GAME_MODE, async () => {
-    return controllerManager.getAudioGameModeConfig()
+    return audioOf(controllerManager).getAudioGameModeConfig()
   })
 
   ipcMain.handle(CONFIG.SET_AUDIO_GAME_MODE, async (_, updates: unknown) => {
     try {
-      const base = controllerManager.getAudioGameModeConfig()
+      const base = audioOf(controllerManager).getAudioGameModeConfig()
       const validation = validateAudioGameModePayload(updates, base)
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
-      await controllerManager.setAudioGameModeConfig(validation.value)
+      await audioOf(controllerManager).setAudioGameModeConfig(validation.value)
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, validation.value)
       return { success: true, config: validation.value }
     } catch (error) {
@@ -115,7 +122,7 @@ export function registerAudioMotionConfigHandlers(
       await controllerManager
         .getConfig()
         .updateCueDomain('audioMotion', { activeCueRef: validation.value })
-      controllerManager.setActiveAudioMotionCueRef(validation.value)
+      audioOf(controllerManager).setActiveAudioMotionCueRef(validation.value)
       return { success: true }
     } catch (error) {
       log.error('Error setting active audio motion cue:', error)
@@ -144,6 +151,27 @@ export function registerAudioMotionConfigHandlers(
     }
   })
 
+  ipcMain.handle(CONFIG.GET_ACTIVE_RB3_MOTION_CUE, async () => {
+    return controllerManager.getConfig().getPreference('cueDomains').rb3Motion.activeCueRef ?? null
+  })
+
+  ipcMain.handle(CONFIG.SET_ACTIVE_RB3_MOTION_CUE, async (_, ref: unknown) => {
+    try {
+      const validation = validateCueRefPayload(ref)
+      if (!validation.ok) {
+        return { success: false, error: validation.error }
+      }
+      await controllerManager
+        .getConfig()
+        .updateCueDomain('rb3Motion', { activeCueRef: validation.value })
+      controllerManager.setActiveRb3MotionCueRef(validation.value)
+      return { success: true }
+    } catch (error) {
+      log.error('Error setting active RB3 motion cue:', error)
+      return { ...ipcError(error), success: false }
+    }
+  })
+
   ipcMain.handle(CONFIG.GET_STAGE_KIT_PRIORITY, async () => {
     const prefs = controllerManager.getConfig().getAllPreferences()
     return prefs.stageKitPrefs?.yargPriority || 'random'
@@ -159,7 +187,7 @@ export function registerAudioMotionConfigHandlers(
         stageKitPrefs: { yargPriority: validation.value },
       })
 
-      const registry = YargCueRegistry.getInstance()
+      const registry = CueRegistry.getInstance()
       registry.setStageKitPriority(validation.value)
       registry.clearConsistencyTracking()
 
@@ -216,9 +244,11 @@ export function registerAudioMotionConfigHandlers(
 
       const currentConfig = controllerManager.getConfig().getAudioConfig()
       const currentDeviceId = currentConfig?.deviceId
-      const newDeviceId = validatedUpdates.deviceId as string | undefined
+      const hasDeviceIdUpdate = 'deviceId' in validatedUpdates
+      const newDeviceId = validatedUpdates.deviceId
 
-      const deviceChanged = newDeviceId !== undefined && newDeviceId !== currentDeviceId
+      const deviceChanged =
+        hasDeviceIdUpdate && (newDeviceId ?? undefined) !== (currentDeviceId ?? undefined)
 
       await controllerManager.getConfig().updateAudioConfig(validatedUpdates)
 
@@ -227,6 +257,7 @@ export function registerAudioMotionConfigHandlers(
       sendToAllWindows(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, updatedConfig)
       log.info('Sent audio:config-update to renderer')
 
+      let warning: string | undefined
       if (controllerManager.getIsAudioEnabled()) {
         if (deviceChanged) {
           log.info('Device changed, restarting audio capture...')
@@ -235,9 +266,14 @@ export function registerAudioMotionConfigHandlers(
             await controllerManager.enableAudio()
           } catch (error) {
             log.error('Failed to restart audio with new device:', error)
+            // The selection is saved, so keep it rather than reverting, but tell the renderer
+            // that capture is not running on it.
+            warning = `Saved, but audio capture failed to restart: ${
+              error instanceof Error ? error.message : String(error)
+            }`
           }
         } else {
-          controllerManager.updateAudioConfig(updatedConfig)
+          audioOf(controllerManager).updateAudioConfig(updatedConfig)
         }
       }
 
@@ -249,7 +285,7 @@ export function registerAudioMotionConfigHandlers(
         }
       }
 
-      return { success: true }
+      return warning ? { success: true, warning } : { success: true }
     } catch (error) {
       log.error('Error saving audio configuration:', error)
       return ipcError(error)

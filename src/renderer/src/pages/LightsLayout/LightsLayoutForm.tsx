@@ -26,7 +26,6 @@ interface LightsLayoutFormProps {
   setSelectedStrobe: (v: ConfigStrobeType) => void
   dedicatedStrobeCount: number
   setDedicatedStrobeCount: (n: number) => void
-  hasPhysicalStrobe: boolean
 }
 
 const LightsLayoutForm: React.FC<LightsLayoutFormProps> = ({
@@ -43,7 +42,6 @@ const LightsLayoutForm: React.FC<LightsLayoutFormProps> = ({
   setSelectedStrobe,
   dedicatedStrobeCount,
   setDedicatedStrobeCount,
-  hasPhysicalStrobe,
 }) => (
   <form className="space-y-6 max-w-full">
     <div className="flex flex-wrap gap-4">
@@ -128,9 +126,7 @@ const LightsLayoutForm: React.FC<LightsLayoutFormProps> = ({
           }}
           className="p-2 border border-gray-300 dark:border-gray-700 rounded w-full text-black dark:text-white dark:bg-gray-700">
           <option value={ConfigStrobeType.None}>None</option>
-          {hasPhysicalStrobe && (
-            <option value={ConfigStrobeType.Dedicated}>Dedicated Strobe Lights</option>
-          )}
+          <option value={ConfigStrobeType.Dedicated}>Dedicated Strobe Lights</option>
           <option value={ConfigStrobeType.AllCapable}>Strobe Enabled Lights</option>
         </select>
       </label>

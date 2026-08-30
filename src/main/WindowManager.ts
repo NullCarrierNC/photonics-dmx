@@ -28,6 +28,26 @@ export class WindowManager {
   }
 
   /**
+   * Opens a renderer-supplied URL in the system browser, allowing only http(s). Anything else
+   * (file:, smb:, custom protocol handlers, unparseable strings) is dropped and logged — a
+   * compromised renderer must not be able to launch arbitrary local handlers via window.open.
+   */
+  private openExternalSafely(url: string): void {
+    let scheme: string
+    try {
+      scheme = new URL(url).protocol
+    } catch {
+      log.warn(`Blocked window.open to unparseable URL: ${url}`)
+      return
+    }
+    if (scheme !== 'http:' && scheme !== 'https:') {
+      log.warn(`Blocked window.open to non-http(s) URL: ${url}`)
+      return
+    }
+    shell.openExternal(url)
+  }
+
+  /**
    * Saves window state to preferences with debouncing
    */
   private async saveWindowState(
@@ -234,7 +254,7 @@ export class WindowManager {
     })
 
     this.mainWindow.webContents.setWindowOpenHandler((details) => {
-      shell.openExternal(details.url)
+      this.openExternalSafely(details.url)
       return { action: 'deny' }
     })
     denyWebContentsWillNavigate(this.mainWindow.webContents)
@@ -312,7 +332,7 @@ export class WindowManager {
     })
 
     this.cueEditorWindow.webContents.setWindowOpenHandler((details) => {
-      shell.openExternal(details.url)
+      this.openExternalSafely(details.url)
       return { action: 'deny' }
     })
     denyWebContentsWillNavigate(this.cueEditorWindow.webContents)
@@ -412,7 +432,7 @@ export class WindowManager {
     })
 
     this.audioPreviewWindow.webContents.setWindowOpenHandler((details) => {
-      shell.openExternal(details.url)
+      this.openExternalSafely(details.url)
       return { action: 'deny' }
     })
     denyWebContentsWillNavigate(this.audioPreviewWindow.webContents)

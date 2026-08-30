@@ -3,6 +3,14 @@ import type {
   LogicNode,
   VariableLogicNode,
   MathLogicNode,
+  ExpressionLogicNode,
+  FrameGateLogicNode,
+  TempoLogicNode,
+  IndexedVariableLogicNode,
+  LedChangedLogicNode,
+  ClampLogicNode,
+  SelectFromListLogicNode,
+  PulseLogicNode,
   ConditionalLogicNode,
   CueDataLogicNode,
   ConfigDataLogicNode,
@@ -26,6 +34,14 @@ import type { NodeCueMode } from '../../../../../../photonics-dmx/cues/types/nod
 
 import VariableLogicEditor from './logic/VariableLogicEditor'
 import MathLogicEditor from './logic/MathLogicEditor'
+import ExpressionLogicEditor from './logic/ExpressionLogicEditor'
+import FrameGateLogicEditor from './logic/FrameGateLogicEditor'
+import TempoLogicEditor from './logic/TempoLogicEditor'
+import IndexedVariableLogicEditor from './logic/IndexedVariableLogicEditor'
+import LedChangedLogicEditor from './logic/LedChangedLogicEditor'
+import ClampLogicEditor from './logic/ClampLogicEditor'
+import SelectFromListLogicEditor from './logic/SelectFromListLogicEditor'
+import PulseLogicEditor from './logic/PulseLogicEditor'
 import CueDataLogicEditor from './logic/CueDataLogicEditor'
 import ConfigDataLogicEditor from './logic/ConfigDataLogicEditor'
 import ConditionalLogicEditor from './logic/ConditionalLogicEditor'
@@ -84,6 +100,86 @@ const LogicNodeEditor: React.FC<LogicNodeEditorProps> = ({
     return (
       <MathLogicEditor
         node={node as MathLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'expression') {
+    return (
+      <ExpressionLogicEditor
+        node={node as ExpressionLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'frame-gate') {
+    return (
+      <FrameGateLogicEditor
+        node={node as FrameGateLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'tempo') {
+    return (
+      <TempoLogicEditor
+        node={node as TempoLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'indexed-variable') {
+    return (
+      <IndexedVariableLogicEditor
+        node={node as IndexedVariableLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'led-changed') {
+    return (
+      <LedChangedLogicEditor
+        node={node as LedChangedLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'clamp') {
+    return (
+      <ClampLogicEditor
+        node={node as ClampLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'select-from-list') {
+    return (
+      <SelectFromListLogicEditor
+        node={node as SelectFromListLogicNode}
+        availableVariables={availableVariables}
+        updateNode={updateNode}
+      />
+    )
+  }
+
+  if (node.logicType === 'pulse') {
+    return (
+      <PulseLogicEditor
+        node={node as PulseLogicNode}
         availableVariables={availableVariables}
         updateNode={updateNode}
       />
