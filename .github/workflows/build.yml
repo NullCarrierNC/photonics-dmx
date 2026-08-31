@@ -36,6 +36,3 @@ jobs:
 
       - name: Build
         run: ${{ matrix.build }}
-        env:
-          # electron-builder on macOS may use this; harmless elsewhere
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

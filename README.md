@@ -35,6 +35,40 @@ When used with the [FatsCo Light Show and Strobe Light](https://fatsco.tech/), y
 
 If you're ready to move up to larger, theatre style stage lighting, then read on!
 
+## Downloading and Playing
+
+Grab the release for your OS and install. For YARG you can run Photonics on the same computer as YARG.
+
+Please take a look at the [Quickstart Guide](https://photonics.rocks/docs/photonics-quick-start-guide/) for instructions on getting up and running.
+
+### Installing on Windows
+
+If the first time you run Photonics on your PC it shows you an error:
+
+> Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.
+
+This is Windows blocking the app because it’s not currently signed. To install, click `More Info` and then `Install Anyway`.
+
+### Installing on Mac
+
+If the first time you run Photonics your Mac shows you an error:
+
+> “Photonics” is damaged and can’t be opened. You should move it to the Trash.
+
+This is Gatekeeper blocking the app because it’s not currently signed. To bypass this warning you need to open your terminal and run: `xattr -r -d com.apple.quarantine /Applications/Photonics.app`
+
+## Upgrading from Previous Versions
+
+Alpha 7 modified how lights with extra channels are configured. If your lights support additional colour channels like White, Amber, etc, you can configure these in the My Lights template. Once updated these additional channels will be used by Photonics!
+
+Alpha 5 introduced a new light layout, `stacked`. This is for lights mounted on a truss or T-bar where some may be up-firing while others are down-firing.
+
+On your first run double-check your light layout, and if necessary, update it to better match your physical layout.
+
+The only time a mismatch between the light layout and your real lights can become an issue is with moving heads: inverted (down-firing) lights need to interpret the motion data differently than up-firing. If this is not accounted for, your lights may aim right when you expect them to aim left, etc.
+
+If you have regular, non-moving PAR or spot style lights, these will only look incorrect in the 3D preview if not setup correctly.
+
 ## YARG vs. Rock Band 3 (Enhanced)
 
 How Photonics works is a bit different between the games:
@@ -70,7 +104,7 @@ There are two primary audio modes: `Manual` and `Game Mode`. Manual will only ru
 
 ## DMX Lighting Fixture Support
 
-Photonics supports all DMX lights that use discreet colour channels, such as common RGB PAR lights. Lights with additional colour channels, such as Orange, Yellow, etc, can be used - but those specific channels won't be used today.
+Photonics supports all DMX lights that use discreet colour channels, such as common RGB PAR lights. Lights with additional colour channels, such as White, Amber, etc, are also supported! You can even add multiple channels for the same colour should your fixture have more than one colour element. For the White channel specifically, you have a choice of setting this to be used in combination with the RGB channels for white (producing the brightest white), or independently (producing a less bright, but as accurate-to-your-fixture white as possible).
 
 **Gobo / colour wheel based lights are NOT supported.**
 
@@ -82,47 +116,12 @@ Photonics also support moving head lights, specifically those that provide pan a
 
 There is an almost inifinte number of variations and unusual DMX lights. While Photonics won't support all of their possible features directly, they are almost always still usable with Photonics. They may look a little different, but still create an enjoyable light show.
 
-Moving Heads that spin in circles will be the most challenging to implement. You can either use them without motion as regular lights, or try setting up their motion capabilities. Photonics assumes discreet pan and tilt, so the results may be somewhat unpredictable, but may be worth trying.
-
-Alpha 7 also introduced DMX channels you can assign arbitrary values to. For something like a spinning head, you could assign a slow rotation value to the light's movement channel. This would cause the light to spin indefinitely while the Photonics is running.
+Moving Heads that spin in circles will be the most challenging to implement. You can either use them without motion as regular lights, or allocate a Fixed Value channel that lets you assign a static DMX value to be sent. You can use this to assign a slow rotation to your light (for example). This would cause the light to spin indefinitely while the Photonics is running.
 
 ## Cue Editor
 
 Create your own cues for YARG or Music Visualization. Photonics includes a powerful node-based cue editor.
 Please see or [Discord Server](https://discord.gg/2Vyqc2hYcK) or [Photonics.rocks](https://photonics.rocks/docs/table-of-contents/#The-Cue-Editor) for more information on how to use this feature.
-
-## Downloading and Playing
-
-Grab the release for your OS and install. For YARG you can run Photonics on the same computer as YARG.
-
-Please take a look at the [Quickstart Guide](https://photonics.rocks/docs/photonics-quick-start-guide/) for instructions on getting up and running.
-
-### Installing on Windows
-
-If the first time you run Photonics on your PC it shows you an error:
-
-> Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.
-
-This is Windows blocking the app because it’s not currently signed. To install, click `More Info` and then `Install Anyway`.
-
-### Installing on Mac
-
-If the first time you run Photonics your Mac shows you an error:
-
-> “Photonics” is damaged and can’t be opened. You should move it to the Trash.
-
-This is Gatekeeper blocking the app because it’s not currently signed. To bypass this warning you need to open your terminal and run:
-`xattr -r -d com.apple.quarantine /Applications/Photonics.app`
-
-## Upgrading from Previous Versions
-
-Alpha 5 introduces a new light layout, `stacked`. This is for lights mounted on a truss or T-bar where some may be up-firing while others are down-firing.
-
-On your first run double-check your light layout, and if necessary, update it to better match your physical layout.
-
-The only time a mismatch between the light layout and your real lights can become an issue is with moving heads: inverted (down-firing) lights need to interpret the motion data differently than up-firing. If this is not accounted for, your lights may aim right when you expect them to aim left, etc.
-
-If you have regular, non-moving PAR or spot style lights, these will only look incorrect in the 3D preview if not setup correctly.
 
 ## Status
 
