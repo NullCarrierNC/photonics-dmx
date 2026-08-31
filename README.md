@@ -35,6 +35,40 @@ When used with the [FatsCo Light Show and Strobe Light](https://fatsco.tech/), y
 
 If you're ready to move up to larger, theatre style stage lighting, then read on!
 
+## Downloading and Playing
+
+Grab the release for your OS and install. For YARG you can run Photonics on the same computer as YARG.
+
+Please take a look at the [Quickstart Guide](https://photonics.rocks/docs/photonics-quick-start-guide/) for instructions on getting up and running.
+
+### Installing on Windows
+
+If the first time you run Photonics on your PC it shows you an error:
+
+> Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.
+
+This is Windows blocking the app because it’s not currently signed. To install, click `More Info` and then `Install Anyway`.
+
+### Installing on Mac
+
+If the first time you run Photonics your Mac shows you an error:
+
+> “Photonics” is damaged and can’t be opened. You should move it to the Trash.
+
+This is Gatekeeper blocking the app because it’s not currently signed. To bypass this warning you need to open your terminal and run: `xattr -r -d com.apple.quarantine /Applications/Photonics.app`
+
+## Upgrading from Previous Versions
+
+Alpha 7 modified how lights with extra channels are configured. If your lights support additional colour channels like White, Amber, etc, you can configure these in the My Lights template. Once updated these additional channels will be used by Photonics!
+
+Alpha 5 introduced a new light layout, `stacked`. This is for lights mounted on a truss or T-bar where some may be up-firing while others are down-firing.
+
+On your first run double-check your light layout, and if necessary, update it to better match your physical layout.
+
+The only time a mismatch between the light layout and your real lights can become an issue is with moving heads: inverted (down-firing) lights need to interpret the motion data differently than up-firing. If this is not accounted for, your lights may aim right when you expect them to aim left, etc.
+
+If you have regular, non-moving PAR or spot style lights, these will only look incorrect in the 3D preview if not setup correctly.
+
 ## YARG vs. Rock Band 3 (Enhanced)
 
 How Photonics works is a bit different between the games:
@@ -88,39 +122,6 @@ Moving Heads that spin in circles will be the most challenging to implement. You
 
 Create your own cues for YARG or Music Visualization. Photonics includes a powerful node-based cue editor.
 Please see or [Discord Server](https://discord.gg/2Vyqc2hYcK) or [Photonics.rocks](https://photonics.rocks/docs/table-of-contents/#The-Cue-Editor) for more information on how to use this feature.
-
-## Downloading and Playing
-
-Grab the release for your OS and install. For YARG you can run Photonics on the same computer as YARG.
-
-Please take a look at the [Quickstart Guide](https://photonics.rocks/docs/photonics-quick-start-guide/) for instructions on getting up and running.
-
-### Installing on Windows
-
-If the first time you run Photonics on your PC it shows you an error:
-
-> Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.
-
-This is Windows blocking the app because it’s not currently signed. To install, click `More Info` and then `Install Anyway`.
-
-### Installing on Mac
-
-If the first time you run Photonics your Mac shows you an error:
-
-> “Photonics” is damaged and can’t be opened. You should move it to the Trash.
-
-This is Gatekeeper blocking the app because it’s not currently signed. To bypass this warning you need to open your terminal and run:
-`xattr -r -d com.apple.quarantine /Applications/Photonics.app`
-
-## Upgrading from Previous Versions
-
-Alpha 5 introduces a new light layout, `stacked`. This is for lights mounted on a truss or T-bar where some may be up-firing while others are down-firing.
-
-On your first run double-check your light layout, and if necessary, update it to better match your physical layout.
-
-The only time a mismatch between the light layout and your real lights can become an issue is with moving heads: inverted (down-firing) lights need to interpret the motion data differently than up-firing. If this is not accounted for, your lights may aim right when you expect them to aim left, etc.
-
-If you have regular, non-moving PAR or spot style lights, these will only look incorrect in the 3D preview if not setup correctly.
 
 ## Status
 
