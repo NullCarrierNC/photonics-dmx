@@ -70,7 +70,7 @@ There are two primary audio modes: `Manual` and `Game Mode`. Manual will only ru
 
 ## DMX Lighting Fixture Support
 
-Photonics supports all DMX lights that use discreet colour channels, such as common RGB PAR lights. Lights with additional colour channels, such as Orange, Yellow, etc, can be used - but those specific channels won't be used today.
+Photonics supports all DMX lights that use discreet colour channels, such as common RGB PAR lights. Lights with additional colour channels, such as White, Amber, etc, are also supported! You can even add multiple channels for the same colour should your fixture have more than one colour element. For the White channel specifically, you have a choice of setting this to be used in combination with the RGB channels for white (producing the brightest white), or independently (producing a less bright, but as accurate-to-your-fixture white as possible).
 
 **Gobo / colour wheel based lights are NOT supported.**
 
@@ -82,9 +82,7 @@ Photonics also support moving head lights, specifically those that provide pan a
 
 There is an almost inifinte number of variations and unusual DMX lights. While Photonics won't support all of their possible features directly, they are almost always still usable with Photonics. They may look a little different, but still create an enjoyable light show.
 
-Moving Heads that spin in circles will be the most challenging to implement. You can either use them without motion as regular lights, or try setting up their motion capabilities. Photonics assumes discreet pan and tilt, so the results may be somewhat unpredictable, but may be worth trying.
-
-Alpha 7 also introduced DMX channels you can assign arbitrary values to. For something like a spinning head, you could assign a slow rotation value to the light's movement channel. This would cause the light to spin indefinitely while the Photonics is running.
+Moving Heads that spin in circles will be the most challenging to implement. You can either use them without motion as regular lights, or allocate a Fixed Value channel that lets you assign a static DMX value to be sent. You can use this to assign a slow rotation to your light (for example). This would cause the light to spin indefinitely while the Photonics is running.
 
 ## Cue Editor
 
