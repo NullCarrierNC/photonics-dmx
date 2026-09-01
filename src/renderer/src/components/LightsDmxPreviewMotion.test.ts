@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { gimbalCompensatedPanTiltOffsetsDeg } from '../../../photonics-dmx/controllers/sequencer/MotionPatternEngine'
+import { gimbalCompensatedPanTiltOffsetsDeg } from '../../../photonics-dmx/controllers/sequencer/motionGeometry'
 import {
   logicalPanDir,
   mirrorDmxForMovingHeadInvert,

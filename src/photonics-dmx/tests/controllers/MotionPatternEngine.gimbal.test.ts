@@ -1,8 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals'
-import {
-  gimbalCompensatedPanTiltOffsetsDeg,
-  MotionPatternEngine,
-} from '../../controllers/sequencer/MotionPatternEngine'
+import { MotionPatternEngine } from '../../controllers/sequencer/MotionPatternEngine'
+import { gimbalCompensatedPanTiltOffsetsDeg } from '../../controllers/sequencer/motionGeometry'
 import {
   type ResolvedMotionPatternSetting,
   resolvePositionToAbsolutePercent,
