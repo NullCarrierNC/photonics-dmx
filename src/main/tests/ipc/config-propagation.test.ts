@@ -46,6 +46,11 @@ const mockVenueFrameProcessor = {
   setVenuePostProcessingEnabled: jest.fn(),
 }
 
+const mockMasterOutput = {
+  setDimmerPercent: jest.fn(),
+  setStrobeOutputEnabled: jest.fn(),
+}
+
 const mockControllerManager = withCollaboratorGetters({
   getConfig: jest.fn().mockReturnValue(mockConfig),
   restartControllers: jest.fn().mockImplementation(() => Promise.resolve()),
@@ -55,6 +60,7 @@ const mockControllerManager = withCollaboratorGetters({
   getIsInitialized: jest.fn().mockReturnValue(true),
   getDmxPublisher: jest.fn().mockReturnValue(mockPublisher),
   getVenueFrameProcessor: jest.fn().mockReturnValue(mockVenueFrameProcessor),
+  getMasterOutput: jest.fn().mockReturnValue(mockMasterOutput),
 })
 
 const mockSendToAllWindows = jest.fn()

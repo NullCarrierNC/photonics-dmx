@@ -9,6 +9,7 @@ import { setupEffectHandlers } from './effect-handlers'
 import { setupShellHandlers } from './shell-handlers'
 import { setupWindowHandlers } from './window-handlers'
 import { setupConsoleHandlers } from './console-handlers'
+import { setupMasterOutputHandlers } from './master-output-handlers'
 import { setupLifecycleHandlers } from './lifecycle-handlers'
 
 /**
@@ -28,6 +29,7 @@ export function setupIpcHandlers(
   setupConfigHandlers(ipcMain, controllerManager)
   setupLightHandlers(ipcMain, controllerManager)
   setupConsoleHandlers(ipcMain, controllerManager)
+  setupMasterOutputHandlers(ipcMain, controllerManager)
   setupCueHandlers(ipcMain, controllerManager)
   setupNodeCueHandlers(ipcMain, controllerManager)
   setupEffectHandlers(ipcMain, controllerManager)

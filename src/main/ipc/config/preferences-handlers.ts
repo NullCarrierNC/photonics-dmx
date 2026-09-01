@@ -65,6 +65,24 @@ export function registerPreferencesDiagnosticsConfigHandlers(
           .setVenuePostProcessingEnabled(validation.value.venuePostProcessingEnabled)
       }
 
+      // The persisted half of the master output controls. The sidebar drives SET_MASTER_OUTPUT for
+      // the live change and saves here separately, so these two normally arrive already applied.
+      // Mirroring them anyway keeps any other writer of these prefs (an import, a future settings
+      // page) from needing a restart to take effect.
+      const master = controllerManager.getMasterOutput()
+      let masterChanged = false
+      if (typeof validation.value.masterDimmerPercent === 'number') {
+        master.setDimmerPercent(validation.value.masterDimmerPercent)
+        masterChanged = true
+      }
+      if (typeof validation.value.strobeOutputEnabled === 'boolean') {
+        master.setStrobeOutputEnabled(validation.value.strobeOutputEnabled)
+        masterChanged = true
+      }
+      if (masterChanged) {
+        controllerManager.getDmxPublisher()?.refreshOutput()
+      }
+
       return { success: true }
     } catch (error) {
       log.error('Error saving preferences:', error)

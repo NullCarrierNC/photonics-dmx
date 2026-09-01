@@ -32,12 +32,14 @@ export {
   validateDisabledCuesMap,
 } from './validation/cueValidation'
 
+export type { MasterOutputUpdate } from './validation/senderValidation'
 export {
   validateSenderId,
   validateRigMirrorFlag,
   validateRigOutputs,
   validateHost,
   validateSenderEnablePayload,
+  validateMasterOutputPayload,
 } from './validation/senderValidation'
 
 export {

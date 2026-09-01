@@ -18,6 +18,59 @@ import {
   dmxOutputRefreshRateHzFromUnknownPayload,
 } from '../../../shared/dmxOutputRefresh'
 import { isPlainObject, isNonEmptyString, validateNumberInRange } from './primitives'
+import {
+  MASTER_DIMMER_MAX_PERCENT,
+  MASTER_DIMMER_MIN_PERCENT,
+} from '../../../photonics-dmx/controllers/MasterOutputState'
+
+/** Fields a SET_MASTER_OUTPUT payload may carry. All optional; see the channel's request type. */
+export interface MasterOutputUpdate {
+  dimmerPercent?: number
+  blackout?: boolean
+  strobeOutputEnabled?: boolean
+}
+
+/**
+ * Validates a master-output update. Every field is optional so one channel serves the fader and
+ * both toggles, but an empty payload is rejected rather than silently doing nothing: it means the
+ * caller sent a shape we do not understand.
+ */
+export function validateMasterOutputPayload(value: unknown): ValidationResult<MasterOutputUpdate> {
+  if (!isPlainObject(value)) {
+    return { ok: false, error: 'Master output payload must be an object' }
+  }
+  const out: MasterOutputUpdate = {}
+
+  if (value.dimmerPercent !== undefined) {
+    const v = validateNumberInRange(
+      value.dimmerPercent,
+      MASTER_DIMMER_MIN_PERCENT,
+      MASTER_DIMMER_MAX_PERCENT,
+      'dimmerPercent',
+    )
+    if (!v.ok) return v
+    out.dimmerPercent = Math.round(v.value)
+  }
+
+  if (value.blackout !== undefined) {
+    if (typeof value.blackout !== 'boolean') {
+      return { ok: false, error: 'blackout must be a boolean' }
+    }
+    out.blackout = value.blackout
+  }
+
+  if (value.strobeOutputEnabled !== undefined) {
+    if (typeof value.strobeOutputEnabled !== 'boolean') {
+      return { ok: false, error: 'strobeOutputEnabled must be a boolean' }
+    }
+    out.strobeOutputEnabled = value.strobeOutputEnabled
+  }
+
+  if (Object.keys(out).length === 0) {
+    return { ok: false, error: 'Master output payload contains no recognised fields' }
+  }
+  return { ok: true, value: out }
+}
 
 const SENDER_IDS = new Set(['sacn', 'ipc', 'enttecpro', 'artnet', 'opendmx'])
 const WIRE_SENDER_ID_SET: ReadonlySet<string> = new Set<string>(WIRE_SENDER_IDS)

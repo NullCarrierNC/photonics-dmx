@@ -15,6 +15,7 @@ import { ControllerGraph } from '../../controllers/ControllerGraph'
 import type { ControllerGraphDeps } from '../../controllers/ControllerGraph'
 import { ChainFanout } from '../../controllers/ChainFanout'
 import { VenueFrameProcessor } from '../../../photonics-dmx/controllers/VenueFrameProcessor'
+import { MasterOutputState } from '../../../photonics-dmx/controllers/MasterOutputState'
 import type { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
 import { CueHandler } from '../../../photonics-dmx/cueHandlers/CueHandler'
 import { RigChain } from '../../../photonics-dmx/controllers/RigChain'
@@ -73,6 +74,7 @@ function makeGraph(
     getSenderManager: jest.fn() as unknown as ControllerGraphDeps['getSenderManager'],
     chainFanout: new ChainFanout(),
     venueFrameProcessor: new VenueFrameProcessor(),
+    masterOutput: new MasterOutputState(),
   }
   const graph = new ControllerGraph(deps)
   Object.assign(graph as unknown as Record<string, unknown>, { rigChains: chains })

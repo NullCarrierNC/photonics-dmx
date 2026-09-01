@@ -438,6 +438,19 @@ export const disableSender = (config: { sender: string }) =>
 export const disableAllOutputSenders = () => window.api.invoke(LIGHT.SENDER_DISABLE_ALL, undefined)
 
 // ---------------------------------------------------------------------------
+// Master output (dimmer / blackout / strobe gate)
+// ---------------------------------------------------------------------------
+
+export const getMasterOutput = () => window.api.invoke(LIGHT.GET_MASTER_OUTPUT, undefined)
+
+/** Partial update: omitted fields are left as they are. Returns the resulting state. */
+export const setMasterOutput = (update: {
+  dimmerPercent?: number
+  blackout?: boolean
+  strobeOutputEnabled?: boolean
+}) => window.api.invoke(LIGHT.SET_MASTER_OUTPUT, update)
+
+// ---------------------------------------------------------------------------
 // DMX Console (exclusive manual buffer)
 // ---------------------------------------------------------------------------
 
