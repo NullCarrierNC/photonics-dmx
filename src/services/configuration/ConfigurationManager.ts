@@ -14,11 +14,7 @@ import {
   DmxRig,
   DmxRigsConfig,
 } from '../../photonics-dmx/types'
-import {
-  migrateDmxRigsConfig,
-  migrateLightingConfiguration,
-  migrateUserLightsSchema,
-} from '../../photonics-dmx/helpers/lightingConfigMigration'
+import { migrateDmxRigsConfig } from '../../photonics-dmx/helpers/lightingConfigMigration'
 import { syncRigsConfigWithUserLights } from '../../photonics-dmx/helpers/rigTemplateSync'
 import equal from 'fast-deep-equal'
 
@@ -30,24 +26,14 @@ import {
 import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio'
 import { DEFAULT_PREFERENCES, type AppPreferences } from './configurationDefaults'
 import { type CueDomain, type CueDomainPrefs, mergePartialCueDomains } from './cueDomainTypes'
-import {
-  applyLegacySenderFlatToNested,
-  hasStraySenderFlatKeys,
-  LEGACY_FLAT_SENDER_PREF_KEYS,
-} from './preferencesMigration'
+import { runStartupMigrations, type UserLightsConfig } from './startupMigrations'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('ConfigurationManager')
 
 export type { AppPreferences } from './configurationDefaults'
 export type { CueDomain, CueDomainPrefs } from './cueDomainTypes'
-
-/**
- * User's lights configuration interface
- */
-export interface UserLightsConfig {
-  lights: DmxFixture[]
-}
+export type { UserLightsConfig } from './startupMigrations'
 
 const DEFAULT_USER_LIGHTS: UserLightsConfig = {
   lights: [],
@@ -115,136 +101,12 @@ export class ConfigurationManager {
       validate: validateDmxRigsData,
     })
 
-    // Handle legacy lights format migration
-    this.migrateLegacyLightsFormat()
-    this.migrateUserLightsFixtureSchema()
-    this.migrateLightingLayoutFixtureSchema()
-    this.normalizeStraySenderFlatKeys()
-    this.migrateToDmxRigs()
-  }
-
-  /**
-   * One-time fixture-shape migrations for the user-defined fixture library (`MyLights`): the
-   * strobe-channel schema (legacy `rgb/s`/`rgbw/s` onto `channels.strobeChannel` + `strobeValues`,
-   * stray `channels.strobeSpeed` renamed) and the RGBW collapse (`rgbw`/`rgbw/mh` onto `rgb`/`rgb/mh`
-   * with the white channel re-expressed as an extra channel).
-   */
-  private migrateUserLightsFixtureSchema(): void {
-    const current = this.userLights.get()
-    if (!current || !Array.isArray(current.lights)) {
-      return
-    }
-    const { lights, changed } = migrateUserLightsSchema(current.lights)
-    if (!changed) {
-      return
-    }
-    this.userLights.applyLoadMigration({ ...current, lights })
-    log.info('[Photonics Config] Migrated user lights to the current fixture schema')
-  }
-
-  /**
-   * Same fixture-shape migrations for the standalone lighting layout. It is still served to the
-   * renderer and seeds the default rig on first run, so it must not keep serving fixture types the
-   * rest of the app no longer knows. The legacy `front-back` rename is deliberately skipped: that
-   * was the rigs' v1 migration, and a layout naming `front-back` today means the current semantic.
-   */
-  private migrateLightingLayoutFixtureSchema(): void {
-    const current = this.lightingLayout.get()
-    if (!current) {
-      return
-    }
-    const { config, changed } = migrateLightingConfiguration(current, { skipLegacyRename: true })
-    if (!changed) {
-      return
-    }
-    this.lightingLayout.applyLoadMigration(config)
-    log.info('[Photonics Config] Migrated lighting layout to the current fixture schema')
-  }
-
-  /**
-   * Migrates legacy lights format (array) to new format ({lights: [...]})
-   */
-  private migrateLegacyLightsFormat(): void {
-    const currentData = this.userLights.get()
-
-    // If already in new format, do nothing
-    if (currentData && Array.isArray(currentData.lights)) {
-      return
-    }
-
-    // If legacy format (just an array), migrate
-    if (Array.isArray(currentData)) {
-      const migratedData: UserLightsConfig = { lights: currentData }
-      this.userLights
-        .update(migratedData)
-        .catch((err) => log.error('[Photonics Config] Failed to persist migrated lights:', err))
-      log.info(`[Photonics Config] Migrated legacy lights format to new format`)
-    }
-  }
-
-  /**
-   * v4+ prefs already nest USB sender config; if `enttecProPort` / `openDmxPort` / `openDmxSpeed`
-   * appear (e.g. manual file edit or pre-v4 stragglers), fold them into `enttecProConfig` and
-   * `openDmxConfig` and persist. Normal migration runs in PreferencesConfigFile v3→v4.
-   */
-  private normalizeStraySenderFlatKeys(): void {
-    const full = { ...this.preferences.get() } as unknown as Record<string, unknown>
-    if (!hasStraySenderFlatKeys(full)) {
-      return
-    }
-
-    const base = { ...this.preferences.get() } as AppPreferences
-    for (const k of LEGACY_FLAT_SENDER_PREF_KEYS) {
-      delete (base as unknown as Record<string, unknown>)[k]
-    }
-    const next = applyLegacySenderFlatToNested(full, base)
-    this.preferences
-      .update(next)
-      .catch((err) => log.error('[Photonics Config] Failed to persist sender key cleanup:', err))
-  }
-
-  /**
-   * Migrates existing lighting layout to a default DMX rig
-   */
-  private migrateToDmxRigs(): void {
-    const currentRigs = this.dmxRigs.get()
-    const rigs = Array.isArray(currentRigs?.rigs) ? currentRigs.rigs : []
-
-    // If rigs already exist, no migration needed
-    if (rigs.length > 0) {
-      return
-    }
-
-    // Check if we have an existing layout to migrate
-    const existingLayout = this.lightingLayout.get() ?? ({} as LightingConfiguration)
-    const safeLayout: LightingConfiguration = {
-      numLights: existingLayout.numLights ?? 0,
-      lightLayout: existingLayout.lightLayout ?? { id: 'default-layout', label: 'Default Layout' },
-      strobeType: existingLayout.strobeType ?? ConfigStrobeType.None,
-      frontLights: Array.isArray(existingLayout.frontLights) ? existingLayout.frontLights : [],
-      backLights: Array.isArray(existingLayout.backLights) ? existingLayout.backLights : [],
-      strobeLights: Array.isArray(existingLayout.strobeLights) ? existingLayout.strobeLights : [],
-    }
-
-    // Only migrate if layout has actual lights configured
-    if (
-      safeLayout.numLights > 0 ||
-      safeLayout.frontLights.length > 0 ||
-      safeLayout.backLights.length > 0 ||
-      safeLayout.strobeLights.length > 0
-    ) {
-      const defaultRig: DmxRig = {
-        id: crypto.randomUUID(),
-        name: 'Default Rig',
-        active: true,
-        config: safeLayout,
-      }
-
-      this.dmxRigs
-        .update({ ...currentRigs, rigs: [defaultRig] })
-        .catch((err) => log.error('[Photonics Config] Failed to persist migrated DMX rigs:', err))
-      log.info('[Photonics Config] Migrated existing layout to default DMX rig')
-    }
+    runStartupMigrations({
+      preferences: this.preferences,
+      userLights: this.userLights,
+      lightingLayout: this.lightingLayout,
+      dmxRigs: this.dmxRigs,
+    })
   }
 
   // Preferences Methods
