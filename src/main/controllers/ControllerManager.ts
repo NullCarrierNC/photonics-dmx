@@ -27,6 +27,7 @@ import { RegistryInitializer } from './RegistryInitializer'
 import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycle'
 import { ControllerGraph } from './ControllerGraph'
 import { runControllerRestart } from './controllerRestart'
+import { runControllerShutdown } from './controllerShutdown'
 import {
   buildControllerCollaborators,
   type ControllerCollaborators,
@@ -40,10 +41,6 @@ import type { MotionCueRef } from '../../photonics-dmx/cues/types/cueTypes'
 import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 // Import all cue sets to register with registry
 import '../../photonics-dmx/cues'
-import { createLogger } from '../../shared/logger'
-
-const log = createLogger('ControllerManager')
-
 /**
  * Runtime lifecycle of the main-process controller graph.
  *
@@ -303,53 +300,17 @@ export class ControllerManager {
    * `awaitShutdownWork`, so draining the queue here would deadlock.
    */
   public async shutdown(): Promise<void> {
-    return this.lifecycle.runExclusiveShutdown(async () => {
-      // 'shuttingDown' is allowed so a retry after a failed teardown can run again.
-      this.lifecycle.assertPhase(
-        ['initializing', 'running', 'restarting', 'consoleMode', 'failed', 'shuttingDown'],
-        'shutdown',
-      )
-      this.lifecycle.setPhase('shuttingDown')
-      log.info('ControllerManager shutdown: starting')
-
-      // Shutdown in reverse order of initialization
-      try {
-        await this.listenerLifecycle.yargRb3.disableYarg()
-        log.info('ControllerManager shutdown: YARG disabled')
-      } catch (err) {
-        log.error('Error disabling YARG:', err)
-      }
-
-      try {
-        await this.listenerLifecycle.yargRb3.disableRb3()
-        log.info('ControllerManager shutdown: RB3 disabled')
-      } catch (err) {
-        log.error('Error disabling RB3:', err)
-      }
-
-      try {
-        await this.listenerLifecycle.audio.disableAudio()
-        log.info('ControllerManager shutdown: Audio disabled')
-      } catch (err) {
-        log.error('Error disabling Audio:', err)
-      }
-
-      await this.graph.disposeLoaders()
-      this.graph.shutdownDomainCueHandlerRefs()
-      await this.graph.disposeChainsForShutdown()
-      await this.graph.shutdownPublisherSafe()
-      this.graph.destroyClock()
-
-      try {
-        await this.senderLifecycle.shutdownSenderOnAppExit()
-        log.info('ControllerManager shutdown: sender manager stopped')
-      } catch (err) {
-        log.error('Error shutting down sender manager:', err)
-      }
-
-      this.isInitialized = false
-      log.info('ControllerManager shutdown: completed')
-    })
+    return this.lifecycle.runExclusiveShutdown(() =>
+      runControllerShutdown({
+        lifecycle: this.lifecycle,
+        graph: this.graph,
+        listenerLifecycle: this.listenerLifecycle,
+        senderLifecycle: this.senderLifecycle,
+        setInitialized: (value) => {
+          this.isInitialized = value
+        },
+      }),
+    )
   }
 
   // Getters for controllers
