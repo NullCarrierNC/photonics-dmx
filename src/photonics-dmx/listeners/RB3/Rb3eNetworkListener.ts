@@ -63,8 +63,6 @@ export class Rb3eNetworkListener extends EventEmitter {
   private listening = false
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- packet header shape from parser
   private lastData: { header: any; payload: Buffer; cueData: CueData } | null = null
-  // Track the current LED brightness setting
-  private _currentBrightness: 'low' | 'medium' | 'high' = 'medium'
   // Track persistent strobe state across all packet types
   private _currentStrobeState: StrobeState = 'Strobe_Off'
   // Track persistent fog state (StageKit FogOn/FogOff commands) across all packet types
@@ -502,12 +500,11 @@ export class Rb3eNetworkListener extends EventEmitter {
     this.emit('stagekit:data', data)
   }
 
-  /** Strobe, fog and brightness as the last StageKit packet left them. */
+  /** Strobe and fog as the last StageKit packet left them. */
   private stageKitState(): StageKitPersistentState {
     return {
       strobeState: this._currentStrobeState,
       fogState: this._currentFogState,
-      brightness: this._currentBrightness,
     }
   }
 

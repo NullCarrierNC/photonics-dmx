@@ -49,7 +49,6 @@ function colourPacket(color: string, positions: number[], rightChannel: number):
   return {
     positions,
     color,
-    brightness: 'medium',
     fog: false,
     leftChannel,
     rightChannel,
@@ -117,7 +116,6 @@ describe('Rb3StageKitCueProcessor', () => {
     emitter.emit('stagekit:data', {
       positions: [],
       color: 'off',
-      brightness: 'medium',
       fog: false,
       strobeEffect: 'fast',
       rightChannel: 0x05,
@@ -136,7 +134,6 @@ describe('Rb3StageKitCueProcessor', () => {
     emitter.emit('stagekit:data', {
       positions: [],
       color: 'off',
-      brightness: 'medium',
       fog: false,
       strobeEffect: 'off',
       rightChannel: 0xff,
@@ -153,7 +150,6 @@ describe('Rb3StageKitCueProcessor', () => {
     emitter.emit('stagekit:data', {
       positions: [0],
       color: 'red',
-      brightness: 'medium',
       fog: true,
       leftChannel: 0b1,
       rightChannel: RC.red,
@@ -172,7 +168,6 @@ describe('Rb3StageKitCueProcessor', () => {
     emitter.emit('stagekit:data', {
       positions: [],
       color: 'off',
-      brightness: 'medium',
       fog: false,
       strobeEffect: 'off',
       leftChannel: 0,
@@ -182,7 +177,6 @@ describe('Rb3StageKitCueProcessor', () => {
     emitter.emit('stagekit:data', {
       positions: [],
       color: 'off',
-      brightness: 'medium',
       fog: false,
       leftChannel: 0,
       rightChannel: 0xff,
@@ -230,7 +224,6 @@ describe('Rb3StageKitCueProcessor', () => {
     emitter.emit('stagekit:data', {
       positions: [],
       color: 'off',
-      brightness: 'medium',
       fog: false,
       strobeEffect: 'slow',
       rightChannel: 0x03,
@@ -349,7 +342,6 @@ describe('Rb3StageKitCueProcessor wait-gate edges (handleSongEvent)', () => {
     emitter.emit('stagekit:data', {
       positions: [0],
       color: 'red',
-      brightness: 'medium',
       fog: true,
       leftChannel: 0b1,
       rightChannel: RC.red,
@@ -366,7 +358,6 @@ describe('Rb3StageKitCueProcessor wait-gate edges (handleSongEvent)', () => {
     emitter.emit('stagekit:data', {
       positions: [0, 2],
       color: 'red',
-      brightness: 'medium',
       fog: true,
       leftChannel: 0b101,
       rightChannel: RC.red,
@@ -376,7 +367,6 @@ describe('Rb3StageKitCueProcessor wait-gate edges (handleSongEvent)', () => {
     emitter.emit('stagekit:data', {
       positions: [],
       color: 'off',
-      brightness: 'medium',
       fog: false,
       strobeEffect: 'off',
       rightChannel: 0xff,

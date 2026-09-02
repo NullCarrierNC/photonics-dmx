@@ -67,7 +67,6 @@ function emitStageKit(emitter: EventEmitter): void {
   emitter.emit('stagekit:data', {
     positions: [0, 1],
     color: 'red',
-    brightness: 'medium',
     timestamp: Date.now(),
   })
 }
@@ -196,7 +195,6 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
       networkListener.emit('stagekit:data', {
         positions,
         color,
-        brightness: 'medium',
         timestamp: Date.now(),
       })
     }

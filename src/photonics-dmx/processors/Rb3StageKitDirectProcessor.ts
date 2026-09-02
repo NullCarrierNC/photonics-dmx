@@ -458,10 +458,6 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     return { ...this.config }
   }
 
-  public getCurrentBrightness(): 'low' | 'medium' | 'high' {
-    return 'medium'
-  }
-
   // ── Aggregated diagnostics (existing public surface) ─────────────────────────────────
 
   public getStatus(): {

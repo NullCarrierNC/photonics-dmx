@@ -19,7 +19,6 @@ function colourPacket(color: string, positions: number[], rightChannel: number):
   return {
     positions,
     color,
-    brightness: 'medium',
     fog: false,
     leftChannel,
     rightChannel,

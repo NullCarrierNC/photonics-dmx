@@ -118,11 +118,10 @@ export function parseRb3ePacketHeader(buffer: Buffer, now: number): Rb3ePacketPa
   }
 }
 
-/** Strobe, fog and brightness persist between packets, so a StageKit byte pair is read against them. */
+/** Strobe and fog persist between packets, so a StageKit byte pair is read against them. */
 export interface StageKitPersistentState {
   strobeState: StrobeState
   fogState: boolean
-  brightness: 'low' | 'medium' | 'high'
 }
 
 /**
@@ -266,14 +265,13 @@ export function parseStageKitData(
     data: {
       positions,
       color,
-      brightness: state.brightness,
       fog: fogState,
       strobeEffect,
       leftChannel,
       rightChannel,
       timestamp: now,
     },
-    state: { strobeState, fogState, brightness: state.brightness },
+    state: { strobeState, fogState },
   }
 }
 

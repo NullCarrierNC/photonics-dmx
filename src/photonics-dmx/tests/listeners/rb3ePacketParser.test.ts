@@ -11,7 +11,7 @@ import {
   readNullTerminatedString,
   type StageKitPersistentState,
 } from '../../listeners/RB3/rb3ePacketParser'
-import { Rb3ePacketType, Rb3PlatformID } from '../../listeners/RB3/rb3eTypes'
+import { Rb3ePacketType, Rb3PlatformID, Rb3RightChannel } from '../../listeners/RB3/rb3eTypes'
 
 const NOW = 1_700_000_000_000
 
@@ -32,7 +32,6 @@ function packet(
 const idleState: StageKitPersistentState = {
   strobeState: 'Strobe_Off',
   fogState: false,
-  brightness: 'medium',
 }
 
 describe('parseRb3ePacketHeader', () => {
@@ -117,7 +116,7 @@ describe('parseRb3ePacketHeader', () => {
 describe('createRb3eCueData', () => {
   it('carries the persisted strobe and fog state into the new frame', () => {
     const frame = createRb3eCueData(
-      { strobeState: 'Strobe_Fast', fogState: true, brightness: 'medium' },
+      { strobeState: 'Strobe_Fast', fogState: true },
       Rb3PlatformID.RB3E_PLATFORM_WII,
     )
 
@@ -133,6 +132,57 @@ describe('createRb3eCueData', () => {
 })
 
 describe('parseStageKitData', () => {
+  /**
+   * Every command RB3Enhanced defines, and what the parser does with it.
+   *
+   * StageKit LEDs are on or off, so nothing here carries an intensity, and the 2-byte
+   * EVENT_STAGEKIT struct has no room for one. A new member of the enum fails the coverage test
+   * below rather than silently falling through to the "no colour" default.
+   */
+  const COMMANDS: Array<{
+    value: Rb3RightChannel
+    handled: 'colour' | 'fog' | 'strobe' | 'reset'
+  }> = [
+    { value: Rb3RightChannel.FogOn, handled: 'fog' },
+    { value: Rb3RightChannel.FogOff, handled: 'fog' },
+    { value: Rb3RightChannel.StrobeSlow, handled: 'strobe' },
+    { value: Rb3RightChannel.StrobeMedium, handled: 'strobe' },
+    { value: Rb3RightChannel.StrobeFast, handled: 'strobe' },
+    { value: Rb3RightChannel.StrobeFastest, handled: 'strobe' },
+    { value: Rb3RightChannel.StrobeOff, handled: 'strobe' },
+    { value: Rb3RightChannel.BlueLeds, handled: 'colour' },
+    { value: Rb3RightChannel.GreenLeds, handled: 'colour' },
+    { value: Rb3RightChannel.YellowLeds, handled: 'colour' },
+    { value: Rb3RightChannel.RedLeds, handled: 'colour' },
+    { value: Rb3RightChannel.DisableAll, handled: 'reset' },
+  ]
+
+  it('handles every command the protocol defines', () => {
+    const enumValues = Object.values(Rb3RightChannel).filter(
+      (v): v is number => typeof v === 'number',
+    )
+
+    expect([...enumValues].sort((a, b) => a - b)).toEqual(
+      COMMANDS.map((c) => c.value).sort((a, b) => a - b),
+    )
+  })
+
+  it.each(COMMANDS)('acts on command 0x$value', ({ value, handled }) => {
+    const lit: StageKitPersistentState = { strobeState: 'Strobe_Medium', fogState: true }
+    const { data, state } = parseStageKitData(0xff, value, lit, NOW)
+
+    if (handled === 'colour') {
+      expect(data.color).not.toBe('off')
+      expect(state).toEqual(lit)
+    } else if (handled === 'strobe') {
+      expect(data.strobeEffect).toBeDefined()
+    } else if (handled === 'fog') {
+      expect(state.fogState).toBe(value === Rb3RightChannel.FogOn)
+    } else {
+      expect(state).toEqual({ strobeState: 'Strobe_Off', fogState: false })
+    }
+  })
+
   it('reads the left channel as an 8-position LED bitmask', () => {
     expect(parseStageKitData(0b0000_0000, 0, idleState, NOW).data.positions).toEqual([])
     expect(parseStageKitData(0b0000_0001, 0, idleState, NOW).data.positions).toEqual([0])
@@ -186,12 +236,11 @@ describe('parseStageKitData', () => {
     const busy: StageKitPersistentState = {
       strobeState: 'Strobe_Fastest',
       fogState: true,
-      brightness: 'medium',
     }
 
     const { data, state } = parseStageKitData(0xff, 255, busy, NOW)
 
-    expect(state).toEqual({ strobeState: 'Strobe_Off', fogState: false, brightness: 'medium' })
+    expect(state).toEqual({ strobeState: 'Strobe_Off', fogState: false })
     expect(data.strobeEffect).toBe('off')
     expect(data.fog).toBe(false)
   })
@@ -200,7 +249,6 @@ describe('parseStageKitData', () => {
     const busy: StageKitPersistentState = {
       strobeState: 'Strobe_Medium',
       fogState: true,
-      brightness: 'medium',
     }
 
     const { data, state } = parseStageKitData(0b0000_0011, 64, busy, NOW)
@@ -216,7 +264,6 @@ describe('parseStageKitData', () => {
     expect(data.leftChannel).toBe(0x0f)
     expect(data.rightChannel).toBe(32)
     expect(data.timestamp).toBe(NOW)
-    expect(data.brightness).toBe('medium')
   })
 })
 
