@@ -11,7 +11,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from 'events'
 import { StageKitConfig, DEFAULT_STAGEKIT_CONFIG } from '../listeners/RB3/StageKitTypes'
-import { CueData, defaultCueData, positionsToMask } from '../cues/types/cueTypes'
+import { CueData, defaultCueData } from '../cues/types/cueTypes'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import { Rb3StageKitRigProcessor } from './Rb3StageKitRigProcessor'
 import { ChainFanout } from '../controllers/ChainFanout'
@@ -20,6 +20,7 @@ import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { Rb3MenuFramePump } from './rb3MenuAnimation'
 import { createLogger } from '../../shared/logger'
 import { monotonicNowMs } from '../../shared/time'
+import { buildMenusCueData, buildStageKitCueData, LedBankAccumulator } from './rb3StageKitCueData'
 const log = createLogger('Rb3StageKitDirectProcessor')
 
 export class Rb3StageKitDirectProcessor extends EventEmitter {
@@ -45,7 +46,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   // per-bank, so we accumulate here and emit a full `ledBanks` snapshot each frame, the same shape the
   // cue-mode processor emits. This keeps the preview a single render path (no per-packet direct mode).
   // Reset on menu/clear/off.
-  private ledBankMasks = { red: 0, green: 0, blue: 0, yellow: 0 }
+  private readonly ledBanks = new LedBankAccumulator()
 
   // Menu-look pump: no immediate first frame (the first paint lands one interval after Menus),
   // start() restarts the interval, frames gated on the Menus game state.
@@ -164,63 +165,16 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   /**
-   * Cue payload for RB3 menu-style screens (code-based Default cue, not node editor).
+   * A menu frame, clearing the accumulated LED snapshot first because a menu has no StageKit LEDs
+   * lit and the frame should carry empty banks.
    */
-  private buildMenusCueData(
+  private menusCueData(
     realCueData: CueData | null,
     platform: string,
     rb3ScreenNameOverride?: string,
   ): CueData {
-    // A menu has no StageKit LEDs lit, so the accumulated snapshot resets and defaultCueData's empty
-    // ledBanks is emitted.
-    this.resetLedBanks()
-    return {
-      ...defaultCueData,
-      datagramVersion: realCueData?.datagramVersion || 1,
-      platform: realCueData?.platform || 'RB3E',
-      currentScene: 'Menu',
-      pauseState: realCueData?.pauseState || 'Unpaused',
-      venueSize: 'NoVenue',
-      beatsPerMinute: realCueData?.beatsPerMinute || 0,
-      songSection: realCueData?.songSection || 'Unknown',
-      guitarNotes: realCueData?.guitarNotes || [],
-      bassNotes: realCueData?.bassNotes || [],
-      drumNotes: realCueData?.drumNotes || [],
-      keysNotes: realCueData?.keysNotes || [],
-      vocalNote: realCueData?.vocalNote || 0,
-      harmony0Note: realCueData?.harmony0Note || 0,
-      harmony1Note: realCueData?.harmony1Note || 0,
-      harmony2Note: realCueData?.harmony2Note || 0,
-      lightingCue: 'Default',
-      postProcessing: realCueData?.postProcessing || 'Default',
-      fogState: realCueData?.fogState || false,
-      strobeState: realCueData?.strobeState || 'Strobe_Off',
-      performer: realCueData?.performer || 0,
-      trackMode: realCueData?.trackMode || 'tracked',
-      beat: realCueData?.beat || 'Unknown',
-      keyframe: realCueData?.keyframe || 'Unknown',
-      bonusEffect: realCueData?.bonusEffect || false,
-      ledColor: '',
-      ledPositions: [],
-      rb3Platform: platform,
-      rb3BuildTag: realCueData?.rb3BuildTag || '',
-      rb3SongName: realCueData?.rb3SongName || '',
-      rb3SongArtist: realCueData?.rb3SongArtist || '',
-      rb3SongShortName: realCueData?.rb3SongShortName || '',
-      rb3VenueName: realCueData?.rb3VenueName || '',
-      rb3ScreenName: rb3ScreenNameOverride ?? realCueData?.rb3ScreenName ?? '',
-      rb3BandInfo: realCueData?.rb3BandInfo || { members: [] },
-      rb3ModData: realCueData?.rb3ModData || { identifyValue: '', string: '' },
-      totalScore: realCueData?.totalScore || 0,
-      memberScores: realCueData?.memberScores || [],
-      stars: realCueData?.stars || 0,
-      sustainDurationMs: realCueData?.sustainDurationMs || 0,
-      measureOrBeat: realCueData?.measureOrBeat || 0,
-      cueHistory: [],
-      executionCount: 1,
-      cueStartTime: monotonicNowMs(),
-      timeSinceLastCue: 0,
-    }
+    this.ledBanks.reset()
+    return buildMenusCueData(realCueData, platform, rb3ScreenNameOverride)
   }
 
   private isDefaultMenuCueRunning(): boolean {
@@ -233,7 +187,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private applyDefaultMenuCueForScreenName(screenName: string): void {
     this._currentGameState = 'Menus'
     this._inSong = false
-    this.emit('cueHandled', this.buildMenusCueData(null, 'RB3E', screenName))
+    this.emit('cueHandled', this.menusCueData(null, 'RB3E', screenName))
     void this.turnOffAllRigs().catch((error) => {
       log.error(
         'StageKitDirectProcessor: Error clearing lights during screen-based Default menu cue:',
@@ -343,7 +297,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       this._currentGameState = gameState
 
       // Clearing the lights resets the accumulated snapshot, so defaultCueData's empty ledBanks is emitted.
-      this.resetLedBanks()
+      this.ledBanks.reset()
       const clearCueData: CueData =
         gameState === 'InGame'
           ? {
@@ -393,7 +347,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
               cueStartTime: monotonicNowMs(),
               timeSinceLastCue: 0,
             }
-          : this.buildMenusCueData(realCueData, event.platform)
+          : this.menusCueData(realCueData, event.platform)
 
       this.emit('cueHandled', clearCueData)
 
@@ -563,93 +517,9 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     await this.turnOffAllRigs()
   }
 
-  /**
-   * Create and emit CueData for network debugging
-   * @param event The StageKit event data
-   */
-  private resetLedBanks(): void {
-    this.ledBankMasks = { red: 0, green: 0, blue: 0, yellow: 0 }
-  }
-
-  /** Fold one per-bank StageKit event into the accumulated snapshot (matches the old preview logic:
-   *  a colour sets that bank to its positions, empty positions clear it, and `off` clears everything). */
-  private updateLedBanks(color: string, positions: number[]): void {
-    if (color === 'off') {
-      this.resetLedBanks()
-      return
-    }
-    if (color === 'red' || color === 'green' || color === 'blue' || color === 'yellow') {
-      this.ledBankMasks[color] = positionsToMask(positions)
-    }
-  }
-
   private emitCueDataForStageKit(event: StageKitData): void {
-    const { positions, color, strobeEffect, fog } = event
-    this.updateLedBanks(color, positions)
-
-    const cueData: CueData = {
-      ...defaultCueData,
-      datagramVersion: 1,
-      platform: 'RB3E',
-      currentScene: 'Gameplay',
-      pauseState: 'Unpaused',
-      venueSize: 'Large',
-      beatsPerMinute: 120,
-      songSection: 'Verse',
-      guitarNotes: [],
-      bassNotes: [],
-      drumNotes: [],
-      keysNotes: [],
-      vocalNote: 0,
-      harmony0Note: 0,
-      harmony1Note: 0,
-      harmony2Note: 0,
-      lightingCue: 'StageKitDirect',
-      postProcessing: 'Default',
-      // Carry the StageKit fog state through for downstream/debug consumers. There is no DMX fog
-      // output yet (a future fixture/channel concept), so nothing renders it today.
-      fogState: fog ?? false,
-      strobeState:
-        strobeEffect === 'off'
-          ? 'Strobe_Off'
-          : strobeEffect === 'slow'
-            ? 'Strobe_Slow'
-            : strobeEffect === 'medium'
-              ? 'Strobe_Medium'
-              : strobeEffect === 'fast'
-                ? 'Strobe_Fast'
-                : strobeEffect === 'fastest'
-                  ? 'Strobe_Fastest'
-                  : 'Strobe_Off',
-      performer: 0,
-      trackMode: 'tracked',
-      beat: 'Strong',
-      keyframe: 'Off',
-      bonusEffect: false,
-      ledColor: color === 'off' ? '' : color,
-      ledPositions: positions,
-      ledBanks: { ...this.ledBankMasks },
-      rb3Platform: 'RB3E',
-      rb3BuildTag: '',
-      rb3SongName: '',
-      rb3SongArtist: '',
-      rb3SongShortName: '',
-      rb3VenueName: '',
-      rb3ScreenName: '',
-      rb3BandInfo: { members: [] },
-      rb3ModData: { identifyValue: '', string: '' },
-      totalScore: 0,
-      memberScores: [],
-      stars: 0,
-      sustainDurationMs: 0,
-      measureOrBeat: 0,
-      cueHistory: [],
-      executionCount: 1,
-      cueStartTime: monotonicNowMs(),
-      timeSinceLastCue: 0,
-    }
-
-    this.emit('cueHandled', cueData)
+    this.ledBanks.update(event.color, event.positions)
+    this.emit('cueHandled', buildStageKitCueData(event, this.ledBanks.snapshot()))
   }
 
   /**
