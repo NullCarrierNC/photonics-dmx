@@ -37,7 +37,7 @@ import { useRigDmxValues } from '../hooks/useRigDmxValues'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('DmxConsole')
 
-function channelSortKey(name: string): number {
+export function channelSortKey(name: string): number {
   const order = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeChannel', 'pan', 'tilt']
   if (name === 'md') {
     return 0
@@ -59,7 +59,7 @@ function channelsAsRecord(channels: DmxFixture['channels']): Record<string, numb
  *
  * Falls back to the light's persisted channels when no template is found (legacy / orphaned light).
  */
-function getTemplateAlignedChannels(
+export function getTemplateAlignedChannels(
   light: DmxLight,
   templates: DmxFixture[],
 ): Record<string, number> {
@@ -95,7 +95,10 @@ function getTemplateAlignedChannels(
  * {@link getTemplateAlignedChannels} derives the base channels. Falls back to the light's persisted
  * extras when no template resolves.
  */
-function getTemplateAlignedExtraChannels(light: DmxLight, templates: DmxFixture[]): ExtraChannel[] {
+export function getTemplateAlignedExtraChannels(
+  light: DmxLight,
+  templates: DmxFixture[],
+): ExtraChannel[] {
   const template = templates.find((t) => t.id === light.fixtureId)
   if (!template) {
     return light.extraChannels ?? []
@@ -111,7 +114,7 @@ function getTemplateAlignedExtraChannels(light: DmxLight, templates: DmxFixture[
  * the publisher's per-frame fixed writes, so without this a fixture whose mode/macro channel must be
  * held at a constant would go dark for the whole console session.
  */
-function buildConsoleFixedSeed(
+export function buildConsoleFixedSeed(
   config: LightingConfiguration,
   templates: DmxFixture[],
 ): Record<number, number> {
@@ -127,7 +130,7 @@ function buildConsoleFixedSeed(
   return seed
 }
 
-function getEffectiveChannelEntries(
+export function getEffectiveChannelEntries(
   light: DmxLight,
   templates: DmxFixture[],
   overrides?: Record<string, number>,
@@ -139,7 +142,7 @@ function getEffectiveChannelEntries(
   )
 }
 
-function isLightModified(
+export function isLightModified(
   light: DmxLight,
   templates: DmxFixture[],
   overrides?: Record<string, number>,
@@ -151,7 +154,7 @@ function isLightModified(
   return Object.entries(overrides).some(([name, num]) => baseline[name] !== num)
 }
 
-function channelLabel(name: string): string {
+export function channelLabel(name: string): string {
   if (name === 'md' || name === 'masterDimmer') {
     return 'MasterDimmer'
   }
@@ -161,11 +164,11 @@ function channelLabel(name: string): string {
   return name
 }
 
-function isPanTiltChannelName(name: string): boolean {
+export function isPanTiltChannelName(name: string): boolean {
   return name === 'pan' || name === 'tilt'
 }
 
-function isMovingHeadFixture(fixture: FixtureTypes): boolean {
+export function isMovingHeadFixture(fixture: FixtureTypes): boolean {
   return fixture === FixtureTypes.RGBMH
 }
 
