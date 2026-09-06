@@ -1,21 +1,8 @@
-/** @jest-environment jsdom */
 /**
  * The console's channel resolution: which channels a rig light shows, what numbers they carry, and
  * which of them the manual buffer seeds before the user touches anything.
- *
- * The shape comes from the live fixture template, so a channel added to a template in MyLights
- * appears here without the light being re-picked. The numbers come from the offset-from-master
- * model the rig editor uses, with a persisted per-channel value winning where one exists.
  */
-import { describe, expect, it, jest } from '@jest/globals'
-
-// The console page mounts the 3D preview, which pulls in THREE and a WebGL canvas that jsdom does
-// not provide. The channel helpers under test never reach it.
-jest.mock('../components/LightsDmxPreview3D', () => ({
-  __esModule: true,
-  default: () => null,
-}))
-
+import { describe, expect, it } from '@jest/globals'
 import {
   ConfigStrobeType,
   FixtureTypes,
@@ -34,7 +21,7 @@ import {
   isLightModified,
   isMovingHeadFixture,
   isPanTiltChannelName,
-} from './DmxConsole'
+} from './dmxConsoleChannels'
 
 /** An RGB template whose colour channels sit one, two and three above its master dimmer. */
 function template(overrides: Partial<DmxFixture> = {}): DmxFixture {
