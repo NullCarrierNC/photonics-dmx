@@ -25,12 +25,18 @@ import {
   updateArtNetConfig,
 } from '../ipcApi'
 import {
-  clampDmxOutputRefreshRateHz,
-  DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
   DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
   DMX_OUTPUT_REFRESH_RATE_HZ_MIN,
   OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
 } from '../../../shared/dmxOutputRefresh'
+import {
+  clampRefreshRateValue,
+  nextOutputConfig,
+  outputConfigFromRunningSenders,
+  parseGlobalPublishingRate,
+  parseOpenDmxSpeed,
+  type DmxOutputFlag,
+} from './DmxOutputSettings/outputConfig'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('DmxOutputSettings')
@@ -93,35 +99,27 @@ const DmxOutputSettings: React.FC = () => {
     loadNetworkInterfaces()
   }, [])
 
-  // Load DMX output configuration independently
+  // Seed the saved output config on first run from whatever the backend already has running.
   useEffect(() => {
-    log.info('Checking DMX output configuration state')
-    log.info('Preferences dmxOutputConfig:', prefs.dmxOutputConfig)
-
-    // Check if preferences need to be initialized
-    if (!prefs.dmxOutputConfig) {
-      log.info('No DMX output config in preferences, initializing from sender states')
-
-      // Initialize from current sender states
-      const initialConfig = {
-        sacnEnabled: isSacnEnabled,
-        artNetEnabled: isArtNetEnabled,
-        enttecProEnabled: isEnttecProEnabled,
-        openDmxEnabled: isOpenDmxEnabled,
-      }
-
-      log.info('Initializing dmxOutputConfig from sender states:', initialConfig)
-
-      // Save the initial configuration to preferences
-      setPrefs((prev) => ({
-        ...prev,
-        dmxOutputConfig: initialConfig,
-      }))
-
-      savePrefs({ dmxOutputConfig: initialConfig }).catch((error) => {
-        log.error('Failed to save initial DMX output configuration:', error)
-      })
+    if (prefs.dmxOutputConfig) {
+      return
     }
+    const initialConfig = outputConfigFromRunningSenders({
+      sacn: isSacnEnabled,
+      artnet: isArtNetEnabled,
+      enttecpro: isEnttecProEnabled,
+      opendmx: isOpenDmxEnabled,
+    })
+    log.info('No DMX output config in preferences, initializing from sender states:', initialConfig)
+
+    setPrefs((prev) => ({
+      ...prev,
+      dmxOutputConfig: initialConfig,
+    }))
+
+    savePrefs({ dmxOutputConfig: initialConfig }).catch((error) => {
+      log.error('Failed to save initial DMX output configuration:', error)
+    })
   }, [
     prefs.dmxOutputConfig,
     isSacnEnabled,
@@ -131,163 +129,76 @@ const DmxOutputSettings: React.FC = () => {
     setPrefs,
   ])
 
-  const handleSacnToggle = async () => {
-    const currentState = prefs.dmxOutputConfig?.sacnEnabled || false
-    log.info('sACN toggle clicked, current state:', currentState)
-    const newState = !currentState
-    const newConfig = {
-      ...prefs.dmxOutputConfig,
-      sacnEnabled: newState,
-      artNetEnabled: prefs.dmxOutputConfig?.artNetEnabled || false,
-      enttecProEnabled: prefs.dmxOutputConfig?.enttecProEnabled || false,
-      openDmxEnabled: prefs.dmxOutputConfig?.openDmxEnabled || false,
-    }
-
-    // Update the global preferences
-    setPrefs((prev) => ({
-      ...prev,
-      dmxOutputConfig: newConfig,
-    }))
-
-    // If enabling sACN, start the sender
-    if (newState && !isSacnEnabled) {
-      enableSender({ sender: 'sacn', ...sacnConfig })
-      setIsSacnEnabled(true) // Turn on the toggle state
-    }
-
-    // If disabling sACN, stop the sender if it's running and turn off the toggle
-    if (!newState && isSacnEnabled) {
-      log.info('Disabling sACN checkbox - stopping sACN sender and turning off toggle')
-      disableSender({ sender: 'sacn' })
-      setIsSacnEnabled(false) // Turn off the toggle state
-    }
-
-    try {
-      const result = await savePrefs({ dmxOutputConfig: newConfig })
-      log.info('Save result:', result)
-    } catch (error) {
-      log.error('Failed to save DMX output configuration:', error)
-    }
+  /** What one sender needs to be turned on or off: its saved flag and its backend state. */
+  type SenderToggle = {
+    flag: DmxOutputFlag
+    isRunning: boolean
+    setRunning: (value: boolean) => void
+    start: () => void
+    stop: () => void
   }
 
-  const handleArtNetToggle = async () => {
-    const currentState = prefs.dmxOutputConfig?.artNetEnabled || false
-    log.info('ArtNet toggle clicked, current state:', currentState)
-    const newState = !currentState
-    const newConfig = {
-      ...prefs.dmxOutputConfig,
-      artNetEnabled: newState,
-      sacnEnabled: prefs.dmxOutputConfig?.sacnEnabled || false,
-      enttecProEnabled: prefs.dmxOutputConfig?.enttecProEnabled || false,
-      openDmxEnabled: prefs.dmxOutputConfig?.openDmxEnabled || false,
-    }
+  type SenderName = 'sacn' | 'artnet' | 'enttecpro' | 'opendmx'
 
-    log.info('Setting new config:', newConfig)
-
-    // Update the global preferences
-    setPrefs((prev) => ({
-      ...prev,
-      dmxOutputConfig: newConfig,
-    }))
-
-    // If enabling ArtNet, start the sender
-    if (newState && !isArtNetEnabled) {
-      log.info('Enabling ArtNet checkbox - starting ArtNet sender')
-      enableSender({ sender: 'artnet', ...artNetConfig })
-      setIsArtNetEnabled(true) // Turn on the toggle state
-    }
-
-    // If disabling ArtNet, stop the sender if it's running and turn off the toggle
-    if (!newState && isArtNetEnabled) {
-      log.info('Disabling ArtNet checkbox - stopping ArtNet sender and turning off toggle')
-      disableSender({ sender: 'artnet' })
-      setIsArtNetEnabled(false) // Turn off the toggle state
-    }
-
-    try {
-      const result = await savePrefs({ dmxOutputConfig: newConfig })
-      log.info('Save result:', result)
-    } catch (error) {
-      log.error('Failed to save DMX output configuration:', error)
-    }
+  const senderToggles: Record<SenderName, SenderToggle> = {
+    sacn: {
+      flag: 'sacnEnabled',
+      isRunning: isSacnEnabled,
+      setRunning: setIsSacnEnabled,
+      start: () => enableSender({ sender: 'sacn', ...sacnConfig }),
+      stop: () => disableSender({ sender: 'sacn' }),
+    },
+    artnet: {
+      flag: 'artNetEnabled',
+      isRunning: isArtNetEnabled,
+      setRunning: setIsArtNetEnabled,
+      start: () => enableSender({ sender: 'artnet', ...artNetConfig }),
+      stop: () => disableSender({ sender: 'artnet' }),
+    },
+    enttecpro: {
+      flag: 'enttecProEnabled',
+      isRunning: isEnttecProEnabled,
+      setRunning: setIsEnttecProEnabled,
+      start: () => enableSender({ sender: 'enttecpro', devicePath: comPort }),
+      stop: () => disableSender({ sender: 'enttecpro' }),
+    },
+    opendmx: {
+      flag: 'openDmxEnabled',
+      isRunning: isOpenDmxEnabled,
+      setRunning: setIsOpenDmxEnabled,
+      start: () =>
+        enableSender({ sender: 'opendmx', devicePath: openDmxComPort, dmxSpeed: openDmxSpeed }),
+      stop: () => disableSender({ sender: 'opendmx' }),
+    },
   }
 
-  const handleEnttecProToggle = async () => {
-    const currentState = prefs.dmxOutputConfig?.enttecProEnabled || false
-    log.info('Enttec Pro toggle clicked, current state:', currentState)
-    const newState = !currentState
-    const newConfig = {
-      ...prefs.dmxOutputConfig,
-      enttecProEnabled: newState,
-      sacnEnabled: prefs.dmxOutputConfig?.sacnEnabled || false,
-      artNetEnabled: prefs.dmxOutputConfig?.artNetEnabled || false,
-      openDmxEnabled: prefs.dmxOutputConfig?.openDmxEnabled || false,
-    }
-
-    log.info('Setting new config:', newConfig)
-
-    // Update the global preferences
-    setPrefs((prev) => ({
-      ...prev,
-      dmxOutputConfig: newConfig,
-    }))
-
-    // If enabling Enttec Pro, start the sender
-    if (newState && !isEnttecProEnabled) {
-      log.info('Enabling Enttec Pro checkbox - starting Enttec Pro sender')
-      enableSender({ sender: 'enttecpro', devicePath: comPort })
-      setIsEnttecProEnabled(true) // Turn on the toggle state
-    }
-
-    // If disabling Enttec Pro, stop the sender if it's running and turn off the toggle
-    if (!newState && isEnttecProEnabled) {
-      log.info('Disabling Enttec Pro checkbox - stopping Enttec Pro sender and turning off toggle')
-      disableSender({ sender: 'enttecpro' })
-      setIsEnttecProEnabled(false) // Turn off the toggle state
-    }
-
-    try {
-      const result = await savePrefs({ dmxOutputConfig: newConfig })
-      log.info('Save result:', result)
-    } catch (error) {
-      log.error('Failed to save DMX output configuration:', error)
-    }
-  }
-
-  const handleOpenDmxToggle = async () => {
-    const currentState = prefs.dmxOutputConfig?.openDmxEnabled || false
-    log.info('OpenDMX toggle clicked, current state:', currentState)
-    const newState = !currentState
-    const newConfig = {
-      ...prefs.dmxOutputConfig,
-      openDmxEnabled: newState,
-      sacnEnabled: prefs.dmxOutputConfig?.sacnEnabled || false,
-      artNetEnabled: prefs.dmxOutputConfig?.artNetEnabled || false,
-      enttecProEnabled: prefs.dmxOutputConfig?.enttecProEnabled || false,
-    }
-
-    log.info('Setting new config:', newConfig)
+  /**
+   * Flips one sender in the saved config and brings the backend into line with it. The checkbox
+   * follows the saved config while starting and stopping follows what the backend reports, so a
+   * sender already in the state being asked for is left running, or stopped, as it is.
+   */
+  const handleSenderToggle = async (name: SenderName) => {
+    const toggle = senderToggles[name]
+    const enabled = !(prefs.dmxOutputConfig?.[toggle.flag] ?? false)
+    const newConfig = nextOutputConfig(prefs.dmxOutputConfig, toggle.flag, enabled)
+    log.info('Sender toggled:', name, enabled, newConfig)
 
     setPrefs((prev) => ({
       ...prev,
       dmxOutputConfig: newConfig,
     }))
 
-    if (newState && !isOpenDmxEnabled) {
-      log.info('Enabling OpenDMX checkbox - starting OpenDMX sender')
-      enableSender({ sender: 'opendmx', devicePath: openDmxComPort, dmxSpeed: openDmxSpeed })
-      setIsOpenDmxEnabled(true)
+    if (enabled && !toggle.isRunning) {
+      toggle.start()
+      toggle.setRunning(true)
     }
-
-    if (!newState && isOpenDmxEnabled) {
-      log.info('Disabling OpenDMX checkbox - stopping OpenDMX sender and turning off toggle')
-      disableSender({ sender: 'opendmx' })
-      setIsOpenDmxEnabled(false)
+    if (!enabled && toggle.isRunning) {
+      toggle.stop()
+      toggle.setRunning(false)
     }
 
     try {
-      const result = await savePrefs({ dmxOutputConfig: newConfig })
-      log.info('Save result:', result)
+      await savePrefs({ dmxOutputConfig: newConfig })
     } catch (error) {
       log.error('Failed to save DMX output configuration:', error)
     }
@@ -297,14 +208,7 @@ const DmxOutputSettings: React.FC = () => {
     field: keyof typeof artNetConfig,
     value: string | number,
   ) => {
-    const parsed =
-      field === 'refreshRateHz'
-        ? clampDmxOutputRefreshRateHz(
-            typeof value === 'number' && Number.isFinite(value)
-              ? value
-              : DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
-          )
-        : value
+    const parsed = field === 'refreshRateHz' ? clampRefreshRateValue(value) : value
     const newConfig = {
       ...artNetConfig,
       [field]: parsed,
@@ -370,15 +274,9 @@ const DmxOutputSettings: React.FC = () => {
   }
 
   const handleOpenDmxSpeedChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const parsed = parseInt(e.target.value, 10)
-    const sanitized =
-      Number.isFinite(parsed) && parsed > 0
-        ? Math.min(44, Math.max(1, parsed))
-        : OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
-
     const newConfig = {
       ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ }),
-      dmxSpeed: sanitized,
+      dmxSpeed: parseOpenDmxSpeed(e.target.value),
     }
 
     try {
@@ -394,10 +292,7 @@ const DmxOutputSettings: React.FC = () => {
   }
 
   const handleGlobalDmxRateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const parsed = parseInt(e.target.value, 10)
-    const sanitized = clampDmxOutputRefreshRateHz(
-      Number.isFinite(parsed) ? parsed : DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
-    )
+    const sanitized = parseGlobalPublishingRate(e.target.value)
 
     try {
       await savePrefs({ globalDmxPublishingRateHz: sanitized })
@@ -411,14 +306,7 @@ const DmxOutputSettings: React.FC = () => {
     field: keyof typeof sacnConfig,
     value: string | number | boolean,
   ) => {
-    const parsed =
-      field === 'refreshRateHz'
-        ? clampDmxOutputRefreshRateHz(
-            typeof value === 'number' && Number.isFinite(value)
-              ? value
-              : DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
-          )
-        : value
+    const parsed = field === 'refreshRateHz' ? clampRefreshRateValue(value) : value
     const newConfig = {
       ...sacnConfig,
       [field]: parsed,
@@ -519,13 +407,13 @@ const DmxOutputSettings: React.FC = () => {
 
       <DmxOutputEnabledModes
         sacnEnabled={prefs.dmxOutputConfig?.sacnEnabled || false}
-        onSacnToggle={handleSacnToggle}
+        onSacnToggle={() => handleSenderToggle('sacn')}
         artNetEnabled={prefs.dmxOutputConfig?.artNetEnabled || false}
-        onArtNetToggle={handleArtNetToggle}
+        onArtNetToggle={() => handleSenderToggle('artnet')}
         enttecProEnabled={prefs.dmxOutputConfig?.enttecProEnabled || false}
-        onEnttecProToggle={handleEnttecProToggle}
+        onEnttecProToggle={() => handleSenderToggle('enttecpro')}
         openDmxEnabled={prefs.dmxOutputConfig?.openDmxEnabled || false}
-        onOpenDmxToggle={handleOpenDmxToggle}
+        onOpenDmxToggle={() => handleSenderToggle('opendmx')}
       />
 
       {prefs.dmxOutputConfig?.sacnEnabled && (
