@@ -257,6 +257,67 @@ describe('CueConsistencySettings selection modes', () => {
     expect(mocks[saver]).toHaveBeenCalledWith(value)
   })
 
+  const REVERTS = [
+    ['cue-group-selection-mode', 'setCueGroupSelectionMode', 'withinSong', 'oncePerSong'],
+    ['rb3-cue-group-selection-mode', 'setRb3CueGroupSelectionMode', 'withinSong', 'oncePerSong'],
+    ['yarg-motion-group-selection-mode', 'setYargMotionGroupSelectionMode', 'perCueChange', 'none'],
+    [
+      'audio-motion-group-selection-mode',
+      'setAudioMotionGroupSelectionMode',
+      'perCueChange',
+      'none',
+    ],
+    ['rb3-motion-group-selection-mode', 'setRb3MotionGroupSelectionMode', 'perCueChange', 'none'],
+  ] as const
+
+  it.each(REVERTS)(
+    '%s puts the old mode back when the write is refused',
+    async (id, saver, was, next) => {
+      mocks[saver].mockReturnValueOnce(fail({ mode: was }))
+      await renderPanel()
+
+      await act(async () => {
+        fireEvent.change(control(id), { target: { value: next } })
+      })
+
+      expect(control<HTMLSelectElement>(id).value).toBe(was)
+    },
+  )
+
+  it.each(REVERTS)(
+    '%s puts the old mode back when the write throws',
+    async (id, saver, was, next) => {
+      mocks[saver].mockImplementationOnce(() => Promise.reject(new Error('offline')))
+      await renderPanel()
+
+      await act(async () => {
+        fireEvent.change(control(id), { target: { value: next } })
+      })
+
+      expect(control<HTMLSelectElement>(id).value).toBe(was)
+    },
+  )
+
+  it('shows the chosen mode while the write is in flight', async () => {
+    let release: (value: { success: boolean; mode: string }) => void = () => {}
+    mocks.setYargMotionGroupSelectionMode.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve
+      }),
+    )
+    await renderPanel()
+
+    await act(async () => {
+      fireEvent.change(control('yarg-motion-group-selection-mode'), { target: { value: 'none' } })
+    })
+    expect(control<HTMLSelectElement>('yarg-motion-group-selection-mode').value).toBe('none')
+
+    await act(async () => {
+      release({ success: true, mode: 'none' })
+    })
+    expect(control<HTMLSelectElement>('yarg-motion-group-selection-mode').value).toBe('none')
+  })
+
   it('disables the YARG and audio motion modes when motion is globally off', async () => {
     await renderPanel({ motionGloballyEnabled: false })
 
