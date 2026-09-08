@@ -90,7 +90,7 @@ export class EffectManager implements IEffectManager {
       effectTransformer,
       lightTransitionController: this.lightTransitionController,
       persistentRuns: this.persistentRuns,
-      fireCompletionCallback: (name) => this.effectCallbacks.fire(name),
+      fireCompletionCallback: (name, cancelled) => this.effectCallbacks.fire(name, cancelled),
     })
 
     // Set this instance on the transition engine to allow it to start queued effects
