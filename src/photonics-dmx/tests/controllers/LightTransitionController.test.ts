@@ -1,93 +1,52 @@
-/*
- * LightTransitionController Test Suite
- *
- * This suite tests the functionality of the LightTransitionController.
- * It verifies that the controller correctly manages light transitions, including
- * setting transitions, removing transitions, and calculating light states.
- *
- * Note: The LightTransitionController should be accessed through the Sequencer facade.
- * These tests validate the internal implementation that is used by the Sequencer.
- */
-
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
-import { RGBIO } from '../../types'
 import { createMockRGBIP } from '../helpers/testFixtures'
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
-
-type MockLightStateManager = Pick<
-  LightStateManager,
-  'setLightState' | 'getLightState' | 'publishLightStates' | 'getTrackedLightIds'
->
-
-/** Test-only access to private LTC state; use cast to avoid private-member intersection reducing to never */
-type LTCTestAccess = {
-  _transitionsByLight: Map<string, Map<number, unknown>>
-  _currentLayerStates: Map<string, Map<number, RGBIO>>
-  _lightStateManager: MockLightStateManager
-  calculateFinalColorForLight: (lightId: string) => RGBIO
-}
-
-function ltcAccess(ctrl: LightTransitionController): LTCTestAccess {
-  return ctrl as unknown as LTCTestAccess
-}
 
 describe('LightTransitionController', () => {
   let lightTransitionController: LightTransitionController
 
   beforeEach(() => {
-    const mockLightStateManager = {
-      setLightState: jest.fn(),
-      getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-      publishLightStates: jest.fn(),
-      getTrackedLightIds: jest.fn().mockReturnValue([]),
-    } as unknown as MockLightStateManager
-
-    lightTransitionController = new LightTransitionController(
-      mockLightStateManager as unknown as LightStateManager,
-    )
-    const ltc = ltcAccess(lightTransitionController)
-    ltc._transitionsByLight = new Map()
-    ltc._currentLayerStates = new Map()
+    lightTransitionController = new LightTransitionController(new LightStateManager())
   })
 
-  describe('orphaned-transition reaper (D-11)', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  describe('orphaned-transition reaper', () => {
     it('does not reap a long fade before duration * 1.5', () => {
       let mockNow = 1000
-      const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => mockNow)
-      try {
-        // startTime is stamped from performance.now() at 1000.
-        lightTransitionController.setTransition(
-          'l',
-          1,
-          createMockRGBIP({ red: 0 }),
-          createMockRGBIP({ red: 255 }),
-          8000,
-          'linear',
-        )
-        const transitions = ltcAccess(lightTransitionController)._transitionsByLight
-        expect(transitions.get('l')?.has(1)).toBe(true)
+      jest.spyOn(performance, 'now').mockImplementation(() => mockNow)
 
-        // Age 6000ms: past the old fixed 5000ms cutoff, but under 8000 * 1.5 = 12000.
-        mockNow = 1000 + 6000
-        lightTransitionController.advanceFrame({
-          frameStartTime: 1000 + 6000,
-          deltaTime: 16,
-          frameIndex: 1,
-        })
-        expect(transitions.get('l')?.has(1)).toBe(true) // still alive
+      // startTime is stamped from performance.now() at 1000.
+      lightTransitionController.setTransition(
+        'l',
+        1,
+        createMockRGBIP({ red: 0 }),
+        createMockRGBIP({ red: 255 }),
+        8000,
+        'linear',
+      )
+      expect(lightTransitionController.getAllLightIds()).toContain('l')
 
-        // Age 13000ms: past duration * 1.5, so now genuinely orphaned and reaped.
-        mockNow = 1000 + 13000
-        lightTransitionController.advanceFrame({
-          frameStartTime: 1000 + 13000,
-          deltaTime: 16,
-          frameIndex: 2,
-        })
-        expect(transitions.get('l')?.has(1) ?? false).toBe(false)
-      } finally {
-        nowSpy.mockRestore()
-      }
+      // Age 6000ms: past the absolute floor, but under 8000 * 1.5 = 12000.
+      mockNow = 1000 + 6000
+      lightTransitionController.advanceFrame({
+        frameStartTime: mockNow,
+        deltaTime: 16,
+        frameIndex: 1,
+      })
+      expect(lightTransitionController.getAllLightIds()).toContain('l')
+
+      // Age 13000ms: past duration * 1.5, so now genuinely orphaned and reaped.
+      mockNow = 1000 + 13000
+      lightTransitionController.advanceFrame({
+        frameStartTime: mockNow,
+        deltaTime: 16,
+        frameIndex: 2,
+      })
+      expect(lightTransitionController.getAllLightIds()).not.toContain('l')
     })
   })
 
@@ -97,22 +56,10 @@ describe('LightTransitionController', () => {
       const layer = 1
       const startState = createMockRGBIP({ red: 0, green: 0, blue: 0 })
       const endState = createMockRGBIP({ red: 255, green: 255, blue: 255 })
-      const duration = 1000
-      const easing = 'linear'
 
-      // Set a transition
-      lightTransitionController.setTransition(
-        lightId,
-        layer,
-        startState,
-        endState,
-        duration,
-        easing,
-      )
+      lightTransitionController.setTransition(lightId, layer, startState, endState, 1000, 'linear')
 
-      // Check if the light state is tracked
       const result = lightTransitionController.getLightState(lightId, layer)
-      expect(result).toBeDefined()
       expect(result).toEqual(startState) // Initially, should be the start state
     })
 
@@ -123,67 +70,75 @@ describe('LightTransitionController', () => {
       const endState1 = createMockRGBIP({ red: 255, green: 0, blue: 0 })
       const startState2 = createMockRGBIP({ red: 255, green: 0, blue: 0 })
       const endState2 = createMockRGBIP({ red: 0, green: 255, blue: 0 })
-      const duration = 1000
-      const easing = 'linear'
 
-      // Set the first transition
       lightTransitionController.setTransition(
         lightId,
         layer,
         startState1,
         endState1,
-        duration,
-        easing,
+        1000,
+        'linear',
       )
-
-      // Set a second transition on the same light and layer
       lightTransitionController.setTransition(
         lightId,
         layer,
         startState2,
         endState2,
-        duration,
-        easing,
+        1000,
+        'linear',
       )
 
-      // Check that the light state is updated to the new start state
       const result = lightTransitionController.getLightState(lightId, layer)
       expect(result).toEqual(startState2)
     })
-  })
 
-  describe('getLightState', () => {
-    it('should return the current state of a light if transitions exist', () => {
-      // Setup mock state
+    it('starts from the layer state already held when no start state is given', () => {
       const lightId = 'test-light'
       const layer = 1
-      const mockState = createMockRGBIP({ red: 100, green: 150, blue: 200 })
+      const held = createMockRGBIP({ red: 90, green: 30 })
 
-      // Mock implementation
-      const layerMap = new Map()
-      layerMap.set(layer, mockState)
-      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerMap)
+      lightTransitionController.setGeneratorLayerState(lightId, layer, held)
+      lightTransitionController.setTransition(
+        lightId,
+        layer,
+        undefined,
+        createMockRGBIP({ red: 255 }),
+        1000,
+        'linear',
+      )
 
-      // Get the state
-      const state = lightTransitionController.getLightState(lightId, layer)
-
-      // Verify
-      expect(state).toEqual(mockState)
+      expect(lightTransitionController.getLightState(lightId, layer)).toEqual(held)
     })
 
-    it('should return a transparent color for a light with no transitions', () => {
-      // Override the mock implementation for this test only
-      ;(
-        ltcAccess(lightTransitionController)._lightStateManager
-          .getLightState as unknown as jest.Mock
-      ).mockReturnValueOnce(undefined)
-
-      const lightId = 'nonexistent-light'
+    it('prefers an initial state override over the given start state', () => {
+      const lightId = 'test-light'
       const layer = 1
+      const override = createMockRGBIP({ blue: 200 })
 
-      // Get the state of a light that doesn't have transitions
-      const state = lightTransitionController.getLightState(lightId, layer)
-      expect(state).toEqual({
+      lightTransitionController.setTransition(
+        lightId,
+        layer,
+        createMockRGBIP({ red: 10 }),
+        createMockRGBIP({ red: 255 }),
+        1000,
+        'linear',
+        override,
+      )
+
+      expect(lightTransitionController.getLightState(lightId, layer)).toEqual(override)
+    })
+
+    it('starts from black when nothing supplies a start state', () => {
+      lightTransitionController.setTransition(
+        'test-light',
+        1,
+        undefined,
+        createMockRGBIP({ red: 255 }),
+        1000,
+        'linear',
+      )
+
+      expect(lightTransitionController.getLightState('test-light', 1)).toEqual({
         red: 0,
         green: 0,
         blue: 0,
@@ -194,1081 +149,65 @@ describe('LightTransitionController', () => {
     })
   })
 
+  describe('getLightState', () => {
+    it('should return the current state of a light if transitions exist', () => {
+      const mockState = createMockRGBIP({ red: 100, green: 150, blue: 200 })
+
+      lightTransitionController.setTransition('test-light', 1, mockState, mockState, 0, 'linear')
+
+      expect(lightTransitionController.getLightState('test-light', 1)).toEqual(mockState)
+    })
+
+    it('should return a transparent color for a light with no transitions', () => {
+      expect(lightTransitionController.getLightState('nonexistent-light', 1)).toEqual({
+        red: 0,
+        green: 0,
+        blue: 0,
+        intensity: 0,
+        opacity: 0.0,
+        blendMode: 'replace',
+      })
+    })
+
+    it('returns a transparent color for a layer the light does not hold', () => {
+      lightTransitionController.setGeneratorLayerState('test-light', 1, createMockRGBIP())
+
+      expect(lightTransitionController.getLightState('test-light', 2).opacity).toBe(0.0)
+    })
+  })
+
   describe('removeTransitionsByLayer', () => {
     it('should remove all transitions for a specific layer', () => {
-      const lightId1 = 'test-light-1'
-      const lightId2 = 'test-light-2'
-      const layer1 = 1
-      const layer2 = 2
       const startState = createMockRGBIP({ red: 0, green: 0, blue: 0 })
       const endState = createMockRGBIP({ red: 255, green: 255, blue: 255 })
-      const duration = 1000
-      const easing = 'linear'
 
-      // Set transitions on different lights and layers
-      lightTransitionController.setTransition(
-        lightId1,
-        layer1,
-        startState,
-        endState,
-        duration,
-        easing,
-      )
+      lightTransitionController.setTransition('light-1', 1, startState, endState, 1000, 'linear')
+      lightTransitionController.setTransition('light-2', 1, startState, endState, 1000, 'linear')
+      lightTransitionController.setTransition('light-1', 2, startState, endState, 1000, 'linear')
 
-      lightTransitionController.setTransition(
-        lightId2,
-        layer1,
-        startState,
-        endState,
-        duration,
-        easing,
-      )
+      lightTransitionController.removeTransitionsByLayer(1)
 
-      lightTransitionController.setTransition(
-        lightId1,
-        layer2,
-        startState,
-        endState,
-        duration,
-        easing,
-      )
-
-      // Remove transitions for layer1
-      lightTransitionController.removeTransitionsByLayer(layer1)
-
-      // Transitions on layer2 should still exist
-      const transitions = ltcAccess(lightTransitionController)._transitionsByLight
-      const layerExists = Array.from(transitions.values() as Iterable<Map<number, unknown>>).some(
-        (layerMap) => layerMap.has(layer1),
-      )
-
-      expect(layerExists).toBeFalsy()
-
-      // Make sure transitions for layer2 still exist
-      const layer2Exists = Array.from(transitions.values() as Iterable<Map<number, unknown>>).some(
-        (layerMap) => layerMap.has(layer2),
-      )
-
-      expect(layer2Exists).toBeTruthy()
+      expect(lightTransitionController.getLightState('light-1', 1).opacity).toBe(0.0)
+      expect(lightTransitionController.getLightState('light-2', 1).opacity).toBe(0.0)
+      expect(lightTransitionController.getLightState('light-1', 2)).toEqual(startState)
     })
   })
 
-  describe('applyTransition', () => {
-    it('should set up a valid transition object that can be updated', () => {
-      // Create mock dependencies
-      const lightStateManager = new LightStateManager()
-      lightStateManager.setLightState = jest.fn()
-
-      // Create test data with non-zero starting values
-      const lightId = 'test-light-1'
-      const layer = 1
-      const startState: RGBIO = {
-        red: 10,
-        green: 20,
-        blue: 30,
-        intensity: 255,
-        opacity: 1.0,
-        blendMode: 'replace',
-      }
-      const endState: RGBIO = {
-        red: 50,
-        green: 100,
-        blue: 150,
-        intensity: 255,
-        opacity: 1.0,
-        blendMode: 'replace',
-      }
-      const duration = 1000
-      const easing = 'linear'
-
-      // Create controller
-      const lightTransitionController = new LightTransitionController(lightStateManager)
-
-      // Set transition
+  describe('shutdown', () => {
+    it('drops every transition it holds', () => {
       lightTransitionController.setTransition(
-        lightId,
-        layer,
-        startState,
-        endState,
-        duration,
-        easing,
+        'l',
+        1,
+        createMockRGBIP(),
+        createMockRGBIP({ red: 255 }),
+        1000,
+        'linear',
       )
 
-      // Verify the transition data was stored correctly
-      const transitions = ltcAccess(lightTransitionController)._transitionsByLight
-      expect(transitions.has(lightId)).toBeTruthy()
+      lightTransitionController.shutdown()
 
-      const lightTransitions = transitions.get(lightId)
-      expect(lightTransitions).toBeDefined()
-      expect(lightTransitions!.has(layer)).toBeTruthy()
-
-      const transitionData = lightTransitions!.get(layer) as
-        | {
-            startState: RGBIO
-            endState: RGBIO
-            transition: { transform: { duration: number; easing: string } }
-          }
-        | undefined
-      expect(transitionData).toBeDefined()
-      expect(transitionData!.startState).toEqual(startState)
-      expect(transitionData!.endState).toEqual(endState)
-      expect(transitionData!.transition.transform.duration).toBe(duration)
-      expect(transitionData!.transition.transform.easing).toBe(easing)
-
-      // Verify initial state is available
-      const initialLightState = lightTransitionController.getLightState(lightId, layer)
-      expect(initialLightState).toBeDefined()
-    })
-  })
-
-  describe('calculateLayeredState', () => {
-    it('should respect higher layer states', () => {
-      // Create a controller with known light states
-      const mockLightStateManager = {
-        setLightState: jest.fn(),
-        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-        publishLightStates: jest.fn(),
-        getTrackedLightIds: jest.fn().mockReturnValue([]),
-      }
-      lightTransitionController = new LightTransitionController(
-        mockLightStateManager as unknown as LightStateManager,
-      )
-
-      // Set states for different layers
-      const lightId = 'test-light'
-      const layer1 = 1
-      const layer2 = 2
-      const layer3 = 3
-
-      const state1 = createMockRGBIP({
-        red: 100,
-        green: 0,
-        blue: 0,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-      const state2 = createMockRGBIP({
-        red: 0,
-        green: 100,
-        blue: 0,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-      const state3 = createMockRGBIP({
-        red: 0,
-        green: 0,
-        blue: 100,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-
-      // Directly set light states for different layers
-      const layerStates = new Map<number, RGBIO>()
-      layerStates.set(layer1, state1)
-      layerStates.set(layer2, state2)
-      layerStates.set(layer3, state3)
-      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates)
-
-      // Manually call the calculateFinalColorForLight method
-      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId)
-
-      // Get the final state from the light state manager
-      expect(mockLightStateManager.setLightState).toHaveBeenCalledWith(lightId, state3)
-    })
-
-    it('should handle missing layers correctly', () => {
-      // Create a controller with known light states
-      const mockLightStateManager = {
-        setLightState: jest.fn(),
-        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-        publishLightStates: jest.fn(),
-        getTrackedLightIds: jest.fn().mockReturnValue([]),
-      }
-      lightTransitionController = new LightTransitionController(
-        mockLightStateManager as unknown as LightStateManager,
-      )
-
-      // Set states for different layers
-      const lightId = 'test-light'
-      const layer1 = 1
-      const layer3 = 3 // Skip layer 2
-
-      const state1 = createMockRGBIP({
-        red: 100,
-        green: 0,
-        blue: 0,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-      const state3 = createMockRGBIP({
-        red: 0,
-        green: 0,
-        blue: 100,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-
-      // Directly set light states for different layers
-      const layerStates = new Map<number, RGBIO>()
-      layerStates.set(layer1, state1)
-      layerStates.set(layer3, state3)
-      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates)
-
-      // Manually call the calculateFinalColorForLight method
-      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId)
-
-      // Get the final state from the light state manager
-      expect(mockLightStateManager.setLightState).toHaveBeenCalledWith(lightId, state3)
-    })
-
-    it('should override base colour when higher layer has full opacity', () => {
-      // Create a controller with known light states
-      const mockLightStateManager = {
-        setLightState: jest.fn(),
-        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-        publishLightStates: jest.fn(),
-        getTrackedLightIds: jest.fn().mockReturnValue([]),
-      }
-      lightTransitionController = new LightTransitionController(
-        mockLightStateManager as unknown as LightStateManager,
-      )
-
-      // Set states for different layers
-      const lightId = 'test-light'
-      const layer0 = 0 // Base layer
-      const layer1 = 1 // Higher layer with full opacity
-
-      // Red on base layer
-      const baseState = createMockRGBIP({
-        red: 255,
-        green: 0,
-        blue: 0,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-      // Blue on higher layer with full opacity
-      const higherState = createMockRGBIP({
-        red: 0,
-        green: 0,
-        blue: 255,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-
-      // Directly set light states for different layers
-      const layerStates = new Map<number, RGBIO>()
-      layerStates.set(layer0, baseState)
-      layerStates.set(layer1, higherState)
-      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates)
-
-      // Manually call the calculateFinalColorForLight method
-      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId)
-
-      // Higher layer state should completely override base layer
-      expect(mockLightStateManager.setLightState).toHaveBeenCalledWith(lightId, higherState)
-    })
-
-    it('should blend colours correctly when higher layer has partial opacity', () => {
-      // Create a controller with known light states
-      const mockLightStateManager = {
-        setLightState: jest.fn(),
-        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-        publishLightStates: jest.fn(),
-        getTrackedLightIds: jest.fn().mockReturnValue([]),
-      }
-      lightTransitionController = new LightTransitionController(
-        mockLightStateManager as unknown as LightStateManager,
-      )
-
-      // Set states for different layers
-      const lightId = 'test-light'
-      const layer0 = 0 // Base layer
-      const layer1 = 1 // Higher layer with partial opacity
-
-      // Red on base layer with full opacity
-      const baseState = createMockRGBIP({
-        red: 255,
-        green: 0,
-        blue: 0,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-
-      // Green on higher layer with channel-specific opacity
-      const higherState = createMockRGBIP({
-        red: 0,
-        green: 200,
-        blue: 0,
-        intensity: 100,
-        opacity: 0.5,
-        blendMode: 'add',
-      })
-
-      // Expected result: Additive blending with opacity scaling
-      // red: 255 + (0 × 0.5) = 255 (base + scaled higher)
-      // green: 0 + (200 × 0.5) = 100 (base + scaled higher)
-      // blue: 0 + (0 × 0.5) = 0 (base + scaled higher)
-      // intensity: 255 + (100 × 0.5) = 305 → clamped to 255 (base + scaled higher)
-      const expectedState = createMockRGBIP({
-        red: 255,
-        green: 100,
-        blue: 0,
-        intensity: 255,
-        opacity: 1.0,
-        blendMode: 'add',
-      })
-
-      // Directly set light states for different layers
-      const layerStates = new Map<number, RGBIO>()
-      layerStates.set(layer0, baseState)
-      layerStates.set(layer1, higherState)
-      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates)
-
-      // Manually call the calculateFinalColorForLight method
-      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId)
-
-      // Should blend each channel according to its individual opacity
-      expect(mockLightStateManager.setLightState).toHaveBeenCalledWith(lightId, expectedState)
-    })
-
-    // 'mix' is an alpha crossfade: a higher layer blends with the composited lower layers
-    // by opacity (opacity 0 = underlying, 1 = this layer). Used so a yellow flash can
-    // crossfade over a blue base into pure yellow and back, rather than fading from black
-    // ('replace') or summing to white ('add').
-    describe('mix blend mode (alpha crossfade)', () => {
-      const blendBlueUnderYellow = (overlayOpacity: number): RGBIO => {
-        const mockLightStateManager = {
-          setLightState: jest.fn(),
-          getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-          publishLightStates: jest.fn(),
-          getTrackedLightIds: jest.fn().mockReturnValue([]),
-        }
-        const ltc = new LightTransitionController(
-          mockLightStateManager as unknown as LightStateManager,
-        )
-        const blueBase = createMockRGBIP({
-          red: 0,
-          green: 0,
-          blue: 255,
-          intensity: 255,
-          opacity: 1.0,
-          blendMode: 'replace',
-        })
-        const yellowOverlay = createMockRGBIP({
-          red: 255,
-          green: 255,
-          blue: 0,
-          intensity: 255,
-          opacity: overlayOpacity,
-          blendMode: 'mix',
-        })
-        const layerStates = new Map<number, RGBIO>()
-        layerStates.set(0, blueBase)
-        layerStates.set(1, yellowOverlay)
-        ltcAccess(ltc)._currentLayerStates.set('mix-light', layerStates)
-        ltcAccess(ltc).calculateFinalColorForLight('mix-light')
-        return (mockLightStateManager.setLightState as jest.Mock).mock.calls.at(-1)![1] as RGBIO
-      }
-
-      it('opacity 0 shows the underlying blue', () => {
-        const out = blendBlueUnderYellow(0)
-        expect([out.red, out.green, out.blue]).toEqual([0, 0, 255])
-      })
-
-      it('opacity 1 shows pure yellow with the blue fully replaced', () => {
-        const out = blendBlueUnderYellow(1)
-        expect([out.red, out.green, out.blue]).toEqual([255, 255, 0])
-      })
-
-      it('opacity 0.5 crossfades — all channels present, not white, not black', () => {
-        const out = blendBlueUnderYellow(0.5)
-        expect(out.red).toBeGreaterThan(0)
-        expect(out.green).toBeGreaterThan(0)
-        expect(out.blue).toBeGreaterThan(0)
-        expect(out.blue).toBeLessThan(255) // blue is fading out
-        expect(out.red).toBeLessThan(255) // yellow is fading in
-      })
-    })
-
-    it('should blend each RGB channel based on its individual opacity', () => {
-      // Create a controller with known light states
-      const mockLightStateManager = {
-        setLightState: jest.fn(),
-        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-        publishLightStates: jest.fn(),
-        getTrackedLightIds: jest.fn().mockReturnValue([]),
-      }
-      lightTransitionController = new LightTransitionController(
-        mockLightStateManager as unknown as LightStateManager,
-      )
-
-      // Set states for different layers
-      const lightId = 'test-light'
-      const layer0 = 0 // Base layer
-      const layer1 = 1 // Higher layer with varying channel opacity
-
-      // White on base layer with full opacity
-      const baseState = createMockRGBIP({
-        red: 200,
-        green: 200,
-        blue: 200,
-        intensity: 200,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-
-      // RGB on higher layer with different channel priorities
-      const higherState = createMockRGBIP({
-        red: 255,
-        green: 255,
-        blue: 255,
-        intensity: 255,
-        opacity: 0.75,
-        blendMode: 'add',
-      })
-
-      // Directly set light states for different layers
-      const layerStates = new Map<number, RGBIO>()
-      layerStates.set(layer0, baseState)
-      layerStates.set(layer1, higherState)
-      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates)
-
-      // Call the calculateFinalColorForLight method
-      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId)
-
-      // Verify that the setLightState method was called
-      expect(mockLightStateManager.setLightState).toHaveBeenCalled()
-
-      // Get what the actual blending result is
-      const actualBlendedResult = mockLightStateManager.setLightState.mock.calls[0][1] as RGBIO
-
-      // Verify that the result exists and has the proper properties
-      expect(actualBlendedResult).toBeDefined()
-
-      // Verify opacity and blendMode are preserved
-      expect(actualBlendedResult.opacity).toBe(1.0)
-      expect(actualBlendedResult.blendMode).toBe('add')
-
-      // Verify red is blended based on opacity
-      // When opacity < 1.0 with add blend mode, higher layer overrides lower layer
-      expect(actualBlendedResult.red).toBe(255)
-
-      // Verify green is blended based on opacity
-      // When opacity < 1.0 with add blend mode, higher layer overrides lower layer
-      expect(actualBlendedResult.green).toBe(255)
-
-      // Verify blue is blended based on opacity
-      // When opacity < 1.0 with add blend mode, higher layer overrides lower layer
-      expect(actualBlendedResult.blue).toBe(255)
-
-      // Verify intensity is blended based on opacity
-      // When opacity < 1.0 with add blend mode, higher layer overrides lower layer
-      expect(actualBlendedResult.intensity).toBe(255)
-    })
-
-    it('should treat intensity as its own channel like RGB, not as a master dimmer', () => {
-      // Create a controller with known light states
-      const mockLightStateManager = {
-        setLightState: jest.fn(),
-        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-        publishLightStates: jest.fn(),
-        getTrackedLightIds: jest.fn().mockReturnValue([]),
-      }
-      lightTransitionController = new LightTransitionController(
-        mockLightStateManager as unknown as LightStateManager,
-      )
-
-      // Set states for different layers
-      const lightId = 'test-light'
-      const layer0 = 0 // Base layer
-      const layer1 = 1 // Higher layer with different intensity opacity
-
-      // Full red with high intensity
-      const baseState = createMockRGBIP({
-        red: 255,
-        green: 0,
-        blue: 0,
-        intensity: 200,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-
-      // Same color but with lower intensity at 50% opacity
-      const higherState = createMockRGBIP({
-        red: 255,
-        green: 0,
-        blue: 0,
-        intensity: 100,
-        opacity: 0.5,
-        blendMode: 'add',
-      })
-
-      // Directly set light states for different layers
-      const layerStates = new Map<number, RGBIO>()
-      layerStates.set(layer0, baseState)
-      layerStates.set(layer1, higherState)
-      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates)
-
-      // Manually call the calculateFinalColorForLight method
-      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId)
-
-      // Get the actual blended result
-      const actualBlendedResult = mockLightStateManager.setLightState.mock.calls[0][1] as RGBIO
-
-      // Verify that the result exists and has the proper properties
-      expect(actualBlendedResult).toBeDefined()
-      expect(actualBlendedResult.opacity).toBe(1.0)
-
-      // RGB values should be blended additively: 255 + (255 × 0.5) = 255 (clamped)
-      expect(actualBlendedResult.red).toBe(255)
-      expect(actualBlendedResult.green).toBe(0)
-      expect(actualBlendedResult.blue).toBe(0)
-
-      // Intensity should be blended additively: 200 + (100 × 0.5) = 250
-      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
-      expect(actualBlendedResult.intensity).toBe(250)
-    })
-
-    it('should respect intensity opacity independently of RGB opacity', () => {
-      // Create a controller with known light states
-      const mockLightStateManager = {
-        setLightState: jest.fn(),
-        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-        publishLightStates: jest.fn(),
-        getTrackedLightIds: jest.fn().mockReturnValue([]),
-      }
-      lightTransitionController = new LightTransitionController(
-        mockLightStateManager as unknown as LightStateManager,
-      )
-
-      // Set states for different layers
-      const lightId = 'test-light'
-      const layer0 = 0 // Base layer
-      const layer1 = 1 // Higher layer with different intensity opacity
-
-      // Base state with full red
-      const baseState = createMockRGBIP({
-        red: 200,
-        green: 0,
-        blue: 0,
-        intensity: 200,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-
-      // Higher state with varying RGB opacity and partial intensity opacity
-      const higherState = createMockRGBIP({
-        red: 100,
-        green: 100,
-        blue: 100,
-        intensity: 100,
-        opacity: 0.5,
-        blendMode: 'add',
-      })
-
-      // Directly set light states for different layers
-      const layerStates = new Map<number, RGBIO>()
-      layerStates.set(layer0, baseState)
-      layerStates.set(layer1, higherState)
-      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates)
-
-      // Manually call the calculateFinalColorForLight method
-      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId)
-
-      // Get the actual blended result
-      const actualBlendedResult = mockLightStateManager.setLightState.mock.calls[0][1] as RGBIO
-
-      // Verify that the result exists and has the proper properties
-      expect(actualBlendedResult).toBeDefined()
-      expect(actualBlendedResult.opacity).toBe(1.0)
-
-      // Verify each RGB channel is blended according to opacity and blend mode
-
-      // Red should be blended additively: 200 + (100 × 0.5) = 250
-      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
-      expect(actualBlendedResult.red).toBe(250)
-
-      // Green should be blended additively: 0 + (100 × 0.5) = 50
-      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
-      expect(actualBlendedResult.green).toBe(50)
-
-      // Blue should be blended additively: 0 + (100 × 0.5) = 50
-      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
-      expect(actualBlendedResult.blue).toBe(50)
-
-      // Intensity should be blended additively: 200 + (100 × 0.5) = 250
-      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
-      expect(actualBlendedResult.intensity).toBe(250)
-    })
-
-    it('should correctly blend multiple layers with varying opacity', () => {
-      // Create a controller with known light states
-      const mockLightStateManager = {
-        setLightState: jest.fn(),
-        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-        publishLightStates: jest.fn(),
-        getTrackedLightIds: jest.fn().mockReturnValue([]),
-      }
-      lightTransitionController = new LightTransitionController(
-        mockLightStateManager as unknown as LightStateManager,
-      )
-
-      // Set states for different layers
-      const lightId = 'test-light'
-      const layer0 = 0 // Base red layer
-      const layer1 = 1 // Green layer with varying opacity
-      const layer2 = 2 // Blue layer with varying opacity
-      const layer3 = 3 // Yellow layer with varying opacity
-
-      // Base layer: Red
-      const state0 = createMockRGBIP({
-        red: 255,
-        green: 0,
-        blue: 0,
-        intensity: 255,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-
-      // Layer 1: Green with opacity
-      const state1 = createMockRGBIP({
-        red: 0,
-        green: 255,
-        blue: 0,
-        intensity: 200,
-        opacity: 0.5,
-        blendMode: 'add',
-      })
-
-      // Layer 2: Blue with opacity
-      const state2 = createMockRGBIP({
-        red: 0,
-        green: 0,
-        blue: 255,
-        intensity: 150,
-        opacity: 0.75,
-        blendMode: 'add',
-      })
-
-      // Layer 3: Yellow with opacity
-      const state3 = createMockRGBIP({
-        red: 255,
-        green: 255,
-        blue: 0,
-        intensity: 100,
-        opacity: 0.25,
-        blendMode: 'add',
-      })
-
-      // Directly set light states for different layers
-      const layerStates = new Map<number, RGBIO>()
-      layerStates.set(layer0, state0)
-      layerStates.set(layer1, state1)
-      layerStates.set(layer2, state2)
-      layerStates.set(layer3, state3)
-      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates)
-
-      // Manually call the calculateFinalColorForLight method
-      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId)
-
-      // Verify that the setLightState method was called
-      expect(mockLightStateManager.setLightState).toHaveBeenCalled()
-      const setStateCall = mockLightStateManager.setLightState.mock.calls[0]
-      expect(setStateCall[0]).toBe(lightId)
-
-      // Get the result and verify each property has appropriate type
-      const finalState = setStateCall[1] as RGBIO
-      expect(finalState).toBeDefined()
-      expect(typeof finalState.red).toBe('number')
-      expect(typeof finalState.green).toBe('number')
-      expect(typeof finalState.blue).toBe('number')
-      expect(typeof finalState.intensity).toBe('number')
-
-      // The top layer's opacity and blendMode values should be preserved
-      expect(finalState.opacity).toBe(1.0)
-      expect(finalState.blendMode).toBe('add')
-    })
-
-    it('should explicitly demonstrate independent channel opacity blending', () => {
-      // Create a controller with known light states
-      const mockLightStateManager = {
-        setLightState: jest.fn(),
-        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-        publishLightStates: jest.fn(),
-        getTrackedLightIds: jest.fn().mockReturnValue([]),
-      }
-      lightTransitionController = new LightTransitionController(
-        mockLightStateManager as unknown as LightStateManager,
-      )
-
-      // Set states for different layers
-      const lightId = 'test-light'
-      const baseLayer = 0
-      const upperLayer = 1
-
-      // Base layer: White (fully opaque)
-      const baseState = createMockRGBIP({
-        red: 200,
-        green: 200,
-        blue: 200,
-        intensity: 200,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-
-      // Upper layer: Each channel has different values with opacity-based blending
-      // This test specifically emphasizes that opacity affects all channels uniformly
-      const upperState = createMockRGBIP({
-        red: 100, // Red value is half of base
-        green: 250, // Green value is higher than base
-        blue: 50, // Blue value is much lower than base
-        intensity: 150, // Intensity is lower than base
-
-        // Opacity-based blending:
-        opacity: 0.5, // 50% opacity - partial blend with base
-        blendMode: 'add', // Additive blending
-      })
-
-      // Directly set light states for different layers
-      const layerStates = new Map<number, RGBIO>()
-      layerStates.set(baseLayer, baseState)
-      layerStates.set(upperLayer, upperState)
-      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates)
-
-      // Manually call the calculateFinalColorForLight method
-      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId)
-
-      // Verify the result
-      expect(mockLightStateManager.setLightState).toHaveBeenCalled()
-      const finalState = mockLightStateManager.setLightState.mock.calls[0][1] as RGBIO
-
-      // Calculate expected values for each channel based on opacity
-
-      // Red channel - blended additively: 200 + (100 × 0.5) = 250
-      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
-      expect(finalState.red).toBe(250)
-
-      // Green channel - blended additively: 200 + (250 × 0.5) = 200 + 125 = 255 (clamped)
-      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
-      expect(finalState.green).toBe(255)
-
-      // Blue channel - blended additively: 200 + (50 × 0.5) = 225
-      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
-      expect(finalState.blue).toBe(225)
-
-      // Intensity channel - blended additively: 200 + (150 × 0.5) = 275 (clamped to 255)
-      // When opacity < 1.0 with add blend mode, higher layer is scaled and added
-      expect(finalState.intensity).toBe(255)
-
-      // Verify that opacity and blendMode from the upper layer are preserved
-      expect(finalState.opacity).toBe(1.0)
-      expect(finalState.blendMode).toBe('add')
-    })
-
-    it('should completely override lower layer when all opacity values are 1.0', () => {
-      // Create a controller with known light states
-      const mockLightStateManager = {
-        setLightState: jest.fn(),
-        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-        publishLightStates: jest.fn(),
-        getTrackedLightIds: jest.fn().mockReturnValue([]),
-      }
-      lightTransitionController = new LightTransitionController(
-        mockLightStateManager as unknown as LightStateManager,
-      )
-
-      // Set states for different layers
-      const lightId = 'test-light'
-      const lowerLayer = 0
-      const upperLayer = 1
-
-      // Lower layer: Specific values that should be completely overridden
-      const lowerState = createMockRGBIP({
-        red: 123,
-        green: 45,
-        blue: 67,
-        intensity: 210,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-
-      // Upper layer: Completely different values with replace blend mode
-      const upperState = createMockRGBIP({
-        red: 42,
-        green: 180,
-        blue: 220,
-        intensity: 150,
-        opacity: 1.0,
-        blendMode: 'replace',
-      })
-
-      // Directly set light states for different layers
-      const layerStates = new Map<number, RGBIO>()
-      layerStates.set(lowerLayer, lowerState)
-      layerStates.set(upperLayer, upperState)
-      ltcAccess(lightTransitionController)._currentLayerStates.set(lightId, layerStates)
-
-      // Call the calculateFinalColorForLight method
-      ltcAccess(lightTransitionController).calculateFinalColorForLight(lightId)
-
-      // Verify the result
-      expect(mockLightStateManager.setLightState).toHaveBeenCalled()
-      const finalState = mockLightStateManager.setLightState.mock.calls[0][1] as RGBIO
-
-      // Expect the higher layer's values to completely override the lower layer
-      expect(finalState.red).toBe(42)
-      expect(finalState.green).toBe(180)
-      expect(finalState.blue).toBe(220)
-      expect(finalState.intensity).toBe(150)
-
-      // Opacity and blendMode should also be preserved
-      expect(finalState.opacity).toBe(1.0)
-      expect(finalState.blendMode).toBe('replace')
-
-      // Verify we get a direct object reference match - optimization in the code
-      // directly returns the higher layer's state object without any blending
-      expect(mockLightStateManager.setLightState).toHaveBeenCalledWith(lightId, upperState)
-    })
-  })
-
-  describe('pan/tilt carry-forward across layer blending', () => {
-    let ltcTest: LightTransitionController
-    let capturedState: RGBIO | undefined
-
-    beforeEach(() => {
-      capturedState = undefined
-      const lsm = {
-        setLightState: jest.fn((_, s: RGBIO) => {
-          capturedState = s
-        }),
-        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-        publishLightStates: jest.fn(),
-        getTrackedLightIds: jest.fn().mockReturnValue([]),
-      }
-      ltcTest = new LightTransitionController(lsm as unknown as LightStateManager)
-    })
-
-    function setLayerAndCompute(lightId: string, layer: number, state: RGBIO): void {
-      const acc = ltcAccess(ltcTest)
-      if (!acc._currentLayerStates.has(lightId)) {
-        acc._currentLayerStates.set(lightId, new Map())
-      }
-      acc._currentLayerStates.get(lightId)!.set(layer, state)
-      acc.calculateFinalColorForLight(lightId)
-    }
-
-    it('pan/tilt from a lower layer are carried through a higher colour-only layer', () => {
-      const lightId = 'test-carry'
-      setLayerAndCompute(lightId, 10, {
-        red: 0,
-        green: 0,
-        blue: 0,
-        intensity: 0,
-        opacity: 0,
-        blendMode: 'replace',
-        pan: 42,
-        tilt: 77,
-      })
-      setLayerAndCompute(lightId, 20, {
-        red: 200,
-        green: 100,
-        blue: 50,
-        intensity: 255,
-        opacity: 1,
-        blendMode: 'replace',
-      })
-      expect(capturedState?.pan).toBe(42)
-      expect(capturedState?.tilt).toBe(77)
-    })
-
-    it('a higher layer that explicitly sets pan/tilt overrides the lower layer', () => {
-      const lightId = 'test-override'
-      setLayerAndCompute(lightId, 10, {
-        red: 0,
-        green: 0,
-        blue: 0,
-        intensity: 0,
-        opacity: 0,
-        blendMode: 'replace',
-        pan: 42,
-        tilt: 77,
-      })
-      setLayerAndCompute(lightId, 20, {
-        red: 200,
-        green: 100,
-        blue: 50,
-        intensity: 255,
-        opacity: 1,
-        blendMode: 'replace',
-        pan: 90,
-        tilt: 10,
-      })
-      expect(capturedState?.pan).toBe(90)
-      expect(capturedState?.tilt).toBe(10)
-    })
-
-    it('single layer with pan/tilt produces correct output', () => {
-      const lightId = 'test-single'
-      setLayerAndCompute(lightId, 10, {
-        red: 128,
-        green: 64,
-        blue: 32,
-        intensity: 255,
-        opacity: 1,
-        blendMode: 'replace',
-        pan: 55,
-        tilt: 30,
-      })
-      expect(capturedState?.pan).toBe(55)
-      expect(capturedState?.tilt).toBe(30)
-    })
-
-    it('no layers with pan/tilt produce undefined pan/tilt so publisher uses home fallback', () => {
-      const lightId = 'test-no-pt'
-      setLayerAndCompute(lightId, 10, {
-        red: 128,
-        green: 64,
-        blue: 32,
-        intensity: 255,
-        opacity: 1,
-        blendMode: 'replace',
-      })
-      expect(capturedState?.pan).toBeUndefined()
-      expect(capturedState?.tilt).toBeUndefined()
-    })
-
-    it('additive blend: pan/tilt carry forward from lower layer through colour-only additive layer', () => {
-      const lightId = 'test-carry-add'
-      setLayerAndCompute(lightId, 10, {
-        red: 0,
-        green: 0,
-        blue: 0,
-        intensity: 0,
-        opacity: 0,
-        blendMode: 'replace',
-        pan: 55,
-        tilt: 33,
-      })
-      setLayerAndCompute(lightId, 20, {
-        red: 100,
-        green: 100,
-        blue: 100,
-        intensity: 255,
-        opacity: 1,
-        blendMode: 'add',
-      })
-      expect(capturedState?.pan).toBe(55)
-      expect(capturedState?.tilt).toBe(33)
-    })
-
-    it('mix blend: pan/tilt carry forward from lower layer through colour-only mix layer', () => {
-      const lightId = 'test-carry-mix'
-      setLayerAndCompute(lightId, 10, {
-        red: 200,
-        green: 100,
-        blue: 50,
-        intensity: 200,
-        opacity: 1,
-        blendMode: 'replace',
-        pan: 20,
-        tilt: 80,
-      })
-      setLayerAndCompute(lightId, 20, {
-        red: 128,
-        green: 128,
-        blue: 128,
-        intensity: 200,
-        opacity: 1,
-        blendMode: 'mix',
-      })
-      expect(capturedState?.pan).toBe(20)
-      expect(capturedState?.tilt).toBe(80)
-    })
-  })
-
-  describe('blend mode opacity composition (replace/add/mix)', () => {
-    let capturedState: RGBIO | undefined
-    let ltcTest: LightTransitionController
-
-    beforeEach(() => {
-      capturedState = undefined
-      const lsm = {
-        setLightState: jest.fn((_, s: RGBIO) => {
-          capturedState = s
-        }),
-        getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-        publishLightStates: jest.fn(),
-        getTrackedLightIds: jest.fn().mockReturnValue([]),
-      }
-      ltcTest = new LightTransitionController(lsm as unknown as LightStateManager)
-    })
-
-    function compose(lightId: string, lower: RGBIO, upper: RGBIO): void {
-      const acc = ltcAccess(ltcTest)
-      const states = new Map<number, RGBIO>()
-      states.set(10, lower)
-      states.set(20, upper)
-      acc._currentLayerStates.set(lightId, states)
-      acc.calculateFinalColorForLight(lightId)
-    }
-
-    // Lower (base) layer the upper layer composites onto: (100, 40, 20) @ intensity 200.
-    const base: RGBIO = {
-      red: 100,
-      green: 40,
-      blue: 20,
-      intensity: 200,
-      opacity: 1,
-      blendMode: 'replace',
-    }
-    const upperColor = { red: 200, green: 100, blue: 50, intensity: 100 }
-
-    for (const blendMode of ['replace', 'add', 'mix'] as const) {
-      it(`${blendMode}: opacity 0 is transparent (shows the lower layer unchanged)`, () => {
-        compose(`op0-${blendMode}`, base, { ...upperColor, opacity: 0, blendMode })
-        expect(capturedState?.red).toBe(100)
-        expect(capturedState?.green).toBe(40)
-        expect(capturedState?.blue).toBe(20)
-        expect(capturedState?.intensity).toBe(200)
-      })
-    }
-
-    it('replace: opacity 0.5 scales the replacement colour from black', () => {
-      compose('rep-half', base, { ...upperColor, opacity: 0.5, blendMode: 'replace' })
-      expect(capturedState?.red).toBe(100) // 200 * 0.5
-      expect(capturedState?.green).toBe(50) // 100 * 0.5
-      expect(capturedState?.blue).toBe(25) // 50 * 0.5
-      expect(capturedState?.intensity).toBe(50) // 100 * 0.5
-    })
-
-    it('add: opacity 0.5 adds the scaled colour onto the lower layer', () => {
-      compose('add-half', base, { ...upperColor, opacity: 0.5, blendMode: 'add' })
-      expect(capturedState?.red).toBe(200) // 100 + 100
-      expect(capturedState?.green).toBe(90) // 40 + 50
-      expect(capturedState?.blue).toBe(45) // 20 + 25
-      expect(capturedState?.intensity).toBe(250) // 200 + 50
-    })
-
-    it('mix: opacity 0.5 crossfades between the lower and upper colours', () => {
-      compose('mix-half', base, { ...upperColor, opacity: 0.5, blendMode: 'mix' })
-      expect(capturedState?.red).toBe(150) // (100 + 200) / 2
-      expect(capturedState?.green).toBe(70) // (40 + 100) / 2
-      expect(capturedState?.blue).toBe(35) // (20 + 50) / 2
-      expect(capturedState?.intensity).toBe(150) // (200 + 100) / 2
-    })
-
-    it('opacity 1.0: replace and mix fully take the upper colour; add saturates', () => {
-      compose('rep-full', base, { ...upperColor, opacity: 1, blendMode: 'replace' })
-      expect(capturedState?.red).toBe(200)
-      expect(capturedState?.intensity).toBe(100)
-
-      compose('mix-full', base, { ...upperColor, opacity: 1, blendMode: 'mix' })
-      expect(capturedState?.red).toBe(200)
-      expect(capturedState?.intensity).toBe(100)
-
-      compose('add-full', base, { ...upperColor, opacity: 1, blendMode: 'add' })
-      expect(capturedState?.red).toBe(255) // 100 + 200, clamped
-      expect(capturedState?.intensity).toBe(255) // 200 + 100, clamped
+      expect(lightTransitionController.getAllLightIds()).toEqual([])
+      expect(lightTransitionController.getLightState('l', 1).opacity).toBe(0.0)
     })
   })
 })

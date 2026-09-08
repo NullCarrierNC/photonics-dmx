@@ -1,9 +1,8 @@
 import { useAtom } from 'jotai'
 import { senderArtNetEnabledAtom, artNetConfigAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
+import { applySenderRunState } from '../ipc/senderSwitch'
 import { RoutedRigsHint } from './RoutedRigsHint'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('ArtNetToggle')
 
 interface ArtNetToggleProps {
   disabled?: boolean
@@ -17,15 +16,11 @@ const ArtNetToggle = ({ disabled = false, compact = false }: ArtNetToggleProps) 
 
   const handleToggle = () => {
     const newState = !isArtNetEnabled
-    setIsArtNetEnabled(newState)
-
-    if (newState) {
-      enableSender({ sender: 'artnet', ...artNetConfig })
-      log.info('ArtNet enabled')
-    } else {
-      disableSender({ sender: 'artnet' })
-      log.info('ArtNet disabled')
-    }
+    void applySenderRunState('artnet', newState, setIsArtNetEnabled, () =>
+      newState
+        ? enableSender({ sender: 'artnet', ...artNetConfig })
+        : disableSender({ sender: 'artnet' }),
+    )
   }
 
   // Only show the toggle if ArtNet is enabled in preferences

@@ -1,10 +1,9 @@
 import { useAtom } from 'jotai'
 import { openDmxComPortAtom, senderOpenDmxEnabledAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
+import { applySenderRunState } from '../ipc/senderSwitch'
 import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../../shared/dmxOutputRefresh'
 import { RoutedRigsHint } from './RoutedRigsHint'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('OpenDmxToggle')
 
 interface OpenDmxToggleProps {
   disabled?: boolean
@@ -19,15 +18,11 @@ const OpenDmxToggle = ({ disabled = false, compact = false }: OpenDmxToggleProps
 
   const handleToggle = () => {
     const newState = !isOpenDmxEnabled
-    setIsOpenDmxEnabled(newState)
-
-    if (newState) {
-      enableSender({ sender: 'opendmx', devicePath: comPort, dmxSpeed: openDmxSpeed })
-      log.info('OpenDMX enabled')
-    } else {
-      disableSender({ sender: 'opendmx' })
-      log.info('OpenDMX disabled')
-    }
+    void applySenderRunState('opendmx', newState, setIsOpenDmxEnabled, () =>
+      newState
+        ? enableSender({ sender: 'opendmx', devicePath: comPort, dmxSpeed: openDmxSpeed })
+        : disableSender({ sender: 'opendmx' }),
+    )
   }
 
   if (!prefs.dmxOutputConfig?.openDmxEnabled) {

@@ -1,9 +1,8 @@
 import { useAtom } from 'jotai'
 import { enttecProComPortAtom, senderEnttecProEnabledAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
+import { applySenderRunState } from '../ipc/senderSwitch'
 import { RoutedRigsHint } from './RoutedRigsHint'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('EnttecProToggle')
 
 interface EnttecProToggleProps {
   disabled?: boolean
@@ -17,15 +16,11 @@ const EnttecProToggle = ({ disabled = false, compact = false }: EnttecProToggleP
 
   const handleToggle = () => {
     const newState = !isEnttecProEnabled
-    setIsEnttecProEnabled(newState)
-
-    if (newState) {
-      enableSender({ sender: 'enttecpro', devicePath: comPort })
-      log.info('EnttecPro enabled')
-    } else {
-      disableSender({ sender: 'enttecpro' })
-      log.info('EnttecPro disabled')
-    }
+    void applySenderRunState('enttecpro', newState, setIsEnttecProEnabled, () =>
+      newState
+        ? enableSender({ sender: 'enttecpro', devicePath: comPort })
+        : disableSender({ sender: 'enttecpro' }),
+    )
   }
 
   // Only show the toggle if Enttec Pro is enabled in preferences

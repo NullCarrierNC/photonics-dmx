@@ -1,8 +1,11 @@
-import { RGBIO, Transition, BlendMode } from '../../types'
-import { BLEND_MODE_OPTIONS } from '../../constants/options'
-
-import { getEasingFunction } from '../../easing'
-
+import { RGBIO, Transition } from '../../types'
+import { blendWithOpacity, opaqueBlack, transparentColor } from './lightBlending'
+import {
+  cleanupOrphanedTransitions,
+  emergencyStateReset,
+  validateAllStates,
+} from './transitionHealth'
+import { stepTransition } from './transitionStep'
 import { LightStateManager } from './LightStateManager'
 import type { FrameContext } from './interfaces'
 import { createLogger } from '../../../shared/logger'
@@ -11,7 +14,7 @@ const log = createLogger('LightTransitionController')
 /**
  * Holds data for each layer's transition on a specific light.
  */
-type TransitionData = {
+export type TransitionData = {
   layer: number
   startState: RGBIO
   endState: RGBIO
@@ -107,15 +110,7 @@ export class LightTransitionController {
       if (currentState) {
         effectiveStartState = { ...currentState }
       } else {
-        // Create a default black RGBIP
-        effectiveStartState = {
-          red: 0,
-          green: 0,
-          blue: 0,
-          intensity: 0,
-          opacity: 0.0,
-          blendMode: 'replace',
-        }
+        effectiveStartState = transparentColor()
       }
     }
 
@@ -161,19 +156,6 @@ export class LightTransitionController {
   }
 
   /**
-   * Gets all unique layers that have transitions
-   */
-  public getAllTransitionLayers(): number[] {
-    const layers = new Set<number>()
-    for (const layerMap of this._transitionsByLight.values()) {
-      for (const layer of layerMap.keys()) {
-        layers.add(layer)
-      }
-    }
-    return Array.from(layers).sort((a, b) => a - b)
-  }
-
-  /**
    * Clears ALL transitions and resets all lights to black
    * This is a nuclear option used when switching cues
    */
@@ -196,14 +178,7 @@ export class LightTransitionController {
       this._currentLayerStates.clear()
 
       // Reset all lights to black
-      const blackState: RGBIO = {
-        red: 0,
-        green: 0,
-        blue: 0,
-        intensity: 0,
-        opacity: 1.0,
-        blendMode: 'replace',
-      }
+      const blackState = opaqueBlack()
 
       allLightIds.forEach((lightId) => {
         this._lightStateManager.setLightState(lightId, blackState)
@@ -214,7 +189,8 @@ export class LightTransitionController {
       // Publish the black states immediately
       this._lightStateManager.publishLightStates()
     } finally {
-      // Release the clearing flag
+      // Released here rather than by the caller, so the callbacks removeAllEffects cancels next
+      // can submit the cue that follows.
       this._clearingTransitions = false
     }
   }
@@ -246,7 +222,7 @@ export class LightTransitionController {
 
     // Force immediate recalculation and publication of the final color
     // This ensures the light updates immediately rather than waiting for the next update cycle
-    this.calculateFinalColorForLight(lightId)
+    this.blendAndSetFinalColor(lightId)
     //  this._lightStateManager.publishLightStates();
   }
 
@@ -262,7 +238,7 @@ export class LightTransitionController {
         delete next.tilt
         layerMap.set(layer, next)
       }
-      this.calculateFinalColorForLight(lightId)
+      this.blendAndSetFinalColor(lightId)
     }
   }
 
@@ -292,18 +268,8 @@ export class LightTransitionController {
     if (currentLayerMap.size === 0) {
       this._currentLayerStates.delete(lightId)
     }
-    this.calculateFinalColorForLight(lightId)
+    this.blendAndSetFinalColor(lightId)
     this._lightStateManager.publishLightStates()
-  }
-
-  /**
-   * Removes all transitions for the given lights entirely.
-   */
-  public removeLights(lightIds: string[]): void {
-    lightIds.forEach((id) => {
-      this._transitionsByLight.delete(id)
-      this._currentLayerStates.delete(id)
-    })
   }
 
   /**
@@ -313,11 +279,11 @@ export class LightTransitionController {
   public getLightState(lightId: string, layer: number): RGBIO {
     const layerMap = this._currentLayerStates.get(lightId)
     if (!layerMap) {
-      return this.transparentColor()
+      return transparentColor()
     }
     const c = layerMap.get(layer)
     if (!c) {
-      return this.transparentColor()
+      return transparentColor()
     }
     return c
   }
@@ -342,15 +308,8 @@ export class LightTransitionController {
       // Get the current state to check if it has pan/tilt values
       const currentState = this._lightStateManager.getLightState(lightId)
 
-      // Create a black state, only including pan/tilt if fixture uses them
-      const blackState: RGBIO = {
-        red: 0,
-        green: 0,
-        blue: 0,
-        intensity: 0,
-        opacity: 0.0,
-        blendMode: 'replace',
-      }
+      // A per-light black, since the pan/tilt below is written onto it.
+      const blackState = transparentColor()
 
       // Check if this fixture has pan/tilt
       if (currentState && (currentState.pan !== undefined || currentState.tilt !== undefined)) {
@@ -407,8 +366,8 @@ export class LightTransitionController {
 
       // Periodic state validation and cleanup
       if (now - this.lastStateValidation > this.VALIDATION_INTERVAL) {
-        this.validateAllStates()
-        this.cleanupOrphanedTransitions()
+        validateAllStates(this._currentLayerStates, this._lightStateManager)
+        cleanupOrphanedTransitions(this._transitionsByLight, this._lightStateManager, now)
         this.lastStateValidation = now
       }
 
@@ -416,65 +375,15 @@ export class LightTransitionController {
       // All calculations use the SAME 'now' timestamp
       const allLayerStates = new Map<string, Map<number, RGBIO>>()
       const layersToRemove: Array<{ lightId: string; layer: number }> = []
-      const lightsToRemove: string[] = []
-      const transitionUpdates: Array<{ lightId: string; layer: number; startState: RGBIO }> = []
 
       this._transitionsByLight.forEach((layerTransitions, lightId) => {
         const layerStates = new Map<number, RGBIO>()
         const layersToRemoveForLight = new Set<number>()
 
         layerTransitions.forEach((transitionData, layer) => {
-          const { startState, endState, startTime, transition } = transitionData
-
-          // Calculate elapsed time using the shared 'now' timestamp
-          const elapsed = now - startTime
-          const duration = transition.transform.duration
-          const progress = duration > 0 ? Math.min(elapsed / duration, 1) : 1
-
-          // Get the easing function
-          const easing = transition.transform.easing
-          const easedProgress = this.getEasingValue(progress, easing)
-
-          // Interpolate the state
-          const newState: RGBIO = {
-            red: this.interpolate(startState.red, endState.red, easedProgress),
-            green: this.interpolate(startState.green, endState.green, easedProgress),
-            blue: this.interpolate(startState.blue, endState.blue, easedProgress),
-            intensity: this.interpolate(startState.intensity, endState.intensity, easedProgress),
-            opacity: this.interpolateFloat(
-              startState.opacity ?? 1.0,
-              endState.opacity ?? 1.0,
-              easedProgress,
-            ),
-            blendMode: endState.blendMode,
-          }
-
-          // Handle optional properties
-          if (startState.pan !== undefined || endState.pan !== undefined) {
-            const startPan = startState.pan ?? endState.pan ?? 0
-            const endPan = endState.pan ?? startState.pan ?? 0
-            newState.pan = this.interpolate(startPan, endPan, easedProgress)
-          }
-
-          if (startState.tilt !== undefined || endState.tilt !== undefined) {
-            const startTilt = startState.tilt ?? endState.tilt ?? 0
-            const endTilt = endState.tilt ?? startState.tilt ?? 0
-            newState.tilt = this.interpolate(startTilt, endTilt, easedProgress)
-          }
-
-          // Validate and correct the state
-          const correctedState = this.validateAndCorrectLightState(lightId, newState)
-          layerStates.set(layer, correctedState)
-
-          // If transition is complete, mark for removal. progress is Math.min(elapsed/duration, 1),
-          // so it hits exactly 1 the frame elapsed reaches the duration — complete there and let the
-          // fade run its full length to the exact end colour (the 0.999 epsilon predated the clamp).
-          if (progress >= 1) {
-            transitionUpdates.push({
-              lightId,
-              layer,
-              startState: { ...endState },
-            })
+          const { state, complete } = stepTransition(transitionData, now)
+          layerStates.set(layer, state)
+          if (complete) {
             layersToRemoveForLight.add(layer)
           }
         })
@@ -488,11 +397,6 @@ export class LightTransitionController {
         for (const layer of layersToRemoveForLight) {
           layersToRemove.push({ lightId, layer })
         }
-
-        // Check if this light should be completely removed
-        if (layersToRemoveForLight.size === layerTransitions.size) {
-          lightsToRemove.push(lightId)
-        }
       })
 
       // Phase 2: Update internal state structures
@@ -504,17 +408,6 @@ export class LightTransitionController {
         layerStates.forEach((state, layer) => {
           currentStates.set(layer, state)
         })
-      })
-
-      // Apply transition updates for completed transitions
-      transitionUpdates.forEach(({ lightId, layer, startState }) => {
-        const layerTransitions = this._transitionsByLight.get(lightId)
-        if (layerTransitions) {
-          const transitionData = layerTransitions.get(layer)
-          if (transitionData) {
-            transitionData.startState = startState
-          }
-        }
       })
 
       // Phase 3: Blend ALL layers for ALL lights that have ANY layer state
@@ -533,13 +426,13 @@ export class LightTransitionController {
           }
         }
       })
-
-      lightsToRemove.forEach((lightId) => {
-        this._transitionsByLight.delete(lightId)
-      })
     } catch (error) {
       log.error('Critical error in transition processing:', error)
-      this.emergencyStateReset()
+      emergencyStateReset(
+        this._lightStateManager,
+        this._transitionsByLight,
+        this._currentLayerStates,
+      )
     }
 
     // Phase 5: Publish all buffered light state updates atomically
@@ -547,187 +440,30 @@ export class LightTransitionController {
   }
 
   /**
-   * Blends all layers for a light and sets the final color
+   * Blends a light's layers lowest first and sets the merged colour on the light state manager. A
+   * light with no layers goes hard black.
+   *
    * @param lightId The ID of the light
-   * @param layerStates Map of layer numbers to their interpolated states
+   * @param layerStates The light's layer states, defaulting to the ones held for it.
    */
-  private blendAndSetFinalColor(lightId: string, layerStates: Map<number, RGBIO>): void {
-    const transparentColor = this.transparentColor()
-    const blackColor: RGBIO = {
-      red: 0,
-      green: 0,
-      blue: 0,
-      intensity: 0,
-      opacity: 1.0,
-      blendMode: 'replace',
-    }
-
-    // If no layers, force hard black output
-    if (layerStates.size === 0) {
-      this._lightStateManager.setLightState(lightId, blackColor)
+  private blendAndSetFinalColor(lightId: string, layerStates?: Map<number, RGBIO>): void {
+    const states = layerStates ?? this._currentLayerStates.get(lightId)
+    if (!states || states.size === 0) {
+      this._lightStateManager.setLightState(lightId, opaqueBlack())
       return
     }
 
-    let finalColor: RGBIO = transparentColor
+    let finalColor: RGBIO = transparentColor()
 
     // Convert Map to array, sort by layer number, then blend
-    const sortedLayers = Array.from(layerStates.entries()).sort(
-      ([layerA], [layerB]) => layerA - layerB,
-    )
+    const sortedLayers = Array.from(states.entries()).sort(([layerA], [layerB]) => layerA - layerB)
 
     for (const [_, layerColor] of sortedLayers) {
-      finalColor = this.blendWithOpacity(finalColor, layerColor)
+      finalColor = blendWithOpacity(finalColor, layerColor)
     }
 
-    // Update the light state manager (will be batched). Occlusion is applied here as well as in
-    // calculateFinalColorForLight: this is the per-frame path, so skipping it would let the very
-    // next tick republish the unoccluded blend.
+    // Update the light state manager (will be batched).
     this._lightStateManager.setLightState(lightId, this.applyOcclusion(finalColor))
-  }
-
-  /**
-   * Helper method to get the easing function value
-   */
-  private getEasingValue(progress: number, easingName: string): number {
-    // Use the centralized getEasingFunction helper
-    const easingFn = getEasingFunction(easingName)
-    return easingFn(progress)
-  }
-
-  /**
-   * Interpolate between start and end values based on progress
-   */
-  private interpolate(start: number, end: number, t: number): number {
-    // Using Math.max to ensure the result is never negative
-    return Math.max(0, Math.round(start + (end - start) * t))
-  }
-
-  /** Interpolate 0–1 float channels (e.g. opacity) without integer rounding */
-  private interpolateFloat(start: number, end: number, t: number): number {
-    const v = start + (end - start) * t
-    return Math.max(0, Math.min(1, v))
-  }
-
-  /**
-   * Blends colors using opacity and blend modes
-   */
-  private blendWithOpacity(current: RGBIO, newState: RGBIO): RGBIO {
-    const opacity = newState.opacity ?? 1.0
-    const blendMode = newState.blendMode ?? 'replace'
-
-    const out: RGBIO = {
-      red: 0,
-      green: 0,
-      blue: 0,
-      intensity: 0,
-      opacity: 1.0, // Final result should always be fully opaque
-      blendMode: blendMode,
-    }
-
-    // Apply blend mode per channel
-    switch (blendMode) {
-      case 'add':
-        if (opacity <= 0.0) {
-          // Transparent layer - show underlying color
-          out.red = current.red
-          out.green = current.green
-          out.blue = current.blue
-          out.intensity = current.intensity
-        } else if (opacity >= 1.0) {
-          // Fully opaque - add colors together
-          out.red = Math.min(255, current.red + newState.red)
-          out.green = Math.min(255, current.green + newState.green)
-          out.blue = Math.min(255, current.blue + newState.blue)
-          out.intensity = Math.min(255, current.intensity + newState.intensity)
-        } else {
-          // Partial opacity - add the scaled color to the underlying color
-          out.red = Math.min(255, current.red + Math.round(newState.red * opacity))
-          out.green = Math.min(255, current.green + Math.round(newState.green * opacity))
-          out.blue = Math.min(255, current.blue + Math.round(newState.blue * opacity))
-          out.intensity = Math.min(
-            255,
-            current.intensity + Math.round(newState.intensity * opacity),
-          )
-        }
-        break
-
-      case 'mix': {
-        // Alpha crossfade: interpolate between the underlying composited colour and this
-        // layer's colour by opacity. opacity 0 → underlying, 1 → this layer, between →
-        // a smooth blend of the two (a true colour crossfade, not a fade up from black).
-        const a = Math.max(0, Math.min(1, opacity))
-        out.red = Math.round(current.red * (1 - a) + newState.red * a)
-        out.green = Math.round(current.green * (1 - a) + newState.green * a)
-        out.blue = Math.round(current.blue * (1 - a) + newState.blue * a)
-        out.intensity = Math.round(current.intensity * (1 - a) + newState.intensity * a)
-        break
-      }
-
-      case 'replace':
-      default:
-        // Replace (and the fallback for any unrecognised mode): opacity controls the
-        // intensity of the replacement colour.
-        // 0.0 = transparent (show underlying); 1.0 = full replacement; 0.5 = half intensity.
-        if (opacity <= 0.0) {
-          out.red = current.red
-          out.green = current.green
-          out.blue = current.blue
-          out.intensity = current.intensity
-        } else {
-          out.red = Math.round(newState.red * opacity)
-          out.green = Math.round(newState.green * opacity)
-          out.blue = Math.round(newState.blue * opacity)
-          out.intensity = Math.round(newState.intensity * opacity)
-        }
-        break
-    }
-
-    // Handle optional properties: carry forward from the lower layer when the incoming layer omits them
-    out.pan = newState.pan !== undefined ? newState.pan : current.pan
-    out.tilt = newState.tilt !== undefined ? newState.tilt : current.tilt
-
-    return out
-  }
-
-  /**
-   * Returns a "transparent" color with all channels = 0.
-   */
-  private transparentColor(): RGBIO {
-    return {
-      red: 0,
-      green: 0,
-      blue: 0,
-      intensity: 0,
-      opacity: 0.0,
-      blendMode: 'replace',
-    }
-  }
-
-  /**
-   * Clears all transitions, final colors, etc.
-   */
-  public resetLightStates(): void {
-    // Force all lights to black state first
-    const allLightIds = this._lightStateManager.getTrackedLightIds()
-    const blackState: RGBIO = {
-      red: 0,
-      green: 0,
-      blue: 0,
-      intensity: 0,
-      opacity: 1.0,
-      blendMode: 'replace',
-    }
-
-    allLightIds.forEach((lightId) => {
-      this._lightStateManager.setLightState(lightId, blackState)
-    })
-
-    // Then clear all internal state
-    this._transitionsByLight.clear()
-    this._currentLayerStates.clear()
-
-    // Ensure the black state is published
-    //this._lightStateManager.publishLightStates();
   }
 
   /**
@@ -761,54 +497,6 @@ export class LightTransitionController {
   }
 
   /**
-   * Calculates the final color for a light by blending all active layers
-   * @param lightId The ID of the light to calculate for
-   * @returns The calculated final color
-   */
-  private calculateFinalColorForLight(lightId: string): RGBIO {
-    const transparentColor = this.transparentColor()
-    const blackColor: RGBIO = {
-      red: 0,
-      green: 0,
-      blue: 0,
-      intensity: 0,
-      opacity: 1.0,
-      blendMode: 'replace',
-    }
-
-    if (!this._currentLayerStates.has(lightId)) {
-      this._lightStateManager.setLightState(lightId, blackColor)
-      return blackColor
-    }
-
-    const layerStates = this._currentLayerStates.get(lightId)!
-
-    // If no layers remain for this light, force hard black output
-    if (layerStates.size === 0) {
-      this._lightStateManager.setLightState(lightId, blackColor)
-      return blackColor
-    }
-
-    let finalColor: RGBIO = transparentColor
-
-    // Convert Map to array, sort by layer number, then process
-    const sortedLayers = Array.from(layerStates.entries()).sort(
-      ([layerA], [layerB]) => layerA - layerB,
-    )
-
-    for (const [_, layerColor] of sortedLayers) {
-      finalColor = this.blendWithOpacity(finalColor, layerColor)
-    }
-
-    finalColor = this.applyOcclusion(finalColor)
-
-    // Update the light state manager
-    this._lightStateManager.setLightState(lightId, finalColor)
-
-    return finalColor
-  }
-
-  /**
    * Force a blended colour dark while an occlusion is held, keeping pan/tilt so moving heads hold
    * their aim behind it.
    *
@@ -835,7 +523,7 @@ export class LightTransitionController {
     }
     this._occlusionHeld = on
     for (const lightId of this._lightStateManager.getTrackedLightIds()) {
-      this.calculateFinalColorForLight(lightId)
+      this.blendAndSetFinalColor(lightId)
     }
     this._lightStateManager.publishLightStates()
   }
@@ -843,140 +531,5 @@ export class LightTransitionController {
   /** Whether the occlusion is currently held. */
   public isOcclusionHeld(): boolean {
     return this._occlusionHeld
-  }
-
-  /**
-   * Get the current system time for debugging timing issues
-   */
-  public getCurrentSystemTime(): number {
-    return performance.now()
-  }
-
-  /**
-   * Validates and corrects a light state to ensure all required properties exist and are valid
-   * @param _lightId The ID of the light (unused for now, but kept for future extensibility)
-   * @param state The state to validate and correct
-   * @returns The corrected state
-   */
-  private validateAndCorrectLightState(_lightId: string, state: RGBIO): RGBIO {
-    // Ensure all required properties exist and are valid
-    const corrected = { ...state }
-
-    // Clamp RGB values to valid range (0-255)
-    corrected.red = Math.max(0, Math.min(255, corrected.red ?? 0))
-    corrected.green = Math.max(0, Math.min(255, corrected.green ?? 0))
-    corrected.blue = Math.max(0, Math.min(255, corrected.blue ?? 0))
-    corrected.intensity = Math.max(0, Math.min(255, corrected.intensity ?? 0))
-    corrected.opacity = Math.max(0, Math.min(1, corrected.opacity ?? 1))
-
-    // Ensure blend mode is valid
-    if (!BLEND_MODE_OPTIONS.includes(corrected.blendMode as BlendMode)) {
-      corrected.blendMode = 'replace'
-    }
-
-    // Validate optional pan/tilt values (normalised 0–100 % of fixture range)
-    if (corrected.pan !== undefined) {
-      corrected.pan = Math.max(0, Math.min(100, corrected.pan))
-    }
-    if (corrected.tilt !== undefined) {
-      corrected.tilt = Math.max(0, Math.min(100, corrected.tilt))
-    }
-
-    return corrected
-  }
-
-  /**
-   * Validates all current light states and corrects any invalid values
-   */
-  private validateAllStates(): void {
-    for (const [lightId, layerMap] of this._currentLayerStates.entries()) {
-      for (const [layer, state] of layerMap.entries()) {
-        const corrected = this.validateAndCorrectLightState(lightId, state)
-        if (JSON.stringify(state) !== JSON.stringify(corrected)) {
-          const position = this.getLightPosition(lightId)
-          log.warn(
-            `Corrected invalid state for light ${lightId} (position ${position}), layer ${layer}`,
-          )
-          layerMap.set(layer, corrected)
-        }
-      }
-    }
-  }
-
-  /**
-   * Cleans up orphaned transitions that have been running too long
-   */
-  private cleanupOrphanedTransitions(): void {
-    const currentTime = performance.now()
-    // Absolute floor for the orphan cutoff; a longer transition gets a proportionally longer grace
-    // so a legitimate multi-second fade isn't reaped mid-fade.
-    const minTransitionAge = 5000
-
-    for (const [lightId, layerMap] of this._transitionsByLight.entries()) {
-      for (const [layer, transitionData] of layerMap.entries()) {
-        const duration = transitionData.transition.transform.duration
-        const maxTransitionAge = Math.max(minTransitionAge, duration * 1.5)
-        if (currentTime - transitionData.startTime > maxTransitionAge) {
-          const position = this.getLightPosition(lightId)
-          log.warn(
-            `Removing orphaned transition for light ${lightId} (position ${position}), layer ${layer}`,
-          )
-          layerMap.delete(layer)
-
-          // Clean up empty layer maps
-          if (layerMap.size === 0) {
-            this._transitionsByLight.delete(lightId)
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Gets the 1-based position of a light in the tracked lights array
-   * @param lightId The light identifier (e.g., "front-1", "back-2")
-   * @returns The 1-based position in the lights array or 0 if not found
-   */
-  private getLightPosition(lightId: string): number {
-    const trackedLightIds = this._lightStateManager.getTrackedLightIds()
-    const index = trackedLightIds.indexOf(lightId)
-    return index !== -1 ? index + 1 : 0
-  }
-
-  /**
-   * Emergency state reset for critical error recovery
-   */
-  private emergencyStateReset(): void {
-    log.error('LightTransitionController: Performing emergency state reset')
-
-    // Force all lights to black state first
-    const allLightIds = this._lightStateManager.getTrackedLightIds()
-    const blackState: RGBIO = {
-      red: 0,
-      green: 0,
-      blue: 0,
-      intensity: 0,
-      opacity: 1.0,
-      blendMode: 'replace',
-    }
-
-    allLightIds.forEach((lightId) => {
-      this._lightStateManager.setLightState(lightId, blackState)
-    })
-
-    // Clear all internal state
-    this._transitionsByLight.clear()
-    this._currentLayerStates.clear()
-
-    // Ensure the black state is published
-    // this._lightStateManager.publishLightStates();
-  }
-
-  /**
-   * Get the current time from the system
-   * Uses performance.now() for high precision timing
-   */
-  public getCurrentTime(): number {
-    return performance.now()
   }
 }

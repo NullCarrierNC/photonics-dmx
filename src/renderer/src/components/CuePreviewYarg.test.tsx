@@ -8,6 +8,7 @@ import { act, render, screen, cleanup } from '@testing-library/react'
 import { Provider, createStore } from 'jotai'
 import { lightingPrefsAtom, yargListenerEnabledAtom } from '../atoms'
 import type { CueData } from '../../../photonics-dmx/cues/types/cueTypes'
+import { DrumNoteType, InstrumentNoteType } from '../../../photonics-dmx/cues/types/cueTypes'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
 const listeners = new Map<string, (payload: unknown) => void>()
@@ -148,5 +149,89 @@ describe('CuePreviewYarg post-processing chip', () => {
     const value = screen.getByText('Sepia Tone')
     expect(value.parentElement?.className).not.toContain('rounded')
     expect(value.parentElement?.className).not.toContain('bg-emerald-200')
+  })
+})
+
+/** The pips under one instrument heading, in render order. */
+function pipsUnder(instrument: string): HTMLElement[] {
+  const heading = screen.getByText(instrument)
+  const container = heading.parentElement
+  if (!container) throw new Error(`no container for ${instrument}`)
+  return Array.from(container.querySelectorAll<HTMLElement>('div.w-6'))
+}
+
+/** A pip is lit when it carries the white note text rather than the dimmed background. */
+const litUnder = (instrument: string): string[] =>
+  pipsUnder(instrument)
+    .filter((pip) => pip.className.includes('text-white'))
+    .map((pip) => pip.textContent ?? '')
+
+describe('CuePreviewYarg instrument notes', () => {
+  it.each([
+    ['Guitar', 'guitarNotes'],
+    ['Bass', 'bassNotes'],
+    ['Keys', 'keysNotes'],
+  ] as const)('lights the %s frets the cue reports', async (instrument, field) => {
+    await renderWithCueData(
+      cueData({ [field]: [InstrumentNoteType.Red, InstrumentNoteType.Blue] } as Partial<CueData>),
+    )
+
+    expect(litUnder(instrument)).toEqual(['R', 'B'])
+  })
+
+  it('offers all five frets whether lit or not', async () => {
+    await renderWithCueData(cueData({ guitarNotes: [InstrumentNoteType.Green] }))
+
+    expect(pipsUnder('Guitar').map((pip) => pip.textContent)).toEqual(['G', 'R', 'Y', 'B', 'O'])
+  })
+
+  it('lights nothing when no notes are reported', async () => {
+    await renderWithCueData(cueData())
+
+    expect(litUnder('Guitar')).toEqual([])
+    expect(litUnder('Bass')).toEqual([])
+    expect(litUnder('Keys')).toEqual([])
+  })
+
+  it('keeps one instrument dark while another plays', async () => {
+    await renderWithCueData(cueData({ guitarNotes: [InstrumentNoteType.Green] }))
+
+    expect(litUnder('Guitar')).toEqual(['G'])
+    expect(litUnder('Bass')).toEqual([])
+  })
+})
+
+describe('CuePreviewYarg drum notes', () => {
+  it('shows the pads and the cymbals with the kick', async () => {
+    await renderWithCueData(cueData())
+
+    expect(pipsUnder('Drums').map((pip) => pip.textContent)).toEqual([
+      'G',
+      'R',
+      'Y',
+      'B',
+      'GC',
+      'YC',
+      'BC',
+      'KD',
+    ])
+  })
+
+  it('lights a pad without lighting its cymbal', async () => {
+    await renderWithCueData(cueData({ drumNotes: [DrumNoteType.YellowDrum] }))
+
+    expect(litUnder('Drums')).toEqual(['Y'])
+  })
+
+  it('lights a cymbal without lighting its pad', async () => {
+    await renderWithCueData(cueData({ drumNotes: [DrumNoteType.YellowCymbal] }))
+
+    expect(litUnder('Drums')).toEqual(['YC'])
+  })
+
+  it('lights the kick', async () => {
+    await renderWithCueData(cueData({ drumNotes: [DrumNoteType.Kick] }))
+
+    expect(litUnder('Drums')).toEqual(['KD'])
   })
 })

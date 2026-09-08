@@ -65,9 +65,11 @@ describe('Runtime Event System', () => {
       }),
       addEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
         setTimeout(() => callback(), 0)
+        return true
       }),
       setEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
         setTimeout(() => callback(), 0)
+        return true
       }),
       removeEffect: jest.fn(),
       removeAllEffects: jest.fn(),
@@ -979,10 +981,14 @@ describe('Runtime Event System', () => {
           (_name: string, _effect: unknown, _callback: () => void) => {},
         ),
         addEffectUnblockedNameWithCallback: jest.fn(
-          (_name: string, _effect: unknown, _callback: () => void) => {},
+          (_name: string, _effect: unknown, _callback: () => void) => {
+            return true
+          },
         ),
         setEffectUnblockedNameWithCallback: jest.fn(
-          (_name: string, _effect: unknown, _callback: () => void) => {},
+          (_name: string, _effect: unknown, _callback: () => void) => {
+            return true
+          },
         ),
       } as any
 

@@ -1,9 +1,8 @@
 import { useAtom } from 'jotai'
 import { senderSacnEnabledAtom, sacnConfigAtom, lightingPrefsAtom } from '../atoms'
 import { enableSender, disableSender } from '../ipcApi'
+import { applySenderRunState } from '../ipc/senderSwitch'
 import { RoutedRigsHint } from './RoutedRigsHint'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('SacnToggle')
 
 interface SacnToggleProps {
   disabled?: boolean
@@ -18,23 +17,19 @@ const SacnToggle = ({ disabled = false, compact = false }: SacnToggleProps) => {
 
   const handleToggle = () => {
     const newState = !isSacnEnabled
-    setIsSacnEnabled(newState)
-
-    if (newState) {
-      const networkInterface = sacnConfig.networkInterface
-      enableSender({
-        sender: 'sacn',
-        universe: sacnConfig.universe,
-        networkInterface: networkInterface === '' ? undefined : networkInterface,
-        unicastDestination: sacnConfig.unicastDestination || '',
-        useUnicast: sacnConfig.useUnicast || false,
-        refreshRateHz: sacnConfig.refreshRateHz,
-      })
-      log.info('sACN enabled with config:', sacnConfig)
-    } else {
-      disableSender({ sender: 'sacn' })
-      log.info('sACN disabled')
-    }
+    void applySenderRunState('sacn', newState, setIsSacnEnabled, () =>
+      newState
+        ? enableSender({
+            sender: 'sacn',
+            universe: sacnConfig.universe,
+            networkInterface:
+              sacnConfig.networkInterface === '' ? undefined : sacnConfig.networkInterface,
+            unicastDestination: sacnConfig.unicastDestination || '',
+            useUnicast: sacnConfig.useUnicast || false,
+            refreshRateHz: sacnConfig.refreshRateHz,
+          })
+        : disableSender({ sender: 'sacn' }),
+    )
   }
 
   // Only show the toggle if sACN is enabled in preferences

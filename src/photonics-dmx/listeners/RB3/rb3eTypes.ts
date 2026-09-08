@@ -51,7 +51,6 @@ export const RB3_SONG_SELECT_SCREEN = 'song_select_screen'
 export interface StageKitData {
   positions: number[] // LED positions derived from leftChannel: [0..7]
   color: string // colour bank: 'red' | 'green' | 'blue' | 'yellow' | 'off'
-  brightness: 'low' | 'medium' | 'high'
   fog: boolean
   strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off'
   leftChannel: number // raw 8-bit LED position mask

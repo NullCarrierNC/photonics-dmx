@@ -118,6 +118,19 @@ export function inferType(value: number | string | boolean): VariableType {
 }
 
 /**
+ * Infer variable type from a value source, for an effect parameter the effect does not declare.
+ * Falling back to a numeric type instead would turn "delay" or "yellow" into 0.
+ */
+export function inferSourceType(source: ValueSource | undefined): VariableType {
+  if (!source || source.source !== 'literal') return 'string'
+  const value = source.value
+  if (typeof value === 'number') return 'number'
+  if (typeof value === 'boolean') return 'boolean'
+  if (Array.isArray(value)) return 'light-array'
+  return 'string'
+}
+
+/**
  * Resolve location groups from ValueSource (comma-separated string to array).
  */
 export function resolveLocationGroups(

@@ -2,21 +2,21 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   DmxLight,
   FixtureConfig,
-  FixtureTypes,
   LightingConfiguration,
   normalizeFixtureConfig,
   RgbMovingHeadDmxChannels,
 } from '../../../photonics-dmx/types'
 import {
-  mirrorDmxForMovingHeadInvert,
-  percentToDmx,
-} from '../../../photonics-dmx/helpers/dmxHelpers'
-import {
   motorDegFromPanDmx,
   motorDegFromTiltDmx,
   rawDmxToLogicalHomePercent,
 } from '../../../photonics-dmx/helpers/movingHeadCalibration'
-import { getDmxPreviewLightColorCss } from './dmxPreviewLightColor'
+import { buildInitialConsoleBuffer } from './movingHeadCalibrationBuffer'
+import { DmxSlider } from './MovingHeadCalibrationWizard/DmxSlider'
+import {
+  STAGE_LABELS_READY_STEP,
+  WizardBeamPreview,
+} from './MovingHeadCalibrationWizard/WizardBeamPreview'
 import {
   enableConsole,
   disableConsole,
@@ -25,7 +25,6 @@ import {
   enableSender,
 } from '../ipcApi'
 import type { IpcSenderConfig } from '../../../photonics-dmx/types'
-import { panTiltDmxToSphericalXY, panTiltDmxToWizardMotorSpaceXY } from './LightsDmxPreview'
 import SacnToggle from './SacnToggle'
 import ArtNetToggle from './ArtNetToggle'
 import EnttecProToggle from './EnttecProToggle'
@@ -48,155 +47,6 @@ const REVIEW_STEP = STEP_TITLES.length - 1
 
 /** Steps where the user must press a capture button before Next is enabled. */
 const STEPS_REQUIRING_SET_CAPTURE = new Set([4, 5, 6])
-
-function channelsRecord(light: DmxLight): Record<string, number> {
-  return light.channels as unknown as Record<string, number>
-}
-
-function buildInitialConsoleBuffer(light: DmxLight): Record<number, number> {
-  const cfg = normalizeFixtureConfig(light.config)
-  const ch = channelsRecord(light)
-  const buf: Record<number, number> = {}
-  for (const [name, addr] of Object.entries(ch)) {
-    if (typeof addr !== 'number' || addr < 1 || addr > 512) continue
-    switch (name) {
-      case 'masterDimmer':
-        buf[addr] = 255
-        break
-      case 'pan': {
-        const logicalDmx = percentToDmx(cfg.panHome, cfg.panMin, cfg.panMax)
-        buf[addr] = cfg.invertPan
-          ? mirrorDmxForMovingHeadInvert(logicalDmx, cfg.panMin, cfg.panMax)
-          : logicalDmx
-        break
-      }
-      case 'tilt': {
-        const logicalDmx = percentToDmx(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
-        buf[addr] = cfg.invertTilt
-          ? mirrorDmxForMovingHeadInvert(logicalDmx, cfg.tiltMin, cfg.tiltMax)
-          : logicalDmx
-        break
-      }
-      case 'red':
-      case 'green':
-      case 'blue':
-      case 'white':
-        buf[addr] = 255
-        break
-      default:
-        buf[addr] = 0
-    }
-  }
-  // Added channels also run in console manual mode: hold fixed/mode channels at their value so a
-  // moving head that needs a pinned mode channel lights up, and park colour extras dark.
-  for (const extra of light.extraChannels ?? []) {
-    if (typeof extra.channel !== 'number' || extra.channel < 1 || extra.channel > 512) continue
-    buf[extra.channel] = extra.type === 'fixed' ? Math.max(0, Math.min(255, extra.value ?? 0)) : 0
-  }
-  return buf
-}
-
-function DmxSlider(props: {
-  label: string
-  value: number
-  onChange: (v: number) => void
-  disabled?: boolean
-}) {
-  const { label, value, onChange, disabled } = props
-  const v = Math.max(0, Math.min(255, Math.round(value)))
-  return (
-    <div className="flex flex-col gap-1 w-full">
-      <div className="flex justify-between text-sm text-gray-700 dark:text-gray-300">
-        <span>{label}</span>
-        <span className="font-mono">{v}</span>
-      </div>
-      <input
-        type="range"
-        min={0}
-        max={255}
-        value={v}
-        disabled={disabled}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full disabled:opacity-50"
-      />
-    </div>
-  )
-}
-
-/** First step index where pan/tilt stage references are captured; Home uses stage-relative preview. */
-const STAGE_LABELS_READY_STEP = 6
-
-function WizardBeamPreview({
-  light,
-  buffer,
-  config,
-  step,
-}: {
-  light: DmxLight
-  buffer: Record<number, number>
-  config: FixtureConfig
-  step: number
-}) {
-  const ch = light.channels as RgbMovingHeadDmxChannels
-  const pan = buffer[ch.pan] ?? 0
-  const tilt = buffer[ch.tilt] ?? 0
-
-  const stageLabelsReady = step >= STAGE_LABELS_READY_STEP
-  const rawConsoleConfig: FixtureConfig = { ...config, invertPan: false, invertTilt: false }
-  const { xPct, yPct } =
-    step < STAGE_LABELS_READY_STEP
-      ? panTiltDmxToWizardMotorSpaceXY(pan, tilt, rawConsoleConfig)
-      : panTiltDmxToSphericalXY(pan, tilt, config)
-
-  // Shared with the DMX previews, so added colour channels (white, amber, UV) tint the wizard
-  // swatch the same way they tint the stage preview.
-  const bg =
-    light.fixture === FixtureTypes.RGBMH
-      ? getDmxPreviewLightColorCss(light, buffer)
-      : 'rgb(40,40,40)'
-
-  const baseCircleClasses =
-    'w-14 h-14 rounded-full flex items-center justify-center text-sm font-semibold shadow-md relative overflow-hidden'
-
-  const labelClass = 'text-[9px] font-medium text-gray-600 dark:text-gray-400 select-none'
-
-  return (
-    <div className="flex flex-col items-center gap-1 shrink-0">
-      <span className="text-xs text-gray-600 dark:text-gray-400">
-        {stageLabelsReady ? 'Beam direction' : 'Motor position'}
-      </span>
-      <div className="relative flex items-center justify-center w-[5.5rem] h-[5.5rem]">
-        {stageLabelsReady ? (
-          <>
-            <span className={`absolute -top-0.5 left-1/2 -translate-x-1/2 ${labelClass}`}>US</span>
-            <span className={`absolute bottom-0 left-1/2 -translate-x-1/2 ${labelClass}`}>DS</span>
-            <span className={`absolute left-0 top-1/2 -translate-y-1/2 ${labelClass}`}>SR</span>
-            <span className={`absolute right-0 top-1/2 -translate-y-1/2 ${labelClass}`}>SL</span>
-          </>
-        ) : (
-          <span
-            className={`absolute -bottom-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap ${labelClass}`}>
-            approx. until calibrated
-          </span>
-        )}
-        <div className={baseCircleClasses} style={{ backgroundColor: bg }}>
-          <div
-            className="absolute rounded-full bg-red-500 z-10"
-            style={{
-              width: 6,
-              height: 6,
-              left: `${xPct}%`,
-              top: `${yPct}%`,
-              transform: 'translate(-50%, -50%)',
-              border: '3px solid black',
-              boxSizing: 'content-box',
-            }}
-          />
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export interface MovingHeadCalibrationWizardProps {
   light: DmxLight

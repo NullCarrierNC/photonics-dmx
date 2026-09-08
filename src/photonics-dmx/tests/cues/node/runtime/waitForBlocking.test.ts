@@ -85,8 +85,8 @@ const makeMockSequencer = (): jest.Mocked<ILightingController> =>
     setEffectWithCallback: jest.fn(),
     addEffectUnblockedName: jest.fn().mockReturnValue(true),
     setEffectUnblockedName: jest.fn().mockReturnValue(true),
-    addEffectUnblockedNameWithCallback: jest.fn(),
-    setEffectUnblockedNameWithCallback: jest.fn(),
+    addEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
+    setEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
     removeEffectCallback: jest.fn(),
     removeEffect: jest.fn(),
     cancelPanTiltClear: jest.fn(),
@@ -110,6 +110,7 @@ function captureBlockingCallbacks(sequencer: jest.Mocked<ILightingController>): 
   ;(sequencer.addEffectUnblockedNameWithCallback as jest.Mock).mockImplementation(
     (_name, _effect, cb) => {
       if (cb) callbacks.push(cb as () => void)
+      return true
     },
   )
   return callbacks

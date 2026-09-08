@@ -18,10 +18,7 @@ import {
   extractAll,
   extractBandFeatures,
 } from '../../../photonics-dmx/listeners/Audio/SpectralFeatureExtractor'
-import {
-  MultibandOnsetDetector,
-  type BandOnsetConfig,
-} from '../../../photonics-dmx/listeners/Audio/MultibandOnsetDetector'
+import { MultibandOnsetDetector } from '../../../photonics-dmx/listeners/Audio/MultibandOnsetDetector'
 import { MelBandAnalyser } from '../../../photonics-dmx/listeners/Audio/MelBandAnalyser'
 import { computeChromagram } from '../../../photonics-dmx/listeners/Audio/ChromaAnalyser'
 import { KeyDetector } from '../../../photonics-dmx/listeners/Audio/KeyDetector'
@@ -29,6 +26,8 @@ import { getBandEnergy } from '../../../photonics-dmx/listeners/Audio/bandEnergy
 import { getDefaultStore } from 'jotai'
 import { audioDataAtom } from '../atoms'
 import { sendAudioData } from '../ipcApi'
+import { buildBinToBandMap } from './audioBandMapping'
+import { previewFrameChanged } from './audioPreviewFrame'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('AudioCaptureManager')
 
@@ -260,57 +259,21 @@ export class AudioCaptureManager {
     }
   }
 
-  /**
-   * Rebuild bin-to-band mapping cache
-   * Called when bands config changes or when audio context is initialized
-   */
+  /** Rebuilds the bin-to-band cache from the live context, clearing it when there is none. */
   private rebuildBinToBandMap(): void {
     if (!this.audioContext || !this.analyser) {
       this.binToBandMap = null
       return
     }
-
-    const sampleRate = this.audioContext.sampleRate
-    const fftSize = this.analyser.fftSize
-    const binSize = sampleRate / fftSize
-    const binCount = this.analyser.frequencyBinCount
-
-    // Create mapping array
-    this.binToBandMap = new Int8Array(binCount)
-    this.binToBandMap.fill(-1) // -1 means no band matches
-
-    // Extract band gains for quick lookup
-    this.bandGains = this.config.bands.map((band) => band.gain)
-
-    // For each bin, find which band it belongs to
-    for (let binIndex = 0; binIndex < binCount; binIndex++) {
-      // Calculate centre frequency of this bin
-      const centreFreq = binIndex * binSize
-
-      // Find matching band (minHz <= centreFreq < maxHz)
-      for (let bandIndex = 0; bandIndex < this.config.bands.length; bandIndex++) {
-        const band = this.config.bands[bandIndex]
-        if (centreFreq >= band.minHz && centreFreq < band.maxHz) {
-          this.binToBandMap[binIndex] = bandIndex
-          break
-        }
-      }
-      // If no band matches (e.g., sub-20 Hz), binToBandMap[binIndex] remains -1
-    }
-
-    const onsetConfigs: BandOnsetConfig[] = this.config.bands.map((band) => ({
-      id: band.id,
-      startBin: Math.floor(band.minHz / binSize),
-      endBin: Math.min(Math.ceil(band.maxHz / binSize), binCount),
-    }))
-    this.multibandOnset.reconfigure(onsetConfigs)
-
-    log.info('Rebuilt bin-to-band mapping', {
-      binCount,
-      sampleRate,
-      fftSize,
-      binSize: binSize.toFixed(2),
-    })
+    const mapping = buildBinToBandMap(
+      this.audioContext.sampleRate,
+      this.analyser.fftSize,
+      this.analyser.frequencyBinCount,
+      this.config.bands,
+    )
+    this.binToBandMap = mapping.binToBandMap
+    this.bandGains = mapping.bandGains
+    this.multibandOnset.reconfigure(mapping.onsetConfigs)
   }
 
   /**
@@ -391,7 +354,10 @@ export class AudioCaptureManager {
         this.uiUpdateCounter = 0
       }
 
-      const pushToPreviewAtom = beatChanged || (shouldUpdateUI && this.shouldUpdateAtom(audioData))
+      const pushToPreviewAtom =
+        beatChanged ||
+        (shouldUpdateUI &&
+          previewFrameChanged(this.lastAudioData, audioData, this.VALUE_CHANGE_THRESHOLD))
 
       if (pushToPreviewAtom) {
         store.set(audioDataAtom, audioData)
@@ -412,54 +378,6 @@ export class AudioCaptureManager {
 
     // Continue loop
     this.animationFrameId = requestAnimationFrame(() => this.analyzeAudio())
-  }
-
-  /**
-   * Check if atom should be updated based on value changes
-   * Only updates if values changed significantly or beat detection changed
-   */
-  private shouldUpdateAtom(newData: AudioLightingData): boolean {
-    if (!this.lastAudioData) {
-      return true // First update
-    }
-
-    // Always update if beat detection changed
-    if (newData.beatDetected !== this.lastAudioData.beatDetected) {
-      return true
-    }
-
-    // Always update if BPM or BPM confidence changed
-    if (newData.bpm !== this.lastAudioData.bpm) return true
-    if ((newData.bpmConfidence ?? 0) !== (this.lastAudioData.bpmConfidence ?? 0)) return true
-
-    // Check overall energy change
-    const energyDiff = Math.abs(newData.energy - this.lastAudioData.energy)
-    if (energyDiff > this.VALUE_CHANGE_THRESHOLD) return true
-
-    // Check if rawFrequencyData changed (for EQ preview bars)
-    // Sample a few bins to detect changes without full array comparison
-    const newRaw = newData.rawFrequencyData
-    const oldRaw = this.lastAudioData.rawFrequencyData
-    if (newRaw && oldRaw && newRaw.length === oldRaw.length) {
-      // Sample bins at low, mid, and high frequencies to detect changes
-      const sampleIndices = [
-        0, // First bin (lowest frequency)
-        Math.floor(newRaw.length / 2), // Middle bin
-        newRaw.length - 1, // Last bin (highest frequency)
-      ]
-      for (const idx of sampleIndices) {
-        const diff = Math.abs(newRaw[idx] - oldRaw[idx])
-        if (diff > 2) {
-          // Changed by more than 2 units (out of 255) - significant enough to update
-          return true
-        }
-      }
-    } else if (newRaw !== oldRaw) {
-      // Array reference changed or length mismatch - update
-      return true
-    }
-
-    return false
   }
 
   /**

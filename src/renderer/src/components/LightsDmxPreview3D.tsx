@@ -7,7 +7,6 @@ import * as THREE from 'three'
 import {
   LightingConfiguration,
   DmxFixture,
-  FixtureTypes,
   RgbMovingHeadDmxChannels,
   ConfigStrobeType,
 } from '../../../photonics-dmx/types'
@@ -17,25 +16,19 @@ import {
   staticWashBeamDirection,
   type StageVector3,
 } from './lightsDmxPreview3DMath'
+import {
+  beamPropsEqual,
+  bodyPropsEqual,
+  fixtureMount,
+  isMovingHead,
+  masterDimmer01,
+  type FixtureBeamProps,
+  type FixtureBodyProps,
+} from './lightsDmxPreview3DProps'
 
 export interface LightsDmxPreview3DProps {
   lightingConfig: LightingConfiguration
   dmxValues: Record<number, number>
-}
-
-const MH_TYPES = new Set([FixtureTypes.RGBMH])
-
-function isMovingHead(light: DmxFixture): boolean {
-  return MH_TYPES.has(light.fixture)
-}
-
-function masterDimmer01(light: DmxFixture, dmxValues: Record<number, number>): number {
-  const d = dmxValues[light.channels.masterDimmer] ?? 0
-  return Math.max(0, Math.min(1, d / 255))
-}
-
-function fixtureMount(light: DmxFixture): 'floor' | 'ceiling' {
-  return light.mount === 'ceiling' ? 'ceiling' : 'floor'
 }
 
 function rgbToThreeColor(rgb: { r: number; g: number; b: number }): THREE.Color {
@@ -164,34 +157,6 @@ const LensFlareBillboard: React.FC<{
     </mesh>
   </Billboard>
 )
-
-type FixtureBeamProps = {
-  position: [number, number, number]
-  direction: StageVector3
-  rgb: { r: number; g: number; b: number }
-  dimmer01: number
-  isMovingHead: boolean
-  flareTexture: THREE.Texture
-}
-
-/**
- * Value-equality for the beam props. The parent recomputes rgb/direction/position arrays every
- * DMX frame, so reference comparison never matches; comparing by value lets a fixture whose
- * channels did not change skip re-rendering (and re-allocating its THREE objects) that frame.
- */
-const beamPropsEqual = (a: FixtureBeamProps, b: FixtureBeamProps): boolean =>
-  a.isMovingHead === b.isMovingHead &&
-  a.flareTexture === b.flareTexture &&
-  a.dimmer01 === b.dimmer01 &&
-  a.position[0] === b.position[0] &&
-  a.position[1] === b.position[1] &&
-  a.position[2] === b.position[2] &&
-  a.direction.x === b.direction.x &&
-  a.direction.y === b.direction.y &&
-  a.direction.z === b.direction.z &&
-  a.rgb.r === b.rgb.r &&
-  a.rgb.g === b.rgb.g &&
-  a.rgb.b === b.rgb.b
 
 const FixtureBeam = React.memo(function FixtureBeam({
   position,
@@ -522,25 +487,6 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
     </>
   )
 }
-
-type FixtureBodyProps = {
-  position: [number, number, number]
-  rgb: { r: number; g: number; b: number }
-  movingHead: boolean
-  /** Upside-down for truss / bottom-of-bar so the body reads as hanging. */
-  fixtureOrientation?: 'up' | 'down'
-}
-
-/** Value-equality for the fixture body; see {@link beamPropsEqual} for why reference compare is insufficient. */
-const bodyPropsEqual = (a: FixtureBodyProps, b: FixtureBodyProps): boolean =>
-  a.movingHead === b.movingHead &&
-  (a.fixtureOrientation ?? 'up') === (b.fixtureOrientation ?? 'up') &&
-  a.position[0] === b.position[0] &&
-  a.position[1] === b.position[1] &&
-  a.position[2] === b.position[2] &&
-  a.rgb.r === b.rgb.r &&
-  a.rgb.g === b.rgb.g &&
-  a.rgb.b === b.rgb.b
 
 const FixtureBody = React.memo(function FixtureBody({
   position,

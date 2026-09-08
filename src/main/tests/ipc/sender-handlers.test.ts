@@ -81,6 +81,32 @@ describe('setupSenderHandlers', () => {
     expect(enableSender).not.toHaveBeenCalled()
   })
 
+  it('SENDER_ENABLE names the sender when a rejected payload still identifies one', async () => {
+    setupSenderHandlers(mockIpcMain as any, mockControllerManager as any)
+    validateEnable.mockReturnValue({ ok: false, error: 'Invalid universe' })
+
+    const h = getHandler(LIGHT.SENDER_ENABLE)
+    await h(null, { sender: 'sacn', universe: -1 })
+
+    expect(sendToAllWindows).toHaveBeenCalledWith(RENDERER_RECEIVE.SENDER_START_FAILED, {
+      sender: 'sacn',
+      error: 'Invalid universe',
+    })
+  })
+
+  it('SENDER_ENABLE names no sender when the rejected payload identifies none', async () => {
+    setupSenderHandlers(mockIpcMain as any, mockControllerManager as any)
+    validateEnable.mockReturnValue({ ok: false, error: 'Sender name is required' })
+
+    const h = getHandler(LIGHT.SENDER_ENABLE)
+    await h(null, { sender: 'not-a-sender' })
+
+    expect(sendToAllWindows).not.toHaveBeenCalledWith(
+      RENDERER_RECEIVE.SENDER_START_FAILED,
+      expect.anything(),
+    )
+  })
+
   it('SENDER_ENABLE returns success when sender already enabled (idempotent)', async () => {
     setupSenderHandlers(mockIpcMain as any, mockControllerManager as any)
     validateEnable.mockReturnValue({ ok: true, value: { sender: 'sacn' } } as any)

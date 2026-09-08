@@ -16,7 +16,6 @@ import { Sequencer } from '../../controllers/sequencer/Sequencer'
 import { Clock } from '../../controllers/sequencer/Clock'
 import { createMockRGBIP } from '../helpers/testFixtures'
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals'
-import { DmxFixture, FixtureTypes } from '../../types'
 
 jest.mock('../../controllers/sequencer/LightTransitionController')
 jest.mock('../../controllers/sequencer/LayerManager')
@@ -37,28 +36,9 @@ describe('SystemEffectsController', () => {
       removeTransitionsByLayer: jest.fn(),
       getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
       getFinalLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-      getLightStateManagerTrackedLights: jest.fn().mockReturnValue([
-        {
-          id: 'moving-head-1',
-          position: 1,
-          fixture: {
-            id: 'moving-head-1',
-            name: 'Moving Head 1',
-            fixture: FixtureTypes.RGBMH,
-            channels: { red: 1, green: 2, blue: 3, pan: 4, tilt: 5 },
-          } as DmxFixture,
-        },
-        {
-          id: 'rgb-fixture-1',
-          position: 2,
-          fixture: {
-            id: 'rgb-fixture-1',
-            name: 'RGB Fixture 1',
-            fixture: FixtureTypes.RGB,
-            channels: { red: 1, green: 2, blue: 3 },
-          } as DmxFixture,
-        },
-      ]),
+      getLightStateManagerTrackedLights: jest
+        .fn()
+        .mockReturnValue(['moving-head-1', 'rgb-fixture-1']),
       getAllLightIds: jest.fn().mockReturnValue(['moving-head-1', 'rgb-fixture-1']),
       immediateBlackout: jest.fn(),
     } as unknown as jest.Mocked<LightTransitionController>
@@ -200,6 +180,28 @@ describe('SystemEffectsController', () => {
     it('should return the correct blackout layer threshold', () => {
       // Verify getBlackoutLayersUnder returns the expected value
       expect(systemEffectsController.getBlackoutLayersUnder()).toBe(255)
+    })
+  })
+
+  describe('a rig with no lights', () => {
+    beforeEach(() => {
+      ;(lightTransitionController.getLightStateManagerTrackedLights as jest.Mock).mockReturnValue(
+        [],
+      )
+    })
+
+    it('still wipes the effects and reports the blackout done', async () => {
+      const onComplete = jest.fn()
+      systemEffectsController.setOnBlackoutCompleteCallback(onComplete)
+
+      const done = systemEffectsController.blackout(100)
+      await jest.advanceTimersByTimeAsync(500)
+      await done
+
+      expect(layerManager.removeActiveEffect).toHaveBeenCalled()
+      expect(layerManager.removeQueuedEffect).toHaveBeenCalled()
+      expect(onComplete).toHaveBeenCalledTimes(1)
+      expect(systemEffectsController.isBlackoutActive()).toBe(false)
     })
   })
 

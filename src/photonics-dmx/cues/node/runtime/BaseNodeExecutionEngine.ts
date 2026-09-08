@@ -1132,15 +1132,18 @@ export abstract class BaseNodeExecutionEngine {
       }
     } else {
       this.submittedEffects.set(effectName, resolvedLayer)
+      let applied = true
       if (useSetEffect) {
-        this.sequencer.setEffectUnblockedName(effectName, effect)
+        applied = this.sequencer.setEffectUnblockedName(effectName, effect)
       } else {
         // set-position is a state-target effect: each new resolved position
         // must take effect immediately. Queueing behind a stale in-flight
         // transition would desynchronise per-light motion across beats.
         this.sequencer.replaceEffect(effectName, effect)
       }
-      this.setPositionSubmissionFingerprint.set(effectName, positionFp)
+      if (applied) {
+        this.setPositionSubmissionFingerprint.set(effectName, positionFp)
+      }
       this.emitNodeExecution('deactivated', actionNode.id)
       this.continueToNextNodes(actionNode.id, context)
     }

@@ -13,7 +13,7 @@ export interface EffectSchedulerDeps {
   lightTransitionController: LightTransitionController
   persistentRuns: PersistentRunRegistry
   /** Fire the completion callback held for this effect, once its last light finishes. */
-  fireCompletionCallback(name: string): void
+  fireCompletionCallback(name: string, cancelled?: boolean): void
 }
 
 /**
@@ -322,10 +322,14 @@ export class EffectScheduler {
     // Convert to array to avoid modifying the map while iterating
     const lightIds = Array.from(activeEffects.keys())
     const lightsToCleanup: string[] = []
+    const evicted = new Set<string>()
 
     // Process each light's effect on this layer
     for (const lightId of lightIds) {
       const effectState = activeEffects.get(lightId)
+      if (effectState) {
+        evicted.add(effectState.name)
+      }
       if (effectState?.effectRunId) {
         this.persistentRuns.cancel(effectState.effectRunId)
       }
@@ -353,6 +357,14 @@ export class EffectScheduler {
     if (lightsToCleanup.length > 0) {
       for (const lightId of lightsToCleanup) {
         this.lightTransitionController.removeLightLayer(lightId, layer)
+      }
+    }
+
+    // An evicted effect never reaches onLightEffectComplete, so tell its waiter the run ended here.
+    // A queued run of the same name taking the slot means the effect is still going, so skip those.
+    for (const name of evicted) {
+      if (!this.isEffectRunningAnywhere(name)) {
+        this.deps.fireCompletionCallback(name, true)
       }
     }
   }

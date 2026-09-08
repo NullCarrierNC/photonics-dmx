@@ -127,6 +127,7 @@ describe('Node cue chaining', () => {
       ) => {
         callOrder.push(name)
         callback(false)
+        return true
       },
       setEffectUnblockedNameWithCallback: (
         name: string,
@@ -135,6 +136,7 @@ describe('Node cue chaining', () => {
       ) => {
         callOrder.push(name)
         callback(false)
+        return true
       },
       removeEffectCallback: () => {},
       removeEffectByLayer: () => {},

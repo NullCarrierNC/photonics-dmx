@@ -85,17 +85,13 @@ export class SenderLifecycleController {
   }
 
   /** Enabled-state of each output sender, for status displays and diagnostics. */
-  public getOutputSenderStatus(): {
-    sacn: boolean
-    artnet: boolean
-    enttecpro: boolean
-    ipc: boolean
-  } {
+  public getOutputSenderStatus(): OutputSenderStateSnapshot {
     const sm = this.getSenderManager()
     return {
       sacn: sm.isSenderEnabled('sacn'),
       artnet: sm.isSenderEnabled('artnet'),
       enttecpro: sm.isSenderEnabled('enttecpro'),
+      opendmx: sm.isSenderEnabled('opendmx'),
       ipc: sm.isSenderEnabled('ipc'),
     }
   }

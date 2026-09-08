@@ -1,7 +1,7 @@
 /**
  * The logic node dispatch table: one handler per `LogicNode['logicType']`.
  *
- * Mirrors the editor's `LOGIC_NODE_FACTORIES` (renderer useNodeCreation), so authoring a node type
+ * Mirrors the editor's `LOGIC_NODE_FACTORIES` (renderer logicNodeFactories), so authoring a node type
  * and executing it are described the same way. Because {@link LogicHandlerTable} is a total mapped
  * type, adding a member to the `LogicNode` union fails the build here until it is given a handler.
  */

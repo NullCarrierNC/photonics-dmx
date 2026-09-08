@@ -22,6 +22,12 @@ import { SystemEffectsController } from '../../controllers/sequencer/SystemEffec
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
 import { Effect, EffectTransition } from '../../types'
 import { createMockTrackedLight, createMockRGBIP } from '../helpers/testFixtures'
+import {
+  resetLogConfiguration,
+  setLogSink,
+  setMinLogLevel,
+  type LogEntry,
+} from '../../../shared/logger'
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals'
 import {
   ILayerManager,
@@ -146,7 +152,6 @@ describe('EffectManager', () => {
       removeLightLayer: jest.fn(),
       getFinalLightState: jest.fn(),
       getLightState: jest.fn(),
-      resetLightStates: jest.fn(),
       clearAllTransitions: jest.fn(),
       beginClearingSequence: jest.fn(),
       endClearingSequence: jest.fn(),
@@ -594,7 +599,7 @@ describe('EffectManager', () => {
   })
 
   describe('addEffectUnblockedName', () => {
-    it('names the rig in the duplicate-name warning when the manager drives one', () => {
+    it('names the rig in the refusal it logs when the manager drives one', () => {
       const effectName = 'test-effect'
       const effect: Effect = {
         id: 'test-effect',
@@ -641,12 +646,20 @@ describe('EffectManager', () => {
         systemEffects as unknown as ISystemEffectsController,
         'Mix RGB&MH',
       )
-      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+      const entries: LogEntry[] = []
+      setMinLogLevel('debug')
+      setLogSink((entry) => entries.push(entry))
 
-      expect(labelled.addEffectUnblockedName(effectName, effect)).toBe(false)
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('[rig: Mix RGB&MH]'))
+      try {
+        expect(labelled.addEffectUnblockedName(effectName, effect)).toBe(false)
+      } finally {
+        resetLogConfiguration()
+      }
 
-      warn.mockRestore()
+      const refusal = entries.find((e) => e.message.includes('already running'))
+      expect(refusal?.message).toContain('[rig: Mix RGB&MH]')
+      // Held cues re-submit on every frame, so the refusal stays below the default level.
+      expect(refusal?.level).toBe('debug')
     })
 
     it('should not add effect if one with the same name exists on any layer', () => {

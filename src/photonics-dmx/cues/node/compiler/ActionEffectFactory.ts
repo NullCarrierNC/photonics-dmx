@@ -4,400 +4,35 @@ import {
   TrackedLight,
   Effect,
   EffectTransition,
-  FixtureConfig,
   RGBIO,
   LocationGroup,
   Color,
   Brightness,
   BlendMode,
   LightTarget,
-  normalizeFixtureConfig,
 } from '../../../types'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'
-import {
-  degreeOffsetToPercent,
-  getColor,
-  logicalPanDir,
-  shouldMirrorTiltForStageRelative,
-} from '../../../helpers/dmxHelpers'
-import {
-  logicalPanPercentFromMotorDeg,
-  pickAliasedPanMotorDeg,
-} from '../../../helpers/panMotorAlias'
-import { reflectBearingUsDs } from '../../../helpers/stageDirections'
-import {
-  ActionNode,
-  createDefaultActionTiming,
-  type LinearSweepAxis,
-  type MotionPatternType,
-  type WaveformType,
-} from '../../types/nodeCueTypes'
-import { EasingType } from '../../../easing'
+import { createDefaultActionTiming } from '../../types/nodeCueTypes'
 import { VariableValue } from '../runtime/executionTypes'
-import { createLogger } from '../../../../shared/logger'
-const log = createLogger('ActionEffectFactory')
+import {
+  ResolvedActionTarget,
+  ResolvedActionTiming,
+  ResolvedColorSetting,
+  resolvePositionToAbsolutePercent,
+} from './resolvedAction'
 
-// Resolved action data (after ValueSource resolution)
-export interface ResolvedActionTarget {
-  groups: LocationGroup[]
-  filter: LightTarget
-}
-
-export interface ResolvedColorSetting {
-  name: Color
-  brightness: Brightness
-  blendMode?: BlendMode
-  opacity?: number // 0.0-1.0
-}
-
-export interface ResolvedActionTiming {
-  waitForCondition: WaitCondition
-  waitForTime: number
-  waitForConditionCount?: number
-  duration: number
-  waitUntilCondition: WaitCondition
-  waitUntilTime: number
-  waitUntilConditionCount?: number
-  easing?: string
-  level?: number
-}
-
-/** Resolved set-position payload after ValueSource resolution. */
-export type ResolvedPositionSetting =
-  | { mode: 'absolute'; pan: number; tilt: number }
-  | { mode: 'direction'; bearingDeg: number; angleFromVerticalDeg: number }
-  | { mode: 'offset'; panOffsetDeg: number; tiltOffsetDeg: number }
-
-/** Stable fingerprint for set-position idempotency when the same effect name is re-submitted after completion. */
-export function buildSetPositionSubmissionFingerprint(
-  resolvedTarget: ResolvedActionTarget,
-  resolvedPosition: ResolvedPositionSetting,
-  resolvedLayer: number,
-  resolvedTiming: ResolvedActionTiming,
-): string {
-  return JSON.stringify({
-    target: resolvedTarget,
-    position: resolvedPosition,
-    layer: resolvedLayer,
-    duration: resolvedTiming.duration,
-    waitUntilCondition: resolvedTiming.waitUntilCondition,
-    waitUntilTime: resolvedTiming.waitUntilTime,
-  })
-}
-
-/** Resolved motion-pattern after ValueSource resolution; drives MotionPatternEngine. */
-export interface ResolvedMotionPatternSetting {
-  pattern: MotionPatternType
-  speedHz: number
-  sizeDeg: number
-  fanSpreadDeg: number
-  panWaveform: WaveformType
-  tiltWaveform: WaveformType
-  panAmplitudeDeg: number
-  tiltAmplitudeDeg: number
-  panPhaseOffsetDeg: number
-  /** Relative to base `speedHz` (e.g. pendulum / figure-8 tilt uses 2). */
-  panFreqMultiplier: number
-  tiltFreqMultiplier: number
-  /** Only used when pattern is linear-sweep. */
-  linearSweepAxis: LinearSweepAxis
-  /** When true, circle patterns use spherical circle math (gimbal compensation). */
-  gimbalCompensation: boolean
-  /**
-   * Stage bearing in degrees for `circle` near-pole solver; ignored when home is far from the pole
-   * or when pattern is not `circle`. Omitted cues default to 180 (downstage) at resolve time.
-   */
-  bearingDeg: number
-  /** When true, phase advances in the opposite direction (reverse orbit). */
-  reverse: boolean
-}
-
-/** True when two resolved motion-pattern configs are equivalent for idempotent re-submission. */
-export function resolvedMotionPatternSettingsEqual(
-  a: ResolvedMotionPatternSetting,
-  b: ResolvedMotionPatternSetting,
-): boolean {
-  return (
-    a.pattern === b.pattern &&
-    a.speedHz === b.speedHz &&
-    a.sizeDeg === b.sizeDeg &&
-    a.fanSpreadDeg === b.fanSpreadDeg &&
-    a.panWaveform === b.panWaveform &&
-    a.tiltWaveform === b.tiltWaveform &&
-    a.panAmplitudeDeg === b.panAmplitudeDeg &&
-    a.tiltAmplitudeDeg === b.tiltAmplitudeDeg &&
-    a.panPhaseOffsetDeg === b.panPhaseOffsetDeg &&
-    a.panFreqMultiplier === b.panFreqMultiplier &&
-    a.tiltFreqMultiplier === b.tiltFreqMultiplier &&
-    a.linearSweepAxis === b.linearSweepAxis &&
-    a.gimbalCompensation === b.gimbalCompensation &&
-    a.bearingDeg === b.bearingDeg &&
-    a.reverse === b.reverse
-  )
-}
-
-/** Equality for fields that require restarting the motion pattern when they change (excludes bearing-only live updates). */
-export function resolvedMotionPatternSettingsEqualExceptBearing(
-  a: ResolvedMotionPatternSetting,
-  b: ResolvedMotionPatternSetting,
-): boolean {
-  return (
-    a.pattern === b.pattern &&
-    a.speedHz === b.speedHz &&
-    a.sizeDeg === b.sizeDeg &&
-    a.fanSpreadDeg === b.fanSpreadDeg &&
-    a.panWaveform === b.panWaveform &&
-    a.tiltWaveform === b.tiltWaveform &&
-    a.panAmplitudeDeg === b.panAmplitudeDeg &&
-    a.tiltAmplitudeDeg === b.tiltAmplitudeDeg &&
-    a.panPhaseOffsetDeg === b.panPhaseOffsetDeg &&
-    a.panFreqMultiplier === b.panFreqMultiplier &&
-    a.tiltFreqMultiplier === b.tiltFreqMultiplier &&
-    a.linearSweepAxis === b.linearSweepAxis &&
-    a.gimbalCompensation === b.gimbalCompensation &&
-    a.reverse === b.reverse
-  )
-}
-
-/** Same lights in the same order (by id). */
-export function trackedLightIdsEqualOrder(a: TrackedLight[], b: TrackedLight[]): boolean {
-  if (a.length !== b.length) {
-    return false
-  }
-  for (let i = 0; i < a.length; i++) {
-    if (a[i]!.id !== b[i]!.id) {
-      return false
-    }
-  }
-  return true
-}
-
-/**
- * Converts resolved position (direction / offset / legacy absolute %) to absolute pan/tilt % for DMX.
- * When `bearingIsFlipped`, direction-mode bearings reflect across SR-SL (US/DS swap) for back-row lights in front-back layout.
- */
-export function resolvePositionToAbsolutePercent(
-  resolved: ResolvedPositionSetting,
-  fixtureConfig: FixtureConfig | undefined,
-  bearingIsFlipped?: boolean,
-): { pan: number; tilt: number } {
-  const c = normalizeFixtureConfig(fixtureConfig)
-  const panDir = logicalPanDir(c)
-
-  const clampAxis = (axis: 'pan' | 'tilt', raw: number): number => {
-    const clamped = clamp(raw, 0, 100)
-    if (raw < -1e-6 || raw > 100 + 1e-6) {
-      log.warn(
-        `[set-position] ${axis} clamped from ${raw.toFixed(2)}% to ${clamped.toFixed(2)}% (fixture range / home limits).`,
-      )
-    }
-    return clamped
-  }
-
-  if (resolved.mode === 'absolute') {
-    return {
-      pan: clampAxis('pan', resolved.pan),
-      tilt: clampAxis('tilt', resolved.tilt),
-    }
-  }
-  const panHomeDeg = (c.panHome / 100) * c.panRangeDeg
-
-  if (resolved.mode === 'offset') {
-    const rawPanMotorDeg = panHomeDeg + panDir * resolved.panOffsetDeg
-    const chosenPanMotorDeg = pickAliasedPanMotorDeg(
-      rawPanMotorDeg,
-      c.panRangeDeg,
-      panHomeDeg,
-      'continuity',
-    )
-    const panRaw = logicalPanPercentFromMotorDeg(chosenPanMotorDeg, c.panRangeDeg)
-    const tiltDir = shouldMirrorTiltForStageRelative(c) ? -1 : 1
-    const tiltRaw =
-      c.tiltHome + tiltDir * degreeOffsetToPercent(resolved.tiltOffsetDeg, c.tiltRangeDeg)
-    return {
-      pan: clampAxis('pan', panRaw),
-      tilt: clampAxis('tilt', tiltRaw),
-    }
-  }
-  const tiltStageZeroPct = (c.tiltStageDeg / c.tiltRangeDeg) * 100
-  const bearingDeg =
-    bearingIsFlipped === true ? reflectBearingUsDs(resolved.bearingDeg) : resolved.bearingDeg
-  const rawPanMotorDeg = c.panStageDeg + panDir * bearingDeg
-  const chosenPanMotorDeg = pickAliasedPanMotorDeg(
-    rawPanMotorDeg,
-    c.panRangeDeg,
-    panHomeDeg,
-    'continuity',
-  )
-  const panRaw = logicalPanPercentFromMotorDeg(chosenPanMotorDeg, c.panRangeDeg)
-  const tiltRaw =
-    tiltStageZeroPct + degreeOffsetToPercent(resolved.angleFromVerticalDeg, c.tiltRangeDeg)
-  return {
-    pan: clampAxis('pan', panRaw),
-    tilt: clampAxis('tilt', tiltRaw),
-  }
-}
-
-interface BuildEffectParams {
-  action: ActionNode
-  lights: TrackedLight[]
-  waitCondition?: WaitCondition
-  /** Time in milliseconds to wait before the effect starts (for chained actions) */
-  waitTime?: number
-  intensityScale?: number
-  // Add resolved values for direct use
-  resolvedTarget?: ResolvedActionTarget
-  resolvedColor?: ResolvedColorSetting
-  resolvedPosition?: ResolvedPositionSetting
-  resolvedTiming?: ResolvedActionTiming
-  resolvedLayer?: number
-}
-
-export interface BuildEffectChainStep {
-  action: ActionNode
-  lights: TrackedLight[]
-  resolvedColor?: ResolvedColorSetting
-  resolvedTiming?: ResolvedActionTiming
-  resolvedLayer?: number
-  intensityScale?: number
-}
-
-const clamp = (value: number, min: number, max: number): number =>
-  Math.max(min, Math.min(max, Number.isFinite(value) ? value : min))
-
-// Resolve a possibly non-numeric literal to a finite number, falling back when it isn't one.
-// A malformed cue param (e.g. a non-numeric duration literal) resolves to NaN through Number(),
-// which would otherwise flow straight into transition timings and light state.
-const finiteOr = <T>(value: unknown, fallback: T): number | T => {
-  const n = Number(value)
-  return Number.isFinite(n) ? n : fallback
-}
-
-const safeDuration = (value: number | undefined, fallback: number, min = 0): number => {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    return fallback
-  }
-  return Math.max(min, value)
-}
-
-const resolveColor = (color: ResolvedColorSetting, intensityScale: number): RGBIO => {
-  const rgb = getColor(color.name, color.brightness, color.blendMode ?? 'replace')
-  const clampedIntensityScale = clamp(intensityScale, 0, 1)
-  rgb.intensity = Math.round(rgb.intensity * clampedIntensityScale)
-  // Use opacity from color setting if provided, otherwise default to 1.0
-  rgb.opacity = color.opacity !== undefined ? clamp(color.opacity, 0, 1) : 1.0
-  return rgb
-}
-
-const resolveEasing = (
-  value?: string,
-  fallback: EasingType = EasingType.SIN_IN_OUT,
-): EasingType => {
-  if (!value) {
-    return fallback
-  }
-  const valid = Object.values(EasingType).includes(value as EasingType)
-  return valid ? (value as EasingType) : fallback
-}
-
-const normalizeWaitFor = (
-  timing: ResolvedActionTiming,
-  waitTimeOffset = 0,
-): { waitFor: WaitCondition; waitForTime: number } => {
-  let waitFor: WaitCondition = timing.waitForCondition ?? 'none'
-  const waitForTime = safeDuration(waitTimeOffset + (timing.waitForTime ?? 0), 0, 0)
-
-  // If the transition wants to "start immediately" but has an explicit delay time,
-  // interpret that as a delay gate (matches existing buildEffect behavior).
-  if (waitFor === 'none' && waitForTime > 0) {
-    waitFor = 'delay'
-  }
-
-  return { waitFor, waitForTime }
-}
-
-/** Builds one step transition. timing is ResolvedActionTiming from the effect run (effect var store);
- * for delay-based cues, waitUntilCondition is 'delay' and waitUntilTime is ms; TransitionEngine
- * advances these in handleWaitingUntil on clock ticks, not SongEventHandler. */
-const createSingleColorTransition = (params: {
-  lights: TrackedLight[]
-  layer: number
-  waitFor: WaitCondition
-  waitForTime: number
-  color: RGBIO
-  timing: ResolvedActionTiming
-  easing: EasingType
-}): EffectTransition => {
-  const { lights, layer, waitFor, waitForTime, color, timing, easing } = params
-  const duration = safeDuration(timing.duration, 0, 0)
-
-  // Coerce invalid delay: delay with waitUntilTime <= 0 or NaN is treated as no wait
-  let waitUntilCondition = timing.waitUntilCondition
-  let waitUntilTime = safeDuration(timing.waitUntilTime, 0, 0)
-  if (waitUntilCondition === 'delay' && waitUntilTime <= 0) {
-    waitUntilCondition = 'none'
-    waitUntilTime = 0
-  }
-
-  return {
-    lights,
-    layer,
-    waitForCondition: waitFor,
-    waitForTime: safeDuration(waitForTime, 0, 0),
-    waitForConditionCount: timing.waitForConditionCount,
-    transform: {
-      color,
-      easing,
-      duration,
-    },
-    waitUntilCondition,
-    waitUntilTime,
-    waitUntilConditionCount: timing.waitUntilConditionCount,
-  }
-}
-
-const createSingleColorEffect = (params: {
-  lights: TrackedLight[]
-  layer: number
-  waitFor: WaitCondition
-  color: RGBIO
-  timing: ResolvedActionTiming
-  easing: EasingType
-}): Effect => {
-  const { lights, layer, waitFor, color, timing, easing } = params
-  const duration = safeDuration(timing.duration, 0, 0)
-  const { waitForTime } = normalizeWaitFor(timing, 0)
-
-  // Coerce invalid delay: delay with waitUntilTime <= 0 or NaN is treated as no wait
-  let waitUntilCondition = timing.waitUntilCondition
-  let waitUntilTime = safeDuration(timing.waitUntilTime, 0, 0)
-  if (waitUntilCondition === 'delay' && waitUntilTime <= 0) {
-    waitUntilCondition = 'none'
-    waitUntilTime = 0
-  }
-
-  return {
-    id: 'single-color',
-    description: 'Single color effect',
-    transitions: [
-      {
-        lights,
-        layer,
-        waitForCondition: waitFor,
-        waitForTime: safeDuration(waitForTime, 0, 0),
-        waitForConditionCount: timing.waitForConditionCount,
-        transform: {
-          color,
-          easing,
-          duration,
-        },
-        waitUntilCondition,
-        waitUntilTime,
-        waitUntilConditionCount: timing.waitUntilConditionCount,
-      },
-    ],
-  }
-}
+import {
+  BuildEffectChainStep,
+  BuildEffectParams,
+  clamp,
+  createSingleColorEffect,
+  createSingleColorTransition,
+  finiteOr,
+  normalizeWaitFor,
+  resolveColor,
+  resolveEasing,
+  safeDuration,
+} from './effectBuilders'
 
 export class ActionEffectFactory {
   // Helper to resolve target if needed
@@ -685,3 +320,30 @@ export class ActionEffectFactory {
     }
   }
 }
+
+export {
+  clamp,
+  createSingleColorEffect,
+  createSingleColorTransition,
+  finiteOr,
+  normalizeWaitFor,
+  resolveColor,
+  resolveEasing,
+  safeDuration,
+} from './effectBuilders'
+export type { BuildEffectChainStep, BuildEffectParams } from './effectBuilders'
+
+export {
+  buildSetPositionSubmissionFingerprint,
+  resolvePositionToAbsolutePercent,
+  resolvedMotionPatternSettingsEqual,
+  resolvedMotionPatternSettingsEqualExceptBearing,
+  trackedLightIdsEqualOrder,
+} from './resolvedAction'
+export type {
+  ResolvedActionTarget,
+  ResolvedActionTiming,
+  ResolvedColorSetting,
+  ResolvedMotionPatternSetting,
+  ResolvedPositionSetting,
+} from './resolvedAction'

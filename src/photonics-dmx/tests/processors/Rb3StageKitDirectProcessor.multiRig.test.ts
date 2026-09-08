@@ -51,8 +51,8 @@ function makeSequencerStub(): {
       setEffect: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
       addEffectWithCallback: jest.fn(),
       setEffectWithCallback: jest.fn(),
-      addEffectUnblockedNameWithCallback: jest.fn(),
-      setEffectUnblockedNameWithCallback: jest.fn(),
+      addEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
+      setEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
       removeEffectCallback: jest.fn(),
       removeEffect: jest.fn(),
       removeAllEffects: jest.fn(),
@@ -165,7 +165,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1],
       color: 'red',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     // Drain microtasks (Promise.allSettled) before the blending timer fires.
@@ -198,7 +197,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1, 2, 3, 4, 5, 6, 7],
       color: 'blue',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     await Promise.resolve()
@@ -243,7 +241,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1],
       color: 'red',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     await Promise.resolve()
@@ -295,7 +292,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0],
       color: 'off',
-      brightness: 'medium',
       strobeEffect: 'medium',
       timestamp: Date.now(),
     })
@@ -358,7 +354,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0],
       color: 'off',
-      brightness: 'medium',
       strobeEffect: 'medium',
       timestamp: Date.now(),
     })
@@ -405,7 +400,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1],
       color: 'red',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     await Promise.resolve()
@@ -416,7 +410,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0],
       color: 'off',
-      brightness: 'medium',
       strobeEffect: 'slow',
       timestamp: Date.now(),
     })
@@ -487,7 +480,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1],
       color: 'red',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     await Promise.resolve()
@@ -505,7 +497,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1],
       color: 'green',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     // Drain the synchronous fanout Promise.allSettled before the blending timer fires.
@@ -525,7 +516,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1],
       color: 'blue',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     await Promise.resolve()
