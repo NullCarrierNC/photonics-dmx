@@ -108,88 +108,17 @@ export class SystemEffectsController implements ISystemEffectsController {
       // Every light the rig publishes, which is the source the instant path takes through
       // immediateBlackout.
       const allLightIds = this.lightTransitionController.getLightStateManagerTrackedLights()
-      if (allLightIds.length > 0) {
-        // Use maximum layer to override everything (including strobe on layer 200)
-        const blackoutLayer = 255
+      // Use maximum layer to override everything (including strobe on layer 200)
+      const blackoutLayer = 255
 
-        // Set transitions for all lights
-        const transitionPromises = allLightIds.map((lightId) => {
-          return new Promise<void>((resolve) => {
-            // Get current light state to check for existing pan/tilt values
-            const currentLightState = this.lightTransitionController.getFinalLightState(lightId)
-
-            // Create a base blackout color without pan/tilt
-            const blackoutColor: RGBIO = {
-              red: 0,
-              green: 0,
-              blue: 0,
-              intensity: 0,
-              opacity: 1.0,
-              blendMode: 'replace',
-            }
-
-            // Only preserve pan/tilt for fixtures that already have them
-            if (currentLightState && currentLightState.pan !== undefined) {
-              blackoutColor.pan = currentLightState.pan
-            }
-
-            if (currentLightState && currentLightState.tilt !== undefined) {
-              blackoutColor.tilt = currentLightState.tilt
-            }
-
-            // Create a blackout transition that only preserves existing pan/tilt values
-            const blackoutTransition: Transition = {
-              transform: {
-                color: blackoutColor,
-                easing: 'linear',
-                duration: duration,
-              },
-              layer: blackoutLayer,
-            }
-
-            this.lightTransitionController.setTransition(
-              lightId,
-              blackoutLayer,
-              this.lightTransitionController.getLightState(lightId, 0),
-              blackoutTransition.transform.color,
-              blackoutTransition.transform.duration,
-              blackoutTransition.transform.easing,
-            )
-            // Resolve after the transition duration (plus one frame time to ensure completion).
-            // Tracked so cancelBlackout/dispose can clear the timer and settle the promise early.
-            const timer = setTimeout(() => {
-              this.pendingTimers.delete(timer)
-              this.pendingResolvers.delete(resolve)
-              resolve()
-            }, duration + 16)
-            this.pendingTimers.add(timer)
-            this.pendingResolvers.add(resolve)
-          })
-        })
-
-        // Wait for all transitions to complete
-        await Promise.all(transitionPromises)
-
-        // A cancelled or superseded blackout must not run the terminal wipe: cancelBlackout has
-        // already removed the fade transitions, and whatever cue started since owns the lights now.
-        if (this.generation !== generation || !this.isBlackingOut) {
-          return
-        }
-
-        // Clear all effects and force black state
-        const allLayers = this.layerManager.getAllLayers()
-        for (const layer of allLayers) {
-          this.layerManager.removeActiveEffect(layer, 'all')
-          this.layerManager.removeQueuedEffect(layer, 'all')
-        }
-
-        // Force immediate black state for all lights while preserving pan/tilt
-        allLightIds.forEach((lightId) => {
-          // Get current state to check for existing pan/tilt values
+      // Set transitions for all lights
+      const transitionPromises = allLightIds.map((lightId) => {
+        return new Promise<void>((resolve) => {
+          // Get current light state to check for existing pan/tilt values
           const currentLightState = this.lightTransitionController.getFinalLightState(lightId)
 
-          // Create a base black state
-          const blackState: RGBIO = {
+          // Create a base blackout color without pan/tilt
+          const blackoutColor: RGBIO = {
             red: 0,
             green: 0,
             blue: 0,
@@ -200,29 +129,96 @@ export class SystemEffectsController implements ISystemEffectsController {
 
           // Only preserve pan/tilt for fixtures that already have them
           if (currentLightState && currentLightState.pan !== undefined) {
-            blackState.pan = currentLightState.pan
+            blackoutColor.pan = currentLightState.pan
           }
 
           if (currentLightState && currentLightState.tilt !== undefined) {
-            blackState.tilt = currentLightState.tilt
+            blackoutColor.tilt = currentLightState.tilt
+          }
+
+          // Create a blackout transition that only preserves existing pan/tilt values
+          const blackoutTransition: Transition = {
+            transform: {
+              color: blackoutColor,
+              easing: 'linear',
+              duration: duration,
+            },
+            layer: blackoutLayer,
           }
 
           this.lightTransitionController.setTransition(
             lightId,
-            0, // Use base layer
-            undefined, // No start state needed for immediate effect
-            blackState,
-            0, // Instant
-            'linear',
+            blackoutLayer,
+            this.lightTransitionController.getLightState(lightId, 0),
+            blackoutTransition.transform.color,
+            blackoutTransition.transform.duration,
+            blackoutTransition.transform.easing,
           )
+          // Resolve after the transition duration (plus one frame time to ensure completion).
+          // Tracked so cancelBlackout/dispose can clear the timer and settle the promise early.
+          const timer = setTimeout(() => {
+            this.pendingTimers.delete(timer)
+            this.pendingResolvers.delete(resolve)
+            resolve()
+          }, duration + 16)
+          this.pendingTimers.add(timer)
+          this.pendingResolvers.add(resolve)
         })
+      })
 
-        // The terminal wipe cleared every layer's effects, so lay a held overlay back down before
+      // Wait for all transitions to complete
+      await Promise.all(transitionPromises)
 
-        // Trigger the callback after timed blackout completes as well
-        if (this.onBlackoutCompleteCallback) {
-          this.onBlackoutCompleteCallback()
+      // A cancelled or superseded blackout must not run the terminal wipe: cancelBlackout has
+      // already removed the fade transitions, and whatever cue started since owns the lights now.
+      if (this.generation !== generation || !this.isBlackingOut) {
+        return
+      }
+
+      // Clear all effects and force black state
+      const allLayers = this.layerManager.getAllLayers()
+      for (const layer of allLayers) {
+        this.layerManager.removeActiveEffect(layer, 'all')
+        this.layerManager.removeQueuedEffect(layer, 'all')
+      }
+
+      // Force immediate black state for all lights while preserving pan/tilt
+      allLightIds.forEach((lightId) => {
+        // Get current state to check for existing pan/tilt values
+        const currentLightState = this.lightTransitionController.getFinalLightState(lightId)
+
+        // Create a base black state
+        const blackState: RGBIO = {
+          red: 0,
+          green: 0,
+          blue: 0,
+          intensity: 0,
+          opacity: 1.0,
+          blendMode: 'replace',
         }
+
+        // Only preserve pan/tilt for fixtures that already have them
+        if (currentLightState && currentLightState.pan !== undefined) {
+          blackState.pan = currentLightState.pan
+        }
+
+        if (currentLightState && currentLightState.tilt !== undefined) {
+          blackState.tilt = currentLightState.tilt
+        }
+
+        this.lightTransitionController.setTransition(
+          lightId,
+          0, // Use base layer
+          undefined, // No start state needed for immediate effect
+          blackState,
+          0, // Instant
+          'linear',
+        )
+      })
+
+      // Trigger the callback after timed blackout completes as well
+      if (this.onBlackoutCompleteCallback) {
+        this.onBlackoutCompleteCallback()
       }
     } catch (error) {
       log.error('An error occurred during blackout:', error)
