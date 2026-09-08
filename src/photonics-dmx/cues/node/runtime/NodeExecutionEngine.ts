@@ -28,7 +28,6 @@ import {
   EffectRaiserNode,
   LogicNode,
   VariableDefinition,
-  ValueSource,
   VariableType,
   NodeCueMode,
 } from '../../types/nodeCueTypes'
@@ -40,26 +39,13 @@ import { EffectExecutionEngine } from './EffectExecutionEngine'
 import { BaseNodeExecutionEngine, CompiledGraph } from './BaseNodeExecutionEngine'
 import { RevisitPolicy } from './GraphExecutionPolicy'
 import { ContextLifecycleEvent } from './executionStateMachineLifecycle'
-import { resolveValue } from './valueResolver'
+import { resolveValue, inferSourceType } from './valueResolver'
+import { debugPreview } from './nodeDebugPreview'
 import { resolveActionTiming, resolveActionLayer, resolveMotionPattern } from './actionResolver'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('NodeExecutionEngine')
-
-/**
- * Infer variable type from a value source when the effect parameter definition is missing.
- * Used so unknown parameters are not coerced through a numeric fallback (which would turn
- * e.g. "delay" or "yellow" into 0).
- */
-function inferEffectParameterType(source: ValueSource | undefined): VariableType {
-  if (!source || source.source !== 'literal') return 'string'
-  const v = source.value
-  if (typeof v === 'number') return 'number'
-  if (typeof v === 'boolean') return 'boolean'
-  if (Array.isArray(v)) return 'light-array'
-  return 'string'
-}
 
 /** Optional collaborators for a {@link NodeExecutionEngine}; omitted fields fall back to defaults. */
 export interface NodeExecutionEngineOptions {
@@ -310,49 +296,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
       return
     }
 
-    log.info(`[NodeCue] ${this.cueId} ${message}`, this.debugPreview(data))
-  }
-
-  private debugPreview(value: unknown): unknown {
-    // Keep logs readable and avoid dumping huge arrays/objects.
-    const maxArray = 12
-    const maxString = 300
-
-    const previewAny = (v: unknown): unknown => {
-      if (v === null || v === undefined) return v
-      if (typeof v === 'string') {
-        return v.length > maxString ? `${v.slice(0, maxString)}…` : v
-      }
-      if (typeof v === 'number' || typeof v === 'boolean') return v
-      if (Array.isArray(v)) {
-        const head = v.slice(0, maxArray).map(previewAny)
-        return v.length > maxArray ? { items: head, truncated: v.length - maxArray } : head
-      }
-      if (v && typeof v === 'object') {
-        const obj = v as Record<string, unknown>
-        // Special-case TrackedLight-ish objects
-        if ('id' in obj && typeof obj.id === 'string') {
-          const out: Record<string, unknown> = { id: obj.id }
-          if ('position' in obj && typeof obj.position === 'number') out.position = obj.position
-          return out
-        }
-
-        // VariableValue preview
-        if ('type' in obj && 'value' in obj) {
-          return { type: obj.type, value: previewAny(obj.value) }
-        }
-
-        // Generic object: shallow preview keys
-        const result: Record<string, unknown> = {}
-        for (const [k, val] of Object.entries(obj)) {
-          result[k] = previewAny(val)
-        }
-        return result
-      }
-      return v
-    }
-
-    return previewAny(value)
+    log.info(`[NodeCue] ${this.cueId} ${message}`, debugPreview(data))
   }
 
   private getVariableValue(name: string, context: ExecutionContext): VariableValue | undefined {
@@ -552,7 +496,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
       for (const [paramName, valueSource] of Object.entries(raiserNode.parameterValues ?? {})) {
         const paramDef = compiledEffect.parameters.get(paramName)
         const expectedType: VariableType =
-          paramDef != null ? paramDef.type : inferEffectParameterType(valueSource)
+          paramDef != null ? paramDef.type : inferSourceType(valueSource)
         paramValues[paramName] = resolveValue(expectedType, valueSource, context)
       }
 
