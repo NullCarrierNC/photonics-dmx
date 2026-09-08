@@ -48,6 +48,12 @@ import {
 } from '../ipcApi'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
 import { createLogger } from '../../../shared/logger'
+import {
+  instrumentNotePayload,
+  simulationContext,
+  type SimulationContext,
+} from './CueSimulation/simulationPayload'
+
 const log = createLogger('CueSimulation')
 
 type CueRegistryType = 'YARG' | 'RB3E'
@@ -389,47 +395,30 @@ const CueSimulation: React.FC = () => {
     }
   }
 
+  const simulationContextNow = (): SimulationContext =>
+    simulationContext(selectedVenueSize, selectedBpm, selectedGroupId, selectedEffect)
+
   const handleSimulateBeat = async () => {
-    await simulateBeat({
-      venueSize: selectedVenueSize,
-      bpm: selectedBpm,
-      cueGroup: selectedGroupId,
-      effectId: selectedEffect?.id || null,
-    })
+    await simulateBeat(simulationContextNow())
     // Simply turn on the indicator, the useTimeoutEffect will reset it
     setShowBeatIndicator(true)
   }
 
   const handleSimulateKeyframe = async () => {
-    await simulateKeyframe({
-      venueSize: selectedVenueSize,
-      bpm: selectedBpm,
-      cueGroup: selectedGroupId,
-      effectId: selectedEffect?.id || null,
-    })
+    await simulateKeyframe(simulationContextNow())
     setShowKeyframeIndicator(true)
   }
 
   const handleSimulateMeasure = async () => {
-    await simulateMeasure({
-      venueSize: selectedVenueSize,
-      bpm: selectedBpm,
-      cueGroup: selectedGroupId,
-      effectId: selectedEffect?.id || null,
-    })
+    await simulateMeasure(simulationContextNow())
     setShowMeasureIndicator(true)
   }
 
   const handleSimulateInstrumentNote = async (noteType: string) => {
     try {
-      await simulateInstrumentNote({
-        instrument: selectedInstrument,
-        noteType: noteType,
-        venueSize: selectedVenueSize,
-        bpm: selectedBpm,
-        cueGroup: selectedGroupId,
-        effectId: selectedEffect?.id || null,
-      })
+      await simulateInstrumentNote(
+        instrumentNotePayload(simulationContextNow(), selectedInstrument, noteType),
+      )
     } catch (error) {
       log.error('Error simulating instrument note:', error)
     }
