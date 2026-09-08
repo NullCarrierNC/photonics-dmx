@@ -47,6 +47,12 @@ import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('NodeExecutionEngine')
 
+/** A running effect engine, with the release for whatever hold its raising context took. */
+interface RaisedEffect {
+  engine: EffectExecutionEngine
+  releaseWaiter: () => void
+}
+
 /** Optional collaborators for a {@link NodeExecutionEngine}; omitted fields fall back to defaults. */
 export interface NodeExecutionEngineOptions {
   firstSubmissionUsesSetEffectRef?: { use: boolean }
@@ -78,7 +84,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
   private cueLevelVarStore: Map<string, VariableValue>
   private groupLevelVarStore: Map<string, VariableValue>
   private effectRegistry: EffectRegistry
-  private activeEffectEngines: Map<string, EffectExecutionEngine> = new Map()
+  private activeEffectEngines: Map<string, RaisedEffect> = new Map()
   /** Node IDs that have emitted 'activated' but not yet 'deactivated', so cancelAll can flush them. */
   private pendingActivations: Set<string> = new Set()
   private readonly revisitPolicyValue: RevisitPolicy
@@ -437,8 +443,15 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
 
   /**
    * Execute an effect raiser node: trigger effect and block re-triggering until it completes.
+   *
+   * A raiser with nodes after it holds its context open until the effect goes idle, so those nodes
+   * run once per effect run rather than on the frame that raised it. A raiser with nothing after it
+   * registers no hold, leaving the rest of the cue free to run while its effect plays.
    */
   private executeEffectRaiserNode(raiserNode: EffectRaiserNode, context: ExecutionContext): void {
+    /** Release for this call's own hold, and for the hold of a run this call interrupted. */
+    let releaseWaiter: (() => void) | undefined
+    let releaseInterrupted: (() => void) | undefined
     try {
       const { effectId } = raiserNode
 
@@ -455,9 +468,9 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
       const engineKey = iterIdx >= 0 ? `${raiserNode.id}:${iterIdx}` : raiserNode.id
 
       // Check if this effect raiser already has an active execution (contexts or callback-backed effects)
-      const existingEngine = this.activeEffectEngines.get(engineKey)
-      if (existingEngine) {
-        if (existingEngine.isBusy()) {
+      const existing = this.activeEffectEngines.get(engineKey)
+      if (existing) {
+        if (existing.engine.isBusy()) {
           if (!raiserNode.interruptible) {
             this.debugLog(`Effect raiser ${raiserNode.id} blocked: effect still running`)
             this.emitNodeExecution('deactivated', raiserNode.id)
@@ -465,13 +478,18 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
             return
           }
           // Interruptible: cancel the in-flight effect so a fresh one restarts from the top.
-          // Removes its submitted effects from the sequencer and clears its idle callback.
+          // Removes its submitted effects from the sequencer and clears its idle callback. The
+          // cancelled run can no longer report idle, so its context is released only once the
+          // replacement is tracked: releasing before that can complete a cue-called context, which
+          // dispatches the frame queued behind it and re-enters this method on the same key.
           this.debugLog(
             `Effect raiser ${raiserNode.id} interruptible: cancelling running effect to restart`,
           )
-          existingEngine.cancelAll()
+          releaseInterrupted = existing.releaseWaiter
+          existing.engine.cancelAll()
         } else {
-          // Engine is idle - clean it up and allow new trigger
+          // Engine is idle - clean it up and allow new trigger. Its queued idle still runs and
+          // carries the context that raised it forward, so no release here.
           this.debugLog(`Effect raiser ${raiserNode.id} cleaning up idle engine`)
         }
         this.activeEffectEngines.delete(engineKey)
@@ -517,35 +535,65 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
         },
       )
 
-      // Set up completion callback: when effect is idle, do cleanup/persistent logic then continue
-      // to the next node. Continuing only on idle ensures delay-based stepping (e.g. Score 500ms
-      // yellow, 200ms blue) is observed: the next raiser (e.g. blue) runs after this effect
-      // completes instead of in the same tick (which would replace this effect via addEffect).
+      // Hold the context open only when there is something after this raiser to hold it for. A
+      // for-each-light iteration takes no hold: engines are keyed per iteration while a context
+      // tracks a single node id, so its downstream nodes run on idle and lose per-light names.
+      const holdsContext =
+        iterIdx < 0 && (this.compiledCue.adjacency.get(raiserNode.id)?.length ?? 0) > 0
+
+      // Frees the hold without stepping the graph forward, for a run being replaced rather than
+      // finished. Mirrors the cancelled branch of onBlockingActionComplete.
+      const release = (): void => {
+        if (!holdsContext) return
+        context.completeActionSilent(raiserNode.id)
+        if (context.tryComplete()) {
+          context.dispose()
+        }
+      }
+      releaseWaiter = release
+
+      // On idle: cleanup/persistent logic, then carry the raising context forward. Continuing only
+      // on idle ensures delay-based stepping (e.g. Score 500ms yellow, 200ms blue) is observed.
       // Idle lands on a microtask, by which time a re-call arriving in the same pass as the beat
       // that finished the run can have retired this engine and tracked a replacement. Only the
-      // engine still tracked under this key acts on its idle.
+      // tracked engine owns the slot and may darken the node, but a retired one still carries its
+      // own context forward: that run did finish, and the replacement drives a different context.
       effectEngine.setOnIdle(() => {
-        if (this.activeEffectEngines.get(engineKey) !== effectEngine) return
-        if (raiserNode.isPersistent) {
-          this.debugLog(`Effect raiser ${raiserNode.id} persistent: re-triggering`)
-          effectEngine.triggerEffect(context.cueData)
-        } else {
-          this.debugLog(`Effect raiser ${raiserNode.id} completed, removing from tracking`)
-          this.activeEffectEngines.delete(engineKey)
+        const tracked = this.activeEffectEngines.get(engineKey)?.engine === effectEngine
+        if (tracked) {
+          if (raiserNode.isPersistent) {
+            this.debugLog(`Effect raiser ${raiserNode.id} persistent: re-triggering`)
+            effectEngine.triggerEffect(context.cueData)
+          } else {
+            this.debugLog(`Effect raiser ${raiserNode.id} completed, removing from tracking`)
+            this.activeEffectEngines.delete(engineKey)
+          }
+          this.emitNodeExecution('deactivated', raiserNode.id)
         }
-        this.emitNodeExecution('deactivated', raiserNode.id)
-        this.continueToNextNodes(raiserNode.id, context)
+        if (holdsContext) {
+          // Routes through onNodeComplete -> onActionComplete: advance the phase, continue
+          // downstream, complete the context. A later idle finds nothing registered.
+          context.completeAction(raiserNode.id)
+        } else if (tracked) {
+          // A loop iteration holds nothing, so it continues on its own rather than through the
+          // context. Nothing to continue for a raiser with no nodes after it.
+          this.continueToNextNodes(raiserNode.id, context)
+        }
       })
 
-      // Store the engine in active tracking
-      this.activeEffectEngines.set(engineKey, effectEngine)
+      if (holdsContext) {
+        context.registerActiveAction(raiserNode.id, raiserNode)
+      }
+      this.activeEffectEngines.set(engineKey, { engine: effectEngine, releaseWaiter: release })
 
-      // Trigger effect; continue to next node only when effect goes idle (in setOnIdle above)
       effectEngine.triggerEffect(context.cueData)
+      releaseInterrupted?.()
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.emitRuntimeError(raiserNode.id, msg)
       log.error(`Error executing effect raiser node ${raiserNode.id}:`, error)
+      releaseWaiter?.()
+      releaseInterrupted?.()
       this.emitNodeExecution('deactivated', raiserNode.id)
     }
   }
@@ -644,8 +692,8 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
 
   /** Cancel nested effect engines spawned by effect-raiser nodes. */
   protected override onCancelFinish(skipEffectRemoval: boolean): void {
-    for (const effectEngine of this.activeEffectEngines.values()) {
-      effectEngine.cancelAll(skipEffectRemoval)
+    for (const raised of this.activeEffectEngines.values()) {
+      raised.engine.cancelAll(skipEffectRemoval)
     }
     this.activeEffectEngines.clear()
   }

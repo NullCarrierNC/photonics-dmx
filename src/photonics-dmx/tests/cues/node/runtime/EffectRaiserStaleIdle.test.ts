@@ -291,19 +291,19 @@ describe('an effect raiser whose idle arrives after its engine was replaced', ()
     expect(blockingCallbacks).toHaveLength(3)
   })
 
-  it("runs the raiser's downstream nodes once, for the tracked engine", async () => {
+  it("runs the raiser's downstream nodes once per raising context", async () => {
     const engine = makeEngine(false)
 
     engine.startExecution(eventNode, cueData())
     finishRunThenRecall(engine, 0)
 
-    // A retired engine's idle leaves the graph where it is.
-    await flushIdle()
-    expect(downstreamCount()).toBe(0)
-
-    // The tracked engine finishing carries it on.
-    blockingCallbacks[1](false)
+    // A retired engine still carries its own context forward: that run did finish.
     await flushIdle()
     expect(downstreamCount()).toBe(1)
+
+    // The tracked engine finishing carries its own context, and no other.
+    blockingCallbacks[1](false)
+    await flushIdle()
+    expect(downstreamCount()).toBe(2)
   })
 })
