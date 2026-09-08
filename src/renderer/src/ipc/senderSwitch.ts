@@ -6,20 +6,9 @@
  * string and so cannot say which sender failed.
  */
 import { createLogger } from '../../../shared/logger'
+import { wasRefused } from './ipcResult'
 
 const log = createLogger('senderSwitch')
-
-/**
- * Whether the main process refused. Only an explicit `success: false` counts, so a handler that
- * resolves nothing is read as having worked.
- */
-function wasRefused(result: unknown): result is { error?: string } {
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    (result as { success?: unknown }).success === false
-  )
-}
 
 export async function applySenderRunState(
   sender: string,

@@ -20,7 +20,11 @@ type NetworkResult = { success: boolean; interfaces: NetworkInterface[]; error?:
 
 let networkResult: NetworkResult = { success: true, interfaces: [] }
 
-const savePrefsMock = jest.fn(async (_p: Record<string, unknown>) => undefined)
+type SaveResult = { success: true } | { success: false; error: string }
+
+const savePrefsMock = jest.fn(
+  async (_p: Record<string, unknown>): Promise<SaveResult> => ({ success: true }),
+)
 const enableSenderMock = jest.fn((_p: Record<string, unknown>) => undefined)
 const disableSenderMock = jest.fn((_p: Record<string, unknown>) => undefined)
 const updateSacnConfigMock = jest.fn(async (_c: Record<string, unknown>) => undefined)
@@ -599,6 +603,53 @@ describe('DmxOutputSettings serial ports', () => {
         openDmxConfig: { port: 'COM9', dmxSpeed: 25 },
       }),
     )
+  })
+})
+
+describe('DmxOutputSettings refused preference writes', () => {
+  const refuseNextSave = (): void => {
+    savePrefsMock.mockResolvedValueOnce({ success: false, error: 'disk full' })
+  }
+
+  it('leaves the checkbox alone when the write is refused', async () => {
+    await renderPanel({ dmxOutputConfig: outputConfig() })
+    refuseNextSave()
+
+    fireEvent.click(screen.getByLabelText('sACN'))
+
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
+    expect((screen.getByLabelText('sACN') as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('starts no sender it could not save', async () => {
+    const store = await renderPanel({ dmxOutputConfig: outputConfig() })
+    refuseNextSave()
+
+    fireEvent.click(screen.getByLabelText('sACN'))
+
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
+    expect(enableSenderMock).not.toHaveBeenCalled()
+    expect(store.get(senderSacnEnabledAtom)).toBe(false)
+  })
+
+  it('says so on screen', async () => {
+    await renderPanel({ dmxOutputConfig: outputConfig() })
+    refuseNextSave()
+
+    fireEvent.click(screen.getByLabelText('sACN'))
+
+    expect(await screen.findByText(/could not save/i)).toBeTruthy()
+  })
+
+  it('leaves the checkbox alone when the write throws', async () => {
+    await renderPanel({ dmxOutputConfig: outputConfig() })
+    savePrefsMock.mockRejectedValueOnce(new Error('bridge gone'))
+
+    fireEvent.click(screen.getByLabelText('sACN'))
+
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
+    expect((screen.getByLabelText('sACN') as HTMLInputElement).checked).toBe(false)
+    expect(enableSenderMock).not.toHaveBeenCalled()
   })
 })
 

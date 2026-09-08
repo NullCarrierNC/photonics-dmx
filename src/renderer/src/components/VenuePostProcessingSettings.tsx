@@ -2,13 +2,10 @@ import React, { useCallback, useState } from 'react'
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
 import { savePrefs } from '../ipcApi'
-import type { IpcErrorResult, IpcSuccessResult } from '../../../shared/ipcTypes'
+import { wasRefused } from '../ipc/ipcResult'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('VenuePostProcessingSettings')
-
-const isSaveFailure = (result: IpcSuccessResult | IpcErrorResult): result is IpcErrorResult =>
-  !result.success
 
 const VenuePostProcessingSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
@@ -22,7 +19,7 @@ const VenuePostProcessingSettings: React.FC = () => {
       setSaving(true)
       try {
         const result = await savePrefs({ venuePostProcessingEnabled: next })
-        if (isSaveFailure(result)) {
+        if (wasRefused(result)) {
           log.error('Failed to save Venue Post-Processing preference', result.error)
           return
         }

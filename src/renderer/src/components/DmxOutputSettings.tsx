@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useState, useEffect } from 'react'
 import { useAtom } from 'jotai'
 import {
   senderArtNetEnabledAtom,
@@ -20,7 +20,6 @@ import {
   getNetworkInterfaces,
   enableSender,
   disableSender,
-  savePrefs,
   updateSacnConfig,
   updateArtNetConfig,
 } from '../ipcApi'
@@ -38,6 +37,10 @@ import {
   type DmxOutputFlag,
 } from './DmxOutputSettings/outputConfig'
 import { applySenderRunState } from '../ipc/senderSwitch'
+import { persistPrefs } from '../ipc/persistPrefs'
+import { useToast } from '../hooks/useToast'
+import ToastContainer from './Toast'
+import type { AppPreferences } from '../../../shared/ipcTypes'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('DmxOutputSettings')
@@ -63,6 +66,14 @@ const DmxOutputSettings: React.FC = () => {
   const [networkInterfaces, setNetworkInterfaces] = useState<
     Array<{ name: string; value: string; family: string }>
   >([])
+  const { toasts, showToast, hideToast } = useToast()
+
+  /** Writes preferences, reporting a refusal on screen. */
+  const persist = useCallback(
+    (updates: Partial<AppPreferences>, what: string) =>
+      persistPrefs(updates, what, (message) => showToast(message, 'error', 5000)),
+    [showToast],
+  )
 
   // Load other preferences (ArtNet config, COM port, etc.)
   useEffect(() => {
@@ -113,14 +124,16 @@ const DmxOutputSettings: React.FC = () => {
     })
     log.info('No DMX output config in preferences, initializing from sender states:', initialConfig)
 
-    setPrefs((prev) => ({
-      ...prev,
-      dmxOutputConfig: initialConfig,
-    }))
-
-    savePrefs({ dmxOutputConfig: initialConfig }).catch((error) => {
-      log.error('Failed to save initial DMX output configuration:', error)
-    })
+    void persist({ dmxOutputConfig: initialConfig }, 'the DMX output configuration').then(
+      (saved) => {
+        if (saved) {
+          setPrefs((prev) => ({
+            ...prev,
+            dmxOutputConfig: initialConfig,
+          }))
+        }
+      },
+    )
   }, [
     prefs.dmxOutputConfig,
     isSacnEnabled,
@@ -128,6 +141,7 @@ const DmxOutputSettings: React.FC = () => {
     isEnttecProEnabled,
     isOpenDmxEnabled,
     setPrefs,
+    persist,
   ])
 
   /** What one sender needs to be turned on or off: its saved flag and its backend state. */
@@ -184,6 +198,10 @@ const DmxOutputSettings: React.FC = () => {
     const newConfig = nextOutputConfig(prefs.dmxOutputConfig, toggle.flag, enabled)
     log.info('Sender toggled:', name, enabled, newConfig)
 
+    if (!(await persist({ dmxOutputConfig: newConfig }, 'the DMX output configuration'))) {
+      return
+    }
+
     setPrefs((prev) => ({
       ...prev,
       dmxOutputConfig: newConfig,
@@ -193,12 +211,6 @@ const DmxOutputSettings: React.FC = () => {
       void applySenderRunState(name, enabled, toggle.setRunning, () =>
         enabled ? toggle.start() : toggle.stop(),
       )
-    }
-
-    try {
-      await savePrefs({ dmxOutputConfig: newConfig })
-    } catch (error) {
-      log.error('Failed to save DMX output configuration:', error)
     }
   }
 
@@ -212,19 +224,21 @@ const DmxOutputSettings: React.FC = () => {
       [field]: parsed,
     }
 
-    try {
-      await savePrefs({ artNetConfig: newConfig })
+    if (!(await persist({ artNetConfig: newConfig }, 'the ArtNet configuration'))) {
+      return
+    }
 
-      setPrefs((prev) => ({
-        ...prev,
-        artNetConfig: newConfig,
-      }))
+    setPrefs((prev) => ({
+      ...prev,
+      artNetConfig: newConfig,
+    }))
 
-      if (isArtNetEnabled) {
+    if (isArtNetEnabled) {
+      try {
         await updateArtNetConfig(newConfig)
+      } catch (error) {
+        log.error('Failed to apply the ArtNet configuration:', error)
       }
-    } catch (error) {
-      log.error('Failed to save ArtNet configuration:', error)
     }
   }
 
@@ -237,17 +251,14 @@ const DmxOutputSettings: React.FC = () => {
       port: newPort,
     }
 
-    try {
-      await savePrefs({ enttecProConfig: newConfig })
-
-      // Update the preferences atom to reflect the change
-      setPrefs((prev) => ({
-        ...prev,
-        enttecProConfig: newConfig,
-      }))
-    } catch (error) {
-      log.error('Failed to save EnttecPro port configuration:', error)
+    if (!(await persist({ enttecProConfig: newConfig }, 'the Enttec Pro port'))) {
+      return
     }
+
+    setPrefs((prev) => ({
+      ...prev,
+      enttecProConfig: newConfig,
+    }))
   }
 
   const handleOpenDmxComPortChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,16 +270,14 @@ const DmxOutputSettings: React.FC = () => {
       port: newPort,
     }
 
-    try {
-      await savePrefs({ openDmxConfig: newConfig })
-
-      setPrefs((prev) => ({
-        ...prev,
-        openDmxConfig: newConfig,
-      }))
-    } catch (error) {
-      log.error('Failed to save OpenDMX port configuration:', error)
+    if (!(await persist({ openDmxConfig: newConfig }, 'the OpenDMX port'))) {
+      return
     }
+
+    setPrefs((prev) => ({
+      ...prev,
+      openDmxConfig: newConfig,
+    }))
   }
 
   const handleOpenDmxSpeedChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -277,27 +286,24 @@ const DmxOutputSettings: React.FC = () => {
       dmxSpeed: parseOpenDmxSpeed(e.target.value),
     }
 
-    try {
-      await savePrefs({ openDmxConfig: newConfig })
-
-      setPrefs((prev) => ({
-        ...prev,
-        openDmxConfig: newConfig,
-      }))
-    } catch (error) {
-      log.error('Failed to save OpenDMX speed configuration:', error)
+    if (!(await persist({ openDmxConfig: newConfig }, 'the OpenDMX rate'))) {
+      return
     }
+
+    setPrefs((prev) => ({
+      ...prev,
+      openDmxConfig: newConfig,
+    }))
   }
 
   const handleGlobalDmxRateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const sanitized = parseGlobalPublishingRate(e.target.value)
 
-    try {
-      await savePrefs({ globalDmxPublishingRateHz: sanitized })
-      setPrefs((prev) => ({ ...prev, globalDmxPublishingRateHz: sanitized }))
-    } catch (error) {
-      log.error('Failed to save Global DMX Publishing Rate:', error)
+    if (!(await persist({ globalDmxPublishingRateHz: sanitized }, 'the DMX publishing rate'))) {
+      return
     }
+
+    setPrefs((prev) => ({ ...prev, globalDmxPublishingRateHz: sanitized }))
   }
 
   const handleSacnConfigChange = async (
@@ -310,22 +316,22 @@ const DmxOutputSettings: React.FC = () => {
       [field]: parsed,
     }
 
-    try {
-      // Save to preferences
-      await savePrefs({ sacnConfig: newConfig })
+    if (!(await persist({ sacnConfig: newConfig }, 'the sACN configuration'))) {
+      return
+    }
 
-      // Update the preferences atom to reflect the change
-      setPrefs((prev) => ({
-        ...prev,
-        sacnConfig: newConfig,
-      }))
+    setPrefs((prev) => ({
+      ...prev,
+      sacnConfig: newConfig,
+    }))
 
-      // Update the running sender if sACN is enabled
-      if (isSacnEnabled) {
+    // Update the running sender if sACN is enabled
+    if (isSacnEnabled) {
+      try {
         await updateSacnConfig(newConfig)
+      } catch (error) {
+        log.error('Failed to apply the sACN configuration:', error)
       }
-    } catch (error) {
-      log.error('Failed to save sACN configuration:', error)
     }
   }
 
@@ -343,16 +349,14 @@ const DmxOutputSettings: React.FC = () => {
       openDmxExpanded: openDmx,
     }
 
-    try {
-      await savePrefs({ dmxSettingsPrefs: newDmxSettingsPrefs })
-
-      setPrefs((prev) => ({
-        ...prev,
-        dmxSettingsPrefs: newDmxSettingsPrefs,
-      }))
-    } catch (error) {
-      log.error('Failed to save DMX settings preferences:', error)
+    if (!(await persist({ dmxSettingsPrefs: newDmxSettingsPrefs }, 'the panel layout'))) {
+      return
     }
+
+    setPrefs((prev) => ({
+      ...prev,
+      dmxSettingsPrefs: newDmxSettingsPrefs,
+    }))
   }
 
   return (
@@ -496,6 +500,8 @@ const DmxOutputSettings: React.FC = () => {
           />
         </div>
       )}
+
+      <ToastContainer toasts={toasts} onDismiss={hideToast} />
     </div>
   )
 }
