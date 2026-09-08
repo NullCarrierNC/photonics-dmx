@@ -1,18 +1,11 @@
 import { RGBIO, Transition } from '../../types'
-import {
-  blendWithOpacity,
-  getEasingValue,
-  interpolate,
-  interpolateFloat,
-  opaqueBlack,
-  transparentColor,
-} from './lightBlending'
+import { blendWithOpacity, opaqueBlack, transparentColor } from './lightBlending'
 import {
   cleanupOrphanedTransitions,
-  correctLightState,
   emergencyStateReset,
   validateAllStates,
 } from './transitionHealth'
+import { stepTransition } from './transitionStep'
 import { LightStateManager } from './LightStateManager'
 import type { FrameContext } from './interfaces'
 import { createLogger } from '../../../shared/logger'
@@ -391,52 +384,9 @@ export class LightTransitionController {
         const layersToRemoveForLight = new Set<number>()
 
         layerTransitions.forEach((transitionData, layer) => {
-          const { startState, endState, startTime, transition } = transitionData
-
-          // Calculate elapsed time using the shared 'now' timestamp
-          const elapsed = now - startTime
-          const duration = transition.transform.duration
-          const progress = duration > 0 ? Math.min(elapsed / duration, 1) : 1
-
-          // Get the easing function
-          const easing = transition.transform.easing
-          const easedProgress = getEasingValue(progress, easing)
-
-          // Interpolate the state
-          const newState: RGBIO = {
-            red: interpolate(startState.red, endState.red, easedProgress),
-            green: interpolate(startState.green, endState.green, easedProgress),
-            blue: interpolate(startState.blue, endState.blue, easedProgress),
-            intensity: interpolate(startState.intensity, endState.intensity, easedProgress),
-            opacity: interpolateFloat(
-              startState.opacity ?? 1.0,
-              endState.opacity ?? 1.0,
-              easedProgress,
-            ),
-            blendMode: endState.blendMode,
-          }
-
-          // Handle optional properties
-          if (startState.pan !== undefined || endState.pan !== undefined) {
-            const startPan = startState.pan ?? endState.pan ?? 0
-            const endPan = endState.pan ?? startState.pan ?? 0
-            newState.pan = interpolate(startPan, endPan, easedProgress)
-          }
-
-          if (startState.tilt !== undefined || endState.tilt !== undefined) {
-            const startTilt = startState.tilt ?? endState.tilt ?? 0
-            const endTilt = endState.tilt ?? startState.tilt ?? 0
-            newState.tilt = interpolate(startTilt, endTilt, easedProgress)
-          }
-
-          // Validate and correct the state
-          const correctedState = correctLightState(newState)
-          layerStates.set(layer, correctedState)
-
-          // If transition is complete, mark for removal. progress is Math.min(elapsed/duration, 1),
-          // so it hits exactly 1 on the frame elapsed reaches the duration. Completing there lets
-          // the fade run its full length to the exact end colour.
-          if (progress >= 1) {
+          const { state, complete } = stepTransition(transitionData, now)
+          layerStates.set(layer, state)
+          if (complete) {
             layersToRemoveForLight.add(layer)
           }
         })
