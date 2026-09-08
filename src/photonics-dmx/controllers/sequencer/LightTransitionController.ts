@@ -385,8 +385,6 @@ export class LightTransitionController {
       // All calculations use the SAME 'now' timestamp
       const allLayerStates = new Map<string, Map<number, RGBIO>>()
       const layersToRemove: Array<{ lightId: string; layer: number }> = []
-      const lightsToRemove: string[] = []
-      const transitionUpdates: Array<{ lightId: string; layer: number; startState: RGBIO }> = []
 
       this._transitionsByLight.forEach((layerTransitions, lightId) => {
         const layerStates = new Map<number, RGBIO>()
@@ -436,14 +434,9 @@ export class LightTransitionController {
           layerStates.set(layer, correctedState)
 
           // If transition is complete, mark for removal. progress is Math.min(elapsed/duration, 1),
-          // so it hits exactly 1 the frame elapsed reaches the duration — complete there and let the
-          // fade run its full length to the exact end colour (the 0.999 epsilon predated the clamp).
+          // so it hits exactly 1 on the frame elapsed reaches the duration. Completing there lets
+          // the fade run its full length to the exact end colour.
           if (progress >= 1) {
-            transitionUpdates.push({
-              lightId,
-              layer,
-              startState: { ...endState },
-            })
             layersToRemoveForLight.add(layer)
           }
         })
@@ -457,11 +450,6 @@ export class LightTransitionController {
         for (const layer of layersToRemoveForLight) {
           layersToRemove.push({ lightId, layer })
         }
-
-        // Check if this light should be completely removed
-        if (layersToRemoveForLight.size === layerTransitions.size) {
-          lightsToRemove.push(lightId)
-        }
       })
 
       // Phase 2: Update internal state structures
@@ -473,17 +461,6 @@ export class LightTransitionController {
         layerStates.forEach((state, layer) => {
           currentStates.set(layer, state)
         })
-      })
-
-      // Apply transition updates for completed transitions
-      transitionUpdates.forEach(({ lightId, layer, startState }) => {
-        const layerTransitions = this._transitionsByLight.get(lightId)
-        if (layerTransitions) {
-          const transitionData = layerTransitions.get(layer)
-          if (transitionData) {
-            transitionData.startState = startState
-          }
-        }
       })
 
       // Phase 3: Blend ALL layers for ALL lights that have ANY layer state
@@ -501,10 +478,6 @@ export class LightTransitionController {
             this._transitionsByLight.delete(lightId)
           }
         }
-      })
-
-      lightsToRemove.forEach((lightId) => {
-        this._transitionsByLight.delete(lightId)
       })
     } catch (error) {
       log.error('Critical error in transition processing:', error)
