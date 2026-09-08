@@ -66,11 +66,13 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     ) {
       if (this.firingIdle) return
       this.firingIdle = true
-      try {
-        this.onIdleCallback()
-      } finally {
-        this.firingIdle = false
-      }
+      queueMicrotask(() => {
+        try {
+          this.onIdleCallback?.()
+        } finally {
+          this.firingIdle = false
+        }
+      })
     }
   }
 
