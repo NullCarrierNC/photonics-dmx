@@ -10,6 +10,18 @@ import { createLogger } from '../../shared/logger'
 const log = createLogger('Ipc.Sender')
 
 /**
+ * A sender id recoverable from a payload the validator rejected, so the renderer can be told which
+ * toggle to put back. Absent when the payload does not name a known sender.
+ */
+function senderIdFrom(data: unknown): string | null {
+  if (data === null || typeof data !== 'object' || !('sender' in data)) {
+    return null
+  }
+  const validated = validateSenderId((data as { sender: unknown }).sender)
+  return validated.ok ? validated.value : null
+}
+
+/**
  * Set up sender-related IPC handlers (enable/disable, sACN config, network interfaces).
  */
 export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
@@ -17,6 +29,13 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
     const payloadValidation = validateSenderEnablePayload(data)
     if (!payloadValidation.ok) {
       sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, payloadValidation.error)
+      const rejected = senderIdFrom(data)
+      if (rejected) {
+        sendToAllWindows(RENDERER_RECEIVE.SENDER_START_FAILED, {
+          sender: rejected,
+          error: payloadValidation.error,
+        })
+      }
       return { success: false as const, error: payloadValidation.error }
     }
     const config = payloadValidation.value
