@@ -357,6 +357,34 @@ describe('CueConsistencySettings selection modes', () => {
     expect(control<HTMLSelectElement>('yarg-motion-group-selection-mode').value).toBe('none')
   })
 
+  it('leaves a mode chosen while a write is in flight showing the stored one', async () => {
+    let release: (value: { success: boolean; mode: string }) => void = () => {}
+    mocks.setYargMotionGroupSelectionMode.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve
+      }),
+    )
+    await renderPanel()
+
+    // The first change starts a write and holds it open.
+    await act(async () => {
+      fireEvent.change(control('yarg-motion-group-selection-mode'), { target: { value: 'none' } })
+    })
+    // A second change while that write is open is dropped, so the select must not show it.
+    await act(async () => {
+      fireEvent.change(control('yarg-motion-group-selection-mode'), {
+        target: { value: 'oncePerSong' },
+      })
+    })
+
+    expect(control<HTMLSelectElement>('yarg-motion-group-selection-mode').value).toBe('none')
+    expect(mocks.setYargMotionGroupSelectionMode).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      release({ success: true, mode: 'none' })
+    })
+  })
+
   it('disables the YARG and audio motion modes when motion is globally off', async () => {
     await renderPanel({ motionGloballyEnabled: false })
 

@@ -217,8 +217,9 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
     save: (value: T) => Promise<{ success: boolean; error?: string }>,
     what: string,
   ): Promise<void> {
-    apply(next)
+    // Nothing is sent while another write is in flight, so do not show the choice either.
     if (isSaving) return
+    apply(next)
     try {
       setIsSaving(true)
       const result = await save(next)
