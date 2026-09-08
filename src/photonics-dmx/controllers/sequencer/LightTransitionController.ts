@@ -189,7 +189,8 @@ export class LightTransitionController {
       // Publish the black states immediately
       this._lightStateManager.publishLightStates()
     } finally {
-      // Release the clearing flag
+      // Released here rather than by the caller, so the callbacks removeAllEffects cancels next
+      // can submit the cue that follows.
       this._clearingTransitions = false
     }
   }

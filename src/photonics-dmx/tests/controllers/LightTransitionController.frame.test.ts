@@ -252,6 +252,17 @@ describe('LightTransitionController frame loop', () => {
       ltc.clearAllTransitions()
       expect(ltc.isClearing()).toBe(false)
     })
+
+    it('holds the lock while it publishes, so a listener cannot submit into the clear', () => {
+      seedLayer('l', 1, color({ red: 200 }))
+      lsm.onLightStatesUpdated(() => {
+        ltc.setTransition('late', 1, color({ red: 200 }), color({ red: 200 }), 0, 'linear')
+      })
+
+      ltc.clearAllTransitions()
+
+      expect(ltc.getAllLightIds()).toEqual([])
+    })
   })
 
   describe('immediateBlackout', () => {
