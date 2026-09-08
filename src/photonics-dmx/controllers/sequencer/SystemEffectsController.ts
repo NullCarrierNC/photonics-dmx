@@ -105,7 +105,9 @@ export class SystemEffectsController implements ISystemEffectsController {
     log.info(`Initiating blackout for ${duration}ms.`)
 
     try {
-      const allLightIds = this.lightTransitionController.getAllLightIds()
+      // Every light the rig publishes, which is the source the instant path takes through
+      // immediateBlackout.
+      const allLightIds = this.lightTransitionController.getLightStateManagerTrackedLights()
       if (allLightIds.length > 0) {
         // Use maximum layer to override everything (including strobe on layer 200)
         const blackoutLayer = 255
