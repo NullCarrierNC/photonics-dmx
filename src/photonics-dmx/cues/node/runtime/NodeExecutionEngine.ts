@@ -195,8 +195,8 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
     this.sequencer
       .blackout(resolvedTiming.duration)
       .then(() => {
-        // Blackout completed
-        if (context.hasVisited(actionNode.id)) {
+        // Guard on isActionActive: another blocking node can advance the phase while this fades.
+        if (context.isActionActive(actionNode.id)) {
           this.emitNodeExecution('deactivated', actionNode.id)
           context.completeAction(actionNode.id)
         }
@@ -204,7 +204,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
       .catch((error) => {
         log.error(`Error during blackout for action node ${actionNode.id}:`, error)
         // Continue execution despite error
-        if (context.hasVisited(actionNode.id)) {
+        if (context.isActionActive(actionNode.id)) {
           this.emitNodeExecution('deactivated', actionNode.id)
           context.completeAction(actionNode.id)
         }
