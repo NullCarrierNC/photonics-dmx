@@ -8,6 +8,7 @@ import {
   lightingConfigsEqual,
   mapLightsToNewIdsForSave,
   buildMergedPrimaryLightsFromConfig,
+  buildRigConfigForSave,
 } from './lightsLayoutHelpers'
 
 describe('mapLightsToNewIdsForSave', () => {
@@ -186,5 +187,87 @@ describe('createDmxLightInstance', () => {
     const lights = bootstrap(3)
     expect(lights.map(masterOf)).toEqual([1, 21, 41])
     expect(findSharedChannelNumbers(lights)).toEqual([])
+  })
+})
+
+describe('buildRigConfigForSave', () => {
+  function light(id: string, group: string, isStrobeEnabled = false): DmxLight {
+    return {
+      id,
+      position: 1,
+      fixtureId: `t-${id}`,
+      fixture: FixtureTypes.RGB,
+      name: id,
+      label: id,
+      isStrobeEnabled,
+      group,
+      channels: { red: 1, green: 2, blue: 3, masterDimmer: 4 },
+      universe: 0,
+    }
+  }
+
+  const mixed = [
+    light('front-plain', 'front'),
+    light('front-strobe', 'front', true),
+    light('back-strobe', 'back', true),
+    light('dedicated', 'strobe', true),
+  ]
+
+  it('takes no strobe lights when strobe is off', () => {
+    const config = buildRigConfigForSave(mixed, ConfigStrobeType.None, 3, 'front')
+
+    expect(config.strobeLights).toEqual([])
+  })
+
+  it('takes every strobe capable primary when strobe follows the lights', () => {
+    const config = buildRigConfigForSave(mixed, ConfigStrobeType.AllCapable, 3, 'front')
+
+    expect(config.strobeLights.map((l) => l.fixtureId).sort()).toEqual([
+      't-back-strobe',
+      't-front-strobe',
+    ])
+  })
+
+  it('leaves the dedicated group out when strobe follows the lights', () => {
+    const config = buildRigConfigForSave(mixed, ConfigStrobeType.AllCapable, 3, 'front')
+
+    expect(config.strobeLights.map((l) => l.fixtureId)).not.toContain('t-dedicated')
+  })
+
+  it('takes only the dedicated group when strobe is dedicated', () => {
+    const config = buildRigConfigForSave(mixed, ConfigStrobeType.Dedicated, 3, 'front')
+
+    expect(config.strobeLights.map((l) => l.fixtureId)).toEqual(['t-dedicated'])
+  })
+
+  it('splits the primaries by their group', () => {
+    const config = buildRigConfigForSave(mixed, ConfigStrobeType.None, 3, 'front')
+
+    expect(config.frontLights.map((l) => l.fixtureId)).toEqual(['t-front-plain', 't-front-strobe'])
+    expect(config.backLights.map((l) => l.fixtureId)).toEqual(['t-back-strobe'])
+  })
+
+  it('gives a light listed in two groups one id across them', () => {
+    const shared = light('shared', 'front', true)
+    const config = buildRigConfigForSave([shared], ConfigStrobeType.AllCapable, 1, 'front')
+
+    expect(config.frontLights[0]!.id).toBe(config.strobeLights[0]!.id)
+    expect(config.frontLights[0]!.id).not.toBe('shared')
+  })
+
+  it('resolves the layout by id', () => {
+    expect(buildRigConfigForSave([], ConfigStrobeType.None, 0, 'two-rows').lightLayout.id).toBe(
+      'two-rows',
+    )
+  })
+
+  it('falls back to the first layout when the id is unknown', () => {
+    expect(buildRigConfigForSave([], ConfigStrobeType.None, 0, 'nope').lightLayout).toEqual(
+      LIGHT_LAYOUTS[0],
+    )
+  })
+
+  it('reads an unset light count as none', () => {
+    expect(buildRigConfigForSave([], ConfigStrobeType.None, null, 'front').numLights).toBe(0)
   })
 })

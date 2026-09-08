@@ -49,7 +49,7 @@ import {
   isTwoRowPrimaryLayout,
   splitLights,
   createDmxLightInstance,
-  mapLightsToNewIdsForSave,
+  buildRigConfigForSave,
   lightingConfigsEqual,
 } from './LightsLayout/lightsLayoutHelpers'
 import {
@@ -484,35 +484,12 @@ const LightsLayout = () => {
       return
     }
 
-    // Decide final strobe set based on the strobe mode
-    let finalStrobe: DmxLight[] = []
-
-    if (selectedStrobe === ConfigStrobeType.AllCapable) {
-      // All primary lights that are strobe-enabled
-      finalStrobe = allPrimaryLights.filter((l) => l.isStrobeEnabled && l.group !== 'strobe')
-    } else if (selectedStrobe === ConfigStrobeType.Dedicated) {
-      // Only dedicated strobe group
-      finalStrobe = allPrimaryLights.filter((l) => l.group === 'strobe')
-    }
-    // If "None", finalStrobe remains empty
-
-    const finalFront = allPrimaryLights.filter((l) => l.group === 'front')
-    const finalBack = allPrimaryLights.filter((l) => l.group === 'back')
-
-    const idMap: Record<string, string> = {}
-
-    const frontWithNewIds = mapLightsToNewIdsForSave(finalFront, idMap)
-    const backWithNewIds = mapLightsToNewIdsForSave(finalBack, idMap)
-    const strobeWithNewIds = mapLightsToNewIdsForSave(finalStrobe, idMap)
-
-    const updatedConfig: LightingConfiguration = {
-      numLights: selectedCount || 0,
-      lightLayout: LIGHT_LAYOUTS.find((layout) => layout.id === selectedLayout) || LIGHT_LAYOUTS[0],
-      strobeType: selectedStrobe,
-      frontLights: frontWithNewIds,
-      backLights: backWithNewIds,
-      strobeLights: strobeWithNewIds,
-    }
+    const updatedConfig = buildRigConfigForSave(
+      allPrimaryLights,
+      selectedStrobe,
+      selectedCount,
+      selectedLayout,
+    )
 
     const currentRig = rigs.find((r) => r.id === activeRigId)
     if (!currentRig) {
