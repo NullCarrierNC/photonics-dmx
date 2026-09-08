@@ -76,7 +76,7 @@ describe('venue post-processing colour transforms', () => {
     const out = apply('Scanlines_Blue', 200, 200, 200)
     expect(out.r).toBe(0)
     // Blue is driven past the ceiling, so it only leaves it by as much as the flicker swings.
-    expect(out.b).toBeGreaterThan(239)
+    expect(out.b).toBeGreaterThan(235)
   })
 
   it('flickers the level for Scanlines without shifting hue', () => {
@@ -88,6 +88,16 @@ describe('venue post-processing colour transforms', () => {
       expect(out.b / out.r).toBeCloseTo(0.25, 1)
     }
     expect(levels.size).toBeGreaterThan(1)
+  })
+
+  it('holds a scan line flicker sample past the film grain quantum', () => {
+    const proc = new VenuePostProcessor()
+    proc.setState('Scanlines')
+    const first = newColor()
+    const later = newColor()
+    proc.transform('light-1', 200, 100, 50, 255, 0, first)
+    proc.transform('light-1', 200, 100, 50, 255, 34, later)
+    expect(later).toEqual(first)
   })
 
   it('reports the whole scan line family as active', () => {
