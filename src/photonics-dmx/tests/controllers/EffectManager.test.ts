@@ -146,7 +146,6 @@ describe('EffectManager', () => {
       removeLightLayer: jest.fn(),
       getFinalLightState: jest.fn(),
       getLightState: jest.fn(),
-      resetLightStates: jest.fn(),
       clearAllTransitions: jest.fn(),
       beginClearingSequence: jest.fn(),
       endClearingSequence: jest.fn(),

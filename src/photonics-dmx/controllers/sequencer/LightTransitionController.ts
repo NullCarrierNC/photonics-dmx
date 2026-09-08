@@ -170,19 +170,6 @@ export class LightTransitionController {
   }
 
   /**
-   * Gets all unique layers that have transitions
-   */
-  public getAllTransitionLayers(): number[] {
-    const layers = new Set<number>()
-    for (const layerMap of this._transitionsByLight.values()) {
-      for (const layer of layerMap.keys()) {
-        layers.add(layer)
-      }
-    }
-    return Array.from(layers).sort((a, b) => a - b)
-  }
-
-  /**
    * Clears ALL transitions and resets all lights to black
    * This is a nuclear option used when switching cues
    */
@@ -303,16 +290,6 @@ export class LightTransitionController {
     }
     this.calculateFinalColorForLight(lightId)
     this._lightStateManager.publishLightStates()
-  }
-
-  /**
-   * Removes all transitions for the given lights entirely.
-   */
-  public removeLights(lightIds: string[]): void {
-    lightIds.forEach((id) => {
-      this._transitionsByLight.delete(id)
-      this._currentLayerStates.delete(id)
-    })
   }
 
   /**
@@ -602,30 +579,6 @@ export class LightTransitionController {
     this._lightStateManager.setLightState(lightId, this.applyOcclusion(finalColor))
   }
 
-  public resetLightStates(): void {
-    // Force all lights to black state first
-    const allLightIds = this._lightStateManager.getTrackedLightIds()
-    const blackState: RGBIO = {
-      red: 0,
-      green: 0,
-      blue: 0,
-      intensity: 0,
-      opacity: 1.0,
-      blendMode: 'replace',
-    }
-
-    allLightIds.forEach((lightId) => {
-      this._lightStateManager.setLightState(lightId, blackState)
-    })
-
-    // Then clear all internal state
-    this._transitionsByLight.clear()
-    this._currentLayerStates.clear()
-
-    // Ensure the black state is published
-    //this._lightStateManager.publishLightStates();
-  }
-
   /**
    * Shuts down the LTC, stopping intervals and clearing data.
    */
@@ -739,20 +692,5 @@ export class LightTransitionController {
   /** Whether the occlusion is currently held. */
   public isOcclusionHeld(): boolean {
     return this._occlusionHeld
-  }
-
-  /**
-   * Get the current system time for debugging timing issues
-   */
-  public getCurrentSystemTime(): number {
-    return performance.now()
-  }
-
-  /**
-   * Get the current time from the system
-   * Uses performance.now() for high precision timing
-   */
-  public getCurrentTime(): number {
-    return performance.now()
   }
 }
