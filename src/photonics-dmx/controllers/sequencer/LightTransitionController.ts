@@ -367,11 +367,7 @@ export class LightTransitionController {
       // Periodic state validation and cleanup
       if (now - this.lastStateValidation > this.VALIDATION_INTERVAL) {
         validateAllStates(this._currentLayerStates, this._lightStateManager)
-        cleanupOrphanedTransitions(
-          this._transitionsByLight,
-          this._lightStateManager,
-          performance.now(),
-        )
+        cleanupOrphanedTransitions(this._transitionsByLight, this._lightStateManager, now)
         this.lastStateValidation = now
       }
 

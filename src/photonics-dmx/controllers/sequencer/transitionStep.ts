@@ -24,7 +24,9 @@ export function stepTransition(data: TransitionData, now: number): TransitionSte
 
   const elapsed = now - startTime
   const duration = transition.transform.duration
-  const progress = duration > 0 ? Math.min(elapsed / duration, 1) : 1
+  // Clamped at both ends. A transition started during this same tick is stamped after the frame
+  // sampled its clock, so elapsed can be negative, and the easing curves are defined over 0 to 1.
+  const progress = duration > 0 ? Math.max(0, Math.min(elapsed / duration, 1)) : 1
   const easedProgress = getEasingValue(progress, transition.transform.easing)
 
   const state: RGBIO = {

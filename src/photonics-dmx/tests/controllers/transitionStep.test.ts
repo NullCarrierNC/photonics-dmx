@@ -54,6 +54,15 @@ describe('stepTransition', () => {
     expect([state.red, state.green, state.blue, state.intensity]).toEqual([100, 50, 150, 50])
   })
 
+  it('holds the start colour when stepped before its start time', () => {
+    const { state, complete } = stepTransition(
+      transition(color({ red: 100 }), color({ red: 200 }), 100, 'quadraticIn'),
+      START_TIME - 40,
+    )
+    expect(state.red).toBe(100)
+    expect(complete).toBe(false)
+  })
+
   it('is not complete a hair before the duration elapses', () => {
     const { complete } = stepTransition(
       transition(color({ red: 0 }), color({ red: 200 }), 1000),
