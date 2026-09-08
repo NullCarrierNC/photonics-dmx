@@ -217,12 +217,14 @@ export function syncOutputSenderAtoms(senderStatus: {
   sacn: boolean
   artnet: boolean
   enttecpro: boolean
+  opendmx: boolean
   ipc: boolean
 }): void {
   const store = getDefaultStore()
   store.set(senderSacnEnabledAtom, senderStatus.sacn)
   store.set(senderArtNetEnabledAtom, senderStatus.artnet)
   store.set(senderEnttecProEnabledAtom, senderStatus.enttecpro)
+  store.set(senderOpenDmxEnabledAtom, senderStatus.opendmx)
 }
 
 // ArtNet config derived from preferences with fallback defaults
