@@ -8,6 +8,7 @@ import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { Rb3MenuCueHandler } from '../../cueHandlers/Rb3MenuCueHandler'
 import { Rb3StageKitDirectProcessor } from '../../processors/Rb3StageKitDirectProcessor'
+import { DEFAULT_STAGEKIT_CONFIG } from '../../listeners/RB3/StageKitTypes'
 import { ChainFanout } from '../../controllers/ChainFanout'
 import type { RigChain } from '../../controllers/RigChain'
 import { getColor } from '../../helpers/dmxHelpers'
@@ -293,5 +294,11 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     for (let i = 0; i < 4; i++) {
       expect(removeEffect).toHaveBeenCalledWith(menuLight(i), 1 + i)
     }
+  })
+})
+
+describe('StageKit direct mode configuration', () => {
+  it('carries only the settings something reads', () => {
+    expect(Object.keys(DEFAULT_STAGEKIT_CONFIG).sort()).toEqual(['debug', 'enabled'])
   })
 })
