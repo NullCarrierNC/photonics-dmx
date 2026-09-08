@@ -294,8 +294,10 @@ export class EffectManager implements IEffectManager {
     }
 
     if (policy.blockDuplicateName && this.isEffectRunning(name)) {
+      // Ordinary flow control rather than a fault. A held cue is called on every forwarded frame,
+      // so a chain that outlives one frame is refused around thirty times a second while it runs.
       const rigSuffix = this.rigLabel ? ` [rig: ${this.rigLabel}]` : ''
-      log.warn(
+      log.debug(
         `Not ${policy.verb.progressive} effect "${name}" because an effect with the same name is already running. Preventing timing issues.${rigSuffix}`,
       )
       return false
