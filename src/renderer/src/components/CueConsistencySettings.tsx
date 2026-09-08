@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getCueConsistencyWindow,
   setCueConsistencyWindow,
@@ -47,6 +47,8 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
   motionGloballyEnabled = true,
 }) => {
   const [consistencyWindow, setConsistencyWindow] = useState(10000)
+  /** The window the main process last confirmed, which a refused write falls back to. */
+  const savedConsistencyWindow = useRef(10000)
   const [selectionMode, setSelectionMode] = useState<CueGroupSelectionMode>('withinSong')
   const [rb3SelectionMode, setRb3SelectionMode] = useState<CueGroupSelectionMode>('withinSong')
   const [yargMotionSelectionMode, setYargMotionSelectionModeState] =
@@ -117,7 +119,10 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           getRb3MotionCueDuration(),
           getRb3CueGroupSelectionMode(),
         ])
-        if (windowResult.success) setConsistencyWindow(windowResult.windowMs)
+        if (windowResult.success) {
+          setConsistencyWindow(windowResult.windowMs)
+          savedConsistencyWindow.current = windowResult.windowMs
+        }
         if (modeResult.success) setSelectionMode(modeResult.mode)
         if (rb3ModeResult.success) setRb3SelectionMode(rb3ModeResult.mode)
         if (yargMotionResult?.success === true && yargMotionResult.mode) {
@@ -186,20 +191,19 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
         const result = await setCueConsistencyWindow(newValue)
         if (result.success) {
           setConsistencyWindow(result.windowMs)
+          savedConsistencyWindow.current = result.windowMs
         } else {
           log.error('Failed to save consistency window:', result.error)
-          // Revert to previous value on failure
-          setConsistencyWindow(consistencyWindow)
+          setConsistencyWindow(savedConsistencyWindow.current)
         }
       } catch (error) {
         log.error('Failed to save consistency window:', error)
-        // Revert to previous value on failure
-        setConsistencyWindow(consistencyWindow)
+        setConsistencyWindow(savedConsistencyWindow.current)
       } finally {
         setIsSaving(false)
       }
     },
-    [isSaving, consistencyWindow],
+    [isSaving],
   )
 
   /**

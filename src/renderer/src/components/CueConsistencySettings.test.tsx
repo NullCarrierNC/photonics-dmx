@@ -143,11 +143,7 @@ describe('CueConsistencySettings consistency window', () => {
     expect(mocks.setCueConsistencyWindow).toHaveBeenCalledWith(expected)
   })
 
-  /**
-   * The failure branch reverts to the state value, which the keystroke handler has already moved
-   * to the typed number, so the field keeps a value the main process rejected.
-   */
-  it('keeps the typed value on screen when the write fails', async () => {
+  it('puts the loaded window back when the write is refused', async () => {
     mocks.setCueConsistencyWindow.mockReturnValueOnce(fail({ windowMs: 0 }))
     await renderPanel()
 
@@ -157,7 +153,50 @@ describe('CueConsistencySettings consistency window', () => {
     })
 
     expect(mocks.setCueConsistencyWindow).toHaveBeenCalledWith(25000)
-    expect(control<HTMLInputElement>('consistency-window').value).toBe('25000')
+    expect(control<HTMLInputElement>('consistency-window').value).toBe('10000')
+  })
+
+  it('falls back to the window the load returned, not the starting default', async () => {
+    mocks.getCueConsistencyWindow.mockReturnValueOnce(ok({ windowMs: 42000 }))
+    mocks.setCueConsistencyWindow.mockReturnValueOnce(fail({ windowMs: 0 }))
+    await renderPanel()
+
+    fireEvent.change(control('consistency-window'), { target: { value: '25000' } })
+    await act(async () => {
+      fireEvent.blur(control('consistency-window'))
+    })
+
+    expect(control<HTMLInputElement>('consistency-window').value).toBe('42000')
+  })
+
+  it('puts the loaded window back when the write throws', async () => {
+    mocks.setCueConsistencyWindow.mockImplementationOnce(() => Promise.reject(new Error('offline')))
+    await renderPanel()
+
+    fireEvent.change(control('consistency-window'), { target: { value: '25000' } })
+    await act(async () => {
+      fireEvent.blur(control('consistency-window'))
+    })
+
+    expect(control<HTMLInputElement>('consistency-window').value).toBe('10000')
+  })
+
+  it('falls back to the last accepted window, not the loaded one', async () => {
+    mocks.setCueConsistencyWindow
+      .mockReturnValueOnce(ok({ windowMs: 30000 }))
+      .mockReturnValueOnce(fail({ windowMs: 0 }))
+    await renderPanel()
+
+    fireEvent.change(control('consistency-window'), { target: { value: '30000' } })
+    await act(async () => {
+      fireEvent.blur(control('consistency-window'))
+    })
+    fireEvent.change(control('consistency-window'), { target: { value: '99000' } })
+    await act(async () => {
+      fireEvent.blur(control('consistency-window'))
+    })
+
+    expect(control<HTMLInputElement>('consistency-window').value).toBe('30000')
   })
 
   it('takes the value the main process returns, not the one it was sent', async () => {
