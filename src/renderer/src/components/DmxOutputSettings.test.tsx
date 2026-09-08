@@ -601,3 +601,39 @@ describe('DmxOutputSettings serial ports', () => {
     )
   })
 })
+
+describe('DmxOutputSettings refused senders', () => {
+  it('keeps the sender available but marks it not running when the start is refused', async () => {
+    enableSenderMock.mockReturnValue({ success: false, error: 'port in use' } as never)
+    const store = await renderPanel({ dmxOutputConfig: outputConfig() })
+
+    fireEvent.click(screen.getByLabelText('sACN'))
+
+    await waitFor(() => expect(store.get(senderSacnEnabledAtom)).toBe(false))
+    // The checkbox says which senders are available, not which are running.
+    await waitFor(() => expect(savedOutputConfig().sacnEnabled).toBe(true))
+  })
+
+  it('marks the sender running again when the stop is refused', async () => {
+    disableSenderMock.mockReturnValue({ success: false, error: 'busy' } as never)
+    const store = await renderPanel(
+      { dmxOutputConfig: enabled('sacnEnabled') },
+      onlyRunning('sacn'),
+    )
+
+    fireEvent.click(screen.getByLabelText('sACN'))
+
+    await waitFor(() => expect(store.get(senderSacnEnabledAtom)).toBe(true))
+  })
+
+  it('marks the sender not running when the start throws', async () => {
+    enableSenderMock.mockImplementation(() => {
+      throw new Error('bridge gone')
+    })
+    const store = await renderPanel({ dmxOutputConfig: outputConfig() })
+
+    fireEvent.click(screen.getByLabelText('sACN'))
+
+    await waitFor(() => expect(store.get(senderSacnEnabledAtom)).toBe(false))
+  })
+})

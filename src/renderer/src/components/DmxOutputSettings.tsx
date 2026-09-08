@@ -37,6 +37,7 @@ import {
   parseOpenDmxSpeed,
   type DmxOutputFlag,
 } from './DmxOutputSettings/outputConfig'
+import { applySenderRunState } from '../ipc/senderSwitch'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('DmxOutputSettings')
@@ -188,13 +189,10 @@ const DmxOutputSettings: React.FC = () => {
       dmxOutputConfig: newConfig,
     }))
 
-    if (enabled && !toggle.isRunning) {
-      toggle.start()
-      toggle.setRunning(true)
-    }
-    if (!enabled && toggle.isRunning) {
-      toggle.stop()
-      toggle.setRunning(false)
+    if (enabled !== toggle.isRunning) {
+      void applySenderRunState(name, enabled, toggle.setRunning, () =>
+        enabled ? toggle.start() : toggle.stop(),
+      )
     }
 
     try {
