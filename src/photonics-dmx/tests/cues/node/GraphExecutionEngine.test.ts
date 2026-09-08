@@ -215,9 +215,11 @@ describe('GraphExecutionEngine', () => {
       }),
       addEffectUnblockedNameWithCallback: jest.fn((_name: string, _e: unknown, cb: () => void) => {
         if (cb) setTimeout(cb, 0)
+        return true
       }),
       setEffectUnblockedNameWithCallback: jest.fn((_name: string, _e: unknown, cb: () => void) => {
         if (cb) setTimeout(cb, 0)
+        return true
       }),
       removeEffectCallback: jest.fn(),
       blackout: jest.fn().mockResolvedValue(undefined),

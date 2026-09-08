@@ -44,10 +44,12 @@ function createRecordingSequencer(): { sequencer: ILightingController; recorded:
     addEffectUnblockedNameWithCallback: (name: string, _effect: unknown, callback: () => void) => {
       recorded.push({ method: 'addEffect', name })
       callback()
+      return true
     },
     setEffectUnblockedNameWithCallback: (name: string, _effect: unknown, callback: () => void) => {
       recorded.push({ method: 'setEffect', name })
       callback()
+      return true
     },
     removeEffectCallback: () => {},
     blackout: () => Promise.resolve(),

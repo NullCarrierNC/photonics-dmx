@@ -52,9 +52,11 @@ describe('EffectExecutionEngine', () => {
       setEffectUnblockedName: jest.fn().mockReturnValue(true),
       addEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
         setTimeout(() => callback(), 0)
+        return true
       }),
       setEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
         setTimeout(() => callback(), 0)
+        return true
       }),
       removeEffectCallback: jest.fn(),
       removeEffect: jest.fn(),

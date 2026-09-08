@@ -70,6 +70,7 @@ describe('NodeExecutionEngine', () => {
       }),
       addEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
         if (callback) setTimeout(() => callback(), 1)
+        return true
       }),
       // Blocking set-position submits through this one and reads the applied result.
       replaceEffectWithCallback: jest.fn((_name, _effect, callback) => {
@@ -78,6 +79,7 @@ describe('NodeExecutionEngine', () => {
       }),
       setEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
         if (callback) setTimeout(() => callback(), 1)
+        return true
       }),
       removeEffectCallback: jest.fn(),
       setEffect: jest.fn(),
