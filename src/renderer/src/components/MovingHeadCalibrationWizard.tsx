@@ -8,15 +8,12 @@ import {
   RgbMovingHeadDmxChannels,
 } from '../../../photonics-dmx/types'
 import {
-  mirrorDmxForMovingHeadInvert,
-  percentToDmx,
-} from '../../../photonics-dmx/helpers/dmxHelpers'
-import {
   motorDegFromPanDmx,
   motorDegFromTiltDmx,
   rawDmxToLogicalHomePercent,
 } from '../../../photonics-dmx/helpers/movingHeadCalibration'
 import { getDmxPreviewLightColorCss } from './dmxPreviewLightColor'
+import { buildInitialConsoleBuffer } from './movingHeadCalibrationBuffer'
 import {
   enableConsole,
   disableConsole,
@@ -48,53 +45,6 @@ const REVIEW_STEP = STEP_TITLES.length - 1
 
 /** Steps where the user must press a capture button before Next is enabled. */
 const STEPS_REQUIRING_SET_CAPTURE = new Set([4, 5, 6])
-
-function channelsRecord(light: DmxLight): Record<string, number> {
-  return light.channels as unknown as Record<string, number>
-}
-
-function buildInitialConsoleBuffer(light: DmxLight): Record<number, number> {
-  const cfg = normalizeFixtureConfig(light.config)
-  const ch = channelsRecord(light)
-  const buf: Record<number, number> = {}
-  for (const [name, addr] of Object.entries(ch)) {
-    if (typeof addr !== 'number' || addr < 1 || addr > 512) continue
-    switch (name) {
-      case 'masterDimmer':
-        buf[addr] = 255
-        break
-      case 'pan': {
-        const logicalDmx = percentToDmx(cfg.panHome, cfg.panMin, cfg.panMax)
-        buf[addr] = cfg.invertPan
-          ? mirrorDmxForMovingHeadInvert(logicalDmx, cfg.panMin, cfg.panMax)
-          : logicalDmx
-        break
-      }
-      case 'tilt': {
-        const logicalDmx = percentToDmx(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
-        buf[addr] = cfg.invertTilt
-          ? mirrorDmxForMovingHeadInvert(logicalDmx, cfg.tiltMin, cfg.tiltMax)
-          : logicalDmx
-        break
-      }
-      case 'red':
-      case 'green':
-      case 'blue':
-      case 'white':
-        buf[addr] = 255
-        break
-      default:
-        buf[addr] = 0
-    }
-  }
-  // Added channels also run in console manual mode: hold fixed/mode channels at their value so a
-  // moving head that needs a pinned mode channel lights up, and park colour extras dark.
-  for (const extra of light.extraChannels ?? []) {
-    if (typeof extra.channel !== 'number' || extra.channel < 1 || extra.channel > 512) continue
-    buf[extra.channel] = extra.type === 'fixed' ? Math.max(0, Math.min(255, extra.value ?? 0)) : 0
-  }
-  return buf
-}
 
 function DmxSlider(props: {
   label: string
