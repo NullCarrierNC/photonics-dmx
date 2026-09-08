@@ -79,6 +79,22 @@ describe('an effect evicted from its layer slot', () => {
     expect(completions).toEqual([])
   })
 
+  it('is told its run ended when a blackout wipes the rig', () => {
+    const completions: boolean[] = []
+    harness.sequencer.addEffectUnblockedNameWithCallback(
+      'held',
+      look(RED, 1),
+      (cancelled) => completions.push(cancelled),
+      false,
+    )
+    harness.advanceBy(50)
+
+    void harness.sequencer.blackout(0)
+    harness.advanceBy(50)
+
+    expect(completions).toEqual([true])
+  })
+
   it('stays waiting while a queued run of the same name takes over', () => {
     const completions: boolean[] = []
     harness.sequencer.addEffectUnblockedNameWithCallback(

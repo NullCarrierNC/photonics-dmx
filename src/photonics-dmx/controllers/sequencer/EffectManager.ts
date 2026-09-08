@@ -100,7 +100,8 @@ export class EffectManager implements IEffectManager {
     this.systemEffects.setOnBlackoutCompleteCallback(() => {
       // Reset layer 0 effect tracking when a blackout completes
       this._lastCalled0LayerEffect = ''
-      //  console.debug("EffectManager: Reset _lastCalled0LayerEffect after blackout");
+      // The wipe bypassed the scheduler, so the waiters it left behind are released here.
+      this.effectCallbacks.cancelAll()
     })
   }
 
@@ -575,7 +576,6 @@ export class EffectManager implements IEffectManager {
     }
 
     // Use our existing mechanism to add the effect on layer 0
-    //console.log(`EffectManager: Adding effect ${effect.id} with transitions: ${effect.transitions.length}`,color);
     this.addEffect('setState', effect)
   }
 
