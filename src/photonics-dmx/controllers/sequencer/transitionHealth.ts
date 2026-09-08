@@ -6,6 +6,7 @@
  * over them.
  */
 import { BLEND_MODE_OPTIONS } from '../../constants/options'
+import { opaqueBlack } from './lightBlending'
 import type { BlendMode, RGBIO } from '../../types'
 import type { LightStateManager } from './LightStateManager'
 import type { TransitionData } from './LightTransitionController'
@@ -116,14 +117,7 @@ export function emergencyStateReset(
 
   // Force all lights to black state first
   const allLightIds = lightStateManager.getTrackedLightIds()
-  const blackState: RGBIO = {
-    red: 0,
-    green: 0,
-    blue: 0,
-    intensity: 0,
-    opacity: 1.0,
-    blendMode: 'replace',
-  }
+  const blackState = opaqueBlack()
 
   allLightIds.forEach((lightId) => {
     lightStateManager.setLightState(lightId, blackState)

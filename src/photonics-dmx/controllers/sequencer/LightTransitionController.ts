@@ -4,6 +4,7 @@ import {
   getEasingValue,
   interpolate,
   interpolateFloat,
+  opaqueBlack,
   transparentColor,
 } from './lightBlending'
 import {
@@ -116,15 +117,7 @@ export class LightTransitionController {
       if (currentState) {
         effectiveStartState = { ...currentState }
       } else {
-        // Create a default black RGBIP
-        effectiveStartState = {
-          red: 0,
-          green: 0,
-          blue: 0,
-          intensity: 0,
-          opacity: 0.0,
-          blendMode: 'replace',
-        }
+        effectiveStartState = transparentColor()
       }
     }
 
@@ -192,14 +185,7 @@ export class LightTransitionController {
       this._currentLayerStates.clear()
 
       // Reset all lights to black
-      const blackState: RGBIO = {
-        red: 0,
-        green: 0,
-        blue: 0,
-        intensity: 0,
-        opacity: 1.0,
-        blendMode: 'replace',
-      }
+      const blackState = opaqueBlack()
 
       allLightIds.forEach((lightId) => {
         this._lightStateManager.setLightState(lightId, blackState)
@@ -242,7 +228,7 @@ export class LightTransitionController {
 
     // Force immediate recalculation and publication of the final color
     // This ensures the light updates immediately rather than waiting for the next update cycle
-    this.calculateFinalColorForLight(lightId)
+    this.blendAndSetFinalColor(lightId)
     //  this._lightStateManager.publishLightStates();
   }
 
@@ -258,7 +244,7 @@ export class LightTransitionController {
         delete next.tilt
         layerMap.set(layer, next)
       }
-      this.calculateFinalColorForLight(lightId)
+      this.blendAndSetFinalColor(lightId)
     }
   }
 
@@ -288,7 +274,7 @@ export class LightTransitionController {
     if (currentLayerMap.size === 0) {
       this._currentLayerStates.delete(lightId)
     }
-    this.calculateFinalColorForLight(lightId)
+    this.blendAndSetFinalColor(lightId)
     this._lightStateManager.publishLightStates()
   }
 
@@ -328,15 +314,8 @@ export class LightTransitionController {
       // Get the current state to check if it has pan/tilt values
       const currentState = this._lightStateManager.getLightState(lightId)
 
-      // Create a black state, only including pan/tilt if fixture uses them
-      const blackState: RGBIO = {
-        red: 0,
-        green: 0,
-        blue: 0,
-        intensity: 0,
-        opacity: 0.0,
-        blendMode: 'replace',
-      }
+      // A per-light black, since the pan/tilt below is written onto it.
+      const blackState = transparentColor()
 
       // Check if this fixture has pan/tilt
       if (currentState && (currentState.pan !== undefined || currentState.tilt !== undefined)) {
@@ -541,41 +520,29 @@ export class LightTransitionController {
   }
 
   /**
-   * Blends all layers for a light and sets the final color
+   * Blends a light's layers lowest first and sets the merged colour on the light state manager. A
+   * light with no layers goes hard black.
+   *
    * @param lightId The ID of the light
-   * @param layerStates Map of layer numbers to their interpolated states
+   * @param layerStates The light's layer states, defaulting to the ones held for it.
    */
-  private blendAndSetFinalColor(lightId: string, layerStates: Map<number, RGBIO>): void {
-    const transparent = transparentColor()
-    const blackColor: RGBIO = {
-      red: 0,
-      green: 0,
-      blue: 0,
-      intensity: 0,
-      opacity: 1.0,
-      blendMode: 'replace',
-    }
-
-    // If no layers, force hard black output
-    if (layerStates.size === 0) {
-      this._lightStateManager.setLightState(lightId, blackColor)
+  private blendAndSetFinalColor(lightId: string, layerStates?: Map<number, RGBIO>): void {
+    const states = layerStates ?? this._currentLayerStates.get(lightId)
+    if (!states || states.size === 0) {
+      this._lightStateManager.setLightState(lightId, opaqueBlack())
       return
     }
 
-    let finalColor: RGBIO = transparent
+    let finalColor: RGBIO = transparentColor()
 
     // Convert Map to array, sort by layer number, then blend
-    const sortedLayers = Array.from(layerStates.entries()).sort(
-      ([layerA], [layerB]) => layerA - layerB,
-    )
+    const sortedLayers = Array.from(states.entries()).sort(([layerA], [layerB]) => layerA - layerB)
 
     for (const [_, layerColor] of sortedLayers) {
       finalColor = blendWithOpacity(finalColor, layerColor)
     }
 
-    // Update the light state manager (will be batched). Occlusion is applied here as well as in
-    // calculateFinalColorForLight: this is the per-frame path, so skipping it would let the very
-    // next tick republish the unoccluded blend.
+    // Update the light state manager (will be batched).
     this._lightStateManager.setLightState(lightId, this.applyOcclusion(finalColor))
   }
 
@@ -610,54 +577,6 @@ export class LightTransitionController {
   }
 
   /**
-   * Calculates the final color for a light by blending all active layers
-   * @param lightId The ID of the light to calculate for
-   * @returns The calculated final color
-   */
-  private calculateFinalColorForLight(lightId: string): RGBIO {
-    const transparent = transparentColor()
-    const blackColor: RGBIO = {
-      red: 0,
-      green: 0,
-      blue: 0,
-      intensity: 0,
-      opacity: 1.0,
-      blendMode: 'replace',
-    }
-
-    if (!this._currentLayerStates.has(lightId)) {
-      this._lightStateManager.setLightState(lightId, blackColor)
-      return blackColor
-    }
-
-    const layerStates = this._currentLayerStates.get(lightId)!
-
-    // If no layers remain for this light, force hard black output
-    if (layerStates.size === 0) {
-      this._lightStateManager.setLightState(lightId, blackColor)
-      return blackColor
-    }
-
-    let finalColor: RGBIO = transparent
-
-    // Convert Map to array, sort by layer number, then process
-    const sortedLayers = Array.from(layerStates.entries()).sort(
-      ([layerA], [layerB]) => layerA - layerB,
-    )
-
-    for (const [_, layerColor] of sortedLayers) {
-      finalColor = blendWithOpacity(finalColor, layerColor)
-    }
-
-    finalColor = this.applyOcclusion(finalColor)
-
-    // Update the light state manager
-    this._lightStateManager.setLightState(lightId, finalColor)
-
-    return finalColor
-  }
-
-  /**
    * Force a blended colour dark while an occlusion is held, keeping pan/tilt so moving heads hold
    * their aim behind it.
    *
@@ -684,7 +603,7 @@ export class LightTransitionController {
     }
     this._occlusionHeld = on
     for (const lightId of this._lightStateManager.getTrackedLightIds()) {
-      this.calculateFinalColorForLight(lightId)
+      this.blendAndSetFinalColor(lightId)
     }
     this._lightStateManager.publishLightStates()
   }

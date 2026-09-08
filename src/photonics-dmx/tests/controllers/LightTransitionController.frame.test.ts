@@ -302,6 +302,21 @@ describe('LightTransitionController frame loop', () => {
       expect(published('mh').tilt).toBe(77)
     })
 
+    it('darkens a light the manager tracks but the controller holds no layers for', () => {
+      lsm.setLightState('manager-only', color({ red: 200 }))
+
+      ltc.setOcclusionHeld(true)
+
+      expect(published('manager-only')).toEqual({
+        red: 0,
+        green: 0,
+        blue: 0,
+        intensity: 0,
+        opacity: 1.0,
+        blendMode: 'replace',
+      })
+    })
+
     it('keeps published colour dark on later frames while held', () => {
       ltc.setTransition('l', 1, color({ red: 0 }), color({ red: 200 }), 1000, 'linear')
       frame(T0)

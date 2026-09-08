@@ -121,5 +121,15 @@ export function transparentColor(): RGBIO {
 }
 
 /**
- * Clears all transitions, final colors, etc.
+ * Returns a black that hides the layers below it, the colour a light with no layers publishes.
  */
+export function opaqueBlack(): RGBIO {
+  return {
+    red: 0,
+    green: 0,
+    blue: 0,
+    intensity: 0,
+    opacity: 1.0,
+    blendMode: 'replace',
+  }
+}
