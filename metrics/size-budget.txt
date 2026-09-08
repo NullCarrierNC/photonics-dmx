@@ -14,4 +14,3 @@ Entries may only shrink. Regenerate after a split with: node scripts/size-budget
 620 src/photonics-dmx/processors/AudioCueProcessor.ts
 613 src/photonics-dmx/cues/node/loader/NodeCueLoader.ts
 602 src/photonics-dmx/cueHandlers/CueHandler.ts
-602 src/renderer/src/components/LightChannelsConfig.tsx
