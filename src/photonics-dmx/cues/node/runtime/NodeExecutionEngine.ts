@@ -577,8 +577,12 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
       // to the next node. Continuing only on idle ensures delay-based stepping (e.g. Score 500ms
       // yellow, 200ms blue) is observed: the next raiser (e.g. blue) runs after this effect
       // completes instead of in the same tick (which would replace this effect via addEffect).
+      // Idle lands on a microtask, by which time a re-call arriving in the same pass as the beat
+      // that finished the run can have retired this engine and tracked a replacement. Only the
+      // engine still tracked under this key acts on its idle.
       effectEngine.setOnIdle(() => {
-        if (raiserNode.isPersistent && this.activeEffectEngines.has(engineKey)) {
+        if (this.activeEffectEngines.get(engineKey) !== effectEngine) return
+        if (raiserNode.isPersistent) {
           this.debugLog(`Effect raiser ${raiserNode.id} persistent: re-triggering`)
           effectEngine.triggerEffect(context.cueData)
         } else {
