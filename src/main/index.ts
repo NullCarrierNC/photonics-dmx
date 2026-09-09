@@ -23,8 +23,18 @@ function closeFileLogWithTimeout(): Promise<void> {
   return Promise.race([c(), new Promise<void>((resolve) => setTimeout(resolve, 500))])
 }
 
-// Global reference to application for error handling
+// Global reference to application for error handling. Null until `whenReady` builds it.
 let applicationInstance: Application | null = null
+
+/** Tell the user why there is no window, then stop. */
+function reportStartupFailure(err: unknown): void {
+  log.error('Failed to initialize application:', err)
+  dialog.showErrorBox(
+    'Photonics could not start',
+    `${err instanceof Error ? err.message : String(err)}\n\nLogs: ${path.join(app.getPath('appData'), 'Photonics.rocks', 'logs')}`,
+  )
+  app.exit(1)
+}
 
 // Global error handling: delegate network sender errors to ControllerManager for unified handling
 process.on('uncaughtException', (error: unknown) => {
@@ -40,10 +50,6 @@ process.on('unhandledRejection', (reason, _promise) => {
   log.error('Unhandled promise rejection:', reason)
 })
 
-// Create application instance
-const application = new Application()
-applicationInstance = application // Store reference for error handling
-
 // Handle clean shutdown on process signals
 process.on('SIGINT', async () => {
   log.info('Received SIGINT signal, shutting down gracefully...')
@@ -55,7 +61,7 @@ process.on('SIGINT', async () => {
   }, 2000)
 
   try {
-    await application.shutdown()
+    await applicationInstance?.shutdown()
     await closeFileLogWithTimeout()
     clearTimeout(forceExitTimeout)
     app.quit()
@@ -79,7 +85,7 @@ process.on('SIGTERM', async () => {
   }, 2000)
 
   try {
-    await application.shutdown()
+    await applicationInstance?.shutdown()
     await closeFileLogWithTimeout()
     clearTimeout(forceExitTimeout)
     app.quit()
@@ -114,17 +120,21 @@ app.whenReady().then(() => {
   // Set app name
   app.name = 'Photonics'
 
+  // Built here rather than at module scope: the constructor reads configuration off disk and
+  // throws when that directory cannot be created, and a throw during module evaluation would
+  // skip the signal handlers, the window and this error path, leaving a process with no interface
+  // and no way to quit it.
+  try {
+    applicationInstance = new Application()
+  } catch (err) {
+    reportStartupFailure(err)
+    return
+  }
+
   // Initialize application. A controller failure resolves and leaves the window reporting the
   // failed phase, so a rejection here means the window or IPC could not be set up and there is
   // nothing left to report through. Say so and stop rather than idling with no interface.
-  application.init().catch((err) => {
-    log.error('Failed to initialize application:', err)
-    dialog.showErrorBox(
-      'Photonics could not start',
-      `${err instanceof Error ? err.message : String(err)}\n\nLogs: ${path.join(app.getPath('appData'), 'Photonics.rocks', 'logs')}`,
-    )
-    app.exit(1)
-  })
+  applicationInstance.init().catch(reportStartupFailure)
 
   // Default session handlers
   app.on('browser-window-created', (_, window) => {
@@ -134,13 +144,13 @@ app.whenReady().then(() => {
 
 // Handle window-all-closed event
 app.on('window-all-closed', () => {
-  application.handleAllWindowsClosed()
+  applicationInstance?.handleAllWindowsClosed()
 })
 
 // Handle activate event (macOS)
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    application.handleActivate()
+    applicationInstance?.handleActivate()
   }
 })
 
@@ -152,7 +162,7 @@ app.on('before-quit', async (event) => {
   // Perform our graceful shutdown
   log.info('Application is shutting down, cleaning up resources...')
   try {
-    await application.shutdown()
+    await applicationInstance?.shutdown()
     // Log the outcome BEFORE closing the file log, so both the success and failure messages are
     // actually written rather than logged into an already-closed sink.
     log.info('Graceful shutdown completed.')
