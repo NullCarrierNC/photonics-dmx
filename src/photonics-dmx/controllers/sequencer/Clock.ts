@@ -44,6 +44,8 @@ export class Clock {
   private lastTickGapMs: number = 0
   /** Set once the coarse-timer notice has been logged, so it reports per clock rather than per resync. */
   private reportedCoarseTimer: boolean = false
+  /** Subscribers currently throwing, so a persistent fault reports once rather than per tick. */
+  private faultedCallbacks: Set<(deltaTime: number) => void> = new Set()
 
   constructor(intervalMs: number = 10) {
     // Math.min/max propagate NaN, and a NaN interval makes setTimeout fire on its 1ms floor, so the
@@ -72,6 +74,7 @@ export class Clock {
     if (index > -1) {
       this.updateCallbacks.splice(index, 1)
     }
+    this.faultedCallbacks.delete(callback)
   }
 
   /**
@@ -205,12 +208,18 @@ export class Clock {
     // overrun episode starts, staying quiet until a clean tick so a sustained stall logs once.
     const tickStart = performance.now()
 
-    // Notify all registered callbacks
+    // Notify all registered callbacks. A subscriber that throws is isolated so the rest of the
+    // pipeline still runs, and reported once per fault rather than on every tick: at the default
+    // rate an unlatched log writes a hundred lines a second for as long as the fault lasts.
     this.updateCallbacks.forEach((callback) => {
       try {
         callback(deltaTime)
+        this.faultedCallbacks.delete(callback)
       } catch (error) {
-        log.error('Error in timing update callback:', error)
+        if (!this.faultedCallbacks.has(callback)) {
+          this.faultedCallbacks.add(callback)
+          log.error('Error in timing update callback:', error)
+        }
       }
     })
 

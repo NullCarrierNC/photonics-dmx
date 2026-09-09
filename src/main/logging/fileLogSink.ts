@@ -14,9 +14,18 @@ export type FileLogSinkOptions = {
   logsDir: string
   /** How many full calendar days of files to keep (default 30). */
   retentionDays?: number
+  /** Bytes a single day's file may reach before further lines are dropped (default 64MB). */
+  maxBytesPerDay?: number
   /** Injected for tests. */
   clock?: () => number
 }
+
+/**
+ * Cap for one day's file. Rotation is by date alone, so without a size bound a fault that logs on
+ * a per-frame path fills the disk over a long show. Hitting the cap drops further lines for that
+ * day rather than truncating what is already written, and says so once.
+ */
+const DEFAULT_MAX_BYTES_PER_DAY = 64 * 1024 * 1024
 
 function localDateKeyFromMs(ms: number): string {
   const d = new Date(ms)
@@ -105,13 +114,15 @@ function formatLine(iso: string, entry: LogEntry): string {
 }
 
 /**
- * Create a `LogSink` that appends to a daily log file, rotating at local midnight and pruning old files once at creation.
+ * Create a `LogSink` that appends to a daily log file, rotating at local midnight, capping each
+ * day's file and pruning old files at creation and on each rotation.
  */
 export function createFileLogSink(options: FileLogSinkOptions): {
   sink: LogSink
   close: () => Promise<void>
 } {
   const retentionDays = options.retentionDays ?? 30
+  const maxBytesPerDay = options.maxBytesPerDay ?? DEFAULT_MAX_BYTES_PER_DAY
   const clock = options.clock ?? Date.now
   const { logsDir } = options
 
@@ -120,6 +131,8 @@ export function createFileLogSink(options: FileLogSinkOptions): {
 
   let currentDateKey: string | null = null
   let currentStream: fs.WriteStream | null = null
+  let bytesThisDay = 0
+  let capReported = false
   // Streams that have been rotated away (or are the final stream) and are flushing to disk.
   // close() awaits these so a file is never read back before its buffered writes have landed.
   const flushing: Promise<void>[] = []
@@ -142,6 +155,13 @@ export function createFileLogSink(options: FileLogSinkOptions): {
     })
     currentStream = s
     currentDateKey = dateKey
+    // Appending, so start from what the file already holds rather than zero.
+    try {
+      bytesThisDay = fs.statSync(filePath).size
+    } catch {
+      bytesThisDay = 0
+    }
+    capReported = false
   }
 
   const sink: LogSink = (entry: LogEntry) => {
@@ -154,6 +174,7 @@ export function createFileLogSink(options: FileLogSinkOptions): {
         currentStream = null
         currentDateKey = null
       }
+      pruneOldLogFiles(logsDir, retentionDays, clock)
       openStreamForDateKey(key)
     }
     if (!currentStream) {
@@ -161,6 +182,17 @@ export function createFileLogSink(options: FileLogSinkOptions): {
     }
     const iso = new Date(clock()).toISOString()
     const line = formatLine(iso, entry)
+    if (bytesThisDay >= maxBytesPerDay) {
+      if (!capReported) {
+        capReported = true
+        // eslint-disable-next-line no-console
+        console.error(
+          `[fileLogSink] ${currentDateKey} log reached ${maxBytesPerDay} bytes, dropping further lines for today.`,
+        )
+      }
+      return
+    }
+    bytesThisDay += Buffer.byteLength(line)
     currentStream.write(line)
   }
 

@@ -85,4 +85,41 @@ describe('createFileLogSink', () => {
     expect(fs.existsSync(oldPath)).toBe(false)
     await close()
   })
+
+  it('stops writing once a day reaches its size cap', async () => {
+    const t = new Date(2025, 3, 29, 10, 30, 0, 0).getTime()
+    const { sink, close } = createFileLogSink({
+      logsDir: tmpDir,
+      clock: () => t,
+      maxBytesPerDay: 400,
+    })
+
+    for (let i = 0; i < 200; i++) {
+      sink(entry({ message: `line ${i} with enough text to pass the cap quickly` }))
+    }
+    await close()
+
+    const written = fs.readFileSync(path.join(tmpDir, 'photonics-2025-04-29.log'), 'utf-8')
+    expect(written.length).toBeLessThan(1000)
+    expect(written).toContain('line 0')
+    expect(written).not.toContain('line 199')
+  })
+
+  it('keeps writing when the cap is not reached', async () => {
+    const t = new Date(2025, 3, 29, 10, 30, 0, 0).getTime()
+    const { sink, close } = createFileLogSink({
+      logsDir: tmpDir,
+      clock: () => t,
+      maxBytesPerDay: 1024 * 1024,
+    })
+
+    for (let i = 0; i < 50; i++) {
+      sink(entry({ message: `line ${i}` }))
+    }
+    await close()
+
+    const written = fs.readFileSync(path.join(tmpDir, 'photonics-2025-04-29.log'), 'utf-8')
+    expect(written).toContain('line 0')
+    expect(written).toContain('line 49')
+  })
 })
