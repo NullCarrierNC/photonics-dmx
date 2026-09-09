@@ -137,20 +137,29 @@ Photonics is licensed under the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.
 
 Some libraries/assets that are packaged with the source code have licenses that must be included.
 
-| Link                                                                      | License     | Use                                  |
-| ------------------------------------------------------------------------- | ----------- | ------------------------------------ |
-| [dmx-ts](https://github.com/node-dmx/dmx-ts)                              | MIT license | ArtNet and Enttec Pro USB Support    |
-| [sacn](https://github.com/node-dmx/sacn)                                  | MIT license | sACN DMX over network                |
-| [@electron-toolkit/preload](https://github.com/alex8088/electron-toolkit) | MIT license | Electron preload utilities           |
-| [@electron-toolkit/utils](https://github.com/alex8088/electron-toolkit)   | MIT license | Electron utilities                   |
-| [jotai](https://github.com/pmndrs/jotai)                                  | MIT license | State Management                     |
-| [reactflow](https://github.com/xyflow/xyflow)                             | MIT license | Node-based cue editor UI             |
-| [ajv](https://github.com/ajv-validator/ajv)                               | MIT license | JSON schema validation for node cues |
-| [ajv-formats](https://github.com/ajv-validator/ajv-formats)               | MIT license | AJV format extensions                |
-| [chokidar](https://github.com/paulmillr/chokidar)                         | MIT license | File watching for cue hot-reload     |
-| [react-icons](https://github.com/react-icons/react-icons)                 | MIT license | UI Icons                             |
-| [date-fns](https://github.com/date-fns/date-fns)                          | MIT license | Date Formatting and Manipulation     |
-| [uuid](https://github.com/uuidjs/uuid)                                    | MIT license | UUID Generation                      |
+| Link                                                                          | License            | Use                                  |
+| ----------------------------------------------------------------------------- | ------------------ | ------------------------------------ |
+| [dmx-ts](https://github.com/node-dmx/dmx-ts)                                  | MIT license        | ArtNet and Enttec Pro USB Support    |
+| [sacn](https://github.com/node-dmx/sacn)                                      | Apache 2.0 license | sACN DMX over network                |
+| [enttec-open-dmx-usb](https://github.com/moritzruth/node-enttec-open-dmx-usb) | MIT license        | OpenDMX (FTDI) USB output            |
+| [@electron-toolkit/preload](https://github.com/alex8088/electron-toolkit)     | MIT license        | Electron preload utilities           |
+| [@electron-toolkit/utils](https://github.com/alex8088/electron-toolkit)       | MIT license        | Electron utilities                   |
+| [jotai](https://github.com/pmndrs/jotai)                                      | MIT license        | State Management                     |
+| [reactflow](https://github.com/xyflow/xyflow)                                 | MIT license        | Node-based cue editor UI             |
+| [react-resizable-panels](https://github.com/bvaughn/react-resizable-panels)   | MIT license        | Resizable editor panels              |
+| [@dnd-kit](https://github.com/clauderic/dnd-kit)                              | MIT license        | Drag and drop ordering               |
+| [CodeMirror](https://github.com/codemirror/dev)                               | MIT license        | JSON editing in the cue editor       |
+| [three](https://github.com/mrdoob/three.js)                                   | MIT license        | 3D DMX preview rendering             |
+| [@react-three/fiber](https://github.com/pmndrs/react-three-fiber)             | MIT license        | React renderer for three.js          |
+| [@react-three/drei](https://github.com/pmndrs/drei)                           | MIT license        | 3D preview helpers                   |
+| [@react-three/postprocessing](https://github.com/pmndrs/react-postprocessing) | MIT license        | 3D preview post-processing           |
+| [postprocessing](https://github.com/pmndrs/postprocessing)                    | Zlib license       | 3D preview post-processing effects   |
+| [ajv](https://github.com/ajv-validator/ajv)                                   | MIT license        | JSON schema validation for node cues |
+| [ajv-formats](https://github.com/ajv-validator/ajv-formats)                   | MIT license        | AJV format extensions                |
+| [chokidar](https://github.com/paulmillr/chokidar)                             | MIT license        | File watching for cue hot-reload     |
+| [react-icons](https://github.com/react-icons/react-icons)                     | MIT license        | UI Icons                             |
+| [date-fns](https://github.com/date-fns/date-fns)                              | MIT license        | Date Formatting and Manipulation     |
+| [fast-deep-equal](https://github.com/epoberezkin/fast-deep-equal)             | MIT license        | Deep equality checks                 |
 
 ## Building it Yourself
 
