@@ -1,3 +1,4 @@
+import { handleInvoke } from './handleInvoke'
 import { IpcMain } from 'electron'
 import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
@@ -155,14 +156,9 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
     }
   })
 
-  ipcMain.handle(LIGHT.GET_CONSISTENCY_STATUS, async () => {
-    try {
-      const registry = CueRegistry.getInstance()
-      const status = registry.getConsistencyStatus()
-      return { success: true, status }
-    } catch (error) {
-      log.error('Error getting consistency status:', error)
-      return ipcError(error)
-    }
+  handleInvoke(ipcMain, LIGHT.GET_CONSISTENCY_STATUS, log, async () => {
+    const registry = CueRegistry.getInstance()
+    const status = registry.getConsistencyStatus()
+    return { success: true, status }
   })
 }

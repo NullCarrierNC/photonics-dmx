@@ -1,9 +1,13 @@
+import { createLogger } from '../../shared/logger'
+import { handleInvoke } from './handleInvoke'
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { LIGHT } from '../../shared/ipcChannels'
 import { ipcError } from './ipcResult'
 import { isPlainObject } from './inputValidation'
 import type { FixtureConfig } from '../../photonics-dmx/types'
+
+const log = createLogger('console-handlers')
 
 /**
  * DMX Console: exclusive manual buffer mode and channel configuration updates.
@@ -20,12 +24,8 @@ export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: Contro
     }
   })
 
-  ipcMain.handle(LIGHT.CONSOLE_DISABLE, async () => {
-    try {
-      return await controllerManager.disableConsoleMode()
-    } catch (error) {
-      return ipcError(error)
-    }
+  handleInvoke(ipcMain, LIGHT.CONSOLE_DISABLE, log, async () => {
+    return await controllerManager.disableConsoleMode()
   })
 
   ipcMain.on(LIGHT.CONSOLE_SEND_DMX, (_, data: unknown) => {

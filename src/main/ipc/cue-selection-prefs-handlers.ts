@@ -1,3 +1,4 @@
+import { handleInvoke } from './handleInvoke'
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import type { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
@@ -142,30 +143,20 @@ export function setupCueSelectionPrefsHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
 ): void {
-  ipcMain.handle(LIGHT.SET_CUE_CONSISTENCY_WINDOW, async (_, windowMs: unknown) => {
-    try {
-      const validated = validateNumberInRange(windowMs, 0, 600000, 'cueConsistencyWindow')
-      if (!validated.ok) {
-        return ipcError(new Error(validated.error))
-      }
-      const rounded = Math.round(validated.value)
-      await controllerManager.getConfig().setPreference('cueConsistencyWindow', rounded)
-      applyCueConsistencyWindow(rounded)
-      return { success: true, windowMs: rounded }
-    } catch (error) {
-      log.error('Error setting cue consistency window:', error)
-      return ipcError(error)
+  handleInvoke(ipcMain, LIGHT.SET_CUE_CONSISTENCY_WINDOW, log, async (_, windowMs: unknown) => {
+    const validated = validateNumberInRange(windowMs, 0, 600000, 'cueConsistencyWindow')
+    if (!validated.ok) {
+      return ipcError(new Error(validated.error))
     }
+    const rounded = Math.round(validated.value)
+    await controllerManager.getConfig().setPreference('cueConsistencyWindow', rounded)
+    applyCueConsistencyWindow(rounded)
+    return { success: true, windowMs: rounded }
   })
 
-  ipcMain.handle(LIGHT.GET_CUE_CONSISTENCY_WINDOW, async () => {
-    try {
-      const windowMs = controllerManager.getConfig().getPreference('cueConsistencyWindow')
-      return { success: true, windowMs }
-    } catch (error) {
-      log.error('Error getting cue consistency window:', error)
-      return ipcError(error)
-    }
+  handleInvoke(ipcMain, LIGHT.GET_CUE_CONSISTENCY_WINDOW, log, async () => {
+    const windowMs = controllerManager.getConfig().getPreference('cueConsistencyWindow')
+    return { success: true, windowMs }
   })
 
   for (const spec of MOTION_NUMBER_PREFS) {
@@ -176,112 +167,70 @@ export function setupCueSelectionPrefsHandlers(
       createDefaultCueDomainPrefs(spec.prefsDomain)[spec.field] ??
       0
 
-    ipcMain.handle(spec.channels.get, async () => {
-      try {
-        return { success: true, [spec.resultKey]: read() }
-      } catch (error) {
-        log.error(`Error getting ${spec.label}:`, error)
-        return ipcError(error)
-      }
+    handleInvoke(ipcMain, spec.channels.get, log, async () => {
+      return { success: true, [spec.resultKey]: read() }
     })
 
-    ipcMain.handle(spec.channels.set, async (_, value: unknown) => {
-      try {
-        const validated = validateNumberInRange(value, 0, spec.max, spec.validationLabel)
-        if (!validated.ok) {
-          return ipcError(new Error(validated.error))
-        }
-        await spec.persist(controllerManager.getConfig(), validated.value)
-        return { success: true, [spec.resultKey]: read() }
-      } catch (error) {
-        log.error(`Error setting ${spec.label}:`, error)
-        return ipcError(error)
-      }
-    })
-  }
-
-  ipcMain.handle(LIGHT.GET_YARG_FALLBACK_CUE_TIME_MS, async () => {
-    try {
-      const fallbackMs =
-        controllerManager.getConfig().getPreference('yargFallbackCueTimeMs') ?? 20000
-      return { success: true, fallbackMs }
-    } catch (error) {
-      log.error('Error getting YARG fallback cue time:', error)
-      return ipcError(error)
-    }
-  })
-
-  ipcMain.handle(LIGHT.SET_YARG_FALLBACK_CUE_TIME_MS, async (_, ms: unknown) => {
-    try {
-      const validated = validateNumberInRange(ms, 0, 600000, 'yargFallbackCueTimeMs')
+    handleInvoke(ipcMain, spec.channels.set, log, async (_, value: unknown) => {
+      const validated = validateNumberInRange(value, 0, spec.max, spec.validationLabel)
       if (!validated.ok) {
         return ipcError(new Error(validated.error))
       }
-      await controllerManager.getConfig().setYargFallbackCueTimeMs(validated.value)
-      const fallbackMs =
-        controllerManager.getConfig().getPreference('yargFallbackCueTimeMs') ?? 20000
-      return { success: true, fallbackMs }
-    } catch (error) {
-      log.error('Error setting YARG fallback cue time:', error)
-      return ipcError(error)
-    }
+      await spec.persist(controllerManager.getConfig(), validated.value)
+      return { success: true, [spec.resultKey]: read() }
+    })
+  }
+
+  handleInvoke(ipcMain, LIGHT.GET_YARG_FALLBACK_CUE_TIME_MS, log, async () => {
+    const fallbackMs = controllerManager.getConfig().getPreference('yargFallbackCueTimeMs') ?? 20000
+    return { success: true, fallbackMs }
   })
 
-  ipcMain.handle(LIGHT.GET_RB3_MOTION_CUE_DURATION, async () => {
-    try {
-      const domain = controllerManager.getConfig().getPreference('cueDomains').rb3Motion
-      return { success: true, min: domain.cueDurationMin ?? 5, max: domain.cueDurationMax ?? 20 }
-    } catch (error) {
-      log.error('Error getting RB3 motion cue duration:', error)
-      return ipcError(error)
+  handleInvoke(ipcMain, LIGHT.SET_YARG_FALLBACK_CUE_TIME_MS, log, async (_, ms: unknown) => {
+    const validated = validateNumberInRange(ms, 0, 600000, 'yargFallbackCueTimeMs')
+    if (!validated.ok) {
+      return ipcError(new Error(validated.error))
     }
+    await controllerManager.getConfig().setYargFallbackCueTimeMs(validated.value)
+    const fallbackMs = controllerManager.getConfig().getPreference('yargFallbackCueTimeMs') ?? 20000
+    return { success: true, fallbackMs }
   })
 
-  ipcMain.handle(LIGHT.SET_RB3_MOTION_CUE_DURATION, async (_, range: unknown) => {
-    try {
-      const r = range as { min?: unknown; max?: unknown }
-      const minV = validateNumberInRange(r?.min, 0, 600, 'rb3MotionCueDurationMin')
-      const maxV = validateNumberInRange(r?.max, 0, 600, 'rb3MotionCueDurationMax')
-      if (!minV.ok) return ipcError(new Error(minV.error))
-      if (!maxV.ok) return ipcError(new Error(maxV.error))
-      // Keep the range ordered so the countdown draw never inverts.
-      const min = Math.min(minV.value, maxV.value)
-      const max = Math.max(minV.value, maxV.value)
-      await controllerManager
-        .getConfig()
-        .updateCueDomain('rb3Motion', { cueDurationMin: min, cueDurationMax: max })
-      return { success: true, min, max }
-    } catch (error) {
-      log.error('Error setting RB3 motion cue duration:', error)
-      return ipcError(error)
-    }
+  handleInvoke(ipcMain, LIGHT.GET_RB3_MOTION_CUE_DURATION, log, async () => {
+    const domain = controllerManager.getConfig().getPreference('cueDomains').rb3Motion
+    return { success: true, min: domain.cueDurationMin ?? 5, max: domain.cueDurationMax ?? 20 }
+  })
+
+  handleInvoke(ipcMain, LIGHT.SET_RB3_MOTION_CUE_DURATION, log, async (_, range: unknown) => {
+    const r = range as { min?: unknown; max?: unknown }
+    const minV = validateNumberInRange(r?.min, 0, 600, 'rb3MotionCueDurationMin')
+    const maxV = validateNumberInRange(r?.max, 0, 600, 'rb3MotionCueDurationMax')
+    if (!minV.ok) return ipcError(new Error(minV.error))
+    if (!maxV.ok) return ipcError(new Error(maxV.error))
+    // Keep the range ordered so the countdown draw never inverts.
+    const min = Math.min(minV.value, maxV.value)
+    const max = Math.max(minV.value, maxV.value)
+    await controllerManager
+      .getConfig()
+      .updateCueDomain('rb3Motion', { cueDurationMin: min, cueDurationMax: max })
+    return { success: true, min, max }
   })
 
   for (const spec of LIGHTING_SELECTION_MODES) {
-    ipcMain.handle(spec.channels.get, async () => {
-      try {
-        return { success: true, mode: spec.read(controllerManager.getConfig()) }
-      } catch (error) {
-        log.error(`Error getting ${spec.label} cue group selection mode:`, error)
-        return ipcError(error)
-      }
+    handleInvoke(ipcMain, spec.channels.get, log, async () => {
+      return { success: true, mode: spec.read(controllerManager.getConfig()) }
     })
 
-    ipcMain.handle(spec.channels.set, async (_, mode: unknown) => {
-      try {
-        const validated = validateCueGroupSelectionMode(mode)
-        if (!validated.ok) {
-          return ipcError(new Error(validated.error))
-        }
-        await controllerManager
-          .getConfig()
-          .updateCueDomain(spec.prefsDomain, { selectionMode: validated.value })
-        spec.registry().setCueGroupSelectionMode(validated.value)
-        return { success: true, mode: validated.value }
-      } catch (error) {
-        log.error(`Error setting ${spec.label} cue group selection mode:`, error)
-        return ipcError(error)
+    handleInvoke(ipcMain, spec.channels.set, log, async (_, mode: unknown) => {
+      const validated = validateCueGroupSelectionMode(mode)
+      if (!validated.ok) {
+        return ipcError(new Error(validated.error))
       }
+      await controllerManager
+        .getConfig()
+        .updateCueDomain(spec.prefsDomain, { selectionMode: validated.value })
+      spec.registry().setCueGroupSelectionMode(validated.value)
+      return { success: true, mode: validated.value }
     })
   }
 }

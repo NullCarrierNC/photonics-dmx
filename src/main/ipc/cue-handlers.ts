@@ -1,8 +1,8 @@
+import { handleInvoke } from './handleInvoke'
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { CueData } from '../../photonics-dmx/cues/types/cueTypes'
 import { sendToAllWindows } from '../utils/windowUtils'
-import { ipcError } from './ipcResult'
 import { CUE, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('cue-handlers')
@@ -34,25 +34,15 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   })
 
   // Disable YARG
-  ipcMain.handle(CUE.DISABLE_YARG, async () => {
-    try {
-      await controllerManager.disableYarg()
-      return { success: true }
-    } catch (error) {
-      log.error('Error disabling YARG:', error)
-      return ipcError(error)
-    }
+  handleInvoke(ipcMain, CUE.DISABLE_YARG, log, async () => {
+    await controllerManager.disableYarg()
+    return { success: true }
   })
 
   // Disable RB3
-  ipcMain.handle(CUE.DISABLE_RB3, async () => {
-    try {
-      await controllerManager.disableRb3()
-      return { success: true }
-    } catch (error) {
-      log.error('Error disabling RB3:', error)
-      return ipcError(error)
-    }
+  handleInvoke(ipcMain, CUE.DISABLE_RB3, log, async () => {
+    await controllerManager.disableRb3()
+    return { success: true }
   })
 
   // Get RB3 current mode
