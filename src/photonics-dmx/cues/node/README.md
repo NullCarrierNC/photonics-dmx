@@ -37,11 +37,13 @@ Sequencer   (effects)
 
 ```
 node/
-  compiler/    # Compilation from JSON to executable form
-  loader/      # File loading, validation, file watching
-  runtime/     # Execution engine, cue instances
-  schema/      # AJV validation
-  utils/       # Shared utilities
+  compiler/           # Compilation from JSON to executable form
+  loader/             # File loading, validation, file watching
+  runtime/            # Execution engine, cue instances
+    logicHandlers/    # One handler per logic node type
+  schema/             # AJV validation
+    logicNodes/       # Logic node schemas, grouped by theme
+  utils/              # Shared utilities
 ```
 
 Per-mode behaviour lives one level up in `cues/domains/`, not here. Each mode has a descriptor carrying its
@@ -58,49 +60,67 @@ rather than branching on the mode itself.
 | `AbstractGraphBuilder`       | Shared compile core both compilers extend: map build, endpoint/reachability/unreachable-action checks via per-compiler hooks                   |
 | `CompilationError`           | Unified base error; `NodeCueCompilationError` / `EffectCompilationError` are thin back-compat subclasses                                       |
 | `sharedActionNodeValidation` | Shared structural checks for action targets, set-position, set-color, and motion-pattern payloads used by both compilers                       |
-| `ActionEffectFactory`        | Builds concrete Effect objects from ActionNode config (color, timing, targets)                                                                 |
+| `ActionEffectFactory`        | Builds concrete Effect objects from ActionNode config (color, timing, targets), over the two modules below                                     |
+| `resolvedAction`             | The action shape once its ValueSources are resolved, with the comparisons and pan/tilt conversions over it                                     |
+| `effectBuilders`             | Turns a resolved action into an `Effect`, with the colour and numeric helpers that needs                                                       |
 
 ### loader/
 
-| File                 | Role                                                                                                                                                                                                      |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BaseNodeFileLoader` | Shared base for both loaders: directory layout, chokidar watching, per-mode summary bookkeeping, and path sandboxing                                                                                      |
-| `NodeCueLoader`      | Extends `BaseNodeFileLoader`: loads cue JSON per mode directory, validates, and registers into the registry for that mode. A build with its own cue kind registers a strategy rather than adding a branch |
-| `EffectLoader`       | Extends `BaseNodeFileLoader`: loads effect JSON; validates; registers with EffectRegistry                                                                                                                 |
+| File                    | Role                                                                                                                                                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BaseNodeFileLoader`    | Shared base for both loaders: directory layout, chokidar watching, per-mode summary bookkeeping, and path sandboxing                                                                                      |
+| `NodeCueLoader`         | Extends `BaseNodeFileLoader`: loads cue JSON per mode directory, validates, and registers into the registry for that mode. A build with its own cue kind registers a strategy rather than adding a branch |
+| `EffectLoader`          | Extends `BaseNodeFileLoader`: loads effect JSON; validates; registers with EffectRegistry                                                                                                                 |
+| `migrateLegacyBearings` | Rewrites legacy bearing tokens in literal ValueSources and action payloads as a file loads                                                                                                                |
 
 ### runtime/
 
-| File                      | Role                                                                                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `BaseNodeExecutionEngine` | Shared node dispatcher both engines extend (action/logic/for-each/delay/cancel); cue-vs-effect differences via template-method hooks |
-| `NodeExecutionEngine`     | Cue execution (extends `BaseNodeExecutionEngine`): strict revisit policy, cue/group variable stores, effect-raiser dispatch          |
-| `EffectExecutionEngine`   | Effect execution (extends `BaseNodeExecutionEngine`): relaxed revisit policy, effect-local parameter store, idle tracking            |
-| `GraphExecutionEngine`    | Unified engine for cue/effect graphs; wraps NodeExecutionEngine/EffectExecutionEngine, queuing, state machine                        |
-| `GraphExecutionPolicy`    | Policy for GraphExecutionEngine (cue vs effect entry events, queuing, revisit)                                                       |
-| `graphActionHelpers`      | Small shared pieces for homogeneous set-color chains (visit marking, step collection, effect-factory argument mapping)               |
-| `CueSession`              | Per-cue session state: variable stores, first-submission policy, cue-started flag                                                    |
-| `ExecutionStateMachine`   | Lifecycle phases (IDLE, RUNNING, BLOCKED, COMPLETED, CANCELLED) per context                                                          |
-| `BaseNodeCue`             | Shared session and engine lifecycle for net cues, keyed per sequencer so parallel rigs stay isolated                                 |
-| `LightingNodeCue`         | Net lighting runtime (extends `BaseNodeCue`): group-level variable sharing, `cueType` identity, style from the definition            |
-| `MotionNodeCue`           | Net motion runtime (extends `BaseNodeCue`): fresh session per cue, `id` identity, always Primary, clears its effects on stop         |
-| `BaseAudioNodeCue`        | Shared audio graph execution (events, triggers, variables, `NodeExecutionEngine`) for lighting and motion                            |
-| `AudioNodeCue`            | Audio lighting runtime (`kind: 'lighting'`); primary/secondary/strobe slot semantics via `style`                                     |
-| `AudioMotionNodeCue`      | Audio motion runtime (`kind: 'motion'`); no lighting `style`; clamps detected BPM for fixture safety; receives `AudioCueData`        |
-| `ExecutionContext`        | Per-execution state: variables, light arrays, beat/measure, etc.                                                                     |
-| `EffectRegistry`          | Maps effect IDs to compiled effect definitions                                                                                       |
-| `valueResolver`           | Resolves ValueSource (literal/variable) to concrete values                                                                           |
-| `actionResolver`          | Resolves ActionNode to Effect; handles effect references                                                                             |
-| `logicNodeEvaluator`      | Evaluates logic nodes (variable, math, conditional, loops, light selectors)                                                          |
-| `dataExtractors`          | Extract game/audio data for node execution                                                                                           |
+| File                             | Role                                                                                                                                                                                                                           |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BaseNodeExecutionEngine`        | Shared node dispatcher both engines extend (action/logic/for-each/delay/cancel); cue-vs-effect differences via template-method hooks                                                                                           |
+| `NodeExecutionEngine`            | Cue execution (extends `BaseNodeExecutionEngine`): strict revisit policy, cue/group variable stores, effect-raiser dispatch. A raiser with downstream nodes keeps its cue context open until the effect goes idle              |
+| `EffectExecutionEngine`          | Effect execution (extends `BaseNodeExecutionEngine`): relaxed revisit policy, effect-local parameter store, idle tracking. The idle callback runs from the microtask queue, so it lands after the submission that triggered it |
+| `GraphExecutionEngine`           | Unified engine for cue/effect graphs; wraps NodeExecutionEngine/EffectExecutionEngine, queuing, state machine                                                                                                                  |
+| `GraphExecutionPolicy`           | Policy for GraphExecutionEngine (cue vs effect entry events, queuing, revisit)                                                                                                                                                 |
+| `graphActionHelpers`             | Small shared pieces for homogeneous set-color chains (visit marking, step collection, effect-factory argument mapping)                                                                                                         |
+| `CueSession`                     | Per-cue session state: variable stores, first-submission policy, cue-started flag                                                                                                                                              |
+| `ExecutionStateMachine`          | Lifecycle phases (IDLE, RUNNING, BLOCKED, COMPLETED, CANCELLED) per context                                                                                                                                                    |
+| `BaseNodeCue`                    | Shared session and engine lifecycle for net cues, keyed per sequencer so parallel rigs stay isolated                                                                                                                           |
+| `LightingNodeCue`                | Net lighting runtime (extends `BaseNodeCue`): group-level variable sharing, `cueType` identity, style from the definition                                                                                                      |
+| `MotionNodeCue`                  | Net motion runtime (extends `BaseNodeCue`): fresh session per cue, `id` identity, always Primary, clears its effects on stop                                                                                                   |
+| `BaseAudioNodeCue`               | Shared audio graph execution (events, triggers, variables, `NodeExecutionEngine`) for lighting and motion                                                                                                                      |
+| `AudioNodeCue`                   | Audio lighting runtime (`kind: 'lighting'`); primary/secondary/strobe slot semantics via `style`                                                                                                                               |
+| `AudioMotionNodeCue`             | Audio motion runtime (`kind: 'motion'`); no lighting `style`; clamps detected BPM for fixture safety; receives `AudioCueData`                                                                                                  |
+| `ExecutionContext`               | Per-execution state: variables, light arrays, beat/measure, etc.                                                                                                                                                               |
+| `EffectRegistry`                 | Maps effect IDs to compiled effect definitions                                                                                                                                                                                 |
+| `valueResolver`                  | Resolves ValueSource (literal/variable) to concrete values, and infers a value's type                                                                                                                                          |
+| `actionResolver`                 | Resolves ActionNode to Effect; handles effect references                                                                                                                                                                       |
+| `logicNodeEvaluator`             | Builds the per-evaluation context and dispatches through the handler table in `logicHandlers/`                                                                                                                                 |
+| `logicHandlers/`                 | One handler per logic type, grouped into variable, numeric, flow, data, light-array and colour-array modules. The table is total, so a new logic type fails the build until it has a handler                                   |
+| `expressionEvaluator`            | Arithmetic compiler behind the `expression` logic node: operators, parentheses, and a small maths function set                                                                                                                 |
+| `fanOut`                         | Engine-agnostic driver for the iterating logic nodes (`for-each-light`, `led-changed`), including the LED bank diff                                                                                                            |
+| `audioEventEvaluator`            | Turns an `AudioCueData` frame into triggered/intensity results against caller-owned edge state                                                                                                                                 |
+| `executionStateMachineLifecycle` | Owns the state machine per context and the transitions between phases, for both the graph engine and the audio runtime                                                                                                         |
+| `engineUtils`                    | `collectReachableNodes`, the body set both engines walk for a for-each loop                                                                                                                                                    |
+| `executionTypes`                 | Shared execution type aliases (variable values, completion callbacks, phases)                                                                                                                                                  |
+| `nodeDebugPreview`               | Log-safe truncating view of a value, for node debug output                                                                                                                                                                     |
+| `dataExtractors`                 | Extract game/audio data for node execution                                                                                                                                                                                     |
 
 ### schema/
 
-| File                   | Role                                                                                                                       |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `cueSchemaBuilder.ts`  | Builds a cue definition schema from what varies by kind and family (the key field, style values, event item shape)         |
-| `cueSchemaRegistry.ts` | Holds each kind's schema per family and compiles one file validator per mode on first use. Registering after that throws   |
-| `cueFiles.ts`          | Registers the `lighting` and `motion` kinds and exposes the per-mode validators                                            |
-| `validation.ts`        | Semantic checks over one shared body: `validateNodeCueFile`, `validateCueFileForMode`, the mode-pinned validators, effects |
+| File                   | Role                                                                                                                          |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `cueSchemaBuilder.ts`  | Builds a cue definition schema from what varies by kind and family (the key field, style values, event item shape)            |
+| `cueSchemaRegistry.ts` | Holds each kind's schema per family and compiles one file validator per mode on first use. Registering after that throws      |
+| `cueFiles.ts`          | Registers the `lighting` and `motion` kinds and exposes the per-mode validators                                               |
+| `validation.ts`        | Semantic checks over one shared body: `validateNodeCueFile`, `validateCueFileForMode`, the mode-pinned validators, effects    |
+| `helpers.ts`           | The shared AJV instance, error formatting, the event and operator vocabularies, `detectCycles`, `checkConditionalValidValues` |
+| `primitives.ts`        | Leaf schemas: ValueSource, action timing and config, effect references, position and motion-pattern settings                  |
+| `nodes.ts`             | Per-node-kind schemas for action, event, audio trigger, event listener, effect raiser and effect event listener               |
+| `logic.ts`             | The logic node union, composed from `logicNodes/`                                                                             |
+| `logicNodes/`          | Logic schemas by theme: `valueSchemas`, `collectionSchemas`, `dataSchemas`, `timingSchemas`                                   |
+| `effectFiles.ts`       | The effect file schemas and their group metadata                                                                              |
+| `migrations.ts`        | Backward-compatible rewrites applied as a file loads                                                                          |
 
 ### utils/
 
@@ -112,13 +132,22 @@ rather than branching on the mode itself.
 
 ## Types
 
-Core types live in `../types/nodeCueTypes.ts`:
+Core types are imported from `../types/nodeCueTypes.ts`, a barrel over `../types/node/`
+(`cueDefinitions`, `effectDefinitions`, `eventNodes`, `actionNodes`, `logicNodes`, `variables`,
+`graph`):
 
 - `NodeCueFile`, `NetNodeCueFile`, `AudioNodeCueFile`: file structure. `NetNodeCueFile` covers both net modes, discriminated by `mode`
 - `NetNodeCueDefinition`, `AudioNodeCueDefinition`: cue definition, discriminated by `kind` (lighting vs motion)
 - `YargEffectDefinition`, `AudioEffectDefinition`: effect definition. The effect trees on disk really are `yarg` and `audio`, so these keep their names
-- `NetEventNode`, `ActionNode`, `LogicNode`, `EventRaiserNode`, `EffectRaiserNode`, `EffectListenerNode`: node types
+- `NetEventNode`, `AudioEventNode`, `AudioTriggerNode`: event entry points. Audio triggers carry their own spectral gates and instrument presets
+- `ActionNode`, `LogicNode`, `EventRaiserNode`, `EventListenerNode`, `EffectRaiserNode`, `EffectEventListenerNode`, `NotesNode`: the remaining node types
 - `ValueSource`, `VariableDefinition`, `Connection`: supporting types
+
+`LogicNode` is a union of around thirty members. Beyond variables, math and conditionals, it covers
+`expression`, `frame-gate`, `tempo`, `pulse`, `clamp`, `select-from-list`, `delay`, `debugger`,
+`indexed-variable`, `led-changed`, `for-each-light`, `build-ring`, and the light and colour array
+operations (index, reverse, concat, shuffle, pair, length). `LogicNodeMeta` alongside it carries the
+label, category and port shape the editor draws each one with.
 
 ## Validation
 
@@ -131,8 +160,9 @@ motion-pattern) live in `sharedActionNodeValidation.ts` so cues and effects stay
 effects in revisit/reachability rules and entry wiring (see `GraphExecutionPolicy` and compiler reachability starts).
 
 Effect files run the same graph-level semantic checks as cue files, logic-only cycle detection (`detectCycles`)
-and conditional literal-vs-variable `validValues` checks (`checkConditionalValidValues`), via `checkEffectSemantics`
-in `validation.ts`. An invalid effect graph is rejected at validation time just like an invalid cue graph.
+and conditional literal-vs-variable `validValues` checks (`checkConditionalValidValues`), through `checkEffectSemantics`
+in `validation.ts`. Those two checks live in `schema/helpers.ts` with the rest of the shared validation pieces.
+An invalid effect graph is rejected at validation time just like an invalid cue graph.
 
 A cue file's envelope accepts the whole net event superset rather than only its own mode's vocabulary, so a file
 that already reads outside its list keeps loading. What that would otherwise hide, an event a mode can never

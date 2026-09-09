@@ -1,14 +1,15 @@
 # Effects
 
 Legacy programmatic effect builders. An effect is a group of one or more transitions (timed changes
-to light state) applied to one or more lights; each builder returns an `Effect` object the sequencer
+to light state) applied to one or more lights. Each builder returns an `Effect` object the sequencer
 can run.
 
 These builders predate the node-based cue system and are not the primary way cues are authored. The
-node-graph system in [../cues/node/README.md](../cues/node/README.md) is the primary mechanism —
-cues and reusable effects are defined as JSON graphs and compiled at runtime. The builders here
-remain in use by a small number of non-node cues and handlers (see [Usage](#usage)); the rest are
-exported from `effects/index.ts` but not currently wired into any cue.
+node-graph system in [../cues/node/README.md](../cues/node/README.md) is the primary mechanism:
+cues and reusable effects are defined as JSON graphs and compiled at runtime. Only
+`getEffectSingleColor` is reached from runtime code (see [Usage](#usage)). The others are exported
+from `effects/index.ts` and covered by `tests/effects/effectPrimitives.test.ts`, but no cue calls
+them.
 
 ## Base Interface
 
@@ -33,14 +34,14 @@ defines how the effect behaves over time.
 
 ## Usage
 
-| Builder                       | Used by                                                                                   |
-| ----------------------------- | ----------------------------------------------------------------------------------------- |
-| `getEffectSingleColor`        | `cueHandlers/Rb3MenuCueHandler.ts`, `processors/AudioCueProcessor.ts`, `cues/menuCues.ts` |
-| `getEffectFlashColor`         | `cues/menuCues.ts`                                                                        |
-| `getSweepEffect`              | `cues/menuCues.ts`, `cues/searchlightsCues.ts`                                            |
-| `getEffectCrossFadeColors`    | exported, not currently used                                                              |
-| `getEffectFadeInColorFadeOut` | exported, not currently used                                                              |
-| `getEffectCycleLights`        | exported, not currently used                                                              |
+| Builder                       | Used by                                                               |
+| ----------------------------- | --------------------------------------------------------------------- |
+| `getEffectSingleColor`        | `cueHandlers/Rb3MenuCueHandler.ts`, `processors/AudioCueProcessor.ts` |
+| `getEffectFlashColor`         | exported and unit tested, no cue                                      |
+| `getSweepEffect`              | exported and unit tested, no cue                                      |
+| `getEffectFadeInColorFadeOut` | exported and unit tested, no cue                                      |
+| `getEffectCrossFadeColors`    | exported, no cue                                                      |
+| `getEffectCycleLights`        | exported, no cue                                                      |
 
 ## Available Effects
 
@@ -73,10 +74,10 @@ interface CrossFadeColorsEffectParams extends IEffect {
   afterEndColorWait: number
   /** The condition that triggers the cross-fade */
   crossFadeTrigger?: WaitCondition
-  /** Duration of the cross-fade transition */
-  duration: number
 }
 ```
+
+`duration` is the optional one inherited from `IEffect`, and defaults to 1000 ms.
 
 ### Flash Color (`getEffectFlashColor`)
 
@@ -125,10 +126,10 @@ interface FadeInColorFadeOutEffectParams extends IEffect {
 Creates a sweeping motion across the lights or light groups. Accepts either
 `SweepEffectSingleParams` or `SweepEffectGroupedParams` as a union.
 
+Both members share a base interface:
+
 ```typescript
-interface SweepEffectSingleParams extends IEffect {
-  /** Array of lights to sweep across */
-  lights: TrackedLight[]
+interface SweepEffectBaseParams {
   /** On state colour */
   high: RGBIO
   /** Off state colour */
@@ -145,23 +146,14 @@ interface SweepEffectSingleParams extends IEffect {
   betweenSweepDelay?: number
 }
 
-interface SweepEffectGroupedParams {
+interface SweepEffectSingleParams extends IEffect, SweepEffectBaseParams {
+  /** Array of lights to sweep across */
+  lights: TrackedLight[]
+}
+
+interface SweepEffectGroupedParams extends SweepEffectBaseParams {
   /** Array of light groups to sweep across */
   lights: TrackedLight[][]
-  /** On state colour */
-  high: RGBIO
-  /** Off state colour */
-  low: RGBIO
-  /** Total time (ms) for one complete sweep across all groups */
-  sweepTime: number
-  /** Desired fade-in duration (ms) */
-  fadeInDuration: number
-  /** Desired fade-out duration (ms) */
-  fadeOutDuration: number
-  /** Percentage (0 to 100) by which subsequent lights overlap. 0 means no overlap */
-  lightOverlap?: number
-  /** How long to wait until the next sweep can run */
-  betweenSweepDelay?: number
   /** The layer to apply the effect on */
   layer?: number
   /** The easing function to use for the effect */
@@ -185,6 +177,8 @@ interface CycleLightsEffectParams extends IEffect {
   activeColor: RGBIO
   /** Duration in ms for colour transitions */
   transitionDuration?: number
+  /** The layer to apply the effect on */
+  layer?: number
   /** The condition that triggers each step in the cycle */
   waitFor?: WaitCondition
 }

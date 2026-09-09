@@ -120,8 +120,8 @@ Moving Heads that spin in circles will be the most challenging to implement. You
 
 ## Cue Editor
 
-Create your own cues for YARG or Music Visualization. Photonics includes a powerful node-based cue editor.
-Please see or [Discord Server](https://discord.gg/2Vyqc2hYcK) or [Photonics.rocks](https://photonics.rocks/docs/table-of-contents/#The-Cue-Editor) for more information on how to use this feature.
+Create your own cues for YARG, Rock Band 3, or Music Visualization. Photonics includes a powerful node-based cue editor.
+Please see our [Discord Server](https://discord.gg/2Vyqc2hYcK) or [Photonics.rocks](https://photonics.rocks/docs/table-of-contents/#The-Cue-Editor) for more information on how to use this feature.
 
 ## Status
 
@@ -192,6 +192,8 @@ $ npm run lint
 # CI uses read-only lint (no --fix)
 $ npm run lint:check
 $ npm run typecheck
+# Prettier formatting, also enforced in CI
+$ npm run format:check
 ```
 
 ### Running Tests
