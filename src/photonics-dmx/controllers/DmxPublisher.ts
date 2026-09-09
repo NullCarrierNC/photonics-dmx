@@ -35,6 +35,7 @@ import type {
   PublisherFrameRigView,
 } from './PublisherFrameProcessor'
 import { VenueFrameProcessor } from './VenueFrameProcessor'
+import { WireSlotGovernor } from './wireSlotGovernor'
 import { getStrobeStateManager, StrobeStateManager } from './StrobeStateManager'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('DmxPublisher')
@@ -92,41 +93,6 @@ interface StrobePeakColor {
   green: number
   blue: number
   intensity: number
-}
-
-/**
- * Per-wire-sender working state. One instance per active wire-sender slot. The publisher merges
- * routed rig channels into `buffer` each frame, then runs the dirty-skip / leading / trailing
- * governor against that slot's own history. Slots are created lazily as senders become enabled
- * and discarded when senders are disabled.
- *
- * IPC has its own (simpler) governor — see {@link IpcGovernor} — because its payload shape is
- * a tagged per-rig structure rather than a flat channel buffer.
- */
-interface SenderSlotState {
-  /** Per-frame working buffer — rebuilt each `publishNow`, reused to limit GC. */
-  buffer: Record<number, number>
-  /** Wall time of the last actual send. 0 = none yet (leading edge fires immediately). */
-  lastSendTimeMs: number
-  /** Last buffer actually handed to the sender; used for dirty-skip. */
-  lastSentBuffer: Record<number, number>
-  hasLastSent: boolean
-  /** Snapshot of the most recent rate-limited frame, flushed by the trailing timer. */
-  pendingBuffer: Record<number, number>
-  hasPending: boolean
-  trailingTimer: TimerHandle | null
-}
-
-function makeSlotState(): SenderSlotState {
-  return {
-    buffer: {},
-    lastSendTimeMs: 0,
-    lastSentBuffer: {},
-    hasLastSent: false,
-    pendingBuffer: {},
-    hasPending: false,
-    trailingTimer: null,
-  }
 }
 
 /**
@@ -188,9 +154,16 @@ export class DmxPublisher {
   private _immediateBlackoutData: Record<number, number> = {}
   /** When true, `publish` ignores light states; output comes only from `setManualBuffer`. */
   private _manualMode = false
+  /** Set once `shutdown` has sent the final blackout. Nothing may reach the wire afterwards. */
+  private _isShutDown = false
   /** Light ids already reported for out-of-range channel numbers, so the skip logs once per light
    *  rather than every frame. */
   private _reportedBadChannelLights = new Set<string>()
+  /** Light ids already reported for excluded extra channels. Separate from the channel-range set,
+   *  so a fixture with both faults reports both rather than whichever it hits first. */
+  private _reportedInvalidExtraLights = new Set<string>()
+  /** Light ids already reported for a fixture type the channel cast does not know. */
+  private _reportedCastFailureLights = new Set<string>()
   /**
    * Per-fixture colour-mixing plans, keyed by fixture object identity. `syncDmxLightWithTemplate`
    * replaces a fixture object immutably whenever its channels/extras change and returns the same
@@ -226,7 +199,7 @@ export class DmxPublisher {
   private _minIntervalMs = 0
   private _timing: PublisherTiming = REAL_TIMING
   /** Per-wire-sender governor + working buffer state. */
-  private _slots: Map<WireSenderId, SenderSlotState> = new Map()
+  private readonly _governor: WireSlotGovernor
   /** Lightweight rate cap for the IPC preview path (separate from wire-slot governor). */
   private _ipc: IpcGovernor = { lastSendTimeMs: 0, pending: null, trailingTimer: null }
 
@@ -250,6 +223,7 @@ export class DmxPublisher {
       this._whiteChannelMixMode = options.whiteChannelMixMode
     }
     this._frameProcessor = options.frameProcessor ?? new VenueFrameProcessor()
+    this._governor = new WireSlotGovernor(senderManager, this._timing, this._minIntervalMs)
 
     this.publish = this.publish.bind(this)
     if (this._lightStateManager) {
@@ -317,7 +291,7 @@ export class DmxPublisher {
    * mapping the desired channels to each DMX fixture's channels.
    */
   public publish = (lights: ReadonlyMap<string, Readonly<RGBIO>>): void => {
-    if (this._manualMode) {
+    if (this._manualMode || this._isShutDown) {
       return
     }
     this.publishNow(lights)
@@ -348,11 +322,7 @@ export class DmxPublisher {
     const out = Object.keys(normalised).length === 0 ? this._immediateBlackoutData : normalised
 
     for (const wireId of this._sender.getEnabledWireSenders()) {
-      try {
-        this._sender.send(wireId, out)
-      } catch (error) {
-        log.error(`Failed to send manual DMX data to ${wireId}:`, error)
-      }
+      void this._sender.send(wireId, out)
     }
     if (this._sender.isIpcEnabled()) {
       this._dispatchIpc({ kind: 'manual', buffer: out })
@@ -380,6 +350,7 @@ export class DmxPublisher {
       return
     }
     this._minIntervalMs = next
+    this._governor.setMinIntervalMs(next)
     this._resetGovernorAllSlots()
   }
 
@@ -402,9 +373,11 @@ export class DmxPublisher {
 
     // Remove managers for rigs that are no longer active or have been deleted
     const currentRigIds = new Set(rigsToPublish.map((rig) => rig.id))
+    let removedAny = false
     for (const [rigId] of this._rigManagers) {
       if (!currentRigIds.has(rigId)) {
         this._rigManagers.delete(rigId)
+        removedAny = true
       }
     }
 
@@ -425,6 +398,18 @@ export class DmxPublisher {
         const manager = new DmxLightManager(rig.config)
         this._rigManagers.set(rig.id, { manager, rig })
       }
+    }
+
+    // Rig configuration just changed, so a fault the user has since fixed should be able to
+    // report again rather than staying suppressed for the life of the process.
+    this._reportedBadChannelLights.clear()
+    this._reportedInvalidExtraLights.clear()
+    this._reportedCastFailureLights.clear()
+
+    // A dropped rig's channels are released on the next frame, so publish one now rather than
+    // waiting for a light state that may never arrive if the rig set is now empty.
+    if (removedAny && !this._manualMode) {
+      this.publishNow(this._aggregatedLights)
     }
   }
 
@@ -453,8 +438,8 @@ export class DmxPublisher {
    */
   private _warnInvalidExtras(lightId: string, plan: ChannelMixPlan): void {
     if (plan.invalidChannels.length === 0) return
-    if (this._reportedBadChannelLights.has(lightId)) return
-    this._reportedBadChannelLights.add(lightId)
+    if (this._reportedInvalidExtraLights.has(lightId)) return
+    this._reportedInvalidExtraLights.add(lightId)
     log.warn(
       `Light ${lightId}: skipping invalid extra channels: ${plan.invalidChannels.join(', ')}`,
     )
@@ -470,7 +455,7 @@ export class DmxPublisher {
     // 1. Snapshot the set of currently-enabled wire-sender slots and reconcile state.
     const enabledWireSenders = this._sender.getEnabledWireSenders()
     const ipcEnabled = this._sender.isIpcEnabled()
-    this._reconcileSlots(new Set(enabledWireSenders))
+    this._governor.reconcile(new Set(enabledWireSenders))
 
     // If nobody's listening on the wire and IPC is off, there's nothing to do.
     if (enabledWireSenders.length === 0 && !ipcEnabled) {
@@ -479,7 +464,7 @@ export class DmxPublisher {
 
     // 2. Clear each wire slot's working buffer in place.
     for (const wireId of enabledWireSenders) {
-      const slot = this._ensureSlot(wireId)
+      const slot = this._governor.slotFor(wireId)
       for (const key of Object.keys(slot.buffer)) {
         delete slot.buffer[Number(key)]
       }
@@ -535,8 +520,8 @@ export class DmxPublisher {
       const wireValue =
         scalePercent === undefined ? clamped : scaleDmxValueByPercent(clamped, scalePercent)
       for (const wireId of curWireTargets) {
-        // _reconcileSlots ensured every enabled wire sender has slot state.
-        this._slots.get(wireId)!.buffer[channelNumber] = wireValue
+        // reconcile() ensured every enabled wire sender has slot state.
+        this._governor.slotFor(wireId).buffer[channelNumber] = wireValue
       }
       if (curIpcBuffer !== null) {
         curIpcBuffer[channelNumber] = clamped
@@ -719,7 +704,12 @@ export class DmxPublisher {
         try {
           dmxChannelData = castToChannelType(dmxLight.fixture, channelsInput)
         } catch (error) {
-          log.error(`Error casting channels for Light ID: ${lightId} - ${error}`)
+          // Once per light: this runs per light per frame, so an unlatched log floods the file
+          // sink at the publish rate for as long as the bad fixture is configured.
+          if (!this._reportedCastFailureLights.has(lightId)) {
+            this._reportedCastFailureLights.add(lightId)
+            log.error(`Error casting channels for Light ID: ${lightId} - ${error}`)
+          }
           continue
         }
 
@@ -793,11 +783,13 @@ export class DmxPublisher {
       }
     }
 
-    // 5. Dispatch each wire slot that received writes through its per-slot governor.
+    // 5. Release channels that stopped being addressed, then dispatch each wire slot through its
+    //    per-slot governor. A slot with nothing left to say sends nothing.
     for (const wireId of enabledWireSenders) {
-      const slot = this._slots.get(wireId)!
+      const slot = this._governor.slotFor(wireId)
+      this._governor.releaseUnwrittenChannels(slot)
       if (Object.keys(slot.buffer).length > 0) {
-        this._dispatchSender(wireId, slot)
+        this._governor.dispatch(wireId, slot)
       }
     }
 
@@ -825,116 +817,6 @@ export class DmxPublisher {
       }
     }
     return targets
-  }
-
-  private _ensureSlot(wireId: WireSenderId): SenderSlotState {
-    let slot = this._slots.get(wireId)
-    if (!slot) {
-      slot = makeSlotState()
-      this._slots.set(wireId, slot)
-    }
-    return slot
-  }
-
-  /**
-   * Removes governor state for wire-sender slots that are no longer enabled (cancelling any
-   * in-flight trailing timer). Called once per frame; cheap because the active set is small.
-   * A stale trailing timer that already fired before this point will hit a disabled slot in
-   * `SenderManager.send`, which silently no-ops.
-   */
-  private _reconcileSlots(activeIds: Set<WireSenderId>): void {
-    for (const [wireId, slot] of this._slots) {
-      if (!activeIds.has(wireId)) {
-        this._cancelTrailingFor(slot)
-        this._slots.delete(wireId)
-      }
-    }
-  }
-
-  /**
-   * Per-wire-slot output governor. `publishNow` always runs every frame (the strobe peak-hold
-   * state machine depends on seeing every blended frame), but the actual wire send is governed
-   * here so weak adapters aren't fed at the render tick rate.
-   *
-   *  - Governor disabled (no `outputRateHz`): legacy behaviour — send every frame, no dirty-skip.
-   *  - Dirty-skip: identical to the last sent frame for this slot → don't send.
-   *  - Rate gate: leading-edge send when the slot's interval has elapsed; otherwise snapshot the
-   *    frame and arm a single trailing timer so the latest state is always flushed (no stale tail).
-   *
-   * Each slot has its own `lastSendTimeMs` and dirty-skip cache, so traffic on one sender does
-   * not suppress traffic on another. `_minIntervalMs` is a global Hz preference shared across
-   * all slots.
-   */
-  private _dispatchSender(wireId: WireSenderId, slot: SenderSlotState): void {
-    if (this._minIntervalMs <= 0) {
-      this._sendToSender(wireId, slot, slot.buffer)
-      return
-    }
-
-    if (slot.hasLastSent && this._buffersEqual(slot.buffer, slot.lastSentBuffer)) {
-      // Latest intent already matches the wire for this slot: nothing to send, and any earlier
-      // deferred frame for this slot is now superseded — drop it so the trailing timer can't
-      // flush a stale value.
-      this._cancelTrailingFor(slot)
-      return
-    }
-
-    const now = this._timing.now()
-    const elapsed = now - slot.lastSendTimeMs
-    if (!slot.hasLastSent || elapsed >= this._minIntervalMs) {
-      this._cancelTrailingFor(slot)
-      slot.lastSendTimeMs = now
-      this._sendToSender(wireId, slot, slot.buffer)
-      return
-    }
-
-    // Within the rate window: keep the latest frame and arm a trailing flush if not already.
-    this._snapshotInto(slot.pendingBuffer, slot.buffer)
-    slot.hasPending = true
-    if (slot.trailingTimer === null) {
-      const delay = this._minIntervalMs - elapsed
-      slot.trailingTimer = this._timing.setTimer(() => this._flushTrailingFor(wireId, slot), delay)
-    }
-  }
-
-  /** Trailing-timer callback: emit the most recent rate-limited frame for this slot. */
-  private _flushTrailingFor(wireId: WireSenderId, slot: SenderSlotState): void {
-    slot.trailingTimer = null
-    if (!slot.hasPending) {
-      return
-    }
-    slot.hasPending = false
-    if (slot.hasLastSent && this._buffersEqual(slot.pendingBuffer, slot.lastSentBuffer)) {
-      return
-    }
-    slot.lastSendTimeMs = this._timing.now()
-    this._sendToSender(wireId, slot, slot.pendingBuffer)
-  }
-
-  /** Hand a buffer to the wire sender for one slot and record it for dirty-skip. */
-  private _sendToSender(
-    wireId: WireSenderId,
-    slot: SenderSlotState,
-    buffer: Record<number, number>,
-  ): void {
-    try {
-      this._sender.send(wireId, buffer)
-    } catch (error) {
-      log.error(`Failed to send DMX data to ${wireId}:`, error)
-      return
-    }
-    if (this._minIntervalMs > 0) {
-      this._snapshotInto(slot.lastSentBuffer, buffer)
-      slot.hasLastSent = true
-    }
-  }
-
-  private _cancelTrailingFor(slot: SenderSlotState): void {
-    if (slot.trailingTimer !== null) {
-      this._timing.clearTimer(slot.trailingTimer)
-      slot.trailingTimer = null
-    }
-    slot.hasPending = false
   }
 
   /**
@@ -990,42 +872,11 @@ export class DmxPublisher {
     this._ipc.pending = null
   }
 
-  /** Reset governor state across all slots so cue output resumes cleanly (leading-edge). */
+  /** Reset governor state so cue output resumes cleanly on a leading edge. */
   private _resetGovernorAllSlots(): void {
-    for (const slot of this._slots.values()) {
-      this._cancelTrailingFor(slot)
-      slot.lastSendTimeMs = 0
-      slot.hasLastSent = false
-      for (const key of Object.keys(slot.lastSentBuffer)) {
-        delete slot.lastSentBuffer[Number(key)]
-      }
-    }
+    this._governor.resetAll()
     this._cancelTrailingIpc()
     this._ipc.lastSendTimeMs = 0
-  }
-
-  /** Copy `src` into the persistent `dest` object (clear-then-fill) to keep allocations down. */
-  private _snapshotInto(dest: Record<number, number>, src: Record<number, number>): void {
-    for (const key of Object.keys(dest)) {
-      delete dest[Number(key)]
-    }
-    for (const [k, v] of Object.entries(src)) {
-      dest[Number(k)] = v
-    }
-  }
-
-  private _buffersEqual(a: Record<number, number>, b: Record<number, number>): boolean {
-    const aKeys = Object.keys(a)
-    const bKeys = Object.keys(b)
-    if (aKeys.length !== bKeys.length) {
-      return false
-    }
-    for (const k of aKeys) {
-      if (a[Number(k)] !== b[Number(k)]) {
-        return false
-      }
-    }
-    return true
   }
 
   public async shutdown(): Promise<void> {
@@ -1042,15 +893,15 @@ export class DmxPublisher {
       }
       this._chainSubscriptions = []
       this._aggregatedLights.clear()
+      // Set before the blackout below, so a flush queued earlier finds the publisher shut down
+      // and drops its write.
+      this._isShutDown = true
+      this._rigManagers.clear()
 
       // Send a final blackout to every enabled wire sender. Blackout must hit every sender
       // regardless of per-rig routing.
       for (const wireId of this._sender.getEnabledWireSenders()) {
-        try {
-          this._sender.send(wireId, this._immediateBlackoutData)
-        } catch (err) {
-          log.error(`Error sending final blackout to ${wireId}:`, err)
-        }
+        void this._sender.send(wireId, this._immediateBlackoutData)
       }
       // Mirror the blackout on the IPC preview so the renderer sees the final state.
       if (this._sender.isIpcEnabled()) {
@@ -1060,10 +911,7 @@ export class DmxPublisher {
       log.info('DmxPublisher sent final blackout signal')
 
       // Cancel any in-flight trailing timers so we don't keep the event loop alive.
-      for (const slot of this._slots.values()) {
-        this._cancelTrailingFor(slot)
-      }
-      this._slots.clear()
+      this._governor.dispose()
 
       log.info('DmxPublisher has been successfully shut down.')
     } catch (error) {

@@ -325,7 +325,7 @@ describe('DmxPublisher extra channels', () => {
     ])
     ctx.publisher.publish(new Map([['l1', rgbio({ red: 255, green: 191, intensity: 255 })]]))
     const buf = ctx.lastWire()
-    expect(buf[5]).toBeUndefined()
+    expect(buf[5]).toBe(0) // amber is released rather than left holding its last value
     expect(buf[2]).toBe(255) // full red again (legacy path)
   })
 })
