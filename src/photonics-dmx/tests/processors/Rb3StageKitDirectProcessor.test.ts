@@ -15,6 +15,7 @@ import { getColor } from '../../helpers/dmxHelpers'
 import { CueData } from '../../cues/types/cueTypes'
 import { Effect, RGBIO } from '../../types'
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
+import { performance as perfHooks } from 'perf_hooks'
 
 const MENU_BASE = 'rb3-menu-base'
 const menuLight = (i: number) => `rb3-menu-light-${i}`
@@ -299,6 +300,111 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
 
 describe('StageKit direct mode configuration', () => {
   it('carries only the settings something reads', () => {
-    expect(Object.keys(DEFAULT_STAGEKIT_CONFIG).sort()).toEqual(['debug', 'enabled'])
+    expect(Object.keys(DEFAULT_STAGEKIT_CONFIG).sort()).toEqual([
+      'debug',
+      'enabled',
+      'strobeWatchdogMs',
+    ])
+  })
+})
+
+describe('StageKit strobe watchdog', () => {
+  let networkListener: EventEmitter
+  let processor: Rb3StageKitDirectProcessor
+  const WINDOW_MS = 2000
+
+  /** A rig with a strobe fixture, so a strobe command produces a real effect to observe. */
+  function makeStrobeRigConfig() {
+    return createMockLightingConfig({
+      numLights: 4,
+      frontLights: [
+        createMockDmxLight({ id: 's-f0', position: 0, fixtureId: 's-f0', isStrobeEnabled: true }),
+        createMockDmxLight({ id: 's-f1', position: 1, fixtureId: 's-f1' }),
+        createMockDmxLight({ id: 's-f2', position: 2, fixtureId: 's-f2' }),
+        createMockDmxLight({ id: 's-f3', position: 3, fixtureId: 's-f3' }),
+      ],
+      backLights: [],
+      strobeLights: [
+        createMockDmxLight({ id: 's-f0', position: 0, fixtureId: 's-f0', isStrobeEnabled: true }),
+      ],
+    })
+  }
+
+  function emitStrobe(speed: 'slow' | 'medium' | 'fast' | 'fastest'): void {
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      strobeEffect: speed,
+      timestamp: Date.now(),
+    })
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers()
+    jest.setSystemTime(0)
+    // monotonicNowMs reads perf_hooks performance, which is a different object from the global
+    // one fake timers install, so the spy has to go on the module the clock actually calls.
+    jest.spyOn(perfHooks, 'now').mockImplementation(() => Date.now())
+    jest.spyOn(console, 'log').mockImplementation(() => {})
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+    networkListener = new EventEmitter()
+    const lightManager = new DmxLightManager(makeStrobeRigConfig())
+    const sequencer = {
+      addEffect: jest.fn(),
+      setEffect: jest.fn().mockImplementation(() => Promise.resolve()),
+      removeEffect: jest.fn(),
+      setState: jest.fn(),
+      blackout: jest.fn().mockImplementation(() => Promise.resolve()),
+    } as unknown as ILightingController
+    const chainFanout = new ChainFanout()
+    chainFanout.setChains([
+      {
+        rigId: 'strobe-rig',
+        isPrimary: true,
+        dmxLightManager: lightManager,
+        sequencer,
+        cueHandlers: { yarg: null, rb3: null },
+        audioCueHandler: null,
+        rb3MenuCueHandler: null,
+      } as unknown as RigChain,
+    ])
+    processor = new Rb3StageKitDirectProcessor(chainFanout, { strobeWatchdogMs: WINDOW_MS })
+    processor.startListening(networkListener)
+  })
+
+  afterEach(() => {
+    processor.stopListening(networkListener)
+    processor.destroy()
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+  })
+
+  it('cuts a strobe the console stopped talking about', () => {
+    emitStrobe('fastest')
+    expect(processor.getStatus().hasActiveStrobeEffects).toBe(true)
+
+    jest.advanceTimersByTime(WINDOW_MS + 500)
+
+    expect(processor.getStatus().hasActiveStrobeEffects).toBe(false)
+  })
+
+  it('leaves a strobe running while packets keep arriving', () => {
+    emitStrobe('fast')
+
+    for (let elapsed = 0; elapsed < WINDOW_MS * 3; elapsed += WINDOW_MS / 2) {
+      jest.advanceTimersByTime(WINDOW_MS / 2)
+      emitStrobe('fast')
+    }
+
+    expect(processor.getStatus().hasActiveStrobeEffects).toBe(true)
+  })
+
+  it('stays quiet when no strobe is running', () => {
+    networkListener.emit('stagekit:data', { positions: [0], color: 'red', timestamp: Date.now() })
+
+    jest.advanceTimersByTime(WINDOW_MS * 2)
+
+    expect(processor.getStatus().hasActiveStrobeEffects).toBe(false)
   })
 })

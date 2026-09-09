@@ -10,6 +10,7 @@ import { ChainFanout } from '../../controllers/ChainFanout'
 import type { RigChain } from '../../controllers/RigChain'
 import { CueType } from '../../cues/types/cueTypes'
 import type { CueData } from '../../cues/types/cueTypes'
+import { performance as perfHooks } from 'perf_hooks'
 
 function mockRuntime(): {
   runtime: CueRuntime
@@ -233,6 +234,39 @@ describe('Rb3StageKitCueProcessor', () => {
     proc.tick()
     expect(calls.some((c) => c.cueType === CueType.RB3)).toBe(true)
     expect(calls.some((c) => c.cueType === CueType.Strobe_Slow)).toBe(true)
+  })
+
+  it('keepalive drops a strobe the console stopped talking about', () => {
+    const { runtime, calls } = mockRuntime()
+    const emitter = new EventEmitter()
+    const proc = new Rb3StageKitCueProcessor(runtime, { keepaliveMs: null, strobeWatchdogMs: 2000 })
+    proc.startListening(emitter)
+    const nowSpy = jest.spyOn(perfHooks, 'now').mockReturnValue(0)
+
+    emitter.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      fog: false,
+      strobeEffect: 'fast',
+      rightChannel: 0x05,
+      timestamp: 0,
+    })
+
+    nowSpy.mockReturnValue(1000)
+    calls.length = 0
+    proc.tick()
+    expect(calls.some((c) => c.cueType === CueType.Strobe_Fast)).toBe(true)
+
+    nowSpy.mockReturnValue(2500)
+    calls.length = 0
+    proc.tick()
+
+    expect(calls.some((c) => c.cueType === CueType.Strobe_Fast)).toBe(false)
+    expect(calls.some((c) => c.cueType === CueType.Strobe_Off)).toBe(true)
+    expect(runtime.stopActiveStrobe).toHaveBeenCalledTimes(1)
+
+    proc.stopListening()
+    nowSpy.mockRestore()
   })
 
   it('stops dispatching after stopListening', () => {

@@ -18,6 +18,7 @@ import { ChainFanout } from '../controllers/ChainFanout'
 import { RB3_MAIN_HUB_SCREEN, RB3_SONG_SELECT_SCREEN } from '../listeners/RB3/rb3eTypes'
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { Rb3MenuFramePump } from './rb3MenuAnimation'
+import { Rb3StrobeWatchdog } from './rb3StrobeWatchdog'
 import { createLogger } from '../../shared/logger'
 import { monotonicNowMs } from '../../shared/time'
 import { buildMenusCueData, buildStageKitCueData, LedBankAccumulator } from './rb3StageKitCueData'
@@ -41,6 +42,9 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
   // Track if we're currently in a song (using direct control)
   private _inSong: boolean = false
+
+  // Cuts a strobe the console stopped talking about.
+  private readonly strobeWatchdog: Rb3StrobeWatchdog
 
   // Accumulated StageKit LED bank masks (bit i = position i lit). The incoming StageKit events are
   // per-bank, so we accumulate here and emit a full `ledBanks` snapshot each frame, the same shape the
@@ -69,6 +73,10 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   ) {
     super()
     this.config = { ...DEFAULT_STAGEKIT_CONFIG, ...stageKitConfig }
+    this.strobeWatchdog = new Rb3StrobeWatchdog(this.config.strobeWatchdogMs ?? 0, () => {
+      log.warn('StageKitDirectProcessor: strobe outlived its packets, cutting it.')
+      this.clearStrobeEffectsAtPositions([])
+    })
     this.rebuildRigProcessorsFromChains()
   }
 
@@ -137,6 +145,8 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       this.boundHandleScreenNameEvent as (event: { screenName: string; timestamp: number }) => void,
     )
 
+    this.strobeWatchdog.start()
+
     log.info(
       'StageKitDirectProcessor: Registered listeners for stagekit:data, rb3e:gameState, and rb3e:screenName',
     )
@@ -159,6 +169,8 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       networkListener.off('rb3e:screenName', this.boundHandleScreenNameEvent)
       this.boundHandleScreenNameEvent = null
     }
+    this.strobeWatchdog.stop()
+
     log.info(
       'StageKitDirectProcessor stopped listening for stagekit:data, rb3e:gameState, and rb3e:screenName',
     )
@@ -236,6 +248,8 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private handleStageKitEvent(event: StageKitData): void {
     const { positions, color, strobeEffect } = event
 
+    this.strobeWatchdog.packetSeen()
+
     if (!this._inSong) {
       log.info(
         'StageKitDirectProcessor: Received StageKit event while not in song, marking as in song',
@@ -244,8 +258,10 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     }
 
     if (strobeEffect === 'off') {
+      this.strobeWatchdog.setStrobeRunning(false)
       this.clearStrobeEffectsAtPositions(positions)
     } else if (strobeEffect) {
+      this.strobeWatchdog.setStrobeRunning(true)
       this.applyStrobeEffect(strobeEffect)
     } else if (color !== 'off') {
       void this.applyLightData(positions, color)
@@ -551,6 +567,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       log.error('StageKitDirectProcessor: Error clearing lights during destroy:', error)
     })
     this.clearMenuAnimationTimer()
+    this.strobeWatchdog.stop()
     for (const rig of this.rigs.values()) {
       void rig.dispose().catch((error) => {
         log.error(`Rig ${rig.rigId}: error disposing during destroy:`, error)
