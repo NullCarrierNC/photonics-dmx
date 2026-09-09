@@ -31,8 +31,6 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:color-blending": "npx ts-node src/photonics-dmx/tests/runColorBlendingTest.ts",
-    "test:color-analysis": "npx ts-node src/photonics-dmx/tests/runColorAnalysis.ts",
     "sim": "npx ts-node --project tsconfig.sim.json src/photonics-dmx/sim/runCueSim.ts"
   },
   "dependencies": {

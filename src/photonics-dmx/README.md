@@ -9,11 +9,11 @@ If you see the term `light` this is the virtual representation used within the l
 
 ## Architecture Overview
 
-1. `Listeners`: listen for game data over the network. Specific implementations for YARG and RB3E. When a lighting cue is received the matching runtime or processor is called.
-2. `Processors`: handle game events and convert them to lighting effects. YARG uses node cue processing while RB3E uses direct StageKit-to-DMX processing.
+1. `Listeners`: listen for game data over the network. Specific implementations for YARG and RB3E, alongside the audio listener that derives its data from signal analysis. When a lighting cue is received the matching runtime or processor is called.
+2. `Processors`: handle game events and convert them to lighting effects. YARG and audio use node cue processing. RB3E uses either direct StageKit-to-DMX processing or node cues, depending on the RB3 processing mode preference.
 3. `Sequencer`: the central coordinator of the lighting system that manages the lifecycle of effects and transitions. It oversees the EffectManager and other components.
 4. `EffectManager`: receives effect data and orchestrates the creation and management of transitions. Handles effect queueing and scheduling, assigns persistent runs, and restarts them only after every light in the run completes.
-5. `LightTransitionController`: processes transitions and interpolates colour states over time, applying easing functions and handling transform timing.
+5. `LightTransitionController`: runs the per-frame transition loop and handles transform timing. Sampling one transition at one instant lives in `transitionStep.ts`, the easing and layer blending maths in `lightBlending.ts`, and range clamping and orphan reaping in `transitionHealth.ts`.
 6. `LayerManager`: tracks each light's state on a per-light-per-layer basis and is responsible for calculating the final results when layers are flattened.
 7. `DmxLightManager`: manages the virtual representation of the physical DMX fixtures.
 8. `DmxPublisher`: maps the abstract light state to each fixture's specific DMX channels using the fixture profiles defined in the configuration.
@@ -24,7 +24,7 @@ Configuration is handled by the `ConfigurationManager` and related services, whi
 
 ## Node-Based Cue System
 
-Photonics uses node-based cues for YARG and audio lighting. Cues and reusable effects are defined as JSON files with a graph of nodes (event listeners, logic, actions, event raisers) and executed at runtime.
+Photonics uses node-based cues for YARG, RB3 and audio lighting. Cues and reusable effects are defined as JSON files with a graph of nodes (event listeners, logic, actions, event raisers) and executed at runtime.
 
 **Flow:** JSON file → Loader (validation) → Compiler → Registry → ExecutionEngine → Sequencer
 
@@ -54,21 +54,28 @@ YARG uses **node cue processing** where network cue events are routed through th
 
 ### RB3E Processing
 
-RB3E uses direct StageKit processing:
+RB3E runs in one of two modes, set by the `processingMode` value in the RB3 preferences. The
+default is `direct`.
 
-The `Rb3StageKitDirectProcessor` provides direct DMX control by:
+**Direct mode** maps the Stage Kit state straight onto the rig. The `Rb3StageKitDirectProcessor`:
 
-- Receiving StageKit light data (4 color banks: Blue, Green, Yellow, Red with 8 positions each)
-- Mapping StageKit positions directly to DMX lights
-- Supporting color blending and accumulation
-- Handling strobe effects
+- Receives StageKit light data (4 color banks: Blue, Green, Yellow, Red with 8 positions each)
+- Maps StageKit positions directly to DMX lights, one `Rb3StageKitRigProcessor` per rig
+- Supports color blending and accumulation
+- Handles strobe effects
+
+**Cue mode** feeds the same data through the node cue system. The `Rb3StageKitCueProcessor` builds
+cue data from the Stage Kit state and dispatches it through a `ChainCueRuntime` bound to the `rb3`
+domain, so RB3 selects from the `rb3` `CueRegistry` the same way YARG selects from its own.
+`Rb3GameModeManager` rotates the primary cue group as play continues.
 
 ### Processor Selection
 
-The system automatically selects the appropriate processor:
+`ProcessorManager.startProcessors` reads the mode and starts the matching processor:
 
 - **YARG**: Uses node cue processing
-- **RB3E**: Uses direct StageKit processing
+- **RB3E**: Uses direct StageKit processing or node cue processing, per the preference
+- **Audio**: Uses node cue processing, driven by `AudioCueProcessor`
 
 ### Additional Components
 
@@ -76,10 +83,18 @@ The sequencing system contains several other components, though these are mainly
 
 - `TransitionEngine`: Handles the animation and timing of transitions between light states using the shared frame context captured by the Sequencer.
 - `SongEventHandler`: Processes beat, measure, and other musical events.
-- `SystemEffectsController`: Manages system-level effects blackout, which don't act like normal cue/effects.
+- `SystemEffectsController`: Manages system-level effects that don't act like normal cue/effects: blackout, and the occluding overlay that darkens the rig while a cue keeps running underneath.
 - `Clock`: Provides centralized timing control with configurable precision (default 10 ms) for all system components. Each tick yields a `FrameContext` that is passed to TransitionEngine and LightTransitionController.
 - `EffectTransformer`: Transforms generic effect definitions into concrete transition specifications.
 - `LightStateManager`: Manages the final merged RGBIO state for each light and publishes the output of each atomic frame calculation to external listeners.
+- `EffectScheduler`: Owns the effect queues and decides when a queued effect starts.
+- `EffectCallbackRegistry`: Holds effect completion callbacks. A cancelled effect still fires its callback.
+- `PersistentRunRegistry`: Tracks the lights in each persistent run so the run restarts only once they have all completed.
+- `effectSubmission.ts`: The `SubmissionPolicy` (add, set, replace) shared by every `EffectManager` submission method.
+- `MotionPatternEngine` and `motionGeometry.ts`: Pan and tilt motion patterns for moving head fixtures.
+- `lightBlending.ts`: Easing, interpolation, and the layer blend maths.
+- `transitionStep.ts`: Samples a single transition at a single instant.
+- `transitionHealth.ts`: Clamps light state into range and reaps orphaned transitions.
 - `DebugMonitor`: Provides real-time monitoring and debugging capabilities (when enabled).
 
 #### Centralized Timing
@@ -88,9 +103,14 @@ The `Clock` provides a single source of truth for all timing operations in the s
 
 ### Processing Components
 
-- `ProcessorManager`: Manages direct StageKit processing for RB3E.
+- `ProcessorManager`: Selects and runs the RB3E processor for the configured mode, and the audio processor.
 - `Rb3StageKitDirectProcessor`: Provides direct StageKit-to-DMX mapping for real-time lighting control.
+- `Rb3StageKitRigProcessor`: Holds the direct-mode render state for one rig.
+- `Rb3StageKitCueProcessor`: Drives the `rb3` node cue domain from StageKit data.
+- `rb3StageKitCueData.ts`: Builds the cue data both RB3 processors dispatch.
+- `Rb3GameModeManager`: Rotates the primary RB3 cue group during play.
 - `StageKitLightMapper`: Maps StageKit light positions to DMX light configurations.
+- `AudioCueProcessor`: Drives the audio cue domain from the analysed audio frame.
 
 ## Multi-Rig Output
 
@@ -102,7 +122,11 @@ This design is intentional differs from traditional multi-universe designs that 
 
 **Flow:** listener → `ChainFanout` → per-rig `RigChain` (`Sequencer` → `LightTransitionController` → `LightStateManager`) → `DmxPublisher` (per-rig buffers) → `SenderManager` → rig-routed senders
 
-`DmxPublisher` builds a separate DMX buffer per rig and routes it to that rig's configured senders/universes. A leading and trailing-edge rate limiter and per-light state de-duplication sit ahead of the senders, so unchanged frames are skipped rather than re-sent.
+`DmxPublisher` builds a separate DMX buffer per rig and routes it to that rig's configured senders/universes. Between the light state and the wire sit two stages: `VenueFrameProcessor` applies the venue post-processing effects through `PublisherFrameProcessor`, and `StrobeStateManager` supplies the hardware strobe channel value each publish tick reads.
+
+An output-rate governor sits ahead of the wire senders, enabled by the global DMX rate preference. Each sender slot keeps the buffer it last sent and skips a frame identical to it. A frame that does differ goes out immediately once the slot's interval has elapsed, and one arriving inside the interval is held and flushed by a trailing timer, so the wire never sits on a stale value. Each slot rate limits independently. The IPC preview path has its own simpler rate limit and no skip.
+
+Each net cue domain reaches the chains through `ChainFanout.cueRuntime('yarg' | 'rb3')`, so YARG and RB3 dispatch into the same fan-out without knowing about each other.
 
 Rig mirroring (`helpers/mirrorRig.ts`, applied per `RigChain`) flips a rig's layout: horizontal mirroring reverses light order within each row and mirrors moving-head pan around home; vertical mirroring swaps the front and back rows. One physical layout can mirror another without re-authoring cues.
 
@@ -127,11 +151,14 @@ Available wait conditions include:
 
 - `none`: No waiting, transition starts immediately
 - `delay`: Wait for a fixed time period
-- `beat`: Wait for a beat event
-- `measure`: Wait for a measure event
-- `keyframe`: Wait for a keyframe event. Note: currently all YARG keyframe events like keyframe-next are treated as a single type in Photonics.
-- Instrument-specific events: `guitar-open`, `guitar-green`, `guitar-red`, etc.
+- `beat`, `half-beat`, `measure`: Wait for a point on the tempo grid
+- `keyframe`, `keyframe-first`, `keyframe-next`, `keyframe-previous`: Wait for a keyframe advance. The specific event and the generic `keyframe` both fire, so a cue can wait on a direction or on any advance.
+- Instrument-specific events: `guitar-open`, `guitar-green`, `guitar-red`, etc, with the same set for `bass-` and `keys-`
 - Drum events: `drum-kick`, `drum-red`, `drum-yellow`, `drum-blue`, `drum-green`, and cymbal events
+- Vocal events: `vocal-note`, `vocal-note-off`
+- RB3 Stage Kit events: `led-1` to `led-8`, their `-off` counterparts, `fog-on` and `fog-off`
+
+The YARG and RB3 events are exclusive to their own mode. `types/songEvents.ts` holds the full lists.
 
 ### Event Count Properties
 
@@ -195,7 +222,10 @@ adding the new effect, so it becomes the only thing playing.
 top of running ones without clearing them inadvertently.
 `EffectManager.addEffectUnblockedName`: Adds an effect only if no effect with the same name is already running. Prevents queue breaking timing issues.
 `EffectManager.setEffectUnblockedName`: Sets an effect only if no effect with the same name is already running. Otherwise discards the new effect.
-Persistent effects register a run that tracks every light in the effect. The run only restarts when all lights report completion, keeping effects like sweeps synchronized even when the cue fires continuously.
+`EffectManager.replaceEffect`: Replaces the effect on the layers it targets, leaving the rest alone.
+Each of these has a `WithCallback` variant that reports completion. `EffectCallbackRegistry` holds
+the callbacks, and a cancelled effect still fires its own so a waiting caller is never stranded.
+Persistent effects register a run in `PersistentRunRegistry` that tracks every light in the effect. The run only restarts when all lights report completion, keeping effects like sweeps synchronized even when the cue fires continuously.
 `EffectManager.getActiveEffectsForLight(lightId)`: Returns all active effects for a specific light across all layers
 `EffectManager.isLayerFreeForLight(layer, lightId)`: Checks if a specific layer is free for a specific light
 
@@ -222,57 +252,57 @@ Layer 10 has 0.0 opacity (completely transparent), so it contributes nothing. On
 ```
 Layer 10: R:255, G:255, B:255, I:255, Opacity: 0.5, BlendMode: 'add'
 Layer 0:  R:255, G:0,   B:0,   I:255, Opacity: 1.0, BlendMode: 'add'
-Result: R:255, G:127, B:127 (Red + 50% White)
+Result: R:255, G:128, B:128 (Red + 50% White)
 ```
 
-With `'add'` blend mode and 0.5 opacity:
+With `'add'` blend mode and 0.5 opacity the scaled colour is rounded, then added:
 
-- Red: `255 + (255 * 0.5) = 255 + 127.5 = 382` → capped at 255
-- Green: `0 + (255 * 0.5) = 0 + 127.5 = 127.5` → 127
-- Blue: `0 + (255 * 0.5) = 0 + 127.5 = 127.5` → 127
+- Red: `255 + round(255 * 0.5) = 255 + 128 = 383` → capped at 255
+- Green: `0 + round(255 * 0.5) = 0 + 128 = 128`
+- Blue: `0 + round(255 * 0.5) = 0 + 128 = 128`
 
 ### Example 3: Replace Mode with Opacity
 
 ```
 Layer 10: R:255, G:255, B:255, I:255, Opacity: 0.5, BlendMode: 'replace'
 Layer 0:  R:255, G:0,   B:0,   I:255, Opacity: 1.0, BlendMode: 'replace'
-Result: R:127, G:127, B:127 (white scaled to 50% intensity; Layer 0 is replaced)
+Result: R:128, G:128, B:128 (white scaled to 50% intensity, Layer 0 is replaced)
 ```
 
 With `'replace'` blend mode and 0.5 opacity every channel of the replacing layer is scaled by opacity. The underlying layer is discarded, not blended, so Layer 0's red does not show through:
 
-- Red: `255 * 0.5 = 127.5` → 127
-- Green: `255 * 0.5 = 127.5` → 127
-- Blue: `255 * 0.5 = 127.5` → 127
-- Intensity: `255 * 0.5 = 127.5` → 127
+- Red: `round(255 * 0.5) = 128`
+- Green: `round(255 * 0.5) = 128`
+- Blue: `round(255 * 0.5) = 128`
+- Intensity: `round(255 * 0.5) = 128`
 
 ### Example 4: Mixed Blend Modes
 
 ```
 Layer 10: R:255, G:255, B:255, I:255, Opacity: 0.5, BlendMode: 'add'
 Layer 0:  R:255, G:0,   B:0,   I:255, Opacity: 1.0, BlendMode: 'replace'
-Result: R:255, G:127, B:127 (Red + 50% White)
+Result: R:255, G:128, B:128 (Red + 50% White)
 ```
 
-When mixing blend modes, the system applies the blend mode first, then the opacity:
+When mixing blend modes, each layer is blended in turn using its own mode and opacity:
 
 - Red: `255` (Layer 0 is fully opaque with 'replace')
-- Green: `0 + (255 * 0.5) = 127.5` → 127 (Layer 10 adds 50% white)
-- Blue: `0 + (255 * 0.5) = 127.5` → 127 (Layer 10 adds 50% white)
+- Green: `0 + round(255 * 0.5) = 128` (Layer 10 adds 50% white)
+- Blue: `0 + round(255 * 0.5) = 128` (Layer 10 adds 50% white)
 
 ### Example 5: Mix Mode (Alpha Crossfade)
 
 ```
 Layer 10: R:255, G:255, B:0,   I:255, Opacity: 0.5, BlendMode: 'mix'
 Layer 0:  R:0,   G:0,   B:255, I:255, Opacity: 1.0, BlendMode: 'replace'
-Result: R:127, G:127, B:127 (50% crossfade from blue toward yellow)
+Result: R:128, G:128, B:128 (50% crossfade from blue toward yellow)
 ```
 
 With `'mix'` blend mode each channel is interpolated between the lower layers and this layer by opacity (`lower * (1 - opacity) + layer * opacity`):
 
-- Red: `0 * 0.5 + 255 * 0.5 = 127`
-- Green: `0 * 0.5 + 255 * 0.5 = 127`
-- Blue: `255 * 0.5 + 0 * 0.5 = 127`
+- Red: `round(0 * 0.5 + 255 * 0.5) = 128`
+- Green: `round(0 * 0.5 + 255 * 0.5) = 128`
+- Blue: `round(255 * 0.5 + 0 * 0.5) = 128`
 
 Unlike `replace`, the lower layer is blended in rather than discarded, so the colour crossfades between the two rather than fading up from black.
 
@@ -298,7 +328,7 @@ export type RGBIO = {
 };
 ```
 
-The final colour calculation takes these opacity and blend mode values into account to determine how colors interact between layers.
+The final colour calculation takes these opacity and blend mode values into account to determine how colors interact between layers. `pan` and `tilt` are not blended: a layer that sets them wins, and a layer that omits them carries forward whatever the layers below aimed at.
 
 ## Effects and Queuing
 
