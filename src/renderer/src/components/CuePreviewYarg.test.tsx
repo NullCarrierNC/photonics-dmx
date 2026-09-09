@@ -6,7 +6,7 @@
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
 import { act, render, screen, cleanup } from '@testing-library/react'
 import { Provider, createStore } from 'jotai'
-import { lightingPrefsAtom, yargListenerEnabledAtom } from '../atoms'
+import { currentCueStateAtom, lightingPrefsAtom, yargListenerEnabledAtom } from '../atoms'
 import type { CueData } from '../../../photonics-dmx/cues/types/cueTypes'
 import { DrumNoteType, InstrumentNoteType } from '../../../photonics-dmx/cues/types/cueTypes'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
@@ -233,5 +233,57 @@ describe('CuePreviewYarg drum notes', () => {
     await renderWithCueData(cueData({ drumNotes: [DrumNoteType.Kick] }))
 
     expect(litUnder('Drums')).toEqual(['KD'])
+  })
+})
+
+describe('CuePreviewYarg primary cue row', () => {
+  beforeEach(() => {
+    listeners.clear()
+    jest.clearAllMocks()
+    jest.useFakeTimers()
+  })
+
+  afterEach(() => {
+    cleanup()
+    jest.useRealTimers()
+  })
+
+  it('clears the cue name once and leaves it clear while the state still holds it', () => {
+    const store = createStore()
+    store.set(yargListenerEnabledAtom, true)
+    render(
+      <Provider store={store}>
+        <CuePreviewYarg />
+      </Provider>,
+    )
+
+    // The grid only renders once a cue frame has arrived.
+    act(() => {
+      listeners.get(RENDERER_RECEIVE.CUE_HANDLED)?.(cueData())
+    })
+    act(() => {
+      store.set(currentCueStateAtom, {
+        cueType: 'Chorus',
+        groupId: null,
+        groupName: null,
+        isFallback: false,
+        cueStyle: 'primary',
+        counter: 0,
+        limit: 0,
+      })
+    })
+    expect(screen.queryByText('Chorus')).toBeTruthy()
+
+    // The clear timer fires. The atom still holds the cue, so a row that re-read its own state
+    // here would set the name straight back and keep flipping.
+    act(() => {
+      jest.advanceTimersByTime(400)
+    })
+    expect(screen.queryByText('Chorus')).toBeNull()
+
+    act(() => {
+      jest.advanceTimersByTime(2000)
+    })
+    expect(screen.queryByText('Chorus')).toBeNull()
   })
 })

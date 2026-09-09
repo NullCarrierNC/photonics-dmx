@@ -5,17 +5,9 @@ import {
   DmxRig,
   LightingConfiguration,
   ConfigStrobeType,
-  IpcSenderConfig,
 } from '../../../photonics-dmx/types'
 import { extraChannelDisplayLabel } from '../components/lightChannelDisplay'
-import {
-  getDmxRig,
-  getDmxRigs,
-  enableConsole,
-  disableConsole,
-  sendConsoleDmx,
-  enableSender,
-} from '../ipcApi'
+import { getDmxRig, getDmxRigs, enableConsole, disableConsole, sendConsoleDmx } from '../ipcApi'
 import {
   lightingPrefsAtom,
   myDmxLightsAtom,
@@ -30,6 +22,7 @@ import ArtNetToggle from '../components/ArtNetToggle'
 import EnttecProToggle from '../components/EnttecProToggle'
 import OpenDmxToggle from '../components/OpenDmxToggle'
 import { useRigDmxValues } from '../hooks/useRigDmxValues'
+import { useIpcPreviewSender } from '@renderer/hooks/useIpcPreviewSender'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('DmxConsole')
 
@@ -126,17 +119,7 @@ const DmxConsole: React.FC = () => {
     }
   }, [selectedRigId])
 
-  useEffect(() => {
-    let cancelled = false
-    void enableSender({ sender: 'ipc' } as IpcSenderConfig).catch((err) => {
-      if (!cancelled) {
-        log.error('Failed to enable IPC preview sender', err)
-      }
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  useIpcPreviewSender()
 
   // `kind: 'manual'` is the console-takeover/blackout loopback (shown as-is); `kind: 'rigs'`
   // carries one buffer per rig, of which we show the currently-selected rig's own universe.

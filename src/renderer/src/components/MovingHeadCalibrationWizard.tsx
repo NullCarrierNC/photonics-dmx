@@ -17,20 +17,14 @@ import {
   STAGE_LABELS_READY_STEP,
   WizardBeamPreview,
 } from './MovingHeadCalibrationWizard/WizardBeamPreview'
-import {
-  enableConsole,
-  disableConsole,
-  sendConsoleDmx,
-  setConsoleFixtureConfig,
-  enableSender,
-} from '../ipcApi'
-import type { IpcSenderConfig } from '../../../photonics-dmx/types'
+import { enableConsole, disableConsole, sendConsoleDmx, setConsoleFixtureConfig } from '../ipcApi'
 import SacnToggle from './SacnToggle'
 import ArtNetToggle from './ArtNetToggle'
 import EnttecProToggle from './EnttecProToggle'
 import OpenDmxToggle from './OpenDmxToggle'
 import LightsDmxPreview3D from './LightsDmxPreview3D'
 import { MotorEdgeHomeWarnings } from './MotorEdgeHomeWarnings'
+import { useIpcPreviewSender } from '@renderer/hooks/useIpcPreviewSender'
 
 const STEP_TITLES = [
   'Pan range',
@@ -100,10 +94,12 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
     [],
   )
 
+  // The wizard drives fixtures live, so it needs the preview stream for as long as it is open.
+  useIpcPreviewSender()
+
   useEffect(() => {
     let cancelled = false
     const snapshot = light
-    enableSender({ sender: 'ipc' } as IpcSenderConfig)
     ;(async () => {
       setInitError(null)
       const result = await enableConsole(rigId)

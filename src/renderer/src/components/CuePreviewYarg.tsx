@@ -84,6 +84,11 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   const keysClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const drumsClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // What the primary row is showing, read by the effect below without depending on it. Depending
+  // on the state it sets would restart the effect when its own clear timer fires, and the cue
+  // state atom still holds the last value, so the row would flip between the cue and blank for
+  // as long as the page stayed open.
+  const primaryCueNameRef = useRef<string>('')
   const primaryClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const secondaryClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -159,20 +164,24 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
     if (!cueState?.cueType || !cueState?.cueStyle) return
     const { cueType, cueStyle } = cueState
     if (cueStyle === 'primary') {
-      if (primaryCueName && primaryCueName !== cueType) {
+      if (primaryCueNameRef.current && primaryCueNameRef.current !== cueType) {
         clearTimeout(secondaryClearTimerRef.current ?? undefined)
         // eslint-disable-next-line react-hooks/set-state-in-effect -- sync display from IPC cue state
         setSecondaryCueName('')
       }
       clearTimeout(primaryClearTimerRef.current ?? undefined)
+      primaryCueNameRef.current = cueType
       setPrimaryCueName(cueType)
-      primaryClearTimerRef.current = setTimeout(() => setPrimaryCueName(''), 200)
+      primaryClearTimerRef.current = setTimeout(() => {
+        primaryCueNameRef.current = ''
+        setPrimaryCueName('')
+      }, 200)
     } else if (cueStyle === 'secondary') {
       clearTimeout(secondaryClearTimerRef.current ?? undefined)
       setSecondaryCueName(cueType)
       secondaryClearTimerRef.current = setTimeout(() => setSecondaryCueName(''), 200)
     }
-  }, [cueState, primaryCueName])
+  }, [cueState])
 
   // Handle manual indicators via props
   useEffect(() => {

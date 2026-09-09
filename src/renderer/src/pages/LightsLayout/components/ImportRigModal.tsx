@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 export type ImportRigSummary = {
   /** New templates that will be added to My Lights. */
@@ -49,6 +49,15 @@ const ImportRigModal: React.FC<Props> = ({
     }
   }
 
+  // The panel handles Escape, so it takes focus when it opens and the key event reaches the
+  // handler.
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    panelRef.current?.focus()
+  }, [isOpen])
+
   if (!isOpen) return null
 
   const { templatesToAddCount, templatesReusedCount, orphanCount } = summary
@@ -58,9 +67,13 @@ const ImportRigModal: React.FC<Props> = ({
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
       onClick={onCancel}>
       <div
+        ref={panelRef}
         className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-[500px] max-w-[90vw]"
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={handleKeyDown}>
+        onKeyDown={handleKeyDown}
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}>
         <h2 className="text-lg font-bold mb-1">Import Layout</h2>
         <p className="text-xs text-gray-500 mb-4">From {sourceBasename}</p>
 

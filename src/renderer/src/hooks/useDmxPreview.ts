@@ -3,9 +3,10 @@ import { useAtomValue, useSetAtom } from 'jotai'
 import { dmxValuesAtom, previewRigIdAtom } from '@renderer/atoms'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getDmxRig, enableSender } from '../ipcApi'
+import { getDmxRig } from '../ipcApi'
 import { useRigDmxValues } from './useRigDmxValues'
-import type { DmxRig, LightingConfiguration, IpcSenderConfig } from '../../../photonics-dmx/types'
+import { useIpcPreviewSender } from './useIpcPreviewSender'
+import type { DmxRig, LightingConfiguration } from '../../../photonics-dmx/types'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('useDmxPreview')
 
@@ -36,7 +37,9 @@ export function useDmxPreview(): {
     selectedRigIdRef.current = selectedRigId
   }, [selectedRigId])
 
-  // Load rig and manage IPC sender: enable when rig loads (cleanup only cancels async work)
+  // The preview stream runs while any view needs it, this one included.
+  useIpcPreviewSender()
+
   useEffect(() => {
     let cancelled = false
     const loadRigConfig = async () => {
@@ -53,7 +56,6 @@ export function useDmxPreview(): {
         if (rig) {
           setSelectedRig(rig)
           setRigConfig(rig.config)
-          enableSender({ sender: 'ipc' } as IpcSenderConfig)
         }
       } catch (error) {
         log.error('Failed to load rig configuration:', error)

@@ -192,6 +192,10 @@ const FixtureBeam = React.memo(function FixtureBeam({
     }
   }, [scene, targetPos])
 
+  // Beams stay mounted at zero rather than unmounting. Adding and removing a light changes the
+  // scene's light count, which invalidates cached shader programs, so a steady count leaves them
+  // valid through a blackout or a strobe.
+  const lit = dimmer01 > 0
   const intensity =
     (isMovingHead ? 2.2 : 1.4) * dimmer01 * Math.max(0.12, (rgb.r + rgb.g + rgb.b) / (3 * 255))
   const flareOpacity = 0.55 * dimmer01 * Math.min(1, (rgb.r + rgb.g + rgb.b) / (3 * 255))
@@ -211,7 +215,7 @@ const FixtureBeam = React.memo(function FixtureBeam({
         penumbra={0.35}
         castShadow={false}
         volumetric
-        opacity={0.35 * dimmer01 + 0.08}
+        opacity={lit ? 0.35 * dimmer01 + 0.08 : 0}
         attenuation={12}
         anglePower={4}
       />
@@ -447,16 +451,14 @@ function StageContent({ lightingConfig, dmxValues }: LightsDmxPreview3DProps) {
               movingHead={isMovingHead(it.light)}
               fixtureOrientation={it.fixtureOrientation}
             />
-            {dim > 0 && (
-              <FixtureBeam
-                position={beamPosition}
-                direction={dir}
-                rgb={rgb}
-                dimmer01={dim}
-                isMovingHead={isMovingHead(it.light)}
-                flareTexture={flareTex}
-              />
-            )}
+            <FixtureBeam
+              position={beamPosition}
+              direction={dir}
+              rgb={rgb}
+              dimmer01={dim}
+              isMovingHead={isMovingHead(it.light)}
+              flareTexture={flareTex}
+            />
           </group>
         )
       })}
