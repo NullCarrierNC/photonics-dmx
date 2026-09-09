@@ -132,3 +132,42 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.cueDomains.rb3Motion).toBeDefined()
   })
 })
+
+describe('PreferencesConfigFile required-key seeding', () => {
+  it.each(['clockRate', 'effectDebounce', 'complex', 'cueConsistencyWindow'] as const)(
+    'seeds a same-version v6 file missing %s instead of wiping it',
+    (missingKey) => {
+      const appData = freshAppData()
+      const stored: Record<string, unknown> = {
+        ...DEFAULT_PREFERENCES,
+        effectDebounce: 91,
+        cueDomains: createDefaultCueDomains(),
+      }
+      delete stored[missingKey]
+      seedPrefs(appData, 6, stored)
+
+      const onCorruptRecovery = jest.fn()
+      const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+      expect(onCorruptRecovery).not.toHaveBeenCalled()
+      expect(prefs[missingKey]).toEqual(DEFAULT_PREFERENCES[missingKey])
+      // Everything else the file carried survives.
+      if (missingKey !== 'effectDebounce') {
+        expect(prefs.effectDebounce).toBe(91)
+      }
+    },
+  )
+
+  it('keeps a stored value that happens to match nothing in the defaults', () => {
+    const appData = freshAppData()
+    seedPrefs(appData, 6, {
+      ...DEFAULT_PREFERENCES,
+      clockRate: 7,
+      cueDomains: createDefaultCueDomains(),
+    })
+
+    const prefs = new PreferencesConfigFile().get()
+
+    expect(prefs.clockRate).toBe(7)
+  })
+})

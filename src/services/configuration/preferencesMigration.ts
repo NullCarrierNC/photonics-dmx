@@ -1,4 +1,5 @@
 import { DEFAULT_PREFERENCES, type AppPreferences } from './configurationDefaults'
+import { REQUIRED_PREFERENCE_KEYS } from './configDataValidators'
 import {
   CUE_DOMAINS,
   type CueDomain,
@@ -298,6 +299,27 @@ export function migratePrefsV5ToV6(legacy: unknown, defaults: AppPreferences): A
  * present (no persist), otherwise a shallow copy with the missing domains defaulted. A malformed
  * `cueDomains` is left untouched so a wholly-corrupt file still falls through to validation.
  */
+/**
+ * Fills in top-level preferences the schema requires but the stored file does not carry, from the
+ * shipped defaults, so a file predating a newly required key passes validation and keeps the rest
+ * of its settings. Returns the input untouched when nothing is missing.
+ */
+export function seedMissingRequiredPrefs(prefs: AppPreferences): AppPreferences {
+  if (prefs == null || typeof prefs !== 'object' || Array.isArray(prefs)) {
+    return prefs
+  }
+  const stored = prefs as unknown as Record<string, unknown>
+  const missing = REQUIRED_PREFERENCE_KEYS.filter((key) => stored[key] === undefined)
+  if (missing.length === 0) {
+    return prefs
+  }
+  const seeded = { ...stored }
+  for (const key of missing) {
+    seeded[key] = (DEFAULT_PREFERENCES as unknown as Record<string, unknown>)[key]
+  }
+  return seeded as unknown as AppPreferences
+}
+
 export function seedMissingCueDomains(prefs: AppPreferences): AppPreferences {
   const domains = prefs?.cueDomains as Record<string, unknown> | undefined
   if (domains == null || typeof domains !== 'object' || Array.isArray(domains)) {

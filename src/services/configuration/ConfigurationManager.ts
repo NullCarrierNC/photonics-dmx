@@ -63,12 +63,6 @@ export class ConfigurationManager {
   private userLights: ConfigFile<UserLightsConfig>
   private lightingLayout: ConfigFile<LightingConfiguration>
   private dmxRigs: ConfigFile<DmxRigsConfig>
-  /**
-   * Last DmxRigsConfig getDmxRigs() scheduled to persist. Lets a read storm coalesce identical
-   * heal-writes while the async update() is still in flight (the in-memory config is not updated
-   * until save() resolves). Reset to null by other dmxRigs writers so a real change still persists.
-   */
-  private lastScheduledDmxRigsPersist: DmxRigsConfig | null = null
   private configCorruptRecovery: ConfigCorruptInfo[] = []
 
   /** Clears and returns batched config recovery events (for one main → renderer send). */
@@ -125,8 +119,7 @@ export class ConfigurationManager {
     key: K,
     value: AppPreferences[K],
   ): Promise<void> {
-    const current = this.preferences.get()
-    await this.preferences.update({ ...current, [key]: value })
+    await this.preferences.mutate((current) => ({ ...current, [key]: value }))
   }
 
   /**
@@ -140,18 +133,19 @@ export class ConfigurationManager {
    * Updates multiple preferences at once
    */
   async updatePreferences(updates: Partial<AppPreferences>): Promise<void> {
-    const currentPrefs = this.preferences.get()
-    let newPrefs: AppPreferences = { ...currentPrefs, ...updates }
-    if (updates.cueDomains) {
-      newPrefs = {
-        ...newPrefs,
-        cueDomains: mergePartialCueDomains(
-          currentPrefs.cueDomains,
-          updates.cueDomains as Partial<Record<CueDomain, Partial<CueDomainPrefs>>>,
-        ),
+    await this.preferences.mutate((currentPrefs) => {
+      let newPrefs: AppPreferences = { ...currentPrefs, ...updates }
+      if (updates.cueDomains) {
+        newPrefs = {
+          ...newPrefs,
+          cueDomains: mergePartialCueDomains(
+            currentPrefs.cueDomains,
+            updates.cueDomains as Partial<Record<CueDomain, Partial<CueDomainPrefs>>>,
+          ),
+        }
       }
-    }
-    await this.preferences.update(newPrefs)
+      return newPrefs
+    })
   }
 
   /**
@@ -166,13 +160,14 @@ export class ConfigurationManager {
    * `disabledCues` is present, it replaces the stored per-group map for that domain (important for IPC).
    */
   async updateCueDomain(domain: CueDomain, patch: Partial<CueDomainPrefs>): Promise<void> {
-    const current = this.preferences.get()
-    const base = current.cueDomains[domain]
-    const next: CueDomainPrefs = { ...base, ...patch }
-    if (Object.prototype.hasOwnProperty.call(patch, 'disabledCues') && patch.disabledCues) {
-      next.disabledCues = { ...patch.disabledCues }
-    }
-    await this.setPreference('cueDomains', { ...current.cueDomains, [domain]: next })
+    await this.preferences.mutate((current) => {
+      const base = current.cueDomains[domain]
+      const next: CueDomainPrefs = { ...base, ...patch }
+      if (Object.prototype.hasOwnProperty.call(patch, 'disabledCues') && patch.disabledCues) {
+        next.disabledCues = { ...patch.disabledCues }
+      }
+      return { ...current, cueDomains: { ...current.cueDomains, [domain]: next } }
+    })
   }
 
   /**
@@ -312,8 +307,7 @@ export class ConfigurationManager {
     key: K,
     value: LightingConfiguration[K],
   ): Promise<void> {
-    const current = this.lightingLayout.get()
-    await this.lightingLayout.update({ ...current, [key]: value })
+    await this.lightingLayout.mutate((current) => ({ ...current, [key]: value }))
   }
 
   /**
@@ -393,22 +387,21 @@ export class ConfigurationManager {
       this.getUserLights(),
     )
     if (migrationChanged || syncChanged) {
-      // Coalesce identical heal-writes during a read storm. getActiveRigs/getDmxRig call this in
-      // bursts, and the in-memory config is not updated until the async update() resolves, so each
-      // call would otherwise re-detect the same change and schedule another identical write. Skip
-      // when an equal payload is already scheduled; other dmxRigs writers reset the memo so a real
-      // change still persists.
-      if (
-        this.lastScheduledDmxRigsPersist === null ||
-        !equal(this.lastScheduledDmxRigsPersist, synced)
-      ) {
-        this.lastScheduledDmxRigsPersist = synced
-        void this.dmxRigs
-          .update(synced)
-          .catch((err) =>
-            log.error('[Photonics Config] Failed to persist migrated/synced DMX rigs:', err),
-          )
-      }
+      // The heal is queued as a turn rather than written directly. Reads come in bursts, so several
+      // callers detect the same repair, and a turn both orders them behind any user edit in flight
+      // and re-derives the repair from the freshest data. A repair that is already applied by the
+      // time its turn runs returns the input unchanged and writes nothing.
+      void this.dmxRigs
+        .mutate((latest) => {
+          const healed = syncRigsConfigWithUserLights(
+            migrateDmxRigsConfig(latest).config,
+            this.getUserLights(),
+          ).config
+          return equal(healed, latest) ? latest : healed
+        })
+        .catch((err) =>
+          log.error('[Photonics Config] Failed to persist migrated/synced DMX rigs:', err),
+        )
     }
     return synced.rigs
   }
@@ -419,13 +412,13 @@ export class ConfigurationManager {
    * edits propagate to rig snapshots without waiting for the next process restart.
    */
   async syncRigsWithUserLights(): Promise<boolean> {
-    const current = this.dmxRigs.get()
-    const { config: synced, changed } = syncRigsConfigWithUserLights(current, this.getUserLights())
+    const { changed } = syncRigsConfigWithUserLights(this.dmxRigs.get(), this.getUserLights())
     if (!changed) {
       return false
     }
-    this.lastScheduledDmxRigsPersist = null
-    await this.dmxRigs.update(synced)
+    await this.dmxRigs.mutate(
+      (latest) => syncRigsConfigWithUserLights(latest, this.getUserLights()).config,
+    )
     return true
   }
 
@@ -447,31 +440,31 @@ export class ConfigurationManager {
    *   edit never changes which rigs are active as a side effect.
    */
   async saveDmxRig(rig: DmxRig, opts: { deactivateOthers?: boolean } = {}): Promise<void> {
-    const current = this.dmxRigs.get()
     const exclusive = opts.deactivateOthers === true && rig.active === true
-    const rigs = current.rigs.map((r) =>
-      exclusive && r.id !== rig.id && r.active ? { ...r, active: false } : r,
-    )
-    const existingIndex = rigs.findIndex((r) => r.id === rig.id)
+    await this.dmxRigs.mutate((current) => {
+      const rigs = current.rigs.map((r) =>
+        exclusive && r.id !== rig.id && r.active ? { ...r, active: false } : r,
+      )
+      const existingIndex = rigs.findIndex((r) => r.id === rig.id)
 
-    if (existingIndex >= 0) {
-      rigs[existingIndex] = rig
-    } else {
-      rigs.push(rig)
-    }
+      if (existingIndex >= 0) {
+        rigs[existingIndex] = rig
+      } else {
+        rigs.push(rig)
+      }
 
-    this.lastScheduledDmxRigsPersist = null
-    await this.dmxRigs.update({ ...current, rigs })
+      return { ...current, rigs }
+    })
   }
 
   /**
    * Deletes a DMX rig by ID
    */
   async deleteDmxRig(id: string): Promise<void> {
-    const current = this.dmxRigs.get()
-    const rigs = current.rigs.filter((rig) => rig.id !== id)
-    this.lastScheduledDmxRigsPersist = null
-    await this.dmxRigs.update({ ...current, rigs })
+    await this.dmxRigs.mutate((current) => ({
+      ...current,
+      rigs: current.rigs.filter((rig) => rig.id !== id),
+    }))
   }
 
   /**

@@ -6,19 +6,22 @@ import {
   migratePrefsV4ToV5,
   migratePrefsV5ToV6,
   seedMissingCueDomains,
+  seedMissingRequiredPrefs,
 } from './preferencesMigration'
 import { validateAppPreferencesData } from './configDataValidators'
 
 /**
  * App preferences (prefs.json) with v3 → v4 migration into `cueDomains`, a one-time v4 → v5
  * refresh of the settings whose shipped defaults changed, and a v5 → v6 seeding of the `rb3` /
- * `rb3Motion` cue domains for files that predate them.
+ * `rb3Motion` cue domains for files that predate them. On every load, top-level keys the schema
+ * requires and cue domains are seeded from the defaults, so a file predating one of them keeps
+ * the rest of its settings.
  */
 export class PreferencesConfigFile extends ConfigFile<AppPreferences> {
   constructor(hooks: ConfigFileHooks<AppPreferences> = {}) {
     super('prefs.json', DEFAULT_PREFERENCES, 6, {
       validate: validateAppPreferencesData,
-      normalizeLoaded: seedMissingCueDomains,
+      normalizeLoaded: (data) => seedMissingCueDomains(seedMissingRequiredPrefs(data)),
       ...hooks,
     })
   }
