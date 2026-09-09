@@ -37,14 +37,16 @@ let audioContextCalls: number
 const getUserMedia = jest.fn(async (_c: MediaStreamConstraints): Promise<unknown> => stream)
 const enumerateDevices = jest.fn(async (): Promise<unknown[]> => [])
 
-/** Pending animation-frame callbacks, run one at a time so a frame is a deliberate step. */
-let frameQueue: FrameRequestCallback[]
-let cancelled: number[]
+/** The analysis loop runs on a fixed interval, so a frame is one tick of that interval. */
+const ANALYSIS_INTERVAL_MS = Math.round(1000 / 60)
 
 function stepFrame(): void {
-  const next = frameQueue.shift()
-  if (!next) throw new Error('no animation frame was scheduled')
-  next(performance.now())
+  jest.advanceTimersByTime(ANALYSIS_INTERVAL_MS)
+}
+
+/** How many analysis ticks are still scheduled. */
+function pendingFrames(): number {
+  return jest.getTimerCount()
 }
 
 const store = getDefaultStore()
@@ -54,8 +56,7 @@ beforeEach(() => {
   analyser = new FakeAnalyser()
   contextClose = jest.fn()
   audioContextCalls = 0
-  frameQueue = []
-  cancelled = []
+  jest.useFakeTimers()
   store.set(audioDataAtom, null)
 
   getUserMedia.mockResolvedValue(stream)
@@ -74,17 +75,11 @@ beforeEach(() => {
       createMediaStreamSource: () => source,
     }
   }
-  globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
-    frameQueue.push(cb)
-    return frameQueue.length
-  }) as typeof requestAnimationFrame
-  globalThis.cancelAnimationFrame = ((id: number) => {
-    cancelled.push(id)
-  }) as typeof cancelAnimationFrame
 })
 
 afterEach(() => {
   store.set(audioDataAtom, null)
+  jest.useRealTimers()
 })
 
 /** A started manager, with the synchronous first analysis frame already run. */
@@ -234,12 +229,12 @@ describe('AudioCaptureManager analysis frames', () => {
     expect(store.get(audioDataAtom)).not.toBeNull()
   })
 
-  it('keeps scheduling itself', async () => {
+  it('keeps running after a frame', async () => {
     await started()
 
     stepFrame()
 
-    expect(frameQueue.length).toBe(1)
+    expect(pendingFrames()).toBe(1)
   })
 })
 
@@ -264,12 +259,13 @@ describe('AudioCaptureManager stop', () => {
     expect(contextClose).toHaveBeenCalled()
   })
 
-  it('cancels the pending frame', async () => {
+  it('stops the analysis loop', async () => {
     const manager = await started()
+    expect(pendingFrames()).toBe(1)
 
     manager.stop()
 
-    expect(cancelled.length).toBe(1)
+    expect(pendingFrames()).toBe(0)
   })
 
   it('reports itself inactive', async () => {

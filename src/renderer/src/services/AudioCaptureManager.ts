@@ -31,6 +31,15 @@ import { previewFrameChanged } from './audioPreviewFrame'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('AudioCaptureManager')
 
+/**
+ * Analysis rate. This drives FFT, beat detection and the frames sent to main, so it is the show
+ * rate and must not depend on the display: requestAnimationFrame is throttled to about 1Hz when
+ * the window is hidden, which is exactly the case where a game is running full-screen in front of
+ * it, and it also ties the analysis rate to the monitor's refresh rate.
+ */
+const ANALYSIS_RATE_HZ = 60
+const ANALYSIS_INTERVAL_MS = Math.round(1000 / ANALYSIS_RATE_HZ)
+
 const store = getDefaultStore()
 
 const DEFAULT_CONFIG: AudioConfig = {
@@ -62,7 +71,7 @@ export class AudioCaptureManager {
   private analyser: AnalyserNode | null = null
   private stream: MediaStream | null = null
   private source: MediaStreamAudioSourceNode | null = null
-  private animationFrameId: number | null = null
+  private analysisTimer: ReturnType<typeof setInterval> | null = null
   private config: AudioConfig
   private isCapturing = false
 
@@ -85,14 +94,16 @@ export class AudioCaptureManager {
   // Cached band gains array (indexed by band index 0-7)
   private bandGains: number[] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
-  // Debug logging (log status every ~60 frames ≈ 1 second at 60fps)
+  // Debug logging (log status once a second at the analysis rate)
   private frameCounter = 0
-  private readonly DEBUG_LOG_INTERVAL = 60
+  private readonly DEBUG_LOG_INTERVAL = ANALYSIS_RATE_HZ
 
-  // Throttling for UI updates (update atom every 2 frames = 30fps)
+  // Throttling for UI updates: the preview atom is written at half the analysis rate.
   private readonly UI_UPDATE_THROTTLE = 2
   private uiUpdateCounter = 0
   private lastAudioData: AudioLightingData | null = null
+  private frequencyBuffer: Uint8Array | null = null
+  private timeDomainBuffer: Float32Array | null = null
   private readonly VALUE_CHANGE_THRESHOLD = 0.01 // Only update if values changed by >1%
 
   constructor(config?: Partial<AudioConfig>) {
@@ -152,6 +163,7 @@ export class AudioCaptureManager {
       this.rebuildBinToBandMap()
 
       // Start analysis loop
+      this.analysisTimer = setInterval(() => this.analyzeAudio(), ANALYSIS_INTERVAL_MS)
       this.analyzeAudio()
 
       log.info('Audio capture started successfully')
@@ -204,10 +216,10 @@ export class AudioCaptureManager {
     // Clear audio data atom
     store.set(audioDataAtom, null)
 
-    // Cancel animation frame
-    if (this.animationFrameId !== null) {
-      cancelAnimationFrame(this.animationFrameId)
-      this.animationFrameId = null
+    // Stop the analysis loop
+    if (this.analysisTimer !== null) {
+      clearInterval(this.analysisTimer)
+      this.analysisTimer = null
     }
 
     // Disconnect and stop stream
@@ -329,10 +341,17 @@ export class AudioCaptureManager {
     }
     this.lastFrameTime = now
 
-    // Get frequency data from analyser (built-in FFT)
-    const dataArray = new Uint8Array(this.analyser.frequencyBinCount)
+    // Get frequency data from analyser (built-in FFT). The buffers are reused across frames, so
+    // the loop allocates nothing at the analysis rate.
+    if (!this.frequencyBuffer || this.frequencyBuffer.length !== this.analyser.frequencyBinCount) {
+      this.frequencyBuffer = new Uint8Array(this.analyser.frequencyBinCount)
+    }
+    if (!this.timeDomainBuffer || this.timeDomainBuffer.length !== this.analyser.fftSize) {
+      this.timeDomainBuffer = new Float32Array(this.analyser.fftSize)
+    }
+    const dataArray = this.frequencyBuffer
     this.analyser.getByteFrequencyData(dataArray)
-    const timeDomainArray = new Float32Array(this.analyser.fftSize)
+    const timeDomainArray = this.timeDomainBuffer
     this.analyser.getFloatTimeDomainData(timeDomainArray)
 
     // Calculate frequency bands and include raw FFT data (byte data is linear 0-255, IPC-safe)
@@ -375,9 +394,6 @@ export class AudioCaptureManager {
         beat: audioData.beatDetected ? 'YES' : 'no',
       })
     }
-
-    // Continue loop
-    this.animationFrameId = requestAnimationFrame(() => this.analyzeAudio())
   }
 
   /**

@@ -237,6 +237,10 @@ export class WindowManager {
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
+        // Audio capture and analysis run in this window and drive the show. Chromium throttles
+        // timers and frames in a hidden window, which is exactly the case where a game is running
+        // full-screen in front of it.
+        backgroundThrottling: false,
       },
     })
 
