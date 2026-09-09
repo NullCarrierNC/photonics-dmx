@@ -1,3 +1,4 @@
+import { applyWaitUntil, delayWaitMs } from './waitUntil'
 import { performance } from 'perf_hooks'
 import { EffectTransition, normalizeFixtureConfig, RGBIO } from '../../types'
 import { LightTransitionController } from './LightTransitionController'
@@ -65,9 +66,11 @@ export class TransitionEngine implements ITransitionEngine {
    * is set (e.g. from rotation effect phases), wait time is count * waitUntilTime so
    * staggered per-light timing works. When undefined, treat as 1 step; when 0, advance immediately.
    */
-  private computeDelayWaitTime(transition: EffectTransition): number {
-    const count = transition.waitUntilConditionCount ?? 1
-    return count > 0 ? count * transition.waitUntilTime : 0
+  /** Prepare whatever transition the effect has just advanced to, if any. */
+  private prepareNextTransition = (effect: LightEffectState, currentTime: number): void => {
+    if (effect.currentTransitionIndex < effect.transitions.length) {
+      this.prepareTransition(effect, effect.transitions[effect.currentTransitionIndex], currentTime)
+    }
   }
 
   /**
@@ -319,7 +322,7 @@ export class TransitionEngine implements ITransitionEngine {
       activeEffect.state = 'waitingUntil'
       activeEffect.transitionStartTime = currentTime
       if (transition.waitUntilCondition === 'delay') {
-        activeEffect.waitEndTime = currentTime + this.computeDelayWaitTime(transition)
+        activeEffect.waitEndTime = currentTime + delayWaitMs(transition)
       } else {
         activeEffect.waitEndTime = currentTime
       }
@@ -393,23 +396,8 @@ export class TransitionEngine implements ITransitionEngine {
       if (transition.waitUntilCondition === 'none') {
         // Intentionally left as 'waitingUntil' — handleWaitingUntil will advance on the
         // next updateTransitions call, after the current frame's blend pass has run.
-      } else if (
-        transition.waitUntilCondition !== 'delay' &&
-        transition.waitUntilConditionCount === 0
-      ) {
-        // Event-type condition with count 0: advance immediately (no event like beat or keyframe needed).
-        activeEffect.currentTransitionIndex += 1
-        activeEffect.state = 'idle'
-        if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
-          const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
-          this.prepareTransition(activeEffect, nextTransition, currentTime)
-        }
-      } else if (transition.waitUntilCondition === 'delay') {
-        activeEffect.transitionStartTime = currentTime
-        activeEffect.waitEndTime = currentTime + this.computeDelayWaitTime(transition)
       } else {
-        activeEffect.transitionStartTime = currentTime
-        activeEffect.waitEndTime = currentTime
+        applyWaitUntil(activeEffect, transition, currentTime, this.prepareNextTransition)
       }
     }
   }
@@ -435,22 +423,8 @@ export class TransitionEngine implements ITransitionEngine {
       if (transition.waitUntilCondition === 'none') {
         activeEffect.currentTransitionIndex += 1
         activeEffect.state = 'idle'
-      } else if (
-        transition.waitUntilCondition !== 'delay' &&
-        transition.waitUntilConditionCount === 0
-      ) {
-        activeEffect.currentTransitionIndex += 1
-        activeEffect.state = 'idle'
-        if (activeEffect.currentTransitionIndex < activeEffect.transitions.length) {
-          const nextTransition = activeEffect.transitions[activeEffect.currentTransitionIndex]
-          this.prepareTransition(activeEffect, nextTransition, currentTime)
-        }
-      } else if (transition.waitUntilCondition === 'delay') {
-        activeEffect.transitionStartTime = currentTime
-        activeEffect.waitEndTime = currentTime + this.computeDelayWaitTime(transition)
       } else {
-        activeEffect.transitionStartTime = currentTime
-        activeEffect.waitEndTime = currentTime
+        applyWaitUntil(activeEffect, transition, currentTime, this.prepareNextTransition)
       }
     }
   }

@@ -1,3 +1,4 @@
+import { applyWaitUntil } from './waitUntil'
 import { Effect, EffectTransition, normalizeFixtureConfig, RGBIO, TrackedLight } from '../../types'
 import { IEffectTransformer, ILayerManager, LightEffectState } from './interfaces'
 import { LightTransitionController } from './LightTransitionController'
@@ -176,17 +177,11 @@ export class EffectScheduler {
           // frame so the LTC has a chance to blend this layer before it is torn down.
           lightEffect.lastEndState = color
           lightEffect.state = 'waitingUntil'
-          if (firstTransition.waitUntilCondition === 'delay') {
-            lightEffect.transitionStartTime = currentTime
-            const count = firstTransition.waitUntilConditionCount ?? 1
-            const delayMs = count > 0 ? count * firstTransition.waitUntilTime : 0
-            lightEffect.waitEndTime = currentTime + delayMs
-          } else if (firstTransition.waitUntilCondition === 'none') {
+          if (firstTransition.waitUntilCondition === 'none') {
             // Intentionally left as 'waitingUntil' — handleWaitingUntil will advance on the
             // next updateTransitions call, after the current frame's blend pass has run.
           } else {
-            lightEffect.transitionStartTime = currentTime
-            lightEffect.waitEndTime = currentTime
+            applyWaitUntil(lightEffect, firstTransition, currentTime)
           }
         }
       } else if (firstTransition.waitForCondition === 'delay') {

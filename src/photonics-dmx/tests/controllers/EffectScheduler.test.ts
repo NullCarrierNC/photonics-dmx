@@ -105,6 +105,29 @@ describe('EffectScheduler', () => {
       expect(layerManager.addActiveEffect.mock.calls[0][0]).toBe(1)
     })
 
+    it('advances past a first transition that needs neither time nor an event', () => {
+      // Duration 0 with an event condition counted zero times: nothing will ever supply the event,
+      // so the effect has to move on by itself rather than sit in waitingUntil forever.
+      const instant: EffectTransition = {
+        ...transition(1),
+        transform: { ...transition(1).transform, duration: 0 },
+        waitUntilCondition: 'beat',
+        waitUntilConditionCount: 0,
+      }
+      const transitions = [instant, transition(1)]
+
+      scheduler.applyEffectTransitions(
+        'instant',
+        effectWith(transitions),
+        groupByLayerAndLight(transitions),
+        false,
+      )
+
+      const started = layerManager.addActiveEffect.mock.calls[0][2] as LightEffectState
+      expect(started.currentTransitionIndex).toBe(1)
+      expect(started.state).not.toBe('waitingUntil')
+    })
+
     it('queues behind an active effect of the same name', () => {
       layerManager.getActiveEffect.mockReturnValue({
         name: 'pulse',
