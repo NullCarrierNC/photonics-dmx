@@ -54,7 +54,7 @@ describe('nextColorBanks', () => {
     expect(out.yellow).toEqual([])
   })
 
-  it('clears a bank on the next snapshot — the stuck-ON regression', () => {
+  it('clears a bank on the next snapshot', () => {
     const lit = nextColorBanks(
       EMPTY,
       frame({ ledBanks: { red: 0b0101, green: 0, blue: 0, yellow: 0 } }),

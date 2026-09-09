@@ -275,7 +275,7 @@ describe('migrateDmxRigsConfig', () => {
     expect(config.rigs[1]!.mirrorVert).toBe(true)
   })
 
-  it('preserves new semantic front-back on a v3-stamped config (regression for stamp-bump rename guard)', () => {
+  it('preserves new semantic front-back on a v3-stamped config', () => {
     // The legacy `front-back` → `two-rows` rename was the v1 migration. A v3-stamped config that
     // *intentionally* uses the new semantic `front-back` layout must NOT be renamed when we bump
     // its stamp to v4 — the rename guard checks "≥ v1" rather than "== current".

@@ -40,6 +40,11 @@ const mocks = {
 
 jest.mock('../ipcApi', () => mocks)
 
+/** What each mock does before a case reaches for it, so a persistent override cannot outlive its test. */
+const mockDefaults = new Map(
+  Object.entries(mocks).map(([name, fn]) => [name, fn.getMockImplementation()]),
+)
+
 import CueConsistencySettings from './CueConsistencySettings'
 
 /** The debounce the three probability sliders share. */
@@ -69,7 +74,13 @@ async function renderPanel(props: { motionGloballyEnabled?: boolean } = {}) {
 
 beforeEach(() => {
   jest.useFakeTimers({ doNotFake: ['queueMicrotask'] })
-  for (const fn of Object.values(mocks)) fn.mockClear()
+  for (const [name, fn] of Object.entries(mocks)) {
+    fn.mockReset()
+    const impl = mockDefaults.get(name)
+    if (impl) {
+      fn.mockImplementation(impl as never)
+    }
+  }
 })
 
 afterEach(() => {

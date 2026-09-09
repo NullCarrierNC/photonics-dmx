@@ -36,6 +36,10 @@ describe('Application init', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     controllerInit.mockReset()
+    createMainWindow.mockReset()
+    setControllerManager.mockReset()
+    setupIpcHandlers.mockReset()
+    setupMenu.mockReset()
   })
 
   it('brings up the window and IPC before the controllers', async () => {

@@ -219,7 +219,7 @@ describe('EffectExecutionEngine', () => {
       expect(() => engine.triggerEffect(createCueData())).not.toThrow()
     })
 
-    it('preserves delay timing and color in transitions when params are delay and 500/200 (score cue regression)', async () => {
+    it('preserves delay timing and color in transitions when params are delay and 500/200', async () => {
       const effect: YargEffectDefinition = {
         id: 'score-like-effect',
         mode: 'yarg',
@@ -344,7 +344,7 @@ describe('EffectExecutionEngine', () => {
       expect(firstTransition.transform.color.green).toBeGreaterThan(0)
     })
 
-    it('second trigger still applies delay params (regression: stop then start score)', async () => {
+    it('second trigger still applies delay params on a restart', async () => {
       const effect: YargEffectDefinition = {
         id: 'score-like',
         mode: 'yarg',

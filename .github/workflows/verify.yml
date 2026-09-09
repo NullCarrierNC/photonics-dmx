@@ -70,7 +70,7 @@ jobs:
         run: npm ci
 
       - name: Test
-        run: npm run test:coverage
+        run: npm run test:coverage -- --randomize
 
   all-checks-passed:
     name: all checks passed

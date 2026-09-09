@@ -1163,7 +1163,7 @@ describe('NodeExecutionEngine', () => {
       expect(mockSequencer.addEffect).toHaveBeenCalled()
     })
 
-    it('resolves effect raiser literal parameter values with correct types (score cue regression)', () => {
+    it('resolves effect raiser literal parameter values with correct types', () => {
       const scoreLikeEffect: YargEffectDefinition = {
         id: 'score-like-effect',
         mode: 'yarg',

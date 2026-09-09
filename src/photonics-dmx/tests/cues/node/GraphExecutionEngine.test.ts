@@ -1,7 +1,7 @@
 /**
  * Tests for GraphExecutionEngine (cue-graph policy). Key scenarios ported from
  * NodeExecutionEngine.test.ts to assert identical sequencer behaviour.
- * Includes regression coverage for sustained strobe/Frenzy (repeated same-cue).
+ * Covers sustained strobe/Frenzy (repeated same-cue).
  */
 
 import { beforeEach, describe, expect, it } from '@jest/globals'

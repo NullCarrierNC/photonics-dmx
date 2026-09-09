@@ -5,7 +5,7 @@ import { CueData, CueType } from '../../cues/types/cueTypes'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { setLogSink } from '../../../shared/logger'
-import { afterEach, beforeEach, describe, it, expect } from '@jest/globals'
+import { beforeEach, describe, it, expect } from '@jest/globals'
 
 // Mock implementations
 class MockCueImplementation implements INetCue {
@@ -47,7 +47,12 @@ describe('CueRegistry', () => {
 
   beforeEach(() => {
     registry = CueRegistry.getInstance()
-    registry.reset() // Clear any existing groups
+    // reset() drops preferences and selection state but keeps the registered groups, so the
+    // singleton is emptied here to give every case the same starting catalogue.
+    registry.reset()
+    for (const id of registry.getAllGroups()) {
+      registry.unregisterGroup(id)
+    }
 
     // Create default group
     defaultGroup = {
@@ -199,13 +204,6 @@ describe('CueRegistry', () => {
       name: id,
       cues: new Map(),
       motionCues: new Map([['m1', new MockCueImplementation(`${id}-m1`)]]),
-    })
-
-    // The registry is a singleton whose groups outlive reset(), so each case drops what it added.
-    afterEach(() => {
-      for (const id of ['motion-default', 'mixed', 'stagekit', 'no-strobes']) {
-        registry.unregisterGroup(id)
-      }
     })
 
     it('routes a motion-only group to the motion default and leaves the lighting default alone', () => {

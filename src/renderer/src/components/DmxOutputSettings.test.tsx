@@ -99,6 +99,14 @@ const savedOutputConfig = (): OutputConfig => {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  // clearAllMocks drops recorded calls but keeps implementations, and several cases install a
+  // failing sender or save, so the defaults are put back here.
+  savePrefsMock.mockReset().mockImplementation(async () => ({ success: true }))
+  enableSenderMock.mockReset().mockImplementation(() => undefined)
+  disableSenderMock.mockReset().mockImplementation(() => undefined)
+  updateSacnConfigMock.mockReset().mockImplementation(async () => undefined)
+  updateArtNetConfigMock.mockReset().mockImplementation(async () => undefined)
+  getNetworkInterfacesMock.mockReset().mockImplementation(async () => networkResult)
   networkResult = { success: true, interfaces: [] }
 })
 

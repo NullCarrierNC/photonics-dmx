@@ -76,7 +76,7 @@ describe('CueHandler shutdown lifecycle', () => {
     jest.restoreAllMocks()
   })
 
-  it('shutdown stops a primary cue that was activated via handleCue (regression: mid-song re-enable replays cue-started)', async () => {
+  it('shutdown stops a primary cue that was activated via handleCue', async () => {
     const primary = makeFakeCue(CueStyle.Primary, 'primary:Frenzy')
     jest.spyOn(registry, 'getCueImplementation').mockReturnValue(primary)
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
