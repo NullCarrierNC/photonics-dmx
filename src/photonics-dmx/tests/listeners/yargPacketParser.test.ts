@@ -22,6 +22,7 @@ import {
   FIXTURE_V3_PACKET_SIZE,
   FIXTURE_V4_FIXED_PACKET_SIZE,
   FIXTURE_V5_FIXED_PACKET_SIZE,
+  type YargPacketFieldValues,
 } from '../helpers/yargPacket'
 import { CueType } from '../../cues/types/cueTypes'
 
@@ -207,5 +208,46 @@ describe('yargPacketParser', () => {
     expect(result.data.beat).toBe('Off')
     expect(result.data.strobeState).toBe('Strobe_Off')
     expect(result.data.keyframe).toBe('Off')
+  })
+})
+
+describe('yargPacketParser numeric bounds', () => {
+  const minVersion = MIN_SUPPORTED_DATAGRAM_VERSION
+  const parseWith = (fields: Partial<YargPacketFieldValues>) => {
+    const buf = buildYargPacket({
+      ...buildCrossVersionLogicalFields(),
+      datagramVersion: 3,
+      playerStarPower: [],
+      ...fields,
+    })
+    const result = parseYargPacket(buf, minVersion)
+    if (result.kind !== 'cue') throw new Error(`expected a cue packet, got ${result.kind}`)
+    return result.data
+  }
+
+  it.each([
+    ['a denormal float', 1.5414283107572988e-43],
+    ['a value far above any tempo', 9.903520314283042e27],
+    ['infinity', Number.POSITIVE_INFINITY],
+    ['a negative tempo', -120],
+    ['not a number', Number.NaN],
+  ])('reports no tempo for %s', (_label, bpm) => {
+    expect(parseWith({ bpm }).beatsPerMinute).toBe(0)
+  })
+
+  it.each([
+    ['the slowest musical tempo', 20],
+    ['a common tempo', 137.5],
+    ['the fastest musical tempo', 400],
+  ])('keeps %s', (_label, bpm) => {
+    expect(parseWith({ bpm }).beatsPerMinute).toBeCloseTo(bpm, 1)
+  })
+
+  it.each([
+    ['infinity', Number.POSITIVE_INFINITY],
+    ['a pitch above the MIDI range', 5000],
+    ['not a number', Number.NaN],
+  ])('reports no vocal for %s', (_label, vocalNote) => {
+    expect(parseWith({ vocalNote }).vocalNote).toBe(0)
   })
 })

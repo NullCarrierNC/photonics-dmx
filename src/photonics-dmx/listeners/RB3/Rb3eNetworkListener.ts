@@ -119,12 +119,22 @@ export class Rb3eNetworkListener extends EventEmitter {
     }
     return new Promise((resolve) => {
       const sock = this.server!
-      sock.close(() => {
-        log.info('RB3ENetworkListener server closed.')
-        this.listening = false
-        this.server = null
+      this.server = null
+      this.listening = false
+      try {
+        sock.close(() => {
+          log.info('RB3ENetworkListener server closed.')
+          resolve()
+        })
+      } catch (err) {
+        // A socket the error handler already closed throws here. Teardown continues either way,
+        // and a rejection would abort the caller before it clears the rest of the listener state.
+        const code = (err as NodeJS.ErrnoException)?.code
+        if (code !== 'ERR_SOCKET_DGRAM_NOT_RUNNING') {
+          log.warn('RB3ENetworkListener: error during close:', err)
+        }
         resolve()
-      })
+      }
     })
   }
 
@@ -137,8 +147,10 @@ export class Rb3eNetworkListener extends EventEmitter {
 
     this.server.on('error', (err) => {
       log.error(`Server error:\n${err.stack}`)
-      this.server?.close()
+      const sock = this.server
+      this.server = null
       this.listening = false
+      sock?.close()
     })
 
     this.server.on('listening', () => {

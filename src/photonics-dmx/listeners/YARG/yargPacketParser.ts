@@ -31,6 +31,7 @@ import {
   V5_FIXED_PACKET_SIZE,
   MAX_KNOWN_DATAGRAM_VERSION,
 } from './yargTypes'
+import { readPitch, readTempo } from './yargFieldBounds'
 
 const PLAYER_STAR_POWER_COUNT_SIZE = 2
 const PLAYER_STAR_POWER_ENTRY_SIZE = 2
@@ -374,20 +375,20 @@ function decodePrefixFields(
   const sceneByte = buffer.readUInt8(offset++)
   const pauseStateByte = buffer.readUInt8(offset++)
   const venueSizeByte = buffer.readUInt8(offset++)
-  const beatsPerMinute = buffer.readFloatLE(offset)
+  const beatsPerMinute = readTempo(buffer, offset)
   offset += 4
   const songSectionByte = buffer.readUInt8(offset++)
   const guitarNotesByte = buffer.readUInt8(offset++)
   const bassNotesByte = buffer.readUInt8(offset++)
   const drumNotesByte = buffer.readUInt8(offset++)
   const keysNotesByte = buffer.readUInt8(offset++)
-  const vocalNote = buffer.readFloatLE(offset)
+  const vocalNote = readPitch(buffer, offset)
   offset += 4
-  const harmony0Note = buffer.readFloatLE(offset)
+  const harmony0Note = readPitch(buffer, offset)
   offset += 4
-  const harmony1Note = buffer.readFloatLE(offset)
+  const harmony1Note = readPitch(buffer, offset)
   offset += 4
-  const harmony2Note = buffer.readFloatLE(offset)
+  const harmony2Note = readPitch(buffer, offset)
   offset += 4
   const lightingCueValue = buffer.readUInt8(offset++)
   const postProcessingByte = buffer.readUInt8(offset++)
