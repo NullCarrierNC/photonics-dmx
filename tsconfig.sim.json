@@ -10,7 +10,7 @@
     "types": ["node"],
     "baseUrl": "./"
   },
-  "include": ["src/photonics-dmx/sim/**/*.ts"],
+  "include": ["src/photonics-dmx/**/*.ts", "scripts/node-graph-prettier.ts"],
   "ts-node": {
     "transpileOnly": true
   }

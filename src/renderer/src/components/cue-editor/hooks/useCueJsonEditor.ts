@@ -11,7 +11,7 @@ import type {
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
 import { updateDocumentFromFlow, updateEffectDocumentFromFlow } from '../lib/cueTransforms'
-import { layoutGraph } from '../lib/graphPrettier'
+import { layoutGraph } from '../../../../../photonics-dmx/cues/node/layout/graphLayout'
 import { replaceCueInFile, replaceEffectInFile } from '../lib/cueUtils'
 
 type EditorDoc = EditorDocument | null

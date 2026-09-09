@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
-import { layoutGraph } from './graphPrettier'
+import { layoutGraph } from '../../../cues/node/layout/graphLayout'
 
 const JITTER_Y = 8
 

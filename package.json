@@ -31,7 +31,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "sim": "npx ts-node --project tsconfig.sim.json src/photonics-dmx/sim/runCueSim.ts"
+    "sim": "npx ts-node --project tsconfig.sim.json src/photonics-dmx/sim/runCueSim.ts",
+    "layout:graphs": "npx ts-node --project tsconfig.sim.json scripts/node-graph-prettier.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

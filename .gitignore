@@ -110,6 +110,6 @@ docs/
 # directory's contents are excluded rather than the directory itself, so these can be re-included.
 scripts/*
 !scripts/any-budget.mjs
-!scripts/node-graph-prettier.mjs
+!scripts/node-graph-prettier.ts
 !scripts/size-budget.mjs
 !scripts/sizeBudgetCore.cjs
