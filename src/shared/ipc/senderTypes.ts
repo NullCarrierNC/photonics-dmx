@@ -39,10 +39,6 @@ export interface SenderInvokeMap {
     request: { sender: string }
     response: IpcSuccessResult | IpcErrorResult
   }
-  [LIGHT.SENDER_DISABLE_ALL]: {
-    request: void
-    response: { disabled: string[] }
-  }
   [LIGHT.CONSOLE_ENABLE]: {
     request: { rigId: string }
     response: IpcSuccessResult | IpcErrorResult

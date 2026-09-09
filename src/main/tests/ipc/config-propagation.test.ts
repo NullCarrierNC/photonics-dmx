@@ -67,7 +67,6 @@ jest.mock('electron', () => ({
 jest.mock('../../utils/windowUtils', () => ({ sendToAllWindows: mockSendToAllWindows }))
 
 // These registries are imported inside config-handlers; mock them to avoid side effects
-jest.mock('../../../photonics-dmx/cues', () => ({}))
 jest.mock('../../../photonics-dmx/cues/registries/CueRegistry', () => ({
   CueRegistry: {
     getInstance: jest.fn().mockReturnValue({

@@ -75,7 +75,6 @@ export const CUE = {
 export const LIGHT = {
   SENDER_ENABLE: 'sender-enable',
   SENDER_DISABLE: 'sender-disable',
-  SENDER_DISABLE_ALL: 'sender-disable-all',
   GET_SYSTEM_STATUS: 'get-system-status',
   GET_CUE_GROUPS: 'get-cue-groups',
   ENABLE_CUE_GROUP: 'enable-cue-group',

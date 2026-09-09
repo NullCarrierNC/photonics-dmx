@@ -18,7 +18,7 @@ import type {
   NetNodeCueDefinition,
   YargEffectDefinition,
 } from '../../../../cues/types/nodeCueTypes'
-import { CueType, defaultCueData, type CueData } from '../../../../cues'
+import { CueType, defaultCueData, type CueData } from '../../../../cues/types/cueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'

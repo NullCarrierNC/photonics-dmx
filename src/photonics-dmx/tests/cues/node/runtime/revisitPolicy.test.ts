@@ -19,7 +19,7 @@ import type {
   NetNodeCueDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import type { RevisitPolicy } from '../../../../cues/node/runtime/GraphExecutionPolicy'
-import { CueType, defaultCueData, type CueData } from '../../../../cues'
+import { CueType, defaultCueData, type CueData } from '../../../../cues/types/cueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'

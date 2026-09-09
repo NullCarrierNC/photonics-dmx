@@ -39,8 +39,6 @@ import { CUE_DOMAIN_BINDINGS, applyAllEnabledGroupsFromConfig } from './cueDomai
 import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import type { MotionCueRef } from '../../photonics-dmx/cues/types/cueTypes'
 import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
-// Import all cue sets to register with registry
-import '../../photonics-dmx/cues'
 /**
  * Runtime lifecycle of the main-process controller graph.
  *

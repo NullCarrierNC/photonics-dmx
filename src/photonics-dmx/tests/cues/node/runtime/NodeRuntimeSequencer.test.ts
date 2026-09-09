@@ -16,7 +16,7 @@ import {
   type CueData,
   DrumNoteType,
   InstrumentNoteType,
-} from '../../../../cues'
+} from '../../../../cues/types/cueTypes'
 import { getColor } from '../../../../helpers/dmxHelpers'
 import type { Color } from '../../../../types'
 import * as utils from '../../../../helpers/utils'

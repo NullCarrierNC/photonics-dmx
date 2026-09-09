@@ -12,7 +12,7 @@ import type {
   NetEventNode,
   NetNodeCueDefinition,
 } from '../../../../cues/types/nodeCueTypes'
-import { CueType, defaultCueData, type CueData } from '../../../../cues'
+import { CueType, defaultCueData, type CueData } from '../../../../cues/types/cueTypes'
 import { createSequencerHarness } from '../../../helpers/sequencerHarness'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
 import { getEffectSingleColor } from '../../../../effects/effectSingleColor'

@@ -189,25 +189,6 @@ export const openDmxComPortAtom = atom<string>('')
 
 export const senderArtNetEnabledAtom = atom<boolean>(false)
 
-/** Maps main-process sender IDs (`getEnabledSenders` / `SENDER_DISABLE_ALL`) to toggle atoms. Excludes `ipc` (preview only). */
-const OUTPUT_SENDER_TOGGLE_ATOMS: Record<string, typeof senderSacnEnabledAtom> = {
-  sacn: senderSacnEnabledAtom,
-  artnet: senderArtNetEnabledAtom,
-  enttecpro: senderEnttecProEnabledAtom,
-  opendmx: senderOpenDmxEnabledAtom,
-}
-
-/** Sync UI toggles after those senders were stopped on the main process (e.g. leaving DMX Console). */
-export function resetOutputSenderToggleAtoms(disabledIds: readonly string[]): void {
-  const store = getDefaultStore()
-  for (const id of disabledIds) {
-    const a = OUTPUT_SENDER_TOGGLE_ATOMS[id]
-    if (a) {
-      store.set(a, false)
-    }
-  }
-}
-
 /**
  * Sync all output sender toggle atoms from a main-process sender status snapshot.
  * Call this after CONTROLLERS_RESTARTED so that the UI reflects the actual runtime

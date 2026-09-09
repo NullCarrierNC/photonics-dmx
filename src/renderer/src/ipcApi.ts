@@ -177,7 +177,6 @@ export {
 } from './ipc/listeners'
 
 export {
-  disableAllOutputSenders,
   disableSender,
   enableSender,
   getNetworkInterfaces,

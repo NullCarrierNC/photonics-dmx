@@ -36,5 +36,3 @@ export const enableSender = (config: SenderConfig) => window.api.invoke(LIGHT.SE
 
 export const disableSender = (config: { sender: string }) =>
   window.api.invoke(LIGHT.SENDER_DISABLE, config)
-
-export const disableAllOutputSenders = () => window.api.invoke(LIGHT.SENDER_DISABLE_ALL, undefined)

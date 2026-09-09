@@ -4,4 +4,3 @@
 
 export * from './dmxHelpers'
 export * from './utils'
-export * from './bpmUtils'

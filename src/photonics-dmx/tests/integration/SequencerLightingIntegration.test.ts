@@ -9,7 +9,7 @@ import { ManualTestClock } from '../helpers/sequencerHarness'
 import { getColor } from '../../helpers/dmxHelpers'
 import { Effect } from '../../types'
 import { Clock } from '../../controllers/sequencer/Clock'
-import { DrumNoteType } from '../../cues'
+import { DrumNoteType } from '../../cues/types/cueTypes'
 
 type SequencerHarness = {
   sequencer: Sequencer
