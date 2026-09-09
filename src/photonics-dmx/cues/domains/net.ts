@@ -9,6 +9,7 @@
  * between the modes is the authoring vocabulary, which lives on each mode's descriptor.
  */
 
+import { beatDurationMs } from '../../helpers/tempo'
 import type { CueData } from '../types/cueTypes'
 import {
   isInstrumentEventTriggered,
@@ -128,7 +129,7 @@ export function extractNetCueDataValue(
     case 'bpm':
       return cueData.beatsPerMinute
     case 'beat-duration-ms':
-      return cueData.beatsPerMinute > 0 ? Math.round(60000 / cueData.beatsPerMinute) : 500
+      return beatDurationMs(cueData.beatsPerMinute)
     case 'song-section':
       return cueData.songSection
     case 'current-scene':

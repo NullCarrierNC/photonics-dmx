@@ -4,6 +4,7 @@
  * through the per-frame condition gate the net family uses.
  */
 
+import { beatDurationMs } from '../../helpers/tempo'
 import type { AudioCueData } from '../types/audioCueTypes'
 import type { AudioCueDataProperty } from '../types/nodeCueTypes'
 
@@ -43,8 +44,7 @@ export function extractAudioCueDataValue(
     case 'audio-bpm':
       return cueData.audioData.bpm ?? 0
     case 'audio-beat-duration-ms': {
-      const bpm = cueData.audioData.bpm ?? 0
-      return bpm > 0 ? Math.round(60000 / bpm) : 500
+      return beatDurationMs(cueData.audioData.bpm ?? 0)
     }
     case 'audio-beat-detected':
       return cueData.audioData.beatDetected

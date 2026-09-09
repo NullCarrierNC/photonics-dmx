@@ -1,6 +1,7 @@
 /**
  * Every logic node kind, and the editor metadata describing them.
  */
+import { DEFAULT_BEAT_MS } from '../../../helpers/tempo'
 import type { ValueSource, VariableType } from './variables'
 import {
   ALL_CONFIG_DATA_PROPERTIES,
@@ -120,7 +121,7 @@ export const TEMPO_DEFAULTS = {
   barsPerPhrase: 2,
   minBeatMs: 250,
   maxBeatMs: 1000,
-  fallbackBeatMs: 461,
+  fallbackBeatMs: DEFAULT_BEAT_MS,
   cycleBands: [110, 150],
   cycleValues: [2, 3, 5],
 } as const

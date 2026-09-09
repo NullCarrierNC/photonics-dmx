@@ -1,3 +1,4 @@
+import { DEFAULT_BEAT_MS } from '../../../../helpers/tempo'
 import {
   evaluateLogicNode,
   type LogicNodeEvaluatorContext,
@@ -75,14 +76,14 @@ describe('tempo logic node', () => {
   })
 
   it('falls back to fallbackBeatMs when the song reports no tempo (bpm <= 0)', () => {
-    // A menu/practice frame reports bpm 0, so the node uses fallbackBeatMs (default 461) rather than a beat.
+    // A menu/practice frame reports bpm 0, so the node uses fallbackBeatMs rather than a beat.
     const silent = harness(0, ['beat_ms'])
     silent.run(
       fullNode({ assignBarMs: undefined, assignPhraseMs: undefined, assignCycles: undefined }),
     )
-    expect(silent.num('beat_ms')).toBe(461)
+    expect(silent.num('beat_ms')).toBe(DEFAULT_BEAT_MS)
 
-    // A custom fallback is honoured (previously the guard was dead and this had no effect).
+    // A custom fallback is honoured.
     const custom = harness(0, ['beat_ms'])
     custom.run(
       fullNode({
