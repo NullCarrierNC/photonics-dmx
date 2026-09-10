@@ -86,4 +86,34 @@ describe('Rb3EnabledCueGroups', () => {
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('rb3 save failed')
   })
+
+  it('shows the RB3 wording for a cue and falls back to the YARG one', async () => {
+    getRb3CueGroups.mockResolvedValue([
+      { id: 'g1', name: 'Group One', description: '', cueTypes: [] },
+    ])
+    getEnabledRb3CueGroups.mockResolvedValue(['g1'])
+    getDisabledRb3Cues.mockResolvedValue({})
+    getAvailableRb3Cues.mockResolvedValue([
+      {
+        id: 'Chorus',
+        yargDescription: 'yarg wording',
+        rb3Description: 'rb3 wording',
+        groupName: 'Group One',
+      },
+      {
+        id: 'Verse',
+        yargDescription: 'shared wording',
+        rb3Description: '',
+        groupName: 'Group One',
+      },
+    ])
+
+    render(<Rb3EnabledCueGroups />)
+    await screen.findByText('Group One')
+    fireEvent.click(screen.getByRole('button', { name: /Group One/ }))
+
+    expect(await screen.findByText(/rb3 wording/)).toBeTruthy()
+    expect(screen.getByText(/shared wording/)).toBeTruthy()
+    expect(screen.queryByText(/yarg wording/)).toBeNull()
+  })
 })
