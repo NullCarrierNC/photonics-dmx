@@ -1,7 +1,10 @@
 import * as path from 'path'
 import { app, BrowserWindow, dialog } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
-import { installDefaultSessionContentSecurityPolicy } from './rendererSessionSecurity'
+import {
+  installDefaultSessionContentSecurityPolicy,
+  installDefaultSessionPermissionHandlers,
+} from './rendererSessionSecurity'
 import { Application } from './application'
 import { createFileLogSink } from './logging/fileLogSink'
 import {
@@ -154,6 +157,7 @@ app
     }
 
     installDefaultSessionContentSecurityPolicy()
+    installDefaultSessionPermissionHandlers()
 
     // Set up the app
     electronApp.setAppUserModelId('rocks.photonics')

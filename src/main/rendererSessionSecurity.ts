@@ -32,3 +32,37 @@ export function denyWebContentsWillNavigate(webContents: WebContents): void {
     event.preventDefault()
   })
 }
+
+/**
+ * Whether the renderer is allowed to hold `permission`.
+ *
+ * Audio capture drives the audio-reactive cues, so the microphone is asked for in normal use. It is
+ * the only one: nothing here captures video, reads a location or talks to a HID or serial device
+ * through the web APIs, and DMX hardware is reached from the main process instead.
+ */
+function isGrantablePermission(permission: string, mediaTypes: readonly string[]): boolean {
+  if (permission !== 'media') {
+    return false
+  }
+  return mediaTypes.length > 0 && mediaTypes.every((type) => type === 'audio')
+}
+
+/**
+ * Answers permission requests and checks for the default session.
+ *
+ * Electron grants every request when no handler is installed, so this is what stands between a
+ * compromised renderer and the camera, the location and the device APIs.
+ */
+export function installDefaultSessionPermissionHandlers(): void {
+  session.defaultSession.setPermissionRequestHandler(
+    (_webContents, permission, callback, details) => {
+      const mediaTypes = (details as { mediaTypes?: string[] }).mediaTypes ?? []
+      callback(isGrantablePermission(permission, mediaTypes))
+    },
+  )
+
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission, _origin, details) => {
+    const mediaType = (details as { mediaType?: string }).mediaType
+    return isGrantablePermission(permission, mediaType === undefined ? [] : [mediaType])
+  })
+}

@@ -15,6 +15,7 @@ const applicationCtor = jest.fn()
 let mockIsPackaged = false
 const createFileLogSink = jest.fn()
 const installCsp = jest.fn()
+const installPermissionHandlers = jest.fn()
 const showErrorBox = jest.fn()
 const appExit = jest.fn()
 
@@ -51,6 +52,7 @@ jest.mock('@electron-toolkit/utils', () => ({
 
 jest.mock('../rendererSessionSecurity', () => ({
   installDefaultSessionContentSecurityPolicy: installCsp,
+  installDefaultSessionPermissionHandlers: installPermissionHandlers,
 }))
 
 jest.mock('../logging/fileLogSink', () => ({
@@ -103,6 +105,7 @@ describe('main startup', () => {
     createFileLogSink.mockReset()
     createFileLogSink.mockReturnValue({ sink: jest.fn(), close: jest.fn(async () => {}) })
     installCsp.mockReset()
+    installPermissionHandlers.mockReset()
     showErrorBox.mockReset()
     appExit.mockReset()
   })
@@ -111,6 +114,7 @@ describe('main startup', () => {
     await startUp()
 
     expect(installCsp).toHaveBeenCalled()
+    expect(installPermissionHandlers).toHaveBeenCalled()
     expect(applicationCtor).toHaveBeenCalledTimes(1)
     expect(applicationInit).toHaveBeenCalledTimes(1)
   })
