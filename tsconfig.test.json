@@ -8,6 +8,7 @@
   "include": [
     "src/renderer/src/env.d.ts",
     "src/preload/*.d.ts",
+    "src/preload/**/*.test.ts",
     "src/shared/**/*.ts",
     "src/main/logging/**/*.ts",
     "src/main/tests/**/*.ts",

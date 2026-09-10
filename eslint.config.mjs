@@ -2,6 +2,7 @@ import { defineConfig } from 'eslint/config'
 import tseslint from '@electron-toolkit/eslint-config-ts'
 import prettier from '@electron-toolkit/eslint-config-prettier'
 import reactHooks from 'eslint-plugin-react-hooks'
+import tsParser from '@typescript-eslint/parser'
 
 export default defineConfig([
   { ignores: ['out/', 'dist/', 'node_modules/'] },
@@ -20,6 +21,25 @@ export default defineConfig([
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-empty-function': 'off',
       'no-console': 'error',
+    },
+  },
+  {
+    // Rules that need the type checker, so only the sources a tsconfig covers.
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        // Named rather than discovered, because the test sources sit in their own project and the
+        // other two exclude them.
+        project: ['./tsconfig.node.json', './tsconfig.web.json', './tsconfig.test.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      // A warning, held at its current count by scripts/floating-promises-budget.mjs, because the
+      // backlog is larger than one pass and each site needs its own answer: await it, catch it, or
+      // say with void that its failure is ignorable.
+      '@typescript-eslint/no-floating-promises': 'warn',
     },
   },
   {

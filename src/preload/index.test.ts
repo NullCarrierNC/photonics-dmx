@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it, jest } from '@jest/globals'
 
 const exposeInMainWorld = jest.fn()
 const ipcRenderer = {
-  invoke: jest.fn(() => Promise.resolve('ok')),
+  invoke: jest.fn((_channel: string, _data?: unknown) => Promise.resolve('ok')),
   send: jest.fn(),
   on: jest.fn(),
   removeListener: jest.fn(),

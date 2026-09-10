@@ -1,0 +1,3 @@
+143
+Auto-generated: `npx eslint src` messages for @typescript-eslint/no-floating-promises.
+Lower this as call sites gain an await, a catch, or an explicit void.
