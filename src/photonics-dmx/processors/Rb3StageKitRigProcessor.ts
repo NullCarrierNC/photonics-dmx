@@ -149,9 +149,17 @@ export class Rb3StageKitRigProcessor {
         strobeInterval = 100
     }
 
-    // Effect name carries the rigId so two rigs running the same strobe type at the same
-    // time don't collide in the activeStrobeEffects map.
-    const effectName = `stagekit-strobe-${this.rigId}-${strobeType}-${Date.now()}`
+    // The name carries the rigId so two rigs running the same strobe type don't collide, and
+    // nothing else, so a repeated packet addresses the run already going rather than starting a
+    // second one alongside it.
+    const effectName = this.strobeEffectName(strobeType)
+    if (this.activeStrobeEffects.has(effectName)) {
+      return
+    }
+    // A rig strobes at one rate, so a new type replaces whatever is running.
+    for (const running of [...this.activeStrobeEffects.keys()]) {
+      this.stopStrobeEffect(running)
+    }
     this.activeStrobeEffects.set(effectName, {
       type: strobeType,
       positions: dmxLightIndices,
@@ -159,6 +167,26 @@ export class Rb3StageKitRigProcessor {
       targetLights,
     })
     this.startStrobeEffect(effectName, targetLights, white, strobeInterval, dmxLightIndices)
+  }
+
+  /** The one name a given strobe type runs under on this rig. */
+  private strobeEffectName(strobeType: StrobeType): string {
+    return `stagekit-strobe-${this.rigId}-${strobeType}`
+  }
+
+  /** Cancel one strobe run and hand its lights back to the blender. */
+  private stopStrobeEffect(effectName: string): void {
+    const effectData = this.activeStrobeEffects.get(effectName)
+    this.activeStrobeEffects.delete(effectName)
+    if (!effectData?.interval) {
+      return
+    }
+    clearInterval(effectData.interval)
+    if (effectData.targetLights) {
+      // restoreColorsAfterStrobe keys strobedLights and the reblend by DMX light index, so
+      // pass the stored DMX indices (effectData.positions).
+      void this.restoreColorsAfterStrobe(effectData.targetLights, effectData.positions)
+    }
   }
 
   public clearStrobeEffectsAtPositions(positions: number[]): void {
@@ -178,16 +206,7 @@ export class Rb3StageKitRigProcessor {
       }
     }
     for (const effectName of effectsToRemove) {
-      const effectData = this.activeStrobeEffects.get(effectName)
-      if (effectData && effectData.interval) {
-        clearInterval(effectData.interval)
-        if (effectData.targetLights) {
-          // restoreColorsAfterStrobe keys strobedLights and the reblend by DMX light index, so
-          // pass the stored DMX indices (effectData.positions).
-          this.restoreColorsAfterStrobe(effectData.targetLights, effectData.positions)
-        }
-      }
-      this.activeStrobeEffects.delete(effectName)
+      this.stopStrobeEffect(effectName)
     }
   }
 
@@ -229,17 +248,9 @@ export class Rb3StageKitRigProcessor {
       }
       this.pendingUpdates.clear()
 
-      for (const [, effectData] of this.activeStrobeEffects.entries()) {
-        if (effectData.interval) {
-          clearInterval(effectData.interval)
-          if (effectData.targetLights) {
-            // Pass the stored DMX light indices (effectData.positions); restoreColorsAfterStrobe
-            // keys by DMX index.
-            this.restoreColorsAfterStrobe(effectData.targetLights, effectData.positions)
-          }
-        }
+      for (const effectName of [...this.activeStrobeEffects.keys()]) {
+        this.stopStrobeEffect(effectName)
       }
-      this.activeStrobeEffects.clear()
       this.strobedLights.clear()
       log.info(`Rig ${this.rigId}: blacking out sequencer`)
       await this.sequencer.blackout(0)
@@ -326,7 +337,7 @@ export class Rb3StageKitRigProcessor {
     }
     const strobeInterval = setInterval(() => {
       if (isOn) {
-        this.restoreColorsAfterStrobe(targetLights, dmxLightIndices)
+        void this.restoreColorsAfterStrobe(targetLights, dmxLightIndices)
         isOn = false
       } else {
         this.sequencer.setState(targetLights, color, 0)

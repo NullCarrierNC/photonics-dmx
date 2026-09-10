@@ -305,13 +305,13 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     expect(aIds).toContain('a-f0')
     expect(bIds).toContain('b-f0')
 
-    // Effect names include the rig id — two rigs running medium strobes don't collide.
+    // Effect names include the rig id, so two rigs running medium strobes don't collide.
     const status = processor.getStatus()
     const aHits = status.activeStrobeEffects.filter((s) =>
-      s.startsWith('stagekit-strobe-a-medium-'),
+      s.startsWith('stagekit-strobe-a-medium:'),
     )
     const bHits = status.activeStrobeEffects.filter((s) =>
-      s.startsWith('stagekit-strobe-b-medium-'),
+      s.startsWith('stagekit-strobe-b-medium:'),
     )
     expect(aHits).toHaveLength(1)
     expect(bHits).toHaveLength(1)

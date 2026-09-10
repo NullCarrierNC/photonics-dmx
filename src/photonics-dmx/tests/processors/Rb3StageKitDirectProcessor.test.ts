@@ -407,4 +407,31 @@ describe('StageKit strobe watchdog', () => {
 
     expect(processor.getStatus().hasActiveStrobeEffects).toBe(false)
   })
+
+  it('runs one strobe however many times the console repeats the packet', () => {
+    for (let i = 0; i < 10; i++) {
+      emitStrobe('fast')
+    }
+
+    expect(processor.getStatus().activeStrobeEffects).toHaveLength(1)
+  })
+
+  it('swaps to the new rate when the console changes strobe speed', () => {
+    emitStrobe('slow')
+    emitStrobe('fastest')
+
+    const running = processor.getStatus().activeStrobeEffects
+    expect(running).toHaveLength(1)
+    expect(running[0]).toContain('fastest')
+  })
+
+  it('starts a fresh strobe after one is cut and the console asks again', () => {
+    emitStrobe('fast')
+    jest.advanceTimersByTime(WINDOW_MS + 500)
+    expect(processor.getStatus().hasActiveStrobeEffects).toBe(false)
+
+    emitStrobe('fast')
+
+    expect(processor.getStatus().activeStrobeEffects).toHaveLength(1)
+  })
 })

@@ -46,6 +46,9 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   // Cuts a strobe the console stopped talking about.
   private readonly strobeWatchdog: Rb3StrobeWatchdog
 
+  // The strobe type the rigs are running, so a repeated packet is not a second start.
+  private _currentStrobeType: 'slow' | 'medium' | 'fast' | 'fastest' | null = null
+
   // Accumulated StageKit LED bank masks (bit i = position i lit). The incoming StageKit events are
   // per-bank, so we accumulate here and emit a full `ledBanks` snapshot each frame, the same shape the
   // cue-mode processor emits. This keeps the preview a single render path (no per-packet direct mode).
@@ -259,10 +262,15 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
     if (strobeEffect === 'off') {
       this.strobeWatchdog.setStrobeRunning(false)
+      this._currentStrobeType = null
       this.clearStrobeEffectsAtPositions(positions)
     } else if (strobeEffect) {
       this.strobeWatchdog.setStrobeRunning(true)
-      this.applyStrobeEffect(strobeEffect)
+      // RB3E repeats the packet for as long as the strobe holds, so only the edge is work.
+      if (strobeEffect !== this._currentStrobeType) {
+        this._currentStrobeType = strobeEffect
+        this.applyStrobeEffect(strobeEffect)
+      }
     } else if (color !== 'off') {
       void this.applyLightData(positions, color)
     } else {
@@ -436,6 +444,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   private clearStrobeEffectsAtPositions(positions: number[]): void {
+    this._currentStrobeType = null
     for (const rig of this.rigs.values()) {
       try {
         rig.clearStrobeEffectsAtPositions(positions)
@@ -452,6 +461,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   private async turnOffAllRigs(): Promise<void> {
+    this._currentStrobeType = null
     await Promise.allSettled(Array.from(this.rigs.values()).map((r) => r.turnOffAllLights()))
   }
 
