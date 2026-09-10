@@ -293,11 +293,19 @@ export function migratePrefsV5ToV6(legacy: unknown, defaults: AppPreferences): A
 }
 
 /**
- * Load-time repair: seed any cue-domain entry that a same-version prefs.json predates (a domain
- * added to `CUE_DOMAINS` after the file was written) so the AJV `required: [...CUE_DOMAINS]` check
- * can't fail and trip corrupt-recovery. Returns the same object when every domain is already
- * present (no persist), otherwise a shallow copy with the missing domains defaulted. A malformed
- * `cueDomains` is left untouched so a wholly-corrupt file still falls through to validation.
+ * Load-time repair for cue domains, so a shortfall in one domain cannot cost the user every
+ * setting in the file.
+ *
+ * AJV requires all six domains and, inside each, `enabledGroups`, `knownGroups` and `disabledCues`.
+ * A domain that is absent, incomplete, or carrying one of those in the wrong shape fails that check
+ * and sends the whole prefs.json to corrupt-recovery, which renames it aside and writes defaults.
+ * The shortfalls that get here are a domain added to `CUE_DOMAINS` after the file was written, a
+ * write interrupted part way, a hand edit, and any future addition to the required list.
+ *
+ * Returns the same object when every domain is already complete, because `ConfigFile` compares by
+ * reference to decide whether to persist and a fresh object every load would rewrite the file every
+ * launch. A malformed `cueDomains` (not an object at all) is left untouched so a wholly-corrupt
+ * file still falls through to validation.
  */
 /**
  * Fills in top-level preferences the schema requires but the stored file does not carry, from the
@@ -320,20 +328,67 @@ export function seedMissingRequiredPrefs(prefs: AppPreferences): AppPreferences 
   return seeded as unknown as AppPreferences
 }
 
-export function seedMissingCueDomains(prefs: AppPreferences): AppPreferences {
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
+}
+
+/**
+ * Whether a stored domain carries the three keys the schema requires, in the shapes it requires.
+ * Anything else has to be repaired before validation, or the whole file is moved aside for it.
+ */
+function cueDomainIsComplete(stored: unknown): boolean {
+  if (!isPlainObject(stored)) {
+    return false
+  }
+  return (
+    Array.isArray(stored.enabledGroups) &&
+    Array.isArray(stored.knownGroups) &&
+    isPlainObject(stored.disabledCues)
+  )
+}
+
+/**
+ * A complete domain built from what was stored, with anything absent or the wrong shape taken from
+ * the defaults. Every value is freshly allocated, so nothing here aliases DEFAULT_PREFERENCES.
+ */
+function repairCueDomain(domain: CueDomain, stored: unknown): CueDomainPrefs {
+  if (!isPlainObject(stored)) {
+    return createDefaultCueDomainPrefs(domain)
+  }
+  const overrides: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(stored)) {
+    if (value !== undefined) {
+      overrides[key] = value
+    }
+  }
+  // Dropping a bad value lets the default take its place, since spreading undefined over a default
+  // would reinstate the missing key rather than fill it.
+  if (!Array.isArray(overrides.enabledGroups)) {
+    delete overrides.enabledGroups
+  }
+  if (!Array.isArray(overrides.knownGroups)) {
+    delete overrides.knownGroups
+  }
+  if (!isPlainObject(overrides.disabledCues)) {
+    delete overrides.disabledCues
+  }
+  return createDefaultCueDomainPrefs(domain, overrides as Partial<CueDomainPrefs>)
+}
+
+export function repairCueDomains(prefs: AppPreferences): AppPreferences {
   const domains = prefs?.cueDomains as Record<string, unknown> | undefined
-  if (domains == null || typeof domains !== 'object' || Array.isArray(domains)) {
+  if (!isPlainObject(domains)) {
     return prefs
   }
-  const missing = CUE_DOMAINS.filter((d) => domains[d] == null)
-  if (missing.length === 0) {
+  const needsRepair = CUE_DOMAINS.filter((d) => !cueDomainIsComplete(domains[d]))
+  if (needsRepair.length === 0) {
     return prefs
   }
-  const seeded = { ...(domains as Record<CueDomain, CueDomainPrefs>) }
-  for (const d of missing) {
-    seeded[d] = createDefaultCueDomainPrefs(d)
+  const repaired = { ...(domains as Record<CueDomain, CueDomainPrefs>) }
+  for (const d of needsRepair) {
+    repaired[d] = repairCueDomain(d, domains[d])
   }
-  return { ...prefs, cueDomains: seeded }
+  return { ...prefs, cueDomains: repaired }
 }
 
 function pickNonLegacyTopLevel(src: Record<string, unknown>): Partial<AppPreferences> {

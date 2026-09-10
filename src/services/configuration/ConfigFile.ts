@@ -162,7 +162,18 @@ export class ConfigFile<T> {
         `[Photonics Config] Not writing default config to ${this.filePath}: could not move corrupt file aside; using in-memory defaults so the app can start.`,
       )
     }
-    return this.defaultData
+    return this.freshDefaults()
+  }
+
+  /**
+   * A private copy of the shipped defaults.
+   *
+   * `defaultData` is a module singleton, and what comes back from here becomes `this.data` and is
+   * handed to every reader, so returning it directly would let one in-place edit anywhere change
+   * the defaults for the rest of the process, and the next recovery would write that to disk.
+   */
+  private freshDefaults(): T {
+    return structuredClone(this.defaultData)
   }
 
   /**
@@ -174,7 +185,7 @@ export class ConfigFile<T> {
       this.save(this.defaultData).catch((err) =>
         log.error(`[Photonics Config] Failed to save default config to ${this.filePath}:`, err),
       )
-      return this.defaultData
+      return this.freshDefaults()
     }
 
     let fileContent: string

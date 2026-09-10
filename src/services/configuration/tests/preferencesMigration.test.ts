@@ -4,7 +4,7 @@ import {
   migratePrefsV3ToV4,
   migratePrefsV4ToV5,
   migratePrefsV5ToV6,
-  seedMissingCueDomains,
+  repairCueDomains,
 } from '../preferencesMigration'
 import type { AppPreferences } from '../configurationDefaults'
 import {
@@ -240,10 +240,10 @@ describe('migratePrefsV5ToV6', () => {
   })
 })
 
-describe('seedMissingCueDomains', () => {
-  it('returns the same object when every cue domain is present', () => {
+describe('repairCueDomains', () => {
+  it('returns the same object when every cue domain is complete', () => {
     const prefs = { ...DEFAULT_PREFERENCES, cueDomains: createDefaultCueDomains() }
-    expect(seedMissingCueDomains(prefs)).toBe(prefs)
+    expect(repairCueDomains(prefs)).toBe(prefs)
   })
 
   it('seeds only the missing domains and preserves the rest', () => {
@@ -258,7 +258,7 @@ describe('seedMissingCueDomains', () => {
         audioMotion: all.audioMotion,
       },
     } as unknown as AppPreferences
-    const out = seedMissingCueDomains(prefs)
+    const out = repairCueDomains(prefs)
     expect(out).not.toBe(prefs)
     expect(out.effectDebounce).toBe(9)
     expect(out.cueDomains.yarg.enabledGroups).toEqual(['stagekit', 'mine'])
@@ -266,9 +266,58 @@ describe('seedMissingCueDomains', () => {
     expect(out.cueDomains.rb3Motion).toEqual(createDefaultCueDomainPrefs('rb3Motion'))
   })
 
+  it('completes a domain that is present but short of a required key', () => {
+    const all = createDefaultCueDomains()
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      clockRate: 42,
+      cueDomains: {
+        ...all,
+        rb3Motion: { enabledGroups: ['mine'], selectionMode: 'none' },
+      },
+    } as unknown as AppPreferences
+
+    const out = repairCueDomains(prefs)
+
+    expect(out.clockRate).toBe(42)
+    expect(out.cueDomains.rb3Motion.enabledGroups).toEqual(['mine'])
+    expect(out.cueDomains.rb3Motion.selectionMode).toBe('none')
+    expect(out.cueDomains.rb3Motion.knownGroups).toEqual([])
+    expect(out.cueDomains.rb3Motion.disabledCues).toEqual({})
+  })
+
+  it('replaces a required key stored in the wrong shape', () => {
+    const all = createDefaultCueDomains()
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      cueDomains: {
+        ...all,
+        audio: { ...all.audio, enabledGroups: 'not-an-array', disabledCues: 7 },
+      },
+    } as unknown as AppPreferences
+
+    const out = repairCueDomains(prefs)
+
+    expect(out.cueDomains.audio.enabledGroups).toEqual([])
+    expect(out.cueDomains.audio.disabledCues).toEqual({})
+  })
+
+  it('gives each repaired domain its own disabledCues', () => {
+    const all = createDefaultCueDomains()
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      cueDomains: { ...all, rb3: {} },
+    } as unknown as AppPreferences
+
+    const out = repairCueDomains(prefs)
+    out.cueDomains.rb3.disabledCues['group'] = ['cue']
+
+    expect(createDefaultCueDomainPrefs('rb3').disabledCues).toEqual({})
+  })
+
   it('leaves a malformed cueDomains untouched for validation to reject', () => {
     const prefs = { ...DEFAULT_PREFERENCES, cueDomains: null } as unknown as AppPreferences
-    expect(seedMissingCueDomains(prefs)).toBe(prefs)
+    expect(repairCueDomains(prefs)).toBe(prefs)
   })
 })
 

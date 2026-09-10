@@ -24,7 +24,7 @@ import {
   DEFAULT_AUDIO_GAME_MODE,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio'
-import { DEFAULT_PREFERENCES, type AppPreferences } from './configurationDefaults'
+import { type AppPreferences } from './configurationDefaults'
 import { type CueDomain, type CueDomainPrefs, mergePartialCueDomains } from './cueDomainTypes'
 import { runStartupMigrations, type UserLightsConfig } from './startupMigrations'
 import { createLogger } from '../../shared/logger'
@@ -146,13 +146,6 @@ export class ConfigurationManager {
       }
       return newPrefs
     })
-  }
-
-  /**
-   * Resets preferences to default values
-   */
-  async resetPreferencesToDefaults(): Promise<void> {
-    await this.preferences.update(DEFAULT_PREFERENCES)
   }
 
   /**

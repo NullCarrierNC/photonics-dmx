@@ -83,6 +83,28 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.cueDomains.rb3Motion).toBeDefined()
   })
 
+  it('completes a half-written cue domain instead of wiping the file', () => {
+    const appData = freshAppData()
+    const all = createDefaultCueDomains()
+    // A domain present but short of knownGroups and disabledCues, which a write interrupted part
+    // way or a hand edit leaves behind. The AJV required-check runs per domain, so without
+    // load-time repair this one domain costs the user every setting in the file.
+    seedPrefs(appData, 6, {
+      ...DEFAULT_PREFERENCES,
+      clockRate: 42,
+      cueDomains: { ...all, rb3Motion: { enabledGroups: ['mine'] } },
+    })
+
+    const onCorruptRecovery = jest.fn()
+    const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+    expect(onCorruptRecovery).not.toHaveBeenCalled()
+    expect(prefs.clockRate).toBe(42)
+    expect(prefs.cueDomains.rb3Motion.enabledGroups).toEqual(['mine'])
+    expect(prefs.cueDomains.rb3Motion.knownGroups).toEqual([])
+    expect(prefs.cueDomains.rb3Motion.disabledCues).toEqual({})
+  })
+
   it('loads a same-version v6 file that predates whiteChannelMixMode without wiping it', () => {
     const appData = freshAppData()
     const { whiteChannelMixMode: _omitted, ...withoutKey } = DEFAULT_PREFERENCES
