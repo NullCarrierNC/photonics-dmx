@@ -16,6 +16,8 @@ export type FileLogSinkOptions = {
   retentionDays?: number
   /** Bytes a single day's file may reach before further lines are dropped (default 64MB). */
   maxBytesPerDay?: number
+  /** Bytes past the cap that errors alone may still use (default 4MB). */
+  errorReserveBytes?: number
   /** Injected for tests. */
   clock?: () => number
 }
@@ -26,6 +28,14 @@ export type FileLogSinkOptions = {
  * day rather than truncating what is already written, and says so once.
  */
 const DEFAULT_MAX_BYTES_PER_DAY = 64 * 1024 * 1024
+
+/**
+ * How far past the cap errors alone may keep writing.
+ *
+ * A cap that silences errors as well takes the account of whatever filled the file with it, which
+ * is the opposite of what the file is for. This bounds how much a sustained fault can add.
+ */
+const ERROR_RESERVE_BYTES = 4 * 1024 * 1024
 
 function localDateKeyFromMs(ms: number): string {
   const d = new Date(ms)
@@ -123,6 +133,7 @@ export function createFileLogSink(options: FileLogSinkOptions): {
 } {
   const retentionDays = options.retentionDays ?? 30
   const maxBytesPerDay = options.maxBytesPerDay ?? DEFAULT_MAX_BYTES_PER_DAY
+  const errorReserveBytes = options.errorReserveBytes ?? ERROR_RESERVE_BYTES
   const clock = options.clock ?? Date.now
   const { logsDir } = options
 
@@ -133,6 +144,7 @@ export function createFileLogSink(options: FileLogSinkOptions): {
   let currentStream: fs.WriteStream | null = null
   let bytesThisDay = 0
   let capReported = false
+  let closed = false
   // Streams that have been rotated away (or are the final stream) and are flushing to disk.
   // close() awaits these so a file is never read back before its buffered writes have landed.
   const flushing: Promise<void>[] = []
@@ -165,6 +177,10 @@ export function createFileLogSink(options: FileLogSinkOptions): {
   }
 
   const sink: LogSink = (entry: LogEntry) => {
+    // Ahead of the rotation branch, which would otherwise open a stream nobody is left to end.
+    if (closed) {
+      return
+    }
     const key = localDateKeyFromMs(clock())
     if (key !== currentDateKey) {
       if (currentStream) {
@@ -182,23 +198,38 @@ export function createFileLogSink(options: FileLogSinkOptions): {
     }
     const iso = new Date(clock()).toISOString()
     const line = formatLine(iso, entry)
+    // The cap keeps a runaway from filling the disk, but an error is the one thing worth the space:
+    // whatever filled the file is usually the thing being diagnosed, and dropping errors too meant
+    // losing the account of it for the rest of the day. Everything below error still stops.
     if (bytesThisDay >= maxBytesPerDay) {
-      if (!capReported) {
-        capReported = true
-        // eslint-disable-next-line no-console
-        console.error(
-          `[fileLogSink] ${currentDateKey} log reached ${maxBytesPerDay} bytes, dropping further lines for today.`,
-        )
+      reportCapOnce()
+      const spent = bytesThisDay >= maxBytesPerDay + errorReserveBytes
+      if (entry.level !== 'error' || spent) {
+        return
       }
-      return
     }
     bytesThisDay += Buffer.byteLength(line)
     currentStream.write(line)
   }
 
+  /** Say once, on the console, that the day's file is full. */
+  function reportCapOnce(): void {
+    if (capReported) {
+      return
+    }
+    capReported = true
+    // eslint-disable-next-line no-console
+    console.error(
+      `[fileLogSink] ${currentDateKey} log reached ${maxBytesPerDay} bytes, dropping further lines for today.`,
+    )
+  }
+
   return {
     sink,
     close: () => {
+      // Terminal. Without this a line logged after the flush would find no current date key, take
+      // the rotation branch and open a fresh stream nobody is left to end.
+      closed = true
       if (currentStream) {
         flushing.push(endStream(currentStream))
         currentStream = null

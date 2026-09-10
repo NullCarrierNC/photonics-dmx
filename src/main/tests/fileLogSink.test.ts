@@ -122,4 +122,67 @@ describe('createFileLogSink', () => {
     expect(written).toContain('line 0')
     expect(written).toContain('line 49')
   })
+
+  it('keeps recording errors after the cap has stopped everything else', async () => {
+    // Whatever filled the file is usually the thing being diagnosed, so a cap that silences errors
+    // too takes the account of it with them.
+    const t = new Date(2025, 3, 29, 10, 30, 0, 0).getTime()
+    const { sink, close } = createFileLogSink({
+      logsDir: tmpDir,
+      clock: () => t,
+      maxBytesPerDay: 400,
+    })
+
+    for (let i = 0; i < 200; i++) {
+      sink(entry({ message: `chatter ${i} with enough text to pass the cap quickly` }))
+    }
+    sink(entry({ level: 'error', message: 'the thing that actually went wrong' }))
+    await close()
+
+    const written = fs.readFileSync(path.join(tmpDir, 'photonics-2025-04-29.log'), 'utf-8')
+    expect(written).not.toContain('chatter 199')
+    expect(written).toContain('the thing that actually went wrong')
+  })
+
+  it('stops recording errors too once the reserve is spent', async () => {
+    const t = new Date(2025, 3, 29, 10, 30, 0, 0).getTime()
+    const { sink, close } = createFileLogSink({
+      logsDir: tmpDir,
+      clock: () => t,
+      maxBytesPerDay: 200,
+      errorReserveBytes: 400,
+    })
+
+    for (let i = 0; i < 400; i++) {
+      sink(entry({ level: 'error', message: `error ${i} with enough text to spend the reserve` }))
+    }
+    await close()
+
+    const written = fs.readFileSync(path.join(tmpDir, 'photonics-2025-04-29.log'), 'utf-8')
+    expect(written).toContain('error 0')
+    expect(written).not.toContain('error 399')
+    expect(written.length).toBeLessThan(1200)
+  })
+
+  it('opens no further stream once it has been closed', async () => {
+    // Close is the last word. Nothing after it may open a stream, because there is no longer
+    // anybody left to end one.
+    const t = new Date(2025, 3, 29, 10, 30, 0, 0).getTime()
+    const { sink, close } = createFileLogSink({ logsDir: tmpDir, clock: () => t })
+
+    sink(entry({ message: 'before the close' }))
+    await close()
+
+    const logFile = path.join(tmpDir, 'photonics-2025-04-29.log')
+    const written = fs.readFileSync(logFile, 'utf-8')
+    expect(written).toContain('before the close')
+
+    // Taking the file away is how a reopened stream gives itself up, since opening one recreates it.
+    fs.rmSync(logFile)
+    sink(entry({ level: 'error', message: 'after the close' }))
+    await new Promise((resolve) => setImmediate(resolve))
+    await new Promise((resolve) => setImmediate(resolve))
+
+    expect(fs.existsSync(logFile)).toBe(false)
+  })
 })
