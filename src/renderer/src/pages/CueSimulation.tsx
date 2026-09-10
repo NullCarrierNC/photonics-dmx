@@ -117,8 +117,11 @@ const CueSimulation: React.FC = () => {
   const isFullyInitialized = useRef(false)
   const isLoadingFromPrefs = useRef(false)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const hasLoadedSavedEffect = useRef(false)
-  const savedEffectIdRef = useRef<string | null>(null)
+  // The effect to restore and the group it belongs to. Carrying the group is what makes the
+  // restore independent of when the load flag clears: the group arrives as a state update, so by
+  // the time the effects below run the flag has already gone false and cannot be used to tell a
+  // restored group apart from one the user picked.
+  const savedEffectRef = useRef<{ groupId: string; effectId: string } | null>(null)
   const postProcessingSimulationActiveRef = useRef(false)
 
   useEffect(() => {
@@ -211,7 +214,10 @@ const CueSimulation: React.FC = () => {
               const group = allGroups.find((g: CueGroup) => g.id === savedSettings.groupId)
               if (group && isYargVisualCueGroup(group)) {
                 if (savedSettings.effectId) {
-                  savedEffectIdRef.current = savedSettings.effectId
+                  savedEffectRef.current = {
+                    groupId: savedSettings.groupId,
+                    effectId: savedSettings.effectId,
+                  }
                 }
                 setSelectedGroupId(savedSettings.groupId)
                 setSelectedGroup(group.name)
@@ -278,8 +284,8 @@ const CueSimulation: React.FC = () => {
   // Load saved effect after group is loaded and effects are available
   useEffect(() => {
     const loadSavedEffect = async () => {
-      // Only load if we have a saved effect ID and haven't loaded it yet
-      if (!selectedGroupId || !savedEffectIdRef.current || hasLoadedSavedEffect.current) {
+      const saved = savedEffectRef.current
+      if (!saved || saved.groupId !== selectedGroupId) {
         return
       }
 
@@ -292,44 +298,36 @@ const CueSimulation: React.FC = () => {
               : await getAvailableCues(selectedGroupId)
           if (availableEffects && availableEffects.length > 0) {
             const savedEffect = availableEffects.find(
-              (e: EffectSelector) => e.id === savedEffectIdRef.current,
+              (e: EffectSelector) => e.id === saved.effectId,
             )
             if (savedEffect) {
               setSelectedEffect(savedEffect)
-              hasLoadedSavedEffect.current = true
-              savedEffectIdRef.current = null // Clear after loading
-            } else {
-              // Effect not found in this group, clear it
-              hasLoadedSavedEffect.current = true
-              savedEffectIdRef.current = null
             }
+            // Either it was restored or this group no longer offers it. Done either way.
+            savedEffectRef.current = null
           } else if (retries > 0) {
             // Effects not loaded yet, retry after a short delay
             setTimeout(() => checkForEffects(retries - 1), 200)
           } else {
-            hasLoadedSavedEffect.current = true
-            savedEffectIdRef.current = null
+            savedEffectRef.current = null
           }
         } catch (error) {
           log.error('Error loading saved effect:', error)
-          hasLoadedSavedEffect.current = true
-          savedEffectIdRef.current = null
+          savedEffectRef.current = null
         }
       }
 
       checkForEffects()
     }
 
-    if (selectedGroupId && savedEffectIdRef.current) {
-      loadSavedEffect()
-    }
+    loadSavedEffect()
   }, [selectedGroupId, selectedRegistryType])
 
-  // Reset the hasLoadedSavedEffect flag when group changes (user-initiated change)
+  // Moving to a different group than the saved effect belongs to abandons the restore.
   useEffect(() => {
-    if (!isLoadingFromPrefs.current) {
-      hasLoadedSavedEffect.current = false
-      savedEffectIdRef.current = null
+    const saved = savedEffectRef.current
+    if (saved && saved.groupId !== selectedGroupId) {
+      savedEffectRef.current = null
     }
   }, [selectedGroupId])
 
