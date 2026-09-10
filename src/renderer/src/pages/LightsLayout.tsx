@@ -458,21 +458,18 @@ const LightsLayout = () => {
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
       <ToastContainer toasts={toasts} onDismiss={hideToast} />
-      <ImportRigModal
-        isOpen={pendingImport !== null}
-        sourceBasename={pendingImport?.sourceBasename ?? ''}
-        defaultName={pendingImport?.defaultName ?? ''}
-        existingRigNamesLower={new Set(rigs.map((r) => r.name.trim().toLowerCase()))}
-        summary={
-          pendingImport?.summary ?? {
-            templatesToAddCount: 0,
-            templatesReusedCount: 0,
-            orphanCount: 0,
-          }
-        }
-        onCancel={clearPendingImport}
-        onSave={(name) => void commitPendingImport(name)}
-      />
+      {pendingImport !== null && (
+        <ImportRigModal
+          key={pendingImport.sourceBasename}
+          isOpen
+          sourceBasename={pendingImport.sourceBasename}
+          defaultName={pendingImport.defaultName}
+          existingRigNamesLower={new Set(rigs.map((r) => r.name.trim().toLowerCase()))}
+          summary={pendingImport.summary}
+          onCancel={clearPendingImport}
+          onSave={(name) => void commitPendingImport(name)}
+        />
+      )}
       <LightsLayoutIntro
         headerRight={
           advancedModeEnabled ? (

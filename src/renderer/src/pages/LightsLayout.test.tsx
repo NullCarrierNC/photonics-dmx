@@ -64,6 +64,15 @@ jest.mock('./LightsLayout/LightsLayoutRigSection', () => ({
 }))
 
 // Imported after the mocks are set up.
+const importRigModalRenders: Array<{ defaultName: string }> = []
+jest.mock('./LightsLayout/components/ImportRigModal', () => ({
+  __esModule: true,
+  default: (props: { defaultName: string }) => {
+    importRigModalRenders.push({ defaultName: props.defaultName })
+    return null
+  },
+}))
+
 import LightsLayout from './LightsLayout'
 
 const fixture = {
@@ -186,5 +195,17 @@ describe('LightsLayout — unsaved-changes flag', () => {
     })
 
     await waitFor(() => expect(store.get(lightsLayoutHasUnsavedChangesAtom)).toBe(false))
+  })
+})
+
+describe('LightsLayout import dialog', () => {
+  it('does not build the import dialog until there is an import to name', async () => {
+    // The dialog seeds its name field when it mounts. Kept mounted behind an isOpen prop it
+    // seeded from nothing, so it later opened empty with Import unavailable. Rendering null while
+    // closed hides that from the DOM, so the check is whether it was built at all.
+    renderPage()
+    await act(async () => {})
+
+    expect(importRigModalRenders).toHaveLength(0)
   })
 })

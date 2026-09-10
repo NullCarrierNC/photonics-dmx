@@ -360,17 +360,19 @@ const CueEditor: React.FC = () => {
         </div>
       )}
 
-      <NewFileModal
-        isOpen={showNewFileModal}
-        isEffectMode={isEffectMode}
-        mode={mode}
-        existingGroupIds={existingGroupIdsForNewFileModal}
-        onCancel={() => setShowNewFileModal(false)}
-        onSave={(metadata) => {
-          handleCreateNewFile(metadata)
-          setShowNewFileModal(false)
-        }}
-      />
+      {showNewFileModal && (
+        <NewFileModal
+          isOpen
+          isEffectMode={isEffectMode}
+          mode={mode}
+          existingGroupIds={existingGroupIdsForNewFileModal}
+          onCancel={() => setShowNewFileModal(false)}
+          onSave={(metadata) => {
+            handleCreateNewFile(metadata)
+            setShowNewFileModal(false)
+          }}
+        />
+      )}
 
       {pendingImport !== null && (
         <ImportCueFileModal
