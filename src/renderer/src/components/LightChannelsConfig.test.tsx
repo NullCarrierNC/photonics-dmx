@@ -13,6 +13,7 @@ import {
   ConfigStrobeType,
   DMX_CHANNEL_MAX,
   FixtureTypes,
+  normalizeFixtureConfig,
   type DmxFixture,
   type DmxLight,
   type ExtraChannel,
@@ -219,5 +220,53 @@ describe('LightChannelsConfig extra channels', () => {
     fireEvent.change(masterDimmerInput(), { target: { value: '100' } })
 
     expect('extraChannels' in lastLight(onChange)).toBe(false)
+  })
+})
+
+describe('LightChannelsConfig fixture config fields', () => {
+  /** A moving head, whose config carries the numeric pan and tilt fields. */
+  const movingHead = (): DmxLight =>
+    light({
+      fixture: FixtureTypes.RGBMH,
+      fixtureId: 'mh',
+      config: normalizeFixtureConfig({ panRangeDeg: 540 }),
+    })
+
+  const templates = (): DmxFixture[] => [
+    { ...template(), id: 'mh', fixture: FixtureTypes.RGBMH } as DmxFixture,
+  ]
+
+  const panField = (): HTMLInputElement => screen.getByLabelText('panRangeDeg') as HTMLInputElement
+
+  it('keeps the stored value when the field is cleared', () => {
+    const { onChange } = renderCard({ light: movingHead(), templates: templates() })
+    const field = panField()
+
+    fireEvent.change(field, { target: { value: '' } })
+    fireEvent.blur(field)
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(field.value).toBe('540')
+  })
+
+  it('accepts a value whose first digit is below the floor', () => {
+    const { onChange } = renderCard({ light: movingHead(), templates: templates() })
+    const field = panField()
+
+    fireEvent.change(field, { target: { value: '2' } })
+    fireEvent.change(field, { target: { value: '20' } })
+    fireEvent.blur(field)
+
+    expect(lastLight(onChange).config?.panRangeDeg).toBe(20)
+  })
+
+  it('keeps the stored value when the entry is not a number', () => {
+    const { onChange } = renderCard({ light: movingHead(), templates: templates() })
+    const field = panField()
+
+    fireEvent.change(field, { target: { value: 'abc' } })
+    fireEvent.blur(field)
+
+    expect(onChange).not.toHaveBeenCalled()
   })
 })

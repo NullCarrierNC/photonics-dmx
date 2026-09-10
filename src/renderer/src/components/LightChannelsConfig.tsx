@@ -13,6 +13,7 @@ import {
   normalizeFixtureConfig,
   LightingConfiguration,
 } from '../../../photonics-dmx/types'
+import { DraftNumberField } from './controls/DraftField'
 import { LightIcon } from './LightIcon'
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
 import {
@@ -190,16 +191,21 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
 
   /**
    * Handles updates for any property in the config.
-   * For number fields, the value is parsed to a number.
-   * For boolean fields (invertPan / invertTilt / panDirectionCW), the value is taken from the checkbox.
+   *
+   * Number fields arrive already held inside their bounds, and only once the user has finished
+   * with them, so an entry part way to a legal value is never written. Boolean fields
+   * (invertPan / invertTilt / panDirectionCW) come from a checkbox.
    */
-  const handleConfigChange = (key: keyof FixtureConfig, value: string | boolean) => {
+  const handleConfigChange = (key: keyof FixtureConfig, value: number | boolean) => {
     if (light && localConfig) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- config value can be number or string
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- config value can be number or boolean
       let updatedValue: any = value
       if (key !== 'invertPan' && key !== 'invertTilt' && key !== 'panDirectionCW') {
         const { min, max } = fixtureConfigFieldBounds(key, localConfig)
-        updatedValue = Math.max(min, Math.min(max, Math.round(Number(value))))
+        const numeric = Number(value)
+        updatedValue = Number.isFinite(numeric)
+          ? Math.max(min, Math.min(max, Math.round(numeric)))
+          : localConfig[key]
       }
       const updatedConfig = { ...localConfig, [key]: updatedValue }
       setLocalConfig(updatedConfig)
@@ -468,14 +474,12 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                       className="ml-2"
                     />
                   ) : (
-                    <input
-                      type="number"
+                    <DraftNumberField
+                      aria-label={key}
                       min={fixtureConfigFieldBounds(key as keyof FixtureConfig, localConfig).min}
                       max={fixtureConfigFieldBounds(key as keyof FixtureConfig, localConfig).max}
                       value={value as number}
-                      onChange={(e) =>
-                        handleConfigChange(key as keyof FixtureConfig, e.target.value)
-                      }
+                      onCommit={(next) => handleConfigChange(key as keyof FixtureConfig, next)}
                       className="w-16 p-1 border border-gray-300 dark:border-gray-700 rounded text-black dark:text-white dark:bg-gray-700 text-right"
                     />
                   )}
