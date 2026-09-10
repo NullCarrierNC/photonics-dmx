@@ -47,12 +47,8 @@ describe('CueRegistry', () => {
 
   beforeEach(() => {
     registry = CueRegistry.getInstance()
-    // reset() drops preferences and selection state but keeps the registered groups, so the
-    // singleton is emptied here to give every case the same starting catalogue.
+    // The registry is a singleton, so every case starts from an emptied one.
     registry.reset()
-    for (const id of registry.getAllGroups()) {
-      registry.unregisterGroup(id)
-    }
 
     // Create default group
     defaultGroup = {
@@ -279,8 +275,8 @@ describe('CueRegistry', () => {
       registry.registerGroup(customGroup)
       registry.setActiveGroups(['custom'])
       registry.reset()
-      expect(registry.getAllGroups()).toHaveLength(2) // default and custom groups remain registered
-      expect(registry.getActiveGroups()).toHaveLength(0) // but active groups are cleared
+      expect(registry.getAllGroups()).toHaveLength(0)
+      expect(registry.getActiveGroups()).toHaveLength(0)
     })
   })
 

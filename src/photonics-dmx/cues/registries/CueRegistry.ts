@@ -77,11 +77,11 @@ export class CueRegistry {
   }
 
   /**
-   * Reset the registry to its initial state. Registered groups stay known; preferences, selection
-   * state and motion state are cleared.
+   * Reset the registry to its initial state, dropping the registered groups along with
+   * preferences, selection state and motion state.
    */
   public reset(): void {
-    this.catalog.clearPreferences()
+    this.catalog.clear()
     this.selection.reset()
     this.motion.reset()
     log.info('CueRegistry reset to initial state')

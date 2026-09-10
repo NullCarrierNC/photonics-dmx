@@ -35,10 +35,13 @@ export class CueGroupCatalog {
   /** Name of the stage kit group for special stage kit handling */
   private stageKitGroup: string | null = null
 
-  /**
-   * Clear every preference-driven part of the catalog while keeping registered groups, matching
-   * what a registry reset preserves.
-   */
+  /** Clear the catalog back to holding nothing at all. */
+  public clear(): void {
+    this.groups.clear()
+    this.clearPreferences()
+  }
+
+  /** Clear every preference-driven part of the catalog while keeping registered groups. */
   public clearPreferences(): void {
     this.enabledGroups.clear()
     this.activeGroups.clear()
