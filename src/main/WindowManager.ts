@@ -481,6 +481,21 @@ export class WindowManager {
   }
 
   /**
+   * Brings the main window to the front, creating it if there is none.
+   */
+  public focusMainWindow(): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+      this.createMainWindow()
+      return
+    }
+    if (this.mainWindow.isMinimized()) {
+      this.mainWindow.restore()
+    }
+    this.mainWindow.show()
+    this.mainWindow.focus()
+  }
+
+  /**
    * Closes all application windows
    */
   public async closeAllWindows(): Promise<void> {

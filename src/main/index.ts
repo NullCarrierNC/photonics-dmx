@@ -142,54 +142,68 @@ function startFileLogging(logsDir: string): void {
   }
 }
 
-app
-  .whenReady()
-  .then(() => {
-    const logsDir = path.join(app.getPath('appData'), 'Photonics.rocks', 'logs')
-    startFileLogging(logsDir)
-    // Named while the floor is still info, so the log file records where it is.
-    log.info(`Writing logs to ${logsDir}`)
-    if (!process.env.PHOTONICS_LOG_LEVEL && app.isPackaged) {
-      setMinLogLevel('error')
-      for (const scope of STARTUP_ACCOUNT_SCOPES) {
-        setScopeMinLogLevel(scope, 'info')
-      }
+/** Everything that builds the window, the IPC surface and the error dialog. */
+function onReady(): void {
+  const logsDir = path.join(app.getPath('appData'), 'Photonics.rocks', 'logs')
+  startFileLogging(logsDir)
+  // Named while the floor is still info, so the log file records where it is.
+  log.info(`Writing logs to ${logsDir}`)
+  if (!process.env.PHOTONICS_LOG_LEVEL && app.isPackaged) {
+    setMinLogLevel('error')
+    for (const scope of STARTUP_ACCOUNT_SCOPES) {
+      setScopeMinLogLevel(scope, 'info')
     }
+  }
 
-    installDefaultSessionContentSecurityPolicy()
-    installDefaultSessionPermissionHandlers()
+  installDefaultSessionContentSecurityPolicy()
+  installDefaultSessionPermissionHandlers()
 
-    // Set up the app
-    electronApp.setAppUserModelId('rocks.photonics')
+  // Set up the app
+  electronApp.setAppUserModelId('rocks.photonics')
 
-    // Set app name
-    app.name = 'Photonics'
+  // Set app name
+  app.name = 'Photonics'
 
-    // Built here rather than at module scope: the constructor reads configuration off disk and
-    // throws when that directory cannot be created, and a throw during module evaluation would
-    // skip the signal handlers, the window and this error path, leaving a process with no interface
-    // and no way to quit it.
-    try {
-      applicationInstance = new Application()
-      applicationInstance.flushLogs = closeFileLogWithTimeout
-    } catch (err) {
-      reportStartupFailure(err)
-      return
-    }
+  // Built here rather than at module scope: the constructor reads configuration off disk and
+  // throws when that directory cannot be created, and a throw during module evaluation would
+  // skip the signal handlers, the window and this error path, leaving a process with no interface
+  // and no way to quit it.
+  try {
+    applicationInstance = new Application()
+    applicationInstance.flushLogs = closeFileLogWithTimeout
+  } catch (err) {
+    reportStartupFailure(err)
+    return
+  }
 
-    // Initialize application. A controller failure resolves and leaves the window reporting the
-    // failed phase, so a rejection here means the window or IPC could not be set up and there is
-    // nothing left to report through. Say so and stop rather than idling with no interface.
-    applicationInstance.init().catch(reportStartupFailure)
+  // Initialize application. A controller failure resolves and leaves the window reporting the
+  // failed phase, so a rejection here means the window or IPC could not be set up and there is
+  // nothing left to report through. Say so and stop rather than idling with no interface.
+  applicationInstance.init().catch(reportStartupFailure)
 
-    // Default session handlers
-    app.on('browser-window-created', (_, window) => {
-      optimizer.watchWindowShortcuts(window)
-    })
+  // Default session handlers
+  app.on('browser-window-created', (_, window) => {
+    optimizer.watchWindowShortcuts(window)
   })
-  // Anything else in here throwing would abort startup with no window and no way to quit, so
-  // report it the same way a failed Application build is reported.
-  .catch(reportStartupFailure)
+}
+
+/**
+ * A second copy would share the configuration files with this one, bind the same UDP ports and
+ * write the same daily log against a byte counter neither knows about. The second launch hands the
+ * user back to this window instead.
+ */
+if (!app.requestSingleInstanceLock()) {
+  // Nothing is built yet, so there is nothing to shut down on the way out.
+  app.exit(0)
+} else {
+  app.on('second-instance', () => {
+    applicationInstance?.handleSecondInstance()
+  })
+
+  // Anything in onReady throwing would abort startup with no window and no way to quit, so report
+  // it the same way a failed Application build is reported.
+  app.whenReady().then(onReady).catch(reportStartupFailure)
+}
 
 // Handle window-all-closed event
 app.on('window-all-closed', () => {

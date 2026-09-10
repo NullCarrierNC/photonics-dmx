@@ -71,6 +71,11 @@ export class Application {
     }
   }
 
+  /** A second launch hands the user back to the window this instance already has. */
+  public handleSecondInstance(): void {
+    this.windowManager.focusMainWindow()
+  }
+
   public getControllerManager(): ControllerManager {
     return this.controllerManager
   }

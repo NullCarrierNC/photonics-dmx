@@ -11,13 +11,16 @@ import type { LogEntry } from '../../shared/logger'
 
 const applicationInit = jest.fn<() => Promise<void>>()
 const applicationShutdown = jest.fn<() => Promise<void>>()
+const handleSecondInstance = jest.fn()
 const applicationCtor = jest.fn()
 let mockIsPackaged = false
+let mockHasInstanceLock = true
 const createFileLogSink = jest.fn()
 const installCsp = jest.fn()
 const installPermissionHandlers = jest.fn()
 const showErrorBox = jest.fn()
 const appExit = jest.fn()
+const appOn = jest.fn()
 
 let readyResolve: (() => void) | undefined
 const whenReady = jest.fn(
@@ -32,8 +35,9 @@ jest.mock('electron', () => ({
     whenReady,
     getPath: jest.fn(() => '/tmp/photonics-startup-test'),
     getVersion: jest.fn(() => '0.0.0'),
-    on: jest.fn(),
+    on: appOn,
     exit: appExit,
+    requestSingleInstanceLock: () => mockHasInstanceLock,
     quit: jest.fn(),
     get isPackaged() {
       return mockIsPackaged
@@ -67,6 +71,7 @@ jest.mock('../application', () => ({
     init = applicationInit
     shutdown = applicationShutdown
     flushLogs: (() => Promise<void>) | null = null
+    handleSecondInstance = handleSecondInstance
     handleAllWindowsClosed = jest.fn()
     handleActivate = jest.fn()
     getControllerManager = jest.fn(() => null)
@@ -100,6 +105,7 @@ describe('main startup', () => {
     applicationInit.mockResolvedValue(undefined)
     applicationShutdown.mockReset()
     applicationShutdown.mockResolvedValue(undefined)
+    handleSecondInstance.mockReset()
     mockIsPackaged = false
     applicationCtor.mockReset()
     createFileLogSink.mockReset()
@@ -108,6 +114,8 @@ describe('main startup', () => {
     installPermissionHandlers.mockReset()
     showErrorBox.mockReset()
     appExit.mockReset()
+    appOn.mockReset()
+    mockHasInstanceLock = true
   })
 
   it('builds the application once Electron is ready', async () => {
@@ -140,6 +148,24 @@ describe('main startup', () => {
 
     expect(showErrorBox).toHaveBeenCalled()
     expect(appExit).toHaveBeenCalledWith(1)
+  })
+
+  it('quits a second launch rather than running two copies', async () => {
+    mockHasInstanceLock = false
+
+    await startUp()
+
+    expect(appExit).toHaveBeenCalledWith(0)
+    expect(applicationCtor).not.toHaveBeenCalled()
+  })
+
+  it('hands a second launch back to the window this one already has', async () => {
+    await startUp()
+
+    const secondInstance = appOn.mock.calls.find((c) => c[0] === 'second-instance')?.[1]
+    ;(secondInstance as () => void)()
+
+    expect(handleSecondInstance).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the configuration account recording when a packaged build raises the floor', async () => {
