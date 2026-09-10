@@ -20,10 +20,6 @@ export function randomInRange(start: number, end: number): number {
   return Math.round(rand)
 }
 
-export function clampTo255(value: number): number {
-  return Math.max(0, Math.min(255, value))
-}
-
 /** Picks a uniformly random element, or undefined if the array is empty. */
 export function pickRandom<T>(items: T[]): T | undefined {
   if (items.length === 0) return undefined
@@ -49,22 +45,4 @@ export function shuffle<T>(items: T[]): T[] {
     ;[out[i], out[j]] = [out[j], out[i]]
   }
   return out
-}
-
-/**
- * Shifts an array by half. For even-length arrays, it splits the array into two equal halves.
- * For odd-length arrays, the first half will have one fewer element than the second half.
- *
- * @param array - The array to be shifted.
- * @returns A new array shifted by half.
- */
-export function shiftArrayByHalf<T>(array: T[]): T[] {
-  const len = array.length
-  if (len === 0) return []
-
-  const midpoint = Math.floor(len / 2)
-  const firstHalf = array.slice(0, midpoint)
-  const secondHalf = array.slice(midpoint)
-
-  return secondHalf.concat(firstHalf)
 }

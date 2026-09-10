@@ -14,7 +14,6 @@ import {
   senderSacnEnabledAtom,
   senderArtNetEnabledAtom,
   senderEnttecProEnabledAtom,
-  senderIpcEnabledAtom,
   LightingPreferences,
   senderOpenDmxEnabledAtom,
   openDmxComPortAtom,
@@ -80,7 +79,6 @@ export const App = (): JSX.Element => {
   const setArtNetEnabled = useSetAtom(senderArtNetEnabledAtom)
   const setEnttecProEnabled = useSetAtom(senderEnttecProEnabledAtom)
   const setOpenDmxEnabled = useSetAtom(senderOpenDmxEnabledAtom)
-  const setIpcEnabled = useSetAtom(senderIpcEnabledAtom)
   const setYargEnabled = useSetAtom(yargListenerEnabledAtom)
   const setRb3Enabled = useSetAtom(rb3eListenerEnabledAtom)
   const [appVer, setAppVer] = useState('')
@@ -182,7 +180,7 @@ export const App = (): JSX.Element => {
           setOpenDmxEnabled(false)
           break
         case 'ipc':
-          setIpcEnabled(false)
+          // The preview sender carries no toggle in the UI, so the toast below is the whole report.
           break
         default:
           log.warn(`Unknown sender type in failure notification: ${data.sender}`)
@@ -196,14 +194,7 @@ export const App = (): JSX.Element => {
             : data.sender.toUpperCase()
       showToast(`Failed to start ${senderName} sender: ${data.error}`, 'error', 5000)
     },
-    [
-      setSacnEnabled,
-      setArtNetEnabled,
-      setEnttecProEnabled,
-      setOpenDmxEnabled,
-      setIpcEnabled,
-      showToast,
-    ],
+    [setSacnEnabled, setArtNetEnabled, setEnttecProEnabled, setOpenDmxEnabled, showToast],
   )
 
   // Handler for sender network errors (invalid destinations, etc.)

@@ -148,23 +148,3 @@ export function cueGraphPolicy(groupId: string, cueId: string): GraphExecutionPo
 export function motionCueGraphPolicy(groupId: string, cueId: string): GraphExecutionPolicy {
   return cueLikeGraphPolicy(groupId, cueId, false)
 }
-
-/**
- * Effect graph policy: single effect-listener entry, no queuing, relaxed revisit, no effect invocation.
- */
-export function effectGraphPolicy(effectId: string, instanceId?: number): GraphExecutionPolicy {
-  const prefix = instanceId != null ? `effect:${effectId}:${instanceId}` : `effect:${effectId}`
-  return {
-    entryEventTypes: ['effect-listener'],
-    queuing: false,
-    revisitPolicy: 'relaxed',
-    useInitialClearPolicy: true,
-    canInvokeEffects: false,
-    getLogPrefix: () => prefix,
-    getEntryNodes(compiled, _parameters, _entryContext): BaseEventNode[] {
-      const effect = compiled as CompiledEffect<BaseEventNode>
-      // Every effect-listener is an entry point (an effect may declare more than one).
-      return Array.from(effect.effectListenerMap.values()) as unknown as BaseEventNode[]
-    },
-  }
-}

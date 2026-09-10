@@ -6,8 +6,6 @@ import {
   LocationGroup,
   WaitCondition,
   WAIT_CONDITIONS,
-  NetEventType,
-  NET_EVENT_TYPES,
 } from '../types'
 import { AudioEventType } from '../cues/types/nodeCueTypes'
 
@@ -62,15 +60,6 @@ export const LIGHT_TARGET_OPTIONS: LightTarget[] = [
   'random-3',
   'random-4',
 ]
-
-/**
- * YARG event options for EVENT NODES - includes system events (cue-started, cue-called)
- * and song events (beat, measure, keyframe, instruments).
- * Excludes 'none' and 'delay' as those are only for action timing.
- */
-export const NET_EVENT_OPTIONS: NetEventType[] = NET_EVENT_TYPES.filter(
-  (c): c is Exclude<NetEventType, 'none' | 'delay'> => c !== 'none' && c !== 'delay',
-)
 
 /**
  * Wait conditions for ACTION TIMING - song-based conditions only (no system events).

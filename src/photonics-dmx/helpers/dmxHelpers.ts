@@ -98,14 +98,6 @@ export function logicalPanDir(c: { panDirectionCW: boolean; invertPan: boolean }
 }
 
 /**
- * Logical tilt direction for stage-relative math.
- * Up-firing fixtures use motor-positive tilt as logical-positive; down-firing fixtures invert it.
- */
-export function logicalTiltDir(c: { invertTilt: boolean }): 1 | -1 {
-  return c.invertTilt ? -1 : 1
-}
-
-/**
  * For waveform / static-offset paths, inverted fixtures with a home position away from 50%
  * need a percentage-space mirror so that stage-relative degree offsets land on the correct
  * side of the physical home after the DMX publisher applies its channel-midpoint inversion.

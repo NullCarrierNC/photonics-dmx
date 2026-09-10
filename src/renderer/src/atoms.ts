@@ -1,6 +1,5 @@
 import { atom, getDefaultStore } from 'jotai'
-import { atomFamily, atomWithStorage, createJSONStorage } from 'jotai/utils'
-import type { CueDomain } from '../../services/configuration/cueDomainTypes'
+import { atomWithStorage, createJSONStorage } from 'jotai/utils'
 import type { AppPreferences } from '../../services/configuration/configurationDefaults'
 import {
   DmxFixture,
@@ -29,13 +28,6 @@ export const dmxLightsLibraryAtom = atom<DmxFixture[]>([])
  * Atom for storing user's configured DmxLights
  */
 export const myDmxLightsAtom = atom<DmxFixture[]>([])
-
-export const dmxLightTypesAtom = atom((get) =>
-  get(dmxLightsLibraryAtom).map((DmxLight) => ({
-    DmxLightType: DmxLight.fixture,
-    label: DmxLight.label,
-  })),
-)
 
 // Derived atom to sort MyDmxLightsAtom in descending alphabetical order by name
 export const sortedMyDmxLightsAtom = atom((get) =>
@@ -164,8 +156,6 @@ export const dmxValuesAtom = atom<Record<number, number>>({})
 
 export const senderSacnEnabledAtom = atom<boolean>(false)
 
-export const senderIpcEnabledAtom = atom<boolean>(false)
-
 export const yargListenerEnabledAtom = atom<boolean>(false)
 
 export const rb3eListenerEnabledAtom = atom<boolean>(false)
@@ -199,7 +189,6 @@ export function syncOutputSenderAtoms(senderStatus: {
   artnet: boolean
   enttecpro: boolean
   opendmx: boolean
-  ipc: boolean
 }): void {
   const store = getDefaultStore()
   store.set(senderSacnEnabledAtom, senderStatus.sacn)
@@ -254,15 +243,6 @@ export type LightingPreferences = Partial<AppPreferences>
 export const lightingPrefsAtom = atom<LightingPreferences>({})
 
 /**
- * Per-domain slice of `cueDomains` from loaded preferences (read-only; updates go through savePrefs or IPC).
- */
-export const prefsCueDomainAtom = atomFamily((domain: CueDomain) =>
-  atom((get) => get(lightingPrefsAtom).cueDomains?.[domain]),
-)
-
-export const useComplexCuesAtom = atom<boolean>(false)
-
-/**
  * When true, show node IDs in the Cue Editor graph and Selected Node inspector.
  */
 export const showNodeIdsAtom = atom<boolean>(false)
@@ -271,14 +251,6 @@ export const showNodeIdsAtom = atom<boolean>(false)
 export const audioConfigAtom = atom((get) => {
   const prefs = get(lightingPrefsAtom)
   return prefs.audioConfig
-})
-
-/** Enumerated audio input devices. `deviceId` is the string `MediaDeviceInfo.deviceId`. */
-export const audioDevicesAtom = atom<Array<{ deviceId: string; label: string }>>([])
-
-export const audioEnabledAtom = atom((get) => {
-  const config = get(audioConfigAtom)
-  return config?.enabled || false
 })
 
 /**

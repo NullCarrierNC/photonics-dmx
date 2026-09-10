@@ -96,8 +96,6 @@ export interface IpcInvokeMap
 
 // Utility types derived from IpcInvokeMap
 export type IpcInvokeChannel = keyof IpcInvokeMap
-export type IpcRequest<T extends IpcInvokeChannel> = IpcInvokeMap[T]['request']
-export type IpcResponse<T extends IpcInvokeChannel> = IpcInvokeMap[T]['response']
 
 // ---------------------------------------------------------------------------
 // Push and fire-and-forget channels
