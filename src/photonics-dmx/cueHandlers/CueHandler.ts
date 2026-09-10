@@ -176,7 +176,7 @@ class CueHandler extends EventEmitter {
       this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
     }
-    getStrobeStateManager().setActive(null)
+    getStrobeStateManager().setActive(null, 'net')
   }
 
   /** Stops any active strobe slot and clears per-frame edge baselines at session boundaries. */
@@ -385,7 +385,7 @@ class CueHandler extends EventEmitter {
           this.currentStrobeCue = null
         }
         this.currentStrobeCue = cue
-        getStrobeStateManager().setActive(cueTypeToStrobeSlot(cueType))
+        getStrobeStateManager().setActive(cueTypeToStrobeSlot(cueType), 'net')
       } else if (incomingIsSecondary) {
         // Non-strobe overlays run concurrently with primary and strobes, but replace the existing secondary overlay.
         if (this.currentSecondaryCue && this.currentSecondaryCue !== cue) {

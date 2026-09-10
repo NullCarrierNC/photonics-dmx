@@ -172,7 +172,7 @@ describe('DmxPublisher brightness scaling', () => {
 
   it('leaves the hardware strobe-speed channel unscaled', () => {
     const strobeManager = new StrobeStateManager()
-    strobeManager.setActive('fast')
+    strobeManager.setActive('fast', 'net')
     const { publisher, wire } = setup(
       [
         {

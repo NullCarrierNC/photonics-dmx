@@ -130,7 +130,7 @@ describe('CueHandler shutdown lifecycle', () => {
   it('shutdown clears shared strobe state even when no strobe cue was active (Fix 2)', () => {
     __resetStrobeStateManagerForTests()
     // Simulate a stale slot left by a prior interrupted strobe (no Strobe_Off received).
-    getStrobeStateManager().setActive('fast')
+    getStrobeStateManager().setActive('fast', 'net')
     expect(getStrobeStateManager().getActive()).toBe('fast')
 
     const handler = new CueHandler(makeLightManager(), makeSequencer())

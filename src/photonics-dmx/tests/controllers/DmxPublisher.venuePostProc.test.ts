@@ -186,7 +186,7 @@ describe('DmxPublisher venue post-processing', () => {
       { id: 's1', channels: { ...RGB, strobeChannel: 5 }, group: 'strobe', isStrobeEnabled: true },
     ])
     ctx.venue.setVenuePostProcessing('BlackAndWhite')
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
     const buf = ctx.publish({ s1: RED })
     expect([buf[2], buf[3], buf[4]]).toEqual([76, 76, 76])
 
@@ -304,7 +304,7 @@ describe('DmxPublisher strobe punch-through', () => {
   it('lets a flash go dark again inside a choppy hold', () => {
     const ctx = setup([SOFT_STROBE])
     ctx.venue.setVenuePostProcessing('Choppy_BlackAndWhite')
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
 
     expect(ctx.publish({ s1: WHITE })[1]).toBe(255)
 
@@ -316,7 +316,7 @@ describe('DmxPublisher strobe punch-through', () => {
   it('lets a flash go dark again under a trail', () => {
     const ctx = setup([SOFT_STROBE])
     ctx.venue.setVenuePostProcessing('Trails')
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
 
     expect(ctx.publish({ s1: WHITE })[1]).toBe(255)
 
@@ -327,7 +327,7 @@ describe('DmxPublisher strobe punch-through', () => {
   it('greys a strobe light with the rest of the rig', () => {
     const ctx = setup([SOFT_STROBE])
     ctx.venue.setVenuePostProcessing('BlackAndWhite')
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
 
     const buf = ctx.publish({ s1: RED })
     expect([buf[2], buf[3], buf[4]]).toEqual([76, 76, 76])
@@ -336,7 +336,7 @@ describe('DmxPublisher strobe punch-through', () => {
   it('keeps a white flash white through a greyscale venue effect', () => {
     const ctx = setup([SOFT_STROBE])
     ctx.venue.setVenuePostProcessing('BlackAndWhite')
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
 
     const buf = ctx.publish({ s1: WHITE })
     expect([buf[2], buf[3], buf[4]]).toEqual([255, 255, 255])
@@ -345,7 +345,7 @@ describe('DmxPublisher strobe punch-through', () => {
   it('keeps a flash white under a photo negative venue effect', () => {
     const ctx = setup([SOFT_STROBE])
     ctx.venue.setVenuePostProcessing('PhotoNegative')
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
 
     const buf = ctx.publish({ s1: WHITE })
     expect([buf[2], buf[3], buf[4]]).toEqual([255, 255, 255])
@@ -357,7 +357,7 @@ describe('DmxPublisher strobe punch-through', () => {
       { id: 'f1', channels: { masterDimmer: 5, red: 6, green: 7, blue: 8 } },
     ])
     ctx.venue.setVenuePostProcessing('PhotoNegative')
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
 
     const buf = ctx.publish({ s1: WHITE, f1: WHITE })
     expect([buf[2], buf[3], buf[4]]).toEqual([255, 255, 255])
@@ -367,13 +367,13 @@ describe('DmxPublisher strobe punch-through', () => {
   it('resumes the trail once the strobe ends', () => {
     const ctx = setup([SOFT_STROBE])
     ctx.venue.setVenuePostProcessing('Trails')
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
     ctx.publish({ s1: WHITE })
 
     ctx.setNow(60)
     expect(ctx.publish({ s1: rgbio() })[1]).toBe(0)
 
-    ctx.strobe.setActive(null)
+    ctx.strobe.setActive(null, 'net')
     ctx.setNow(120)
     ctx.publish({ s1: WHITE })
     ctx.setNow(180)
@@ -387,7 +387,7 @@ describe('DmxPublisher strobe punch-through', () => {
       { id: 'f1', channels: { masterDimmer: 5, red: 6, green: 7, blue: 8 } },
     ])
     ctx.venue.setVenuePostProcessing('Trails')
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
     ctx.publish({ s1: WHITE, f1: WHITE })
 
     ctx.setNow(60)

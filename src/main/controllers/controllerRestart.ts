@@ -79,7 +79,7 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
     // even if no cue handler was active to clear it during its own shutdown.
     // Prevents a stale strobe slot from driving hardware-strobe-channel
     // lights after an input-platform switch.
-    getStrobeStateManager().setActive(null)
+    getStrobeStateManager().reset()
 
     // Drop process-scoped state bound to the engine/registry being rebuilt (e.g. an active laser sim
     // cue + its render tick). Each callback is wrapped so one consumer's failure can neither abort the
