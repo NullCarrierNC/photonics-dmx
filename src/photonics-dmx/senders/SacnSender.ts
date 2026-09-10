@@ -160,7 +160,7 @@ export class SacnSender extends BaseSender {
     return this.config.universe !== undefined ? this.config.universe : 1
   }
 
-  public getConfiguredPort(): number {
+  public override getConfiguredPort(): number {
     return 5568
   }
 }

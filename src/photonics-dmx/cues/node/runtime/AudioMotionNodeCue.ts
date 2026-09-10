@@ -48,7 +48,7 @@ export class AudioMotionNodeCue extends BaseAudioNodeCue implements IAudioCue {
     )
   }
 
-  protected transformCueDataForExecution(data: AudioCueData): AudioCueData {
+  protected override transformCueDataForExecution(data: AudioCueData): AudioCueData {
     return withMotionSafeAudioData(data)
   }
 

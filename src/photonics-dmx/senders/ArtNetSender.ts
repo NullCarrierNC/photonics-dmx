@@ -156,7 +156,7 @@ export class ArtNetSender extends BaseSender {
     return this.options.universe || 1
   }
 
-  public getConfiguredPort(): number {
+  public override getConfiguredPort(): number {
     return this.options.port ?? 6454
   }
 }

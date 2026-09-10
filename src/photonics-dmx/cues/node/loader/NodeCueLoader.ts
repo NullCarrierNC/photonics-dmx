@@ -117,7 +117,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     super(options.baseDir, 'cues', ['yarg', 'audio', 'rb3'])
   }
 
-  protected onBeforeLoadAll(): void {
+  protected override onBeforeLoadAll(): void {
     this.customAudioCueTypes.clear()
   }
 
