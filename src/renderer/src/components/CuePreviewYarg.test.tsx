@@ -287,3 +287,45 @@ describe('CuePreviewYarg primary cue row', () => {
     expect(screen.queryByText('Chorus')).toBeNull()
   })
 })
+
+describe('CuePreviewYarg beat indicator', () => {
+  beforeEach(() => {
+    jest.useFakeTimers()
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it('stays lit while beats keep arriving faster than the clear', async () => {
+    // Each beat schedules its own clear and cancels the one before it, so a stream arriving
+    // inside the window holds the indicator lit rather than blinking it.
+    const store = createStore()
+    store.set(yargListenerEnabledAtom, true)
+    render(
+      <Provider store={store}>
+        <CuePreviewYarg />
+      </Provider>,
+    )
+    const send = (beat: CueData['beat']): void => {
+      listeners.get(RENDERER_RECEIVE.CUE_HANDLED)?.(cueData({ beat }))
+    }
+
+    await act(async () => {
+      send('Strong')
+    })
+    // Beats 100ms apart, which is inside the 200ms clear the first one armed.
+    for (const beat of ['Weak', 'Strong', 'Weak'] as const) {
+      await act(async () => {
+        jest.advanceTimersByTime(100)
+        send(beat)
+      })
+    }
+    await act(async () => {
+      jest.advanceTimersByTime(100)
+    })
+
+    // Still showing the beat rather than having been blanked by an older beat's clear.
+    expect(screen.queryByText('Waiting for beat...')).toBeNull()
+  })
+})

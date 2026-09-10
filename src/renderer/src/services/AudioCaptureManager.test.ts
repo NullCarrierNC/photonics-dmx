@@ -197,6 +197,21 @@ describe('AudioCaptureManager start failures', () => {
 
     expect(manager.isActive()).toBe(false)
   })
+
+  it('gives the microphone back when the start fails after taking it', async () => {
+    // getUserMedia resolves, so the device is live, and everything after it throws. The capturing
+    // flag is not set yet and stop() bails on that flag, so nothing else can close it.
+    ;(globalThis as unknown as { AudioContext: unknown }).AudioContext =
+      function FailingAudioContext() {
+        throw new Error('no audio device')
+      }
+    const manager = new AudioCaptureManager()
+
+    await manager.start().catch(() => undefined)
+
+    expect(track.stop).toHaveBeenCalled()
+    expect(manager.isActive()).toBe(false)
+  })
 })
 
 describe('AudioCaptureManager analysis frames', () => {

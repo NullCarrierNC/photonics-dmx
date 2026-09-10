@@ -169,6 +169,10 @@ export class AudioCaptureManager {
       log.info('Audio capture started successfully')
     } catch (error) {
       log.error('Failed to start audio capture:', error)
+      // The device is live from getUserMedia onward, but the capturing flag is only set once
+      // everything downstream is built, and stop() bails on that flag. Anything failing in
+      // between would leave the microphone open with no way left to close it.
+      this.releasePartialStart()
 
       if (error instanceof DOMException) {
         if (error.name === 'NotAllowedError') {
@@ -205,6 +209,27 @@ export class AudioCaptureManager {
   /**
    * Stop audio capture and clean up resources
    */
+  /** Give back whatever a failed start had already taken. */
+  private releasePartialStart(): void {
+    try {
+      this.source?.disconnect()
+      this.stream?.getTracks().forEach((track) => track.stop())
+      void this.audioContext?.close()
+      if (this.analysisTimer !== null) {
+        clearInterval(this.analysisTimer)
+      }
+    } catch (error) {
+      log.error('Failed to release a partly started capture:', error)
+    }
+    this.source = null
+    this.stream = null
+    this.audioContext = null
+    this.analyser = null
+    this.melBandAnalyser = null
+    this.analysisTimer = null
+    this.isCapturing = false
+  }
+
   stop(): void {
     if (!this.isCapturing) {
       log.warn('AudioCaptureManager is not capturing')

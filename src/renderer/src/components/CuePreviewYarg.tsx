@@ -79,6 +79,12 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   const prevKeyframeRef = useRef<string | null>(null)
 
   // Refs for instrument note clear timers so sustained notes stay solid (cancel previous timer on new packet)
+  // Beat, measure and keyframe indicators clear on their own timer. Held in refs like the
+  // instrument ones below, so a fresh packet cancels the clear an older one scheduled rather than
+  // letting it blank an indicator that has just lit.
+  const beatClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const measureClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const keyframeClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const guitarClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bassClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const keysClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -265,8 +271,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
             setLastBeatType(cueData.beat)
             setBeatReceived(true)
 
-            // Clear beat indicator
-            setTimeout(() => {
+            clearTimeout(beatClearTimerRef.current ?? undefined)
+            beatClearTimerRef.current = setTimeout(() => {
               setBeatReceived(false)
             }, 200)
           }
@@ -275,8 +281,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
             setLastMeasureType('Measure Event')
             setMeasureReceived(true)
 
-            // Clear measure indicator
-            setTimeout(() => {
+            clearTimeout(measureClearTimerRef.current ?? undefined)
+            measureClearTimerRef.current = setTimeout(() => {
               setMeasureReceived(false)
             }, 250)
           }
@@ -294,8 +300,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
           setLastMeasureType(`Measure ${cueData.measureOrBeat}`)
           setMeasureReceived(true)
 
-          // Clear measure indicator after 500ms
-          setTimeout(() => {
+          clearTimeout(measureClearTimerRef.current ?? undefined)
+          measureClearTimerRef.current = setTimeout(() => {
             setMeasureReceived(false)
           }, 250)
         }
@@ -312,8 +318,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
             setLastKeyframeType(cueData.keyframe)
             setKeyframeReceived(true)
 
-            // Clear keyframe indicator after 500ms
-            setTimeout(() => {
+            clearTimeout(keyframeClearTimerRef.current ?? undefined)
+            keyframeClearTimerRef.current = setTimeout(() => {
               setKeyframeReceived(false)
             }, 250)
           }
@@ -326,6 +332,9 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
       // Handle instrument notes (ref-tracked timers so sustained notes stay solid; each new packet cancels previous clear)
       if (cueData.guitarNotes && cueData.guitarNotes.length > 0) {
         const guitarNotes = cueData.guitarNotes.filter((note) => note !== InstrumentNoteType.None)
+        clearTimeout(beatClearTimerRef.current ?? undefined)
+        clearTimeout(measureClearTimerRef.current ?? undefined)
+        clearTimeout(keyframeClearTimerRef.current ?? undefined)
         clearTimeout(guitarClearTimerRef.current ?? undefined)
         setActiveInstrumentNotes((prev) => ({
           ...prev,
