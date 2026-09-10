@@ -111,5 +111,6 @@ docs/
 scripts/*
 !scripts/any-budget.mjs
 !scripts/node-graph-prettier.ts
+!scripts/packaged-files-check.mjs
 !scripts/size-budget.mjs
 !scripts/sizeBudgetCore.cjs

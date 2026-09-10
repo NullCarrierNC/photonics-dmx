@@ -34,6 +34,9 @@ jobs:
       - name: Build
         run: npm run build:mac
 
+      - name: Check the package carries only what ships
+        run: npm run package:check
+
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
         with:
@@ -61,6 +64,9 @@ jobs:
 
       - name: Build
         run: npm run build:win
+
+      - name: Check the package carries only what ships
+        run: npm run package:check
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
