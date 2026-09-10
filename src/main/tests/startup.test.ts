@@ -7,6 +7,7 @@
  * and it creates its directory up front, which is the throw most likely to happen in the field.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import type { LogEntry } from '../../shared/logger'
 
 const applicationInit = jest.fn<() => Promise<void>>()
 const applicationShutdown = jest.fn<() => Promise<void>>()
@@ -135,6 +136,26 @@ describe('main startup', () => {
 
     expect(showErrorBox).toHaveBeenCalled()
     expect(appExit).toHaveBeenCalledWith(1)
+  })
+
+  it('keeps the configuration account recording when a packaged build raises the floor', async () => {
+    // The floor answers to the engine, which logs per frame. These scopes log a handful of lines a
+    // launch and are the only record of what a migration or a recovery did to the user's own files.
+    mockIsPackaged = true
+
+    const entries: LogEntry[] = []
+    await startUp()
+    const logger = await loadedLogger()
+    logger.setLogSink((entry) => entries.push(entry))
+    try {
+      logger.createLogger('ConfigFile').info('recovered from a parse failure')
+      logger.createLogger('LightTransitionController').info('frame chatter')
+      logger.createLogger('Main').error('a real failure')
+    } finally {
+      logger.resetLogConfiguration()
+    }
+
+    expect(entries.map((e) => e.scope)).toEqual(['ConfigFile', 'Main'])
   })
 
   it('flushes the log before a forced exit on a signal', async () => {
