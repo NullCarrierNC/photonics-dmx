@@ -361,6 +361,51 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect(senderManager.enableSender).not.toHaveBeenCalled()
   })
 
+  it('restoreSenderOutputsFromPrefs leaves Art-Net off when the stored host is not an address', async () => {
+    // The file is hand-editable and older builds wrote it under looser rules, so the host is
+    // checked again here rather than trusted because a write path once accepted it.
+    const { manager, senderManager } = makeManagerForRestore({
+      dmxOutputConfig: {
+        sacnEnabled: false,
+        artNetEnabled: true,
+        enttecProEnabled: false,
+        openDmxEnabled: false,
+      },
+      artNetConfig: {
+        host: 'http://attacker.example',
+        universe: 1,
+        net: 0,
+        subnet: 0,
+        subuni: 0,
+        port: 6454,
+      },
+    })
+
+    await manager.restoreSenderOutputsFromPrefs()
+
+    expect(senderManager.enableSender).not.toHaveBeenCalled()
+  })
+
+  it('restoreSenderOutputsFromPrefs leaves sACN off when the stored universe is out of range', async () => {
+    const { manager, senderManager } = makeManagerForRestore({
+      dmxOutputConfig: {
+        sacnEnabled: true,
+        artNetEnabled: false,
+        enttecProEnabled: false,
+        openDmxEnabled: false,
+      },
+      sacnConfig: {
+        universe: 70000,
+        useUnicast: false,
+        unicastDestination: '',
+      },
+    })
+
+    await manager.restoreSenderOutputsFromPrefs()
+
+    expect(senderManager.enableSender).not.toHaveBeenCalled()
+  })
+
   it('restoreSenderOutputsFromPrefs honors explicit active-sender snapshot over prefs', async () => {
     const { manager, senderManager } = makeManagerForRestore({
       dmxOutputConfig: {

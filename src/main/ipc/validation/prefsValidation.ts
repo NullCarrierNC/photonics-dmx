@@ -16,6 +16,7 @@ import {
   isStringArray,
 } from './primitives'
 import { validateStageKitPriority, RB3_PROCESSING_MODES } from './cueValidation'
+import { validateHost } from './senderValidation'
 import { validateAudioConfigPayload, validateAudioGameModePayload } from './audioValidation'
 
 /**
@@ -117,6 +118,119 @@ function validateCueDomainsPayload(
     }
   }
   return { ok: true, value: out }
+}
+
+type StoredArtNetConfig = NonNullable<AppPreferences['artNetConfig']>
+type StoredSacnConfig = NonNullable<AppPreferences['sacnConfig']>
+
+/** Art-Net addressing fields and the range each one may hold, matching the enable payload. */
+const ART_NET_NUMERIC_BOUNDS = [
+  ['universe', 0, 32767],
+  ['net', 0, 127],
+  ['subnet', 0, 15],
+  ['subuni', 0, 15],
+  ['port', 1, 65535],
+] as const
+
+/** Highest sACN universe number the protocol defines. */
+const SACN_UNIVERSE_MAX = 63999
+
+/**
+ * Checks a stored Art-Net block, on the way in and again on the way back out.
+ *
+ * The restore path hands the host straight to the driver, so a value that is not an address sends
+ * the rig's output to another machine and goes on doing it every launch. An empty host is how "not
+ * configured" is stored, and restore skips on it.
+ */
+export function validateStoredArtNetConfig(value: unknown): ValidationResult<StoredArtNetConfig> {
+  if (!isPlainObject(value)) {
+    return { ok: false, error: 'artNetConfig must be an object' }
+  }
+  const next: Record<string, unknown> = { ...value }
+
+  if (next.host !== undefined && next.host !== '') {
+    const host = validateHost(next.host)
+    if (!host.ok) {
+      return { ok: false, error: `artNetConfig.host: ${host.error}` }
+    }
+    next.host = host.value
+  }
+
+  for (const [field, min, max] of ART_NET_NUMERIC_BOUNDS) {
+    if (next[field] === undefined) {
+      continue
+    }
+    const bounded = validateNumberInRange(next[field], min, max, `artNetConfig.${field}`)
+    if (!bounded.ok) {
+      return bounded
+    }
+    next[field] = Math.round(bounded.value)
+  }
+
+  if (next.refreshRateHz !== undefined) {
+    const hz = next.refreshRateHz
+    if (typeof hz !== 'number' || Number.isNaN(hz)) {
+      return { ok: false, error: 'artNetConfig.refreshRateHz must be a finite number' }
+    }
+    next.refreshRateHz = clampDmxOutputRefreshRateHz(hz)
+  }
+
+  return { ok: true, value: next as StoredArtNetConfig }
+}
+
+/**
+ * Checks a stored sACN block, on the way in and again on the way back out. The unicast destination
+ * reaches the socket the way the Art-Net host reaches the driver.
+ */
+export function validateStoredSacnConfig(value: unknown): ValidationResult<StoredSacnConfig> {
+  if (!isPlainObject(value)) {
+    return { ok: false, error: 'sacnConfig must be an object' }
+  }
+  const next: Record<string, unknown> = { ...value }
+
+  if (next.universe !== undefined) {
+    const universe = validateNumberInRange(
+      next.universe,
+      0,
+      SACN_UNIVERSE_MAX,
+      'sacnConfig.universe',
+    )
+    if (!universe.ok) {
+      return universe
+    }
+    next.universe = Math.round(universe.value)
+  }
+
+  if (next.useUnicast !== undefined && typeof next.useUnicast !== 'boolean') {
+    return { ok: false, error: 'sacnConfig.useUnicast must be a boolean' }
+  }
+
+  if (next.networkInterface !== undefined && typeof next.networkInterface !== 'string') {
+    return { ok: false, error: 'sacnConfig.networkInterface must be a string' }
+  }
+
+  if (next.unicastDestination !== undefined) {
+    if (typeof next.unicastDestination !== 'string') {
+      return { ok: false, error: 'sacnConfig.unicastDestination must be a string' }
+    }
+    if (next.unicastDestination !== '') {
+      const destination = validateHost(next.unicastDestination)
+      if (!destination.ok) {
+        return { ok: false, error: `sacnConfig.unicastDestination: ${destination.error}` }
+      }
+      next.unicastDestination = destination.value
+    }
+  }
+
+  if (next.refreshRateHz !== undefined) {
+    const hz = next.refreshRateHz
+    if (typeof hz !== 'number' || Number.isNaN(hz)) {
+      return { ok: false, error: 'sacnConfig.refreshRateHz must be a finite number' }
+    }
+    next.refreshRateHz = clampDmxOutputRefreshRateHz(hz)
+  }
+
+  return { ok: true, value: next as StoredSacnConfig }
 }
 
 /** Upper bound on a persisted window edge, wide enough for any real multi-monitor desktop. */
@@ -256,35 +370,19 @@ export function validatePreferencesPayload(
   }
 
   if ('sacnConfig' in cleaned) {
-    const sc = cleaned.sacnConfig
-    if (!isPlainObject(sc)) {
-      return { ok: false, error: 'sacnConfig must be an object' }
+    const sc = validateStoredSacnConfig(cleaned.sacnConfig)
+    if (!sc.ok) {
+      return sc
     }
-    const next: Record<string, unknown> = { ...sc }
-    if ('refreshRateHz' in next) {
-      const hz = next.refreshRateHz
-      if (typeof hz !== 'number' || Number.isNaN(hz)) {
-        return { ok: false, error: 'sacnConfig.refreshRateHz must be a finite number' }
-      }
-      next.refreshRateHz = clampDmxOutputRefreshRateHz(hz)
-    }
-    cleaned.sacnConfig = next
+    cleaned.sacnConfig = sc.value
   }
 
   if ('artNetConfig' in cleaned) {
-    const ac = cleaned.artNetConfig
-    if (!isPlainObject(ac)) {
-      return { ok: false, error: 'artNetConfig must be an object' }
+    const ac = validateStoredArtNetConfig(cleaned.artNetConfig)
+    if (!ac.ok) {
+      return ac
     }
-    const next: Record<string, unknown> = { ...ac }
-    if ('refreshRateHz' in next) {
-      const hz = next.refreshRateHz
-      if (typeof hz !== 'number' || Number.isNaN(hz)) {
-        return { ok: false, error: 'artNetConfig.refreshRateHz must be a finite number' }
-      }
-      next.refreshRateHz = clampDmxOutputRefreshRateHz(hz)
-    }
-    cleaned.artNetConfig = next
+    cleaned.artNetConfig = ac.value
   }
 
   if ('brightness' in cleaned) {

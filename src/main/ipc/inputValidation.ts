@@ -48,7 +48,11 @@ export {
 
 export { validateOpenablePath, validatePathUnderAllowedRoots } from './validation/pathValidation'
 
-export { validatePreferencesPayload } from './validation/prefsValidation'
+export {
+  validatePreferencesPayload,
+  validateStoredArtNetConfig,
+  validateStoredSacnConfig,
+} from './validation/prefsValidation'
 
 export {
   validateAudioConfigPayload,
