@@ -9,7 +9,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 const applicationInit = jest.fn<() => Promise<void>>()
+const applicationShutdown = jest.fn<() => Promise<void>>()
 const applicationCtor = jest.fn()
+let mockIsPackaged = false
 const createFileLogSink = jest.fn()
 const installCsp = jest.fn()
 const showErrorBox = jest.fn()
@@ -31,7 +33,9 @@ jest.mock('electron', () => ({
     on: jest.fn(),
     exit: appExit,
     quit: jest.fn(),
-    isPackaged: false,
+    get isPackaged() {
+      return mockIsPackaged
+    },
     commandLine: { appendSwitch: jest.fn() },
     name: '',
   },
@@ -58,12 +62,23 @@ jest.mock('../application', () => ({
       applicationCtor()
     }
     init = applicationInit
-    shutdown = jest.fn(async () => {})
+    shutdown = applicationShutdown
+    flushLogs: (() => Promise<void>) | null = null
     handleAllWindowsClosed = jest.fn()
     handleActivate = jest.fn()
     getControllerManager = jest.fn(() => null)
   },
 }))
+
+/**
+ * The logger the entry point is holding.
+ *
+ * `resetModules` gives each test its own copy of the module graph, so the file's own static import
+ * would be a different instance from the one whose floor the entry point just set.
+ */
+function loadedLogger(): Promise<typeof import('../../shared/logger')> {
+  return import('../../shared/logger')
+}
 
 /** Load the entry point and run its ready callback to completion. */
 async function startUp(): Promise<void> {
@@ -80,6 +95,9 @@ describe('main startup', () => {
     readyResolve = undefined
     applicationInit.mockReset()
     applicationInit.mockResolvedValue(undefined)
+    applicationShutdown.mockReset()
+    applicationShutdown.mockResolvedValue(undefined)
+    mockIsPackaged = false
     applicationCtor.mockReset()
     createFileLogSink.mockReset()
     createFileLogSink.mockReturnValue({ sink: jest.fn(), close: jest.fn(async () => {}) })
@@ -117,5 +135,38 @@ describe('main startup', () => {
 
     expect(showErrorBox).toHaveBeenCalled()
     expect(appExit).toHaveBeenCalledWith(1)
+  })
+
+  it('flushes the log before a forced exit on a signal', async () => {
+    const order: string[] = []
+    const closeFileLog = jest.fn(async () => {
+      order.push('flush')
+    })
+    createFileLogSink.mockReturnValue({ sink: jest.fn(), close: closeFileLog })
+    applicationShutdown.mockImplementation(() => new Promise<void>(() => {}))
+
+    const before = new Set(process.listeners('SIGINT'))
+    await startUp()
+    const handler = process.listeners('SIGINT').find((l) => !before.has(l))
+
+    const exit = jest.spyOn(process, 'exit').mockImplementation(((): never => {
+      order.push('exit')
+      return undefined as never
+    }) as never)
+    const logger = await loadedLogger()
+    logger.setLogSink(() => {})
+    jest.useFakeTimers()
+    try {
+      void handler?.('SIGINT')
+      await jest.advanceTimersByTimeAsync(2000)
+
+      expect(order).toEqual(['flush', 'exit'])
+      expect(exit).toHaveBeenCalledWith(1)
+    } finally {
+      jest.clearAllTimers()
+      jest.useRealTimers()
+      exit.mockRestore()
+      logger.resetLogConfiguration()
+    }
   })
 })

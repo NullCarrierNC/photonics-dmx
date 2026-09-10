@@ -5,6 +5,7 @@ const setControllerManager = jest.fn()
 const setupIpcHandlers = jest.fn()
 const setupMenu = jest.fn()
 const controllerInit = jest.fn<() => Promise<void>>()
+const controllerShutdown = jest.fn<() => Promise<void>>()
 
 jest.mock('electron', () => ({
   app: { getPath: jest.fn(() => '/tmp/photonics-test'), quit: jest.fn() },
@@ -23,7 +24,7 @@ jest.mock('../WindowManager', () => ({
 jest.mock('../controllers/ControllerManager', () => ({
   ControllerManager: jest.fn(() => ({
     init: controllerInit,
-    shutdown: jest.fn(async () => {}),
+    shutdown: controllerShutdown,
   })),
 }))
 
@@ -31,11 +32,14 @@ jest.mock('../ipc/index', () => ({ setupIpcHandlers }))
 jest.mock('../menu', () => ({ setupMenu }))
 
 import { Application } from '../application'
+import { resetLogConfiguration, setLogSink } from '../../shared/logger'
 
 describe('Application init', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     controllerInit.mockReset()
+    controllerShutdown.mockReset()
+    controllerShutdown.mockResolvedValue(undefined)
     createMainWindow.mockReset()
     setControllerManager.mockReset()
     setupIpcHandlers.mockReset()
@@ -73,5 +77,43 @@ describe('Application init', () => {
     await expect(new Application().init()).rejects.toThrow('display unavailable')
 
     expect(controllerInit).not.toHaveBeenCalled()
+  })
+})
+
+describe('Application shutdown watchdog', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    controllerShutdown.mockReset()
+    controllerShutdown.mockResolvedValue(undefined)
+  })
+
+  it('gets the log onto disk before it forces the exit', async () => {
+    // The line saying why the app went is still buffered in the stream when the watchdog fires.
+    const order: string[] = []
+    controllerShutdown.mockImplementation(() => new Promise<void>(() => {}))
+
+    const exit = jest.spyOn(process, 'exit').mockImplementation(((): never => {
+      order.push('exit')
+      return undefined as never
+    }) as never)
+    setLogSink(() => {})
+    jest.useFakeTimers()
+    try {
+      const application = new Application()
+      application.flushLogs = async () => {
+        order.push('flush')
+      }
+
+      void application.shutdown()
+      await jest.advanceTimersByTimeAsync(5000)
+
+      expect(order).toEqual(['flush', 'exit'])
+      expect(exit).toHaveBeenCalledWith(0)
+    } finally {
+      jest.clearAllTimers()
+      jest.useRealTimers()
+      exit.mockRestore()
+      resetLogConfiguration()
+    }
   })
 })

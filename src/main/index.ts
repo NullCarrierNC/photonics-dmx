@@ -57,7 +57,9 @@ process.on('SIGINT', async () => {
   // Set a hard timeout to force exit after 2 seconds
   const forceExitTimeout = setTimeout(() => {
     log.error('Forced exit due to shutdown timeout!')
-    process.exit(1)
+    // The line explaining the forced exit is the one worth having, and it is still buffered in the
+    // stream at this point, so give the flush its chance before going.
+    void closeFileLogWithTimeout().finally(() => process.exit(1))
   }, 2000)
 
   try {
@@ -81,7 +83,9 @@ process.on('SIGTERM', async () => {
   // Set a hard timeout to force exit after 2 seconds
   const forceExitTimeout = setTimeout(() => {
     log.error('Forced exit due to shutdown timeout!')
-    process.exit(1)
+    // The line explaining the forced exit is the one worth having, and it is still buffered in the
+    // stream at this point, so give the flush its chance before going.
+    void closeFileLogWithTimeout().finally(() => process.exit(1))
   }, 2000)
 
   try {
@@ -144,6 +148,7 @@ app
     // and no way to quit it.
     try {
       applicationInstance = new Application()
+      applicationInstance.flushLogs = closeFileLogWithTimeout
     } catch (err) {
       reportStartupFailure(err)
       return

@@ -13,6 +13,14 @@ export class Application {
   private applicationShutdownPromise: Promise<void> | null = null
   private applicationShutdownCompleted = false
 
+  /**
+   * Get any buffered log lines onto disk before a forced exit.
+   *
+   * The entry point owns the file sink and this module cannot reach it, so it hands the flush down
+   * rather than being imported back the other way.
+   */
+  public flushLogs: (() => Promise<void>) | null = null
+
   constructor() {
     this.windowManager = new WindowManager()
     this.controllerManager = new ControllerManager()
@@ -77,8 +85,10 @@ export class Application {
 
       // Allow max 5 seconds for shutdown
       const shutdownTimeout = setTimeout(() => {
-        log.warn('Shutdown taking too long, forcing exit')
-        process.exit(0)
+        // At error level so a packaged build, which records nothing below it, still says why the
+        // app went, and flushed before going since the line is still buffered in the stream.
+        log.error('Shutdown taking too long, forcing exit')
+        void Promise.resolve(this.flushLogs?.()).finally(() => process.exit(0))
       }, 5000)
 
       try {
