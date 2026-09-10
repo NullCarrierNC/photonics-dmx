@@ -81,4 +81,21 @@ describe('YargEnabledCueGroups', () => {
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('yarg save failed')
   })
+
+  it('puts the enabled groups back when the disabled-cues write that follows fails', async () => {
+    // The two writes are not one transaction. Without a rollback the enabled list is on disk while
+    // the panel still shows the old one, so the next launch starts on a state nobody chose.
+    seedHappyPath()
+    setDisabledYargCues.mockResolvedValueOnce({ success: false, error: 'disabled save failed' })
+
+    render(<YargEnabledCueGroups />)
+    await screen.findByRole('button', { name: /Yarg Group 1/ })
+
+    fireEvent.click(screen.getAllByRole('checkbox', { name: /Enable Yarg Group/ })[1])
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('disabled save failed')
+    await waitFor(() => expect(setEnabledCueGroups).toHaveBeenCalledTimes(2))
+    expect(setEnabledCueGroups).toHaveBeenLastCalledWith(['yg1'])
+  })
 })

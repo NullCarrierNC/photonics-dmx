@@ -121,6 +121,15 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
     })
   }, [])
 
+  /** Undo an accepted enabled-groups write after the disabled-cues write that followed it failed. */
+  const restoreEnabled = async (previous: string[]): Promise<void> => {
+    try {
+      await domain.setEnabled(previous)
+    } catch (error) {
+      log.error(`Could not put the enabled ${domain.label} cue groups back:`, error)
+    }
+  }
+
   const persistEnabledAndDisabled = async (
     nextEnabled: string[],
     nextDisabled: Record<string, string[]>,
@@ -141,6 +150,9 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
       }
       if (disabledResult && 'success' in disabledResult && disabledResult.success === false) {
         log.error(`Failed to save disabled ${domain.label} cues`)
+        // The enabled list is already on disk. Putting it back keeps what is stored matching what
+        // the panel shows, rather than leaving the next launch on a state nobody chose.
+        await restoreEnabled(enabledGroupIds)
         return {
           ok: false,
           error: disabledResult.error || `Failed to save disabled ${domain.label} cues`,
@@ -341,7 +353,7 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
                 <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 ">
                   {domain.cuesHeading(group.cues.length)}
                 </h4>
-                {group.cues
+                {[...group.cues]
                   .sort((a, b) => a.id.localeCompare(b.id))
                   .map((cue) => {
                     const isOn = enabledGroupIds.includes(group.id) && !disabledSet.has(cue.id)
