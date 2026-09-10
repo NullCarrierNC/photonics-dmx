@@ -8,25 +8,19 @@ import {
   FixtureTypes,
   DEFAULT_STROBE_CHANNEL_VALUES,
   DEFAULT_WHITE_CHANNEL_MIX_MODE,
-  normalizeFixtureConfig,
   WireSenderId,
   type WhiteChannelMixMode,
 } from '../types'
 import type { DmxValuesPayload } from '../../shared/ipcTypes'
 import { DmxLightManager } from './DmxLightManager'
-import {
-  castToChannelType,
-  mirrorDmxForMovingHeadInvert,
-  mirrorPercentAroundHome,
-  normaliseUniverseBuffer,
-  percentToDmx,
-} from '../helpers/dmxHelpers'
+import { castToChannelType, normaliseUniverseBuffer } from '../helpers/dmxHelpers'
 import {
   applyChannelMixPlan,
   buildChannelMixPlan,
   type ChannelMixPlan,
 } from '../helpers/colorChannelMixer'
 import { buildBrightnessScaleMap, scaleDmxValueByPercent } from '../helpers/brightnessScaling'
+import { resolveMovingHeadAxes, StrobePeakLatch } from './publisherLightOutput'
 import { SenderManager } from './SenderManager'
 import { LightStateManager, type LightStatesListener } from './sequencer/LightStateManager'
 import type {
@@ -89,13 +83,6 @@ export interface DmxPublisherOptions {
  * `channel * opacity`) and emits a constant `opacity: 1.0`. So peak brightness — not opacity —
  * is the signal that identifies the cue's highest-opacity moment.
  */
-interface StrobePeakColor {
-  red: number
-  green: number
-  blue: number
-  intensity: number
-}
-
 /**
  * Lightweight rate cap for the IPC preview path. Mirrors `_minIntervalMs` but skips dirty-skip
  * (renderer tolerates redundant frames; comparing the multi-buffer payload isn't worth it) and
@@ -175,16 +162,8 @@ export class DmxPublisher {
   private _mixPlans = new WeakMap<DmxFixture, ChannelMixPlan | null>()
   /** Per-fixture brightness scale maps, keyed on identity like {@link _mixPlans}. */
   private _scaleMaps = new WeakMap<DmxFixture, Map<number, number> | null>()
-  /**
-   * Per-light peak colour seen since the current strobe became active. The stock strobe cues
-   * modulate opacity, which the blender bakes into rgb/intensity — so the brightest blended
-   * frame corresponds to the cue's peak (highest-opacity) moment. We hold that peak for the
-   * whole strobe so a hardware-strobe-channel light shows a steady color while its strobe
-   * channel does the chopping. Reset when the strobe cue ends.
-   */
-  private _strobePeakColors: Map<string, StrobePeakColor> = new Map()
-  /** Tracks whether a strobe was active on the previous publish, so we can clear the latch on transition. */
-  private _lastStrobeActive = false
+  /** Steady colour for a fixture whose own strobe channel is chopping. */
+  private _strobePeakLatch = new StrobePeakLatch()
 
   /** How a `white` emitter is driven; see {@link WhiteChannelMixMode}. */
   private _whiteChannelMixMode: WhiteChannelMixMode = DEFAULT_WHITE_CHANNEL_MIX_MODE
@@ -474,10 +453,7 @@ export class DmxPublisher {
 
     // 3. Strobe peak-hold state machine runs once per frame (across all rigs/lights).
     const activeStrobeSlot = this._strobeStateManager.getActive()
-    if (this._lastStrobeActive && activeStrobeSlot == null) {
-      this._strobePeakColors.clear()
-    }
-    this._lastStrobeActive = activeStrobeSlot != null
+    this._strobePeakLatch.beginFrame(activeStrobeSlot != null)
 
     // One timestamp for the whole frame, so a light reached by more than one rig neither advances
     // its trail twice nor re-rolls its grain.
@@ -622,71 +598,24 @@ export class DmxPublisher {
         // colour while its hardware strobe channel does the chopping, so we track the brightest
         // sample seen since the strobe became active and always emit that. Brightness metric is
         // max(intensity, r, g, b) so a future constant-intensity coloured strobe still latches.
-        if (strobeChannelActive) {
-          const currentLevel = Math.max(intensity, r, g, b)
-          const peak = this._strobePeakColors.get(lightId)
-          if (!peak) {
-            if (currentLevel > 0) {
-              this._strobePeakColors.set(lightId, { red: r, green: g, blue: b, intensity })
-            }
-            // else: pre-peak (first frame is fully dark) — emit as-is until a non-zero arrives.
-          } else {
-            const peakLevel = Math.max(peak.intensity, peak.red, peak.green, peak.blue)
-            if (currentLevel > peakLevel) {
-              // New brighter peak: store it and emit the current frame as-is.
-              this._strobePeakColors.set(lightId, { red: r, green: g, blue: b, intensity })
-            } else {
-              // Hold the established peak.
-              r = peak.red
-              g = peak.green
-              b = peak.blue
-              intensity = peak.intensity
-            }
-          }
-        } else if (this._strobePeakColors.has(lightId)) {
-          this._strobePeakColors.delete(lightId)
-        }
+        const held = this._strobePeakLatch.resolve(lightId, strobeChannelActive, {
+          red: r,
+          green: g,
+          blue: b,
+          intensity,
+        })
+        r = held.red
+        g = held.green
+        b = held.blue
+        intensity = held.intensity
 
         const isMovingHead = dmxLight.fixture === FixtureTypes.RGBMH
-        let panOut: number
-        let tiltOut: number
-        if (isMovingHead) {
-          const cfg = normalizeFixtureConfig(dmxLight.config)
-          const homePanDmxLogical = percentToDmx(cfg.panHome, cfg.panMin, cfg.panMax)
-          const homeTiltDmxLogical = percentToDmx(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
-          const homePanDmx = cfg.invertPan
-            ? mirrorDmxForMovingHeadInvert(homePanDmxLogical, cfg.panMin, cfg.panMax)
-            : homePanDmxLogical
-          const homeTiltDmx = cfg.invertTilt
-            ? mirrorDmxForMovingHeadInvert(homeTiltDmxLogical, cfg.tiltMin, cfg.tiltMax)
-            : homeTiltDmxLogical
-          if (pan != null) {
-            // Rig-level Horiz mirror: invert cue-driven pan around the fixture's calibrated home
-            // BEFORE percent→DMX, so a "look 15% stage-left of home" cue becomes
-            // "look 15% stage-right of home" on the mirrored rig. Idle home (pan == null) is
-            // untouched — mirror is a choreographic overlay, not a calibration override. Composes
-            // with cfg.invertPan, which is applied at the DMX layer below for hardware mounting.
-            const panEffective =
-              rig.mirrorHoriz === true ? mirrorPercentAroundHome(pan, cfg.panHome) : pan
-            const panDmx = percentToDmx(panEffective, cfg.panMin, cfg.panMax)
-            panOut = cfg.invertPan
-              ? mirrorDmxForMovingHeadInvert(panDmx, cfg.panMin, cfg.panMax)
-              : panDmx
-          } else {
-            panOut = homePanDmx
-          }
-          if (tilt != null) {
-            const tiltDmx = percentToDmx(tilt, cfg.tiltMin, cfg.tiltMax)
-            tiltOut = cfg.invertTilt
-              ? mirrorDmxForMovingHeadInvert(tiltDmx, cfg.tiltMin, cfg.tiltMax)
-              : tiltDmx
-          } else {
-            tiltOut = homeTiltDmx
-          }
-        } else {
-          panOut = pan ?? dmxLight.config?.panHome ?? 0
-          tiltOut = tilt ?? dmxLight.config?.tiltHome ?? 0
-        }
+        const { panOut, tiltOut } = isMovingHead
+          ? resolveMovingHeadAxes(dmxLight, rig, pan, tilt)
+          : {
+              panOut: pan ?? dmxLight.config?.panHome ?? 0,
+              tiltOut: tilt ?? dmxLight.config?.tiltHome ?? 0,
+            }
 
         const channelsInput: { [key: string]: number } = {
           red: r,
