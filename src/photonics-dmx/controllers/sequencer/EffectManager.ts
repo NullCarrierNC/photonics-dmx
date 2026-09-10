@@ -485,12 +485,11 @@ export class EffectManager implements IEffectManager {
     const activeEffects = this.layerManager.getActiveEffects().get(layer)
     if (!activeEffects) return
 
-    // Find and remove effects with the matching name
-    activeEffects.forEach((activeEffect, _lightId) => {
-      if (activeEffect.name === name) {
-        this.removeEffectByLayer(layer, true)
-      }
-    })
+    // One call covers the layer, and it starts each light's queued successor. Calling it per match
+    // re-entered the map being iterated, so a successor sharing the name drained the queue too.
+    if ([...activeEffects.values()].some((e) => e.name === name)) {
+      this.removeEffectByLayer(layer, true)
+    }
   }
 
   /**

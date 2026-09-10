@@ -105,6 +105,45 @@ describe('EffectScheduler', () => {
       expect(layerManager.addActiveEffect.mock.calls[0][0]).toBe(1)
     })
 
+    it('leaves the lights it has already started alone when it displaces another', () => {
+      // The layer-wide removal runs outside the per-light loop, so taking a slot from a different
+      // effect leaves alone the lights this same submission has just started, along with their
+      // completion callbacks and their in-flight transitions.
+      const two = createMockTrackedLight({ id: 'light-2' })
+      const transitions: EffectTransition[] = [
+        { ...transition(1), lights: [light] },
+        { ...transition(1), lights: [two] },
+      ]
+      // A live active-effects map, so a light started earlier in this submission is visible to a
+      // removal that happens later in it. A fixed map cannot show the eviction at all.
+      const active = new Map<string, LightEffectState>([
+        ['light-2', { name: 'other', lightId: 'light-2' } as LightEffectState],
+      ])
+      layerManager.getActiveEffects.mockReturnValue(new Map([[1, active]]))
+      layerManager.getActiveEffect.mockImplementation((_layer, lightId) => active.get(lightId))
+      layerManager.addActiveEffect.mockImplementation((_layer, lightId, state) => {
+        active.set(lightId as string, state as LightEffectState)
+      })
+      layerManager.removeActiveEffect.mockImplementation((_layer, lightId) => {
+        active.delete(lightId as string)
+      })
+
+      scheduler.applyEffectTransitions(
+        'pulse',
+        effectWith(transitions),
+        groupByLayerAndLight(transitions),
+        false,
+      )
+
+      // Only the slot that held a different effect is given up.
+      expect(layerManager.removeActiveEffect).toHaveBeenCalledTimes(1)
+      expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(1, 'light-2')
+      // Both lights end up running the submitted effect.
+      expect([...active.keys()].sort()).toEqual(['light-1', 'light-2'])
+      expect([...active.values()].every((e) => e.name === 'pulse')).toBe(true)
+      expect(fireCompletionCallback).not.toHaveBeenCalledWith('pulse', true)
+    })
+
     it('advances past a first transition that needs neither time nor an event', () => {
       // Duration 0 with an event condition counted zero times: nothing will ever supply the event,
       // so the effect has to move on by itself rather than sit in waitingUntil forever.

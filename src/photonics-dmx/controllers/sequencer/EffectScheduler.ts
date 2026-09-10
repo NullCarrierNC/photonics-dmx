@@ -228,7 +228,7 @@ export class EffectScheduler {
               effectRunId,
             })
           } else {
-            this.removeEffectByLayer(layer, false)
+            this.removeEffectForLight(layer, lightId, false)
             this.layerManager.removeQueuedEffect(layer, lightId)
             this.startEffect(
               name,
@@ -310,12 +310,35 @@ export class EffectScheduler {
    * @param shouldRemoveTransitions Whether to remove transition (colour) data too
    */
   public removeEffectByLayer(layer: number, shouldRemoveTransitions: boolean): void {
-    // Get all active effects for this layer
+    const activeEffects = this.layerManager.getActiveEffects().get(layer)
+    if (!activeEffects) return
+    // Snapshotted, because the removal below starts queued successors back into this same map.
+    this.removeEffectsForLights(layer, Array.from(activeEffects.keys()), shouldRemoveTransitions)
+  }
+
+  /**
+   * Displaces the active effect on one light, leaving the rest of the layer running.
+   *
+   * What a submission needs when it takes a slot from a different effect: clearing the whole layer
+   * there would evict lights the same submission had already started, and fire their completion
+   * callbacks as cancelled while their transitions were still in flight.
+   */
+  public removeEffectForLight(
+    layer: number,
+    lightId: string,
+    shouldRemoveTransitions: boolean,
+  ): void {
+    this.removeEffectsForLights(layer, [lightId], shouldRemoveTransitions)
+  }
+
+  private removeEffectsForLights(
+    layer: number,
+    lightIds: string[],
+    shouldRemoveTransitions: boolean,
+  ): void {
     const activeEffects = this.layerManager.getActiveEffects().get(layer)
     if (!activeEffects) return
 
-    // Convert to array to avoid modifying the map while iterating
-    const lightIds = Array.from(activeEffects.keys())
     const lightsToCleanup: string[] = []
     const evicted = new Set<string>()
 

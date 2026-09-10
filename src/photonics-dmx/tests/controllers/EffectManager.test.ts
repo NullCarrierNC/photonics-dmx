@@ -1095,6 +1095,25 @@ describe('EffectManager', () => {
       expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(layer, 'test-light-1')
     })
 
+    it('gives up the layer once however many lights are running the effect', () => {
+      // removeEffectByLayer clears the whole layer and starts each light's queued successor, so
+      // calling it per matching light re-entered the map being iterated. A successor sharing the
+      // name was then seen by that same loop and removed in turn, draining the queue.
+      const effectName = 'test-effect'
+      const layer = 1
+      const lightMap = new Map()
+      for (const lightId of ['light-1', 'light-2', 'light-3']) {
+        lightMap.set(lightId, { name: effectName, layer, lightId })
+      }
+      layerManager.getActiveEffects.mockReturnValue(new Map([[layer, lightMap]]))
+      const removeByLayer = jest.spyOn(effectManager, 'removeEffectByLayer')
+
+      effectManager.removeEffect(effectName, layer)
+
+      expect(removeByLayer).toHaveBeenCalledTimes(1)
+      removeByLayer.mockRestore()
+    })
+
     it('should not remove an effect if name does not match', () => {
       const effectName = 'test-effect'
       const layer = 1
