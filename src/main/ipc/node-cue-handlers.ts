@@ -9,6 +9,10 @@ import { NodeExecutionEngine } from '../../photonics-dmx/cues/node/runtime/NodeE
 import { cueDomainBinding, reconcileAndApplyGroups } from '../controllers/cueDomainBindings'
 import { ipcError } from './ipcResult'
 import { NODE_CUES, RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+import { handleInvoke } from './handleInvoke'
+
+const log = createLogger('node-cue-handlers')
 
 const ensureLoader = (controllerManager: ControllerManager) => {
   const loader = controllerManager.getNodeCueLoader()
@@ -49,27 +53,27 @@ async function persistGroupEnableAfterNodeCueSave(
 }
 
 export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  ipcMain.handle(NODE_CUES.SET_DEBUG, async (_event, enabled: boolean) => {
+  handleInvoke(ipcMain, NODE_CUES.SET_DEBUG, log, async (_event, enabled: boolean) => {
     NodeExecutionEngine.setDebugEnabled(Boolean(enabled))
     return { success: true, enabled: NodeExecutionEngine.getDebugEnabled() }
   })
 
-  ipcMain.handle(NODE_CUES.LIST, async () => {
+  handleInvoke(ipcMain, NODE_CUES.LIST, log, async () => {
     const loader = ensureLoader(controllerManager)
     return loader.getSummary()
   })
 
-  ipcMain.handle(NODE_CUES.RELOAD, async () => {
+  handleInvoke(ipcMain, NODE_CUES.RELOAD, log, async () => {
     const loader = ensureLoader(controllerManager)
     return loader.reload()
   })
 
-  ipcMain.handle(NODE_CUES.READ, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, NODE_CUES.READ, log, async (_event, filePath: string) => {
     const loader = ensureLoader(controllerManager)
     return loader.readFile(filePath)
   })
 
-  ipcMain.handle(NODE_CUES.SAVE, async (_event, payload: SavePayload) => {
+  handleInvoke(ipcMain, NODE_CUES.SAVE, log, async (_event, payload: SavePayload) => {
     const loader = ensureLoader(controllerManager)
     const result = await loader.saveFile(payload.mode, payload.filename, payload.content)
     await persistGroupEnableAfterNodeCueSave(
@@ -80,12 +84,12 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     return result
   })
 
-  ipcMain.handle(NODE_CUES.DELETE, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, NODE_CUES.DELETE, log, async (_event, filePath: string) => {
     const loader = ensureLoader(controllerManager)
     return loader.deleteFile(filePath)
   })
 
-  ipcMain.handle(NODE_CUES.VALIDATE, async (_event, payload: ValidatePayload) => {
+  handleInvoke(ipcMain, NODE_CUES.VALIDATE, log, async (_event, payload: ValidatePayload) => {
     const loader = ensureLoader(controllerManager)
 
     if (payload.content) {
@@ -108,15 +112,17 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     throw new Error('Validation payload must include either content or path.')
   })
 
-  ipcMain.handle(
+  handleInvoke(
+    ipcMain,
     NODE_CUES.GET_CUE_TYPES,
+    log,
     async (_event, payload: { mode: NodeCueMode; kind?: NodeCueKind }) => {
       const loader = ensureLoader(controllerManager)
       return loader.getAvailableCueTypes(payload.mode, payload.kind)
     },
   )
 
-  ipcMain.handle(NODE_CUES.IMPORT_PICK, async (_event, preferredMode?: NodeCueMode) => {
+  handleInvoke(ipcMain, NODE_CUES.IMPORT_PICK, log, async (_event, preferredMode?: NodeCueMode) => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Node Cue Files', extensions: ['json'] }],
@@ -148,7 +154,7 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     }
   })
 
-  ipcMain.handle(NODE_CUES.EXPORT, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, NODE_CUES.EXPORT, log, async (_event, filePath: string) => {
     const loader = ensureLoader(controllerManager)
     // Resolve through the loader so the source path used for fs.copyFile is the same
     // rooted path the loader vetted; never copy from the raw IPC string.

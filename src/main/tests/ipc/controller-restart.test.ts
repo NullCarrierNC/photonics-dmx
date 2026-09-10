@@ -362,8 +362,7 @@ describe('ControllerManager lifecycle and sender restore', () => {
   })
 
   it('restoreSenderOutputsFromPrefs leaves Art-Net off when the stored host is not an address', async () => {
-    // The file is hand-editable and older builds wrote it under looser rules, so the host is
-    // checked again here rather than trusted because a write path once accepted it.
+    // The file is hand-editable, so the host is checked on the way out as well as on the way in.
     const { manager, senderManager } = makeManagerForRestore({
       dmxOutputConfig: {
         sacnEnabled: false,

@@ -165,8 +165,7 @@ describe('createFileLogSink', () => {
   })
 
   it('opens no further stream once it has been closed', async () => {
-    // Close is the last word. Nothing after it may open a stream, because there is no longer
-    // anybody left to end one.
+    // Close is the last word: nothing after it opens a stream, because nobody is left to end one.
     const t = new Date(2025, 3, 29, 10, 30, 0, 0).getTime()
     const { sink, close } = createFileLogSink({ logsDir: tmpDir, clock: () => t })
 

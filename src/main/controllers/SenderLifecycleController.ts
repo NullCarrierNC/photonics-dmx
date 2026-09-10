@@ -159,8 +159,8 @@ export class SenderLifecycleController {
     }
 
     if (sendersToRestore.sacn) {
-      // Checked again on the way out. The file is editable and an older build wrote it under looser
-      // rules, so what a write path accepted is not what this launch is willing to send.
+      // Checked again on the way out, because the file is editable by hand and what it holds is
+      // not necessarily what a write path would accept today.
       const stored = validateStoredSacnConfig(prefs.sacnConfig ?? {})
       if (!stored.ok) {
         log.error(

@@ -3,13 +3,14 @@ import { WindowManager } from '../WindowManager'
 import { ipcError } from './ipcResult'
 import { WINDOW } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
+import { handleInvoke } from './handleInvoke'
 const log = createLogger('window-handlers')
 
 /**
  * Set up window-related IPC handlers
  */
 export function setupWindowHandlers(ipcMain: IpcMain, windowManager: WindowManager): void {
-  ipcMain.handle(WINDOW.OPEN_CUE_EDITOR, () => {
+  handleInvoke(ipcMain, WINDOW.OPEN_CUE_EDITOR, log, () => {
     try {
       windowManager.openCueEditorWindow()
       return { success: true }
@@ -21,7 +22,7 @@ export function setupWindowHandlers(ipcMain: IpcMain, windowManager: WindowManag
     }
   })
 
-  ipcMain.handle(WINDOW.OPEN_AUDIO_PREVIEW, () => {
+  handleInvoke(ipcMain, WINDOW.OPEN_AUDIO_PREVIEW, log, () => {
     try {
       windowManager.openAudioPreviewWindow()
       return { success: true }

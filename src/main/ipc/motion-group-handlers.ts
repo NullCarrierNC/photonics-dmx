@@ -85,7 +85,7 @@ export function setupMotionGroupHandlers(
   controllerManager: ControllerManager,
 ): void {
   for (const spec of MOTION_DOMAINS) {
-    ipcMain.handle(spec.channels.groups, async () => {
+    handleInvoke(ipcMain, spec.channels.groups, log, async () => {
       try {
         return spec.registry().getMotionGroupsInfo()
       } catch (error) {
@@ -94,7 +94,7 @@ export function setupMotionGroupHandlers(
       }
     })
 
-    ipcMain.handle(spec.channels.availableCues, async (_, groupId?: unknown) => {
+    handleInvoke(ipcMain, spec.channels.availableCues, log, async (_, groupId?: unknown) => {
       try {
         const registry = spec.registry()
         const resolvedGroupId = typeof groupId === 'string' ? groupId : undefined

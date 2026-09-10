@@ -5,11 +5,11 @@ import { ipcError } from './ipcResult'
 /**
  * Registers an invoke handler that reports an unexpected throw as an IPC failure.
  *
- * Nearly every handler wrapped its body in the same try, logged, and returned `ipcError`, which
- * made the error contract a convention rather than something the registration enforced: a handler
- * that forgot the try rejected the renderer's invoke instead of answering it.
+ * Every invoke channel registers through here, so answering rather than rejecting is a property of
+ * the registration rather than a convention each body has to remember. A rejected invoke reaches
+ * the renderer as an unhandled rejection with nothing to show the user.
  *
- * Expected failures still return `{ success: false, error }` from the body. This only covers the
+ * Expected failures still return `{ success: false, error }` from the body. This covers the
  * unexpected ones.
  */
 export function handleInvoke(

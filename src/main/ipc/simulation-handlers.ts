@@ -66,7 +66,7 @@ export function setupSimulationHandlers(
   const livePostProcessingBlocked = (): boolean =>
     controllerManager.getIsRb3Enabled() || controllerManager.getIsYargEnabled()
 
-  ipcMain.handle(LIGHT.GET_AUDIO_CUE_GROUPS, async () => {
+  handleInvoke(ipcMain, LIGHT.GET_AUDIO_CUE_GROUPS, log, async () => {
     try {
       const registry = AudioCueRegistry.getInstance()
       return registry.getGroupSummaries()
@@ -76,7 +76,7 @@ export function setupSimulationHandlers(
     }
   })
 
-  ipcMain.handle(LIGHT.GET_AVAILABLE_AUDIO_CUES, async (_, groupId?: unknown) => {
+  handleInvoke(ipcMain, LIGHT.GET_AVAILABLE_AUDIO_CUES, log, async (_, groupId?: unknown) => {
     try {
       const registry = AudioCueRegistry.getInstance()
       const resolvedGroupId = typeof groupId === 'string' ? groupId : undefined
@@ -90,7 +90,7 @@ export function setupSimulationHandlers(
     }
   })
 
-  ipcMain.handle(LIGHT.GET_AVAILABLE_CUES, async (_, groupId?: unknown) => {
+  handleInvoke(ipcMain, LIGHT.GET_AVAILABLE_CUES, log, async (_, groupId?: unknown) => {
     try {
       const registry = CueRegistry.getInstance()
       const targetGroupId =
@@ -124,8 +124,10 @@ export function setupSimulationHandlers(
     }
   })
 
-  ipcMain.handle(
+  handleInvoke(
+    ipcMain,
     LIGHT.START_TEST_EFFECT,
+    log,
     async (
       _,
       data: {
@@ -162,8 +164,10 @@ export function setupSimulationHandlers(
   // re-dispatches on an interval so a held strobe re-fires `cue-called` continuously (a single
   // dispatch would flash once). Firing is refused while the live RB3E listener owns the rig chains
   // (same guard as every simulate handler).
-  ipcMain.handle(
+  handleInvoke(
+    ipcMain,
     LIGHT.START_RB3_TEST_EFFECT,
+    log,
     async (
       _,
       data: {
@@ -191,8 +195,10 @@ export function setupSimulationHandlers(
     },
   )
 
-  ipcMain.handle(
+  handleInvoke(
+    ipcMain,
     LIGHT.SET_RB3_SIM_LED_STATE,
+    log,
     async (
       _,
       data: { red?: unknown; green?: unknown; blue?: unknown; yellow?: unknown; fog?: unknown },
@@ -221,7 +227,7 @@ export function setupSimulationHandlers(
     },
   )
 
-  ipcMain.handle(LIGHT.STOP_TEST_EFFECT, async () => {
+  handleInvoke(ipcMain, LIGHT.STOP_TEST_EFFECT, log, async () => {
     try {
       await controllerManager.stopTestEffect()
       return true
@@ -233,19 +239,26 @@ export function setupSimulationHandlers(
 
   // Drives the same publisher state the YARG listener feeds, so a real packet arriving later
   // simply takes over.
-  ipcMain.handle(LIGHT.SIMULATE_POST_PROCESSING, async (_, data?: { state?: unknown }) => {
-    if (livePostProcessingBlocked() || !controllerManager.getIsInitialized()) return false
-    const state = data?.state
-    if (!isPostProcessingState(state)) {
-      log.warn(`Ignoring unknown post-processing state: ${String(state)}`)
-      return false
-    }
-    controllerManager.getVenueFrameProcessor().setVenuePostProcessing(state)
-    return true
-  })
+  handleInvoke(
+    ipcMain,
+    LIGHT.SIMULATE_POST_PROCESSING,
+    log,
+    async (_, data?: { state?: unknown }) => {
+      if (livePostProcessingBlocked() || !controllerManager.getIsInitialized()) return false
+      const state = data?.state
+      if (!isPostProcessingState(state)) {
+        log.warn(`Ignoring unknown post-processing state: ${String(state)}`)
+        return false
+      }
+      controllerManager.getVenueFrameProcessor().setVenuePostProcessing(state)
+      return true
+    },
+  )
 
-  ipcMain.handle(
+  handleInvoke(
+    ipcMain,
     LIGHT.SIMULATE_BEAT,
+    log,
     async (
       _,
       data?: {
@@ -295,8 +308,10 @@ export function setupSimulationHandlers(
     },
   )
 
-  ipcMain.handle(
+  handleInvoke(
+    ipcMain,
     LIGHT.SIMULATE_KEYFRAME,
+    log,
     async (
       _,
       data?: {
@@ -344,8 +359,10 @@ export function setupSimulationHandlers(
     },
   )
 
-  ipcMain.handle(
+  handleInvoke(
+    ipcMain,
     LIGHT.SIMULATE_MEASURE,
+    log,
     async (
       _,
       data?: {
@@ -393,8 +410,10 @@ export function setupSimulationHandlers(
     },
   )
 
-  ipcMain.handle(
+  handleInvoke(
+    ipcMain,
     LIGHT.SIMULATE_INSTRUMENT_NOTE,
+    log,
     async (
       _,
       data: {
@@ -473,7 +492,7 @@ export function setupSimulationHandlers(
     },
   )
 
-  ipcMain.handle(LIGHT.START_YARG_MOTION_CUE_SIMULATION, async (_, data: unknown) => {
+  handleInvoke(ipcMain, LIGHT.START_YARG_MOTION_CUE_SIMULATION, log, async (_, data: unknown) => {
     try {
       if (rb3Blocked()) {
         return ipcError(new Error(RB3_BLOCKED_ERROR))

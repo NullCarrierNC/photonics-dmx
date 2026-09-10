@@ -437,10 +437,9 @@ export class LightTransitionController {
       // A frame that got all the way through means the fault is over, so the next one reports.
       this._faultReported = false
     } catch (error) {
-      // Reported once per fault episode. This runs every frame, a hundred times a second by
-      // default, and the file log drops everything for the rest of the day once it hits its size
-      // cap, so an unlatched line here would take the diagnostics down with it. Clock does the
-      // same for a faulting tick callback.
+      // Once per fault episode. The catch runs every frame, and the file log has a daily byte cap
+      // to spend, so a sustained fault gets one line rather than a hundred a second. Clock latches
+      // a faulting tick callback the same way.
       if (!this._faultReported) {
         this._faultReported = true
         log.error('Critical error in transition processing:', error)

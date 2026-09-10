@@ -3,7 +3,7 @@ import { IpcMain, dialog } from 'electron'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { ControllerManager } from '../../controllers/ControllerManager'
-import { ipcError, ipcSuccess } from '../ipcResult'
+import { ipcSuccess } from '../ipcResult'
 import { CONFIG, RIGS } from '../../../shared/ipcChannels'
 import {
   validateLightingConfiguration,
@@ -33,37 +33,32 @@ export function registerLightsRigsConfigHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
 ): void {
-  ipcMain.handle(CONFIG.GET_LIGHT_LIBRARY, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_LIGHT_LIBRARY, log, async () => {
     return controllerManager.getConfig().getLightLibrary()
   })
 
-  ipcMain.handle(CONFIG.GET_MY_LIGHTS, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_MY_LIGHTS, log, async () => {
     return controllerManager.getConfig().getUserLights()
   })
 
-  ipcMain.handle(CONFIG.SAVE_MY_LIGHTS, async (_, data: unknown) => {
+  handleInvoke(ipcMain, CONFIG.SAVE_MY_LIGHTS, log, async (_, data: unknown) => {
     const v = validateDmxFixturesArray(data, 'myLights')
     if (!v.ok) {
       return { success: false, error: v.error }
     }
-    try {
-      const config = controllerManager.getConfig()
-      await config.updateUserLights(v.value)
-      // Template edits in MyLights cascade to rig snapshots so changes like adding a Strobe Channel
-      // reach the rig — and therefore the runtime publisher — without the user having to re-pick
-      // the fixture in LightsLayout. Restart controllers when at least one rig actually changed.
-      const rigsChanged = await config.syncRigsWithUserLights()
-      if (rigsChanged) {
-        await controllerManager.restartControllers()
-      }
-      return ipcSuccess()
-    } catch (err) {
-      log.error('SAVE_MY_LIGHTS failed:', err)
-      return ipcError(err)
+    const config = controllerManager.getConfig()
+    await config.updateUserLights(v.value)
+    // Template edits in MyLights cascade to rig snapshots so changes like adding a Strobe Channel
+    // reach the rig — and therefore the runtime publisher — without the user having to re-pick
+    // the fixture in LightsLayout. Restart controllers when at least one rig actually changed.
+    const rigsChanged = await config.syncRigsWithUserLights()
+    if (rigsChanged) {
+      await controllerManager.restartControllers()
     }
+    return ipcSuccess()
   })
 
-  ipcMain.handle(CONFIG.GET_LIGHT_LAYOUT, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_LIGHT_LAYOUT, log, async () => {
     try {
       return controllerManager.getConfig().getLightingLayout()
     } catch (error) {
@@ -84,7 +79,7 @@ export function registerLightsRigsConfigHandlers(
     return { success: true }
   })
 
-  ipcMain.handle(CONFIG.GET_DMX_RIGS, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_DMX_RIGS, log, async () => {
     try {
       return controllerManager.getConfig().getDmxRigs()
     } catch (error) {
@@ -93,7 +88,7 @@ export function registerLightsRigsConfigHandlers(
     }
   })
 
-  ipcMain.handle(CONFIG.GET_DMX_RIG, async (_, id: string) => {
+  handleInvoke(ipcMain, CONFIG.GET_DMX_RIG, log, async (_, id: string) => {
     try {
       return controllerManager.getConfig().getDmxRig(id)
     } catch (error) {
@@ -102,7 +97,7 @@ export function registerLightsRigsConfigHandlers(
     }
   })
 
-  ipcMain.handle(CONFIG.GET_ACTIVE_RIGS, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_ACTIVE_RIGS, log, async () => {
     try {
       return controllerManager.getConfig().getActiveRigs()
     } catch (error) {

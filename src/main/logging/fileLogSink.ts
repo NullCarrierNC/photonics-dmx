@@ -177,7 +177,7 @@ export function createFileLogSink(options: FileLogSinkOptions): {
   }
 
   const sink: LogSink = (entry: LogEntry) => {
-    // Ahead of the rotation branch, which would otherwise open a stream nobody is left to end.
+    // Ahead of the rotation branch, so a closed sink opens nothing.
     if (closed) {
       return
     }
@@ -198,9 +198,9 @@ export function createFileLogSink(options: FileLogSinkOptions): {
     }
     const iso = new Date(clock()).toISOString()
     const line = formatLine(iso, entry)
-    // The cap keeps a runaway from filling the disk, but an error is the one thing worth the space:
-    // whatever filled the file is usually the thing being diagnosed, and dropping errors too meant
-    // losing the account of it for the rest of the day. Everything below error still stops.
+    // The cap keeps a runaway from filling the disk, and an error is the one thing worth the space
+    // past it, since whatever filled the file is usually the thing being diagnosed. Everything
+    // below error stops here.
     if (bytesThisDay >= maxBytesPerDay) {
       reportCapOnce()
       const spent = bytesThisDay >= maxBytesPerDay + errorReserveBytes
@@ -227,8 +227,7 @@ export function createFileLogSink(options: FileLogSinkOptions): {
   return {
     sink,
     close: () => {
-      // Terminal. Without this a line logged after the flush would find no current date key, take
-      // the rotation branch and open a fresh stream nobody is left to end.
+      // Terminal: the sink accepts nothing after this, and no stream outlives the flush.
       closed = true
       if (currentStream) {
         flushing.push(endStream(currentStream))

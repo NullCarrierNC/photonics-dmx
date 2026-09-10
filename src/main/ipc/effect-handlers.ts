@@ -6,6 +6,10 @@ import { EffectMode, EffectFile } from '../../photonics-dmx/cues/types/nodeCueTy
 import { validateEffectFile } from '../../photonics-dmx/cues/node/schema/validation'
 import { ipcError } from './ipcResult'
 import { EFFECTS } from '../../shared/ipcChannels'
+import { createLogger } from '../../shared/logger'
+import { handleInvoke } from './handleInvoke'
+
+const log = createLogger('effect-handlers')
 
 const ensureLoader = (controllerManager: ControllerManager) => {
   const loader = controllerManager.getEffectLoader()
@@ -27,32 +31,32 @@ interface ValidatePayload {
 }
 
 export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  ipcMain.handle(EFFECTS.LIST, async () => {
+  handleInvoke(ipcMain, EFFECTS.LIST, log, async () => {
     const loader = ensureLoader(controllerManager)
     return loader.getSummary()
   })
 
-  ipcMain.handle(EFFECTS.RELOAD, async () => {
+  handleInvoke(ipcMain, EFFECTS.RELOAD, log, async () => {
     const loader = ensureLoader(controllerManager)
     return loader.reload()
   })
 
-  ipcMain.handle(EFFECTS.READ, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, EFFECTS.READ, log, async (_event, filePath: string) => {
     const loader = ensureLoader(controllerManager)
     return loader.readFile(filePath)
   })
 
-  ipcMain.handle(EFFECTS.SAVE, async (_event, payload: SavePayload) => {
+  handleInvoke(ipcMain, EFFECTS.SAVE, log, async (_event, payload: SavePayload) => {
     const loader = ensureLoader(controllerManager)
     return loader.saveFile(payload.mode, payload.filename, payload.content)
   })
 
-  ipcMain.handle(EFFECTS.DELETE, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, EFFECTS.DELETE, log, async (_event, filePath: string) => {
     const loader = ensureLoader(controllerManager)
     return loader.deleteFile(filePath)
   })
 
-  ipcMain.handle(EFFECTS.VALIDATE, async (_event, payload: ValidatePayload) => {
+  handleInvoke(ipcMain, EFFECTS.VALIDATE, log, async (_event, payload: ValidatePayload) => {
     const loader = ensureLoader(controllerManager)
 
     if (payload.content) {
@@ -75,7 +79,7 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     throw new Error('Validation payload must include either content or path.')
   })
 
-  ipcMain.handle(EFFECTS.IMPORT_PICK, async (_event, preferredMode?: EffectMode) => {
+  handleInvoke(ipcMain, EFFECTS.IMPORT_PICK, log, async (_event, preferredMode?: EffectMode) => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'Effect Files', extensions: ['json'] }],
@@ -111,7 +115,7 @@ export function setupEffectHandlers(ipcMain: IpcMain, controllerManager: Control
     }
   })
 
-  ipcMain.handle(EFFECTS.EXPORT, async (_event, filePath: string) => {
+  handleInvoke(ipcMain, EFFECTS.EXPORT, log, async (_event, filePath: string) => {
     const loader = ensureLoader(controllerManager)
     // Resolve through the loader so the source path used for fs.copyFile is the same
     // rooted path the loader vetted; never copy from the raw IPC string.

@@ -32,8 +32,8 @@ describe('StrobeStateManager', () => {
   })
 
   it('leaves a strobe alone when the other domain ends its cue', () => {
-    // Audio and the net domains run at once, and each ends its own cues without knowing about the
-    // other, so an unqualified release let stopping audio drop a YARG strobe mid-cue.
+    // Audio and the net domains run at once and each ends its own cues without knowing about the
+    // other, so a release only counts from whoever holds the slot.
     const mgr = new StrobeStateManager()
     mgr.setActive('fastest', 'net')
 

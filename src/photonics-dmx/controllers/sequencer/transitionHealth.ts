@@ -110,8 +110,8 @@ export function cleanupOrphanedTransitions(
 /**
  * Blacks out every tracked light and drops all transition state, for critical error recovery.
  *
- * Says nothing itself. Its one caller runs inside the frame loop and reports the fault it is
- * recovering from once per episode, so a line from here would be a second one every frame.
+ * Says nothing itself. Its one caller runs inside the frame loop and reports the fault once per
+ * episode, which is where the account of a reset belongs.
  */
 export function emergencyStateReset(
   lightStateManager: LightStateManager,

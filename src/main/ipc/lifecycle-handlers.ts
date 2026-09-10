@@ -3,6 +3,7 @@ import { ControllerManager } from '../controllers/ControllerManager'
 import { LIFECYCLE } from '../../shared/ipcChannels'
 import { ipcError, ipcSuccess } from './ipcResult'
 import { createLogger } from '../../shared/logger'
+import { handleInvoke } from './handleInvoke'
 
 const log = createLogger('lifecycle-handlers')
 
@@ -16,9 +17,9 @@ export function setupLifecycleHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
 ): void {
-  ipcMain.handle(LIFECYCLE.GET_PHASE, () => controllerManager.getLifecyclePhase())
+  handleInvoke(ipcMain, LIFECYCLE.GET_PHASE, log, () => controllerManager.getLifecyclePhase())
 
-  ipcMain.handle(LIFECYCLE.RETRY_INIT, async () => {
+  handleInvoke(ipcMain, LIFECYCLE.RETRY_INIT, log, async () => {
     try {
       // A graph that never came up has nothing to tear down, so build it. One that is up gets the
       // full restart, which is what picks up a configuration the user repaired in the meantime.

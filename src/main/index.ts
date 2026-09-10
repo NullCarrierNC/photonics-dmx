@@ -25,9 +25,8 @@ if (!app.isPackaged) {
  * Scopes kept at `info` when a packaged build raises the floor to `error`.
  *
  * These record what became of the user's own files: which one was loaded, what a migration
- * rewrote, and what a recovery replaced. Only the failure itself logs at `error`, so without
- * these the log says a file was lost and nothing about what took its place. They run a handful
- * of lines a launch, none of them on a frame path.
+ * rewrote, and what a recovery replaced. The failure itself logs at `error`, and these are the
+ * lines that say what took its place. A handful a launch, none of them on a frame path.
  */
 const STARTUP_ACCOUNT_SCOPES = ['ConfigFile', 'ConfigurationManager', 'copyDefaultData']
 

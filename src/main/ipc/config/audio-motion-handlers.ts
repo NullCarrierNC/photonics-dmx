@@ -28,7 +28,7 @@ export function registerAudioMotionConfigHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
 ): void {
-  ipcMain.handle(CONFIG.GET_AUDIO_REACTIVE_CUES, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_AUDIO_REACTIVE_CUES, log, async () => {
     try {
       const cues = audioOf(controllerManager).getAudioCueOptions()
       const activeCueType = audioOf(controllerManager).getActiveAudioCueType()
@@ -64,11 +64,11 @@ export function registerAudioMotionConfigHandlers(
     return { success: true }
   })
 
-  ipcMain.handle(CONFIG.GET_AUDIO_GAME_MODE, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_AUDIO_GAME_MODE, log, async () => {
     return audioOf(controllerManager).getAudioGameModeConfig()
   })
 
-  ipcMain.handle(CONFIG.SET_AUDIO_GAME_MODE, async (_, updates: unknown) => {
+  handleInvoke(ipcMain, CONFIG.SET_AUDIO_GAME_MODE, log, async (_, updates: unknown) => {
     try {
       const base = audioOf(controllerManager).getAudioGameModeConfig()
       const validation = validateAudioGameModePayload(updates, base)
@@ -84,11 +84,11 @@ export function registerAudioMotionConfigHandlers(
     }
   })
 
-  ipcMain.handle(CONFIG.GET_MOTION_ENABLED, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_MOTION_ENABLED, log, async () => {
     return controllerManager.getConfig().getPreference('motionEnabled') ?? true
   })
 
-  ipcMain.handle(CONFIG.SET_MOTION_ENABLED, async (_, enabled: unknown) => {
+  handleInvoke(ipcMain, CONFIG.SET_MOTION_ENABLED, log, async (_, enabled: unknown) => {
     try {
       if (typeof enabled !== 'boolean') {
         return { success: false, error: 'motion enabled must be a boolean' }
@@ -103,13 +103,13 @@ export function registerAudioMotionConfigHandlers(
     }
   })
 
-  ipcMain.handle(CONFIG.GET_ACTIVE_AUDIO_MOTION_CUE, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_ACTIVE_AUDIO_MOTION_CUE, log, async () => {
     return (
       controllerManager.getConfig().getPreference('cueDomains').audioMotion.activeCueRef ?? null
     )
   })
 
-  ipcMain.handle(CONFIG.SET_ACTIVE_AUDIO_MOTION_CUE, async (_, ref: unknown) => {
+  handleInvoke(ipcMain, CONFIG.SET_ACTIVE_AUDIO_MOTION_CUE, log, async (_, ref: unknown) => {
     try {
       const validation = validateCueRefPayload(ref)
       if (!validation.ok) {
@@ -126,11 +126,11 @@ export function registerAudioMotionConfigHandlers(
     }
   })
 
-  ipcMain.handle(CONFIG.GET_ACTIVE_YARG_MOTION_CUE, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_ACTIVE_YARG_MOTION_CUE, log, async () => {
     return controllerManager.getConfig().getPreference('cueDomains').yargMotion.activeCueRef ?? null
   })
 
-  ipcMain.handle(CONFIG.SET_ACTIVE_YARG_MOTION_CUE, async (_, ref: unknown) => {
+  handleInvoke(ipcMain, CONFIG.SET_ACTIVE_YARG_MOTION_CUE, log, async (_, ref: unknown) => {
     try {
       const validation = validateCueRefPayload(ref)
       if (!validation.ok) {
@@ -147,11 +147,11 @@ export function registerAudioMotionConfigHandlers(
     }
   })
 
-  ipcMain.handle(CONFIG.GET_ACTIVE_RB3_MOTION_CUE, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_ACTIVE_RB3_MOTION_CUE, log, async () => {
     return controllerManager.getConfig().getPreference('cueDomains').rb3Motion.activeCueRef ?? null
   })
 
-  ipcMain.handle(CONFIG.SET_ACTIVE_RB3_MOTION_CUE, async (_, ref: unknown) => {
+  handleInvoke(ipcMain, CONFIG.SET_ACTIVE_RB3_MOTION_CUE, log, async (_, ref: unknown) => {
     try {
       const validation = validateCueRefPayload(ref)
       if (!validation.ok) {
@@ -168,7 +168,7 @@ export function registerAudioMotionConfigHandlers(
     }
   })
 
-  ipcMain.handle(CONFIG.GET_STAGE_KIT_PRIORITY, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_STAGE_KIT_PRIORITY, log, async () => {
     const prefs = controllerManager.getConfig().getAllPreferences()
     return prefs.stageKitPrefs?.yargPriority || 'random'
   })
@@ -211,7 +211,7 @@ export function registerAudioMotionConfigHandlers(
     return { success: true }
   })
 
-  ipcMain.handle(CONFIG.GET_AUDIO_CONFIG, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_AUDIO_CONFIG, log, async () => {
     return controllerManager.getConfig().getAudioConfig()
   })
 
@@ -268,7 +268,7 @@ export function registerAudioMotionConfigHandlers(
     return warning ? { success: true, warning } : { success: true }
   })
 
-  ipcMain.handle(CONFIG.GET_AUDIO_ENABLED, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_AUDIO_ENABLED, log, async () => {
     return controllerManager.getIsAudioEnabled()
   })
 

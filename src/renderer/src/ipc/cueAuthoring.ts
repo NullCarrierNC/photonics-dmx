@@ -9,6 +9,10 @@ import type {
   NodeCueMode,
 } from '../../../shared/ipcTypes'
 import { EFFECTS, NODE_CUES } from '../../../shared/ipcChannels'
+import { orThrow } from './ipcResult'
+
+// Listing, reloading and reading answer with a payload that has no error arm of its own, so a
+// refusal becomes a throw here rather than reaching a caller as a value it cannot read.
 
 // ---------------------------------------------------------------------------
 // Node cue debug
@@ -20,11 +24,12 @@ export const setNodeCueDebug = (enabled: boolean) => window.api.invoke(NODE_CUES
 // Node cue management
 // ---------------------------------------------------------------------------
 
-export const listNodeCueFiles = () => window.api.invoke(NODE_CUES.LIST, undefined)
+export const listNodeCueFiles = () => window.api.invoke(NODE_CUES.LIST, undefined).then(orThrow)
 
-export const reloadNodeCueFiles = () => window.api.invoke(NODE_CUES.RELOAD, undefined)
+export const reloadNodeCueFiles = () => window.api.invoke(NODE_CUES.RELOAD, undefined).then(orThrow)
 
-export const readNodeCueFile = (filePath: string) => window.api.invoke(NODE_CUES.READ, filePath)
+export const readNodeCueFile = (filePath: string) =>
+  window.api.invoke(NODE_CUES.READ, filePath).then(orThrow)
 
 export const saveNodeCueFile = (payload: {
   mode: NodeCueMode
@@ -38,7 +43,7 @@ export const validateNodeCue = (payload: { path?: string; content?: NodeCueFile 
   window.api.invoke(NODE_CUES.VALIDATE, payload)
 
 export const getNodeCueTypes = (mode: NodeCueMode, kind?: NodeCueKind) =>
-  window.api.invoke(NODE_CUES.GET_CUE_TYPES, { mode, kind })
+  window.api.invoke(NODE_CUES.GET_CUE_TYPES, { mode, kind }).then(orThrow)
 
 export const pickNodeCueImportFile = (mode?: NodeCueMode) =>
   window.api.invoke(NODE_CUES.IMPORT_PICK, mode)
@@ -49,11 +54,12 @@ export const exportNodeCueFile = (filePath: string) => window.api.invoke(NODE_CU
 // Effect file management
 // ---------------------------------------------------------------------------
 
-export const listEffectFiles = () => window.api.invoke(EFFECTS.LIST, undefined)
+export const listEffectFiles = () => window.api.invoke(EFFECTS.LIST, undefined).then(orThrow)
 
-export const reloadEffectFiles = () => window.api.invoke(EFFECTS.RELOAD, undefined)
+export const reloadEffectFiles = () => window.api.invoke(EFFECTS.RELOAD, undefined).then(orThrow)
 
-export const readEffectFile = (filePath: string) => window.api.invoke(EFFECTS.READ, filePath)
+export const readEffectFile = (filePath: string) =>
+  window.api.invoke(EFFECTS.READ, filePath).then(orThrow)
 
 export const saveEffectFile = (payload: {
   mode: EffectMode
