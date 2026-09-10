@@ -60,9 +60,10 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
   const fields = useRef(Object.keys(defaults) as K[])
   const loading = useRef<Promise<void> | null>(null)
   // A debounced save holds one timer and the values from before the burst began, so a revert goes
-  // back to what was stored rather than to the middle of a drag.
+  // back to what was stored rather than to the middle of a drag, along with the fields it touched.
   const quietTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const burstPrevious = useRef<T | null>(null)
+  const burstFields = useRef<Set<K>>(new Set())
 
   const apply = useCallback((patch: Partial<T>): T => {
     const next = { ...latest.current, ...patch }
@@ -109,19 +110,26 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
     [apply, owned],
   )
 
-  const persist = useCallback(async (next: T, previous: T): Promise<AudioSaveOutcome> => {
+  /**
+   * Write the panel's fields, putting `revert` back if the write is refused.
+   *
+   * `revert` holds only the fields this call is changing, at the values they had beforehand. A
+   * whole-state snapshot would undo a different field that was saved successfully while this one
+   * was in flight, since a write covers every field the panel owns.
+   */
+  const persist = useCallback(async (next: T, revert: Partial<T>): Promise<AudioSaveOutcome> => {
     setIsSaving(true)
     try {
       const result = await saveAudioConfig(next)
       if (wasRefused(result)) {
         log.error('Audio settings were refused:', result.error)
-        apply(previous)
+        apply(revert)
         return { ok: false, error: result.error }
       }
       return { ok: true, warning: result?.warning }
     } catch (error) {
       log.error('Failed to save audio settings:', error)
-      apply(previous)
+      apply(revert)
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     } finally {
       setIsSaving(false)
@@ -130,13 +138,22 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /** The current values of the named fields, as the patch that would put them back. */
+  const snapshotOf = useCallback((keys: Iterable<K>): Partial<T> => {
+    const taken = {} as Partial<T>
+    for (const key of keys) {
+      taken[key] = latest.current[key]
+    }
+    return taken
+  }, [])
+
   const save = useCallback(
     async (patch: Partial<T>): Promise<AudioSaveOutcome> => {
       await loading.current
-      const previous = latest.current
-      return persist(apply(patch), previous)
+      const revert = snapshotOf(Object.keys(patch) as K[])
+      return persist(apply(patch), revert)
     },
-    [apply, persist],
+    [apply, persist, snapshotOf],
   )
 
   const set = useCallback(
@@ -153,33 +170,62 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
     }
   }, [])
 
-  // An unmounted panel must not write, so a burst that has not settled is dropped.
-  useEffect(() => cancelPending, [cancelPending])
+  /** Write whatever a debounced burst was holding, if one is still pending. */
+  const flushPending = useCallback((): void => {
+    if (burstPrevious.current === null) {
+      return
+    }
+    const before = burstPrevious.current
+    const touched = [...burstFields.current]
+    burstPrevious.current = null
+    burstFields.current = new Set()
+    const revert = {} as Partial<T>
+    for (const key of touched) {
+      revert[key] = before[key]
+    }
+    void (async () => {
+      await loading.current
+      await persist(latest.current, revert)
+    })()
+  }, [persist])
+
+  // Held in a ref so the unmount write uses the current flush, not the one from the first render.
+  const flushRef = useRef(flushPending)
+  useEffect(() => {
+    flushRef.current = flushPending
+  }, [flushPending])
+
+  // A burst that has not settled is written on the way out rather than dropped, so leaving a tab
+  // within the quiet window does not silently lose the change.
+  useEffect(() => {
+    return () => {
+      cancelPending()
+      flushRef.current()
+    }
+  }, [cancelPending])
 
   const saveSoon = useCallback(
     (patch: Partial<T>, quietMs: number = SAVE_QUIET_MS): void => {
       if (burstPrevious.current === null) {
         burstPrevious.current = latest.current
       }
+      for (const key of Object.keys(patch) as K[]) {
+        burstFields.current.add(key)
+      }
       apply(patch)
       cancelPending()
       quietTimer.current = setTimeout(() => {
         quietTimer.current = null
-        const previous = burstPrevious.current ?? latest.current
-        burstPrevious.current = null
-        void (async () => {
-          await loading.current
-          await persist(latest.current, previous)
-        })()
+        flushPending()
       }, quietMs)
     },
-    [apply, cancelPending, persist],
+    [apply, cancelPending, flushPending],
   )
 
   const commit = useCallback(async (): Promise<AudioSaveOutcome> => {
     await loading.current
-    const current = latest.current
-    return persist(current, current)
+    // Nothing to put back: a commit writes what the panel already shows.
+    return persist(latest.current, {})
   }, [persist])
 
   return { values, isSaving, loaded, save, set, saveSoon, commit }

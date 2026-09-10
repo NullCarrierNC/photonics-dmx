@@ -33,6 +33,7 @@ function Panel(): JSX.Element {
       <span data-testid="noiseFloor">{audio.values.noiseFloor}</span>
       <span data-testid="saving">{String(audio.isSaving)}</span>
       <button onClick={() => void audio.save({ sensitivity: 4 })}>save</button>
+      <button onClick={() => void audio.save({ noiseFloor: 30 })}>save floor</button>
       <button onClick={() => audio.set({ sensitivity: 3 })}>set</button>
       <button onClick={() => void audio.commit()}>commit</button>
       <button
@@ -207,5 +208,47 @@ describe('useAudioConfigFields', () => {
 
     expect(sensitivity()).toBe('0.9')
     expect(screen.getByTestId('noiseFloor').textContent).toBe('120')
+  })
+
+  it('writes a pending burst on the way out rather than dropping it', async () => {
+    render(<Panel />)
+    await waitFor(() => expect(getAudioConfig).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByText('drag'))
+    expect(saveAudioConfig).not.toHaveBeenCalled()
+
+    await act(async () => {
+      cleanup()
+    })
+
+    await waitFor(() =>
+      expect(saveAudioConfig).toHaveBeenCalledWith(expect.objectContaining({ sensitivity: 7 })),
+    )
+  })
+
+  it('puts back only the field whose save was refused', async () => {
+    // A write covers every field the panel owns, so reverting a whole snapshot would undo a
+    // different field that was saved successfully while this one was in flight.
+    let releaseFirst: ((value: unknown) => void) | undefined
+    saveAudioConfig.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirst = resolve
+        }),
+    )
+    render(<Panel />)
+    await waitFor(() => expect(getAudioConfig).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByText('save'))
+    await waitFor(() => expect(releaseFirst).toBeDefined())
+    fireEvent.click(screen.getByText('save floor'))
+    await waitFor(() => expect(screen.getByTestId('noiseFloor').textContent).toBe('30'))
+
+    await act(async () => {
+      releaseFirst?.({ success: false, error: 'refused' })
+    })
+
+    expect(sensitivity()).toBe('2.5')
+    expect(screen.getByTestId('noiseFloor').textContent).toBe('30')
   })
 })
