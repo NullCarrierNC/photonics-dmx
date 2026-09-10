@@ -10,6 +10,9 @@ import {
   normalizeFixtureConfig,
 } from '../../photonics-dmx/types'
 import { rawDmxToLogicalHomePercent } from '../../photonics-dmx/helpers/movingHeadCalibration'
+import { createLogger } from '../../shared/logger'
+
+const log = createLogger('ConsoleModeController')
 
 type ListenerChannelSnapshot = { yarg: boolean; rb3: boolean }
 
@@ -100,7 +103,19 @@ export class ConsoleModeController {
     return { success: true }
   }
 
+  /**
+   * Drive the wire from the console.
+   *
+   * Gated on console mode being open, because `setManualBuffer` latches the publisher into manual
+   * output and only `disableConsoleMode` lifts it, which returns early when it has no console
+   * state to restore. Ungated, one stray message from a renderer would freeze cue output for the
+   * rest of the session with nothing reporting it.
+   */
   public sendConsoleDmx(buffer: Record<number, number>): void {
+    if (this.consoleRestore === null) {
+      log.warn('Ignoring console DMX: console mode is not open')
+      return
+    }
     this.deps.getDmxPublisher()?.setManualBuffer(buffer)
   }
 

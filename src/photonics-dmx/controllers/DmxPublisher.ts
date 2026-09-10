@@ -18,6 +18,7 @@ import {
   castToChannelType,
   mirrorDmxForMovingHeadInvert,
   mirrorPercentAroundHome,
+  normaliseUniverseBuffer,
   percentToDmx,
 } from '../helpers/dmxHelpers'
 import {
@@ -307,18 +308,14 @@ export class DmxPublisher {
    * per-channel takeover, and calibration depends on reading back the number you typed.
    */
   public setManualBuffer(buffer: Record<number, number>): void {
+    if (this._isShutDown) {
+      return
+    }
     this._manualMode = true
     this._resetGovernorAllSlots()
 
     // Normalise the input buffer once; broadcast to every enabled wire slot.
-    const normalised: Record<number, number> = {}
-    for (const [k, v] of Object.entries(buffer)) {
-      const ch = Number(k)
-      if (!Number.isFinite(ch) || ch < 1 || ch > 512) {
-        continue
-      }
-      normalised[ch] = Math.max(0, Math.min(255, Math.round(v)))
-    }
+    const normalised = normaliseUniverseBuffer(buffer)
     const out = Object.keys(normalised).length === 0 ? this._immediateBlackoutData : normalised
 
     for (const wireId of this._sender.getEnabledWireSenders()) {

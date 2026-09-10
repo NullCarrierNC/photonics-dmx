@@ -315,4 +315,17 @@ describe('DmxPublisher', () => {
     publisher.publish(lights)
     expect(mockSenderManager.send).toHaveBeenCalled()
   })
+
+  it('setManualBuffer stays quiet once the publisher has shut down', async () => {
+    // The publisher is torn down first now, so the rest of the app shutdown is a window in which a
+    // late console message could otherwise re-light the rig after its final blackout.
+    const config = createMockLightingConfig()
+    publisher.updateActiveRigs([{ id: 'r1', name: 'R1', active: true, config }])
+    await publisher.shutdown()
+    mockSenderManager.send.mockClear()
+
+    publisher.setManualBuffer({ 1: 255, 2: 255 })
+
+    expect(mockSenderManager.send).not.toHaveBeenCalled()
+  })
 })

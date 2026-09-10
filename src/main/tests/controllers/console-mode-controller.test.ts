@@ -146,4 +146,38 @@ describe('ConsoleModeController', () => {
     c.onControllersReinitializedWhileConsoleOpen()
     expect(setManualBuffer).toHaveBeenCalledWith({})
   })
+
+  it('ignores console DMX while console mode is closed', () => {
+    // setManualBuffer latches the publisher into manual output and only disableConsoleMode lifts
+    // it, which returns early with no console state to restore. An ungated send would freeze cue
+    // output for the rest of the session.
+    const setManualBuffer = jest.fn()
+    const c = new ConsoleModeController(
+      baseDeps({
+        getConfig: () => ({ getDmxRig: jest.fn().mockReturnValue({ id: 'rig' }) }) as never,
+        getDmxPublisher: () => ({ setManualBuffer, clearManualBuffer: jest.fn() }),
+      }),
+    )
+
+    c.sendConsoleDmx({ 1: 255 })
+
+    expect(setManualBuffer).not.toHaveBeenCalled()
+  })
+
+  it('passes console DMX through once console mode is open', async () => {
+    const setManualBuffer = jest.fn()
+    const c = new ConsoleModeController(
+      baseDeps({
+        getConfig: () => ({ getDmxRig: jest.fn().mockReturnValue({ id: 'rig' }) }) as never,
+        getDmxPublisher: () => ({ setManualBuffer, clearManualBuffer: jest.fn() }),
+      }),
+    )
+    c.setOnConsoleEnter(null)
+    await c.enableConsoleMode('rig')
+    setManualBuffer.mockClear()
+
+    c.sendConsoleDmx({ 1: 255 })
+
+    expect(setManualBuffer).toHaveBeenCalledWith({ 1: 255 })
+  })
 })

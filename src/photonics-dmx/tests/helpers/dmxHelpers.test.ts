@@ -4,8 +4,23 @@ import {
   getGlobalBrightnessConfig,
   logicalPanDir,
   mirrorDmxForMovingHeadInvert,
+  normaliseUniverseBuffer,
   percentToDmx,
 } from '../../helpers/dmxHelpers'
+
+describe('normaliseUniverseBuffer', () => {
+  it('keeps channels a universe actually has', () => {
+    expect(normaliseUniverseBuffer({ 1: 10, 512: 20 })).toEqual({ 1: 10, 512: 20 })
+  })
+
+  it('drops channels outside 1 to 512', () => {
+    expect(normaliseUniverseBuffer({ 0: 10, 513: 20, 5: 30 })).toEqual({ 5: 30 })
+  })
+
+  it('rounds values into 0 to 255', () => {
+    expect(normaliseUniverseBuffer({ 1: -5, 2: 300, 3: 12.6 })).toEqual({ 1: 0, 2: 255, 3: 13 })
+  })
+})
 
 describe('logicalPanDir', () => {
   it('CW=true, invertPan=false → 1 (physical observation matches logical)', () => {
