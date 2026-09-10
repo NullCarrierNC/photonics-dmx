@@ -1,6 +1,6 @@
 import { IpcMain, shell } from 'electron'
 import { SHELL } from '../../shared/ipcChannels'
-import { validatePathUnderAllowedRoots } from './inputValidation'
+import { validateOpenablePath, validatePathUnderAllowedRoots } from './inputValidation'
 import { ipcError, ipcSuccess } from './ipcResult'
 
 /**
@@ -23,7 +23,7 @@ export function setupShellHandlers(ipcMain: IpcMain): void {
    * Open a path with the default system application
    */
   ipcMain.handle(SHELL.OPEN_PATH, async (_event, filePath: string) => {
-    const validatedPath = validatePathUnderAllowedRoots(filePath)
+    const validatedPath = validateOpenablePath(filePath)
     if (!validatedPath.ok) {
       return ipcError(validatedPath.error)
     }

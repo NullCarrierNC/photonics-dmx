@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { shell } from 'electron'
 import { SHELL } from '../../../shared/ipcChannels'
 import { setupShellHandlers } from '../../ipc/shell-handlers'
-import { validatePathUnderAllowedRoots } from '../../ipc/inputValidation'
+import { validateOpenablePath, validatePathUnderAllowedRoots } from '../../ipc/inputValidation'
 
 /**
- * Shell handlers must run every path through validatePathUnderAllowedRoots before touching the OS,
- * so a rejected path never reaches shell.showItemInFolder / shell.openPath.
+ * Shell handlers must run every path through a validator before touching the OS, so a rejected path
+ * never reaches shell.showItemInFolder / shell.openPath. Reveal only needs the path to be under an
+ * allowed root, while open also needs the type to be one the app opens.
  */
 
 jest.mock('electron', () => ({
@@ -17,11 +18,13 @@ jest.mock('electron', () => ({
 }))
 jest.mock('../../ipc/inputValidation', () => ({
   validatePathUnderAllowedRoots: jest.fn(),
+  validateOpenablePath: jest.fn(),
 }))
 
 const showItemInFolder = jest.mocked(shell.showItemInFolder)
 const openPath = jest.mocked(shell.openPath)
 const validate = jest.mocked(validatePathUnderAllowedRoots)
+const validateOpenable = jest.mocked(validateOpenablePath)
 
 type Handler = (event: unknown, filePath: string) => Promise<{ success: boolean; error?: string }>
 
@@ -39,6 +42,7 @@ function registerAndGetHandlers(): Record<string, Handler> {
 describe('shell handlers', () => {
   beforeEach(() => {
     validate.mockReset()
+    validateOpenable.mockReset()
     showItemInFolder.mockReset()
     openPath.mockReset()
     openPath.mockResolvedValue('')
@@ -61,7 +65,7 @@ describe('shell handlers', () => {
   })
 
   it('rejects an invalid path without reaching the OS (openPath)', async () => {
-    validate.mockReturnValue({ ok: false, error: 'nope' })
+    validateOpenable.mockReturnValue({ ok: false, error: 'nope' })
     const handlers = registerAndGetHandlers()
     const result = await handlers[SHELL.OPEN_PATH]({}, '../../secret')
     expect(result).toEqual({ success: false, error: 'nope' })
@@ -69,7 +73,7 @@ describe('shell handlers', () => {
   })
 
   it('surfaces an OS open failure as an error', async () => {
-    validate.mockReturnValue({ ok: true, value: '/safe/file' })
+    validateOpenable.mockReturnValue({ ok: true, value: '/safe/file' })
     openPath.mockResolvedValue('No app to open this')
     const handlers = registerAndGetHandlers()
     const result = await handlers[SHELL.OPEN_PATH]({}, '/safe/file')
@@ -77,7 +81,7 @@ describe('shell handlers', () => {
   })
 
   it('reports success when the OS opens the path', async () => {
-    validate.mockReturnValue({ ok: true, value: '/safe/file' })
+    validateOpenable.mockReturnValue({ ok: true, value: '/safe/file' })
     openPath.mockResolvedValue('')
     const handlers = registerAndGetHandlers()
     const result = await handlers[SHELL.OPEN_PATH]({}, '/safe/file')

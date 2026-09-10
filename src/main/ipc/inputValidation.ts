@@ -46,7 +46,7 @@ export {
   validateDmxFixturesArray,
 } from './validation/fixtureValidation'
 
-export { validatePathUnderAllowedRoots } from './validation/pathValidation'
+export { validateOpenablePath, validatePathUnderAllowedRoots } from './validation/pathValidation'
 
 export { validatePreferencesPayload } from './validation/prefsValidation'
 

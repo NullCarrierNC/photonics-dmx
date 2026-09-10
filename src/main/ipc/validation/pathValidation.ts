@@ -2,6 +2,7 @@
  * Filesystem path payloads for shell open and reveal operations.
  */
 
+import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import type { ValidationResult } from './primitives'
@@ -62,4 +63,45 @@ export function validatePathUnderAllowedRoots(
   }
 
   return { ok: true, value: resolvedTarget }
+}
+
+/**
+ * Extensions the system handler may be given.
+ *
+ * Opening a path hands it to whatever the OS has registered for that type, and for an executable
+ * that means running it. Being under the home directory is no protection, since Downloads is under
+ * it too. The app's own openable files are its libraries, its logs and plain documents.
+ */
+const OPENABLE_EXTENSIONS = new Set(['.json', '.txt', '.log', '.md', '.csv'])
+
+/**
+ * Resolves `targetPath` the way `validatePathUnderAllowedRoots` does, then confirms the system
+ * handler should be given it: a plain directory, which opens a file manager, or a file whose
+ * extension is on the list. A directory carrying an extension is rejected along with the files,
+ * because a macOS application bundle is one.
+ */
+export function validateOpenablePath(
+  targetPath: unknown,
+  allowedRoots?: string[],
+): ValidationResult<string> {
+  const underRoot =
+    allowedRoots === undefined
+      ? validatePathUnderAllowedRoots(targetPath)
+      : validatePathUnderAllowedRoots(targetPath, allowedRoots)
+  if (!underRoot.ok) {
+    return underRoot
+  }
+
+  const extension = path.extname(underRoot.value).toLowerCase()
+  if (extension === '') {
+    const stat = fs.statSync(underRoot.value, { throwIfNoEntry: false })
+    if (stat?.isDirectory()) {
+      return underRoot
+    }
+  }
+  if (!OPENABLE_EXTENSIONS.has(extension)) {
+    return { ok: false, error: 'Path is not a type this app opens' }
+  }
+
+  return underRoot
 }
