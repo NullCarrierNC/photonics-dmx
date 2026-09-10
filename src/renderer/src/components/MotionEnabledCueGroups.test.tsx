@@ -66,6 +66,22 @@ describe('MotionEnabledCueGroups (yarg)', () => {
     expect(screen.getByText(/Motion 1/)).toBeTruthy()
   })
 
+  it('names the program, its id and what it does on one row', async () => {
+    seedHappyPath()
+
+    render(<MotionEnabledCueGroups platform="yarg" />)
+    await screen.findByRole('button', { name: /Motion Group 1/ })
+
+    fireEvent.click(screen.getByRole('button', { name: /Motion Group 1/ }))
+
+    const name = await screen.findByText(/Motion 1/)
+    const row = name.closest('p')
+    expect(row?.textContent).toContain('Motion 1')
+    expect(row?.textContent).toContain('(m1)')
+    expect(row?.textContent).toContain('desc')
+    expect(screen.getByText(/Motion programs in this group \(1\)/)).toBeTruthy()
+  })
+
   it('surfaces an inline persistence error when the enabled-motion-group save fails', async () => {
     seedHappyPath()
     setEnabledYargMotionCueGroups.mockResolvedValueOnce({

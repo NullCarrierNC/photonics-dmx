@@ -7,12 +7,16 @@ import {
   getDisabledRb3Cues,
   setDisabledRb3Cues,
 } from '../ipcApi'
+import { CueGroupsPanel, type CueGroupsDomain } from './cue-groups/CueGroupsPanel'
 import {
-  LightingCueGroupsPanel,
-  type LightingCueGroupsDomain,
-} from './cue-groups/LightingCueGroupsPanel'
+  cueLabel,
+  lightingCuesHeading,
+  NO_CUES_LABEL,
+  type LightingCueInfo,
+} from './cue-groups/cueRowCopy'
+import type { CueGroup } from '../../../photonics-dmx/types'
 
-const RB3_DOMAIN: LightingCueGroupsDomain = {
+const RB3_DOMAIN: CueGroupsDomain<CueGroup, LightingCueInfo> = {
   key: 'rb3',
   label: 'RB3',
   title: 'RB3 Lighting Cue Groups',
@@ -25,9 +29,11 @@ const RB3_DOMAIN: LightingCueGroupsDomain = {
   setDisabled: setDisabledRb3Cues,
   getCues: getAvailableRb3Cues,
   // RB3 cues carry their own wording where they have it, and fall back to the YARG description.
-  describeCue: (cue) => cue.rb3Description || cue.yargDescription,
+  renderCueLabel: (cue) => cueLabel(cue.id, cue.rb3Description || cue.yargDescription),
+  emptyLabel: NO_CUES_LABEL,
+  cuesHeading: lightingCuesHeading,
 }
 
-const Rb3EnabledCueGroups: React.FC = () => <LightingCueGroupsPanel domain={RB3_DOMAIN} />
+const Rb3EnabledCueGroups: React.FC = () => <CueGroupsPanel domain={RB3_DOMAIN} />
 
 export default Rb3EnabledCueGroups

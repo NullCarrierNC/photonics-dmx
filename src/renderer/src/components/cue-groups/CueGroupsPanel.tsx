@@ -1,56 +1,68 @@
 /**
- * The enable/disable panel for a lighting domain's cue groups.
+ * The enable/disable panel for one domain's cue groups.
  *
- * YARG and RB3 present the same panel over their own IPC surface, so the domain arrives as a
- * descriptor rather than the component being written twice.
+ * YARG, RB3, audio and the three motion platforms present the same panel over their own IPC
+ * surface, so the domain arrives as a descriptor rather than the component being written per
+ * domain.
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { CueGroup } from 'src/photonics-dmx/types'
 import { createLogger } from '../../../../shared/logger'
 import { CueGroupEnableList } from './CueGroupEnableList'
 import { CueGroupRow } from './CueGroupRow'
 import { useCueGroupRovingTabIndex } from './useCueGroupRovingTabIndex'
 import { useLatestGenerationGate } from './useLatestGenerationGate'
 
-export interface CueInfo {
+/** The least a group row needs. Each domain's own group type carries more. */
+export interface CueGroupRowData {
   id: string
-  yargDescription: string
-  rb3Description: string
-  groupName?: string
+  name: string
+  description?: string
+}
+
+/** The least a cue row needs. Each domain's own cue type carries its own wording. */
+export interface CueRowData {
+  id: string
 }
 
 type SaveResult = { success?: boolean; error?: string } | void | undefined
 
-/** Everything that differs between one lighting domain's panel and another's. */
-export interface LightingCueGroupsDomain {
+/** Everything that differs between one domain's panel and another's. */
+export interface CueGroupsDomain<G extends CueGroupRowData, C extends CueRowData> {
   /** Logger scope, and the prefix for per-cue row label ids. */
   key: string
   title: string
   description: string
   /** Names the domain in error copy, e.g. YARG. */
   label: string
-  getGroups: () => Promise<CueGroup[]>
+  getGroups: () => Promise<G[]>
   getEnabled: () => Promise<string[]>
   setEnabled: (groupIds: string[]) => Promise<SaveResult>
   getDisabled: () => Promise<Record<string, string[]>>
   setDisabled: (disabled: Record<string, string[]>) => Promise<SaveResult>
-  getCues: (groupId: string) => Promise<CueInfo[]>
-  /** Which description a cue row shows. */
-  describeCue: (cue: CueInfo) => string
+  getCues: (groupId: string) => Promise<C[]>
+  /** What one cue's row reads, since a motion program is named differently to a lighting cue. */
+  renderCueLabel: (cue: C) => React.ReactNode
+  /** Shown in place of the cue list when an expanded group holds none. */
+  emptyLabel: string
+  /** The heading above the cue list, given how many there are. */
+  cuesHeading: (count: number) => string
 }
 
-interface GroupCueDetails extends CueGroup {
-  cues: CueInfo[]
+type GroupCueDetails<G extends CueGroupRowData, C extends CueRowData> = G & {
+  cues: C[]
   isExpanded: boolean
 }
 
 type RowError = { message: string; onRetry: () => void }
 
-export const LightingCueGroupsPanel: React.FC<{ domain: LightingCueGroupsDomain }> = ({
+export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>({
   domain,
-}) => {
+}: {
+  domain: CueGroupsDomain<G, C>
+}): JSX.Element {
+  type Row = GroupCueDetails<G, C>
   const log = useMemo(() => createLogger(domain.key), [domain.key])
-  const [allGroups, setAllGroups] = useState<GroupCueDetails[]>([])
+  const [allGroups, setAllGroups] = useState<Row[]>([])
   const [enabledGroupIds, setEnabledGroupIds] = useState<string[]>([])
   const [disabledByGroup, setDisabledByGroup] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
@@ -70,10 +82,10 @@ export const LightingCueGroupsPanel: React.FC<{ domain: LightingCueGroupsDomain 
         domain.getDisabled(),
       ])
 
-      const groupsWithDetails: GroupCueDetails[] = all
+      const groupsWithDetails: Row[] = all
         .map((group) => ({
           ...group,
-          cues: [],
+          cues: [] as C[],
           isExpanded: false,
         }))
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
@@ -145,9 +157,7 @@ export const LightingCueGroupsPanel: React.FC<{ domain: LightingCueGroupsDomain 
     }
   }
 
-  const getGroupCheckboxState = (
-    group: GroupCueDetails,
-  ): { checked: boolean; indeterminate: boolean } => {
+  const getGroupCheckboxState = (group: Row): { checked: boolean; indeterminate: boolean } => {
     if (!enabledGroupIds.includes(group.id)) {
       return { checked: false, indeterminate: false }
     }
@@ -199,7 +209,7 @@ export const LightingCueGroupsPanel: React.FC<{ domain: LightingCueGroupsDomain 
     })()
   }
 
-  const expandRow = useCallback((groupId: string, cues: CueInfo[]) => {
+  const expandRow = useCallback((groupId: string, cues: C[]) => {
     setAllGroups((prev) =>
       prev.map((g) => (g.id === groupId ? { ...g, cues, isExpanded: true } : g)),
     )
@@ -238,7 +248,7 @@ export const LightingCueGroupsPanel: React.FC<{ domain: LightingCueGroupsDomain 
   }
 
   const handleCueToggle = async (groupId: string, cueId: string, turnOn: boolean) => {
-    let cues = allGroups.find((g) => g.id === groupId)?.cues ?? []
+    let cues: C[] = allGroups.find((g) => g.id === groupId)?.cues ?? []
     if (cues.length === 0) {
       try {
         cues = await domain.getCues(groupId)
@@ -325,13 +335,11 @@ export const LightingCueGroupsPanel: React.FC<{ domain: LightingCueGroupsDomain 
             loadError={expandErrorByGroup[group.id] ?? null}
             persistError={persistErrorByGroup[group.id] ?? null}>
             {group.cues.length === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-                No cues found in this group.
-              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 italic">{domain.emptyLabel}</p>
             ) : (
               <div className="space-y-1">
                 <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 ">
-                  Cues in this group ({group.cues.length}):
+                  {domain.cuesHeading(group.cues.length)}
                 </h4>
                 {group.cues
                   .sort((a, b) => a.id.localeCompare(b.id))
@@ -348,10 +356,7 @@ export const LightingCueGroupsPanel: React.FC<{ domain: LightingCueGroupsDomain 
                           aria-labelledby={rowLabelId}
                         />
                         <p id={rowLabelId} className="text-xs text-gray-600 dark:text-gray-400">
-                          <span className="font-medium text-gray-800 dark:text-gray-200">
-                            {cue.id}:
-                          </span>{' '}
-                          {domain.describeCue(cue)}
+                          {domain.renderCueLabel(cue)}
                         </p>
                       </div>
                     )

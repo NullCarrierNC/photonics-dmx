@@ -7,12 +7,16 @@ import {
   getDisabledYargCues,
   setDisabledYargCues,
 } from '../ipcApi'
+import { CueGroupsPanel, type CueGroupsDomain } from './cue-groups/CueGroupsPanel'
 import {
-  LightingCueGroupsPanel,
-  type LightingCueGroupsDomain,
-} from './cue-groups/LightingCueGroupsPanel'
+  cueLabel,
+  lightingCuesHeading,
+  NO_CUES_LABEL,
+  type LightingCueInfo,
+} from './cue-groups/cueRowCopy'
+import type { CueGroup } from '../../../photonics-dmx/types'
 
-const YARG_DOMAIN: LightingCueGroupsDomain = {
+const YARG_DOMAIN: CueGroupsDomain<CueGroup, LightingCueInfo> = {
   key: 'yarg',
   label: 'YARG',
   title: 'YARG Lighting Cue Groups',
@@ -24,9 +28,11 @@ const YARG_DOMAIN: LightingCueGroupsDomain = {
   getDisabled: getDisabledYargCues,
   setDisabled: setDisabledYargCues,
   getCues: getAvailableCues,
-  describeCue: (cue) => cue.yargDescription,
+  renderCueLabel: (cue) => cueLabel(cue.id, cue.yargDescription),
+  emptyLabel: NO_CUES_LABEL,
+  cuesHeading: lightingCuesHeading,
 }
 
-const YargEnabledCueGroups: React.FC = () => <LightingCueGroupsPanel domain={YARG_DOMAIN} />
+const YargEnabledCueGroups: React.FC = () => <CueGroupsPanel domain={YARG_DOMAIN} />
 
 export default YargEnabledCueGroups
