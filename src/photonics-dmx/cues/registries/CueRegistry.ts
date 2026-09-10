@@ -42,7 +42,7 @@ export class CueRegistry {
   /** The singleton instance of the CueRegistry */
   private static instance: CueRegistry
 
-  private readonly catalog = new CueGroupCatalog()
+  private readonly catalog = new CueGroupCatalog<CueType, INetCue, ICueGroup>()
   private readonly selection = new CueSelectionPolicy(this.catalog)
   private readonly motion = new MotionCueAccess(this.catalog)
 

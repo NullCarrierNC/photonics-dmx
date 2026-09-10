@@ -1,4 +1,7 @@
-import { CueGroupCatalog } from '../../cues/registries/CueGroupCatalog'
+import {
+  CueGroupCatalog,
+  type LightingCueGroupCatalog,
+} from '../../cues/registries/CueGroupCatalog'
 import { INetCue, CueStyle } from '../../cues/interfaces/INetCue'
 import { ICueGroup } from '../../cues/interfaces/INetCueGroup'
 import { CueData, CueType } from '../../cues/types/cueTypes'
@@ -34,10 +37,10 @@ const group = (id: string, cueTypes: CueType[]): ICueGroup => ({
 })
 
 describe('CueGroupCatalog', () => {
-  let catalog: CueGroupCatalog
+  let catalog: LightingCueGroupCatalog
 
   beforeEach(() => {
-    catalog = new CueGroupCatalog()
+    catalog = new CueGroupCatalog<CueType, INetCue, ICueGroup>()
   })
 
   it('registers a group enabled and active by default', () => {

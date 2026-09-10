@@ -1,6 +1,6 @@
 import { CueType } from '../types/cueTypes'
 import { INetCue, CueStyle } from '../interfaces/INetCue'
-import { CueGroupCatalog } from './CueGroupCatalog'
+import type { LightingCueGroupCatalog } from './CueGroupCatalog'
 import { createLogger } from '../../../shared/logger'
 import { monotonicNowMs } from '../../../shared/time'
 
@@ -116,7 +116,7 @@ export class CueSelectionPolicy {
   /** Optional callback for sending cue state updates to frontend */
   private cueStateUpdateCallback: ((state: CueStateUpdate) => void) | null = null
 
-  constructor(private readonly catalog: CueGroupCatalog) {}
+  constructor(private readonly catalog: LightingCueGroupCatalog) {}
 
   /** Set callback for sending cue state updates to frontend. */
   public setStateUpdateCallback(callback: (state: CueStateUpdate) => void): void {

@@ -4,7 +4,7 @@ import { ICueGroup } from '../interfaces/INetCueGroup'
 import { INetCue } from '../interfaces/INetCue'
 import { MotionNodeCue } from '../node/runtime/MotionNodeCue'
 import { MotionSelectionState } from './MotionSelectionState'
-import { CueGroupCatalog } from './CueGroupCatalog'
+import type { LightingCueGroupCatalog } from './CueGroupCatalog'
 import {
   findMotionCueRefIn,
   motionCueDetailsFor,
@@ -22,7 +22,7 @@ import {
 export class MotionCueAccess {
   private readonly motionState = new MotionSelectionState<INetCue>()
 
-  constructor(private readonly catalog: CueGroupCatalog) {}
+  constructor(private readonly catalog: LightingCueGroupCatalog) {}
 
   public reset(): void {
     this.motionState.reset()

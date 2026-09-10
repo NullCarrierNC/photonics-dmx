@@ -374,6 +374,22 @@ describe('NodeCueLoader', () => {
     expect(group!.motionCues?.get('am-cue-called')).toBeDefined()
   })
 
+  it('leaves an audio group turned off when its file is loaded again', async () => {
+    const file = audioMotionOnlyFile()
+    const audioDir = path.join(tmpDir, 'node-data', 'cues', 'audio')
+    fs.mkdirSync(audioDir, { recursive: true })
+    const filePath = path.join(audioDir, 'audio-motion-only.json')
+    fs.writeFileSync(filePath, JSON.stringify(file), 'utf-8')
+
+    await loader.loadAll()
+    expect(audioRegistry.getEnabledGroups()).toContain('loader-test-audio-motion')
+
+    audioRegistry.disableGroup('loader-test-audio-motion')
+    await loader.loadAll()
+
+    expect(audioRegistry.getEnabledGroups()).not.toContain('loader-test-audio-motion')
+  })
+
   describe('cue file path resolution', () => {
     it('rejects readFile for paths outside YARG/audio cue directories', async () => {
       await expect(loader.readFile('/etc/passwd')).rejects.toThrow(

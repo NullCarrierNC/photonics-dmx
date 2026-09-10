@@ -1,21 +1,30 @@
-import { CueType } from '../types/cueTypes'
-import { ICueGroup } from '../interfaces/INetCueGroup'
-import { INetCue } from '../interfaces/INetCue'
+import type { CueType } from '../types/cueTypes'
+import type { INetCue } from '../interfaces/INetCue'
+import type { ICueGroup } from '../interfaces/INetCueGroup'
 import { DisabledCueStore } from './cueRegistrySupport'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('CueGroupCatalog')
 
+/** The least a catalog needs of a group: an id, and the cues it carries keyed by cue type. */
+export interface CatalogGroup<K, V> {
+  id: string
+  cues: Map<K, V>
+}
+
 /**
- * The group container behind CueRegistry: which cue groups are registered, which the user has
- * enabled, which are active during gameplay, the default fallback group, the stage kit group, and
- * the per-group disabled cue types. Holds no selection state and emits nothing; selection policy
- * and cross-collaborator side effects (motion bookkeeping, consistency clearing) live with the
- * callers.
+ * The group container behind the cue registries: which cue groups are registered, which the user
+ * has enabled, which are active during gameplay, the default fallback group, the stage kit group,
+ * and the per-group disabled cue types. Holds no selection state and emits nothing, selection
+ * policy and cross-collaborator side effects (motion bookkeeping, consistency clearing) live with
+ * the callers.
+ *
+ * Generic over the cue-type key and the cue itself, so the net registries and the audio registry
+ * hold their groups the same way rather than each keeping their own container.
  */
-export class CueGroupCatalog {
+export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> {
   /** Map of all registered cue groups by their name */
-  private groups: Map<string, ICueGroup> = new Map()
+  private groups: Map<string, G> = new Map()
 
   /** Set of groups that are enabled in user preferences */
   private enabledGroups: Set<string> = new Set()
@@ -52,7 +61,7 @@ export class CueGroupCatalog {
   }
 
   /** Register a group, enabled and active by default. */
-  public register(group: ICueGroup): void {
+  public register(group: G): void {
     this.groups.set(group.id, group)
     this.enabledGroups.add(group.id)
     this.activeGroups.add(group.id)
@@ -253,11 +262,11 @@ export class CueGroupCatalog {
   }
 
   /** Active groups that implement (and haven't disabled) the given cue type. */
-  public getActiveGroupsImplementing(cueType: CueType): string[] {
+  public getActiveGroupsImplementing(cueType: K): string[] {
     return this.getActiveGroups().filter((id) => this.cueFrom(id, cueType) !== null)
   }
 
-  public getGroup(groupId: string): ICueGroup | undefined {
+  public getGroup(groupId: string): G | undefined {
     return this.groups.get(groupId)
   }
 
@@ -270,7 +279,7 @@ export class CueGroupCatalog {
   }
 
   /** Every registered group, for callers that fan out over the whole catalog. */
-  public groupsIterable(): IterableIterator<ICueGroup> {
+  public groupsIterable(): IterableIterator<G> {
     return this.groups.values()
   }
 
@@ -280,7 +289,7 @@ export class CueGroupCatalog {
   }
 
   /** Whether this cue type is disabled for the given group in preferences. */
-  public isCueDisabled(groupId: string, cueType: CueType): boolean {
+  public isCueDisabled(groupId: string, cueType: K): boolean {
     return this.disabledCues.isDisabled(groupId, cueType)
   }
 
@@ -288,7 +297,7 @@ export class CueGroupCatalog {
    * The cue implementation for a group, or null when the group is unknown, does not implement the
    * cue type, or has it disabled in preferences. The single validation gate selection runs on.
    */
-  public cueFrom(groupId: string, cueType: CueType): INetCue | null {
+  public cueFrom(groupId: string, cueType: K): V | null {
     if (this.isCueDisabled(groupId, cueType)) {
       return null
     }
@@ -296,7 +305,7 @@ export class CueGroupCatalog {
   }
 
   /** Which groups carry an implementation for the cue type, split by active status. */
-  public getCueAvailability(cueType: CueType): {
+  public getCueAvailability(cueType: K): {
     activeGroupsWithCue: string[]
     allGroupsWithCue: string[]
     defaultHasCue: boolean
@@ -320,3 +329,6 @@ export class CueGroupCatalog {
     return { activeGroupsWithCue, allGroupsWithCue, defaultHasCue }
   }
 }
+
+/** The catalog the net registries hold: YARG and RB3 cue types over the net cue interface. */
+export type LightingCueGroupCatalog = CueGroupCatalog<CueType, INetCue, ICueGroup>
