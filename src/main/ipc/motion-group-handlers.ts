@@ -66,8 +66,7 @@ const MOTION_DOMAINS: readonly MotionDomainSpec[] = [
     label: 'RB3',
     prefsDomain: 'rb3Motion',
     registry: () => getCueRegistry('rb3'),
-    getSelectionMode: (config) =>
-      config.getPreference('cueDomains').rb3Motion.selectionMode ?? 'perCueChange',
+    getSelectionMode: (config) => config.getRb3MotionGroupSelectionMode(),
     channels: {
       groups: LIGHT.GET_RB3_MOTION_CUE_GROUPS,
       availableCues: LIGHT.GET_AVAILABLE_RB3_MOTION_CUES,

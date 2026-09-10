@@ -45,6 +45,23 @@ async function writeJsonAtomic(destPath: string, data: Record<string, unknown>):
   }
 }
 
+/**
+ * Rename a file that will not parse out of the way, keeping a timestamped copy.
+ *
+ * The same shape ConfigFile uses when it recovers a corrupt config: the bytes are kept, so a file
+ * the user had edited is recoverable rather than gone.
+ */
+async function quarantineCorruptFile(filePath: string): Promise<void> {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const asideName = `${filePath}.corrupt-${stamp}`
+  try {
+    await fs.rename(filePath, asideName)
+    log.error(`Seeded file ${filePath} would not parse, kept as ${asideName} and seeded again`)
+  } catch (err) {
+    log.error(`Could not move the unparsable ${filePath} aside, seeding over it:`, err)
+  }
+}
+
 async function copyDirectory(sourceDir: string, destBase: string): Promise<void> {
   const entries = await fs.readdir(sourceDir, { withFileTypes: true })
 
@@ -82,7 +99,19 @@ async function copyDirectory(sourceDir: string, destBase: string): Promise<void>
           try {
             const destRaw = await fs.readFile(destPath, 'utf-8')
             destObj = JSON.parse(destRaw) as Record<string, unknown>
-          } catch {
+          } catch (err) {
+            // Unreadable is a different problem from unparsable. A permissions or IO failure will
+            // fail the rewrite too, so leave it and say so.
+            if ((err as NodeJS.ErrnoException)?.code) {
+              log.error(`Cannot read seeded file ${destPath}, leaving it alone:`, err)
+              continue
+            }
+            // Corrupt content. Move it aside and seed again, rather than skipping it on every
+            // launch from here on, which left the cue dead for the life of the install. Kept
+            // rather than overwritten, because the ownership marker is inside the body that would
+            // not parse, so there is no telling whether the user had made it theirs.
+            await quarantineCorruptFile(destPath)
+            await writeJsonAtomic(destPath, sourceObj)
             continue
           }
           if (destObj.bundled !== true) {

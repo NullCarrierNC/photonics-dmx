@@ -88,4 +88,19 @@ describe('copyDefaultData', () => {
     const written = JSON.parse(fs.readFileSync(path.join(appData, 'cue.json'), 'utf-8'))
     expect(written.marker).toBe('mine')
   })
+
+  it('seeds a destination that will not parse again, keeping the old bytes', async () => {
+    // A file left truncated by an interrupted write carries no readable version, so the bundled
+    // copy is seeded over it and the install keeps that cue.
+    seedSource({ 'cue.json': JSON.stringify({ cueVersion: 9, marker: 'shipped' }) })
+    fs.writeFileSync(path.join(appData, 'cue.json'), '{ "cueVersion": 3, "marker": "trunc')
+
+    await copyDefaultData(appRoot, appData)
+
+    const written = JSON.parse(fs.readFileSync(path.join(appData, 'cue.json'), 'utf-8'))
+    expect(written.marker).toBe('shipped')
+    const kept = fs.readdirSync(appData).filter((f) => f.startsWith('cue.json.corrupt-'))
+    expect(kept).toHaveLength(1)
+    expect(fs.readFileSync(path.join(appData, kept[0]), 'utf-8')).toContain('trunc')
+  })
 })

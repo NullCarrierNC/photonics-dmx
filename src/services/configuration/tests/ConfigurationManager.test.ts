@@ -82,6 +82,21 @@ describe('ConfigurationManager', () => {
       await configManager.updatePreferences({ effectDebounce: 50, complex: false })
       expect(fsPromises.writeFile).toHaveBeenCalled()
     })
+
+    test('holds a motion selection mode to the three a motion domain can take', async () => {
+      // withinSong is legal in the schema but only means something for lighting, so reading a
+      // motion domain straight through would answer outside the union its channel declares.
+      await configManager.updateCueDomain('rb3Motion', { selectionMode: 'withinSong' })
+      expect(configManager.getRb3MotionGroupSelectionMode()).toBe('perCueChange')
+
+      await configManager.updateCueDomain('yargMotion', { selectionMode: 'withinSong' })
+      expect(configManager.getMotionGroupSelectionMode()).toBe('perCueChange')
+    })
+
+    test('keeps a motion selection mode the domain does take', async () => {
+      await configManager.updateCueDomain('rb3Motion', { selectionMode: 'oncePerSong' })
+      expect(configManager.getRb3MotionGroupSelectionMode()).toBe('oncePerSong')
+    })
   })
 
   describe('User Lights', () => {

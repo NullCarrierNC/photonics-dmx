@@ -184,20 +184,33 @@ export class ConfigurationManager {
       : 'withinSong'
   }
 
-  getMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
-    const m = this.preferences.get().cueDomains.yargMotion.selectionMode
+  /**
+   * The motion selection mode stored for one domain, held to the three a motion domain can take.
+   *
+   * The schema allows a fourth mode that only means something for lighting, so a stored value has
+   * to be narrowed here rather than read straight through, or it reaches the renderer outside the
+   * union its channel declares.
+   */
+  private motionSelectionModeFor(
+    domain: 'yargMotion' | 'audioMotion' | 'rb3Motion',
+  ): 'oncePerSong' | 'perCueChange' | 'none' {
+    const m = this.preferences.get().cueDomains?.[domain]?.selectionMode
     if (m === 'oncePerSong' || m === 'perCueChange' || m === 'none') {
       return m
     }
     return 'perCueChange'
   }
 
+  getMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
+    return this.motionSelectionModeFor('yargMotion')
+  }
+
+  getRb3MotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
+    return this.motionSelectionModeFor('rb3Motion')
+  }
+
   getAudioMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
-    const m = this.preferences.get().cueDomains.audioMotion.selectionMode
-    if (m === 'oncePerSong' || m === 'perCueChange' || m === 'none') {
-      return m
-    }
-    return 'perCueChange'
+    return this.motionSelectionModeFor('audioMotion')
   }
 
   /**
