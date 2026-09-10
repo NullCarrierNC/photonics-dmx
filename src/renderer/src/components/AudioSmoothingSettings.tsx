@@ -1,58 +1,21 @@
-import React, { useState, useEffect } from 'react'
-import { getAudioConfig, saveAudioConfig } from '../ipcApi'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('AudioSmoothingSettings')
+import React from 'react'
+import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 
 const AudioSmoothingSettings: React.FC = () => {
-  const [enabled, setEnabled] = useState(true)
-  const [alpha, setAlpha] = useState(0.7)
-  const [isSaving, setIsSaving] = useState(false)
+  const audio = useAudioConfigFields({ smoothing: { enabled: true, alpha: 0.7 } })
+  const { enabled, alpha } = audio.values.smoothing
+  const isSaving = audio.isSaving
 
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const config = await getAudioConfig()
-        if (config?.smoothing) {
-          setEnabled(config.smoothing.enabled !== undefined ? config.smoothing.enabled : true)
-          setAlpha(config.smoothing.alpha || 0.7)
-        }
-      } catch (error) {
-        log.error('Failed to load smoothing settings:', error)
-      }
-    }
-
-    loadSettings()
-  }, [])
-
-  const handleToggle = async () => {
-    const newEnabled = !enabled
-    setEnabled(newEnabled)
-    setIsSaving(true)
-
-    try {
-      await saveAudioConfig({ smoothing: { enabled: newEnabled, alpha } })
-    } catch (error) {
-      log.error('Failed to save smoothing enabled state:', error)
-      setEnabled(!newEnabled) // Revert on error
-    } finally {
-      setIsSaving(false)
-    }
+  const handleToggle = (): void => {
+    void audio.save({ smoothing: { ...audio.values.smoothing, enabled: !enabled } })
   }
 
-  const handleAlphaChange = async (newAlpha: number) => {
-    setAlpha(newAlpha)
+  const handleAlphaChange = (newAlpha: number): void => {
+    audio.set({ smoothing: { ...audio.values.smoothing, alpha: newAlpha } })
   }
 
-  const handleAlphaSave = async () => {
-    setIsSaving(true)
-
-    try {
-      await saveAudioConfig({ smoothing: { enabled, alpha } })
-    } catch (error) {
-      log.error('Failed to save smoothing alpha:', error)
-    } finally {
-      setIsSaving(false)
-    }
+  const handleAlphaSave = (): void => {
+    void audio.commit()
   }
 
   return (

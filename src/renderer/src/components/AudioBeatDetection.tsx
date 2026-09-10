@@ -1,49 +1,24 @@
-import React, { useState, useEffect } from 'react'
-import { getAudioConfig, saveAudioConfig } from '../ipcApi'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('AudioBeatDetection')
+import React from 'react'
+import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 
 const AudioBeatDetection: React.FC = () => {
-  const [threshold, setThreshold] = useState(0.3)
-  const [decayRate, setDecayRate] = useState(0.8)
-  const [minInterval, setMinInterval] = useState(100)
-  const [isSaving, setIsSaving] = useState(false)
+  const audio = useAudioConfigFields({
+    beatDetection: { threshold: 0.3, decayRate: 0.8, minInterval: 100 },
+  })
+  const { threshold, decayRate, minInterval } = audio.values.beatDetection
+  const isSaving = audio.isSaving
 
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const config = await getAudioConfig()
-        if (config?.beatDetection) {
-          setThreshold(config.beatDetection.threshold || 0.3)
-          setDecayRate(config.beatDetection.decayRate || 0.8)
-          setMinInterval(config.beatDetection.minInterval || 100)
-        }
-      } catch (error) {
-        log.error('Failed to load beat detection settings:', error)
-      }
-    }
+  /** Update one field locally, for controls that commit on release. */
+  const setField = (patch: Partial<typeof audio.values.beatDetection>): void => {
+    audio.set({ beatDetection: { ...audio.values.beatDetection, ...patch } })
+  }
 
-    loadSettings()
-  }, [])
+  const setThreshold = (value: number): void => setField({ threshold: value })
+  const setDecayRate = (value: number): void => setField({ decayRate: value })
+  const setMinInterval = (value: number): void => setField({ minInterval: value })
 
-  const handleSave = async (
-    updates: Partial<{ threshold: number; decayRate: number; minInterval: number }>,
-  ) => {
-    setIsSaving(true)
-
-    try {
-      const beatDetection = {
-        threshold: updates.threshold !== undefined ? updates.threshold : threshold,
-        decayRate: updates.decayRate !== undefined ? updates.decayRate : decayRate,
-        minInterval: updates.minInterval !== undefined ? updates.minInterval : minInterval,
-      }
-
-      await saveAudioConfig({ beatDetection })
-    } catch (error) {
-      log.error('Failed to save beat detection settings:', error)
-    } finally {
-      setIsSaving(false)
-    }
+  const handleSave = (): void => {
+    void audio.commit()
   }
 
   return (
@@ -72,8 +47,8 @@ const AudioBeatDetection: React.FC = () => {
             step="0.05"
             value={threshold}
             onChange={(e) => setThreshold(parseFloat(e.target.value))}
-            onMouseUp={() => handleSave({ threshold })}
-            onTouchEnd={() => handleSave({ threshold })}
+            onMouseUp={() => handleSave()}
+            onTouchEnd={() => handleSave()}
             className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
             style={{
               background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((threshold - 0.1) / (1.0 - 0.1)) * 100}%, #e5e7eb ${((threshold - 0.1) / (1.0 - 0.1)) * 100}%, #e5e7eb 100%)`,
@@ -90,7 +65,7 @@ const AudioBeatDetection: React.FC = () => {
               const value = parseFloat(e.target.value) || 0.1
               setThreshold(Math.max(0.1, Math.min(1.0, value)))
             }}
-            onBlur={() => handleSave({ threshold })}
+            onBlur={() => handleSave()}
             className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
           />
         </div>
@@ -113,8 +88,8 @@ const AudioBeatDetection: React.FC = () => {
             step="0.01"
             value={decayRate}
             onChange={(e) => setDecayRate(parseFloat(e.target.value))}
-            onMouseUp={() => handleSave({ decayRate })}
-            onTouchEnd={() => handleSave({ decayRate })}
+            onMouseUp={() => handleSave()}
+            onTouchEnd={() => handleSave()}
             className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
             style={{
               background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((decayRate - 0.8) / (0.99 - 0.8)) * 100}%, #e5e7eb ${((decayRate - 0.8) / (0.99 - 0.8)) * 100}%, #e5e7eb 100%)`,
@@ -131,7 +106,7 @@ const AudioBeatDetection: React.FC = () => {
               const value = parseFloat(e.target.value) || 0.8
               setDecayRate(Math.max(0.8, Math.min(0.99, value)))
             }}
-            onBlur={() => handleSave({ decayRate })}
+            onBlur={() => handleSave()}
             className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
           />
         </div>
@@ -156,8 +131,8 @@ const AudioBeatDetection: React.FC = () => {
             step="10"
             value={minInterval}
             onChange={(e) => setMinInterval(parseInt(e.target.value))}
-            onMouseUp={() => handleSave({ minInterval })}
-            onTouchEnd={() => handleSave({ minInterval })}
+            onMouseUp={() => handleSave()}
+            onTouchEnd={() => handleSave()}
             className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
             style={{
               background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((minInterval - 50) / (500 - 50)) * 100}%, #e5e7eb ${((minInterval - 50) / (500 - 50)) * 100}%, #e5e7eb 100%)`,
@@ -174,7 +149,7 @@ const AudioBeatDetection: React.FC = () => {
               const value = parseInt(e.target.value) || 50
               setMinInterval(Math.max(50, Math.min(500, value)))
             }}
-            onBlur={() => handleSave({ minInterval })}
+            onBlur={() => handleSave()}
             className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
           />
         </div>
