@@ -1,15 +1,15 @@
 /**
  * Graph layout for node cues and effects: where each node sits on the canvas.
  *
- * Lives in the engine because both the editor's prettify action and the batch script that lays out
- * the shipped cue libraries need the same answer, and a graph laid out by one has to match a graph
- * laid out by the other. Applies positions in memory only.
+ * The editor's prettify action and the batch script that lays out the shipped cue libraries both
+ * come here, so a graph laid out by one matches a graph laid out by the other. Applies positions
+ * in memory only.
  *
  * Vertical spacing uses per-row max estimated node heights; parallel chain segments
  * in the same layout group are packed into a sqrt grid when multiple segments share one group.
  */
 
-import { LOGIC_NODE_META, type LogicNode } from '../../types/nodeCueTypes'
+import { LOGIC_NODE_META, LogicNode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 // ─── Types (minimal shape matching cue/effect nodes + connections) ─────────────
 

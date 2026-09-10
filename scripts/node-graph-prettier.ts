@@ -5,7 +5,7 @@
  * Recomputes node positions for every cue or effect in the given JSON files, using the same
  * layout the editor's prettify button runs. Nothing invokes this on its own: it only touches the
  * files named with --file, or the built-in list when none are given, and it writes a .bak first. The layout itself lives in the engine
- * (src/photonics-dmx/cues/node/layout/graphLayout.ts) so a graph laid out here and one laid out
+ * (src/renderer/src/components/cue-editor/lib/graphLayout.ts) so a graph laid out here and one laid out
  * in the editor cannot drift apart.
  *
  * Usage:
@@ -19,7 +19,7 @@
 
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { resolve } from 'path'
-import { layoutGraph } from '../src/photonics-dmx/cues/node/layout/graphLayout'
+import { layoutGraph } from '../src/renderer/src/components/cue-editor/lib/graphLayout'
 
 type Kind = 'cues' | 'effects'
 
