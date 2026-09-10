@@ -4,7 +4,7 @@
  * one carries, and what reaches the backend when either changes.
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react'
 import { Provider, createStore } from 'jotai'
 import {
   lightingPrefsAtom,
@@ -595,6 +595,35 @@ describe('DmxOutputSettings serial ports', () => {
     await waitFor(() =>
       expect(savePrefsMock).toHaveBeenCalledWith({ enttecProConfig: { port: 'COM9' } }),
     )
+  })
+
+  it('keeps the newest text when an earlier save lands late', async () => {
+    let releaseFirst: (() => void) | undefined
+    savePrefsMock
+      .mockImplementationOnce(async () => {
+        await new Promise<void>((resolve) => {
+          releaseFirst = resolve
+        })
+        return { success: true }
+      })
+      .mockImplementation(async () => ({ success: true }))
+
+    await renderPanel({
+      dmxOutputConfig: outputConfig({ enttecProEnabled: true }),
+      dmxSettingsPrefs: expansion({ enttecProExpanded: true }),
+      enttecProConfig: { port: '' },
+    })
+
+    const field = screen.getByPlaceholderText('COM3') as HTMLInputElement
+    fireEvent.change(field, { target: { value: 'COM9' } })
+    await waitFor(() => expect(releaseFirst).toBeDefined())
+    fireEvent.change(field, { target: { value: 'COM90' } })
+
+    await act(async () => {
+      releaseFirst?.()
+    })
+
+    expect(field.value).toBe('COM90')
   })
 
   it('saves the OpenDMX port while keeping its rate', async () => {

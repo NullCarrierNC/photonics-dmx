@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react'
+import React, { useCallback, useState, useEffect, useRef } from 'react'
 import { useAtom } from 'jotai'
 import {
   senderArtNetEnabledAtom,
@@ -75,23 +75,39 @@ const DmxOutputSettings: React.FC = () => {
     [showToast],
   )
 
-  // Load other preferences (ArtNet config, COM port, etc.)
+  // Preferences seed the port fields, and each one owns its text from the first keystroke onward.
+  // A port is stored one keystroke at a time, so a write-back can land after a later keystroke
+  // and the field keeps the newer text.
+  const storedEnttecPort = prefs.enttecProConfig?.port ?? ''
+  const storedOpenDmxPort = prefs.openDmxConfig?.port ?? ''
+  const enttecPortEdited = useRef(false)
+  const openDmxPortEdited = useRef(false)
+
   useEffect(() => {
-    log.info('Loading other preferences')
-
-    setComPort(prefs.enttecProConfig?.port ?? '')
-    setOpenDmxComPort(prefs.openDmxConfig?.port ?? '')
-
-    // Load DMX settings UI preferences
-    if (prefs.dmxSettingsPrefs) {
-      /* eslint-disable react-hooks/set-state-in-effect -- sync expansion state from prefs */
-      setArtNetExpanded(prefs.dmxSettingsPrefs.artNetExpanded || false)
-      setSacnExpanded(prefs.dmxSettingsPrefs.sacnExpanded || false)
-      setEnttecProExpanded(prefs.dmxSettingsPrefs.enttecProExpanded || false)
-      setOpenDmxExpanded(prefs.dmxSettingsPrefs.openDmxExpanded || false)
-      /* eslint-enable react-hooks/set-state-in-effect */
+    if (!enttecPortEdited.current) {
+      setComPort(storedEnttecPort)
     }
-  }, [prefs, setComPort, setOpenDmxComPort])
+  }, [storedEnttecPort, setComPort])
+
+  useEffect(() => {
+    if (!openDmxPortEdited.current) {
+      setOpenDmxComPort(storedOpenDmxPort)
+    }
+  }, [storedOpenDmxPort, setOpenDmxComPort])
+
+  // Which cards are open is stored too, so it follows preferences on its own.
+  const dmxSettingsPrefs = prefs.dmxSettingsPrefs
+  useEffect(() => {
+    if (!dmxSettingsPrefs) {
+      return
+    }
+    /* eslint-disable react-hooks/set-state-in-effect -- sync expansion state from prefs */
+    setArtNetExpanded(dmxSettingsPrefs.artNetExpanded || false)
+    setSacnExpanded(dmxSettingsPrefs.sacnExpanded || false)
+    setEnttecProExpanded(dmxSettingsPrefs.enttecProExpanded || false)
+    setOpenDmxExpanded(dmxSettingsPrefs.openDmxExpanded || false)
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [dmxSettingsPrefs])
 
   // Load network interfaces for sACN configuration
   useEffect(() => {
@@ -244,6 +260,7 @@ const DmxOutputSettings: React.FC = () => {
 
   const handleComPortChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newPort = e.target.value
+    enttecPortEdited.current = true
     setComPort(newPort)
 
     const newConfig = {
@@ -263,6 +280,7 @@ const DmxOutputSettings: React.FC = () => {
 
   const handleOpenDmxComPortChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newPort = e.target.value
+    openDmxPortEdited.current = true
     setOpenDmxComPort(newPort)
 
     const newConfig = {
