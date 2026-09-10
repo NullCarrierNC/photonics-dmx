@@ -41,6 +41,7 @@ import { persistPrefs } from '../ipc/persistPrefs'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from './Toast'
 import type { AppPreferences } from '../../../shared/ipcTypes'
+import { DraftNumberField } from './controls/DraftField'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('DmxOutputSettings')
@@ -68,6 +69,14 @@ const DmxOutputSettings: React.FC = () => {
   >([])
   const { toasts, showToast, hideToast } = useToast()
 
+  // Handlers rebuild a nested config object, so they read preferences from here rather than from
+  // the render that created them. Two fields of one config committed close together would
+  // otherwise write over each other, since the merge in main is one level deep.
+  const prefsRef = useRef(prefs)
+  useEffect(() => {
+    prefsRef.current = prefs
+  }, [prefs])
+
   /** Writes preferences, reporting a refusal on screen. */
   const persist = useCallback(
     (updates: Partial<AppPreferences>, what: string) =>
@@ -75,24 +84,17 @@ const DmxOutputSettings: React.FC = () => {
     [showToast],
   )
 
-  // Preferences seed the port fields, and each one owns its text from the first keystroke onward.
-  // A port is stored one keystroke at a time, so a write-back can land after a later keystroke
-  // and the field keeps the newer text.
+  // The port fields hold their own text while they are being edited and report on blur, so the
+  // atoms can simply follow what is stored.
   const storedEnttecPort = prefs.enttecProConfig?.port ?? ''
   const storedOpenDmxPort = prefs.openDmxConfig?.port ?? ''
-  const enttecPortEdited = useRef(false)
-  const openDmxPortEdited = useRef(false)
 
   useEffect(() => {
-    if (!enttecPortEdited.current) {
-      setComPort(storedEnttecPort)
-    }
+    setComPort(storedEnttecPort)
   }, [storedEnttecPort, setComPort])
 
   useEffect(() => {
-    if (!openDmxPortEdited.current) {
-      setOpenDmxComPort(storedOpenDmxPort)
-    }
+    setOpenDmxComPort(storedOpenDmxPort)
   }, [storedOpenDmxPort, setOpenDmxComPort])
 
   // Which cards are open is stored too, so it follows preferences on its own.
@@ -258,13 +260,11 @@ const DmxOutputSettings: React.FC = () => {
     }
   }
 
-  const handleComPortChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newPort = e.target.value
-    enttecPortEdited.current = true
+  const handleComPortChange = async (newPort: string) => {
     setComPort(newPort)
 
     const newConfig = {
-      ...(prefs.enttecProConfig ?? { port: '' }),
+      ...(prefsRef.current.enttecProConfig ?? { port: '' }),
       port: newPort,
     }
 
@@ -278,13 +278,14 @@ const DmxOutputSettings: React.FC = () => {
     }))
   }
 
-  const handleOpenDmxComPortChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newPort = e.target.value
-    openDmxPortEdited.current = true
+  const handleOpenDmxComPortChange = async (newPort: string) => {
     setOpenDmxComPort(newPort)
 
     const newConfig = {
-      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ }),
+      ...(prefsRef.current.openDmxConfig ?? {
+        port: '',
+        dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
+      }),
       port: newPort,
     }
 
@@ -298,10 +299,13 @@ const DmxOutputSettings: React.FC = () => {
     }))
   }
 
-  const handleOpenDmxSpeedChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleOpenDmxSpeedChange = async (hz: number) => {
     const newConfig = {
-      ...(prefs.openDmxConfig ?? { port: '', dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ }),
-      dmxSpeed: parseOpenDmxSpeed(e.target.value),
+      ...(prefsRef.current.openDmxConfig ?? {
+        port: '',
+        dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
+      }),
+      dmxSpeed: parseOpenDmxSpeed(String(hz)),
     }
 
     if (!(await persist({ openDmxConfig: newConfig }, 'the OpenDMX rate'))) {
@@ -314,8 +318,8 @@ const DmxOutputSettings: React.FC = () => {
     }))
   }
 
-  const handleGlobalDmxRateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const sanitized = parseGlobalPublishingRate(e.target.value)
+  const handleGlobalDmxRateChange = async (hz: number) => {
+    const sanitized = parseGlobalPublishingRate(String(hz))
 
     if (!(await persist({ globalDmxPublishingRateHz: sanitized }, 'the DMX publishing rate'))) {
       return
@@ -389,10 +393,10 @@ const DmxOutputSettings: React.FC = () => {
             Global DMX Publishing Rate
           </h3>
           <div className="flex items-center gap-2">
-            <input
-              type="number"
+            <DraftNumberField
+              aria-label="Global DMX Publishing Rate"
               value={globalDmxPublishingRate}
-              onChange={handleGlobalDmxRateChange}
+              onCommit={handleGlobalDmxRateChange}
               className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               min={DMX_OUTPUT_REFRESH_RATE_HZ_MIN}
               max={DMX_OUTPUT_REFRESH_RATE_HZ_MAX}

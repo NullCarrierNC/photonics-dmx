@@ -314,6 +314,12 @@ describe('DmxOutputSettings first run', () => {
   })
 })
 
+/** Type a value and leave the field, which is when the panel is told about it. */
+function commit(field: Element, value: string): void {
+  fireEvent.change(field, { target: { value } })
+  fireEvent.blur(field)
+}
+
 describe('DmxOutputSettings global publishing rate', () => {
   const advanced = (over: LightingPreferences = {}): LightingPreferences => ({
     advancedModeEnabled: true,
@@ -342,7 +348,7 @@ describe('DmxOutputSettings global publishing rate', () => {
   it('holds a rate below the floor at 10', async () => {
     await renderPanel(advanced())
 
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '2' } })
+    commit(screen.getByRole('spinbutton'), '2')
 
     await waitFor(() =>
       expect(savePrefsMock).toHaveBeenCalledWith({ globalDmxPublishingRateHz: 10 }),
@@ -350,23 +356,31 @@ describe('DmxOutputSettings global publishing rate', () => {
   })
 
   it('holds a rate above the ceiling at 44', async () => {
-    await renderPanel(advanced())
+    await renderPanel(advanced({ globalDmxPublishingRateHz: 30 }))
 
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '200' } })
+    commit(screen.getByRole('spinbutton'), '200')
 
     await waitFor(() =>
       expect(savePrefsMock).toHaveBeenCalledWith({ globalDmxPublishingRateHz: 44 }),
     )
   })
 
-  it('falls back to the ceiling when the field is cleared', async () => {
-    await renderPanel(advanced())
+  it('says nothing when the committed rate is the one already stored', async () => {
+    await renderPanel(advanced({ globalDmxPublishingRateHz: 30 }))
 
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '' } })
+    commit(screen.getByRole('spinbutton'), '30')
 
-    await waitFor(() =>
-      expect(savePrefsMock).toHaveBeenCalledWith({ globalDmxPublishingRateHz: 44 }),
-    )
+    expect(savePrefsMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps the stored rate when the field is cleared', async () => {
+    await renderPanel(advanced({ globalDmxPublishingRateHz: 30 }))
+    const field = screen.getByRole('spinbutton') as HTMLInputElement
+
+    commit(field, '')
+
+    expect(savePrefsMock).not.toHaveBeenCalled()
+    expect(field.value).toBe('30')
   })
 })
 
@@ -386,7 +400,7 @@ describe('DmxOutputSettings OpenDMX refresh rate', () => {
   it('accepts a rate below the floor the network senders hold to', async () => {
     await renderPanel(openDmxOpen())
 
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '5' } })
+    commit(screen.getByRole('spinbutton'), '5')
 
     await waitFor(() => expect(savedOpenDmx().dmxSpeed).toBe(5))
   })
@@ -394,31 +408,33 @@ describe('DmxOutputSettings OpenDMX refresh rate', () => {
   it('holds a rate above the ceiling at 44', async () => {
     await renderPanel(openDmxOpen())
 
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '200' } })
+    commit(screen.getByRole('spinbutton'), '200')
 
     await waitFor(() => expect(savedOpenDmx().dmxSpeed).toBe(44))
   })
 
-  it('falls back to 40 when the field is cleared', async () => {
+  it('keeps the stored rate when the field is cleared', async () => {
     await renderPanel(openDmxOpen(20))
+    const field = screen.getByRole('spinbutton') as HTMLInputElement
 
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '' } })
+    commit(field, '')
 
-    await waitFor(() => expect(savedOpenDmx().dmxSpeed).toBe(40))
+    expect(savePrefsMock).not.toHaveBeenCalled()
+    expect(field.value).toBe('20')
   })
 
-  it('falls back to 40 rather than clamping a zero up', async () => {
+  it('holds a zero at the floor of one', async () => {
     await renderPanel(openDmxOpen(20))
 
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '0' } })
+    commit(screen.getByRole('spinbutton'), '0')
 
-    await waitFor(() => expect(savedOpenDmx().dmxSpeed).toBe(40))
+    await waitFor(() => expect(savedOpenDmx().dmxSpeed).toBe(1))
   })
 
   it('keeps the port when only the rate changes', async () => {
     await renderPanel(openDmxOpen())
 
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '25' } })
+    commit(screen.getByRole('spinbutton'), '25')
 
     await waitFor(() => expect(savedOpenDmx()).toEqual({ port: 'COM4', dmxSpeed: 25 }))
   })
@@ -437,7 +453,7 @@ describe('DmxOutputSettings sACN configuration', () => {
   it('saves the whole resolved config when one field changes', async () => {
     await renderPanel(sacnOpen())
 
-    fireEvent.change(universeInput(), { target: { value: '9' } })
+    commit(universeInput(), '9')
 
     await waitFor(() =>
       expect(savePrefsMock).toHaveBeenCalledWith({
@@ -455,7 +471,7 @@ describe('DmxOutputSettings sACN configuration', () => {
   it('clamps the refresh rate to the network floor', async () => {
     await renderPanel(sacnOpen())
 
-    fireEvent.change(refreshInput(), { target: { value: '2' } })
+    commit(refreshInput(), '2')
 
     await waitFor(() =>
       expect(savePrefsMock).toHaveBeenCalledWith(
@@ -467,7 +483,7 @@ describe('DmxOutputSettings sACN configuration', () => {
   it('pushes the change to a running sender', async () => {
     await renderPanel(sacnOpen(), { sacn: true })
 
-    fireEvent.change(universeInput(), { target: { value: '9' } })
+    commit(universeInput(), '9')
 
     await waitFor(() =>
       expect(updateSacnConfigMock).toHaveBeenCalledWith(expect.objectContaining({ universe: 9 })),
@@ -477,7 +493,7 @@ describe('DmxOutputSettings sACN configuration', () => {
   it('saves without pushing when the sender is not running', async () => {
     await renderPanel(sacnOpen())
 
-    fireEvent.change(universeInput(), { target: { value: '9' } })
+    commit(universeInput(), '9')
 
     await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
     expect(updateSacnConfigMock).not.toHaveBeenCalled()
@@ -516,7 +532,7 @@ describe('DmxOutputSettings ArtNet configuration', () => {
   it('saves the whole resolved config when the host changes', async () => {
     await renderPanel(artNetOpen())
 
-    fireEvent.change(screen.getByPlaceholderText('127.0.0.1'), { target: { value: '10.0.0.9' } })
+    commit(screen.getByPlaceholderText('127.0.0.1'), '10.0.0.9')
 
     await waitFor(() =>
       expect(savePrefsMock).toHaveBeenCalledWith({
@@ -536,11 +552,57 @@ describe('DmxOutputSettings ArtNet configuration', () => {
   it('pushes the change to a running sender', async () => {
     await renderPanel(artNetOpen(), { artnet: true })
 
-    fireEvent.change(screen.getByPlaceholderText('127.0.0.1'), { target: { value: '10.0.0.9' } })
+    commit(screen.getByPlaceholderText('127.0.0.1'), '10.0.0.9')
 
     await waitFor(() =>
       expect(updateArtNetConfigMock).toHaveBeenCalledWith(
         expect.objectContaining({ host: '10.0.0.9' }),
+      ),
+    )
+  })
+})
+
+describe('DmxOutputSettings editing a field', () => {
+  const artNetOpen = (over: LightingPreferences = {}): LightingPreferences => ({
+    dmxOutputConfig: outputConfig({ artNetEnabled: true }),
+    dmxSettingsPrefs: expansion({ artNetExpanded: true }),
+    ...over,
+  })
+
+  it('leaves a running sender alone until the address is finished', async () => {
+    await renderPanel(artNetOpen(), { artnet: true })
+    const host = screen.getByPlaceholderText('127.0.0.1')
+
+    for (const partial of ['1', '19', '192', '192.', '192.168.1.100']) {
+      fireEvent.change(host, { target: { value: partial } })
+    }
+
+    expect(updateArtNetConfigMock).not.toHaveBeenCalled()
+    expect(savePrefsMock).not.toHaveBeenCalled()
+
+    fireEvent.blur(host)
+
+    await waitFor(() =>
+      expect(updateArtNetConfigMock).toHaveBeenCalledWith(
+        expect.objectContaining({ host: '192.168.1.100' }),
+      ),
+    )
+    expect(updateArtNetConfigMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('accepts a rate whose first digit is below the floor', async () => {
+    // Clamping as the digits arrive replaced the 1 of 15 with the floor of 10, so the 5 landed on
+    // that and the field settled on 44. The rate is only clamped once the field is left.
+    await renderPanel(artNetOpen())
+    const rate = screen.getByLabelText('Refresh Rate')
+
+    fireEvent.change(rate, { target: { value: '1' } })
+    fireEvent.change(rate, { target: { value: '15' } })
+    fireEvent.blur(rate)
+
+    await waitFor(() =>
+      expect(savePrefsMock).toHaveBeenCalledWith(
+        expect.objectContaining({ artNetConfig: expect.objectContaining({ refreshRateHz: 15 }) }),
       ),
     )
   })
@@ -583,21 +645,21 @@ describe('DmxOutputSettings card expansion', () => {
 })
 
 describe('DmxOutputSettings serial ports', () => {
-  it('saves the Enttec Pro port as it is typed', async () => {
+  it('saves the Enttec Pro port once the field is left', async () => {
     await renderPanel({
       dmxOutputConfig: outputConfig({ enttecProEnabled: true }),
       dmxSettingsPrefs: expansion({ enttecProExpanded: true }),
       enttecProConfig: { port: '' },
     })
 
-    fireEvent.change(screen.getByPlaceholderText('COM3'), { target: { value: 'COM9' } })
+    commit(screen.getByPlaceholderText('COM3'), 'COM9')
 
     await waitFor(() =>
       expect(savePrefsMock).toHaveBeenCalledWith({ enttecProConfig: { port: 'COM9' } }),
     )
   })
 
-  it('keeps the newest text when an earlier save lands late', async () => {
+  it('keeps what is being typed while an earlier save is still in flight', async () => {
     let releaseFirst: (() => void) | undefined
     savePrefsMock
       .mockImplementationOnce(async () => {
@@ -615,8 +677,9 @@ describe('DmxOutputSettings serial ports', () => {
     })
 
     const field = screen.getByPlaceholderText('COM3') as HTMLInputElement
-    fireEvent.change(field, { target: { value: 'COM9' } })
+    commit(field, 'COM9')
     await waitFor(() => expect(releaseFirst).toBeDefined())
+    fireEvent.focus(field)
     fireEvent.change(field, { target: { value: 'COM90' } })
 
     await act(async () => {
@@ -633,7 +696,7 @@ describe('DmxOutputSettings serial ports', () => {
       openDmxConfig: { port: '', dmxSpeed: 25 },
     })
 
-    fireEvent.change(screen.getByPlaceholderText('COM4'), { target: { value: 'COM9' } })
+    commit(screen.getByPlaceholderText('COM4'), 'COM9')
 
     await waitFor(() =>
       expect(savePrefsMock).toHaveBeenCalledWith({

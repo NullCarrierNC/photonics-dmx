@@ -1,9 +1,10 @@
 import React from 'react'
 import CollapsibleSenderCard from './CollapsibleSenderCard'
+import { DraftTextField } from '../controls/DraftField'
 
 interface EnttecProConfigCardProps {
   comPort: string
-  onComPortChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onComPortChange: (port: string) => void
   expanded: boolean
   onToggle: () => void
 }
@@ -21,10 +22,10 @@ export const EnttecProConfigCard: React.FC<EnttecProConfigCardProps> = ({
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-16">COM:</label>
-        <input
-          type="text"
+        <DraftTextField
+          aria-label="COM"
           value={comPort}
-          onChange={onComPortChange}
+          onCommit={onComPortChange}
           className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-64 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           placeholder="COM3"
         />
