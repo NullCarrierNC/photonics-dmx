@@ -323,8 +323,10 @@ export class SenderManager {
     if (!sender) {
       return Promise.resolve(false)
     }
+    // A sender answers whether the frame reached the wire, and reports the reason separately
+    // through its error emitter. The rejection arm is for a sender that throws outright.
     return Promise.resolve(sender.send(universeBuffer)).then(
-      () => true,
+      (delivered) => delivered,
       (error) => {
         log.error(`Error sending data with ${sender.constructor.name}:`, error)
         if (error instanceof SenderError && error.shouldDisable) {

@@ -53,7 +53,14 @@ export abstract class BaseSender {
    * Sends DMX data to the corresponding implementation.
    * @param universeBuffer Pre-built universe buffer (channel -> value mapping).
    */
-  public abstract send(universeBuffer: Record<number, number>): Promise<void>
+  /**
+   * Put one frame on the wire, reporting whether it got there.
+   *
+   * True also covers a frame the throttle withheld, because the trailing flush will deliver it and
+   * the wire ends up holding that buffer either way. Reporting those as failures would make the
+   * publisher's governor drop its dirty-skip cache on every throttled frame.
+   */
+  public abstract send(universeBuffer: Record<number, number>): Promise<boolean>
 
   /**
    * Gets the universe number this sender is configured for.

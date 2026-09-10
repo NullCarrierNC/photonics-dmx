@@ -101,8 +101,8 @@ function setup(): {
   listener: YargNetworkListener
 } {
   const sender = {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<void>>(() =>
-      Promise.resolve(),
+    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
+      Promise.resolve(true),
     ),
     getEnabledWireSenders: () => ['sacn'],
     isIpcEnabled: () => false,

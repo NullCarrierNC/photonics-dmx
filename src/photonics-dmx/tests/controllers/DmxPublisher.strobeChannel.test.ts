@@ -39,7 +39,7 @@ function makeBrightRgbio(overrides: Partial<RGBIO> = {}): RGBIO {
 interface ScenarioContext {
   publisher: DmxPublisher
   sender: {
-    send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<void>>
+    send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
     getEnabledWireSenders: () => string[]
     isIpcEnabled: () => boolean
   }
@@ -54,13 +54,13 @@ interface ScenarioContext {
  * arg of the (slotId, buffer) call signature.
  */
 function makeMockSender(): {
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<void>>
+  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
   getEnabledWireSenders: () => string[]
   isIpcEnabled: () => boolean
 } {
   return {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<void>>(() =>
-      Promise.resolve(),
+    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
+      Promise.resolve(true),
     ),
     getEnabledWireSenders: () => ['sacn'],
     isIpcEnabled: () => false,

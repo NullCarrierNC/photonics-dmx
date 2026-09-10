@@ -94,8 +94,8 @@ function setup(
   const ipcPayloads: DmxValuesPayload[] = []
   let nowMs = 0
   const sender = {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<void>>(() =>
-      Promise.resolve(),
+    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
+      Promise.resolve(true),
     ),
     getEnabledWireSenders: () => ['sacn'],
     isIpcEnabled: () => options.ipc === true,
@@ -552,8 +552,8 @@ describe('DmxPublisher bloom bleed', () => {
   it('prepares each rig through the injected frame processor', () => {
     const ipcPayloads: DmxValuesPayload[] = []
     const sender = {
-      send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<void>>(() =>
-        Promise.resolve(),
+      send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
+        Promise.resolve(true),
       ),
       getEnabledWireSenders: () => ['sacn'],
       isIpcEnabled: () => false,
@@ -595,7 +595,7 @@ describe('DmxPublisher bloom bleed', () => {
 
   it('skips the frame processor entirely while it reports inactive', () => {
     const sender = {
-      send: jest.fn(() => Promise.resolve()),
+      send: jest.fn(() => Promise.resolve(true)),
       getEnabledWireSenders: () => ['sacn'],
       isIpcEnabled: () => false,
       sendIpc: jest.fn(),

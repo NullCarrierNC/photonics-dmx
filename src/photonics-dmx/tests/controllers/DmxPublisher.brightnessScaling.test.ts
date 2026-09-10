@@ -23,7 +23,7 @@ function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
 }
 
 interface MockSender {
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<void>>
+  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
   sendIpc: jest.Mock<(payload: DmxValuesPayload) => void>
   getEnabledWireSenders: () => string[]
   isIpcEnabled: () => boolean
@@ -31,8 +31,8 @@ interface MockSender {
 
 function makeMockSender(ipc = true): MockSender {
   return {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<void>>(() =>
-      Promise.resolve(),
+    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
+      Promise.resolve(true),
     ),
     sendIpc: jest.fn<(payload: DmxValuesPayload) => void>(),
     getEnabledWireSenders: () => ['sacn'],

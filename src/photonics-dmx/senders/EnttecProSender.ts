@@ -93,10 +93,11 @@ export class EnttecProSender extends BaseSender {
     }
   }
 
-  public async send(universeBuffer: Record<number, number>): Promise<void> {
+  public async send(universeBuffer: Record<number, number>): Promise<boolean> {
     try {
       this.verifySenderStarted()
       this.universe!.update(universeBuffer)
+      return true
     } catch (err) {
       log.error('EnttecProSender error:', err)
       // Disable the sender on failure so the user gets a true on/off indicator and can
@@ -105,6 +106,7 @@ export class EnttecProSender extends BaseSender {
       // the only error signal available for the Enttec Pro.
       const errorEvent = new SenderError(err, { senderId: 'enttecpro', shouldDisable: true })
       this.emitSenderError(errorEvent)
+      return false
     }
   }
 

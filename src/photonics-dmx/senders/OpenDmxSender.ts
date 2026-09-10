@@ -211,11 +211,12 @@ export class OpenDmxSender extends BaseSender {
     }
   }
 
-  public async send(universeBuffer: Record<number, number>): Promise<void> {
+  public async send(universeBuffer: Record<number, number>): Promise<boolean> {
     try {
       this.verifySenderStarted()
       this.device!.writeChannels(universeBuffer)
       this.consecutiveSendFailures = 0
+      return true
     } catch (err) {
       log.error('OpenDmxSender error:', err)
       // Per-frame USB writes can fail transiently, so a single failure only reports; a sustained
@@ -225,6 +226,7 @@ export class OpenDmxSender extends BaseSender {
       const shouldDisable = this.consecutiveSendFailures >= OpenDmxSender.MAX_SEND_FAILURES
       const errorEvent = new SenderError(err, { senderId: 'opendmx', shouldDisable })
       this.emitSenderError(errorEvent)
+      return false
     }
   }
 

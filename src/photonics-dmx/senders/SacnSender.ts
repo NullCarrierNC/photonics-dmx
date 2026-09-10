@@ -135,18 +135,20 @@ export class SacnSender extends BaseSender {
     }
   }
 
-  public async send(universeBuffer: Record<number, number>): Promise<void> {
+  public async send(universeBuffer: Record<number, number>): Promise<boolean> {
     try {
       this.verifySenderStarted()
 
       if (this.throttleSend(universeBuffer)) {
-        return
+        return true
       }
 
       await this.sender!.send({ payload: universeBuffer })
+      return true
     } catch (err: unknown) {
       log.error('SacnSender error:', err)
       this.emitSenderError(this.toSenderError(err, 'sacn'))
+      return false
     }
   }
 

@@ -124,12 +124,12 @@ export class ArtNetSender extends BaseSender {
     }
   }
 
-  public async send(universeBuffer: Record<number, number>): Promise<void> {
+  public async send(universeBuffer: Record<number, number>): Promise<boolean> {
     try {
       this.verifySenderStarted()
 
       if (this.throttleSend(universeBuffer)) {
-        return
+        return true
       }
 
       // Convert from 1-based DMX indexing to 0-based ArtNet indexing
@@ -140,9 +140,11 @@ export class ArtNetSender extends BaseSender {
       }
 
       this.universe!.update(convertedBuffer)
+      return true
     } catch (err: unknown) {
       log.error('ArtNetSender error:', err)
       this.emitSenderError(this.toSenderError(err, 'artnet'))
+      return false
     }
   }
 
