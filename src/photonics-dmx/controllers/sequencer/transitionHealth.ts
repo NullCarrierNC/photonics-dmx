@@ -107,14 +107,17 @@ export function cleanupOrphanedTransitions(
   }
 }
 
-/** Blacks out every tracked light and drops all transition state, for critical error recovery. */
+/**
+ * Blacks out every tracked light and drops all transition state, for critical error recovery.
+ *
+ * Says nothing itself. Its one caller runs inside the frame loop and reports the fault it is
+ * recovering from once per episode, so a line from here would be a second one every frame.
+ */
 export function emergencyStateReset(
   lightStateManager: LightStateManager,
   transitionsByLight: Map<string, Map<number, TransitionData>>,
   currentLayerStates: Map<string, Map<number, RGBIO>>,
 ): void {
-  log.error('LightTransitionController: Performing emergency state reset')
-
   // Force all lights to black state first
   const allLightIds = lightStateManager.getTrackedLightIds()
   const blackState = opaqueBlack()

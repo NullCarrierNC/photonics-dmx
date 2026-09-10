@@ -401,4 +401,68 @@ describe('LightTransitionController frame loop', () => {
       expect(published('mh').red).toBe(200)
     })
   })
+
+  describe('a fault in the frame body', () => {
+    /**
+     * Make the blend throw, which is inside the try the frame body runs in.
+     *
+     * Only for a lit colour, because the recovery the catch runs writes black through this same
+     * method and a throw from there would escape the frame instead of being handled.
+     */
+    function breakBlending(message = 'blend failed'): jest.SpiedFunction<typeof lsm.setLightState> {
+      const real = lsm.setLightState.bind(lsm)
+      return jest.spyOn(lsm, 'setLightState').mockImplementation((lightId, state) => {
+        if (state.red !== 0) {
+          throw new Error(message)
+        }
+        real(lightId, state)
+      })
+    }
+
+    it('reports a sustained fault once rather than every frame', () => {
+      // The loop runs a hundred times a second by default, and the file log drops everything for
+      // the rest of the day once it hits its size cap, so a line per frame takes the diagnostics
+      // with it.
+      const errors = jest.spyOn(console, 'error').mockImplementation(() => {})
+      breakBlending()
+
+      // The recovery drops every transition, so the work has to come back each frame for the fault
+      // to repeat. That is what the sequencer does upstream: it submits every frame regardless.
+      for (let i = 0; i < 20; i++) {
+        ltc.setTransition('light-1', 0, color(), color({ red: 255 }), 100, 'linear')
+        frame(T0 + i * 10)
+      }
+
+      const reported = errors.mock.calls.filter((c) =>
+        String(c[0]).includes('Critical error in transition processing'),
+      )
+      expect(reported).toHaveLength(1)
+      errors.mockRestore()
+    })
+
+    it('reports again after a clean frame in between', () => {
+      // A fault the user has since fixed should be able to report if it comes back, rather than
+      // staying suppressed for the life of the process.
+      const errors = jest.spyOn(console, 'error').mockImplementation(() => {})
+
+      ltc.setTransition('light-1', 0, color(), color({ red: 255 }), 100, 'linear')
+      const broken = breakBlending()
+      frame(T0 + 10)
+
+      // A clean frame with work in it re-arms the report.
+      broken.mockRestore()
+      ltc.setTransition('light-1', 0, color(), color({ red: 255 }), 100, 'linear')
+      frame(T0 + 20)
+
+      ltc.setTransition('light-1', 0, color(), color({ red: 255 }), 100, 'linear')
+      breakBlending('blend failed again')
+      frame(T0 + 30)
+
+      const reported = errors.mock.calls.filter((c) =>
+        String(c[0]).includes('Critical error in transition processing'),
+      )
+      expect(reported).toHaveLength(2)
+      errors.mockRestore()
+    })
+  })
 })

@@ -47,6 +47,14 @@ export class LightTransitionController {
    * Guards against state mutations while a global clear is running.
    */
   private _clearingTransitions = false
+  /**
+   * Whether the current fault episode has already been reported.
+   *
+   * Keyed on nothing, because the catch wraps the whole frame body and has no per-light value in
+   * scope, so this is the boolean form Clock's overrun watchdog uses rather than the per-entity
+   * sets the publisher keeps.
+   */
+  private _faultReported = false
 
   // Monitoring fields
   private lastStateValidation: number = 0
@@ -426,8 +434,17 @@ export class LightTransitionController {
           }
         }
       })
+      // A frame that got all the way through means the fault is over, so the next one reports.
+      this._faultReported = false
     } catch (error) {
-      log.error('Critical error in transition processing:', error)
+      // Reported once per fault episode. This runs every frame, a hundred times a second by
+      // default, and the file log drops everything for the rest of the day once it hits its size
+      // cap, so an unlatched line here would take the diagnostics down with it. Clock does the
+      // same for a faulting tick callback.
+      if (!this._faultReported) {
+        this._faultReported = true
+        log.error('Critical error in transition processing:', error)
+      }
       emergencyStateReset(
         this._lightStateManager,
         this._transitionsByLight,
