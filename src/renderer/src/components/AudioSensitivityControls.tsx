@@ -1,151 +1,35 @@
-import React, { useState, useEffect } from 'react'
-import type { AudioConfig } from '../../../shared/ipcTypes'
-import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getAudioConfig, saveAudioConfig } from '../ipcApi'
-import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('AudioSensitivityControls')
+import React from 'react'
+import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 
 interface AudioSensitivityControlsProps {
   /** Omit long helper copy (e.g. DMX Preview quick controls). */
   compact?: boolean
 }
 
+const clamp = (value: number, min: number, max: number): number =>
+  Math.max(min, Math.min(max, value))
+
 const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ compact = false }) => {
-  const [sensitivity, setSensitivity] = useState(2.5)
-  const [noiseFloor, setNoiseFloor] = useState(60)
-  const [strobeEnabled, setStrobeEnabled] = useState(false)
-  const [strobeTriggerThreshold, setStrobeTriggerThreshold] = useState(0.8)
-  const [strobeProbability, setStrobeProbability] = useState(100)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
+  const audio = useAudioConfigFields({
+    sensitivity: 2.5,
+    noiseFloor: 60,
+    strobeEnabled: false,
+    strobeTriggerThreshold: 0.8,
+    strobeProbability: 100,
+  })
+  const { sensitivity, noiseFloor, strobeEnabled, strobeTriggerThreshold, strobeProbability } =
+    audio.values
 
-  useEffect(() => {
-    const loadConfig = async () => {
-      try {
-        const config = await getAudioConfig()
-        setSensitivity(config?.sensitivity ?? 2.5)
-        setNoiseFloor(config?.noiseFloor ?? 60)
-        setStrobeEnabled(config?.strobeEnabled ?? false)
-        setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)
-        setStrobeProbability(config?.strobeProbability ?? 100)
-      } catch (error) {
-        log.error('Failed to load audio sensitivity:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadConfig()
-  }, [])
-
-  useEffect(() => {
-    const onConfigUpdate = (config: AudioConfig | undefined) => {
-      if (!config) return
-      setSensitivity(config.sensitivity ?? 2.5)
-      setNoiseFloor(config.noiseFloor ?? 60)
-      setStrobeEnabled(config.strobeEnabled ?? false)
-      setStrobeTriggerThreshold(config.strobeTriggerThreshold ?? 0.8)
-      setStrobeProbability(config.strobeProbability ?? 100)
-    }
-    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onConfigUpdate)
-    return () => removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onConfigUpdate)
-  }, [])
-
-  const handleSensitivityChange = async (value: number) => {
-    if (isSaving) return
-
-    const newValue = Math.max(0.1, Math.min(5.0, value))
-    setSensitivity(newValue)
-
-    try {
-      setIsSaving(true)
-      const result = await saveAudioConfig({ sensitivity: newValue })
-      if (!result.success) {
-        log.error('Failed to save audio sensitivity:', result.error)
-        // Revert on failure
-        const config = await getAudioConfig()
-        setSensitivity(config?.sensitivity ?? 2.5)
-      }
-    } catch (error) {
-      log.error('Failed to save audio sensitivity:', error)
-      // Revert on failure
-      const config = await getAudioConfig()
-      setSensitivity(config?.sensitivity ?? 2.5)
-    } finally {
-      setIsSaving(false)
-    }
+  // The sliders carry their own bounds, the numeric boxes do not, so a commit clamps.
+  const commitSensitivity = (): void => {
+    void audio.save({ sensitivity: clamp(sensitivity, 0.1, 5.0) })
   }
 
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value)
-    setSensitivity(value)
+  const commitNoiseFloor = (): void => {
+    void audio.save({ noiseFloor: clamp(noiseFloor, 0, 255) })
   }
 
-  const handleSliderBlur = () => {
-    handleSensitivityChange(sensitivity)
-  }
-
-  const handleNoiseFloorChange = async (value: number) => {
-    if (isSaving) return
-
-    const newValue = Math.max(0, Math.min(255, value))
-    setNoiseFloor(newValue)
-
-    try {
-      setIsSaving(true)
-      const result = await saveAudioConfig({ noiseFloor: newValue })
-      if (!result.success) {
-        log.error('Failed to save noise floor:', result.error)
-        // Revert on failure
-        const config = await getAudioConfig()
-        setNoiseFloor(config?.noiseFloor ?? 60)
-      }
-    } catch (error) {
-      log.error('Failed to save noise floor:', error)
-      // Revert on failure
-      const config = await getAudioConfig()
-      setNoiseFloor(config?.noiseFloor ?? 60)
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleNoiseFloorSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value)
-    setNoiseFloor(value)
-  }
-
-  const handleNoiseFloorSliderBlur = () => {
-    handleNoiseFloorChange(noiseFloor)
-  }
-
-  const persistStrobe = async (
-    updates: Partial<
-      Pick<AudioConfig, 'strobeEnabled' | 'strobeTriggerThreshold' | 'strobeProbability'>
-    >,
-  ) => {
-    if (isSaving) return
-    try {
-      setIsSaving(true)
-      const result = await saveAudioConfig(updates)
-      if (!result.success) {
-        log.error('Failed to save strobe settings:', result.error)
-        const config = await getAudioConfig()
-        setStrobeEnabled(config?.strobeEnabled ?? false)
-        setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)
-        setStrobeProbability(config?.strobeProbability ?? 100)
-      }
-    } catch (error) {
-      log.error('Failed to save strobe settings:', error)
-      const config = await getAudioConfig()
-      setStrobeEnabled(config?.strobeEnabled ?? false)
-      setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)
-      setStrobeProbability(config?.strobeProbability ?? 100)
-    } finally {
-      setIsSaving(false)
-    }
-  }
+  const commitStrobe = (): void => void audio.commit()
 
   const sensitivityRangeStyle = {
     background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((sensitivity - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb ${((sensitivity - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb 100%)`,
@@ -163,7 +47,7 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
     background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${strobeProbability}%, #e5e7eb ${strobeProbability}%, #e5e7eb 100%)`,
   } as const
 
-  const controlsDisabled = isLoading || isSaving
+  const controlsDisabled = !audio.loaded || audio.isSaving
   const strobeControlsDisabled = controlsDisabled || !strobeEnabled
 
   const rangeClassName =
@@ -188,8 +72,8 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             max="5.0"
             step="0.1"
             value={sensitivity}
-            onChange={handleSliderChange}
-            onMouseUp={handleSliderBlur}
+            onChange={(e) => audio.set({ sensitivity: parseFloat(e.target.value) })}
+            onMouseUp={commitSensitivity}
             disabled={controlsDisabled}
             className={rangeClassName}
             style={sensitivityRangeStyle}
@@ -203,9 +87,9 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             value={sensitivity}
             onChange={(e) => {
               const value = parseFloat(e.target.value) || 0.1
-              setSensitivity(Math.max(0.1, Math.min(5.0, value)))
+              audio.set({ sensitivity: clamp(value, 0.1, 5.0) })
             }}
-            onBlur={() => handleSensitivityChange(sensitivity)}
+            onBlur={commitSensitivity}
             disabled={controlsDisabled}
             className={numberClassName}
             aria-label="Global sensitivity numeric"
@@ -225,8 +109,8 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             max="255"
             step="1"
             value={noiseFloor}
-            onChange={handleNoiseFloorSliderChange}
-            onMouseUp={handleNoiseFloorSliderBlur}
+            onChange={(e) => audio.set({ noiseFloor: parseFloat(e.target.value) })}
+            onMouseUp={commitNoiseFloor}
             disabled={controlsDisabled}
             className={rangeClassName}
             style={noiseFloorRangeStyle}
@@ -240,9 +124,9 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             value={noiseFloor}
             onChange={(e) => {
               const value = parseFloat(e.target.value) || 0
-              setNoiseFloor(Math.max(0, Math.min(255, value)))
+              audio.set({ noiseFloor: clamp(value, 0, 255) })
             }}
-            onBlur={() => handleNoiseFloorChange(noiseFloor)}
+            onBlur={commitNoiseFloor}
             disabled={controlsDisabled}
             className={numberClassName}
             aria-label="Noise floor numeric"
@@ -260,9 +144,7 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             checked={strobeEnabled}
             disabled={controlsDisabled}
             onChange={(e) => {
-              const next = e.target.checked
-              setStrobeEnabled(next)
-              void persistStrobe({ strobeEnabled: next })
+              void audio.save({ strobeEnabled: e.target.checked })
             }}
             aria-label="Strobe"
           />
@@ -282,9 +164,9 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
               max={1}
               step={0.01}
               value={strobeTriggerThreshold}
-              onChange={(e) => setStrobeTriggerThreshold(Number(e.target.value))}
-              onMouseUp={() => void persistStrobe({ strobeTriggerThreshold })}
-              onTouchEnd={() => void persistStrobe({ strobeTriggerThreshold })}
+              onChange={(e) => audio.set({ strobeTriggerThreshold: Number(e.target.value) })}
+              onMouseUp={commitStrobe}
+              onTouchEnd={commitStrobe}
               disabled={strobeControlsDisabled}
               className={compactStrobeRangeClassName}
               style={strobeTriggerRangeStyle}
@@ -299,10 +181,10 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
               onChange={(e) => {
                 const value = parseFloat(e.target.value)
                 if (Number.isFinite(value)) {
-                  setStrobeTriggerThreshold(Math.max(0, Math.min(1, value)))
+                  audio.set({ strobeTriggerThreshold: clamp(value, 0, 1) })
                 }
               }}
-              onBlur={() => void persistStrobe({ strobeTriggerThreshold })}
+              onBlur={commitStrobe}
               disabled={strobeControlsDisabled}
               className={numberClassName}
               aria-label="Strobe threshold numeric"
@@ -320,9 +202,9 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
               max={100}
               step={1}
               value={strobeProbability}
-              onChange={(e) => setStrobeProbability(Number(e.target.value))}
-              onMouseUp={() => void persistStrobe({ strobeProbability })}
-              onTouchEnd={() => void persistStrobe({ strobeProbability })}
+              onChange={(e) => audio.set({ strobeProbability: Number(e.target.value) })}
+              onMouseUp={commitStrobe}
+              onTouchEnd={commitStrobe}
               disabled={strobeControlsDisabled}
               className={compactStrobeRangeClassName}
               style={strobeProbabilityRangeStyle}
@@ -336,10 +218,10 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
               onChange={(e) => {
                 const value = parseFloat(e.target.value)
                 if (Number.isFinite(value)) {
-                  setStrobeProbability(Math.max(0, Math.min(100, Math.round(value))))
+                  audio.set({ strobeProbability: clamp(Math.round(value), 0, 100) })
                 }
               }}
-              onBlur={() => void persistStrobe({ strobeProbability })}
+              onBlur={commitStrobe}
               disabled={strobeControlsDisabled}
               className={numberClassName}
               aria-label="Strobe probability percent"
@@ -371,8 +253,8 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             max="5.0"
             step="0.1"
             value={sensitivity}
-            onChange={handleSliderChange}
-            onMouseUp={handleSliderBlur}
+            onChange={(e) => audio.set({ sensitivity: parseFloat(e.target.value) })}
+            onMouseUp={commitSensitivity}
             disabled={controlsDisabled}
             className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
             style={sensitivityRangeStyle}
@@ -386,9 +268,9 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             value={sensitivity}
             onChange={(e) => {
               const value = parseFloat(e.target.value) || 0.1
-              setSensitivity(Math.max(0.1, Math.min(5.0, value)))
+              audio.set({ sensitivity: clamp(value, 0.1, 5.0) })
             }}
-            onBlur={() => handleSensitivityChange(sensitivity)}
+            onBlur={commitSensitivity}
             disabled={controlsDisabled}
             className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
           />
@@ -416,8 +298,8 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             max="255"
             step="1"
             value={noiseFloor}
-            onChange={handleNoiseFloorSliderChange}
-            onMouseUp={handleNoiseFloorSliderBlur}
+            onChange={(e) => audio.set({ noiseFloor: parseFloat(e.target.value) })}
+            onMouseUp={commitNoiseFloor}
             disabled={controlsDisabled}
             className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
             style={noiseFloorRangeStyle}
@@ -431,9 +313,9 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             value={noiseFloor}
             onChange={(e) => {
               const value = parseFloat(e.target.value) || 0
-              setNoiseFloor(Math.max(0, Math.min(255, value)))
+              audio.set({ noiseFloor: clamp(value, 0, 255) })
             }}
-            onBlur={() => handleNoiseFloorChange(noiseFloor)}
+            onBlur={commitNoiseFloor}
             disabled={controlsDisabled}
             className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
           />

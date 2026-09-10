@@ -23,7 +23,7 @@ jest.mock('../utils/ipcHelpers', () => ({
   },
 }))
 
-import { useAudioConfigFields } from './useAudioConfigFields'
+import { useAudioConfigFields, type AudioSaveOutcome } from './useAudioConfigFields'
 
 function Panel(): JSX.Element {
   const audio = useAudioConfigFields({ sensitivity: 2.5, noiseFloor: 60 })
@@ -35,6 +35,14 @@ function Panel(): JSX.Element {
       <button onClick={() => void audio.save({ sensitivity: 4 })}>save</button>
       <button onClick={() => audio.set({ sensitivity: 3 })}>set</button>
       <button onClick={() => void audio.commit()}>commit</button>
+      <button
+        onClick={() => {
+          audio.saveSoon({ sensitivity: 5 }, 20)
+          audio.saveSoon({ sensitivity: 6 }, 20)
+          audio.saveSoon({ sensitivity: 7 }, 20)
+        }}>
+        drag
+      </button>
     </div>
   )
 }
@@ -115,6 +123,77 @@ describe('useAudioConfigFields', () => {
     fireEvent.click(screen.getByText('commit'))
     await waitFor(() =>
       expect(saveAudioConfig).toHaveBeenCalledWith({ sensitivity: 3, noiseFloor: 60 }),
+    )
+  })
+
+  it('writes once when a burst of changes goes quiet', async () => {
+    getAudioConfig.mockImplementation(async () => ({ sensitivity: 1.5, noiseFloor: 60 }))
+    render(<Panel />)
+    await waitFor(() => expect(sensitivity()).toBe('1.5'))
+
+    fireEvent.click(screen.getByText('drag'))
+    expect(sensitivity()).toBe('7')
+
+    await waitFor(() =>
+      expect(saveAudioConfig).toHaveBeenCalledWith({ sensitivity: 7, noiseFloor: 60 }),
+    )
+    expect(saveAudioConfig).toHaveBeenCalledTimes(1)
+  })
+
+  it('puts the values from before a burst back when its save is refused', async () => {
+    getAudioConfig.mockImplementation(async () => ({ sensitivity: 1.5, noiseFloor: 60 }))
+    saveAudioConfig.mockImplementation(async () => ({ success: false, error: 'nope' }))
+    render(<Panel />)
+    await waitFor(() => expect(sensitivity()).toBe('1.5'))
+
+    fireEvent.click(screen.getByText('drag'))
+
+    await waitFor(() => expect(sensitivity()).toBe('1.5'))
+  })
+
+  it('reports a warning main sent back with the save', async () => {
+    saveAudioConfig.mockImplementation(async () => ({ success: true, warning: 'capture stopped' }))
+    let outcome: AudioSaveOutcome | undefined
+    function Probe(): JSX.Element {
+      const audio = useAudioConfigFields({ sensitivity: 2.5 })
+      return (
+        <button
+          onClick={() => {
+            void audio.save({ sensitivity: 4 }).then((r) => {
+              outcome = r
+            })
+          }}>
+          save
+        </button>
+      )
+    }
+    render(<Probe />)
+    await waitFor(() => expect(getAudioConfig).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByText('save'))
+
+    await waitFor(() => expect(outcome).toEqual({ ok: true, warning: 'capture stopped' }))
+  })
+
+  it('waits for the stored config before writing the fields it was not asked to change', async () => {
+    let release: (() => void) | undefined
+    getAudioConfig.mockImplementation(async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve
+      })
+      return { sensitivity: 1.5, noiseFloor: 90 }
+    })
+
+    render(<Panel />)
+    await waitFor(() => expect(release).toBeDefined())
+
+    fireEvent.click(screen.getByText('save'))
+    expect(saveAudioConfig).not.toHaveBeenCalled()
+
+    act(() => release?.())
+
+    await waitFor(() =>
+      expect(saveAudioConfig).toHaveBeenCalledWith({ sensitivity: 4, noiseFloor: 90 }),
     )
   })
 
