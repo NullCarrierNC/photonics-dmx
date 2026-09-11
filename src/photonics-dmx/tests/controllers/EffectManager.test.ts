@@ -923,7 +923,7 @@ describe('EffectManager', () => {
       const firstState = firstCall[2] as LightEffectState
       const secondState = secondCall[2] as LightEffectState
 
-      expect(firstState.effectRunId).toBeTruthy()
+      expect(firstState.effectRunId).toMatch(/.+/)
       expect(secondState.effectRunId).toBe(firstState.effectRunId)
 
       // Complete the first light - should not restart yet

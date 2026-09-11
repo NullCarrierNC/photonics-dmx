@@ -8,6 +8,7 @@
  * explains the cap rather than applying it silently.
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
+import '@testing-library/jest-dom/jest-globals'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import {
   ConfigStrobeType,
@@ -105,9 +106,9 @@ describe('LightChannelsConfig rendering', () => {
 
     expect(masterDimmerInput().value).toBe('10')
     // red/green/blue keep the template's offsets of +1/+2/+3.
-    expect(screen.getByText('11')).toBeTruthy()
-    expect(screen.getByText('12')).toBeTruthy()
-    expect(screen.getByText('13')).toBeTruthy()
+    expect(screen.getByText('11')).toBeInTheDocument()
+    expect(screen.getByText('12')).toBeInTheDocument()
+    expect(screen.getByText('13')).toBeInTheDocument()
   })
 
   it('renders no channel list when the light names a template that is gone', () => {
@@ -158,15 +159,15 @@ describe('LightChannelsConfig master dimmer', () => {
 
     fireEvent.change(masterDimmerInput(), { target: { value: '999' } })
 
-    expect(screen.getByText(/Capped at 509/)).toBeTruthy()
-    expect(screen.getByText(/4 channels fit/)).toBeTruthy()
+    expect(screen.getByText(/Capped at 509/)).toBeInTheDocument()
+    expect(screen.getByText(/4 channels fit/)).toBeInTheDocument()
   })
 
   it('drops the notice once a value inside the universe is entered', () => {
     renderCard()
 
     fireEvent.change(masterDimmerInput(), { target: { value: '999' } })
-    expect(screen.queryByText(/Capped at/)).toBeTruthy()
+    expect(screen.queryByText(/Capped at/)).toBeInTheDocument()
 
     fireEvent.change(masterDimmerInput(), { target: { value: '10' } })
     expect(screen.queryByText(/Capped at/)).toBeNull()
@@ -175,7 +176,7 @@ describe('LightChannelsConfig master dimmer', () => {
   it('does not carry the notice onto a different light', () => {
     const { rerender } = renderCard()
     fireEvent.change(masterDimmerInput(), { target: { value: '999' } })
-    expect(screen.queryByText(/Capped at/)).toBeTruthy()
+    expect(screen.queryByText(/Capped at/)).toBeInTheDocument()
 
     rerender(
       <LightChannelsConfig

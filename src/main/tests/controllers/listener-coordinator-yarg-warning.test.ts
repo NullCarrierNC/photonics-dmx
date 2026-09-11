@@ -80,7 +80,7 @@ describe('ListenerCoordinator YARG warning forwarding', () => {
     const listener = (
       lc as unknown as { yargListener: { emit: (event: string, payload: unknown) => void } }
     ).yargListener
-    expect(listener).toBeTruthy()
+    expect(listener).toEqual(expect.objectContaining({ emit: expect.any(Function) }))
 
     const payload = {
       type: 'datagram-version-newer',

@@ -114,9 +114,9 @@ describe('CueSelectionPolicy', () => {
       policy.onSongStart()
       policy.setCueConsistencyWindow(0)
 
-      const first = policy.selectCue(CueType.Chorus)!
+      const first = policy.selectCue(CueType.Chorus)
       const lockedGroup = seen[0].groupId
-      expect(first).toBeTruthy()
+      expect(first).toBe(catalog.getGroup(lockedGroup)?.cues.get(CueType.Chorus))
       for (let i = 0; i < 10; i++) {
         policy.selectCue(CueType.Chorus)
         policy.selectCue(CueType.Verse)
@@ -124,7 +124,10 @@ describe('CueSelectionPolicy', () => {
       expect(seen.every((u) => u.groupId === lockedGroup)).toBe(true)
 
       policy.onSongEnd()
-      expect(policy.selectCue(CueType.Chorus)).toBeTruthy()
+      const chorusCues = ['groupA', 'groupB'].map((id) =>
+        catalog.getGroup(id)?.cues.get(CueType.Chorus),
+      )
+      expect(chorusCues).toContain(policy.selectCue(CueType.Chorus))
     })
   })
 

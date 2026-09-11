@@ -1,5 +1,6 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest } from '@jest/globals'
+import '@testing-library/jest-dom/jest-globals'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { CueGroupEnableList } from './CueGroupEnableList'
 
@@ -14,9 +15,9 @@ describe('CueGroupEnableList', () => {
         <div data-testid="row">Row body</div>
       </CueGroupEnableList>,
     )
-    expect(screen.getByText('Group Panel')).toBeTruthy()
-    expect(screen.getByText('Group panel description.')).toBeTruthy()
-    expect(screen.getByTestId('row')).toBeTruthy()
+    expect(screen.getByText('Group Panel')).toBeInTheDocument()
+    expect(screen.getByText('Group panel description.')).toBeInTheDocument()
+    expect(screen.getByTestId('row')).toBeInTheDocument()
   })
 
   it('renders the load-error UI and Retry button when loadError is set', async () => {
@@ -45,7 +46,7 @@ describe('CueGroupEnableList', () => {
         <div data-testid="row">should not render</div>
       </CueGroupEnableList>,
     )
-    expect(screen.getByText(/loading/i)).toBeTruthy()
+    expect(screen.getByText(/loading/i)).toBeInTheDocument()
     expect(screen.queryByTestId('row')).toBeNull()
   })
 

@@ -4,6 +4,7 @@
  * after its base channels, with their live DMX value; a plain fixture renders only its base rows.
  */
 import { describe, expect, it, afterEach } from '@jest/globals'
+import '@testing-library/jest-dom/jest-globals'
 import { render, screen, within, cleanup } from '@testing-library/react'
 import {
   ConfigStrobeType,
@@ -54,21 +55,21 @@ describe('LightsDmxChannelsPreview extra channels', () => {
     const amberRow = within(card)
       .getByText(/^Amber/)
       .closest('li') as HTMLElement
-    expect(within(amberRow).getByText('200')).toBeTruthy()
+    expect(within(amberRow).getByText('200')).toBeInTheDocument()
   })
 
   it('shows a fixed channel with its pinned live value', () => {
     const l = light(RGB, [{ type: 'fixed', channel: 5, value: 42 }])
     render(<LightsDmxChannelsPreview lightingConfig={config(l)} dmxValues={{ 5: 42 }} />)
     const row = screen.getByText(/^Fixed value/).closest('li') as HTMLElement
-    expect(within(row).getByText('42')).toBeTruthy()
+    expect(within(row).getByText('42')).toBeInTheDocument()
   })
 
   it('renders only base channels for a fixture with no extras', () => {
     const l = light(RGB)
     render(<LightsDmxChannelsPreview lightingConfig={config(l)} dmxValues={{}} />)
     expect(screen.queryByText('Amber:')).toBeNull()
-    expect(screen.getByText(/^red/)).toBeTruthy()
+    expect(screen.getByText(/^red/)).toBeInTheDocument()
   })
 
   it('lists Master Dimmer before the other base channels', () => {

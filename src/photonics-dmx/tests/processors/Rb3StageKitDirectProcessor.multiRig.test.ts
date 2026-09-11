@@ -419,7 +419,8 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     const blend = processor.getColorBlendingInfo('red')
     expect(blend.color).toBe('red')
     expect(blend.description).toBe('Single color: red')
-    expect(blend.blendedColor).toBeTruthy()
+    // With no active rig the processor answers null, so a value means a rig blended it.
+    expect(blend.blendedColor).not.toBeNull()
   })
 
   it('refreshRigs adds processors for new chains and disposes processors for removed ones', async () => {
