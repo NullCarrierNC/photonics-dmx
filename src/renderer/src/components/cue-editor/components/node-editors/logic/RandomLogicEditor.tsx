@@ -5,6 +5,7 @@ import type {
 } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
+import VariableSelect from './VariableSelect'
 import MultiItemSummary from './MultiItemSummary'
 
 export interface RandomLogicEditorProps extends LogicEditorCommonProps {
@@ -99,20 +100,13 @@ const RandomLogicEditor: React.FC<RandomLogicEditorProps> = ({
       )}
       {mode === 'random-light' && (
         <>
-          <label className="flex flex-col font-medium">
-            Source Variable (light-array)
-            <select
-              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={node.sourceVariable ?? ''}
-              onChange={(e) => updateNode({ sourceVariable: e.target.value || undefined })}>
-              <option value="">-- Select light-array --</option>
-              {lightArrayVars.map((v) => (
-                <option key={v.name} value={v.name}>
-                  {v.name} ({v.scope})
-                </option>
-              ))}
-            </select>
-          </label>
+          <VariableSelect
+            label="Source Variable (light-array)"
+            value={node.sourceVariable ?? ''}
+            onChange={(name) => updateNode({ sourceVariable: name || undefined })}
+            variables={lightArrayVars}
+            placeholder="-- Select light-array --"
+          />
           <ValueSourceEditor
             label="Count (number of lights to pick)"
             value={node.count}
@@ -122,20 +116,13 @@ const RandomLogicEditor: React.FC<RandomLogicEditorProps> = ({
           />
         </>
       )}
-      <label className="flex flex-col font-medium">
-        Assign To
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.assignTo ?? ''}
-          onChange={(e) => updateNode({ assignTo: e.target.value })}>
-          <option value="">-- Select variable --</option>
-          {assignToVars.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.type}, {v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
+      <VariableSelect
+        label="Assign To"
+        value={node.assignTo ?? ''}
+        onChange={(name) => updateNode({ assignTo: name })}
+        variables={assignToVars}
+        showType
+      />
       <p className="text-[10px] text-gray-500 italic">
         {mode === 'random-integer' && 'Random integer in [min, max] (inclusive).'}
         {mode === 'random-choice' && 'Picks one string from the list at random.'}

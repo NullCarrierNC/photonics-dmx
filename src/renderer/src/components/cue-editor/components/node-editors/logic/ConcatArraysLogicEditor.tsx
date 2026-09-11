@@ -1,17 +1,42 @@
 import React from 'react'
-import type { ConcatColorsLogicNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type {
+  ConcatColorsLogicNode,
+  ConcatLightsLogicNode,
+} from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
+import VariableSelect from './VariableSelect'
 
-export interface ConcatColorsLogicEditorProps extends LogicEditorCommonProps {
-  node: ConcatColorsLogicNode
+export type ConcatArraysLogicNode = ConcatColorsLogicNode | ConcatLightsLogicNode
+
+/** The array each concat node joins, how its sources are labelled, and the line of help under its fields. */
+const CONCATS: Record<
+  ConcatArraysLogicNode['logicType'],
+  { arrayType: 'color-array' | 'light-array'; sourceLabel: string; description: string }
+> = {
+  'concat-colors': {
+    arrayType: 'color-array',
+    sourceLabel: 'Source Palettes',
+    description: 'Concatenates multiple colour palettes into one. Order matters.',
+  },
+  'concat-lights': {
+    arrayType: 'light-array',
+    sourceLabel: 'Source Arrays',
+    description: 'Concatenates multiple light arrays into one. Order matters.',
+  },
 }
 
-const ConcatColorsLogicEditor: React.FC<ConcatColorsLogicEditorProps> = ({
+export interface ConcatArraysLogicEditorProps extends LogicEditorCommonProps {
+  node: ConcatArraysLogicNode
+}
+
+/** The editor for the nodes that join arrays end to end, over colours or lights. */
+const ConcatArraysLogicEditor: React.FC<ConcatArraysLogicEditorProps> = ({
   node,
   availableVariables,
   updateNode,
 }) => {
-  const colorArrayVars = availableVariables.filter((v) => v.type === 'color-array')
+  const { arrayType, sourceLabel, description } = CONCATS[node.logicType]
+  const arrayVars = availableVariables.filter((v) => v.type === arrayType)
   const sourceVariables = node.sourceVariables || []
 
   const addSourceVariable = (varName: string): void => {
@@ -29,7 +54,7 @@ const ConcatColorsLogicEditor: React.FC<ConcatColorsLogicEditorProps> = ({
   return (
     <div className="space-y-2 text-xs">
       <label className="flex flex-col font-medium">
-        Source Palettes (color-array)
+        {sourceLabel} ({arrayType})
         <div className="mt-1 space-y-1">
           {sourceVariables.map((varName, index) => (
             <div key={index} className="flex items-center gap-2">
@@ -48,8 +73,8 @@ const ConcatColorsLogicEditor: React.FC<ConcatColorsLogicEditorProps> = ({
             className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
             value=""
             onChange={(event) => addSourceVariable(event.target.value)}>
-            <option value="">-- Add color-array --</option>
-            {colorArrayVars
+            <option value="">-- Add {arrayType} --</option>
+            {arrayVars
               .filter((v) => !sourceVariables.includes(v.name))
               .map((v) => (
                 <option key={v.name} value={v.name}>
@@ -60,26 +85,16 @@ const ConcatColorsLogicEditor: React.FC<ConcatColorsLogicEditorProps> = ({
         </div>
       </label>
 
-      <label className="flex flex-col font-medium">
-        Assign To (color-array variable)
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.assignTo}
-          onChange={(event) => updateNode({ assignTo: event.target.value })}>
-          <option value="">-- Select variable --</option>
-          {colorArrayVars.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
+      <VariableSelect
+        label={`Assign To (${arrayType} variable)`}
+        value={node.assignTo}
+        onChange={(name) => updateNode({ assignTo: name })}
+        variables={arrayVars}
+      />
 
-      <p className="text-[10px] text-gray-500 italic">
-        Concatenates multiple colour palettes into one. Order matters.
-      </p>
+      <p className="text-[10px] text-gray-500 italic">{description}</p>
     </div>
   )
 }
 
-export default ConcatColorsLogicEditor
+export default ConcatArraysLogicEditor

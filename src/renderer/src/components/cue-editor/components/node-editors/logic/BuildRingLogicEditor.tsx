@@ -1,6 +1,7 @@
 import React from 'react'
 import type { BuildRingLogicNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
+import VariableSelect from './VariableSelect'
 
 export interface BuildRingLogicEditorProps extends LogicEditorCommonProps {
   node: BuildRingLogicNode
@@ -16,35 +17,19 @@ const BuildRingLogicEditor: React.FC<BuildRingLogicEditorProps> = ({
 
   return (
     <div className="space-y-2 text-xs">
-      <label className="flex flex-col font-medium">
-        Ring (light-array variable)
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.assignTo}
-          onChange={(event) => updateNode({ assignTo: event.target.value })}>
-          <option value="">-- Select variable --</option>
-          {lightArrayVars.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
+      <VariableSelect
+        label="Ring (light-array variable)"
+        value={node.assignTo}
+        onChange={(name) => updateNode({ assignTo: name })}
+        variables={lightArrayVars}
+      />
 
-      <label className="flex flex-col font-medium">
-        Group Size (number variable)
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.assignGroupSize}
-          onChange={(event) => updateNode({ assignGroupSize: event.target.value })}>
-          <option value="">-- Select variable --</option>
-          {numberVars.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
+      <VariableSelect
+        label="Group Size (number variable)"
+        value={node.assignGroupSize}
+        onChange={(name) => updateNode({ assignGroupSize: name })}
+        variables={numberVars}
+      />
 
       <p className="text-[10px] text-gray-500 italic">
         Builds a virtual 8-step LED ring from all lights so chases keep their shape on any rig:
