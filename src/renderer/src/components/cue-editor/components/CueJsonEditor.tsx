@@ -1,11 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react'
-import { EditorState } from '@codemirror/state'
-import { EditorView, keymap, lineNumbers } from '@codemirror/view'
-import { defaultKeymap } from '@codemirror/commands'
-import { json, jsonParseLinter } from '@codemirror/lang-json'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { linter, lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint'
-import { ensureSyntaxTree } from '@codemirror/language'
+import React, { useCallback } from 'react'
 import type {
   AudioNodeCueDefinition,
   NodeCueFile,
@@ -14,78 +7,26 @@ import type {
 import type { EditorDocument } from '../lib/types'
 import { validateNodeCue } from '../../../ipcApi'
 import { replaceCueInFile, resolveCueCollisions } from '../lib/cueUtils'
+import NodeJsonEditor from './NodeJsonEditor'
 
-/**
- * Resolve a JSON Pointer path (e.g. ["nodes", "events", "0", "type"]) to character
- * positions in the editor by walking the tree.
- */
-function resolveJsonPath(
-  state: EditorState,
-  segments: string[],
-): { from: number; to: number } | null {
-  const tree = ensureSyntaxTree(state, state.doc.length)
-  if (!tree) return null
+type CueDefinition = NetNodeCueDefinition | AudioNodeCueDefinition
 
-  const cur = tree.cursor()
-  if (cur.name !== 'JsonText') return null
-  if (!cur.firstChild()) return null
-
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i]
-    const name = cur.name as string
-
-    if (name === 'Object') {
-      if (!cur.firstChild()) return null
-      while ((cur.name as string) === '{' || (cur.name as string) === '}') {
-        if (!cur.nextSibling()) return null
-      }
-      let found = false
-      while ((cur.name as string) === 'Property') {
-        if (!cur.firstChild()) return null
-        const key = state.doc.sliceString(cur.from, cur.to).replace(/^"|"$/g, '')
-        if (!cur.parent()) return null
-        if (key === seg) {
-          cur.firstChild()
-          cur.nextSibling()
-          cur.nextSibling()
-          found = true
-          break
-        }
-        if (!cur.nextSibling()) return null
-        while ((cur.name as string) === ',') {
-          if (!cur.nextSibling()) return null
-        }
-      }
-      if (!found) return null
-    } else if (name === 'Array') {
-      const index = parseInt(seg, 10)
-      if (Number.isNaN(index) || index < 0) return null
-      if (!cur.firstChild()) return null
-      if ((cur.name as string) === '[' && !cur.nextSibling()) return null
-      for (let j = 0; j < index; j++) {
-        if (!cur.nextSibling() || (cur.name as string) !== ',') return null
-        if (!cur.nextSibling()) return null
-      }
-    } else {
-      return null
-    }
-
-    if (i === segments.length - 1) return { from: cur.from, to: cur.to }
-  }
-
-  return { from: cur.from, to: cur.to }
-}
+const validateCueContent = (file: NodeCueFile) => validateNodeCue({ content: file })
 
 type CueJsonEditorProps = {
-  cueDefinition: NetNodeCueDefinition | AudioNodeCueDefinition
+  cueDefinition: CueDefinition
   editorDoc: EditorDocument
   selectedCueId: string
   availableCueTypes: string[]
-  onSave: (updatedCue: NetNodeCueDefinition | AudioNodeCueDefinition) => void
+  onSave: (updatedCue: CueDefinition) => void
   onCancel: () => void
   onDirtyChange?: (dirty: boolean) => void
 }
 
+/**
+ * The JSON editor for one cue. A cue pasted from elsewhere has its id, name and cue type reconciled
+ * against the other cues in the file first, so saving it cannot clobber a sibling.
+ */
 const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
   cueDefinition,
   editorDoc,
@@ -95,213 +36,33 @@ const CueJsonEditor: React.FC<CueJsonEditorProps> = ({
   onCancel,
   onDirtyChange,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const viewRef = useRef<EditorView | null>(null)
-  const [hasEdits, setHasEdits] = useState(false)
-  const [validationPassed, setValidationPassed] = useState(false)
-  const validationPassedRef = useRef(false)
-  const [contentChangedAfterValidation, setContentChangedAfterValidation] = useState(false)
-  const [validationErrors, setValidationErrors] = useState<string[]>([])
-  const [notices, setNotices] = useState<string[]>([])
-
-  useEffect(() => {
-    onDirtyChange?.(hasEdits)
-  }, [hasEdits, onDirtyChange])
-
-  useEffect(() => {
-    validationPassedRef.current = validationPassed
-  }, [validationPassed])
-
-  const showSaveButton = validationPassed && !contentChangedAfterValidation
-
-  const buildFileWithCue = useCallback(
-    (cue: NetNodeCueDefinition | AudioNodeCueDefinition): NodeCueFile => {
-      const file = editorDoc.file as NodeCueFile
-      return replaceCueInFile(file, selectedCueId, cue)
-    },
+  const buildFile = useCallback(
+    (cue: CueDefinition): NodeCueFile =>
+      replaceCueInFile(editorDoc.file as NodeCueFile, selectedCueId, cue),
     [editorDoc.file, selectedCueId],
   )
 
-  const handleValidate = useCallback(async () => {
-    const view = viewRef.current
-    if (!view) return
-
-    const raw = view.state.doc.toString()
-    setValidationErrors([])
-    setNotices([])
-    view.dispatch(setDiagnostics(view.state, []))
-
-    let parsed: NetNodeCueDefinition | AudioNodeCueDefinition
-    try {
-      parsed = JSON.parse(raw) as NetNodeCueDefinition | AudioNodeCueDefinition
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Invalid JSON'
-      setValidationErrors([`Parse error: ${message}`])
-      setValidationPassed(false)
-      return
-    }
-
-    // Reconcile identity collisions (id / name / cue type) against the other cues in this
-    // file so a cue pasted from elsewhere can be saved without clobbering a sibling.
-    const file = editorDoc.file as NodeCueFile
-    const siblings = file.cues.filter((c) => c.id !== selectedCueId)
-    const { cue: normalized, notices: collisionNotices } = resolveCueCollisions(
-      parsed,
-      siblings,
-      availableCueTypes,
-    )
-    if (collisionNotices.length > 0) {
-      // Rewrite the editor text with the resolved cue before validation passes, so the
-      // doc-change listener does not flip contentChangedAfterValidation.
-      view.dispatch({
-        changes: {
-          from: 0,
-          to: view.state.doc.length,
-          insert: JSON.stringify(normalized, null, 2),
-        },
-      })
-      setNotices(collisionNotices)
-    }
-    parsed = normalized
-
-    const fileWithCue = buildFileWithCue(parsed)
-    const result = await validateNodeCue({ content: fileWithCue })
-
-    if (!result.valid) {
-      setValidationErrors(result.errors ?? ['Validation failed'])
-      setValidationPassed(false)
-      const structured =
-        (result as { structuredErrors?: { instancePath: string; message: string }[] })
-          .structuredErrors ?? []
-      const cueIndex = fileWithCue.cues.findIndex((c) => c.id === selectedCueId)
-      const cuePrefix = cueIndex >= 0 ? `/cues/${cueIndex}/` : ''
-      const diagnostics: Diagnostic[] = []
-      for (const err of structured) {
-        const pathRelative =
-          cuePrefix && err.instancePath.startsWith(cuePrefix)
-            ? err.instancePath.slice(cuePrefix.length)
-            : err.instancePath
-        const segments = pathRelative.split('/').filter(Boolean)
-        const pos = resolveJsonPath(view.state, segments)
-        if (pos) {
-          diagnostics.push({
-            from: pos.from,
-            to: pos.to,
-            severity: 'error',
-            message: err.message,
-            source: 'schema',
-          })
-        }
-      }
-      view.dispatch(setDiagnostics(view.state, diagnostics))
-      return
-    }
-
-    view.dispatch(setDiagnostics(view.state, []))
-    setValidationErrors([])
-    // Warnings do not block a save: the cue is valid, but something in it will not fire. Surfaced on
-    // the same notice line as the collision messages so the author sees it before saving.
-    const warnings = (result as { warnings?: string[] }).warnings ?? []
-    if (warnings.length > 0) {
-      setNotices((current) => [...current, ...warnings])
-    }
-    setValidationPassed(true)
-    setContentChangedAfterValidation(false)
-  }, [buildFileWithCue, selectedCueId, editorDoc.file, availableCueTypes])
-
-  const handleSave = useCallback(() => {
-    const view = viewRef.current
-    if (!view || !validationPassed) return
-
-    const raw = view.state.doc.toString()
-    try {
-      const parsed = JSON.parse(raw) as NetNodeCueDefinition | AudioNodeCueDefinition
-      onSave(parsed)
-    } catch {
-      setValidationErrors(['Parse error: cannot save invalid JSON'])
-    }
-  }, [onSave, validationPassed])
-
-  useEffect(() => {
-    if (!containerRef.current) return
-
-    const extensions = [
-      lineNumbers(),
-      json(),
-      oneDark,
-      keymap.of(defaultKeymap),
-      lintGutter(),
-      linter(jsonParseLinter()),
-      EditorView.updateListener.of((update) => {
-        if (update.docChanged) {
-          setHasEdits(true)
-          if (validationPassedRef.current) {
-            setContentChangedAfterValidation(true)
-            setNotices([])
-          }
-          update.view.dispatch(setDiagnostics(update.state, []))
-        }
-      }),
-    ]
-
-    const initialState = EditorState.create({
-      doc: JSON.stringify(cueDefinition, null, 2),
-      extensions,
-    })
-
-    const view = new EditorView({
-      state: initialState,
-      parent: containerRef.current,
-    })
-    viewRef.current = view
-
-    return () => {
-      view.destroy()
-      viewRef.current = null
-    }
-  }, [cueDefinition])
+  const reconcile = useCallback(
+    (cue: CueDefinition) => {
+      const siblings = (editorDoc.file as NodeCueFile).cues.filter((c) => c.id !== selectedCueId)
+      const { cue: definition, notices } = resolveCueCollisions(cue, siblings, availableCueTypes)
+      return { definition, notices }
+    },
+    [editorDoc.file, selectedCueId, availableCueTypes],
+  )
 
   return (
-    <div className="flex-1 min-h-0 relative flex flex-col rounded-b-lg overflow-hidden bg-[#282c34]">
-      <div className="flex items-center justify-end gap-2 px-2 py-1.5 bg-[#21252b] border-b border-[#181a1f] shrink-0">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-3 py-1.5 text-sm font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
-          Cancel
-        </button>
-        {showSaveButton ? (
-          <button
-            type="button"
-            onClick={handleSave}
-            className="px-3 py-1.5 text-sm font-medium rounded text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
-            Apply
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleValidate}
-            className="px-3 py-1.5 text-sm font-medium rounded text-white bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400">
-            Validate
-          </button>
-        )}
-      </div>
-      <div ref={containerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" />
-      {notices.length > 0 && (
-        <div className="px-3 py-2 text-xs text-blue-100 bg-blue-900/50 border-t border-blue-800 overflow-auto max-h-24">
-          {notices.map((msg, i) => (
-            <div key={i}>{msg}</div>
-          ))}
-        </div>
-      )}
-      {validationErrors.length > 0 && (
-        <div className="px-3 py-2 text-xs text-red-200 bg-red-900/50 border-t border-red-800 overflow-auto max-h-24">
-          {validationErrors.map((msg, i) => (
-            <div key={i}>{msg}</div>
-          ))}
-        </div>
-      )}
-    </div>
+    <NodeJsonEditor
+      definition={cueDefinition}
+      collectionKey="cues"
+      selectedId={selectedCueId}
+      buildFile={buildFile}
+      validate={validateCueContent}
+      reconcile={reconcile}
+      onSave={onSave}
+      onCancel={onCancel}
+      onDirtyChange={onDirtyChange}
+    />
   )
 }
 

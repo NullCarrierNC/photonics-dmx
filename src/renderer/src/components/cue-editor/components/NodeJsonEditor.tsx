@@ -1,0 +1,306 @@
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { EditorState } from '@codemirror/state'
+import { EditorView, keymap, lineNumbers } from '@codemirror/view'
+import { defaultKeymap } from '@codemirror/commands'
+import { json, jsonParseLinter } from '@codemirror/lang-json'
+import { oneDark } from '@codemirror/theme-one-dark'
+import { linter, lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint'
+import { ensureSyntaxTree } from '@codemirror/language'
+
+/**
+ * Resolve a JSON Pointer path (e.g. ["nodes", "events", "0", "type"]) to character
+ * positions in the editor by walking the tree.
+ */
+function resolveJsonPath(
+  state: EditorState,
+  segments: string[],
+): { from: number; to: number } | null {
+  const tree = ensureSyntaxTree(state, state.doc.length)
+  if (!tree) return null
+
+  const cur = tree.cursor()
+  if (cur.name !== 'JsonText') return null
+  if (!cur.firstChild()) return null
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]
+    const name = cur.name as string
+
+    if (name === 'Object') {
+      if (!cur.firstChild()) return null
+      while ((cur.name as string) === '{' || (cur.name as string) === '}') {
+        if (!cur.nextSibling()) return null
+      }
+      let found = false
+      while ((cur.name as string) === 'Property') {
+        if (!cur.firstChild()) return null
+        const key = state.doc.sliceString(cur.from, cur.to).replace(/^"|"$/g, '')
+        if (!cur.parent()) return null
+        if (key === seg) {
+          cur.firstChild()
+          cur.nextSibling()
+          cur.nextSibling()
+          found = true
+          break
+        }
+        if (!cur.nextSibling()) return null
+        while ((cur.name as string) === ',') {
+          if (!cur.nextSibling()) return null
+        }
+      }
+      if (!found) return null
+    } else if (name === 'Array') {
+      const index = parseInt(seg, 10)
+      if (Number.isNaN(index) || index < 0) return null
+      if (!cur.firstChild()) return null
+      if ((cur.name as string) === '[' && !cur.nextSibling()) return null
+      for (let j = 0; j < index; j++) {
+        if (!cur.nextSibling() || (cur.name as string) !== ',') return null
+        if (!cur.nextSibling()) return null
+      }
+    } else {
+      return null
+    }
+
+    if (i === segments.length - 1) return { from: cur.from, to: cur.to }
+  }
+
+  return { from: cur.from, to: cur.to }
+}
+
+/** What a validation channel answers, as far as the editor reads it. */
+export type JsonValidationResult = {
+  valid: boolean
+  errors?: string[]
+  structuredErrors?: { instancePath: string; message: string }[]
+  warnings?: string[]
+}
+
+export type NodeJsonEditorProps<
+  K extends string,
+  D extends { id: string },
+  F extends Record<K, D[]>,
+> = {
+  definition: D
+  /** The array in the file holding the definitions, for pointing schema errors at the edited one. */
+  collectionKey: K
+  selectedId: string
+  /** The whole file with the edited definition in place, for validation. */
+  buildFile: (definition: D) => F
+  validate: (file: F) => Promise<JsonValidationResult>
+  /** Adjusts a parsed definition before validation, with notices to show the author. */
+  reconcile?: (definition: D) => { definition: D; notices: string[] }
+  onSave: (definition: D) => void
+  onCancel: () => void
+  onDirtyChange?: (dirty: boolean) => void
+}
+
+/**
+ * The JSON editor behind the cue and effect editors: edit one definition as text, validate it inside
+ * its file, and apply it once it passes. Schema errors are pointed back at the spot in the text they
+ * came from, and warnings are shown without blocking the save.
+ */
+function NodeJsonEditor<K extends string, D extends { id: string }, F extends Record<K, D[]>>({
+  definition,
+  collectionKey,
+  selectedId,
+  buildFile,
+  validate,
+  reconcile,
+  onSave,
+  onCancel,
+  onDirtyChange,
+}: NodeJsonEditorProps<K, D, F>): JSX.Element {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const viewRef = useRef<EditorView | null>(null)
+  const [hasEdits, setHasEdits] = useState(false)
+  const [validationPassed, setValidationPassed] = useState(false)
+  const validationPassedRef = useRef(false)
+  const [contentChangedAfterValidation, setContentChangedAfterValidation] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [notices, setNotices] = useState<string[]>([])
+
+  useEffect(() => {
+    onDirtyChange?.(hasEdits)
+  }, [hasEdits, onDirtyChange])
+
+  useEffect(() => {
+    validationPassedRef.current = validationPassed
+  }, [validationPassed])
+
+  const showSaveButton = validationPassed && !contentChangedAfterValidation
+
+  const handleValidate = useCallback(async () => {
+    const view = viewRef.current
+    if (!view) return
+
+    const raw = view.state.doc.toString()
+    setValidationErrors([])
+    setNotices([])
+    view.dispatch(setDiagnostics(view.state, []))
+
+    let parsed: D
+    try {
+      parsed = JSON.parse(raw) as D
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Invalid JSON'
+      setValidationErrors([`Parse error: ${message}`])
+      setValidationPassed(false)
+      return
+    }
+
+    if (reconcile) {
+      const reconciled = reconcile(parsed)
+      if (reconciled.notices.length > 0) {
+        // Rewrite the editor text with the reconciled definition before validation passes, so the
+        // doc-change listener does not flip contentChangedAfterValidation.
+        view.dispatch({
+          changes: {
+            from: 0,
+            to: view.state.doc.length,
+            insert: JSON.stringify(reconciled.definition, null, 2),
+          },
+        })
+        setNotices(reconciled.notices)
+      }
+      parsed = reconciled.definition
+    }
+
+    const fileWithDefinition = buildFile(parsed)
+    const result = await validate(fileWithDefinition)
+
+    if (!result.valid) {
+      setValidationErrors(result.errors ?? ['Validation failed'])
+      setValidationPassed(false)
+      const index = fileWithDefinition[collectionKey].findIndex((d) => d.id === selectedId)
+      const prefix = index >= 0 ? `/${collectionKey}/${index}/` : ''
+      const diagnostics: Diagnostic[] = []
+      for (const err of result.structuredErrors ?? []) {
+        const pathRelative =
+          prefix && err.instancePath.startsWith(prefix)
+            ? err.instancePath.slice(prefix.length)
+            : err.instancePath
+        const segments = pathRelative.split('/').filter(Boolean)
+        const pos = resolveJsonPath(view.state, segments)
+        if (pos) {
+          diagnostics.push({
+            from: pos.from,
+            to: pos.to,
+            severity: 'error',
+            message: err.message,
+            source: 'schema',
+          })
+        }
+      }
+      view.dispatch(setDiagnostics(view.state, diagnostics))
+      return
+    }
+
+    view.dispatch(setDiagnostics(view.state, []))
+    setValidationErrors([])
+    // Warnings do not block a save: the definition is valid, but something in it will not fire.
+    // They share the notice line with any reconcile notices, so the author sees them before saving.
+    const warnings = result.warnings ?? []
+    if (warnings.length > 0) {
+      setNotices((current) => [...current, ...warnings])
+    }
+    setValidationPassed(true)
+    setContentChangedAfterValidation(false)
+  }, [buildFile, collectionKey, reconcile, selectedId, validate])
+
+  const handleSave = useCallback(() => {
+    const view = viewRef.current
+    if (!view || !validationPassed) return
+
+    const raw = view.state.doc.toString()
+    try {
+      onSave(JSON.parse(raw) as D)
+    } catch {
+      setValidationErrors(['Parse error: cannot save invalid JSON'])
+    }
+  }, [onSave, validationPassed])
+
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const extensions = [
+      lineNumbers(),
+      json(),
+      oneDark,
+      keymap.of(defaultKeymap),
+      lintGutter(),
+      linter(jsonParseLinter()),
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          setHasEdits(true)
+          if (validationPassedRef.current) {
+            setContentChangedAfterValidation(true)
+            setNotices([])
+          }
+          update.view.dispatch(setDiagnostics(update.state, []))
+        }
+      }),
+    ]
+
+    const initialState = EditorState.create({
+      doc: JSON.stringify(definition, null, 2),
+      extensions,
+    })
+
+    const view = new EditorView({
+      state: initialState,
+      parent: containerRef.current,
+    })
+    viewRef.current = view
+
+    return () => {
+      view.destroy()
+      viewRef.current = null
+    }
+  }, [definition])
+
+  return (
+    <div className="flex-1 min-h-0 relative flex flex-col rounded-b-lg overflow-hidden bg-[#282c34]">
+      <div className="flex items-center justify-end gap-2 px-2 py-1.5 bg-[#21252b] border-b border-[#181a1f] shrink-0">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-3 py-1.5 text-sm font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+          Cancel
+        </button>
+        {showSaveButton ? (
+          <button
+            type="button"
+            onClick={handleSave}
+            className="px-3 py-1.5 text-sm font-medium rounded text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
+            Apply
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleValidate}
+            className="px-3 py-1.5 text-sm font-medium rounded text-white bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400">
+            Validate
+          </button>
+        )}
+      </div>
+      <div ref={containerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" />
+      {notices.length > 0 && (
+        <div className="px-3 py-2 text-xs text-blue-100 bg-blue-900/50 border-t border-blue-800 overflow-auto max-h-24">
+          {notices.map((msg, i) => (
+            <div key={i}>{msg}</div>
+          ))}
+        </div>
+      )}
+      {validationErrors.length > 0 && (
+        <div className="px-3 py-2 text-xs text-red-200 bg-red-900/50 border-t border-red-800 overflow-auto max-h-24">
+          {validationErrors.map((msg, i) => (
+            <div key={i}>{msg}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default NodeJsonEditor
