@@ -26,6 +26,11 @@ export function pickRandom<T>(items: T[]): T | undefined {
   return items[Math.floor(Math.random() * items.length)]
 }
 
+/** A uniformly random element other than `current`, or undefined when there is none. */
+export function pickOther<T>(items: T[], current: T): T | undefined {
+  return pickRandom(items.filter((item) => item !== current))
+}
+
 /**
  * A uniformly random float in [start, end). Unlike {@link randomInRange} this does NOT round, so
  * it preserves sub-unit precision (used for second-based game-mode durations).

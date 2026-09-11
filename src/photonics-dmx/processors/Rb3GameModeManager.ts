@@ -1,26 +1,22 @@
-import { monotonicNowMs } from '../../shared/time'
-import { pickRandom, randomFloatInRange } from '../helpers/utils'
+import { pickOther, pickRandom } from '../helpers/utils'
+import { DwellTimer, type DwellSchedulePayload } from './dwellTimer'
 
 /** Countdown state pushed to the renderer for the RB3 primary-cue countdown display. */
-export type Rb3GameModeSchedulePayload = { deadlineMs: number | null; pending: boolean }
+export type Rb3GameModeSchedulePayload = DwellSchedulePayload
 
 /**
- * Drives RB3 "game mode" primary-cue rotation. RB3E sends no cue-change signal, so — like the audio
- * Game Mode dwell timer — a countdown drawn from a [min, max] second range arms a pending switch once
- * it elapses, and the switch fires on the next StageKit Light-1 (led-1) edge. On each switch it rotates
- * the primary cue GROUP (RB3 has a single cueType, so rotation is by group) and re-rolls motion via
- * `onSwitchDue` (the handler owns the probability + min-hold gated re-pick). It mirrors
- * {@link AudioGameModeManager}, but keyed on Light-1 edges instead of beats and on groups instead of
- * cueTypes; it keeps a monotonic deadline for the switch logic and a wall-clock mirror for the display.
+ * Drives RB3 "game mode" primary-cue rotation. RB3E sends no cue-change signal, so a dwell drawn
+ * from a [min, max] second range arms a pending switch once it elapses, and the switch fires on the
+ * next StageKit Light-1 (led-1) edge. On each switch it rotates the primary cue GROUP, since RB3 has
+ * a single cueType, and re-rolls motion via `onSwitchDue`, where the handler owns the probability and
+ * min-hold gated re-pick. The countdown is a {@link DwellTimer}, the same one
+ * {@link AudioGameModeManager} runs on beats and cue types.
  */
 export class Rb3GameModeManager {
   private started = false
-  private pendingSwitch = false
   private primaryGroupId = ''
-  private switchDeadlineMs = 0 // monotonic; drives the actual switch (immune to clock changes)
-  private switchDeadlineWallMs = 0 // wall-clock mirror; sent to the renderer countdown
+  private readonly dwell = new DwellTimer()
   private onPrimaryCueChange: ((groupId: string | null) => void) | null = null
-  private onScheduleChange: ((info: Rb3GameModeSchedulePayload) => void) | null = null
 
   /**
    * @param getRotationEnabled Read live on every tick: false is the RB3 lighting domain's
@@ -39,7 +35,7 @@ export class Rb3GameModeManager {
   }
 
   public setOnScheduleChange(cb: ((info: Rb3GameModeSchedulePayload) => void) | null): void {
-    this.onScheduleChange = cb
+    this.dwell.setOnChange(cb)
   }
 
   public getActivePrimaryGroupId(): string {
@@ -49,65 +45,62 @@ export class Rb3GameModeManager {
   /** Begin scheduling (call on song start): pick an initial primary group and arm a fresh countdown. */
   public start(): void {
     this.started = true
-    this.pendingSwitch = false
+    this.dwell.clearPending()
     this.primaryGroupId = pickRandom(this.getPrimaryGroupPool()) ?? ''
     this.scheduleNext()
     this.onPrimaryCueChange?.(this.primaryGroupId || null)
-    this.emitScheduleChange()
+    this.dwell.emit()
   }
 
   /** Stop scheduling (call on song end). Clears the renderer countdown. */
   public stop(): void {
     this.started = false
-    this.pendingSwitch = false
-    this.onScheduleChange?.({ deadlineMs: null, pending: false })
+    this.dwell.clearPending()
+    this.dwell.emitCleared()
   }
 
   /** Run on the ~30 Hz keepalive tick: arm a pending switch once the countdown has elapsed. */
   public tick(): void {
-    if (!this.started || this.pendingSwitch) return
+    if (!this.started || this.dwell.isPending) return
     if (!this.getRotationEnabled()) return
-    if (monotonicNowMs() >= this.switchDeadlineMs) {
-      this.pendingSwitch = true
-      this.emitScheduleChange()
-    }
+    this.dwell.armIfElapsed()
   }
 
   /**
    * Run on any Light-1 (led-1 / led-1-off) edge: once the countdown has elapsed, rotate the primary
    * group, re-arm the timer, and re-roll motion. A no-op until the timer elapses, so edges before the
    * deadline are ignored. Emission order per switch: primary change (only when the group actually
-   * changes) -> schedule -> motion re-roll, matching the audio flow.
+   * changes), then schedule, then motion re-roll, matching the audio flow.
    */
   public notifyLight1Edge(): void {
-    if (!this.started || !this.pendingSwitch) return
-    this.pendingSwitch = false
+    if (!this.started || !this.dwell.isPending) return
+    this.dwell.clearPending()
     const changed = this.switchToNextGroup()
     this.scheduleNext()
     if (changed) {
       this.onPrimaryCueChange?.(this.primaryGroupId || null)
     }
-    this.emitScheduleChange()
+    this.dwell.emit()
     this.onSwitchDue()
   }
 
   /**
    * Re-validate the active primary group against the current pool WITHOUT restarting a still-valid
    * run (e.g. after the user toggles enabled groups). Leaves a still-eligible group and its timer
-   * running; only re-picks and reschedules when the active group left the pool.
+   * running, and only re-picks and reschedules when the active group left the pool.
    */
   public ensureValidPrimary(): void {
     if (!this.started) return
     const pool = this.getPrimaryGroupPool()
     if (this.primaryGroupId !== '' && pool.includes(this.primaryGroupId)) {
-      this.emitScheduleChange()
+      this.dwell.emit()
       return
     }
     this.primaryGroupId = pickRandom(pool) ?? ''
-    this.pendingSwitch = false
+    this.dwell.clearPending()
     this.scheduleNext()
     this.onPrimaryCueChange?.(this.primaryGroupId || null)
-    this.emitScheduleChange()
+    this.dwell.emit()
   }
 
   /** Advance to a different primary group (avoid-repeat). Returns whether the group actually changed. */
@@ -115,9 +108,9 @@ export class Rb3GameModeManager {
     const prev = this.primaryGroupId
     const pool = this.getPrimaryGroupPool()
     if (pool.length === 0) return false
-    const others = pool.filter((id) => id !== this.primaryGroupId)
-    if (others.length > 0) {
-      this.primaryGroupId = pickRandom(others) ?? this.primaryGroupId
+    const next = pickOther(pool, this.primaryGroupId)
+    if (next !== undefined) {
+      this.primaryGroupId = next
     } else if (!pool.includes(this.primaryGroupId)) {
       this.primaryGroupId = pool[0]!
     }
@@ -126,17 +119,6 @@ export class Rb3GameModeManager {
 
   private scheduleNext(): void {
     const { min, max } = this.getDurationRangeSec()
-    const lo = Math.max(0, min)
-    const hi = Math.max(lo, max)
-    const durationMs = Math.round(randomFloatInRange(lo, hi) * 1000)
-    this.switchDeadlineMs = monotonicNowMs() + durationMs
-    this.switchDeadlineWallMs = Date.now() + durationMs
-  }
-
-  private emitScheduleChange(): void {
-    this.onScheduleChange?.({
-      deadlineMs: this.switchDeadlineMs > 0 ? this.switchDeadlineWallMs : null,
-      pending: this.pendingSwitch,
-    })
+    this.dwell.schedule(min, max)
   }
 }

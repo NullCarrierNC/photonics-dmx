@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals'
-import { shuffle } from '../../helpers/utils'
+import { pickOther, shuffle } from '../../helpers/utils'
 
 describe('shuffle', () => {
   it('preserves the elements and does not mutate the input', () => {
@@ -35,5 +35,25 @@ describe('shuffle', () => {
         expect(Math.abs(counts[element][pos] - expected)).toBeLessThan(tolerance)
       }
     }
+  })
+})
+
+describe('pickOther', () => {
+  it('never returns the current element', () => {
+    for (let i = 0; i < 50; i++) {
+      expect(pickOther(['a', 'b', 'c'], 'b')).not.toBe('b')
+    }
+  })
+
+  it('returns nothing when the current element is the only one', () => {
+    expect(pickOther(['a'], 'a')).toBeUndefined()
+  })
+
+  it('returns nothing from an empty list', () => {
+    expect(pickOther([], 'a')).toBeUndefined()
+  })
+
+  it('can return any element when the current one is not in the list', () => {
+    expect(['a', 'b']).toContain(pickOther(['a', 'b'], 'z'))
   })
 })

@@ -5,9 +5,9 @@ import type {
 } from '../listeners/Audio/AudioTypes'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import type { AudioCueType } from '../cues/types/audioCueTypes'
-import { monotonicNowMs } from '../../shared/time'
-import { pickRandom, randomFloatInRange } from '../helpers/utils'
+import { pickOther, pickRandom } from '../helpers/utils'
 import { isStrobeStyleCue } from './audioStrobeHelpers'
+import { DwellTimer } from './dwellTimer'
 
 /** Cues eligible as Game Mode primary (excludes style strobe). */
 function filterPrimaryRotationPool(
@@ -24,50 +24,35 @@ export class AudioGameModeManager {
   private config: AudioGameModeConfig
   private registry = AudioCueRegistry.getInstance()
   private primaryCue: AudioCueType = ''
-  private pendingSwitch = false
-  private switchDeadlineMs = 0 // monotonic deadline; drives the actual switch (immune to clock changes)
-  private switchDeadlineWallMs = 0 // wall-clock mirror; sent to the renderer for the countdown display
+  private readonly dwell = new DwellTimer()
   private onCueSwitch: ((cueType: AudioCueType) => void) | null = null
-  private onScheduleChange: ((info: AudioGameModeSchedulePayload) => void) | null = null
 
   constructor(initialConfig: AudioGameModeConfig) {
     this.config = { ...initialConfig }
   }
 
   public start(): void {
-    let pool = filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes())
-    if (pool.length === 0) {
-      pool = filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes(true))
-    }
-    if (pool.length === 0) {
-      const any = this.registry.getAvailableCueTypes()
-      const fallbackAny = any.length > 0 ? any : this.registry.getAvailableCueTypes(true)
-      this.primaryCue = pickRandom(fallbackAny) ?? ''
-    } else {
-      this.primaryCue = pickRandom(pool) ?? ''
-    }
-    this.pendingSwitch = false
+    const pool = this.rotationPool()
+    this.primaryCue = pickRandom(pool.length > 0 ? pool : this.anyCues()) ?? ''
+    this.dwell.clearPending()
     this.scheduleNextSwitch()
-    this.emitScheduleChange()
+    this.dwell.emit()
     this.onCueSwitch?.(this.primaryCue)
   }
 
   /**
    * Re-validate the active primary cue against the current eligible pool WITHOUT restarting a
    * still-valid run. Re-rolls and reschedules only when the active cue is empty or no longer
-   * eligible (e.g. after the user toggles cue groups); otherwise the running cue and its dwell
+   * eligible (e.g. after the user toggles cue groups), otherwise the running cue and its dwell
    * timer are left untouched. Used by `refreshCueSelection` so incidental refreshes (settings
    * edits, cue hot-reloads) don't yank the lights to a new cue and reset the schedule.
    */
   public ensureValidPrimary(): void {
-    let pool = filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes())
-    if (pool.length === 0) {
-      pool = filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes(true))
-    }
+    const pool = this.rotationPool()
     const eligible = pool.length > 0 ? pool : this.registry.getAvailableCueTypes()
     if (this.primaryCue !== '' && eligible.includes(this.primaryCue)) {
-      // Active cue still valid: leave it and its dwell timer running; just re-broadcast state.
-      this.emitScheduleChange()
+      // Active cue still valid: leave it and its dwell timer running, just re-broadcast state.
+      this.dwell.emit()
       return
     }
     // Active cue is empty or not in the eligible pool: pick a fresh one and (re)schedule.
@@ -79,25 +64,18 @@ export class AudioGameModeManager {
   }
 
   public setOnScheduleChange(cb: ((info: AudioGameModeSchedulePayload) => void) | null): void {
-    this.onScheduleChange = cb
+    this.dwell.setOnChange(cb)
   }
 
   public stop(): void {
-    this.onScheduleChange?.({ deadlineMs: null, pending: false })
-    this.pendingSwitch = false
+    this.dwell.emitCleared()
+    this.dwell.clearPending()
   }
 
   public updateConfig(config: AudioGameModeConfig): void {
-    const wasPending = this.pendingSwitch
     this.config = { ...config }
-    if (!this.pendingSwitch && this.switchDeadlineMs > 0) {
-      const remaining = this.switchDeadlineMs - monotonicNowMs()
-      if (remaining < 0) {
-        this.pendingSwitch = true
-      }
-    }
-    if (!wasPending && this.pendingSwitch) {
-      this.emitScheduleChange()
+    if (this.dwell.isScheduled) {
+      this.dwell.armIfElapsed()
     }
   }
 
@@ -109,55 +87,42 @@ export class AudioGameModeManager {
    * Run once per audio frame before cue execution.
    */
   public processFrame(audioData: AudioLightingData): void {
-    const now = monotonicNowMs()
-    if (!this.pendingSwitch && now >= this.switchDeadlineMs) {
-      this.pendingSwitch = true
-      this.emitScheduleChange()
-    }
+    this.dwell.armIfElapsed()
 
-    if (this.pendingSwitch && audioData.beatDetected) {
+    if (this.dwell.isPending && audioData.beatDetected) {
       this.switchToNextCue()
-      this.pendingSwitch = false
+      this.dwell.clearPending()
       this.scheduleNextSwitch()
-      this.emitScheduleChange()
+      this.dwell.emit()
     }
-  }
-
-  private emitScheduleChange(): void {
-    this.onScheduleChange?.({
-      deadlineMs: this.switchDeadlineMs > 0 ? this.switchDeadlineWallMs : null,
-      pending: this.pendingSwitch,
-    })
   }
 
   private scheduleNextSwitch(): void {
-    const { cueDurationMin, cueDurationMax } = this.config
-    const durationSec = randomFloatInRange(cueDurationMin, cueDurationMax)
-    const durationMs = Math.round(durationSec * 1000)
-    this.switchDeadlineMs = monotonicNowMs() + durationMs
-    this.switchDeadlineWallMs = Date.now() + durationMs
+    this.dwell.schedule(this.config.cueDurationMin, this.config.cueDurationMax)
+  }
+
+  /** Non-strobe cues from the enabled groups, or from every group when the enabled ones hold none. */
+  private rotationPool(): AudioCueType[] {
+    const enabled = filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes())
+    return enabled.length > 0
+      ? enabled
+      : filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes(true))
+  }
+
+  /** Every cue from the enabled groups, or from every group when the enabled ones hold none. */
+  private anyCues(): AudioCueType[] {
+    const enabled = this.registry.getAvailableCueTypes()
+    return enabled.length > 0 ? enabled : this.registry.getAvailableCueTypes(true)
   }
 
   private switchToNextCue(): void {
     const prev = this.primaryCue
-    let pool = filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes())
-    if (pool.length === 0) {
-      pool = filterPrimaryRotationPool(this.registry, this.registry.getAvailableCueTypes(true))
-    }
-    if (pool.length === 0) {
-      const any = this.registry.getAvailableCueTypes()
-      const fallbackAny = any.length > 0 ? any : this.registry.getAvailableCueTypes(true)
-      const others = fallbackAny.filter((id) => id !== this.primaryCue)
-      this.primaryCue = (others.length > 0 ? pickRandom(others) : fallbackAny[0]) ?? this.primaryCue
-      if (this.primaryCue !== prev) {
-        this.onCueSwitch?.(this.primaryCue)
-      }
-      return
-    }
-
-    const others = pool.filter((id) => id !== this.primaryCue)
-    if (others.length > 0) {
-      this.primaryCue = pickRandom(others) ?? this.primaryCue
+    const pool = this.rotationPool()
+    if (pool.length > 0) {
+      this.primaryCue = pickOther(pool, this.primaryCue) ?? this.primaryCue
+    } else {
+      const fallback = this.anyCues()
+      this.primaryCue = pickOther(fallback, this.primaryCue) ?? fallback[0] ?? this.primaryCue
     }
     if (this.primaryCue !== prev) {
       this.onCueSwitch?.(this.primaryCue)
