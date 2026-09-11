@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useId, useState } from 'react'
+import Modal from '../../Modal'
 import type {
   EventDefinition,
   NodeCueFile,
@@ -24,6 +25,7 @@ const EventRegistry: React.FC<Props> = ({
     name: '',
     description: '',
   })
+  const dialogTitleId = useId()
 
   const currentCue =
     editorDoc?.mode === 'cue'
@@ -153,52 +155,56 @@ const EventRegistry: React.FC<Props> = ({
 
       {/* Add/Edit Dialog */}
       {showDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-96 max-w-full">
-            <h3 className="font-semibold text-lg mb-4">{editingEvent ? 'Edit' : 'Add'} Event</h3>
-            <div className="space-y-3">
-              <label className="flex flex-col font-medium text-sm">
-                Name
-                <input
-                  type="text"
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={formData.name ?? ''}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="eventName"
-                  pattern="[a-zA-Z_][a-zA-Z0-9_]*"
-                  disabled={!!editingEvent}
-                />
-                <span className="text-[10px] text-gray-500 mt-1">
-                  Must start with letter or underscore
-                </span>
-              </label>
+        <Modal
+          onClose={closeDialog}
+          labelledBy={dialogTitleId}
+          closeOnBackdrop={false}
+          panelClassName="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-96 max-w-full">
+          <h3 id={dialogTitleId} className="font-semibold text-lg mb-4">
+            {editingEvent ? 'Edit' : 'Add'} Event
+          </h3>
+          <div className="space-y-3">
+            <label className="flex flex-col font-medium text-sm">
+              Name
+              <input
+                type="text"
+                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                value={formData.name ?? ''}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="eventName"
+                pattern="[a-zA-Z_][a-zA-Z0-9_]*"
+                disabled={!!editingEvent}
+              />
+              <span className="text-[10px] text-gray-500 mt-1">
+                Must start with letter or underscore
+              </span>
+            </label>
 
-              <label className="flex flex-col font-medium text-sm">
-                Description (optional)
-                <input
-                  type="text"
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-                  value={formData.description ?? ''}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="What this event is for"
-                />
-              </label>
-            </div>
-
-            <div className="flex gap-2 mt-6">
-              <button
-                className="flex-1 px-3 py-2 rounded bg-purple-600 text-white hover:bg-purple-500"
-                onClick={handleSave}>
-                Save
-              </button>
-              <button
-                className="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
-                onClick={closeDialog}>
-                Cancel
-              </button>
-            </div>
+            <label className="flex flex-col font-medium text-sm">
+              Description (optional)
+              <input
+                type="text"
+                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+                value={formData.description ?? ''}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="What this event is for"
+              />
+            </label>
           </div>
-        </div>
+
+          <div className="flex gap-2 mt-6">
+            <button
+              className="flex-1 px-3 py-2 rounded bg-purple-600 text-white hover:bg-purple-500"
+              onClick={handleSave}>
+              Save
+            </button>
+            <button
+              className="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+              onClick={closeDialog}>
+              Cancel
+            </button>
+          </div>
+        </Modal>
       )}
     </>
   )

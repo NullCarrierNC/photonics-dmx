@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react'
+import React, { useId, useMemo, useState } from 'react'
+import Modal from '../../Modal'
 import type { NodeCueMode } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 type Props = {
@@ -30,6 +31,7 @@ const NewFileModal: React.FC<Props> = ({
   const [groupDescription, setGroupDescription] = useState('')
   const [itemName, setItemName] = useState('')
   const [itemDescription, setItemDescription] = useState('')
+  const titleId = useId()
 
   const fileTypeLabel = isEffectMode ? 'Effect' : 'Cue'
   const groupLabel = isEffectMode ? 'Effect Group' : 'Cue Group'
@@ -54,121 +56,116 @@ const NewFileModal: React.FC<Props> = ({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && e.metaKey) {
       handleSave()
-    } else if (e.key === 'Escape') {
-      onCancel()
     }
   }
 
   if (!isOpen) return null
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      onClick={onCancel}>
-      <div
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-[500px] max-w-[90vw]"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={handleKeyDown}>
-        <h2 className="text-lg font-bold mb-4">
-          Create New {fileTypeLabel} File ({mode.toUpperCase()})
-        </h2>
+    <Modal
+      onClose={onCancel}
+      labelledBy={titleId}
+      onKeyDown={handleKeyDown}
+      panelClassName="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-[500px] max-w-[90vw]">
+      <h2 id={titleId} className="text-lg font-bold mb-4">
+        Create New {fileTypeLabel} File ({mode.toUpperCase()})
+      </h2>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold mb-1">
-              {groupLabel} ID <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              placeholder="e.g., my-custom-effects"
-              aria-invalid={groupIdTaken}
-              className={`w-full px-3 py-2 border rounded bg-white dark:bg-gray-700 text-sm ${
-                groupIdTaken
-                  ? 'border-red-500 dark:border-red-500'
-                  : 'border-gray-300 dark:border-gray-600'
-              }`}
-              autoFocus
-            />
-            {groupIdTaken ? (
-              <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                This group ID is already used by another {fileTypeLabel.toLowerCase()} file in{' '}
-                {mode.toUpperCase()} mode. Choose a different ID.
-              </p>
-            ) : (
-              <p className="text-xs text-gray-500 mt-1">
-                Used as the filename (e.g., my-custom-effects.json)
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-1">
-              {groupLabel} Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              placeholder="e.g., My Custom Effects"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-1">{groupLabel} Description</label>
-            <textarea
-              value={groupDescription}
-              onChange={(e) => setGroupDescription(e.target.value)}
-              placeholder={`Description of this ${groupLabel.toLowerCase()}`}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
-            />
-          </div>
-
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-            <label className="block text-sm font-semibold mb-1">
-              First {fileTypeLabel} Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={itemName}
-              onChange={(e) => setItemName(e.target.value)}
-              placeholder={`e.g., My First ${fileTypeLabel}`}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-1">
-              First {fileTypeLabel} Description
-            </label>
-            <textarea
-              value={itemDescription}
-              onChange={(e) => setItemDescription(e.target.value)}
-              placeholder={`Description of this ${fileTypeLabel.toLowerCase()}`}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
-            />
-          </div>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold mb-1">
+            {groupLabel} ID <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={groupId}
+            onChange={(e) => setGroupId(e.target.value)}
+            placeholder="e.g., my-custom-effects"
+            aria-invalid={groupIdTaken}
+            className={`w-full px-3 py-2 border rounded bg-white dark:bg-gray-700 text-sm ${
+              groupIdTaken
+                ? 'border-red-500 dark:border-red-500'
+                : 'border-gray-300 dark:border-gray-600'
+            }`}
+            autoFocus
+          />
+          {groupIdTaken ? (
+            <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+              This group ID is already used by another {fileTypeLabel.toLowerCase()} file in{' '}
+              {mode.toUpperCase()} mode. Choose a different ID.
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500 mt-1">
+              Used as the filename (e.g., my-custom-effects.json)
+            </p>
+          )}
         </div>
 
-        <div className="flex justify-end gap-2 mt-6">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-sm rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600">
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!groupId.trim() || !groupName.trim() || !itemName.trim() || groupIdTaken}
-            className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
-            Save
-          </button>
+        <div>
+          <label className="block text-sm font-semibold mb-1">
+            {groupLabel} Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            placeholder="e.g., My Custom Effects"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold mb-1">{groupLabel} Description</label>
+          <textarea
+            value={groupDescription}
+            onChange={(e) => setGroupDescription(e.target.value)}
+            placeholder={`Description of this ${groupLabel.toLowerCase()}`}
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+          />
+        </div>
+
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+          <label className="block text-sm font-semibold mb-1">
+            First {fileTypeLabel} Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={itemName}
+            onChange={(e) => setItemName(e.target.value)}
+            placeholder={`e.g., My First ${fileTypeLabel}`}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold mb-1">
+            First {fileTypeLabel} Description
+          </label>
+          <textarea
+            value={itemDescription}
+            onChange={(e) => setItemDescription(e.target.value)}
+            placeholder={`Description of this ${fileTypeLabel.toLowerCase()}`}
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+          />
         </div>
       </div>
-    </div>
+
+      <div className="flex justify-end gap-2 mt-6">
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 text-sm rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600">
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={!groupId.trim() || !groupName.trim() || !itemName.trim() || groupIdTaken}
+          className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
+          Save
+        </button>
+      </div>
+    </Modal>
   )
 }
 
