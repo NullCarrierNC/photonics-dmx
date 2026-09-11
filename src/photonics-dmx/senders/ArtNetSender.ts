@@ -1,7 +1,8 @@
-import { DMX, ArtnetDriver, IUniverseDriver } from 'dmx-ts'
+import { ArtnetDriver } from 'dmx-ts'
 import { createLogger } from '../../shared/logger'
 import { hzToThrottleIntervalMs } from '../../shared/dmxOutputRefresh'
-import { BaseSender, SenderError } from './BaseSender'
+import { SenderError } from './BaseSender'
+import { DmxTsSender } from './DmxTsSender'
 
 const log = createLogger('ArtNetSender')
 
@@ -19,10 +20,7 @@ export interface ArtNetSenderOptions {
   maxOutputRate?: number
 }
 
-export class ArtNetSender extends BaseSender {
-  private dmx: DMX = new DMX()
-  private universe?: IUniverseDriver
-
+export class ArtNetSender extends DmxTsSender {
   constructor(
     private host: string = '127.0.0.1',
     private options: ArtNetSenderOptions = {
@@ -35,7 +33,7 @@ export class ArtNetSender extends BaseSender {
       maxOutputRate: ARTNET_DEFAULT_MAX_OUTPUT_RATE,
     },
   ) {
-    super()
+    super('ArtNet', log)
     const rate = this.options.maxOutputRate ?? ARTNET_DEFAULT_MAX_OUTPUT_RATE
     this.minIntervalMs = hzToThrottleIntervalMs(rate)
   }
@@ -59,69 +57,16 @@ export class ArtNetSender extends BaseSender {
     }
   }
 
-  public async stop(): Promise<void> {
-    if (!this.universe) {
-      return
-    }
+  protected describeTarget(): string {
+    return `host ${this.host}`
+  }
 
-    log.info(`Stopping ArtNet sender on host ${this.host}...`)
-
-    // Drop any withheld frame and its flush timer BEFORE the blackout write, so the last frame on
-    // the wire is the blackout rather than a stale queued cue frame.
-    this.cancelThrottledSend()
-
-    try {
-      // Blackout all 512 channels through send(), which converts the 1-based DMX channels to the
-      // 0-based keys dmxnet expects (its prepChannel rejects channel 512).
-      const zeroPayload: Record<number, number> = {}
-      for (let channel = 1; channel <= 512; channel++) {
-        zeroPayload[channel] = 0
-      }
-      try {
-        await this.send(zeroPayload)
-        log.info('Sent zero values to all ArtNet channels')
-      } catch (err) {
-        log.error('Failed to send zero values before stopping:', err)
-      }
-
-      // Give a small delay to ensure commands are sent
-      await new Promise((resolve) => setTimeout(resolve, 100))
-
-      // Clean up all event listeners first
-      try {
-        this.removeAllSendErrorListeners()
-        if (this.dmx) {
-          this.dmx.removeAllListeners()
-        }
-        log.info('Removed all event listeners')
-      } catch (err) {
-        log.error('Error removing event listeners:', err)
-      }
-
-      // Close the DMX connection
-      try {
-        if (this.dmx) {
-          await this.dmx.close()
-          log.info('ArtNet connection closed')
-        }
-      } catch (err) {
-        log.error('Error during ArtNet close:', err)
-
-        // If close fails, we'll try forcibly clearing references
-        try {
-          this.universe = undefined
-          await new Promise((resolve) => setTimeout(resolve, 100))
-        } catch (innerErr) {
-          log.error('Error during failsafe cleanup:', innerErr)
-        }
-      }
-    } catch (outerErr) {
-      log.error('Unhandled error during ArtNetSender stop:', outerErr)
-    } finally {
-      // Final cleanup, clear all references
-      this.universe = undefined
-      log.info('ArtNetSender cleanup completed')
-    }
+  /**
+   * The blackout goes through send(), which converts the 1-based DMX channels to the 0-based keys
+   * dmxnet expects (its prepChannel rejects channel 512).
+   */
+  protected async writeBlackout(buffer: Record<number, number>): Promise<void> {
+    await this.send(buffer)
   }
 
   public async send(universeBuffer: Record<number, number>): Promise<boolean> {

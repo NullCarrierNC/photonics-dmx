@@ -1,4 +1,5 @@
 import {
+  blackoutUniverse,
   getColor,
   setGlobalBrightnessConfig,
   getGlobalBrightnessConfig,
@@ -182,5 +183,23 @@ describe('dmxHelpers brightness configuration', () => {
 
       expect(linearResult.intensity).toBe(255)
     })
+  })
+})
+
+describe('blackoutUniverse', () => {
+  it('sets every channel of the universe to zero', () => {
+    const buffer = blackoutUniverse()
+
+    expect(Object.keys(buffer)).toHaveLength(512)
+    expect(buffer[1]).toBe(0)
+    expect(buffer[512]).toBe(0)
+    expect(Object.values(buffer).every((value) => value === 0)).toBe(true)
+  })
+
+  it('hands each caller its own buffer', () => {
+    const first = blackoutUniverse()
+    first[1] = 255
+
+    expect(blackoutUniverse()[1]).toBe(0)
   })
 })

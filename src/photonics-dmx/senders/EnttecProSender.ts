@@ -1,11 +1,10 @@
-import { DMX, EnttecUSBDMXProDriver, IUniverseDriver } from 'dmx-ts'
-import { BaseSender, SenderError } from './BaseSender'
+import { EnttecUSBDMXProDriver } from 'dmx-ts'
+import { SenderError } from './BaseSender'
+import { DmxTsSender } from './DmxTsSender'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('EnttecProSender')
 
-export class EnttecProSender extends BaseSender {
-  private dmx: DMX = new DMX()
-  private universe?: IUniverseDriver
+export class EnttecProSender extends DmxTsSender {
   private dmxUniverse: number
 
   constructor(
@@ -14,7 +13,7 @@ export class EnttecProSender extends BaseSender {
     private universeName: string = 'uni1',
     universe: number = 0,
   ) {
-    super()
+    super('Enttec Pro', log)
     this.dmxUniverse = universe
   }
 
@@ -25,72 +24,13 @@ export class EnttecProSender extends BaseSender {
     )
   }
 
-  public async stop(): Promise<void> {
-    if (!this.universe) {
-      return
-    }
+  protected describeTarget(): string {
+    return `port ${this.port}`
+  }
 
-    log.info(`Stopping Enttec Pro sender on port ${this.port}...`)
-
-    try {
-      // First set all channels to zero (blackout). A DMX universe is 512 channels.
-      const zeroPayload: Record<number, number> = {}
-      for (let channel = 1; channel <= 512; channel++) {
-        zeroPayload[channel] = 0
-      }
-
-      // Try to update one last time
-      try {
-        if (this.universe) {
-          this.universe.update(zeroPayload)
-          log.info('Sent zero values to all DMX channels')
-        }
-      } catch (err) {
-        log.error('Failed to send zero values before stopping:', err)
-      }
-
-      // Give a small delay to ensure commands are sent
-      await new Promise((resolve) => setTimeout(resolve, 100))
-
-      // Clean up all event listeners first
-      try {
-        this.removeAllSendErrorListeners()
-        if (this.dmx) {
-          this.dmx.removeAllListeners()
-        }
-        log.info('Removed all event listeners')
-      } catch (err) {
-        log.error('Error removing event listeners:', err)
-      }
-
-      // Carefully close the DMX connection
-      try {
-        if (this.dmx) {
-          // Try first with close()
-          await this.dmx.close()
-          log.info('DMX connection closed')
-        }
-      } catch (err) {
-        log.error('Error during DMX close:', err)
-
-        // If close fails, we'll try forcibly clearing references
-        try {
-          // Force nullify the universe reference first
-          this.universe = undefined
-
-          // Add a small delay to let any pending operations complete
-          await new Promise((resolve) => setTimeout(resolve, 100))
-        } catch (innerErr) {
-          log.error('Error during failsafe cleanup:', innerErr)
-        }
-      }
-    } catch (outerErr) {
-      log.error('Unhandled error during EnttecProSender stop:', outerErr)
-    } finally {
-      // Final cleanup, clear all references
-      this.universe = undefined
-      log.info('EnttecProSender cleanup completed')
-    }
+  /** The serial driver is 1-based, so the blackout goes to the universe as it is. */
+  protected writeBlackout(buffer: Record<number, number>): void {
+    this.universe?.update(buffer)
   }
 
   public async send(universeBuffer: Record<number, number>): Promise<boolean> {

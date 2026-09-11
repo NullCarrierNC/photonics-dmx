@@ -13,7 +13,7 @@ import {
 } from '../types'
 import type { DmxValuesPayload } from '../../shared/ipcTypes'
 import { DmxLightManager } from './DmxLightManager'
-import { castToChannelType, normaliseUniverseBuffer } from '../helpers/dmxHelpers'
+import { blackoutUniverse, castToChannelType, normaliseUniverseBuffer } from '../helpers/dmxHelpers'
 import {
   applyChannelMixPlan,
   buildChannelMixPlan,
@@ -139,7 +139,7 @@ export class DmxPublisher {
   /** Microtask-coalesced publish: many chain emissions in one synchronous burst → one publish. */
   private _publishScheduled = false
   private _strobeStateManager: StrobeStateManager
-  private _immediateBlackoutData: Record<number, number> = {}
+  private _immediateBlackoutData: Record<number, number> = blackoutUniverse()
   /** When true, `publish` ignores light states; output comes only from `setManualBuffer`. */
   private _manualMode = false
   /** Set once `shutdown` has sent the final blackout. Nothing may reach the wire afterwards. */
@@ -208,11 +208,6 @@ export class DmxPublisher {
     this.publish = this.publish.bind(this)
     if (this._lightStateManager) {
       this._lightStateManager.onLightStatesUpdated(this.publish)
-    }
-
-    // Pre-build blackout buffer
-    for (let channel = 1; channel <= 512; channel++) {
-      this._immediateBlackoutData[channel] = 0
     }
   }
 

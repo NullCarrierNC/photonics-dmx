@@ -1,6 +1,7 @@
 // src/senders/SacnSender.ts
 import { createLogger } from '../../shared/logger'
 import { hzToThrottleIntervalMs } from '../../shared/dmxOutputRefresh'
+import { blackoutUniverse } from '../helpers/dmxHelpers'
 import { BaseSender } from './BaseSender'
 import { Sender } from 'sacn'
 import * as os from 'os'
@@ -122,11 +123,7 @@ export class SacnSender extends BaseSender {
     this.cancelThrottledSend()
 
     try {
-      const zeroBuffer: Record<number, number> = {}
-      for (let i = 1; i <= 512; i++) {
-        zeroBuffer[i] = 0
-      }
-      await this.send(zeroBuffer)
+      await this.send(blackoutUniverse())
     } catch (error) {
       log.error('Failed to send zero values before stopping:', error)
     } finally {

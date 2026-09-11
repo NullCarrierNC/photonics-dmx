@@ -15,6 +15,7 @@ import {
   OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
   hzToThrottleIntervalMs,
 } from '../../shared/dmxOutputRefresh'
+import { blackoutUniverse } from '../helpers/dmxHelpers'
 import { BaseSender, SenderError } from './BaseSender'
 import { usleep } from './usleep'
 
@@ -102,11 +103,7 @@ class OpenDmxDeviceAdapter implements IOpenDmxDeviceAdapter {
     if (this.onError) {
       device.off('error', this.onError)
     }
-    const zeroPayload: Record<number, number> = {}
-    for (let ch = 1; ch <= 512; ch++) {
-      zeroPayload[ch] = 0
-    }
-    device.setChannels(zeroPayload, true)
+    device.setChannels(blackoutUniverse(), true)
     device.stopSending()
 
     type PortWithClose = {

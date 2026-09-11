@@ -27,6 +27,15 @@ export function normaliseUniverseBuffer(buffer: Record<number, number>): Record<
   return normalised
 }
 
+/** A fresh universe buffer with all 512 channels at zero, for blacking a universe out. */
+export function blackoutUniverse(): Record<number, number> {
+  const buffer: Record<number, number> = {}
+  for (let channel = 1; channel <= 512; channel++) {
+    buffer[channel] = 0
+  }
+  return buffer
+}
+
 /**
  * Converts a normalised percentage (0–100) to a DMX value (0–255) within the fixture's
  * configured min/max range. 0% = min, 100% = max.
