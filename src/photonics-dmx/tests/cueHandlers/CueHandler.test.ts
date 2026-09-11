@@ -1,5 +1,5 @@
 /**
- * Regression: re-enabling YARG mid-song must replay the current cue.
+ * Re-enabling YARG mid-song replays the current cue.
  *
  * `LightingNodeCue` instances are singletons in `CueRegistry`, so their
  * `CueSession` (which gates `cue-started`) survives a YARG disable. The handler's

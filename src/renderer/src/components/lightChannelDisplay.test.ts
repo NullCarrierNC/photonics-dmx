@@ -68,9 +68,7 @@ describe('sortBaseChannelEntries', () => {
     ])
   })
 
-  it('reproduces the prior display order for every built-in archetype (refactor lock)', () => {
-    // Regression lock for the channelOrder consolidation: every archetype's channels sort into a
-    // prefix of BASE_CHANNEL_ORDER.
+  it('sorts every built-in archetype into a prefix of the base channel order', () => {
     for (const tpl of LightTypes) {
       const keys = sortBaseChannelEntries(Object.entries(tpl.channels)).map(([k]) => k)
       const expected = BASE_CHANNEL_ORDER.filter((name) => name in tpl.channels)

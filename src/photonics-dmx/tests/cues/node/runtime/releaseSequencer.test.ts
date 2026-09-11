@@ -204,7 +204,7 @@ describe('releaseSequencer drops per-sequencer state', () => {
     cue.execute(minimalYargCueData(), seqA, lightManager)
     cue.execute(minimalYargCueData(), seqB, lightManager)
 
-    // The states map is private; cast to peek for this regression assertion.
+    // The states map is private, so cast to peek at it.
     const states = (cue as unknown as { states: Map<ILightingController, unknown> }).states
     expect(states.size).toBe(2)
 

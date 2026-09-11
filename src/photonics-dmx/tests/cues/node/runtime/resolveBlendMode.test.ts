@@ -1,8 +1,7 @@
 /**
- * Guards the cue-path blend-mode resolution. A cue/effect action's blendMode flows through
- * resolveBlendMode before reaching the compositor; this validates that 'mix' (and the other
- * real modes) survive resolution rather than being coerced to 'replace'. Regression guard for
- * the YARG Alt 1 > Score crossfade fix.
+ * Cue-path blend-mode resolution. A cue or effect action's blendMode flows through
+ * resolveBlendMode before it reaches the compositor, and 'mix' and the other real modes come
+ * through as themselves rather than coerced to 'replace'.
  */
 import { resolveBlendMode } from '../../../../cues/node/runtime/valueResolver'
 import type { ExecutionContext } from '../../../../cues/node/runtime/ExecutionContext'

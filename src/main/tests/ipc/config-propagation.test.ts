@@ -2,10 +2,6 @@
  * Config-propagation IPC tests: verifies that SAVE_DMX_RIG, setConsoleFixtureConfig, and
  * DELETE_DMX_RIG trigger the correct controller restart/refresh strategy, and that SAVE_PREFS
  * hot-swaps the publisher settings that must apply without a restart.
- *
- * Regression coverage for the config-staleness bugs fixed alongside the inversion pipeline:
- *   - Bug 2: SAVE_DMX_RIG didn't call restartControllers when config fields changed
- *   - Bug 3: setConsoleFixtureConfig only called refreshActiveRigs, leaving sequencer stale
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { withCollaboratorGetters } from './managerFacades'

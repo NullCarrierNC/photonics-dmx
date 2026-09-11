@@ -1480,11 +1480,11 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
   })
 
   /**
-   * Regression for fixtures with asymmetric tiltStageDeg (≠ tiltRangeDeg/2).
+   * Fixtures with an asymmetric tiltStageDeg (≠ tiltRangeDeg/2).
    *
-   * The old code gate on shouldMirrorTiltForStageRelative required tiltStageDeg to equal
-   * tiltRangeDeg/2. Fixtures with any other value (e.g. tiltStageDeg=93° on a 180° fixture) were
-   * never mirrored, breaking stage-relative parity. The new code drops that condition.
+   * shouldMirrorTiltForStageRelative decides on invertTilt and tiltHome alone, so a fixture such
+   * as tiltStageDeg=93° on a 180° fixture is mirrored like any other and keeps stage-relative
+   * parity.
    *
    * Fixture notes:
    *   Top: floor, tiltHome=76%, tiltStageDeg=93° → phi0=+43.8° (home above pole)
@@ -1590,15 +1590,12 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
   })
 
   /**
-   * Regression for the orbit direction unification fix.
+   * Orbit direction does not depend on the sign of phi0.
    *
-   * Before the phaseSign fix, the orbit's pan direction depended on sign(phi0). A phi0<0 fixture
-   * (home below the tilt pole) would orbit CCW in stage space while phi0>0 fixtures orbited CW,
-   * because panTiltOffsetsFromBeam's +180° azimuth offset for phi0<0 inverts the motor travel
-   * direction relative to the sphere orbit's e2 component.
-   *
-   * The fix negates the phase when phi0<0 so the e2 traversal direction is reversed, cancelling
-   * the azimuth flip and restoring CW stage rotation.
+   * panTiltOffsetsFromBeam's +180° azimuth offset for phi0<0 (home below the tilt pole)
+   * inverts the motor travel direction relative to the sphere orbit's e2 component. The gimbal
+   * negates the phase when phi0<0, which reverses the e2 traversal and cancels that flip, so
+   * every fixture orbits CW in stage space.
    *
    * Direction is verified via the shoelace signed area of the closed orbit on the preview disc,
    * sampled over one full period. After gimbal `phaseSign`, stage-CW is unified, but the disc

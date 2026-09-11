@@ -1,9 +1,8 @@
 /**
- * Regression tests for the fix that makes a `waitForCondition` gate block downstream graph
- * execution (previously only `waitUntilCondition` did). An action gated solely by `waitFor`
- * must submit via the blocking (...WithCallback) path and must not run downstream nodes
- * until the effect's completion callback fires. Covers both the cue (NodeExecutionEngine)
- * and effect (EffectExecutionEngine) engines, single-action and chain.
+ * A `waitForCondition` gate blocks downstream graph execution, as `waitUntilCondition` does. An
+ * action gated solely by `waitFor` submits through the blocking (...WithCallback) path and runs no
+ * downstream node until the effect's completion callback fires. Covers both the cue
+ * (NodeExecutionEngine) and effect (EffectExecutionEngine) engines, single-action and chain.
  */
 import { jest } from '@jest/globals'
 import { NodeExecutionEngine } from '../../../../cues/node/runtime/NodeExecutionEngine'

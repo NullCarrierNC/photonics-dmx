@@ -60,8 +60,8 @@ describe('occlusion hold', () => {
   })
 
   it('survives the setEffect that a new primary cue makes', () => {
-    // The regression this guards: setEffect wipes every transition, so a top-layer overlay would be
-    // gone the instant the next cue started and the rig would light up mid-mute.
+    // setEffect wipes every transition, so a hold kept as a top-layer overlay would be gone the
+    // instant the next cue started and the rig would light up mid-mute.
     lightEverything('look')
     harness.sequencer.holdOcclusion(true)
     expect(anyLit()).toBe(false)
