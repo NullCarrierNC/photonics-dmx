@@ -10,6 +10,7 @@ import {
   type TrackedCueStatus,
 } from './CueSelectionPolicy'
 import { MotionCueAccess } from './MotionCueAccess'
+import { MotionNodeCue } from '../node/runtime/MotionNodeCue'
 import {
   releaseSequencersFor,
   type MotionCueDetail,
@@ -20,6 +21,15 @@ import { createLogger } from '../../../shared/logger'
 const log = createLogger('CueRegistry')
 
 export type { CueStateUpdate }
+
+/** How a net motion program reads in the motion-cue picker. */
+function describeNetMotionCue(cue: INetCue): MotionCueDetail {
+  return {
+    id: cue.cueId,
+    name: cue instanceof MotionNodeCue ? cue.name : cue.cueId,
+    description: cue.description ?? '',
+  }
+}
 
 /**
  * Registry for managing multiple sets of cue implementations.
@@ -44,7 +54,7 @@ export class CueRegistry {
 
   private readonly catalog = new CueGroupCatalog<CueType, INetCue, ICueGroup>()
   private readonly selection = new CueSelectionPolicy(this.catalog)
-  private readonly motion = new MotionCueAccess(this.catalog)
+  private readonly motion = new MotionCueAccess(this.catalog, describeNetMotionCue)
 
   private constructor() {}
 

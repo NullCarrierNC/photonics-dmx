@@ -117,7 +117,7 @@ const bindings: CueDomainRegistryBinding[] = [
   },
   {
     domain: 'audio',
-    getRegisteredIds: () => AudioCueRegistry.getInstance().getRegisteredGroups(),
+    getRegisteredIds: () => AudioCueRegistry.getInstance().getAllGroups(),
     setEnabled: (ids) => AudioCueRegistry.getInstance().setEnabledGroups(ids),
     setDisabled: (map) => AudioCueRegistry.getInstance().setDisabledCues(map),
     ...cueDomainStorage('audio'),
@@ -128,7 +128,7 @@ const bindings: CueDomainRegistryBinding[] = [
         registry.setEnabledGroups(enabledGroupIds)
         log.info('AudioCueRegistry initialized with enabled groups:', enabledGroupIds)
       } else {
-        const allGroups = registry.getRegisteredGroups()
+        const allGroups = registry.getAllGroups()
         registry.setEnabledGroups(allGroups)
         if (allGroups.length > 0) {
           void config

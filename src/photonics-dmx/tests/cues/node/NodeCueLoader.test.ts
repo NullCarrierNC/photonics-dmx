@@ -233,7 +233,7 @@ describe('NodeCueLoader', () => {
 
     await loader.loadAll()
 
-    expect(audioRegistry.getRegisteredGroups()).toEqual(['group-a', 'group-b'])
+    expect(audioRegistry.getAllGroups()).toEqual(['group-a', 'group-b'])
   })
 
   it("honours an audio file's default flag over the first group", async () => {

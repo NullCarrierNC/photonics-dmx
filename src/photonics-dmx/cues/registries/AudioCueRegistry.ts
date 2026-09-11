@@ -1,14 +1,10 @@
 import { AudioCueType, AudioMotionCueRef } from '../types/audioCueTypes'
 import type { MotionGroupSelectionMode } from '../types/nodeCueTypes'
 import { IAudioCue } from '../interfaces/IAudioCue'
-import { MotionSelectionState } from './MotionSelectionState'
 import { CueGroupCatalog } from './CueGroupCatalog'
+import { MotionCueAccess } from './MotionCueAccess'
 import {
-  findMotionCueRefIn,
-  motionCueDetailsFor,
-  motionGroupsInfoFor,
   releaseSequencersFor,
-  resolveMotionCue,
   type MotionCueDetail,
   type MotionGroupInfo,
 } from './cueRegistrySupport'
@@ -27,6 +23,11 @@ export interface AudioCueGroup {
   motionCues?: Map<string, IAudioCue>
 }
 
+/** How an audio motion program reads in the motion-cue picker. */
+function describeAudioMotionCue(cue: IAudioCue): MotionCueDetail {
+  return { id: String(cue.cueType), name: cue.name, description: cue.description ?? '' }
+}
+
 /**
  * Registry for managing audio-reactive lighting cue implementations.
  *
@@ -43,7 +44,7 @@ export class AudioCueRegistry {
   /** The registered groups, which of them are enabled, the default, and the disabled cue sets. */
   private readonly catalog = new CueGroupCatalog<AudioCueType, IAudioCue, AudioCueGroup>()
 
-  private readonly motionState = new MotionSelectionState<IAudioCue>()
+  private readonly motion = new MotionCueAccess(this.catalog, describeAudioMotionCue)
 
   /** Cache of cue metadata for renderer requests */
   private cueDetailsCache: Map<string, Array<{ id: string; description: string }>> = new Map()
@@ -68,7 +69,7 @@ export class AudioCueRegistry {
   public registerGroup(group: AudioCueGroup): void {
     this.catalog.register(group)
     this.cueDetailsCache.delete(group.id)
-    this.motionState.onRegisterGroup(group.id, group.motionCues?.size ?? 0)
+    this.motion.onRegisterGroup(group)
   }
 
   /**
@@ -81,7 +82,7 @@ export class AudioCueRegistry {
     }
 
     this.cueDetailsCache.delete(groupId)
-    this.motionState.onUnregisterGroup(groupId)
+    this.motion.onUnregisterGroup(groupId)
     return true
   }
 
@@ -168,7 +169,7 @@ export class AudioCueRegistry {
   /**
    * Get all registered group IDs.
    */
-  public getRegisteredGroups(): string[] {
+  public getAllGroups(): string[] {
     return this.catalog.getAllGroups()
   }
 
@@ -295,32 +296,29 @@ export class AudioCueRegistry {
    */
   public reset(): void {
     this.catalog.clear()
-    this.motionState.reset()
+    this.motion.reset()
     this.cueDetailsCache.clear()
     log.info('AudioCueRegistry reset to initial state')
   }
 
   public setMotionSelectionMode(mode: MotionGroupSelectionMode): void {
-    this.motionState.setMotionSelectionMode(mode)
+    this.motion.setMotionSelectionMode(mode)
   }
 
   public getMotionSelectionMode(): MotionGroupSelectionMode {
-    return this.motionState.getMotionSelectionMode()
+    return this.motion.getMotionSelectionMode()
   }
 
   public onMotionSongStart(): void {
-    this.motionState.onMotionSongStart()
+    this.motion.onMotionSongStart()
   }
 
   public onMotionSongEnd(): void {
-    this.motionState.onMotionSongEnd()
+    this.motion.onMotionSongEnd()
   }
 
   public getRandomMotionCue(): IAudioCue | null {
-    return this.motionState.getRandomMotionCue(
-      (id) => this.catalog.getGroup(id),
-      this.catalog.getDefaultMotionGroupId(),
-    )
+    return this.motion.getRandomMotionCue()
   }
 
   /**
@@ -328,57 +326,43 @@ export class AudioCueRegistry {
    * Returns null if the group is not motion-enabled, the cue is disabled, or the id is unknown.
    */
   public getMotionCueImplementation(ref: AudioMotionCueRef): IAudioCue | null {
-    return resolveMotionCue(
-      this.catalog.getGroup(ref.groupId),
-      ref,
-      (groupId) => this.motionState.getEnabledMotionGroups().includes(groupId),
-      (groupId, cueId) => this.isMotionCueDisabled(groupId, cueId),
-    )
+    return this.motion.getMotionCueImplementation(ref)
   }
 
   /** Locate group/cue ids for a motion cue instance (for UI / IPC metadata). */
   public findMotionCueRef(cue: IAudioCue): AudioMotionCueRef | null {
-    return findMotionCueRefIn(this.catalog.groupsIterable(), cue)
+    return this.motion.findMotionCueRef(cue)
   }
 
   public getMotionGroupsInfo(): MotionGroupInfo[] {
-    return motionGroupsInfoFor(this.catalog.groupsIterable())
+    return this.motion.getMotionGroupsInfo()
   }
 
   public getMotionCueDetails(groupId: string): MotionCueDetail[] {
-    return motionCueDetailsFor(this.catalog.getGroup(groupId)?.motionCues, (cue) => ({
-      id: String(cue.cueType),
-      name: cue.name,
-      description: cue.description ?? '',
-    }))
+    return this.motion.getMotionCueDetails(groupId)
   }
 
   public setDisabledMotionCues(map: Record<string, string[]>): void {
-    this.motionState.setDisabledMotionCues(map)
+    this.motion.setDisabledMotionCues(map)
   }
 
   public isMotionCueDisabled(groupId: string, cueId: string): boolean {
-    return this.motionState.isMotionCueDisabled(groupId, cueId)
+    return this.motion.isMotionCueDisabled(groupId, cueId)
   }
 
   public setEnabledMotionGroups(groupIds: string[]): void {
-    this.motionState.setEnabledMotionGroups(groupIds, (id) => this.hasMotionCues(id))
-  }
-
-  /** Whether the group is registered and carries at least one motion program. */
-  private hasMotionCues(groupId: string): boolean {
-    return (this.catalog.getGroup(groupId)?.motionCues?.size ?? 0) > 0
+    this.motion.setEnabledMotionGroups(groupIds)
   }
 
   public getEnabledMotionGroups(): string[] {
-    return this.motionState.getEnabledMotionGroups()
+    return this.motion.getEnabledMotionGroups()
   }
 
   public getRegisteredMotionGroupIds(): string[] {
-    return this.motionState.getRegisteredMotionGroupIds(this.catalog.groupsIterable())
+    return this.motion.getRegisteredMotionGroupIds()
   }
 
   public enableMotionGroup(groupId: string): void {
-    this.motionState.enableMotionGroup(groupId, (id) => this.hasMotionCues(id))
+    this.motion.enableMotionGroup(groupId)
   }
 }

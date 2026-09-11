@@ -62,7 +62,7 @@ describe('AudioCueRegistry', () => {
       registry.registerGroup(group('a', ['Chorus']))
       registry.registerGroup(group('b', ['Chorus']))
 
-      expect(registry.getRegisteredGroups()).toEqual(['a', 'b'])
+      expect(registry.getAllGroups()).toEqual(['a', 'b'])
       expect(registry.getEnabledGroups()).toEqual(['a', 'b'])
     })
 
