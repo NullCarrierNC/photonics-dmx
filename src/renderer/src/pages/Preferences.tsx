@@ -81,6 +81,24 @@ const Preferences: React.FC = () => {
   const tabId = (tab: PreferencesTabId) => `${baseId}-${tab}-tab`
   const panelId = (tab: PreferencesTabId) => `${baseId}-${tab}-panel`
 
+  /** Arrow keys move between the tabs and select as they go, and Home and End jump to either end. */
+  const handleTabListKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const count = visibleTabs.length
+    const current = visibleTabs.findIndex((tab) => tab.id === effectiveTab)
+    const moves: Partial<Record<string, number>> = {
+      ArrowRight: (current + 1) % count,
+      ArrowLeft: (current - 1 + count) % count,
+      Home: 0,
+      End: count - 1,
+    }
+    const target = moves[event.key]
+    if (target === undefined) return
+    event.preventDefault()
+    const tab = visibleTabs[target].id
+    setActiveTab(tab)
+    document.getElementById(tabId(tab))?.focus()
+  }
+
   return (
     <div className="p-6 space-y-4">
       <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Preferences</h1>
@@ -88,6 +106,7 @@ const Preferences: React.FC = () => {
       <div
         role="tablist"
         aria-label="Preference categories"
+        onKeyDown={handleTabListKeyDown}
         className="flex flex-wrap gap-1 border-b border-gray-200 dark:border-gray-600 pb-2">
         {visibleTabs.map((tab) => (
           <button

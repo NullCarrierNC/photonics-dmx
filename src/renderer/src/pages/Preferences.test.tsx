@@ -137,4 +137,26 @@ describe('Preferences', () => {
     expect(screen.getByTestId('prefs-cue-consistency')).toBeTruthy()
     expect(screen.getByTestId('prefs-clock-rate')).toBeTruthy()
   })
+
+  it('moves between tabs with the arrow keys, Home and End', () => {
+    render(<Preferences />)
+    const tab = (name: string) => screen.getByRole('tab', { name })
+
+    fireEvent.keyDown(tab('DMX Out'), { key: 'ArrowRight' })
+    expect(tab('YARG').getAttribute('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(tab('YARG'))
+
+    fireEvent.keyDown(tab('YARG'), { key: 'End' })
+    expect(document.activeElement).toBe(tab('Advanced'))
+
+    fireEvent.keyDown(tab('Advanced'), { key: 'ArrowRight' })
+    expect(document.activeElement).toBe(tab('DMX Out'))
+
+    fireEvent.keyDown(tab('DMX Out'), { key: 'ArrowLeft' })
+    expect(document.activeElement).toBe(tab('Advanced'))
+
+    fireEvent.keyDown(tab('Advanced'), { key: 'Home' })
+    expect(tab('DMX Out').getAttribute('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(tab('DMX Out'))
+  })
 })
