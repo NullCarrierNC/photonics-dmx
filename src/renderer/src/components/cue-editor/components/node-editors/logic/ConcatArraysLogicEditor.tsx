@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useId } from 'react'
 import type {
   ConcatColorsLogicNode,
   ConcatLightsLogicNode,
@@ -35,6 +35,7 @@ const ConcatArraysLogicEditor: React.FC<ConcatArraysLogicEditorProps> = ({
   availableVariables,
   updateNode,
 }) => {
+  const addSelectId = useId()
   const { arrayType, sourceLabel, description } = CONCATS[node.logicType]
   const arrayVars = availableVariables.filter((v) => v.type === arrayType)
   const sourceVariables = node.sourceVariables || []
@@ -53,8 +54,12 @@ const ConcatArraysLogicEditor: React.FC<ConcatArraysLogicEditorProps> = ({
 
   return (
     <div className="space-y-2 text-xs">
-      <label className="flex flex-col font-medium">
-        {sourceLabel} ({arrayType})
+      <div className="flex flex-col font-medium">
+        {/* The label names only the add select. Wrapped around the list it would pass its name and
+            its clicks to the first remove button. */}
+        <label htmlFor={addSelectId}>
+          {sourceLabel} ({arrayType})
+        </label>
         <div className="mt-1 space-y-1">
           {sourceVariables.map((varName, index) => (
             <div key={index} className="flex items-center gap-2">
@@ -63,6 +68,7 @@ const ConcatArraysLogicEditor: React.FC<ConcatArraysLogicEditorProps> = ({
               </span>
               <button
                 type="button"
+                aria-label={`Remove ${varName}`}
                 className="text-red-500 hover:text-red-700 px-1"
                 onClick={() => removeSourceVariable(index)}>
                 ×
@@ -70,6 +76,7 @@ const ConcatArraysLogicEditor: React.FC<ConcatArraysLogicEditorProps> = ({
             </div>
           ))}
           <select
+            id={addSelectId}
             className="w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
             value=""
             onChange={(event) => addSourceVariable(event.target.value)}>
@@ -83,7 +90,7 @@ const ConcatArraysLogicEditor: React.FC<ConcatArraysLogicEditorProps> = ({
               ))}
           </select>
         </div>
-      </label>
+      </div>
 
       <VariableSelect
         label={`Assign To (${arrayType} variable)`}

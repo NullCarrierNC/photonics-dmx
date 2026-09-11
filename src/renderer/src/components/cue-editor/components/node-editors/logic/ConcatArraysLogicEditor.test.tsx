@@ -40,7 +40,7 @@ describe('ConcatArraysLogicEditor', () => {
     ['concat-lights', 'Source Arrays (light-array)', '-- Add light-array --', ['ring (cue)']],
   ] as const)('%s offers its own array type', (logicType, label, placeholder, options) => {
     const { addSource, assignTo } = renderEditor(logicType)
-    expect(screen.queryByText(label)).not.toBeNull()
+    expect(screen.getByRole('combobox', { name: label })).toBe(addSource)
     expect(optionTexts(addSource)).toEqual([placeholder, ...options])
     expect(optionTexts(assignTo)).toEqual(['-- Select variable --', ...options])
   })
@@ -52,9 +52,16 @@ describe('ConcatArraysLogicEditor', () => {
     expect(updateNode).toHaveBeenCalledWith({ sourceVariables: ['warm', 'cool'] })
   })
 
-  it('removes a source', () => {
-    const { updateNode } = renderEditor('concat-lights', ['ring'])
-    fireEvent.click(screen.getByText('×'))
-    expect(updateNode).toHaveBeenCalledWith({ sourceVariables: [] })
+  it('removes the source whose button is pressed', () => {
+    const { updateNode } = renderEditor('concat-colors', ['warm', 'cool'])
+    fireEvent.click(screen.getByRole('button', { name: 'Remove cool' }))
+    expect(updateNode).toHaveBeenCalledWith({ sourceVariables: ['warm'] })
+  })
+
+  it('leaves the sources alone when the heading or a source name is clicked', () => {
+    const { updateNode } = renderEditor('concat-colors', ['warm', 'cool'])
+    fireEvent.click(screen.getByText('Source Palettes (color-array)'))
+    fireEvent.click(screen.getByText('warm'))
+    expect(updateNode).not.toHaveBeenCalled()
   })
 })
