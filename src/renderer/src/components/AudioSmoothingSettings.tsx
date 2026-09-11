@@ -1,10 +1,11 @@
-import React from 'react'
+import React, { useId } from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 
 const AudioSmoothingSettings: React.FC = () => {
   const audio = useAudioConfigFields({ smoothing: { enabled: true, alpha: 0.7 } })
   const { enabled, alpha } = audio.values.smoothing
   const isSaving = audio.isSaving
+  const labelId = useId()
 
   const handleToggle = (): void => {
     void audio.save({ smoothing: { ...audio.values.smoothing, enabled: !enabled } })
@@ -22,12 +23,17 @@ const AudioSmoothingSettings: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable Smoothing</p>
+          <p id={labelId} className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Enable Smoothing
+          </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             Reduces flickering by smoothing rapid frequency changes
           </p>
         </div>
         <button
+          role="switch"
+          aria-checked={enabled}
+          aria-labelledby={labelId}
           onClick={handleToggle}
           disabled={isSaving}
           className={`w-12 h-6 rounded-full ${
