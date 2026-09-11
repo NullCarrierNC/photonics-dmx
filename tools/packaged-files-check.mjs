@@ -3,7 +3,8 @@
  *
  * electron-builder takes its file list from electron-builder.yml, so a working copy holding
  * anything else has to pack the same app. This reads the archive electron-builder produced and
- * compares its top level to the list below, which names what ships and nothing else.
+ * compares its top level to the list below, which names what ships and nothing else, then looks
+ * inside out/ for the three files that make the difference between an app and a blank window.
  *
  * Run it after `npm run build:unpack` or any of the per-platform builds.
  */
@@ -12,6 +13,17 @@ import { join } from 'node:path'
 
 /** What a packaged build holds at the top level of its archive. */
 const SHIPPED = ['LICENSE', 'THIRD-PARTY-LICENSES.md', 'node_modules', 'out', 'package.json']
+
+/**
+ * Files inside out/ without which the app starts and shows nothing.
+ *
+ * A build missing any of these still leaves out/ present, so the top-level comparison passes and
+ * the first sign of trouble is a blank window on a released installer.
+ */
+const REQUIRED_IN_OUT = ['main/index.js', 'preload/index.js', 'renderer/index.html']
+
+/** Names under out/ that ship. Anything else there is build state or a stray artifact. */
+const ALLOWED_IN_OUT = ['main', 'preload', 'renderer']
 
 const DIST = 'dist'
 
@@ -54,7 +66,7 @@ function findBuildArchives() {
  * The archive opens with four little-endian uint32s, the last of which is the length of the JSON
  * index that follows, so the index can be read without unpacking anything.
  */
-function topLevelNames(archivePath) {
+function readIndex(archivePath) {
   const fd = openSync(archivePath, 'r')
   try {
     const preamble = Buffer.alloc(16)
@@ -62,10 +74,40 @@ function topLevelNames(archivePath) {
     const jsonLength = preamble.readUInt32LE(12)
     const json = Buffer.alloc(jsonLength)
     readSync(fd, json, 0, jsonLength, 16)
-    return Object.keys(JSON.parse(json.toString('utf8')).files ?? {})
+    return JSON.parse(json.toString('utf8'))
   } finally {
     closeSync(fd)
   }
+}
+
+/**
+ * An asar index is a tree of `{ files: { name: entry } }`, where a directory carries its own
+ * `files` map and a file carries a size instead.
+ */
+
+/** The names at the top level of an archive. */
+function topLevelNames(index) {
+  return Object.keys(index?.files ?? {})
+}
+
+/**
+ * Whether the archive holds a file at `path`, given as slash-separated segments. A directory at
+ * that name does not count, so asking for out/renderer/index.html asks for the file.
+ */
+function hasFile(index, path) {
+  let node = index
+  for (const segment of path.split('/')) {
+    node = node?.files?.[segment]
+    if (!node) {
+      return false
+    }
+  }
+  return node.files === undefined
+}
+
+/** Names directly under a top-level directory, or an empty list when it is not there. */
+function namesIn(index, dir) {
+  return Object.keys(index?.files?.[dir]?.files ?? {})
 }
 
 if (!existsSync(DIST)) {
@@ -85,12 +127,20 @@ const expected = [...SHIPPED].sort()
 let failed = false
 
 for (const archive of archives) {
-  const actual = topLevelNames(archive).sort()
+  const index = readIndex(archive)
+  const actual = topLevelNames(index).sort()
   const missing = expected.filter((name) => !actual.includes(name))
   const extra = actual.filter((name) => !expected.includes(name))
+  const missingInOut = REQUIRED_IN_OUT.filter((path) => !hasFile(index, `out/${path}`))
+  const extraInOut = namesIn(index, 'out').filter((name) => !ALLOWED_IN_OUT.includes(name))
 
-  if (missing.length === 0 && extra.length === 0) {
-    console.log(`${archive}: carries the ${expected.length} entries it should`)
+  if (
+    missing.length === 0 &&
+    extra.length === 0 &&
+    missingInOut.length === 0 &&
+    extraInOut.length === 0
+  ) {
+    console.log(`${archive}: carries the ${expected.length} entries it should, out/ included`)
     continue
   }
 
@@ -102,7 +152,14 @@ for (const archive of archives) {
   if (extra.length > 0) {
     console.error(`  unexpected: ${extra.length} entry(s) beyond the list`)
   }
+  if (missingInOut.length > 0) {
+    console.error(`  missing inside out/: ${missingInOut.join(', ')}`)
+  }
+  if (extraInOut.length > 0) {
+    console.error(`  unexpected inside out/: ${extraInOut.join(', ')}`)
+  }
   console.error(`  expected exactly: ${expected.join(', ')}`)
+  console.error(`  and inside out/: ${REQUIRED_IN_OUT.join(', ')}`)
 }
 
 if (failed) {
