@@ -1,16 +1,13 @@
 import {
   ActionNode,
-  ActionTimingConfig,
   AudioEventNodeUnion,
   AudioNodeCueDefinition,
   BaseEventNode,
-  createDefaultActionTiming,
   EffectRaiserNode,
   VariableDefinition,
   NetEventNode,
   NetNodeCueDefinition,
   NodeCueMode,
-  ValueSource,
 } from '../../types/nodeCueTypes'
 import { AbstractGraphBuilder, CompiledGraphBase } from './AbstractGraphBuilder'
 import { CompilationError } from './CompilationError'
@@ -51,31 +48,6 @@ export function cueKeyOf(definition: NetNodeCueDefinition | AudioNodeCueDefiniti
 
 export type CompiledNetCue = CompiledNodeCue<NetEventNode>
 export type CompiledAudioCue = CompiledNodeCue<AudioEventNodeUnion>
-
-const getActionTiming = (action: ActionNode): ActionTimingConfig => ({
-  ...createDefaultActionTiming(),
-  ...(action.timing ?? {}),
-})
-
-/**
- * Calculates the total duration of an action based on its timing settings.
- */
-export const calculateActionDuration = (action: ActionNode): number => {
-  const timing = getActionTiming(action)
-
-  // Extract numeric values from ValueSource (use literal value; variable source uses default at compile time)
-  const extractNumber = (vs: ValueSource | undefined, defaultValue: number): number => {
-    if (!vs) return defaultValue
-    if (vs.source === 'literal') return Number(vs.value) || defaultValue
-    return defaultValue
-  }
-
-  return (
-    Math.max(0, extractNumber(timing.waitForTime, 0)) +
-    Math.max(0, extractNumber(timing.duration, 200)) +
-    Math.max(0, extractNumber(timing.waitUntilTime, 0))
-  )
-}
 
 export class NodeCueCompiler extends AbstractGraphBuilder {
   /**

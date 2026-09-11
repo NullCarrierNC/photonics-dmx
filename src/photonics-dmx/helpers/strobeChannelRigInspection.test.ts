@@ -2,7 +2,6 @@ import { describe, expect, it } from '@jest/globals'
 import { ConfigStrobeType, FixtureTypes } from '../types'
 import type { DmxLight, LightingConfiguration } from '../types'
 import {
-  configHasStrobeChannelLights,
   getStrobeChannelLightsInConfig,
   isRgbFamilyWithStrobeChannel,
 } from './strobeChannelRigInspection'
@@ -108,28 +107,5 @@ describe('getStrobeChannelLightsInConfig', () => {
     })
     // Only the canonical front-row entry is counted; the strobeLights snapshot is ignored.
     expect(getStrobeChannelLightsInConfig(config).map((l) => l.id)).toEqual(['f1'])
-  })
-})
-
-describe('configHasStrobeChannelLights', () => {
-  it('is false for an empty rig', () => {
-    expect(configHasStrobeChannelLights(makeConfig())).toBe(false)
-  })
-
-  it('is true when at least one RGB+S light is present', () => {
-    expect(
-      configHasStrobeChannelLights(makeConfig({ frontLights: [makeRgbWithStrobeChannel()] })),
-    ).toBe(true)
-  })
-
-  it('is false when only dedicated STROBE fixtures exist', () => {
-    expect(
-      configHasStrobeChannelLights(
-        makeConfig({
-          strobeType: ConfigStrobeType.Dedicated,
-          strobeLights: [makeDedicatedStrobe()],
-        }),
-      ),
-    ).toBe(false)
   })
 })

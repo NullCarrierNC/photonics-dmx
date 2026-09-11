@@ -349,14 +349,6 @@ export function isVenueEffectActive(state: PostProcessing): boolean {
   )
 }
 
-/**
- * The bloom settings for a state, or `null` when it does not spread light. Callers use the null
- * case to stay on the cheaper per-light path.
- */
-export function venueBloomSpec(state: PostProcessing): VenueBloomSpec | null {
-  return (VENUE_EFFECT_SPECS[state] ?? VENUE_EFFECT_SPECS.Default).bloom ?? null
-}
-
 /** True for a value the transform recognises. */
 export function isPostProcessingState(value: unknown): value is PostProcessing {
   return typeof value === 'string' && (POST_PROCESSING_VALUES as readonly string[]).includes(value)

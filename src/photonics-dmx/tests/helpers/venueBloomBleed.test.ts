@@ -5,7 +5,7 @@
 
 import { POST_PROCESSING_VALUES } from '../../cues/types/cueTypes'
 import { applyVenueBleed, type VenueBleedChain } from '../../helpers/venueBloomBleed'
-import { venueBloomSpec } from '../../helpers/venuePostProcessing'
+import { VENUE_EFFECT_SPECS } from '../../helpers/venuePostProcessing'
 
 interface LightSample {
   r: number
@@ -62,17 +62,17 @@ function readEmitted(chain: VenueBleedChain): Array<{ r: number; g: number; b: n
   })
 }
 
-const BLOOM = venueBloomSpec('Bloom')!
+const BLOOM = VENUE_EFFECT_SPECS.Bloom.bloom!
 const OFF: LightSample = { r: 0, g: 0, b: 0, i: 0 }
 const LIT_RED: LightSample = { r: 255, g: 0, b: 0 }
 const LIT_GREEN: LightSample = { r: 0, g: 255, b: 0 }
 
 describe('venue bloom bleed', () => {
   it('is configured for Bloom alone', () => {
-    expect(BLOOM).not.toBeNull()
+    expect(VENUE_EFFECT_SPECS.Bloom.bloom).toBeDefined()
     for (const state of POST_PROCESSING_VALUES) {
       if (state === 'Bloom') continue
-      expect(venueBloomSpec(state)).toBeNull()
+      expect(VENUE_EFFECT_SPECS[state].bloom).toBeUndefined()
     }
   })
 
