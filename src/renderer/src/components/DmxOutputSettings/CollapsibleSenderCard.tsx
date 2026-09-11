@@ -17,7 +17,12 @@ const CollapsibleSenderCard: React.FC<CollapsibleSenderCardProps> = ({
     <div
       className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-t-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
       onClick={onToggle}
-      onKeyDown={(e) => e.key === 'Enter' && onToggle()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onToggle()
+        }
+      }}
       role="button"
       tabIndex={0}
       aria-expanded={expanded}>
