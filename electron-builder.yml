@@ -10,6 +10,10 @@ directories:
 files:
   - 'out/**'
   - '!out/**/*.map'
+  # TypeScript build state, if an editor or a stray tsc run leaves any under out/. The project
+  # source paths it lists have no business in a shipped app.
+  - '!out/types/**'
+  - '!out/**/*.tsbuildinfo'
   - 'package.json'
   - 'LICENSE'
   - 'THIRD-PARTY-LICENSES.md'
