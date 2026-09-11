@@ -1,7 +1,7 @@
 /**
  * The size budget's pure core: parsing the baseline, comparing measurements against it, and
  * rendering a fresh baseline. The CLI in size-budget.mjs owns the filesystem walk and the exit
- * codes; everything decidable from data lives here so it can be tested directly.
+ * codes. Everything decidable from data lives here.
  */
 
 /** @typedef {{ limit: number, allowances: Map<string, number>, malformed: string[] }} Baseline */
@@ -125,7 +125,7 @@ function renderBaseline(sizes, limit) {
   const header = [
     `limit ${limit}`,
     'Auto-generated: non-test sources under src/ that exceed the line limit.',
-    'Entries may only shrink. Regenerate after a split with: node scripts/size-budget.mjs --write',
+    'Entries may only shrink. Regenerate after a split with: node tools/size-budget.mjs --write',
   ]
   const body = overLimitEntries(sizes, limit).map(([path, lines]) => `${lines} ${path}`)
   return `${[...header, ...body].join('\n')}\n`

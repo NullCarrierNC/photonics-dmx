@@ -7,7 +7,7 @@ const {
   overLimitEntries,
   grownSinceBaseline,
   renderBaseline,
-} = require('../../../../scripts/sizeBudgetCore.cjs')
+} = require('../../../../tools/sizeBudgetCore.cjs')
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 type Baseline = {
@@ -20,7 +20,7 @@ const baselineText = (limit: number, entries: Array<[number, string]>): string =
   [
     `limit ${limit}`,
     'Auto-generated: non-test sources under src/ that exceed the line limit.',
-    'Entries may only shrink. Regenerate after a split with: node scripts/size-budget.mjs --write',
+    'Entries may only shrink. Regenerate after a split with: node tools/size-budget.mjs --write',
     ...entries.map(([lines, path]) => `${lines} ${path}`),
   ].join('\n') + '\n'
 

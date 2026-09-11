@@ -13,7 +13,7 @@
   "include": [
     "src/photonics-dmx/**/*.ts",
     "src/renderer/src/components/cue-editor/lib/graphLayout.ts",
-    "scripts/node-graph-prettier.ts"
+    "tools/node-graph-prettier.ts"
   ],
   "ts-node": {
     "transpileOnly": true

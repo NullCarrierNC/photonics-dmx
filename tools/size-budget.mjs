@@ -1,8 +1,8 @@
 /**
  * Measures line counts of non-test sources under `src/` and compares them to
  * metrics/size-budget.txt so files at or over the limit cannot grow further and no new file
- * crosses it. Files already over the limit are listed with the size they may not exceed;
- * that list only ever ratchets down, via `node scripts/size-budget.mjs --write`. A file that has
+ * crosses it. Files already over the limit are listed with the size they may not exceed, and
+ * that list only ever ratchets down, via `node tools/size-budget.mjs --write`. A file that has
  * shrunk below its entry fails the check too, so the baseline cannot go stale and leave the file
  * room to grow back.
  */
@@ -24,7 +24,7 @@ const root = join(__dirname, '..')
 const BUDGET_FILE = join(root, 'metrics', 'size-budget.txt')
 const SRC_DIR = join(root, 'src')
 const LIMIT = 600
-const REGENERATE = 'node scripts/size-budget.mjs --write'
+const REGENERATE = 'node tools/size-budget.mjs --write'
 
 /**
  * @param {string} path

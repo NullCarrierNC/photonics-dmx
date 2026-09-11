@@ -5,7 +5,9 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import tsParser from '@typescript-eslint/parser'
 
 export default defineConfig([
-  { ignores: ['out/', 'dist/', 'node_modules/'] },
+  // scripts/ holds local-only generators the repository does not carry, so lint leaves it alone and
+  // gives the same answer on every machine.
+  { ignores: ['out/', 'dist/', 'node_modules/', 'scripts/'] },
   tseslint.configs.recommended,
   {
     plugins: { 'react-hooks': reactHooks },
@@ -36,7 +38,7 @@ export default defineConfig([
       },
     },
     rules: {
-      // A warning, held at its current count by scripts/floating-promises-budget.mjs, because the
+      // A warning, held at its current count by tools/floating-promises-budget.mjs, because the
       // backlog is larger than one pass and each site needs its own answer: await it, catch it, or
       // say with void that its failure is ignorable.
       '@typescript-eslint/no-floating-promises': 'warn',
@@ -61,7 +63,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['scripts/**'],
+    files: ['tools/**'],
     rules: {
       'no-console': 'off',
     },
