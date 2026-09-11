@@ -1,6 +1,8 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
-import { render, waitFor } from '@testing-library/react'
+import { waitFor } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import { CueType } from '../../../photonics-dmx/cues/types/cueTypes'
 import CueRegistrySelector from './CueRegistrySelector'
@@ -10,16 +12,13 @@ jest.mock('../utils/ipcHelpers', () => ({
   removeIpcListener: jest.fn(),
 }))
 
-jest.mock('../ipcApi', () => {
-  const actual = jest.requireActual<typeof import('../ipcApi')>('../ipcApi')
-  return {
-    ...actual,
-    getCueGroups: jest.fn(),
-    getEnabledCueGroups: jest.fn(),
-    getRb3CueGroups: jest.fn(),
-    getEnabledRb3CueGroups: jest.fn(),
-  }
-})
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
 const getCueGroups = jest.mocked(ipcApi.getCueGroups)
 const getEnabledCueGroups = jest.mocked(ipcApi.getEnabledCueGroups)
@@ -37,7 +36,7 @@ const baseProps = {
 
 describe('CueRegistrySelector', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    resetIpcApiMock()
     getCueGroups.mockResolvedValue([
       { id: 'yarg-stagekit', name: 'YARG Stage Kit', description: '', cueTypes: [CueType.Chorus] },
       { id: 'yarg-fade', name: 'YARG Fade', description: '', cueTypes: [CueType.Verse] },
@@ -57,7 +56,7 @@ describe('CueRegistrySelector', () => {
 
   it('auto-selects and notifies the parent for a single-group RB3 registry', async () => {
     const onGroupChange = jest.fn()
-    render(
+    renderWithProviders(
       <CueRegistrySelector
         {...baseProps}
         onGroupChange={onGroupChange}
@@ -72,7 +71,7 @@ describe('CueRegistrySelector', () => {
 
   it('re-selects the new registry group when switching YARG -> RB3E', async () => {
     const onGroupChange = jest.fn()
-    const { rerender } = render(
+    const { rerender } = renderWithProviders(
       <CueRegistrySelector
         {...baseProps}
         onGroupChange={onGroupChange}

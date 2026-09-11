@@ -1,21 +1,18 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import AudioEnabledCueGroups from './AudioEnabledCueGroups'
 
-jest.mock('../ipcApi', () => {
-  const actual = jest.requireActual<typeof import('../ipcApi')>('../ipcApi')
-  return {
-    ...actual,
-    getAudioCueGroups: jest.fn(),
-    getEnabledAudioCueGroups: jest.fn(),
-    getDisabledAudioCues: jest.fn(),
-    setEnabledAudioCueGroups: jest.fn(),
-    setDisabledAudioCues: jest.fn(),
-    getAvailableAudioCues: jest.fn(),
-  }
-})
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
 const getAudioCueGroups = jest.mocked(ipcApi.getAudioCueGroups)
 const getEnabledAudioCueGroups = jest.mocked(ipcApi.getEnabledAudioCueGroups)
@@ -38,7 +35,7 @@ function seedHappyPath(): void {
 
 describe('AudioEnabledCueGroups', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    resetIpcApiMock()
   })
 
   it('surfaces a per-row error when lazy-loading cues fails, and Retry re-runs the fetch', async () => {
@@ -47,8 +44,8 @@ describe('AudioEnabledCueGroups', () => {
       .mockRejectedValueOnce(new Error('boom'))
       .mockResolvedValueOnce([{ id: 'c1', description: 'cue 1' }])
 
-    render(<AudioEnabledCueGroups />)
-    expect(screen.getByRole('heading', { name: /Audio Lighting Cue Groups/i })).toBeTruthy()
+    renderWithProviders(<AudioEnabledCueGroups />)
+    expect(screen.getByRole('heading', { name: /Audio Lighting Cue Groups/i })).toBeInTheDocument()
     await screen.findByRole('button', { name: /Group 1/ })
 
     fireEvent.click(screen.getByRole('button', { name: /Group 1/ }))
@@ -59,15 +56,15 @@ describe('AudioEnabledCueGroups', () => {
     fireEvent.click(screen.getByRole('button', { name: /retry/i }))
 
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
-    expect(screen.getByText(/cue 1/)).toBeTruthy()
+    expect(screen.getByText(/cue 1/)).toBeInTheDocument()
   })
 
   it('surfaces an inline persistence error when the enabled-cue-group save fails', async () => {
     seedHappyPath()
     setEnabledAudioCueGroups.mockResolvedValueOnce({ success: false, error: 'save failed' })
 
-    render(<AudioEnabledCueGroups />)
-    expect(screen.getByRole('heading', { name: /Audio Lighting Cue Groups/i })).toBeTruthy()
+    renderWithProviders(<AudioEnabledCueGroups />)
+    expect(screen.getByRole('heading', { name: /Audio Lighting Cue Groups/i })).toBeInTheDocument()
     await screen.findByRole('button', { name: /Group 1/ })
 
     const enableCheckboxes = screen.getAllByRole('checkbox', { name: /Enable Group/ })
@@ -89,8 +86,8 @@ describe('AudioEnabledCueGroups', () => {
       // Second toggle: setEnabled resolves immediately with failure.
       .mockResolvedValueOnce({ success: false, error: 'fast failure' })
 
-    render(<AudioEnabledCueGroups />)
-    expect(screen.getByRole('heading', { name: /Audio Lighting Cue Groups/i })).toBeTruthy()
+    renderWithProviders(<AudioEnabledCueGroups />)
+    expect(screen.getByRole('heading', { name: /Audio Lighting Cue Groups/i })).toBeInTheDocument()
     await screen.findByRole('button', { name: /Group 1/ })
 
     const enableCheckboxes = screen.getAllByRole('checkbox', { name: /Enable Group/ })

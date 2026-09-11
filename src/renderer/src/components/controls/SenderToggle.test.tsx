@@ -3,21 +3,28 @@
  * One output sender's on/off row: the preference gate, the switch, and what it sends when clicked.
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
-import { Provider, createStore, atom } from 'jotai'
+import { screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { atom } from 'jotai'
 import { lightingPrefsAtom } from '../../atoms'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../../ipcApi'
 
-const disableSender = jest.fn(async (_p: unknown) => ({ success: true }))
-
-jest.mock('../../ipcApi', () => ({
-  disableSender: (...args: unknown[]) => disableSender(args[0]),
-}))
+jest.mock(
+  '../../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
 jest.mock('../RoutedRigsHint', () => ({
   RoutedRigsHint: () => null,
 }))
 
 import SenderToggle from './SenderToggle'
+
+const disableSender = jest.mocked(ipcApi.disableSender)
 
 const runningAtom = atom(false)
 
@@ -28,36 +35,35 @@ function renderToggle(
     notReady?: boolean
     enable?: () => unknown
   } = {},
-): ReturnType<typeof createStore> {
-  const store = createStore()
-  store.set(runningAtom, opts.running ?? false)
-  store.set(lightingPrefsAtom, {
-    dmxOutputConfig: {
-      sacnEnabled: opts.sacnEnabled ?? true,
-      artNetEnabled: false,
-      enttecProEnabled: false,
-      openDmxEnabled: false,
+) {
+  return renderWithProviders(
+    <SenderToggle
+      senderId="sacn"
+      label="sACN Out"
+      runningAtom={runningAtom}
+      prefsFlag="sacnEnabled"
+      notReady={opts.notReady}
+      enable={opts.enable ?? (async () => ({ success: true }))}
+    />,
+    {
+      seed: (set) => {
+        set(runningAtom, opts.running ?? false)
+        set(lightingPrefsAtom, {
+          dmxOutputConfig: {
+            sacnEnabled: opts.sacnEnabled ?? true,
+            artNetEnabled: false,
+            enttecProEnabled: false,
+            openDmxEnabled: false,
+          },
+        })
+      },
     },
-  })
-  render(
-    <Provider store={store}>
-      <SenderToggle
-        senderId="sacn"
-        label="sACN Out"
-        runningAtom={runningAtom}
-        prefsFlag="sacnEnabled"
-        notReady={opts.notReady}
-        enable={opts.enable ?? (async () => ({ success: true }))}
-      />
-    </Provider>,
-  )
-  return store
+  ).store
 }
 
 describe('SenderToggle', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    disableSender.mockImplementation(async () => ({ success: true }))
+    resetIpcApiMock()
   })
 
   afterEach(() => cleanup())

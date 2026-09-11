@@ -2,10 +2,15 @@
  * The `ipcApi` stand-in every renderer suite that touches main needs.
  *
  * `jest.mock` is hoisted and its factory cannot close over an import, so each suite still writes
- * its own one-line registration. The factory may `require`, which is how it reaches this object:
+ * its own registration. The factory reaches this object through `jest.requireActual`:
  *
- *   jest.mock('../ipcApi', () => require('@renderer/tests/helpers/ipcApiMock').ipcApiMock)
- *   import { ipcApiMock, resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+ *   jest.mock('../ipcApi', () =>
+ *     jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+ *       '@renderer/tests/helpers/ipcApiMock',
+ *     ).ipcApiMock,
+ *   )
+ *
+ * and reads a channel typed from the real module with `jest.mocked(ipcApi.savePrefs)`.
  *
  * Jest gives each suite its own module registry, so the object is per-suite despite being a
  * module singleton.
@@ -66,8 +71,9 @@ export const ipcApiMock = new Proxy({} as Record<string, jest.Mock>, {
 /**
  * Put every mock back to its default answer.
  *
- * The shared setup calls `clearAllMocks` after each test, which drops implementations as well as
- * calls, so a suite that relies on the defaults re-arms them here in `beforeEach`.
+ * The shared setup only clears calls after each test, so an answer one test sets, a
+ * `mockResolvedValueOnce` it never consumed included, would carry into the next. A suite calls
+ * this in `beforeEach`.
  */
 export function resetIpcApiMock(): void {
   for (const [name, fn] of created) {

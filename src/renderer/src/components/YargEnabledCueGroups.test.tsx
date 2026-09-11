@@ -1,21 +1,18 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import YargEnabledCueGroups from './YargEnabledCueGroups'
 
-jest.mock('../ipcApi', () => {
-  const actual = jest.requireActual<typeof import('../ipcApi')>('../ipcApi')
-  return {
-    ...actual,
-    getCueGroups: jest.fn(),
-    getEnabledCueGroups: jest.fn(),
-    getDisabledYargCues: jest.fn(),
-    setEnabledCueGroups: jest.fn(),
-    setDisabledYargCues: jest.fn(),
-    getAvailableCues: jest.fn(),
-  }
-})
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
 const getCueGroups = jest.mocked(ipcApi.getCueGroups)
 const getEnabledCueGroups = jest.mocked(ipcApi.getEnabledCueGroups)
@@ -40,7 +37,7 @@ function seedHappyPath(): void {
 
 describe('YargEnabledCueGroups', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    resetIpcApiMock()
   })
 
   it('surfaces an inline error when lazy-loading YARG cues fails, and Retry recovers', async () => {
@@ -54,8 +51,8 @@ describe('YargEnabledCueGroups', () => {
       },
     ])
 
-    render(<YargEnabledCueGroups />)
-    expect(screen.getByRole('heading', { name: /YARG Lighting Cue Groups/i })).toBeTruthy()
+    renderWithProviders(<YargEnabledCueGroups />)
+    expect(screen.getByRole('heading', { name: /YARG Lighting Cue Groups/i })).toBeInTheDocument()
     await screen.findByRole('button', { name: /Yarg Group 1/ })
 
     fireEvent.click(screen.getByRole('button', { name: /Yarg Group 1/ }))
@@ -64,15 +61,15 @@ describe('YargEnabledCueGroups', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /retry/i }))
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
-    expect(screen.getByText(/cue 1 desc/)).toBeTruthy()
+    expect(screen.getByText(/cue 1 desc/)).toBeInTheDocument()
   })
 
   it('surfaces an inline persistence error when the enabled-cue-group save fails', async () => {
     seedHappyPath()
     setEnabledCueGroups.mockResolvedValueOnce({ success: false, error: 'yarg save failed' })
 
-    render(<YargEnabledCueGroups />)
-    expect(screen.getByRole('heading', { name: /YARG Lighting Cue Groups/i })).toBeTruthy()
+    renderWithProviders(<YargEnabledCueGroups />)
+    expect(screen.getByRole('heading', { name: /YARG Lighting Cue Groups/i })).toBeInTheDocument()
     await screen.findByRole('button', { name: /Yarg Group 1/ })
 
     const enableCheckboxes = screen.getAllByRole('checkbox', { name: /Enable Yarg Group/ })
@@ -88,7 +85,7 @@ describe('YargEnabledCueGroups', () => {
     seedHappyPath()
     setDisabledYargCues.mockResolvedValueOnce({ success: false, error: 'disabled save failed' })
 
-    render(<YargEnabledCueGroups />)
+    renderWithProviders(<YargEnabledCueGroups />)
     await screen.findByRole('button', { name: /Yarg Group 1/ })
 
     fireEvent.click(screen.getAllByRole('checkbox', { name: /Enable Yarg Group/ })[1])
