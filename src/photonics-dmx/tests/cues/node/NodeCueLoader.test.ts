@@ -4,7 +4,7 @@
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { NodeCueLoader } from '../../../cues/node/loader/NodeCueLoader'
 import { CueRegistry } from '../../../cues/registries/CueRegistry'
 import { AudioCueRegistry } from '../../../cues/registries/AudioCueRegistry'
@@ -26,6 +26,21 @@ import type {
 } from '../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../cues/types/cueTypes'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+
+/** Set by a test to hand the loader its directory listing back to front. */
+let mockReverseReaddir = false
+
+jest.mock('fs/promises', () => {
+  const actual = jest.requireActual<typeof import('fs/promises')>('fs/promises')
+  const readdir = actual.readdir as unknown as (...args: unknown[]) => Promise<unknown[]>
+  return {
+    ...actual,
+    readdir: async (...args: unknown[]) => {
+      const entries = await readdir(...args)
+      return mockReverseReaddir ? [...entries].reverse() : entries
+    },
+  }
+})
 
 /** A minimal RB3 lighting cue file (YARG-shaped, mode 'rb3') keyed to a real CueType. */
 function rb3LightingFile(
@@ -179,6 +194,7 @@ describe('NodeCueLoader', () => {
   })
 
   afterEach(() => {
+    mockReverseReaddir = false
     yargRegistry.reset()
     audioRegistry.reset()
     getCueRegistry('rb3').reset()
@@ -202,6 +218,22 @@ describe('NodeCueLoader', () => {
     expect(group!.motionCues?.get('m1')).toBeDefined()
 
     expect(loader.getAvailableCueTypes('yarg', 'motion')).toEqual([])
+  })
+
+  it('registers groups in name order, whatever order the directory lists them in', async () => {
+    const audioDir = path.join(tmpDir, 'node-data', 'cues', 'audio')
+    fs.mkdirSync(audioDir, { recursive: true })
+    const first = audioMotionOnlyFile()
+    first.group = { ...first.group, id: 'group-a', name: 'Group A' }
+    const second = audioMotionOnlyFile()
+    second.group = { ...second.group, id: 'group-b', name: 'Group B' }
+    fs.writeFileSync(path.join(audioDir, 'a-first.json'), JSON.stringify(first), 'utf-8')
+    fs.writeFileSync(path.join(audioDir, 'b-second.json'), JSON.stringify(second), 'utf-8')
+    mockReverseReaddir = true
+
+    await loader.loadAll()
+
+    expect(audioRegistry.getRegisteredGroups()).toEqual(['group-a', 'group-b'])
   })
 
   it('routes a motion-only default claim to the motion default group', async () => {

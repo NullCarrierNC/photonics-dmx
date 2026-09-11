@@ -127,7 +127,9 @@ export abstract class BaseNodeFileLoader<
 
   protected async loadDirectory(mode: TMode): Promise<BaseLoadResult> {
     const dir = this.dirs[mode]
-    const files = await fs.readdir(dir).catch(() => [] as string[])
+    // Sorted, so files load and groups register in the same order on every platform. readdir hands
+    // them back in whatever order the filesystem keeps.
+    const files = (await fs.readdir(dir).catch(() => [] as string[])).sort()
 
     // Paths this mode registered on its previous load, so a file that has since vanished from disk
     // (e.g. a manual reload() with no chokidar unlink event) is unregistered rather than left stale
