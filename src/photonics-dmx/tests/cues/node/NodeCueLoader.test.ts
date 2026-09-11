@@ -236,6 +236,21 @@ describe('NodeCueLoader', () => {
     expect(audioRegistry.getRegisteredGroups()).toEqual(['group-a', 'group-b'])
   })
 
+  it("honours an audio file's default flag over the first group", async () => {
+    const audioDir = path.join(tmpDir, 'node-data', 'cues', 'audio')
+    fs.mkdirSync(audioDir, { recursive: true })
+    const plain = audioMotionOnlyFile()
+    plain.group = { ...plain.group, id: 'group-a', name: 'Group A' }
+    const flagged = audioMotionOnlyFile()
+    flagged.group = { ...flagged.group, id: 'group-b', name: 'Group B', isDefault: true }
+    fs.writeFileSync(path.join(audioDir, 'a-plain.json'), JSON.stringify(plain), 'utf-8')
+    fs.writeFileSync(path.join(audioDir, 'b-flagged.json'), JSON.stringify(flagged), 'utf-8')
+
+    await loader.loadAll()
+
+    expect(audioRegistry.getDefaultMotionGroupId()).toBe('group-b')
+  })
+
   it('routes a motion-only default claim to the motion default group', async () => {
     const file = yargMotionOnlyFile()
     file.group = { ...file.group, isDefault: true }

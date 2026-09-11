@@ -110,7 +110,7 @@ export class CueRegistry {
   }
 
   /**
-   * Set the group serving fallback lighting cues.
+   * Flag the group serving fallback lighting cues.
    * @param groupId The name of the group to set as default
    * @throws Error if the group doesn't exist
    */
@@ -119,7 +119,7 @@ export class CueRegistry {
   }
 
   /**
-   * Set the group serving fallback motion programs.
+   * Flag the group serving fallback motion programs.
    * @param groupId The name of the group to set as motion default
    * @throws Error if the group doesn't exist
    */
@@ -128,25 +128,14 @@ export class CueRegistry {
   }
 
   /**
-   * Apply a cue file's group designations to a registered group. A group's default claim is routed
-   * by what it actually holds, so a motion-only group becomes the motion fallback and leaves the
-   * lighting fallback to a group that serves lighting cues. A group holding both serves both.
+   * Apply a cue file's group designations to a registered group. See
+   * CueGroupCatalog.designateDefaults for how a default claim is routed.
    */
   public applyGroupDesignations(
     meta: { isDefault?: boolean; isStageKit?: boolean },
     group: ICueGroup,
   ): void {
-    if (meta.isDefault) {
-      if (group.cues.size > 0) {
-        this.catalog.setDefaultGroup(group.id)
-      }
-      if (group.motionCues && group.motionCues.size > 0) {
-        this.catalog.setDefaultMotionGroup(group.id)
-      }
-    }
-    if (meta.isStageKit) {
-      this.catalog.setStageKitGroup(group.id)
-    }
+    this.catalog.designateDefaults(meta, group.id)
   }
 
   /**

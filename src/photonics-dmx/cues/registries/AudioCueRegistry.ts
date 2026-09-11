@@ -30,11 +30,11 @@ export interface AudioCueGroup {
 /**
  * Registry for managing audio-reactive lighting cue implementations.
  *
- * The groups, the enabled set, the fallback group and the disabled cue sets live in a
+ * The groups, the enabled set, the fallback groups and the disabled cue sets live in a
  * CueGroupCatalog, the same container the net registries hold, so the two answer questions like
- * "which groups are enabled" the same way. What stays here is what audio does differently: the
- * first group registered serves fallbacks for both lighting and motion, and the cue-details cache
- * the renderer reads.
+ * "which groups are enabled" and "which group falls back" the same way. What stays here is what
+ * audio does differently: a first-match selection over the enabled groups in place of the net
+ * selection policy, and the cue-details cache the renderer reads.
  */
 export class AudioCueRegistry {
   /** The singleton instance of the AudioCueRegistry */
@@ -68,12 +68,6 @@ export class AudioCueRegistry {
   public registerGroup(group: AudioCueGroup): void {
     this.catalog.register(group)
     this.cueDetailsCache.delete(group.id)
-
-    // Audio cue files carry no group designations, so the first group registered serves fallbacks.
-    if (!this.catalog.getDefaultGroupId()) {
-      this.catalog.setDefaultGroup(group.id)
-    }
-
     this.motionState.onRegisterGroup(group.id, group.motionCues?.size ?? 0)
   }
 
@@ -92,13 +86,24 @@ export class AudioCueRegistry {
   }
 
   /**
-   * Set the default group.
+   * Flag the group serving fallback lighting cues. Leaves the enabled groups alone, since a
+   * fallback serves whether or not its group is enabled.
    * @param groupId The ID of the group to set as default
    * @throws Error if the group doesn't exist
    */
   public setDefaultGroup(groupId: string): void {
     this.catalog.setDefaultGroup(groupId)
-    this.catalog.enableGroup(groupId)
+  }
+
+  /**
+   * Apply a cue file's group designations to a registered group. See
+   * CueGroupCatalog.designateDefaults for how a default claim is routed.
+   */
+  public applyGroupDesignations(
+    meta: { isDefault?: boolean; isStageKit?: boolean },
+    group: AudioCueGroup,
+  ): void {
+    this.catalog.designateDefaults(meta, group.id)
   }
 
   /**
@@ -138,10 +143,16 @@ export class AudioCueRegistry {
   }
 
   /**
-   * Get a cue implementation from a specific group.
+   * Get a cue implementation from a specific group, falling back to the default group when that
+   * group cannot serve the cue.
    */
   public getCueImplementationFromGroup(cueType: AudioCueType, groupId: string): IAudioCue | null {
-    return this.catalog.cueFrom(groupId, cueType)
+    const cue = this.catalog.cueFrom(groupId, cueType)
+    if (cue) {
+      return cue
+    }
+    const fallbackId = this.catalog.getDefaultGroupId()
+    return fallbackId ? this.catalog.cueFrom(fallbackId, cueType) : null
   }
 
   /** Add every cue type the group carries and has not disabled. */
@@ -274,12 +285,9 @@ export class AudioCueRegistry {
     return this.catalog.getDefaultGroupId()
   }
 
-  /**
-   * Get the group serving fallback motion programs. Audio keeps a single default group for both
-   * surfaces, since audio cue files carry no group designations.
-   */
+  /** Get the group serving fallback motion programs. */
   public getDefaultMotionGroupId(): string | null {
-    return this.catalog.getDefaultGroupId()
+    return this.catalog.getDefaultMotionGroupId()
   }
 
   /**
@@ -311,7 +319,7 @@ export class AudioCueRegistry {
   public getRandomMotionCue(): IAudioCue | null {
     return this.motionState.getRandomMotionCue(
       (id) => this.catalog.getGroup(id),
-      this.catalog.getDefaultGroupId(),
+      this.catalog.getDefaultMotionGroupId(),
     )
   }
 

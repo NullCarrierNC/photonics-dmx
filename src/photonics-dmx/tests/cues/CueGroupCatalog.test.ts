@@ -36,6 +36,13 @@ const group = (id: string, cueTypes: CueType[]): ICueGroup => ({
   cues: new Map(cueTypes.map((t) => [t, new MockCue(`${id}-${t}`)])),
 })
 
+const motionOnly = (id: string): ICueGroup => ({
+  id,
+  name: id,
+  cues: new Map(),
+  motionCues: new Map([['m1', new MockCue(`${id}-m1`)]]),
+})
+
 describe('CueGroupCatalog', () => {
   let catalog: LightingCueGroupCatalog
 
@@ -83,6 +90,58 @@ describe('CueGroupCatalog', () => {
     catalog.unregister('motion')
     expect(catalog.getDefaultGroupId()).toBe('lighting')
     expect(catalog.getDefaultMotionGroupId()).toBeNull()
+  })
+
+  it('fills each fallback from the first group able to serve it', () => {
+    catalog.register(motionOnly('m'))
+    catalog.register(group('a', [CueType.Chorus]))
+    catalog.register(group('b', [CueType.Chorus]))
+
+    expect(catalog.getDefaultGroupId()).toBe('a')
+    expect(catalog.getDefaultMotionGroupId()).toBe('m')
+  })
+
+  it('never fills the lighting fallback from a motion-only group', () => {
+    catalog.register(motionOnly('m'))
+
+    expect(catalog.getDefaultGroupId()).toBeNull()
+  })
+
+  it('keeps a flagged fallback when a later group registers', () => {
+    catalog.register(group('a', [CueType.Chorus]))
+    catalog.register(group('b', [CueType.Chorus]))
+    catalog.setDefaultGroup('b')
+
+    catalog.register(group('c', [CueType.Chorus]))
+
+    expect(catalog.getDefaultGroupId()).toBe('b')
+  })
+
+  it('refills an emptied fallback from the first remaining group able to serve it', () => {
+    catalog.register(group('a', [CueType.Chorus]))
+    catalog.register(motionOnly('m'))
+    catalog.register(group('b', [CueType.Chorus]))
+    catalog.setDefaultGroup('a')
+
+    catalog.unregister('a')
+
+    expect(catalog.getDefaultGroupId()).toBe('b')
+  })
+
+  it('routes a default claim by what the group holds', () => {
+    catalog.register(group('lighting', [CueType.Chorus]))
+    catalog.register(motionOnly('motion'))
+
+    catalog.designateDefaults({ isDefault: true }, 'motion')
+
+    expect(catalog.getDefaultMotionGroupId()).toBe('motion')
+    expect(catalog.getDefaultGroupId()).toBe('lighting')
+  })
+
+  it('refuses to designate a group it does not hold', () => {
+    expect(() => catalog.designateDefaults({ isDefault: true }, 'missing')).toThrow(
+      "group 'missing' not found",
+    )
   })
 
   it('clearPreferences drops both default designations', () => {

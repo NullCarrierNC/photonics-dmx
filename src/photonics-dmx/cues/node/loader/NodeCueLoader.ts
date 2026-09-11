@@ -301,6 +301,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       const audioFile = file as AudioNodeCueFile
       const group = await buildAudioGroup(audioFile, compileErrors, this.buildContext())
       this.options.registries.audio.registerGroup(group)
+      this.options.registries.audio.applyGroupDesignations(audioFile.group, group)
       if (audioGroupWasEnabled === false) {
         this.options.registries.audio.disableGroup(group.id)
       }

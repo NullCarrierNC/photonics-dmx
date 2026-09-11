@@ -6,10 +6,14 @@ import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('CueGroupCatalog')
 
-/** The least a catalog needs of a group: an id, and the cues it carries keyed by cue type. */
+/**
+ * The least a catalog needs of a group: an id, the cues it carries keyed by cue type, and any
+ * motion programs, which decide whether it can serve as the motion fallback.
+ */
 export interface CatalogGroup<K, V> {
   id: string
   cues: Map<K, V>
+  motionCues?: ReadonlyMap<string, unknown>
 }
 
 /**
@@ -21,6 +25,11 @@ export interface CatalogGroup<K, V> {
  *
  * Generic over the cue-type key and the cue itself, so the net registries and the audio registry
  * hold their groups the same way rather than each keeping their own container.
+ *
+ * Each surface keeps a fallback while any group can serve it. A group flagged as the default, by a
+ * cue file or an explicit call, holds its slot. Until one is flagged, and whenever the flagged group
+ * goes, the first registered group able to serve the surface fills it: one with lighting cues for
+ * the lighting fallback, one with motion programs for the motion fallback.
  */
 export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> {
   /** Map of all registered cue groups by their name */
@@ -44,6 +53,10 @@ export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> 
   /** Name of the stage kit group for special stage kit handling */
   private stageKitGroup: string | null = null
 
+  /** Whether each fallback was flagged, rather than filled from the first group able to serve it. */
+  private defaultFlagged = false
+  private motionDefaultFlagged = false
+
   /** Clear the catalog back to holding nothing at all. */
   public clear(): void {
     this.groups.clear()
@@ -58,18 +71,24 @@ export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> 
     this.defaultGroup = null
     this.defaultMotionGroup = null
     this.stageKitGroup = null
+    this.defaultFlagged = false
+    this.motionDefaultFlagged = false
   }
 
-  /** Register a group, enabled and active by default. */
+  /**
+   * Register a group, enabled and active by default. It fills either fallback that is empty and
+   * that it can serve.
+   */
   public register(group: G): void {
     this.groups.set(group.id, group)
     this.enabledGroups.add(group.id)
     this.activeGroups.add(group.id)
+    this.fillEmptyFallbacks()
   }
 
   /**
    * Remove a group from the catalog, dropping any default or stage kit designation that pointed
-   * at it.
+   * at it. An emptied fallback is refilled from the first remaining group able to serve it.
    * @returns false when the group was not registered
    */
   public unregister(groupId: string): boolean {
@@ -83,30 +102,34 @@ export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> 
 
     if (this.defaultGroup === groupId) {
       this.defaultGroup = null
+      this.defaultFlagged = false
     }
     if (this.defaultMotionGroup === groupId) {
       this.defaultMotionGroup = null
+      this.motionDefaultFlagged = false
     }
     if (this.stageKitGroup === groupId) {
       this.stageKitGroup = null
     }
+    this.fillEmptyFallbacks()
     return true
   }
 
   /**
-   * Set the group serving fallback lighting cues.
+   * Flag the group serving fallback lighting cues. It holds the slot until it is unregistered.
    * @throws Error if the group doesn't exist
    */
   public setDefaultGroup(groupId: string): void {
     if (!this.groups.has(groupId)) {
       throw new Error(`Cannot set default group: group '${groupId}' not found`)
     }
-    if (this.defaultGroup !== null && this.defaultGroup !== groupId) {
+    if (this.defaultFlagged && this.defaultGroup !== groupId) {
       log.warn(
         `Default group '${this.defaultGroup}' replaced by '${groupId}': only one group can serve fallback cues`,
       )
     }
     this.defaultGroup = groupId
+    this.defaultFlagged = true
   }
 
   public getDefaultGroupId(): string | null {
@@ -114,20 +137,21 @@ export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> 
   }
 
   /**
-   * Set the group serving fallback motion programs. Tracked separately from the lighting default,
-   * so each surface falls back to a group that serves it.
+   * Flag the group serving fallback motion programs. Tracked separately from the lighting default,
+   * so each surface falls back to a group that serves it, and held until the group is unregistered.
    * @throws Error if the group doesn't exist
    */
   public setDefaultMotionGroup(groupId: string): void {
     if (!this.groups.has(groupId)) {
       throw new Error(`Cannot set default motion group: group '${groupId}' not found`)
     }
-    if (this.defaultMotionGroup !== null && this.defaultMotionGroup !== groupId) {
+    if (this.motionDefaultFlagged && this.defaultMotionGroup !== groupId) {
       log.warn(
         `Default motion group '${this.defaultMotionGroup}' replaced by '${groupId}': only one group can serve fallback motion programs`,
       )
     }
     this.defaultMotionGroup = groupId
+    this.motionDefaultFlagged = true
   }
 
   public getDefaultMotionGroupId(): string | null {
@@ -147,6 +171,33 @@ export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> 
 
   public getStageKitGroupId(): string | null {
     return this.stageKitGroup
+  }
+
+  /**
+   * Apply a cue file's designations to a registered group. A default claim is routed by what the
+   * group actually holds, so a motion-only group takes the motion fallback and leaves the lighting
+   * fallback to a group that serves lighting cues. A group holding both serves both.
+   * @throws Error if the group doesn't exist
+   */
+  public designateDefaults(
+    meta: { isDefault?: boolean; isStageKit?: boolean },
+    groupId: string,
+  ): void {
+    const group = this.groups.get(groupId)
+    if (!group) {
+      throw new Error(`Cannot designate defaults: group '${groupId}' not found`)
+    }
+    if (meta.isDefault) {
+      if (group.cues.size > 0) {
+        this.setDefaultGroup(groupId)
+      }
+      if ((group.motionCues?.size ?? 0) > 0) {
+        this.setDefaultMotionGroup(groupId)
+      }
+    }
+    if (meta.isStageKit) {
+      this.setStageKitGroup(groupId)
+    }
   }
 
   /**
@@ -327,6 +378,26 @@ export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> 
       : false
 
     return { activeGroupsWithCue, allGroupsWithCue, defaultHasCue }
+  }
+
+  /** Fill each empty fallback from the first registered group able to serve it. */
+  private fillEmptyFallbacks(): void {
+    if (this.defaultGroup === null) {
+      this.defaultGroup = this.firstGroupWhere((group) => group.cues.size > 0)
+    }
+    if (this.defaultMotionGroup === null) {
+      this.defaultMotionGroup = this.firstGroupWhere((group) => (group.motionCues?.size ?? 0) > 0)
+    }
+  }
+
+  /** The first registered group, in registration order, that passes the test. */
+  private firstGroupWhere(test: (group: G) => boolean): string | null {
+    for (const group of this.groups.values()) {
+      if (test(group)) {
+        return group.id
+      }
+    }
+    return null
   }
 }
 
