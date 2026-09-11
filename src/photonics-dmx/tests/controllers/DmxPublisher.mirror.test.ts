@@ -26,12 +26,14 @@ import {
 } from '../../helpers/dmxHelpers'
 
 function makeMockSenderManager(): {
-  send: ReturnType<typeof jest.fn>
-  getEnabledWireSenders: ReturnType<typeof jest.fn>
-  isIpcEnabled: ReturnType<typeof jest.fn>
+  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
+  getEnabledWireSenders: jest.Mock<() => string[]>
+  isIpcEnabled: jest.Mock<() => boolean>
 } {
   return {
-    send: jest.fn().mockImplementation(() => Promise.resolve()),
+    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
+      Promise.resolve(true),
+    ),
     getEnabledWireSenders: jest.fn(() => ['sacn']),
     isIpcEnabled: jest.fn(() => false),
   }
