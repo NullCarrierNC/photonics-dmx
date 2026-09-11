@@ -4,45 +4,28 @@
  * what it saves, and how it reacts to the audio events the main process pushes.
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
-import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
+import { screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { DEFAULT_AUDIO_GAME_MODE } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../ipcApi'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
-type Cue = {
-  id: string
-  label: string
-  description: string
-  groupId: string
-  groupName: string
-  groupDescription?: string
-}
-type CueState = {
-  success: boolean
-  activeCueType?: string | null
-  secondaryCueType?: string | null
-  cues?: Cue[]
-  error?: string
-}
-type MotionGroup = { id: string; name: string; description?: string; cueCount: number }
-type MotionCue = { id: string; name: string }
-type MotionRef = { groupId: string; cueId: string } | null
+type LoadedCueState = Extract<
+  Awaited<ReturnType<typeof ipcApi.getAudioReactiveCues>>,
+  { success: true }
+>
+type Cue = LoadedCueState['cues'][number]
 
-const api = {
-  getAudioEnabled: jest.fn(async (): Promise<boolean> => true),
-  getMotionEnabled: jest.fn(async (): Promise<boolean> => true),
-  getAudioGameMode: jest.fn(async (): Promise<{ enabled: boolean }> => ({ enabled: false })),
-  getAudioMotionCueGroups: jest.fn(async (): Promise<MotionGroup[]> => []),
-  getActiveAudioMotionCue: jest.fn(async (): Promise<MotionRef> => null),
-  getAvailableAudioMotionCues: jest.fn(async (_g: string): Promise<MotionCue[]> => []),
-  getAudioReactiveCues: jest.fn(async (): Promise<CueState> => ({ success: true, cues: [] })),
-  setActiveAudioCue: jest.fn(
-    async (_id: string): Promise<{ success: boolean; error?: string }> => ({ success: true }),
-  ),
-  setActiveAudioMotionCue: jest.fn(
-    async (_ref: MotionRef): Promise<{ success: boolean; error?: string }> => ({ success: true }),
-  ),
-}
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
-jest.mock('../ipcApi', () => api)
+const api = jest.mocked(ipcApi)
 jest.mock('../utils/ipcHelpers', () => ({
   addIpcListener: jest.fn(),
   removeIpcListener: jest.fn(),
@@ -75,9 +58,18 @@ function cue(overrides: Partial<Cue> = {}): Cue {
     description: 'A pulse',
     groupId: 'core',
     groupName: 'Core',
+    groupDescription: '',
     ...overrides,
   }
 }
+
+/** The cue state main reports, with nothing active unless a case names a cue. */
+function cueState(state: Partial<LoadedCueState> = {}): LoadedCueState {
+  return { success: true, activeCueType: '', secondaryCueType: null, cues: [], ...state }
+}
+
+/** Game mode as main reports it, switched on or off. */
+const gameModeConfig = (enabled: boolean) => ({ ...DEFAULT_AUDIO_GAME_MODE, enabled })
 
 const selects = () => screen.getAllByRole('combobox') as HTMLSelectElement[]
 const audioGroupSelect = () => selects()[0]
@@ -91,7 +83,7 @@ const totalIpcCalls = (): number =>
  * whether audio and motion are on, so it flushes until no new call arrives.
  */
 async function renderPanel(): Promise<void> {
-  render(<AudioCueSelectorPanel />)
+  renderWithProviders(<AudioCueSelectorPanel />)
   let previous = -1
   for (let guard = 0; guard < 10 && totalIpcCalls() !== previous; guard += 1) {
     previous = totalIpcCalls()
@@ -101,14 +93,15 @@ async function renderPanel(): Promise<void> {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  resetIpcApiMock()
   jest.useRealTimers()
   api.getAudioEnabled.mockResolvedValue(true)
   api.getMotionEnabled.mockResolvedValue(true)
-  api.getAudioGameMode.mockResolvedValue({ enabled: false })
+  api.getAudioGameMode.mockResolvedValue(gameModeConfig(false))
   api.getAudioMotionCueGroups.mockResolvedValue([])
   api.getActiveAudioMotionCue.mockResolvedValue(null)
   api.getAvailableAudioMotionCues.mockResolvedValue([])
-  api.getAudioReactiveCues.mockResolvedValue({ success: true, cues: [] })
+  api.getAudioReactiveCues.mockResolvedValue(cueState({ cues: [] }))
   api.setActiveAudioCue.mockResolvedValue({ success: true })
   api.setActiveAudioMotionCue.mockResolvedValue({ success: true })
 })
@@ -120,54 +113,62 @@ describe('AudioCueSelectorPanel load', () => {
     api.getAudioEnabled.mockResolvedValue(false)
     await renderPanel()
 
-    expect(screen.getByText(/Enable Audio Reactive mode in Preferences/)).toBeTruthy()
+    expect(screen.getByText(/Enable Audio Reactive mode in Preferences/)).toBeInTheDocument()
     expect(screen.queryByRole('combobox')).toBeNull()
   })
 
   it('says so when audio is on but no group offers a cue', async () => {
     await renderPanel()
 
-    expect(screen.getByText('No audio cues are available in the enabled groups.')).toBeTruthy()
+    expect(
+      screen.getByText('No audio cues are available in the enabled groups.'),
+    ).toBeInTheDocument()
   })
 
   it('shows the pickers once cues arrive', async () => {
-    api.getAudioReactiveCues.mockResolvedValue({ success: true, cues: [cue()] })
+    api.getAudioReactiveCues.mockResolvedValue(cueState({ cues: [cue()] }))
     await renderPanel()
 
     expect(selects().length).toBeGreaterThanOrEqual(2)
   })
 
   it('reports the error the cue state carries', async () => {
-    api.getAudioReactiveCues.mockResolvedValue({ success: false, error: 'registry offline' })
+    api.getAudioReactiveCues.mockResolvedValue({
+      success: false,
+      error: 'registry offline',
+      activeCueType: null,
+      secondaryCueType: null,
+      cues: [],
+    })
     await renderPanel()
 
-    expect(screen.getByText('registry offline')).toBeTruthy()
+    expect(screen.getByText('registry offline')).toBeInTheDocument()
   })
 
   it('reports a generic failure when the load throws', async () => {
     api.getAudioReactiveCues.mockRejectedValue(new Error('boom'))
     await renderPanel()
 
-    expect(screen.getByText('Failed to load audio cue state')).toBeTruthy()
+    expect(screen.getByText('Failed to load audio cue state')).toBeInTheDocument()
   })
 
   it('treats motion as on when the motion-enabled read fails', async () => {
     api.getMotionEnabled.mockRejectedValue(new Error('no'))
-    api.getAudioReactiveCues.mockResolvedValue({ success: true, cues: [cue()] })
+    api.getAudioReactiveCues.mockResolvedValue(cueState({ cues: [cue()] }))
     api.getAudioMotionCueGroups.mockResolvedValue([{ id: 'g1', name: 'Sweeps', cueCount: 2 }])
     await renderPanel()
 
-    expect(screen.getByText('Motion Cue')).toBeTruthy()
+    expect(screen.getByText('Motion Cue')).toBeInTheDocument()
   })
 
   it('treats game mode as off when the game-mode read fails', async () => {
     api.getAudioGameMode.mockRejectedValue(new Error('no'))
-    api.getAudioReactiveCues.mockResolvedValue({ success: true, cues: [cue()] })
+    api.getAudioReactiveCues.mockResolvedValue(cueState({ cues: [cue()] }))
     await renderPanel()
 
     // Game mode swaps the summary over to primary/secondary/strobe.
     expect(screen.queryByText('Primary cue')).toBeNull()
-    expect(screen.getByText('Lighting Cue Group')).toBeTruthy()
+    expect(screen.getByText('Lighting Cue Group')).toBeInTheDocument()
   })
 })
 
@@ -179,7 +180,7 @@ describe('AudioCueSelectorPanel cue list', () => {
   ]
 
   it('orders by group name, then by label', async () => {
-    api.getAudioReactiveCues.mockResolvedValue({ success: true, cues: spread })
+    api.getAudioReactiveCues.mockResolvedValue(cueState({ cues: spread }))
     await renderPanel()
 
     // The first cue of the first group wins the initial selection.
@@ -188,11 +189,12 @@ describe('AudioCueSelectorPanel cue list', () => {
   })
 
   it('settles on the cue the backend reports active', async () => {
-    api.getAudioReactiveCues.mockResolvedValue({
-      success: true,
-      cues: spread,
-      activeCueType: 'z',
-    })
+    api.getAudioReactiveCues.mockResolvedValue(
+      cueState({
+        cues: spread,
+        activeCueType: 'z',
+      }),
+    )
     await renderPanel()
 
     expect(audioCueSelect().value).toBe('z')
@@ -207,7 +209,7 @@ describe('AudioCueSelectorPanel selection', () => {
   ]
 
   it('saves a cue the user picks', async () => {
-    api.getAudioReactiveCues.mockResolvedValue({ success: true, cues: two, activeCueType: 'one' })
+    api.getAudioReactiveCues.mockResolvedValue(cueState({ cues: two, activeCueType: 'one' }))
     await renderPanel()
 
     fireEvent.change(audioCueSelect(), { target: { value: 'two' } })
@@ -216,7 +218,7 @@ describe('AudioCueSelectorPanel selection', () => {
   })
 
   it('does not save the cue that is already active', async () => {
-    api.getAudioReactiveCues.mockResolvedValue({ success: true, cues: two, activeCueType: 'one' })
+    api.getAudioReactiveCues.mockResolvedValue(cueState({ cues: two, activeCueType: 'one' }))
     await renderPanel()
 
     fireEvent.change(audioCueSelect(), { target: { value: 'one' } })
@@ -226,13 +228,13 @@ describe('AudioCueSelectorPanel selection', () => {
   })
 
   it('reports a refused save', async () => {
-    api.getAudioReactiveCues.mockResolvedValue({ success: true, cues: two, activeCueType: 'one' })
+    api.getAudioReactiveCues.mockResolvedValue(cueState({ cues: two, activeCueType: 'one' }))
     api.setActiveAudioCue.mockResolvedValue({ success: false, error: 'cue is gone' })
     await renderPanel()
 
     fireEvent.change(audioCueSelect(), { target: { value: 'two' } })
 
-    await waitFor(() => expect(screen.getByText('cue is gone')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('cue is gone')).toBeInTheDocument())
   })
 
   it('saves the first cue of a group the user switches to', async () => {
@@ -241,7 +243,7 @@ describe('AudioCueSelectorPanel selection', () => {
       cue({ id: 'b1', label: 'B1', groupId: 'b', groupName: 'B' }),
       cue({ id: 'b2', label: 'B2', groupId: 'b', groupName: 'B' }),
     ]
-    api.getAudioReactiveCues.mockResolvedValue({ success: true, cues: across, activeCueType: 'a1' })
+    api.getAudioReactiveCues.mockResolvedValue(cueState({ cues: across, activeCueType: 'a1' }))
     await renderPanel()
 
     fireEvent.change(audioGroupSelect(), { target: { value: 'b' } })
@@ -253,14 +255,14 @@ describe('AudioCueSelectorPanel selection', () => {
 describe('AudioCueSelectorPanel motion picker', () => {
   const withMotion = async (motionOn = true): Promise<void> => {
     api.getMotionEnabled.mockResolvedValue(motionOn)
-    api.getAudioReactiveCues.mockResolvedValue({ success: true, cues: [cue()] })
+    api.getAudioReactiveCues.mockResolvedValue(cueState({ cues: [cue()] }))
     api.getAudioMotionCueGroups.mockResolvedValue([
       { id: 'g1', name: 'Sweeps', cueCount: 2 },
       { id: 'g2', name: 'Spins', cueCount: 1 },
     ])
     api.getAvailableAudioMotionCues.mockResolvedValue([
-      { id: 'c1', name: 'Sweep One' },
-      { id: 'c2', name: 'Sweep Two' },
+      { id: 'c1', name: 'Sweep One', description: '' },
+      { id: 'c2', name: 'Sweep Two', description: '' },
     ])
     await renderPanel()
   }
@@ -313,18 +315,19 @@ describe('AudioCueSelectorPanel main process events', () => {
   })
 
   it('follows a game mode cue change without reloading', async () => {
-    api.getAudioGameMode.mockResolvedValue({ enabled: true })
-    api.getAudioReactiveCues.mockResolvedValue({
-      success: true,
-      cues: [cue({ id: 'one', label: 'One' }), cue({ id: 'two', label: 'Two' })],
-      activeCueType: 'one',
-    })
+    api.getAudioGameMode.mockResolvedValue(gameModeConfig(true))
+    api.getAudioReactiveCues.mockResolvedValue(
+      cueState({
+        cues: [cue({ id: 'one', label: 'One' }), cue({ id: 'two', label: 'Two' })],
+        activeCueType: 'one',
+      }),
+    )
     await renderPanel()
     const before = api.getAudioReactiveCues.mock.calls.length
 
     await emit(RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE, { activeCueType: 'two' })
 
-    expect(screen.getByText('Two')).toBeTruthy()
+    expect(screen.getByText('Two')).toBeInTheDocument()
     expect(api.getAudioReactiveCues.mock.calls.length).toBe(before)
   })
 
@@ -340,12 +343,13 @@ describe('AudioCueSelectorPanel main process events', () => {
 
 describe('AudioCueSelectorPanel strobe indicator', () => {
   const gameMode = async (): Promise<void> => {
-    api.getAudioGameMode.mockResolvedValue({ enabled: true })
-    api.getAudioReactiveCues.mockResolvedValue({
-      success: true,
-      cues: [cue({ id: 'strobe', label: 'Strobe Fast' })],
-      activeCueType: 'strobe',
-    })
+    api.getAudioGameMode.mockResolvedValue(gameModeConfig(true))
+    api.getAudioReactiveCues.mockResolvedValue(
+      cueState({
+        cues: [cue({ id: 'strobe', label: 'Strobe Fast' })],
+        activeCueType: 'strobe',
+      }),
+    )
     await renderPanel()
   }
 

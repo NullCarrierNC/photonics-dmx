@@ -150,7 +150,8 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
           return a.groupName.localeCompare(b.groupName)
         })
         setAvailableCues(sortedCues)
-        const initialCueId = response.activeCueType ?? sortedCues[0]?.id ?? ''
+        // Main names no active cue with an empty string until it has picked one, so that falls back too.
+        const initialCueId = response.activeCueType || sortedCues[0]?.id || ''
         const initialGroupId =
           sortedCues.find((cue) => cue.id === initialCueId)?.groupId ?? sortedCues[0]?.groupId ?? ''
         setActiveCue(initialCueId || null)
