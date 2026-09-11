@@ -1,7 +1,8 @@
 /**
  * The ratchet behind the per-rule budgets: count how many times one ESLint rule reports under
  * `src/`, compare that to a budget file, and fail when the count has grown. `--write` records the
- * current count, which is how a budget comes down after a deliberate pass.
+ * current count, which is how a budget comes down after a deliberate pass, and refuses to record a
+ * higher one so the ratchet cannot be widened by rerunning the command the failure names.
  *
  * Rules that cannot go clean in one sitting are set to warn in the ESLint config and held here
  * instead, so the backlog is visible and cannot grow.
@@ -55,6 +56,20 @@ function countReports(ruleId) {
 }
 
 /**
+ * The budget a file records, from its first line.
+ *
+ * @param {string} file
+ * @returns {number | null} The recorded budget, or null when there is none to read.
+ */
+function readBudget(file) {
+  if (!existsSync(file)) {
+    return null
+  }
+  const first = parseInt(readFileSync(file, 'utf8').trim().split('\n')[0], 10)
+  return Number.isNaN(first) || first < 0 ? null : first
+}
+
+/**
  * Run one rule's budget check, exiting the process with the result.
  *
  * @param {object} options
@@ -68,6 +83,16 @@ export function runRuleBudget({ ruleId, budgetFile, label, note }) {
   const current = countReports(ruleId)
 
   if (process.argv.includes('--write')) {
+    // A ratchet only holds if writing it can lower the number and never raise it. Otherwise the
+    // message a failing budget prints is also the way past the failure.
+    const previous = readBudget(file)
+    if (previous !== null && current > previous) {
+      console.error(`${label} count ${current} is above the recorded ${previous} (file ${file})`)
+      console.error(
+        `Refusing to raise the budget. Fix the new reports, or edit line 1 of ${file} by hand if the increase is intended.`,
+      )
+      process.exit(1)
+    }
     mkdirSync(dirname(file), { recursive: true })
     const lines = [
       String(current),
@@ -84,15 +109,17 @@ export function runRuleBudget({ ruleId, budgetFile, label, note }) {
     process.exit(1)
   }
 
-  const budget = parseInt(readFileSync(file, 'utf8').trim().split('\n')[0], 10)
-  if (Number.isNaN(budget)) {
+  const budget = readBudget(file)
+  if (budget === null) {
     console.error('Budget file must start with a non-negative integer on line 1')
     process.exit(1)
   }
 
   if (current > budget) {
     console.error(`${label} count ${current} exceeds budget ${budget} (file ${file})`)
-    console.error('If this increase is intended, run the same command with --write')
+    console.error(
+      `Fix the new reports. --write will not raise the budget, so edit line 1 of ${file} by hand if the increase is intended.`,
+    )
     process.exit(1)
   }
 
