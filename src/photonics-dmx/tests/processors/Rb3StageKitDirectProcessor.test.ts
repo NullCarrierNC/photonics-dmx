@@ -16,6 +16,7 @@ import { CueData } from '../../cues/types/cueTypes'
 import { Effect, RGBIO } from '../../types'
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
 import { performance as perfHooks } from 'perf_hooks'
+import { fakeLightingController } from '../helpers/fakeLightingController'
 
 const MENU_BASE = 'rb3-menu-base'
 const menuLight = (i: number) => `rb3-menu-light-${i}`
@@ -87,10 +88,10 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
   let menuHandler: Rb3MenuCueHandler
   let processor: Rb3StageKitDirectProcessor
   let addEffect: jest.Mock
-  let setEffect: jest.Mock
+  let setEffect: jest.Mock<ILightingController['setEffect']>
   let removeEffect: jest.Mock
   let setState: jest.Mock
-  let blackout: jest.Mock
+  let blackout: jest.Mock<ILightingController['blackout']>
 
   beforeEach(() => {
     jest.useFakeTimers()
@@ -102,47 +103,18 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     lightManager = new DmxLightManager(makeFourLightConfig())
 
     addEffect = jest.fn()
-    setEffect = jest.fn().mockImplementation(() => Promise.resolve())
+    setEffect = jest.fn<ILightingController['setEffect']>(() => Promise.resolve())
     removeEffect = jest.fn()
     setState = jest.fn()
-    blackout = jest.fn().mockImplementation(() => Promise.resolve())
+    blackout = jest.fn<ILightingController['blackout']>(() => Promise.resolve())
 
-    photonicsSequencer = {
+    photonicsSequencer = fakeLightingController({
       addEffect,
       setEffect,
-      addEffectWithCallback: jest.fn(),
-      setEffectWithCallback: jest.fn(),
-      addEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
-      setEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
-      removeEffectCallback: jest.fn(),
       removeEffect,
-      removeAllEffects: jest.fn(),
-      removeEffectByLayer: jest.fn(),
-      addEffectUnblockedName: jest.fn(),
-      setEffectUnblockedName: jest.fn(),
-      getActiveEffectsForLight: jest.fn(),
-      isLayerFreeForLight: jest.fn(),
       setState,
-      onBeat: jest.fn(),
-      onMeasure: jest.fn(),
-      onKeyframe: jest.fn(),
-      onDrumNote: jest.fn(),
-      onGuitarNote: jest.fn(),
-      onBassNote: jest.fn(),
-      onKeysNote: jest.fn(),
       blackout,
-      cancelBlackout: jest.fn(),
-      enableDebug: jest.fn(),
-      debugLightLayers: jest.fn(),
-      schedulePanTiltClear: jest.fn(),
-      cancelPanTiltClear: jest.fn(),
-      addMotionPattern: jest.fn(),
-      removeMotionPattern: jest.fn(),
-      getMotionPattern: jest.fn(),
-      updateMotionPatternConfig: jest.fn(),
-      replaceEffect: jest.fn(),
-      shutdown: jest.fn(),
-    } as unknown as ILightingController
+    })
 
     menuHandler = new Rb3MenuCueHandler(lightManager, photonicsSequencer)
     // Single-rig fanout: the processor builds one Rb3StageKitRigProcessor from the chain.
@@ -350,13 +322,7 @@ describe('StageKit strobe watchdog', () => {
 
     networkListener = new EventEmitter()
     const lightManager = new DmxLightManager(makeStrobeRigConfig())
-    const sequencer = {
-      addEffect: jest.fn(),
-      setEffect: jest.fn().mockImplementation(() => Promise.resolve()),
-      removeEffect: jest.fn(),
-      setState: jest.fn(),
-      blackout: jest.fn().mockImplementation(() => Promise.resolve()),
-    } as unknown as ILightingController
+    const sequencer = fakeLightingController()
     const chainFanout = new ChainFanout()
     chainFanout.setChains([
       {

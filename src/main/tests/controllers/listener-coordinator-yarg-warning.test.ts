@@ -4,12 +4,12 @@ import {
   type ListenerCoordinatorDeps,
 } from '../../controllers/ListenerCoordinator'
 import { DmxLightManager } from '../../../photonics-dmx/controllers/DmxLightManager'
-import { ILightingController } from '../../../photonics-dmx/controllers/sequencer/interfaces'
 import { ChainFanout } from '../../../photonics-dmx/controllers/ChainFanout'
 import { noopRuntimeBroadcaster } from '../../../photonics-dmx/runtime/broadcaster'
 import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { withCapturedLogEntries } from '../captureLogSink'
+import { fakeLightingController } from '../../../photonics-dmx/tests/helpers/fakeLightingController'
 
 const mockBind = jest.fn((_port: number, callback: () => void) => {
   callback()
@@ -28,10 +28,7 @@ jest.mock('dgram', () => ({
 }))
 
 function makeDeps(): ListenerCoordinatorDeps & { sendToAllWindows: jest.Mock } {
-  const effects = {
-    removeAllEffects: jest.fn(),
-    blackout: jest.fn<() => Promise<void>>().mockImplementation(() => Promise.resolve()),
-  } as unknown as ILightingController
+  const effects = fakeLightingController()
   const dmx = {} as DmxLightManager
   const fakeChain = {
     rigId: 'stub',

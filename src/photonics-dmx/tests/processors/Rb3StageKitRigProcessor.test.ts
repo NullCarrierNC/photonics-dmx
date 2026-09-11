@@ -15,6 +15,7 @@ import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { Rb3StageKitRigProcessor } from '../../processors/Rb3StageKitRigProcessor'
 import { DEFAULT_STAGEKIT_CONFIG } from '../../listeners/RB3/StageKitTypes'
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
+import { fakeLightingController } from '../helpers/fakeLightingController'
 
 function makeFourLightManager(): DmxLightManager {
   return new DmxLightManager(
@@ -60,14 +61,9 @@ function runningStrobes(proc: Rb3StageKitRigProcessor): string[] {
 }
 
 function makeSequencerStub(setState: jest.Mock): ILightingController {
-  return {
+  return fakeLightingController({
     setState,
-    addEffect: jest.fn(),
-    setEffect: jest.fn(),
-    removeAllEffects: jest.fn(),
-    blackout: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-    cancelBlackout: jest.fn(),
-  } as unknown as ILightingController
+  })
 }
 
 describe('Rb3StageKitRigProcessor accumulated-colour flush', () => {

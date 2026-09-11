@@ -20,6 +20,7 @@ import {
   getStrobeStateManager,
   __resetStrobeStateManagerForTests,
 } from '../../controllers/StrobeStateManager'
+import { fakeLightingController } from '../helpers/fakeLightingController'
 
 type CueLifecycleMocks = {
   execute: jest.Mock
@@ -37,22 +38,7 @@ function makeFakeCue(style: CueStyle, id: string): INetCue & CueLifecycleMocks {
 }
 
 function makeSequencer(): ILightingController {
-  return {
-    schedulePanTiltClear: jest.fn(),
-    cancelPanTiltClear: jest.fn(),
-    blackout: jest.fn(),
-    onBeat: jest.fn(),
-    onMeasure: jest.fn(),
-    onKeyframe: jest.fn(),
-    onKeyframeFirst: jest.fn(),
-    onKeyframeNext: jest.fn(),
-    onKeyframePrevious: jest.fn(),
-    onDrumNote: jest.fn(),
-    onGuitarNote: jest.fn(),
-    onBassNote: jest.fn(),
-    onKeysNote: jest.fn(),
-    onVocalNote: jest.fn(),
-  } as unknown as ILightingController
+  return fakeLightingController()
 }
 
 function makeLightManager(): DmxLightManager {

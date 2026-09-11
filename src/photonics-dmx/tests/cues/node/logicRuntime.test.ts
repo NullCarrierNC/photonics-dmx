@@ -12,10 +12,10 @@ import type {
 import { ActionEffectFactory } from '../../../cues/node/compiler/ActionEffectFactory'
 import { VariableValue } from '../../../cues/node/runtime/executionTypes'
 import { Beat, CueData } from '../../../cues/types/cueTypes'
-import type { ILightingController } from '../../../controllers/sequencer/interfaces'
 import type { DmxLightManager } from '../../../controllers/DmxLightManager'
 import type { TrackedLight } from '../../../types'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { fakeLightingController } from '../../helpers/fakeLightingController'
 
 const createCueData = (beat?: Beat): CueData =>
   ({
@@ -341,17 +341,18 @@ describe('Node cue logic runtime', () => {
       ]
       const cueLevelVarStore = new Map<string, VariableValue>()
       const groupLevelVarStore = new Map<string, VariableValue>()
-      const mockSequencer = {
-        addEffect: jest.fn(),
-        addEffectUnblockedName: jest.fn().mockReturnValue(true),
-        setEffectUnblockedName: jest.fn().mockReturnValue(true),
-        addEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-        setEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-      } as unknown as ILightingController
+      const mockSequencer = fakeLightingController({
+        addEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+        setEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+      })
       const mockLightManager = { getLights: jest.fn() } as unknown as DmxLightManager
 
       const eventNode: NetEventNode = { id: 'e1', type: 'event', eventType: 'beat' }
@@ -419,17 +420,18 @@ describe('Node cue logic runtime', () => {
     it('empty array input produces empty output', () => {
       const cueLevelVarStore = new Map<string, VariableValue>()
       const groupLevelVarStore = new Map<string, VariableValue>()
-      const mockSequencer = {
-        addEffect: jest.fn(),
-        addEffectUnblockedName: jest.fn().mockReturnValue(true),
-        setEffectUnblockedName: jest.fn().mockReturnValue(true),
-        addEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-        setEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-      } as unknown as ILightingController
+      const mockSequencer = fakeLightingController({
+        addEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+        setEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+      })
       const mockLightManager = { getLights: jest.fn() } as unknown as DmxLightManager
 
       const eventNode: NetEventNode = { id: 'e1', type: 'event', eventType: 'beat' }
@@ -502,17 +504,18 @@ describe('Node cue logic runtime', () => {
     const runBuildRing = (lights: TrackedLight[]) => {
       const cueLevelVarStore = new Map<string, VariableValue>()
       const groupLevelVarStore = new Map<string, VariableValue>()
-      const mockSequencer = {
-        addEffect: jest.fn(),
-        addEffectUnblockedName: jest.fn().mockReturnValue(true),
-        setEffectUnblockedName: jest.fn().mockReturnValue(true),
-        addEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-        setEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-      } as unknown as ILightingController
+      const mockSequencer = fakeLightingController({
+        addEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+        setEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+      })
       const mockLightManager = {
         getLights: jest.fn(),
         getLightsInGroup: jest.fn().mockReturnValue(lights),
@@ -672,17 +675,18 @@ describe('Node cue logic runtime', () => {
     it('random-integer: result is in [min, max] and min === max returns that value', () => {
       const cueLevelVarStore = new Map<string, VariableValue>()
       const groupLevelVarStore = new Map<string, VariableValue>()
-      const mockSequencer = {
-        addEffect: jest.fn(),
-        addEffectUnblockedName: jest.fn().mockReturnValue(true),
-        setEffectUnblockedName: jest.fn().mockReturnValue(true),
-        addEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-        setEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-      } as unknown as ILightingController
+      const mockSequencer = fakeLightingController({
+        addEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+        setEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+      })
       const mockLightManager = { getLights: jest.fn() } as unknown as DmxLightManager
 
       const eventNode: NetEventNode = { id: 'e1', type: 'event', eventType: 'beat' }
@@ -739,17 +743,18 @@ describe('Node cue logic runtime', () => {
     it('random-integer: min === max always returns that value', () => {
       const cueLevelVarStore = new Map<string, VariableValue>()
       const groupLevelVarStore = new Map<string, VariableValue>()
-      const mockSequencer = {
-        addEffect: jest.fn(),
-        addEffectUnblockedName: jest.fn().mockReturnValue(true),
-        setEffectUnblockedName: jest.fn().mockReturnValue(true),
-        addEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-        setEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-      } as unknown as ILightingController
+      const mockSequencer = fakeLightingController({
+        addEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+        setEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+      })
       const mockLightManager = { getLights: jest.fn() } as unknown as DmxLightManager
 
       const eventNode: NetEventNode = { id: 'e1', type: 'event', eventType: 'beat' }
@@ -800,17 +805,18 @@ describe('Node cue logic runtime', () => {
     it('random-choice: result is one of the choices', () => {
       const cueLevelVarStore = new Map<string, VariableValue>()
       const groupLevelVarStore = new Map<string, VariableValue>()
-      const mockSequencer = {
-        addEffect: jest.fn(),
-        addEffectUnblockedName: jest.fn().mockReturnValue(true),
-        setEffectUnblockedName: jest.fn().mockReturnValue(true),
-        addEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-        setEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-      } as unknown as ILightingController
+      const mockSequencer = fakeLightingController({
+        addEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+        setEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+      })
       const mockLightManager = { getLights: jest.fn() } as unknown as DmxLightManager
 
       const eventNode: NetEventNode = { id: 'e1', type: 'event', eventType: 'beat' }
@@ -866,17 +872,18 @@ describe('Node cue logic runtime', () => {
       ]
       const cueLevelVarStore = new Map<string, VariableValue>()
       const groupLevelVarStore = new Map<string, VariableValue>()
-      const mockSequencer = {
-        addEffect: jest.fn(),
-        addEffectUnblockedName: jest.fn().mockReturnValue(true),
-        setEffectUnblockedName: jest.fn().mockReturnValue(true),
-        addEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-        setEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-      } as unknown as ILightingController
+      const mockSequencer = fakeLightingController({
+        addEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+        setEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+      })
       const mockLightManager = {
         getLightsInGroup: jest.fn().mockReturnValue(mockLights),
       } as unknown as DmxLightManager
@@ -945,16 +952,19 @@ describe('Node cue logic runtime', () => {
   describe('debugger', () => {
     it('execution passes through and downstream action fires', () => {
       const addEffect = jest.fn()
-      const mockSequencer = {
+      const mockSequencer = fakeLightingController({
         addEffect,
-        setEffectUnblockedName: jest.fn().mockReturnValue(true),
-        addEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-        setEffectUnblockedNameWithCallback: jest
-          .fn()
-          .mockImplementation((_n: string, _e: unknown, cb: () => void) => cb()),
-      } as unknown as ILightingController
+        addEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+        setEffectUnblockedNameWithCallback: (
+          _n: string,
+          _e: unknown,
+          cb: (cancelled: boolean) => void,
+        ) => cb(false),
+      })
       const mockLightManager = {
         getLights: jest.fn().mockReturnValue([{ id: 'l1', position: 0, config: {} }]),
       } as unknown as DmxLightManager

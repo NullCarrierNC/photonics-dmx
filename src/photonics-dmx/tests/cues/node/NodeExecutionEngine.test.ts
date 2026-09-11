@@ -20,6 +20,7 @@ import type { TrackedLight } from '../../../types'
 import { type FixtureConfig, DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } from '../../../types'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { fakeLightingController } from '../../helpers/fakeLightingController'
 
 /** Minimal fixture config for test TrackedLight objects */
 type MinimalLightConfig = Partial<FixtureConfig>
@@ -59,57 +60,27 @@ describe('NodeExecutionEngine', () => {
 
   beforeEach(() => {
     // Create mock sequencer
-    mockSequencer = {
-      addEffect: jest.fn(),
-      replaceEffect: jest.fn(),
-      addEffectWithCallback: jest.fn((_name, _effect, callback) => {
-        if (callback) setTimeout(() => callback(), 1)
-      }),
-      setEffectWithCallback: jest.fn((_name, _effect, callback) => {
-        if (callback) setTimeout(() => callback(), 1)
-      }),
-      addEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
-        if (callback) setTimeout(() => callback(), 1)
+    mockSequencer = fakeLightingController({
+      addEffectWithCallback: (_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(false), 1)
+      },
+      setEffectWithCallback: (_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(false), 1)
+      },
+      addEffectUnblockedNameWithCallback: (_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(false), 1)
         return true
-      }),
+      },
       // Blocking set-position submits through this one and reads the applied result.
-      replaceEffectWithCallback: jest.fn((_name, _effect, callback) => {
-        if (callback) setTimeout(() => callback(), 1)
+      replaceEffectWithCallback: (_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(false), 1)
         return true
-      }),
-      setEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
-        if (callback) setTimeout(() => callback(), 1)
+      },
+      setEffectUnblockedNameWithCallback: (_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(false), 1)
         return true
-      }),
-      removeEffectCallback: jest.fn(),
-      setEffect: jest.fn(),
-      removeEffect: jest.fn(),
-      removeAllEffects: jest.fn(),
-      removeEffectByLayer: jest.fn(),
-      addEffectUnblockedName: jest.fn(),
-      setEffectUnblockedName: jest.fn(),
-      getActiveEffectsForLight: jest.fn(),
-      isLayerFreeForLight: jest.fn(),
-      setState: jest.fn(),
-      onBeat: jest.fn(),
-      onMeasure: jest.fn(),
-      onKeyframe: jest.fn(),
-      onDrumNote: jest.fn(),
-      onGuitarNote: jest.fn(),
-      onBassNote: jest.fn(),
-      onKeysNote: jest.fn(),
-      blackout: jest.fn(),
-      cancelBlackout: jest.fn(),
-      enableDebug: jest.fn(),
-      debugLightLayers: jest.fn(),
-      shutdown: jest.fn(),
-      cancelPanTiltClear: jest.fn(),
-      schedulePanTiltClear: jest.fn(),
-      addMotionPattern: jest.fn(),
-      getMotionPattern: jest.fn().mockReturnValue(undefined),
-      removeMotionPattern: jest.fn(),
-      updateMotionPatternConfig: jest.fn(),
-    } as unknown as ILightingController
+      },
+    })
 
     mockLightManager = {
       getLights: jest.fn().mockReturnValue([

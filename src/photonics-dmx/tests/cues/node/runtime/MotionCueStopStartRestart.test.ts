@@ -22,6 +22,7 @@ import type { CueData } from '../../../../cues/types/cueTypes'
 import type { AudioCueData } from '../../../../cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
 import type { AudioEventNodeUnion } from '../../../../cues/types/nodeCueTypes'
+import { fakeLightingController } from '../../../helpers/fakeLightingController'
 
 function minimalYargCueData(overrides?: Partial<CueData>): CueData {
   return {
@@ -144,21 +145,7 @@ describe('MotionNodeCue stop/start variable lifecycle', () => {
   beforeEach(() => {
     const config = createMockLightingConfig()
     lightManager = new DmxLightManager(config)
-    sequencer = {
-      addEffect: jest.fn(),
-      setEffect: jest.fn(),
-      removeEffect: jest.fn(),
-      removeAllEffects: jest.fn(),
-      removeEffectByLayer: jest.fn(),
-      addEffectUnblockedName: jest.fn(),
-      setEffectUnblockedName: jest.fn(),
-      cancelPanTiltClear: jest.fn(),
-      addMotionPattern: jest.fn(),
-      removeMotionPattern: jest.fn(),
-      getMotionPattern: jest.fn(),
-      updateMotionPatternConfig: jest.fn(),
-      onBeat: jest.fn(),
-    } as unknown as ILightingController
+    sequencer = fakeLightingController()
   })
 
   it('second activation after onStop does not reach motion-pattern when cue-started is missing (tick uninitialized)', () => {
@@ -249,21 +236,7 @@ describe('AudioMotionNodeCue stop/start variable lifecycle', () => {
   beforeEach(() => {
     const config = createMockLightingConfig()
     lightManager = new DmxLightManager(config)
-    sequencer = {
-      addEffect: jest.fn(),
-      setEffect: jest.fn(),
-      removeEffect: jest.fn(),
-      removeAllEffects: jest.fn(),
-      removeEffectByLayer: jest.fn(),
-      addEffectUnblockedName: jest.fn(),
-      setEffectUnblockedName: jest.fn(),
-      cancelPanTiltClear: jest.fn(),
-      addMotionPattern: jest.fn(),
-      removeMotionPattern: jest.fn(),
-      getMotionPattern: jest.fn(),
-      updateMotionPatternConfig: jest.fn(),
-      onBeat: jest.fn(),
-    } as unknown as ILightingController
+    sequencer = fakeLightingController()
   })
 
   it('second activation after onStop runs cue-started then cue-called (motion-pattern twice)', async () => {

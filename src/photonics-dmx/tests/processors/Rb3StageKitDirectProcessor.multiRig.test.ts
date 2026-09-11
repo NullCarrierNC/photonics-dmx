@@ -12,6 +12,7 @@ import { Rb3StageKitDirectProcessor } from '../../processors/Rb3StageKitDirectPr
 import { ChainFanout } from '../../controllers/ChainFanout'
 import type { RigChain } from '../../controllers/RigChain'
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
+import { fakeLightingController } from '../helpers/fakeLightingController'
 
 function makeFourLightConfig() {
   return createMockLightingConfig({
@@ -46,42 +47,10 @@ function makeSequencerStub(): {
   const setState = jest.fn()
   const blackout = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
   return {
-    ctrl: {
-      addEffect: jest.fn(),
-      setEffect: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-      addEffectWithCallback: jest.fn(),
-      setEffectWithCallback: jest.fn(),
-      addEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
-      setEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
-      removeEffectCallback: jest.fn(),
-      removeEffect: jest.fn(),
-      removeAllEffects: jest.fn(),
-      removeEffectByLayer: jest.fn(),
-      addEffectUnblockedName: jest.fn(),
-      setEffectUnblockedName: jest.fn(),
-      getActiveEffectsForLight: jest.fn(),
-      isLayerFreeForLight: jest.fn(),
+    ctrl: fakeLightingController({
       setState,
-      onBeat: jest.fn(),
-      onMeasure: jest.fn(),
-      onKeyframe: jest.fn(),
-      onDrumNote: jest.fn(),
-      onGuitarNote: jest.fn(),
-      onBassNote: jest.fn(),
-      onKeysNote: jest.fn(),
       blackout,
-      cancelBlackout: jest.fn(),
-      enableDebug: jest.fn(),
-      debugLightLayers: jest.fn(),
-      schedulePanTiltClear: jest.fn(),
-      cancelPanTiltClear: jest.fn(),
-      addMotionPattern: jest.fn(),
-      removeMotionPattern: jest.fn(),
-      getMotionPattern: jest.fn(),
-      updateMotionPatternConfig: jest.fn(),
-      replaceEffect: jest.fn(),
-      shutdown: jest.fn(),
-    } as unknown as ILightingController,
+    }),
     setState,
     blackout,
   }

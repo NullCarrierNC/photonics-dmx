@@ -18,6 +18,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { createMockLightingConfig } from '../../helpers/testFixtures'
 import type { ILightingController } from '../../../controllers/sequencer/interfaces'
 import type { CueData } from '../../../cues/types/cueTypes'
+import { fakeLightingController } from '../../helpers/fakeLightingController'
 
 type RecordedCall = {
   method: 'addEffect' | 'setEffect' | 'removeEffect'
@@ -27,39 +28,43 @@ type RecordedCall = {
 
 function createRecordingSequencer(): { sequencer: ILightingController; recorded: RecordedCall[] } {
   const recorded: RecordedCall[] = []
-  const sequencer = {
+  const sequencer = fakeLightingController({
     addEffect: (name: string) => {
       recorded.push({ method: 'addEffect', name })
     },
     setEffect: (name: string) => {
       recorded.push({ method: 'setEffect', name })
+      return Promise.resolve()
     },
     removeEffect: (name: string, layer?: number) => {
       recorded.push({ method: 'removeEffect', name, layer })
     },
-    addEffectWithCallback: (name: string, _e: unknown, cb: () => void) => {
+    addEffectWithCallback: (name: string, _e: unknown, cb: (cancelled: boolean) => void) => {
       recorded.push({ method: 'addEffect', name })
-      cb()
+      cb(false)
     },
-    setEffectWithCallback: (name: string, _e: unknown, cb: () => void) => {
+    setEffectWithCallback: (name: string, _e: unknown, cb: (cancelled: boolean) => void) => {
       recorded.push({ method: 'setEffect', name })
-      cb()
+      cb(false)
     },
-    addEffectUnblockedNameWithCallback: (name: string, _e: unknown, cb: () => void) => {
+    addEffectUnblockedNameWithCallback: (
+      name: string,
+      _e: unknown,
+      cb: (cancelled: boolean) => void,
+    ) => {
       recorded.push({ method: 'addEffect', name })
-      cb()
+      cb(false)
       return true
     },
-    setEffectUnblockedNameWithCallback: (name: string, _e: unknown, cb: () => void) => {
+    setEffectUnblockedNameWithCallback: (
+      name: string,
+      _e: unknown,
+      cb: (cancelled: boolean) => void,
+    ) => {
       recorded.push({ method: 'setEffect', name })
-      cb()
+      cb(false)
       return true
     },
-    removeEffectCallback: () => {},
-    blackout: () => Promise.resolve(),
-    onBeat: () => {},
-    onMeasure: () => {},
-    onKeyframe: () => {},
     addEffectUnblockedName: (name: string) => {
       recorded.push({ method: 'addEffect', name })
       return true
@@ -68,9 +73,8 @@ function createRecordingSequencer(): { sequencer: ILightingController; recorded:
       recorded.push({ method: 'setEffect', name })
       return true
     },
-    removeEffectByLayer: () => {},
-  }
-  return { sequencer: sequencer as unknown as ILightingController, recorded }
+  })
+  return { sequencer: sequencer, recorded }
 }
 
 function minimalCueDefinition(): NetNodeCueDefinition {

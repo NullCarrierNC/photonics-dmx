@@ -24,25 +24,10 @@ import type { RuntimeBroadcaster } from '../../../../runtime/broadcaster'
 import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
 import type { TrackedLight } from '../../../../types'
+import { fakeLightingController } from '../../../helpers/fakeLightingController'
 
 function makeSequencerStub(): ILightingController {
-  return {
-    addEffect: jest.fn(),
-    setEffect: jest.fn(),
-    removeEffect: jest.fn(),
-    removeAllEffects: jest.fn(),
-    removeEffectByLayer: jest.fn(),
-    addEffectUnblockedName: jest.fn(),
-    setEffectUnblockedName: jest.fn(),
-    addEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
-    setEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
-    cancelPanTiltClear: jest.fn(),
-    addMotionPattern: jest.fn(),
-    removeMotionPattern: jest.fn(),
-    getMotionPattern: jest.fn(),
-    updateMotionPatternConfig: jest.fn(),
-    onBeat: jest.fn(),
-  } as unknown as ILightingController
+  return fakeLightingController()
 }
 
 function fourFrontLightManager(): DmxLightManager {

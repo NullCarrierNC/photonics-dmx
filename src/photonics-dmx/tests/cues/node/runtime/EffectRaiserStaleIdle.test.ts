@@ -19,6 +19,7 @@ import { CueType } from '../../../../cues/types/cueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
+import { fakeLightingController } from '../../../helpers/fakeLightingController'
 
 /** The idle callback is queued as a microtask, so let it run before asserting on it. */
 const flushIdle = (): Promise<void> => Promise.resolve()
@@ -190,32 +191,21 @@ describe('an effect raiser whose idle arrives after its engine was replaced', ()
   let mockSequencer: ILightingController
   let mockLightManager: DmxLightManager
   /** Completion callbacks for the blocking submissions, one per effect trigger. */
-  let blockingCallbacks: Array<(cancelled?: boolean) => void>
+  let blockingCallbacks: Array<(cancelled: boolean) => void>
 
   beforeEach(() => {
     blockingCallbacks = []
-    mockSequencer = {
-      addEffect: jest.fn(),
-      setEffect: jest.fn(),
-      replaceEffect: jest.fn(),
-      addEffectUnblockedName: jest.fn().mockReturnValue(true),
-      setEffectUnblockedName: jest.fn().mockReturnValue(true),
+    mockSequencer = fakeLightingController({
       // Hold the callbacks rather than firing them, so the test decides when a run finishes.
-      addEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
+      addEffectUnblockedNameWithCallback: (_name, _effect, callback) => {
         blockingCallbacks.push(callback)
         return true
-      }),
-      setEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
+      },
+      setEffectUnblockedNameWithCallback: (_name, _effect, callback) => {
         blockingCallbacks.push(callback)
         return true
-      }),
-      removeEffectCallback: jest.fn(),
-      removeEffect: jest.fn(),
-      removeAllEffects: jest.fn(),
-      removeEffectByLayer: jest.fn(),
-      removeMotionPattern: jest.fn(),
-      blackout: jest.fn(),
-    } as unknown as ILightingController
+      },
+    })
 
     mockLightManager = {
       getLights: jest.fn().mockReturnValue([{ id: 'light1', position: 1, config: {} }]),

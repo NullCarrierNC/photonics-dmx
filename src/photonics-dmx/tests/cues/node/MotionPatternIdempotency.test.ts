@@ -22,6 +22,7 @@ import type { ILightingController } from '../../../controllers/sequencer/interfa
 import type { NodeRuntimeCallbacks } from '../../../cues/node/runtime/executionTypes'
 import type { TrackedLight } from '../../../types'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { fakeLightingController } from '../../helpers/fakeLightingController'
 
 const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
 
@@ -77,58 +78,35 @@ describe('motion-pattern idempotency (cue-called)', () => {
     session = new CueSession()
     patternStore = new Map<string, ActiveMotionPattern>()
 
-    sequencer = {
-      addEffect: jest.fn(),
-      setEffect: jest.fn(),
-      removeEffect: jest.fn(),
-      addEffectWithCallback: jest.fn(),
-      setEffectWithCallback: jest.fn(),
-      addEffectUnblockedName: jest.fn().mockReturnValue(true),
-      setEffectUnblockedName: jest.fn().mockReturnValue(true),
-      addEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
-      setEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
-      removeEffectCallback: jest.fn(),
-      removeAllEffects: jest.fn(),
-      removeEffectByLayer: jest.fn(),
-      getActiveEffectsForLight: jest.fn(),
-      isLayerFreeForLight: jest.fn(),
-      setState: jest.fn(),
-      blackout: jest.fn().mockResolvedValue(undefined),
-      onBeat: jest.fn(),
-      onMeasure: jest.fn(),
-      onKeyframe: jest.fn(),
-      cancelPanTiltClear: jest.fn(),
-      schedulePanTiltClear: jest.fn(),
-      getMotionPattern: jest.fn((name: string) => patternStore.get(name)),
-      addMotionPattern: jest.fn(
-        (
-          name: string,
-          config: ResolvedMotionPatternSetting,
-          ls: TrackedLight[],
-          layer: number,
-          rampUpDurationMs: number,
-        ) => {
-          const run: ActiveMotionPattern = {
-            name,
-            config,
-            lights: ls,
-            layer,
-            startTime: 0,
-            rampUpDurationMs,
-          }
-          patternStore.set(name, run)
-        },
-      ),
-      removeMotionPattern: jest.fn((name: string) => {
+    sequencer = fakeLightingController({
+      getMotionPattern: (name: string) => patternStore.get(name),
+      addMotionPattern: (
+        name: string,
+        config: ResolvedMotionPatternSetting,
+        ls: TrackedLight[],
+        layer: number,
+        rampUpDurationMs: number,
+      ) => {
+        const run: ActiveMotionPattern = {
+          name,
+          config,
+          lights: ls,
+          layer,
+          startTime: 0,
+          rampUpDurationMs,
+        }
+        patternStore.set(name, run)
+      },
+      removeMotionPattern: (name: string) => {
         patternStore.delete(name)
-      }),
-      updateMotionPatternConfig: jest.fn((name: string, config: ResolvedMotionPatternSetting) => {
+      },
+      updateMotionPatternConfig: (name: string, config: ResolvedMotionPatternSetting) => {
         const run = patternStore.get(name)
         if (run) {
           run.config = config
         }
-      }),
-    } as unknown as ILightingController
+      },
+    })
   })
 
   it('does not call addMotionPattern again when config, layer, ramp, and lights match', () => {

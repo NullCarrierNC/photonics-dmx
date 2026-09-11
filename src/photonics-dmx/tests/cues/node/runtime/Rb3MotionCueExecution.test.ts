@@ -4,7 +4,7 @@
  */
 import fs from 'fs'
 import path from 'path'
-import { describe, expect, it, jest } from '@jest/globals'
+import { describe, expect, it } from '@jest/globals'
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import { MotionNodeCue } from '../../../../cues/node/runtime/MotionNodeCue'
 import { validateRb3NodeCueFile } from '../../../../cues/node/schema/validation'
@@ -12,26 +12,10 @@ import { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { createMockLightingConfig } from '../../../helpers/testFixtures'
 import { defaultCueData } from '../../../../cues/types/cueTypes'
 import type { CueData } from '../../../../cues/types/cueTypes'
-import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { fakeLightingController } from '../../../helpers/fakeLightingController'
 
 function mockSequencer() {
-  return {
-    addEffect: jest.fn(),
-    setEffect: jest.fn(),
-    removeEffect: jest.fn(),
-    removeAllEffects: jest.fn(),
-    removeEffectByLayer: jest.fn(),
-    addEffectUnblockedName: jest.fn(),
-    setEffectUnblockedName: jest.fn(),
-    cancelPanTiltClear: jest.fn(),
-    schedulePanTiltClear: jest.fn(),
-    setPosition: jest.fn(),
-    addMotionPattern: jest.fn(),
-    removeMotionPattern: jest.fn(),
-    getMotionPattern: jest.fn(),
-    updateMotionPatternConfig: jest.fn(),
-    onBeat: jest.fn(),
-  } as unknown as ILightingController
+  return fakeLightingController()
 }
 
 function loadRb3MotionCues() {
