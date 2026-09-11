@@ -39,6 +39,31 @@ function dmxSpeedToIntervalMs(dmxSpeed: number): number {
   return hzToThrottleIntervalMs(dmxSpeed) || 1000 / OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
 }
 
+/** How long the stop path waits for the blackout frame to reach the port before closing it. */
+const FINAL_FRAME_TIMEOUT_MS = 100
+
+/**
+ * Puts the buffer the device currently holds on the port once, bounded so a device that has gone
+ * away cannot hold the stop open.
+ */
+async function sendFinalFrame(device: EnttecOpenDMXUSBDevice): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      device._sendUniverse(),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, FINAL_FRAME_TIMEOUT_MS)
+      }),
+    ])
+  } catch (err) {
+    log.error('OpenDMX blackout frame failed to reach the port:', err)
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer)
+    }
+  }
+}
+
 /** Minimal device interface used by OpenDmxSender (and by tests for injection). */
 interface IOpenDmxDeviceAdapter {
   start(): Promise<void>
@@ -103,8 +128,12 @@ class OpenDmxDeviceAdapter implements IOpenDmxDeviceAdapter {
     if (this.onError) {
       device.off('error', this.onError)
     }
+    // Clearing the buffer first means an in-flight pass of the device's send loop already carries
+    // zeros. Stopping that loop is what makes the cleared buffer stay unsent, so the frame goes out
+    // here instead, before the port closes.
     device.setChannels(blackoutUniverse(), true)
     device.stopSending()
+    await sendFinalFrame(device)
 
     type PortWithClose = {
       isOpen: boolean
