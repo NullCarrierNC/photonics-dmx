@@ -1,3 +1,4 @@
+import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import { NodeExecutionEngine } from '../../../../cues/node/runtime/NodeExecutionEngine'
 import { EffectRegistry } from '../../../../cues/node/runtime/EffectRegistry'
 import type { CompiledNetCue } from '../../../../cues/node/compiler/NodeCueCompiler'
@@ -1304,15 +1305,46 @@ describe('Node runtime with real Sequencer', () => {
     })
   })
 
-  it('gates on drum and guitar note counts', () => {
+  it.each([
+    {
+      label: 'drum and guitar',
+      first: {
+        id: 'drum',
+        condition: 'drum-red',
+        color: 'green',
+        fire: (sequencer: ILightingController) => sequencer.onDrumNote(DrumNoteType.RedDrum),
+      },
+      second: {
+        id: 'guitar',
+        condition: 'guitar-green',
+        color: 'yellow',
+        fire: (sequencer: ILightingController) => sequencer.onGuitarNote(InstrumentNoteType.Green),
+      },
+    },
+    {
+      label: 'bass and keys',
+      first: {
+        id: 'bass',
+        condition: 'bass-blue',
+        color: 'purple',
+        fire: (sequencer: ILightingController) => sequencer.onBassNote(InstrumentNoteType.Blue),
+      },
+      second: {
+        id: 'keys',
+        condition: 'keys-yellow',
+        color: 'orange',
+        fire: (sequencer: ILightingController) => sequencer.onKeysNote(InstrumentNoteType.Yellow),
+      },
+    },
+  ] as const)('gates on $label note counts', ({ first, second }) => {
     const eventNode: NetEventNode = {
       id: 'event-1',
       type: 'event',
       eventType: 'beat',
     }
 
-    const drumAction: ActionNode = {
-      id: 'action-drum',
+    const firstAction: ActionNode = {
+      id: `action-${first.id}`,
       type: 'action',
       effectType: 'set-color',
       target: {
@@ -1320,12 +1352,12 @@ describe('Node runtime with real Sequencer', () => {
         filter: { source: 'literal', value: 'all' },
       },
       color: {
-        name: { source: 'literal', value: 'green' },
+        name: { source: 'literal', value: first.color },
         brightness: { source: 'literal', value: 'high' },
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: { source: 'literal', value: 'drum-red' },
+        waitForCondition: { source: 'literal', value: first.condition },
         waitForConditionCount: { source: 'literal', value: 2 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
@@ -1334,8 +1366,8 @@ describe('Node runtime with real Sequencer', () => {
       },
     }
 
-    const guitarAction: ActionNode = {
-      id: 'action-guitar',
+    const secondAction: ActionNode = {
+      id: `action-${second.id}`,
       type: 'action',
       effectType: 'set-color',
       target: {
@@ -1343,12 +1375,12 @@ describe('Node runtime with real Sequencer', () => {
         filter: { source: 'literal', value: 'all' },
       },
       color: {
-        name: { source: 'literal', value: 'yellow' },
+        name: { source: 'literal', value: second.color },
         brightness: { source: 'literal', value: 'high' },
         blendMode: { source: 'literal', value: 'replace' },
       },
       timing: {
-        waitForCondition: { source: 'literal', value: 'guitar-green' },
+        waitForCondition: { source: 'literal', value: second.condition },
         waitForConditionCount: { source: 'literal', value: 1 },
         waitForTime: { source: 'literal', value: 0 },
         duration: { source: 'literal', value: 0 },
@@ -1358,28 +1390,28 @@ describe('Node runtime with real Sequencer', () => {
     }
 
     const definition: NetNodeCueDefinition = {
-      id: 'note-counts',
-      name: 'Note Counts',
+      id: `${first.id}-${second.id}-counts`,
+      name: `${first.id} and ${second.id} counts`,
       kind: 'lighting',
       cueType: CueType.Default,
       style: 'primary',
       nodes: {
         events: [eventNode],
-        actions: [drumAction, guitarAction],
+        actions: [firstAction, secondAction],
         logic: [],
         eventRaisers: [],
         eventListeners: [],
         effectRaisers: [],
       },
       connections: [
-        { from: 'event-1', to: 'action-drum' },
-        { from: 'event-1', to: 'action-guitar' },
+        { from: 'event-1', to: firstAction.id },
+        { from: 'event-1', to: secondAction.id },
       ],
     }
 
     const engine = new NodeExecutionEngine(
       compileCue(definition),
-      'test-group:note-counts',
+      `test-group:${definition.id}`,
       harness.sequencer,
       harness.lightManager,
       noopRuntimeBroadcaster(),
@@ -1396,145 +1428,28 @@ describe('Node runtime with real Sequencer', () => {
     expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
     expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0)
 
-    harness.sequencer.onDrumNote(DrumNoteType.RedDrum)
+    first.fire(harness.sequencer)
     harness.advanceBy(1)
     expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
 
-    harness.sequencer.onDrumNote(DrumNoteType.RedDrum)
+    first.fire(harness.sequencer)
     harness.advanceBy(1)
-    const green = getColor('green', 'high')
+    const firstColor = getColor(first.color, 'high')
     expect(harness.getLightState(frontId)).toMatchObject({
-      red: green.red,
-      green: green.green,
-      blue: green.blue,
-      blendMode: green.blendMode,
+      red: firstColor.red,
+      green: firstColor.green,
+      blue: firstColor.blue,
+      blendMode: firstColor.blendMode,
     })
 
-    harness.sequencer.onGuitarNote(InstrumentNoteType.Green)
+    second.fire(harness.sequencer)
     harness.advanceBy(1)
-    const yellow = getColor('yellow', 'high')
+    const secondColor = getColor(second.color, 'high')
     expect(harness.getLightState(backId)).toMatchObject({
-      red: yellow.red,
-      green: yellow.green,
-      blue: yellow.blue,
-      blendMode: yellow.blendMode,
-    })
-  })
-
-  it('gates on bass and keys note counts', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
-    const bassAction: ActionNode = {
-      id: 'action-bass',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'purple' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'bass-blue' },
-        waitForConditionCount: { source: 'literal', value: 2 },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const keysAction: ActionNode = {
-      id: 'action-keys',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'back' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'orange' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'keys-yellow' },
-        waitForConditionCount: { source: 'literal', value: 1 },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'bass-keys-counts',
-      name: 'Bass Keys Counts',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [bassAction, keysAction],
-        logic: [],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'action-bass' },
-        { from: 'event-1', to: 'action-keys' },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:bass-keys-counts',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-    )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const frontId = harness.frontLightIds[0]
-    const backId = harness.backLightIds[0]
-    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
-    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0)
-
-    harness.sequencer.onBassNote(InstrumentNoteType.Blue)
-    harness.advanceBy(1)
-    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
-
-    harness.sequencer.onBassNote(InstrumentNoteType.Blue)
-    harness.advanceBy(1)
-    const purple = getColor('purple', 'high')
-    expect(harness.getLightState(frontId)).toMatchObject({
-      red: purple.red,
-      green: purple.green,
-      blue: purple.blue,
-      blendMode: purple.blendMode,
-    })
-
-    harness.sequencer.onKeysNote(InstrumentNoteType.Yellow)
-    harness.advanceBy(1)
-    const orange = getColor('orange', 'high')
-    expect(harness.getLightState(backId)).toMatchObject({
-      red: orange.red,
-      green: orange.green,
-      blue: orange.blue,
-      blendMode: orange.blendMode,
+      red: secondColor.red,
+      green: secondColor.green,
+      blue: secondColor.blue,
+      blendMode: secondColor.blendMode,
     })
   })
 

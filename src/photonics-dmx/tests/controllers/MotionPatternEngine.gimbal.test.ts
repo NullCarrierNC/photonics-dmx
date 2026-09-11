@@ -1637,19 +1637,38 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
     }
   }
 
-  it('circle direction: phi0<0 floor fixture (real-rig Light 2) orbits CW', () => {
-    const light2Config: FixtureConfig = {
+  it.each([
+    [
+      'phi0<0 floor fixture (real-rig Light 2)',
+      {
+        panHome: 34,
+        panDirectionCW: false,
+        panStageDeg: 0,
+        tiltHome: 24,
+        tiltStageDeg: 90,
+        invertPan: false,
+        invertTilt: false,
+      },
+    ],
+    [
+      'phi0>0 truss fixture (real-rig Light 6)',
+      {
+        panHome: 67,
+        panDirectionCW: true,
+        panStageDeg: 540,
+        tiltHome: 76,
+        tiltStageDeg: 93,
+        invertPan: true,
+        invertTilt: true,
+      },
+    ],
+  ] as const)('circle direction: %s orbits CW', (_label, calibration) => {
+    const config: FixtureConfig = {
       ...defaultMh,
-      panHome: 34,
       panMax: 255,
       panRangeDeg: 540,
-      panDirectionCW: false,
-      panStageDeg: 0,
-      tiltHome: 24,
       tiltRangeDeg: 180,
-      tiltStageDeg: 90,
-      invertPan: false,
-      invertTilt: false,
+      ...calibration,
     }
     const circlePattern = resolveMotionPattern(
       {
@@ -1660,32 +1679,6 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
       } as NodeMotionPatternSetting,
       makeExecutionContext(),
     )
-    assertCircleCW(light2Config, circlePattern)
-  })
-
-  it('circle direction: phi0>0 truss fixture (real-rig Light 6) orbits CW', () => {
-    const light6Config: FixtureConfig = {
-      ...defaultMh,
-      panHome: 67,
-      panMax: 255,
-      panRangeDeg: 540,
-      panDirectionCW: true,
-      panStageDeg: 540,
-      tiltHome: 76,
-      tiltRangeDeg: 180,
-      tiltStageDeg: 93,
-      invertPan: true,
-      invertTilt: true,
-    }
-    const circlePattern = resolveMotionPattern(
-      {
-        pattern: { source: 'literal', value: 'circle' },
-        bearing: { source: 'literal', value: 180 },
-        speed: { source: 'literal', value: 1 },
-        size: { source: 'literal', value: 20 },
-      } as NodeMotionPatternSetting,
-      makeExecutionContext(),
-    )
-    assertCircleCW(light6Config, circlePattern)
+    assertCircleCW(config, circlePattern)
   })
 })

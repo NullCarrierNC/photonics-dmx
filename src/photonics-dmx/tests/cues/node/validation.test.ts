@@ -1775,70 +1775,16 @@ describe('Node cue validation', () => {
     })
   })
 
-  it('validates bundled audio-70s-light-organs.json', () => {
+  it.each([
+    'audio-70s-light-organs',
+    'audio-stagekit',
+    'audio-disco',
+    'audio-rock',
+    'audio-motion-default',
+  ])('validates bundled %s.json', (name) => {
     const filePath = path.join(
       __dirname,
-      '../../../../../resources/defaults/node-data/cues/audio/audio-70s-light-organs.json',
-    )
-    const raw = fs.readFileSync(filePath, 'utf8')
-    const result = validateAudioNodeCueFile(JSON.parse(raw))
-    expect(result.valid).toBe(true)
-    if (result.valid) {
-      for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
-      }
-    }
-  })
-
-  it('validates bundled audio-stagekit.json', () => {
-    const filePath = path.join(
-      __dirname,
-      '../../../../../resources/defaults/node-data/cues/audio/audio-stagekit.json',
-    )
-    const raw = fs.readFileSync(filePath, 'utf8')
-    const result = validateAudioNodeCueFile(JSON.parse(raw))
-    expect(result.valid).toBe(true)
-    if (result.valid) {
-      for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
-      }
-    }
-  })
-
-  it('validates bundled audio-disco.json', () => {
-    const filePath = path.join(
-      __dirname,
-      '../../../../../resources/defaults/node-data/cues/audio/audio-disco.json',
-    )
-    const raw = fs.readFileSync(filePath, 'utf8')
-    const result = validateAudioNodeCueFile(JSON.parse(raw))
-    expect(result.valid).toBe(true)
-    if (result.valid) {
-      for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
-      }
-    }
-  })
-
-  it('validates bundled audio-rock.json', () => {
-    const filePath = path.join(
-      __dirname,
-      '../../../../../resources/defaults/node-data/cues/audio/audio-rock.json',
-    )
-    const raw = fs.readFileSync(filePath, 'utf8')
-    const result = validateAudioNodeCueFile(JSON.parse(raw))
-    expect(result.valid).toBe(true)
-    if (result.valid) {
-      for (const cue of result.data.cues) {
-        expect(() => NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')).not.toThrow()
-      }
-    }
-  })
-
-  it('validates bundled audio-motion-default.json', () => {
-    const filePath = path.join(
-      __dirname,
-      '../../../../../resources/defaults/node-data/cues/audio/audio-motion-default.json',
+      `../../../../../resources/defaults/node-data/cues/audio/${name}.json`,
     )
     const raw = fs.readFileSync(filePath, 'utf8')
     const result = validateAudioNodeCueFile(JSON.parse(raw))
@@ -2202,37 +2148,19 @@ describe('Node cue validation', () => {
       expect(validAudio.mode).toBe('audio')
     })
 
-    it('validates bundled audio-core-effects.json', () => {
+    it.each([
+      ['audio', 'audio-core-effects'],
+      ['audio', 'audio-stagekit-effects'],
+      ['yarg', 'yarg-fade-effects'],
+    ] as const)('validates bundled %s/%s.json', (mode, name) => {
       const filePath = path.join(
         __dirname,
-        '../../../../../resources/defaults/node-data/effects/audio/audio-core-effects.json',
+        `../../../../../resources/defaults/node-data/effects/${mode}/${name}.json`,
       )
       const raw = fs.readFileSync(filePath, 'utf8')
       const result = validateEffectFile(JSON.parse(raw))
       expect(result.valid).toBe(true)
-      expect(result.mode).toBe('audio')
-    })
-
-    it('validates bundled audio-stagekit-effects.json', () => {
-      const filePath = path.join(
-        __dirname,
-        '../../../../../resources/defaults/node-data/effects/audio/audio-stagekit-effects.json',
-      )
-      const raw = fs.readFileSync(filePath, 'utf8')
-      const result = validateEffectFile(JSON.parse(raw))
-      expect(result.valid).toBe(true)
-      expect(result.mode).toBe('audio')
-    })
-
-    it('validates bundled yarg-fade-effects.json', () => {
-      const filePath = path.join(
-        __dirname,
-        '../../../../../resources/defaults/node-data/effects/yarg/yarg-fade-effects.json',
-      )
-      const raw = fs.readFileSync(filePath, 'utf8')
-      const result = validateEffectFile(JSON.parse(raw))
-      expect(result.valid).toBe(true)
-      expect(result.mode).toBe('yarg')
+      expect(result.mode).toBe(mode)
     })
   })
 })
