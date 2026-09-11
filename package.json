@@ -19,6 +19,7 @@
     "any:budget": "node tools/any-budget.mjs",
     "floating:budget": "node tools/floating-promises-budget.mjs",
     "size:budget": "node tools/size-budget.mjs",
+    "paths:check": "node tools/referenced-paths-check.mjs",
     "prestart": "install-electron",
     "start": "electron-vite preview",
     "predev": "install-electron",

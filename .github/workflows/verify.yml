@@ -51,6 +51,9 @@ jobs:
       - name: File size budget
         run: npm run size:budget
 
+      - name: Referenced paths are tracked
+        run: npm run paths:check
+
       - name: Security audit
         run: npm audit --audit-level=high
 
