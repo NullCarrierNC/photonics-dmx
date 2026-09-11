@@ -6,8 +6,9 @@
  * frame and never leaves an LED stuck ON.
  */
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
-import { act, render, screen } from '@testing-library/react'
-import { Provider, createStore } from 'jotai'
+import { act, screen } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import { rb3eListenerEnabledAtom } from '../atoms'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
@@ -24,18 +25,13 @@ jest.mock('../utils/ipcHelpers', () => ({
     mockHandlers[ch] = (mockHandlers[ch] || []).filter((x) => x !== h)
   },
 }))
-jest.mock('../ipcApi', () => {
-  const actual = jest.requireActual<typeof import('../ipcApi')>('../ipcApi')
-  return {
-    ...actual,
-    setListenCueData: jest.fn(),
-    getMotionEnabled: jest.fn(),
-    getActiveRb3MotionCue: jest.fn(),
-    getRb3CueGroups: jest.fn(),
-    getRb3MotionCueGroups: jest.fn(),
-    getAvailableRb3MotionCues: jest.fn(),
-  }
-})
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
 type Banks = { red: number[]; green: number[]; blue: number[]; yellow: number[] }
 const EMPTY: Banks = { red: [], green: [], blue: [], yellow: [] }
@@ -111,19 +107,13 @@ async function fire(channel: string, payload?: unknown): Promise<void> {
 }
 
 function renderEnabled(): void {
-  const store = createStore()
-  store.set(rb3eListenerEnabledAtom, true)
-  render(
-    <Provider store={store}>
-      <CuePreviewRb3e />
-    </Provider>,
-  )
+  renderWithProviders(<CuePreviewRb3e />, { seed: (set) => set(rb3eListenerEnabledAtom, true) })
 }
 
 describe('CuePreviewRb3e game-mode display', () => {
   beforeEach(() => {
     for (const k of Object.keys(mockHandlers)) delete mockHandlers[k]
-    jest.clearAllMocks()
+    resetIpcApiMock()
     jest.mocked(ipcApi.getMotionEnabled).mockResolvedValue(true)
     jest.mocked(ipcApi.getActiveRb3MotionCue).mockResolvedValue(null as never)
     jest
@@ -149,10 +139,10 @@ describe('CuePreviewRb3e game-mode display', () => {
       ref: { groupId: 'rb3-motion-default', cueId: 'rb3-motion-wave' },
     })
 
-    expect(await screen.findByText('StageKit Mirror')).toBeTruthy()
-    expect(await screen.findByText(/Next cue in \d+s/)).toBeTruthy()
-    expect(await screen.findByText('RB3 Default motion')).toBeTruthy()
-    expect(await screen.findByText('Wave')).toBeTruthy()
+    expect(await screen.findByText('StageKit Mirror')).toBeInTheDocument()
+    expect(await screen.findByText(/Next cue in \d+s/)).toBeInTheDocument()
+    expect(await screen.findByText('RB3 Default motion')).toBeInTheDocument()
+    expect(await screen.findByText('Wave')).toBeInTheDocument()
   })
 
   it('shows "Waiting for Light 1…" while a switch is pending', async () => {
@@ -162,7 +152,7 @@ describe('CuePreviewRb3e game-mode display', () => {
       deadlineMs: Date.now() + 5000,
       pending: true,
     })
-    expect(await screen.findByText('Waiting for Light 1…')).toBeTruthy()
+    expect(await screen.findByText('Waiting for Light 1…')).toBeInTheDocument()
   })
 
   it('hides the motion block when motion is disabled', async () => {

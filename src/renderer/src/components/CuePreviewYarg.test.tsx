@@ -4,8 +4,10 @@
  * tracked and auto-generated state.
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
-import { act, render, screen, cleanup } from '@testing-library/react'
-import { Provider, createStore } from 'jotai'
+import { act, screen, cleanup } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../ipcApi'
 import { currentCueStateAtom, lightingPrefsAtom, yargListenerEnabledAtom } from '../atoms'
 import type { CueData } from '../../../photonics-dmx/cues/types/cueTypes'
 import { DrumNoteType, InstrumentNoteType } from '../../../photonics-dmx/cues/types/cueTypes'
@@ -22,13 +24,22 @@ jest.mock('../utils/ipcHelpers', () => ({
   },
 }))
 
-jest.mock('../ipcApi', () => ({
-  getActiveYargMotionCue: async () => null,
-  getAvailableYargMotionCues: async () => [],
-  getMotionEnabled: async () => false,
-  getYargMotionCueGroups: async () => [],
-  setListenCueData: jest.fn(),
-}))
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
+
+/** Every case runs with motion switched off, whatever order the suite runs in. */
+beforeEach(() => {
+  resetIpcApiMock()
+  jest.mocked(ipcApi.getActiveYargMotionCue).mockResolvedValue(null)
+  jest.mocked(ipcApi.getAvailableYargMotionCues).mockResolvedValue([])
+  jest.mocked(ipcApi.getMotionEnabled).mockResolvedValue(false)
+  jest.mocked(ipcApi.getYargMotionCueGroups).mockResolvedValue([])
+})
 
 import CuePreviewYarg from './CuePreviewYarg'
 
@@ -66,16 +77,14 @@ async function renderWithCueData(
   data: CueData,
   venuePostProcessingEnabled?: boolean,
 ): Promise<void> {
-  const store = createStore()
-  store.set(yargListenerEnabledAtom, true)
-  if (venuePostProcessingEnabled !== undefined) {
-    store.set(lightingPrefsAtom, { venuePostProcessingEnabled })
-  }
-  render(
-    <Provider store={store}>
-      <CuePreviewYarg />
-    </Provider>,
-  )
+  renderWithProviders(<CuePreviewYarg />, {
+    seed: (set) => {
+      set(yargListenerEnabledAtom, true)
+      if (venuePostProcessingEnabled !== undefined) {
+        set(lightingPrefsAtom, { venuePostProcessingEnabled })
+      }
+    },
+  })
   await act(async () => {
     listeners.get(RENDERER_RECEIVE.CUE_HANDLED)?.(data)
   })
@@ -94,20 +103,20 @@ describe('CuePreviewYarg post-processing field', () => {
   it('shows the state YARG reports, spelled out', async () => {
     await renderWithCueData(cueData({ postProcessing: 'Scanlines_Blue' }))
 
-    expect(screen.getByText('Post-Processing:')).toBeTruthy()
-    expect(screen.getByText('Scanlines Blue')).toBeTruthy()
+    expect(screen.getByText('Post-Processing:')).toBeInTheDocument()
+    expect(screen.getByText('Scanlines Blue')).toBeInTheDocument()
   })
 
   it('shows Default when no effect is running', async () => {
     await renderWithCueData(cueData())
-    expect(screen.getByText('Default')).toBeTruthy()
+    expect(screen.getByText('Default')).toBeInTheDocument()
   })
 
   it('no longer carries the Auto-Gen field, which the pill above already reports', async () => {
     await renderWithCueData(cueData({ trackMode: 'autogen' }))
 
     expect(screen.queryByText('Auto-Gen:')).toBeNull()
-    expect(screen.getByText('Auto-Generated')).toBeTruthy()
+    expect(screen.getByText('Auto-Generated')).toBeInTheDocument()
   })
 })
 
@@ -249,13 +258,9 @@ describe('CuePreviewYarg primary cue row', () => {
   })
 
   it('clears the cue name once and leaves it clear while the state still holds it', () => {
-    const store = createStore()
-    store.set(yargListenerEnabledAtom, true)
-    render(
-      <Provider store={store}>
-        <CuePreviewYarg />
-      </Provider>,
-    )
+    const { store } = renderWithProviders(<CuePreviewYarg />, {
+      seed: (set) => set(yargListenerEnabledAtom, true),
+    })
 
     // The grid only renders once a cue frame has arrived.
     act(() => {
@@ -272,7 +277,7 @@ describe('CuePreviewYarg primary cue row', () => {
         limit: 0,
       })
     })
-    expect(screen.queryByText('Chorus')).toBeTruthy()
+    expect(screen.queryByText('Chorus')).toBeInTheDocument()
 
     // The clear timer fires. The atom still holds the cue, so a row that re-read its own state
     // here would set the name straight back and keep flipping.
@@ -300,13 +305,9 @@ describe('CuePreviewYarg beat indicator', () => {
   it('stays lit while beats keep arriving faster than the clear', async () => {
     // Each beat schedules its own clear and cancels the one before it, so a stream arriving
     // inside the window holds the indicator lit rather than blinking it.
-    const store = createStore()
-    store.set(yargListenerEnabledAtom, true)
-    render(
-      <Provider store={store}>
-        <CuePreviewYarg />
-      </Provider>,
-    )
+    renderWithProviders(<CuePreviewYarg />, {
+      seed: (set) => set(yargListenerEnabledAtom, true),
+    })
     const send = (beat: CueData['beat']): void => {
       listeners.get(RENDERER_RECEIVE.CUE_HANDLED)?.(cueData({ beat }))
     }
