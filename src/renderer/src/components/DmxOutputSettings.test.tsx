@@ -4,8 +4,10 @@
  * one carries, and what reaches the backend when either changes.
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
-import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react'
-import { Provider, createStore } from 'jotai'
+import { screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../ipcApi'
 import {
   lightingPrefsAtom,
   senderArtNetEnabledAtom,
@@ -15,32 +17,24 @@ import {
   type LightingPreferences,
 } from '../atoms'
 
-type NetworkInterface = { name: string; value: string; family: string }
-type NetworkResult = { success: boolean; interfaces: NetworkInterface[]; error?: string }
+type NetworkResult = Awaited<ReturnType<typeof ipcApi.getNetworkInterfaces>>
 
 let networkResult: NetworkResult = { success: true, interfaces: [] }
 
-type SaveResult = { success: true } | { success: false; error: string }
-
-const savePrefsMock = jest.fn(
-  async (_p: Record<string, unknown>): Promise<SaveResult> => ({ success: true }),
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
 )
-const enableSenderMock = jest.fn((_p: Record<string, unknown>) => undefined)
-const disableSenderMock = jest.fn((_p: Record<string, unknown>) => undefined)
-const updateSacnConfigMock = jest.fn(async (_c: Record<string, unknown>) => undefined)
-const updateArtNetConfigMock = jest.fn(async (_c: Record<string, unknown>) => undefined)
-const getNetworkInterfacesMock = jest.fn(async (): Promise<NetworkResult> => networkResult)
 
-jest.mock('../ipcApi', () => ({
-  savePrefs: (...args: unknown[]) => savePrefsMock(...(args as [Record<string, unknown>])),
-  enableSender: (...args: unknown[]) => enableSenderMock(...(args as [Record<string, unknown>])),
-  disableSender: (...args: unknown[]) => disableSenderMock(...(args as [Record<string, unknown>])),
-  updateSacnConfig: (...args: unknown[]) =>
-    updateSacnConfigMock(...(args as [Record<string, unknown>])),
-  updateArtNetConfig: (...args: unknown[]) =>
-    updateArtNetConfigMock(...(args as [Record<string, unknown>])),
-  getNetworkInterfaces: () => getNetworkInterfacesMock(),
-}))
+const savePrefsMock = jest.mocked(ipcApi.savePrefs)
+const enableSenderMock = jest.mocked(ipcApi.enableSender)
+const disableSenderMock = jest.mocked(ipcApi.disableSender)
+const updateSacnConfigMock = jest.mocked(ipcApi.updateSacnConfig)
+const updateArtNetConfigMock = jest.mocked(ipcApi.updateArtNetConfig)
+const getNetworkInterfacesMock = jest.mocked(ipcApi.getNetworkInterfaces)
 
 import DmxOutputSettings from './DmxOutputSettings'
 
@@ -71,21 +65,16 @@ function expansion(overrides: Partial<SettingsPrefs> = {}): SettingsPrefs {
 
 type RunningSenders = { sacn?: boolean; artnet?: boolean; enttecpro?: boolean; opendmx?: boolean }
 
-async function renderPanel(
-  prefs: LightingPreferences = {},
-  running: RunningSenders = {},
-): Promise<ReturnType<typeof createStore>> {
-  const store = createStore()
-  store.set(lightingPrefsAtom, prefs)
-  store.set(senderSacnEnabledAtom, running.sacn ?? false)
-  store.set(senderArtNetEnabledAtom, running.artnet ?? false)
-  store.set(senderEnttecProEnabledAtom, running.enttecpro ?? false)
-  store.set(senderOpenDmxEnabledAtom, running.opendmx ?? false)
-  render(
-    <Provider store={store}>
-      <DmxOutputSettings />
-    </Provider>,
-  )
+async function renderPanel(prefs: LightingPreferences = {}, running: RunningSenders = {}) {
+  const { store } = renderWithProviders(<DmxOutputSettings />, {
+    seed: (set) => {
+      set(lightingPrefsAtom, prefs)
+      set(senderSacnEnabledAtom, running.sacn ?? false)
+      set(senderArtNetEnabledAtom, running.artnet ?? false)
+      set(senderEnttecProEnabledAtom, running.enttecpro ?? false)
+      set(senderOpenDmxEnabledAtom, running.opendmx ?? false)
+    },
+  })
   // The network interface list is fetched on mount, so waiting on it settles the first render.
   await waitFor(() => expect(getNetworkInterfacesMock).toHaveBeenCalled())
   return store
@@ -98,15 +87,8 @@ const savedOutputConfig = (): OutputConfig => {
 }
 
 beforeEach(() => {
-  jest.clearAllMocks()
-  // clearAllMocks drops recorded calls but keeps implementations, and several cases install a
-  // failing sender or save, so the defaults are put back here.
-  savePrefsMock.mockReset().mockImplementation(async () => ({ success: true }))
-  enableSenderMock.mockReset().mockImplementation(() => undefined)
-  disableSenderMock.mockReset().mockImplementation(() => undefined)
-  updateSacnConfigMock.mockReset().mockImplementation(async () => undefined)
-  updateArtNetConfigMock.mockReset().mockImplementation(async () => undefined)
-  getNetworkInterfacesMock.mockReset().mockImplementation(async () => networkResult)
+  resetIpcApiMock()
+  getNetworkInterfacesMock.mockImplementation(async () => networkResult)
   networkResult = { success: true, interfaces: [] }
 })
 
@@ -124,7 +106,7 @@ describe('DmxOutputSettings sender checkboxes', () => {
     await renderPanel({ dmxOutputConfig: outputConfig() })
 
     for (const label of ['sACN', 'ArtNet', 'Enttec Pro USB', 'OpenDMX USB']) {
-      expect(screen.getByLabelText(label)).toBeTruthy()
+      expect(screen.getByLabelText(label)).toBeInTheDocument()
     }
   })
 })
@@ -738,7 +720,7 @@ describe('DmxOutputSettings refused preference writes', () => {
 
     fireEvent.click(screen.getByLabelText('sACN'))
 
-    expect(await screen.findByText(/could not save/i)).toBeTruthy()
+    expect(await screen.findByText(/could not save/i)).toBeInTheDocument()
   })
 
   it('leaves the checkbox alone when the write throws', async () => {

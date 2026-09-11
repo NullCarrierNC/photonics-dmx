@@ -5,45 +5,53 @@
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
 import { render, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../ipcApi'
 
-/** Both outcomes carry the same fields, so one mock can return either without re-typing it. */
-type Res<T> = Promise<{ success: boolean } & T>
-const ok = <T extends object>(v: T): Res<T> => Promise.resolve({ success: true, ...v })
-const fail = <T extends object>(v: T): Res<T> => Promise.resolve({ success: false, ...v })
+/** Answers shaped like main's: a success carrying the value, or a refusal carrying an error. */
+const ok = <const T extends object>(v: T) => Promise.resolve({ success: true as const, ...v })
+const fail = <const T extends object>(v: T) =>
+  Promise.resolve({ success: false as const, error: 'refused', ...v })
 
-const mocks = {
-  getCueConsistencyWindow: jest.fn(() => ok({ windowMs: 10000 })),
-  setCueConsistencyWindow: jest.fn((windowMs: number) => ok({ windowMs })),
-  getCueGroupSelectionMode: jest.fn(() => ok({ mode: 'withinSong' as string })),
-  setCueGroupSelectionMode: jest.fn((mode: string) => ok({ mode })),
-  getRb3CueGroupSelectionMode: jest.fn(() => ok({ mode: 'withinSong' as string })),
-  setRb3CueGroupSelectionMode: jest.fn((mode: string) => ok({ mode })),
-  getYargMotionGroupSelectionMode: jest.fn(() => ok({ mode: 'perCueChange' as string })),
-  setYargMotionGroupSelectionMode: jest.fn((mode: string) => ok({ mode })),
-  getAudioMotionGroupSelectionMode: jest.fn(() => ok({ mode: 'perCueChange' as string })),
-  setAudioMotionGroupSelectionMode: jest.fn((mode: string) => ok({ mode })),
-  getRb3MotionGroupSelectionMode: jest.fn(() => ok({ mode: 'perCueChange' as string })),
-  setRb3MotionGroupSelectionMode: jest.fn((mode: string) => ok({ mode })),
-  getMotionCueMinHoldMs: jest.fn(() => ok({ minHoldMs: 5000 })),
-  setMotionCueMinHoldMs: jest.fn((minHoldMs: number) => ok({ minHoldMs })),
-  getRb3MotionCueMinHoldMs: jest.fn(() => ok({ minHoldMs: 5000 })),
-  setRb3MotionCueMinHoldMs: jest.fn((minHoldMs: number) => ok({ minHoldMs })),
-  getMotionCueProbabilityPercent: jest.fn(() => ok({ percent: 50 })),
-  setMotionCueProbabilityPercent: jest.fn((percent: number) => ok({ percent })),
-  getAudioMotionCueProbabilityPercent: jest.fn(() => ok({ percent: 50 })),
-  setAudioMotionCueProbabilityPercent: jest.fn((percent: number) => ok({ percent })),
-  getRb3MotionCueProbabilityPercent: jest.fn(() => ok({ percent: 50 })),
-  setRb3MotionCueProbabilityPercent: jest.fn((percent: number) => ok({ percent })),
-  getRb3MotionCueDuration: jest.fn(() => ok({ min: 5, max: 20 })),
-  setRb3MotionCueDuration: jest.fn((range: { min: number; max: number }) => ok(range)),
-}
-
-jest.mock('../ipcApi', () => mocks)
-
-/** What each mock does before a case reaches for it, so a persistent override cannot outlive its test. */
-const mockDefaults = new Map(
-  Object.entries(mocks).map(([name, fn]) => [name, fn.getMockImplementation()]),
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
 )
+
+const mocks = jest.mocked(ipcApi)
+
+/** What each channel answers before a case reaches for it. */
+function armDefaults(): void {
+  mocks.getCueConsistencyWindow.mockImplementation(() => ok({ windowMs: 10000 }))
+  mocks.setCueConsistencyWindow.mockImplementation((windowMs: number) => ok({ windowMs }))
+  mocks.getCueGroupSelectionMode.mockImplementation(() => ok({ mode: 'withinSong' }))
+  mocks.setCueGroupSelectionMode.mockImplementation((mode) => ok({ mode }))
+  mocks.getRb3CueGroupSelectionMode.mockImplementation(() => ok({ mode: 'withinSong' }))
+  mocks.setRb3CueGroupSelectionMode.mockImplementation((mode) => ok({ mode }))
+  mocks.getYargMotionGroupSelectionMode.mockImplementation(() => ok({ mode: 'perCueChange' }))
+  mocks.setYargMotionGroupSelectionMode.mockImplementation((mode) => ok({ mode }))
+  mocks.getAudioMotionGroupSelectionMode.mockImplementation(() => ok({ mode: 'perCueChange' }))
+  mocks.setAudioMotionGroupSelectionMode.mockImplementation((mode) => ok({ mode }))
+  mocks.getRb3MotionGroupSelectionMode.mockImplementation(() => ok({ mode: 'perCueChange' }))
+  mocks.setRb3MotionGroupSelectionMode.mockImplementation((mode) => ok({ mode }))
+  mocks.getMotionCueMinHoldMs.mockImplementation(() => ok({ minHoldMs: 5000 }))
+  mocks.setMotionCueMinHoldMs.mockImplementation((minHoldMs: number) => ok({ minHoldMs }))
+  mocks.getRb3MotionCueMinHoldMs.mockImplementation(() => ok({ minHoldMs: 5000 }))
+  mocks.setRb3MotionCueMinHoldMs.mockImplementation((minHoldMs: number) => ok({ minHoldMs }))
+  mocks.getMotionCueProbabilityPercent.mockImplementation(() => ok({ percent: 50 }))
+  mocks.setMotionCueProbabilityPercent.mockImplementation((percent: number) => ok({ percent }))
+  mocks.getAudioMotionCueProbabilityPercent.mockImplementation(() => ok({ percent: 50 }))
+  mocks.setAudioMotionCueProbabilityPercent.mockImplementation((percent: number) => ok({ percent }))
+  mocks.getRb3MotionCueProbabilityPercent.mockImplementation(() => ok({ percent: 50 }))
+  mocks.setRb3MotionCueProbabilityPercent.mockImplementation((percent: number) => ok({ percent }))
+  mocks.getRb3MotionCueDuration.mockImplementation(() => ok({ min: 5, max: 20 }))
+  mocks.setRb3MotionCueDuration.mockImplementation((range: { min: number; max: number }) =>
+    ok(range),
+  )
+}
 
 import CueConsistencySettings from './CueConsistencySettings'
 
@@ -74,13 +82,8 @@ async function renderPanel(props: { motionGloballyEnabled?: boolean } = {}) {
 
 beforeEach(() => {
   jest.useFakeTimers({ doNotFake: ['queueMicrotask'] })
-  for (const [name, fn] of Object.entries(mocks)) {
-    fn.mockReset()
-    const impl = mockDefaults.get(name)
-    if (impl) {
-      fn.mockImplementation(impl as never)
-    }
-  }
+  resetIpcApiMock()
+  armDefaults()
 })
 
 afterEach(() => {
@@ -337,7 +340,7 @@ describe('CueConsistencySettings selection modes', () => {
   it.each(REVERTS)(
     '%s puts the old mode back when the write throws',
     async (id, saver, was, next) => {
-      mocks[saver].mockImplementationOnce(() => Promise.reject(new Error('offline')))
+      mocks[saver].mockRejectedValueOnce(new Error('offline'))
       await renderPanel()
 
       await act(async () => {
@@ -349,7 +352,9 @@ describe('CueConsistencySettings selection modes', () => {
   )
 
   it('shows the chosen mode while the write is in flight', async () => {
-    let release: (value: { success: boolean; mode: string }) => void = () => {}
+    let release: (
+      value: Awaited<ReturnType<typeof ipcApi.setYargMotionGroupSelectionMode>>,
+    ) => void = () => {}
     mocks.setYargMotionGroupSelectionMode.mockReturnValueOnce(
       new Promise((resolve) => {
         release = resolve
@@ -369,7 +374,9 @@ describe('CueConsistencySettings selection modes', () => {
   })
 
   it('leaves a mode chosen while a write is in flight showing the stored one', async () => {
-    let release: (value: { success: boolean; mode: string }) => void = () => {}
+    let release: (
+      value: Awaited<ReturnType<typeof ipcApi.setYargMotionGroupSelectionMode>>,
+    ) => void = () => {}
     mocks.setYargMotionGroupSelectionMode.mockReturnValueOnce(
       new Promise((resolve) => {
         release = resolve
