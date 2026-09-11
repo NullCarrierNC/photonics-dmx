@@ -5,8 +5,8 @@
  * `outputs` set (no point showing it when everything goes everywhere by default).
  */
 import { describe, expect, it, afterEach } from '@jest/globals'
-import { render, screen, cleanup } from '@testing-library/react'
-import { Provider, createStore } from 'jotai'
+import { screen, cleanup } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { dmxRigsAtom } from '../atoms'
 import {
   ConfigStrobeType,
@@ -46,13 +46,9 @@ function makeRig(opts: {
 }
 
 function renderHint(rigs: DmxRig[], senderId: WireSenderId, compact = false) {
-  const store = createStore()
-  store.set(dmxRigsAtom, rigs)
-  return render(
-    <Provider store={store}>
-      <RoutedRigsHint senderId={senderId} compact={compact} />
-    </Provider>,
-  )
+  return renderWithProviders(<RoutedRigsHint senderId={senderId} compact={compact} />, {
+    seed: (set) => set(dmxRigsAtom, rigs),
+  })
 }
 
 afterEach(() => cleanup())
@@ -88,7 +84,7 @@ describe('RoutedRigsHint — per-sender display once routing is defined', () => 
       makeRig({ id: 'b', name: 'Garage', outputs: ['opendmx'] }),
     ]
     renderHint(rigs, 'sacn')
-    expect(screen.queryByText('Living Room')).toBeTruthy()
+    expect(screen.queryByText('Living Room')).toBeInTheDocument()
     expect(screen.queryByText('Garage')).toBeNull()
   })
 
@@ -100,14 +96,14 @@ describe('RoutedRigsHint — per-sender display once routing is defined', () => 
       makeRig({ id: 'b', name: 'Garage', outputs: ['opendmx'] }),
     ]
     renderHint(rigs, 'sacn')
-    expect(screen.queryByText('Living Room')).toBeTruthy()
+    expect(screen.queryByText('Living Room')).toBeInTheDocument()
     expect(screen.queryByText('Garage')).toBeNull()
 
     cleanup()
     renderHint(rigs, 'opendmx')
     // Both should appear under opendmx.
-    expect(screen.queryByText(/Living Room/)).toBeTruthy()
-    expect(screen.queryByText(/Garage/)).toBeTruthy()
+    expect(screen.queryByText(/Living Room/)).toBeInTheDocument()
+    expect(screen.queryByText(/Garage/)).toBeInTheDocument()
   })
 
   it('excludes inactive rigs even when their outputs target the sender', () => {
@@ -116,7 +112,7 @@ describe('RoutedRigsHint — per-sender display once routing is defined', () => 
       makeRig({ id: 'b', name: 'Garage', outputs: ['sacn'] }),
     ]
     renderHint(rigs, 'sacn')
-    expect(screen.queryByText('Garage')).toBeTruthy()
+    expect(screen.queryByText('Garage')).toBeInTheDocument()
     expect(screen.queryByText(/Living Room/)).toBeNull()
   })
 
@@ -126,7 +122,7 @@ describe('RoutedRigsHint — per-sender display once routing is defined', () => 
       makeRig({ id: 'b', name: 'Garage', outputs: ['opendmx'] }),
     ]
     renderHint(rigs, 'sacn')
-    expect(screen.queryByText(/No active rig routed/i)).toBeTruthy()
+    expect(screen.queryByText(/No active rig routed/i)).toBeInTheDocument()
   })
 
   it('rig with outputs: [] is treated as routed nowhere on the wire', () => {
@@ -135,7 +131,7 @@ describe('RoutedRigsHint — per-sender display once routing is defined', () => 
       makeRig({ id: 'b', name: 'Garage', outputs: ['sacn'] }),
     ]
     renderHint(rigs, 'sacn')
-    expect(screen.queryByText('Garage')).toBeTruthy()
+    expect(screen.queryByText('Garage')).toBeInTheDocument()
     expect(screen.queryByText(/Living Room/)).toBeNull()
   })
 })

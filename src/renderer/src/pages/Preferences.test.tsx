@@ -1,17 +1,19 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest, beforeEach, beforeAll } from '@jest/globals'
-import { fireEvent, render, screen } from '@testing-library/react'
-import { Provider, createStore } from 'jotai'
+import { fireEvent, screen } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../ipcApi'
 import Preferences from './Preferences'
 import { lightingPrefsAtom } from '../atoms'
 
-jest.mock('../ipcApi', () => {
-  const actual = jest.requireActual<typeof import('../ipcApi')>('../ipcApi')
-  return {
-    ...actual,
-    getMotionEnabled: jest.fn(() => Promise.resolve(true)),
-  }
-})
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
 beforeAll(() => {
   Object.defineProperty(window, 'api', {
@@ -82,64 +84,60 @@ jest.mock('../components/AdvancedModeSettings', () => ({
 
 describe('Preferences', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    resetIpcApiMock()
+    jest.mocked(ipcApi.getMotionEnabled).mockResolvedValue(true)
   })
 
   it('with Advanced Mode off hides Audio tab, Active Rigs, and only Advanced toggle on Advanced tab', () => {
-    render(<Preferences />)
+    renderWithProviders(<Preferences />)
 
-    expect(screen.getByRole('tablist', { name: /preference categories/i })).toBeTruthy()
+    expect(screen.getByRole('tablist', { name: /preference categories/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'DMX Out' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.queryByRole('tab', { name: 'Audio' })).toBeNull()
     expect(screen.queryByTestId('prefs-active-rigs')).toBeNull()
-    expect(screen.getByTestId('prefs-dmx-output')).toBeTruthy()
-    expect(screen.getByTestId('prefs-brightness')).toBeTruthy()
-    expect(screen.getByTestId('prefs-white-mix-mode')).toBeTruthy()
+    expect(screen.getByTestId('prefs-dmx-output')).toBeInTheDocument()
+    expect(screen.getByTestId('prefs-brightness')).toBeInTheDocument()
+    expect(screen.getByTestId('prefs-white-mix-mode')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Advanced' }))
-    expect(screen.getByTestId('prefs-advanced-mode')).toBeTruthy()
+    expect(screen.getByTestId('prefs-advanced-mode')).toBeInTheDocument()
     expect(screen.queryByTestId('prefs-motion-master')).toBeNull()
     expect(screen.queryByTestId('prefs-cue-consistency')).toBeNull()
     expect(screen.queryByTestId('prefs-clock-rate')).toBeNull()
   })
 
   it('with Advanced Mode on shows Audio tab, Active Rigs, and full Advanced tab content', () => {
-    const store = createStore()
-    store.set(lightingPrefsAtom, { advancedModeEnabled: true })
+    renderWithProviders(<Preferences />, {
+      seed: (set) => set(lightingPrefsAtom, { advancedModeEnabled: true }),
+    })
 
-    render(
-      <Provider store={store}>
-        <Preferences />
-      </Provider>,
-    )
-
-    expect(screen.getByRole('tab', { name: 'Audio' })).toBeTruthy()
-    expect(screen.getByTestId('prefs-active-rigs')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Audio' })).toBeInTheDocument()
+    expect(screen.getByTestId('prefs-active-rigs')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'YARG' }))
-    expect(screen.getByTestId('prefs-yarg-cues')).toBeTruthy()
-    expect(screen.getByTestId('prefs-motion-yarg')).toBeTruthy()
-    expect(screen.getByTestId('prefs-stagekit-yarg')).toBeTruthy()
+    expect(screen.getByTestId('prefs-yarg-cues')).toBeInTheDocument()
+    expect(screen.getByTestId('prefs-motion-yarg')).toBeInTheDocument()
+    expect(screen.getByTestId('prefs-stagekit-yarg')).toBeInTheDocument()
     expect(screen.queryByTestId('prefs-motion-master')).toBeNull()
 
     fireEvent.click(screen.getByRole('tab', { name: 'RB3' }))
-    expect(screen.getByTestId('prefs-stagekit-rb3')).toBeTruthy()
+    expect(screen.getByTestId('prefs-stagekit-rb3')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Audio' }))
-    expect(screen.getByTestId('prefs-audio-inner')).toBeTruthy()
-    expect(screen.getByTestId('prefs-audio-cues')).toBeTruthy()
-    expect(screen.getByTestId('prefs-motion-audio')).toBeTruthy()
+    expect(screen.getByTestId('prefs-audio-inner')).toBeInTheDocument()
+    expect(screen.getByTestId('prefs-audio-cues')).toBeInTheDocument()
+    expect(screen.getByTestId('prefs-motion-audio')).toBeInTheDocument()
     expect(screen.queryByTestId('prefs-motion-master')).toBeNull()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Advanced' }))
-    expect(screen.getByTestId('prefs-advanced-mode')).toBeTruthy()
-    expect(screen.getByTestId('prefs-motion-master')).toBeTruthy()
-    expect(screen.getByTestId('prefs-cue-consistency')).toBeTruthy()
-    expect(screen.getByTestId('prefs-clock-rate')).toBeTruthy()
+    expect(screen.getByTestId('prefs-advanced-mode')).toBeInTheDocument()
+    expect(screen.getByTestId('prefs-motion-master')).toBeInTheDocument()
+    expect(screen.getByTestId('prefs-cue-consistency')).toBeInTheDocument()
+    expect(screen.getByTestId('prefs-clock-rate')).toBeInTheDocument()
   })
 
   it('moves between tabs with the arrow keys, Home and End', () => {
-    render(<Preferences />)
+    renderWithProviders(<Preferences />)
     const tab = (name: string) => screen.getByRole('tab', { name })
 
     fireEvent.keyDown(tab('DMX Out'), { key: 'ArrowRight' })

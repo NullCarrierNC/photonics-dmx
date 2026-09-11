@@ -5,16 +5,22 @@
  * first and keeps the editor open when the prompt is declined.
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
-import { Provider, createStore } from 'jotai'
+import { screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../ipcApi'
 import { FixtureTypes, type DmxFixture } from '../../../photonics-dmx/types'
 import { myDmxLightsAtom } from './../atoms'
 
-const saveMyLightsMock = jest.fn(async (_lights: DmxFixture[]) => ({ success: true }) as const)
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
-jest.mock('../ipcApi', () => ({
-  saveMyLights: (lights: DmxFixture[]) => saveMyLightsMock(lights),
-}))
+const saveMyLights = jest.mocked(ipcApi.saveMyLights)
 
 const confirmMock = jest.fn(async () => true)
 
@@ -39,13 +45,7 @@ function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
 }
 
 function renderPage(lights: DmxFixture[] = [fixture()]) {
-  const store = createStore()
-  store.set(myDmxLightsAtom, lights)
-  return render(
-    <Provider store={store}>
-      <MyLights />
-    </Provider>,
-  )
+  return renderWithProviders(<MyLights />, { seed: (set) => set(myDmxLightsAtom, lights) })
 }
 
 /** The light name input inside the modal, which is where edits are made in these tests. */
@@ -55,7 +55,7 @@ function nameInput(): HTMLInputElement {
 }
 
 beforeEach(() => {
-  saveMyLightsMock.mockClear()
+  resetIpcApiMock()
   confirmMock.mockClear()
   confirmMock.mockResolvedValue(true)
 })
@@ -70,14 +70,14 @@ describe('MyLights editor modal', () => {
   it('opens on the chosen light when its card is clicked', () => {
     renderPage()
     fireEvent.click(screen.getByText('Front PAR'))
-    expect(screen.getByRole('dialog')).toBeTruthy()
-    expect(screen.getByText('Edit Front PAR')).toBeTruthy()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('Edit Front PAR')).toBeInTheDocument()
   })
 
   it('opens an empty RGB light from + Light', () => {
     renderPage([])
     fireEvent.click(screen.getByText('+ Light'))
-    expect(screen.getByText('Add Light')).toBeTruthy()
+    expect(screen.getByText('Add Light')).toBeInTheDocument()
     // A new light has nothing to delete yet.
     expect(screen.queryByText('Delete')).toBeNull()
   })
@@ -87,7 +87,7 @@ describe('MyLights editor modal', () => {
     fireEvent.click(screen.getByText('Front PAR'))
     fireEvent.click(screen.getByText('Save'))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    expect(saveMyLightsMock).toHaveBeenCalledTimes(1)
+    expect(saveMyLights).toHaveBeenCalledTimes(1)
   })
 
   it('closes without prompting when nothing was edited', async () => {
@@ -114,7 +114,7 @@ describe('MyLights editor modal', () => {
     fireEvent.change(nameInput(), { target: { value: 'Renamed' } })
     fireEvent.click(screen.getByText('Cancel'))
     await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1))
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(nameInput().value).toBe('Renamed')
   })
 
@@ -124,7 +124,7 @@ describe('MyLights editor modal', () => {
     fireEvent.click(screen.getByText('Delete'))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(confirmMock).toHaveBeenCalledTimes(1)
-    expect(saveMyLightsMock).toHaveBeenCalledWith([])
+    expect(saveMyLights).toHaveBeenCalledWith([])
   })
 
   it('leaves the light in place when the delete prompt is declined', async () => {
@@ -133,7 +133,7 @@ describe('MyLights editor modal', () => {
     fireEvent.click(screen.getByText('Front PAR'))
     fireEvent.click(screen.getByText('Delete'))
     await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1))
-    expect(screen.getByRole('dialog')).toBeTruthy()
-    expect(saveMyLightsMock).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(saveMyLights).not.toHaveBeenCalled()
   })
 })
