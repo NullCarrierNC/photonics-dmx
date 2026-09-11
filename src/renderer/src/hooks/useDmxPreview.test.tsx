@@ -6,19 +6,23 @@
  * than the send rate drops the frames it missed rather than queueing them.
  */
 import { describe, expect, it, beforeEach, afterEach, jest } from '@jest/globals'
-import { renderHook, act } from '@testing-library/react'
-import { Provider, createStore, useAtomValue } from 'jotai'
-import React from 'react'
+import { act } from '@testing-library/react'
+import { useAtomValue } from 'jotai'
+import { renderHookWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcHelpers from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { dmxValuesAtom, previewRigIdAtom } from '../atoms'
 import type { DmxValuesPayload } from '../../../shared/ipcTypes'
 import { useDmxPreview } from './useDmxPreview'
 
-jest.mock('../ipcApi', () => ({
-  getDmxRig: jest.fn(async () => null),
-  enableSender: jest.fn(),
-}))
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
 /** Captured DMX_VALUES subscriber, so tests can push payloads the way the main process would. */
 let emitDmxValues: ((payload: DmxValuesPayload) => void) | null = null
@@ -38,6 +42,7 @@ function runAnimationFrame(): void {
 }
 
 beforeEach(() => {
+  resetIpcApiMock()
   emitDmxValues = null
   frameCallbacks = []
   jest.spyOn(ipcHelpers, 'registerIpcListener').mockImplementation((channel, listener) => {
@@ -63,17 +68,12 @@ afterEach(() => {
 
 /** Renders the hook alongside a live read of the atom it writes, with a rig selected to preview. */
 function renderPreview() {
-  const store = createStore()
-  store.set(previewRigIdAtom, 'rig-1')
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <Provider store={store}>{children}</Provider>
-  )
-  return renderHook(
+  return renderHookWithProviders(
     () => {
       useDmxPreview()
       return useAtomValue(dmxValuesAtom)
     },
-    { wrapper },
+    { seed: (set) => set(previewRigIdAtom, 'rig-1') },
   )
 }
 

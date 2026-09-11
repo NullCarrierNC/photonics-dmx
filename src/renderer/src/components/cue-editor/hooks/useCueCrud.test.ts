@@ -2,12 +2,13 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, jest } from '@jest/globals'
 
-jest.mock('../../../ipcApi', () => ({
-  validateNodeCue: jest.fn(),
-  validateEffect: jest.fn(),
-  saveNodeCueFile: jest.fn(),
-  saveEffectFile: jest.fn(),
-}))
+jest.mock(
+  '../../../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
 import { useCueCrud } from './useCueCrud'
 import type { EditorDocument } from '../lib/types'

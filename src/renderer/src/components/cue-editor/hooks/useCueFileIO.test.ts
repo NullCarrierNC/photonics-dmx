@@ -1,20 +1,18 @@
 /** @jest-environment jsdom */
 import { act, renderHook } from '@testing-library/react'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../../../ipcApi'
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
-const readNodeCueFile = jest.fn()
-jest.mock('../../../ipcApi', () => ({
-  readNodeCueFile: (...args: unknown[]) => readNodeCueFile(...args),
-  readEffectFile: jest.fn(),
-  saveNodeCueFile: jest.fn(),
-  saveEffectFile: jest.fn(),
-  deleteNodeCueFile: jest.fn(),
-  deleteEffectFile: jest.fn(),
-  exportNodeCueFile: jest.fn(),
-  exportEffectFile: jest.fn(),
-  validateNodeCue: jest.fn(),
-  validateEffect: jest.fn(),
-}))
+jest.mock(
+  '../../../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
+
+const readNodeCueFile = jest.mocked(ipcApi.readNodeCueFile)
 
 import { useCueFileIO, type UseCueFileIOParams } from './useCueFileIO'
 import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
@@ -72,7 +70,7 @@ const setup = (overrides: Partial<UseCueFileIOParams> = {}) => {
 
 describe('useCueFileIO selectFile', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    resetIpcApiMock()
   })
 
   it('synchronises cue kind from the preferred cue', async () => {
@@ -182,7 +180,7 @@ describe('useCueFileIO selectFile', () => {
 
 describe('useCueFileIO handleReload', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    resetIpcApiMock()
   })
 
   const openDoc = (selectedCueId: string | null) => ({
@@ -239,7 +237,7 @@ describe('useCueFileIO handleReload', () => {
 
 describe('useCueFileIO revertCurrentFileToDisk', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    resetIpcApiMock()
   })
 
   const openDoc = (selectedCueId: string | null) =>

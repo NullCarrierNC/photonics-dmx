@@ -10,7 +10,13 @@
 // The jest-globals entry point, because the suites import `expect` from '@jest/globals' rather
 // than taking the global one, and only this build extends that expect and declares its types.
 import '@testing-library/jest-dom/jest-globals'
-import { render, type RenderOptions, type RenderResult } from '@testing-library/react'
+import {
+  render,
+  renderHook,
+  type RenderHookResult,
+  type RenderOptions,
+  type RenderResult,
+} from '@testing-library/react'
 import { Provider, createStore, getDefaultStore, type WritableAtom } from 'jotai'
 import type { ReactElement, ReactNode } from 'react'
 
@@ -44,7 +50,25 @@ export function renderWithProviders(
   ui: ReactElement,
   options: RenderWithProvidersOptions = {},
 ): RenderWithProvidersResult {
-  const { seed, store = createStore(), ...renderOptions } = options
+  const { seed, store: given, ...renderOptions } = options
+  const { store, wrapper } = providersFor(seed, given)
+  return { ...render(ui, { wrapper, ...renderOptions }), store }
+}
+
+/** {@link renderWithProviders} for a hook, with the same seeding and store. */
+export function renderHookWithProviders<Result>(
+  callback: () => Result,
+  { seed, store: given }: Pick<RenderWithProvidersOptions, 'seed' | 'store'> = {},
+): RenderHookResult<Result, unknown> & { store: Store } {
+  const { store, wrapper } = providersFor(seed, given)
+  return { ...renderHook(callback, { wrapper }), store }
+}
+
+/** The seeded store and the Provider that hands it to whatever renders under it. */
+function providersFor(
+  seed: RenderWithProvidersOptions['seed'],
+  store: Store = createStore(),
+): { store: Store; wrapper: (props: { children: ReactNode }) => ReactElement } {
   const shared = getDefaultStore()
   const set: SeedFn = (atom, ...args) => {
     store.set(atom, ...args)
@@ -54,5 +78,5 @@ export function renderWithProviders(
   const wrapper = ({ children }: { children: ReactNode }): ReactElement => (
     <Provider store={store}>{children}</Provider>
   )
-  return { ...render(ui, { wrapper, ...renderOptions }), store }
+  return { store, wrapper }
 }

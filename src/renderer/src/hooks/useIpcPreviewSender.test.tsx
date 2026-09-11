@@ -5,14 +5,19 @@
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
 import { render, cleanup, act } from '@testing-library/react'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../ipcApi'
 
-const enableSender = jest.fn(async (_config: unknown) => undefined)
-const disableSender = jest.fn(async (_config: unknown) => undefined)
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
-jest.mock('../ipcApi', () => ({
-  enableSender: (...args: unknown[]) => enableSender(args[0]),
-  disableSender: (...args: unknown[]) => disableSender(args[0]),
-}))
+const enableSender = jest.mocked(ipcApi.enableSender)
+const disableSender = jest.mocked(ipcApi.disableSender)
 
 import { useIpcPreviewSender, __resetIpcPreviewSenderForTests } from './useIpcPreviewSender'
 
@@ -31,7 +36,7 @@ const settleRelease = (): void => {
 describe('useIpcPreviewSender', () => {
   beforeEach(() => {
     jest.useFakeTimers()
-    jest.clearAllMocks()
+    resetIpcApiMock()
     __resetIpcPreviewSenderForTests()
   })
 

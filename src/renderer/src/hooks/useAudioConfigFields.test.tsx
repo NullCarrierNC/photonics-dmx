@@ -5,16 +5,26 @@
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
 import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../ipcApi'
+import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
-const getAudioConfig = jest.fn(async (): Promise<unknown> => ({}))
-const saveAudioConfig = jest.fn(async (_p: unknown): Promise<unknown> => ({ success: true }))
 const listeners = new Map<string, (payload: unknown) => void>()
 
-jest.mock('../ipcApi', () => ({
-  getAudioConfig: () => getAudioConfig(),
-  saveAudioConfig: (p: unknown) => saveAudioConfig(p),
-}))
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
+
+const getAudioConfig = jest.mocked(ipcApi.getAudioConfig)
+const saveAudioConfig = jest.mocked(ipcApi.saveAudioConfig)
+
+/** A stored config holding only the fields these panels read. */
+const storedConfig = (fields: Partial<AudioConfig>): AudioConfig => fields as AudioConfig
 
 jest.mock('../utils/ipcHelpers', () => ({
   registerIpcListener: (channel: string, handler: (payload: unknown) => void) => {
@@ -52,16 +62,18 @@ const sensitivity = (): string => screen.getByTestId('sensitivity').textContent 
 
 describe('useAudioConfigFields', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    resetIpcApiMock()
     listeners.clear()
-    getAudioConfig.mockImplementation(async () => ({}))
+    getAudioConfig.mockImplementation(async () => storedConfig({}))
     saveAudioConfig.mockImplementation(async () => ({ success: true }))
   })
 
   afterEach(() => cleanup())
 
   it('starts from the defaults and takes the stored values', async () => {
-    getAudioConfig.mockImplementation(async () => ({ sensitivity: 1.5, noiseFloor: 90 }))
+    getAudioConfig.mockImplementation(async () =>
+      storedConfig({ sensitivity: 1.5, noiseFloor: 90 }),
+    )
 
     render(<Panel />)
 
@@ -70,7 +82,7 @@ describe('useAudioConfigFields', () => {
   })
 
   it('keeps a default the stored config does not carry', async () => {
-    getAudioConfig.mockImplementation(async () => ({ sensitivity: 1.5 }))
+    getAudioConfig.mockImplementation(async () => storedConfig({ sensitivity: 1.5 }))
 
     render(<Panel />)
 
@@ -90,7 +102,9 @@ describe('useAudioConfigFields', () => {
   })
 
   it('puts the old value back when the save throws', async () => {
-    getAudioConfig.mockImplementation(async () => ({ sensitivity: 1.5, noiseFloor: 60 }))
+    getAudioConfig.mockImplementation(async () =>
+      storedConfig({ sensitivity: 1.5, noiseFloor: 60 }),
+    )
     saveAudioConfig.mockImplementation(async () => {
       throw new Error('bridge gone')
     })
@@ -103,7 +117,9 @@ describe('useAudioConfigFields', () => {
   })
 
   it('puts the old value back when the save is refused', async () => {
-    getAudioConfig.mockImplementation(async () => ({ sensitivity: 1.5, noiseFloor: 60 }))
+    getAudioConfig.mockImplementation(async () =>
+      storedConfig({ sensitivity: 1.5, noiseFloor: 60 }),
+    )
     saveAudioConfig.mockImplementation(async () => ({ success: false, error: 'nope' }))
     render(<Panel />)
     await waitFor(() => expect(sensitivity()).toBe('1.5'))
@@ -128,7 +144,9 @@ describe('useAudioConfigFields', () => {
   })
 
   it('writes once when a burst of changes goes quiet', async () => {
-    getAudioConfig.mockImplementation(async () => ({ sensitivity: 1.5, noiseFloor: 60 }))
+    getAudioConfig.mockImplementation(async () =>
+      storedConfig({ sensitivity: 1.5, noiseFloor: 60 }),
+    )
     render(<Panel />)
     await waitFor(() => expect(sensitivity()).toBe('1.5'))
 
@@ -142,7 +160,9 @@ describe('useAudioConfigFields', () => {
   })
 
   it('puts the values from before a burst back when its save is refused', async () => {
-    getAudioConfig.mockImplementation(async () => ({ sensitivity: 1.5, noiseFloor: 60 }))
+    getAudioConfig.mockImplementation(async () =>
+      storedConfig({ sensitivity: 1.5, noiseFloor: 60 }),
+    )
     saveAudioConfig.mockImplementation(async () => ({ success: false, error: 'nope' }))
     render(<Panel />)
     await waitFor(() => expect(sensitivity()).toBe('1.5'))
@@ -182,7 +202,7 @@ describe('useAudioConfigFields', () => {
       await new Promise<void>((resolve) => {
         release = resolve
       })
-      return { sensitivity: 1.5, noiseFloor: 90 }
+      return storedConfig({ sensitivity: 1.5, noiseFloor: 90 })
     })
 
     render(<Panel />)
@@ -229,7 +249,9 @@ describe('useAudioConfigFields', () => {
   it('puts back only the field whose save was refused', async () => {
     // A write covers every field the panel owns, so reverting a whole snapshot would undo a
     // different field that was saved successfully while this one was in flight.
-    let releaseFirst: ((value: unknown) => void) | undefined
+    let releaseFirst:
+      | ((value: Awaited<ReturnType<typeof ipcApi.saveAudioConfig>>) => void)
+      | undefined
     saveAudioConfig.mockImplementationOnce(
       () =>
         new Promise((resolve) => {

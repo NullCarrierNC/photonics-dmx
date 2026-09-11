@@ -6,9 +6,18 @@
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
 import { getDefaultStore } from 'jotai'
 import { audioDataAtom } from '../atoms'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../ipcApi'
 
-const sendAudioData = jest.fn((_data: unknown) => undefined)
-jest.mock('../ipcApi', () => ({ sendAudioData: (d: unknown) => sendAudioData(d) }))
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
+
+const sendAudioData = jest.mocked(ipcApi.sendAudioData)
 
 import { AudioCaptureManager } from './AudioCaptureManager'
 
@@ -53,6 +62,7 @@ const store = getDefaultStore()
 
 beforeEach(() => {
   jest.clearAllMocks()
+  resetIpcApiMock()
   analyser = new FakeAnalyser()
   contextClose = jest.fn()
   audioContextCalls = 0
