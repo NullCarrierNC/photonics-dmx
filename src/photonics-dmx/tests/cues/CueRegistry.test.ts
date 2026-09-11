@@ -5,7 +5,7 @@ import { CueData, CueType } from '../../cues/types/cueTypes'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { setLogSink } from '../../../shared/logger'
-import { beforeEach, describe, it, expect } from '@jest/globals'
+import { beforeEach, describe, it, expect, jest } from '@jest/globals'
 
 // Mock implementations
 class MockCueImplementation implements INetCue {
@@ -265,8 +265,7 @@ describe('CueRegistry', () => {
 
       const strobe = registry.getCueImplementation(CueType.Strobe_Fast, 'tracked')
 
-      expect(strobe).toBeTruthy()
-      expect(strobe!.cueId).toBe('stagekit-strobe-fast')
+      expect(strobe?.cueId).toBe('stagekit-strobe-fast')
     })
   })
 
@@ -306,15 +305,10 @@ describe('CueRegistry', () => {
 
       // First call should randomly select a group
       const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(firstCue).toBeTruthy()
-      const firstGroupId = firstCue!.id.includes('group1') ? 'group1' : 'group2'
+      expect(['group1-cool-auto', 'group2-cool-auto']).toContain(firstCue?.cueId)
 
       // Second call within window should use same group
-      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(secondCue).toBeTruthy()
-      const secondGroupId = secondCue!.id.includes('group1') ? 'group1' : 'group2'
-
-      expect(secondGroupId).toBe(firstGroupId)
+      expect(registry.getCueImplementation(CueType.Cool_Automatic)).toBe(firstCue)
     })
 
     it('should allow new randomization after consistency window expires', () => {
@@ -340,17 +334,14 @@ describe('CueRegistry', () => {
       // Set consistency window to 0ms for testing (immediate expiration)
       registry.setCueConsistencyWindow(0)
 
-      // First call
+      // A 0ms window lets every call roll again, so two forced rolls land on different groups.
+      const roll = jest.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.99)
       const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(firstCue).toBeTruthy()
-
-      // Second call should allow new randomization since window is 0ms
       const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(secondCue).toBeTruthy()
+      roll.mockRestore()
 
-      // Both calls should work without hanging
-      expect(firstCue).toBeDefined()
-      expect(secondCue).toBeDefined()
+      expect(firstCue?.cueId).toBe('group1-cool-auto')
+      expect(secondCue?.cueId).toBe('group2-cool-auto')
     })
 
     it('should preserve consistency when setActiveGroups is called twice with the same list', () => {
@@ -374,16 +365,12 @@ describe('CueRegistry', () => {
       registry.setCueConsistencyWindow(2000)
 
       const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(firstCue).toBeTruthy()
-      const firstGroupId = firstCue!.id.includes('group1') ? 'group1' : 'group2'
+      expect(['group1-cool-auto', 'group2-cool-auto']).toContain(firstCue?.cueId)
 
       // Re-apply same active list (e.g. UI refresh) – should not clear consistency
       registry.setActiveGroups(['group1', 'group2'])
 
-      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(secondCue).toBeTruthy()
-      const secondGroupId = secondCue!.id.includes('group1') ? 'group1' : 'group2'
-      expect(secondGroupId).toBe(firstGroupId)
+      expect(registry.getCueImplementation(CueType.Cool_Automatic)).toBe(firstCue)
     })
 
     it('should clear consistency when setActiveGroups is called with a different list', () => {
@@ -407,7 +394,7 @@ describe('CueRegistry', () => {
       registry.setCueConsistencyWindow(2000)
 
       const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(firstCue).toBeTruthy()
+      expect(['group1-cool-auto', 'group2-cool-auto']).toContain(firstCue?.cueId)
 
       // Change active groups (e.g. DMX preview toggle)
       registry.setActiveGroups(['group2'])
@@ -417,8 +404,7 @@ describe('CueRegistry', () => {
 
       // Next getCueImplementation must use the new active set (only group2)
       const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(secondCue).toBeTruthy()
-      expect(secondCue!.id).toContain('group2')
+      expect(secondCue?.cueId).toBe('group2-cool-auto')
     })
 
     it('should provide consistency status information', () => {
@@ -440,7 +426,7 @@ describe('CueRegistry', () => {
 
       // Call a cue
       const cue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(cue).toBeTruthy()
+      expect(cue?.cueId).toBe('group1-cool-auto')
 
       // Get status
       const status = registry.getConsistencyStatus()
@@ -481,13 +467,11 @@ describe('CueRegistry', () => {
 
       // First call to Cool_Automatic should use default group as fallback
       const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(firstCue).toBeTruthy()
-      expect(firstCue!.id).toContain('default-cool-auto')
+      expect(firstCue?.cueId).toBe('default-cool-auto')
 
       // Second call within window should use same fallback group
       const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(secondCue).toBeTruthy()
-      expect(secondCue!.id).toContain('default-cool-auto')
+      expect(secondCue?.cueId).toBe('default-cool-auto')
 
       // Verify consistency tracking shows fallback
       const status = registry.getConsistencyStatus()
@@ -525,8 +509,7 @@ describe('CueRegistry', () => {
 
       // Call Strobe_Fast - should use default group as fallback since custom doesn't have it
       const strobeCue = registry.getCueImplementation(CueType.Strobe_Fast, 'tracked')
-      expect(strobeCue).toBeTruthy()
-      expect(strobeCue!.id).toContain('default-strobe-fast')
+      expect(strobeCue?.cueId).toBe('default-strobe-fast')
 
       // Verify this was treated as a fallback
       const status = registry.getConsistencyStatus()
@@ -561,14 +544,12 @@ describe('CueRegistry', () => {
 
       // When trackMode is 'autogen' (auto-generated lighting), should use random selection (existing behavior)
       const cueWithAutoGen = registry.getCueImplementation(CueType.Cool_Automatic, 'autogen')
-      expect(cueWithAutoGen).toBeTruthy()
       // Could be either group since it's random
-      expect(['stagekit-cool-auto', 'custom-cool-auto']).toContain(cueWithAutoGen!.cueId)
+      expect(['stagekit-cool-auto', 'custom-cool-auto']).toContain(cueWithAutoGen?.cueId)
 
       // When trackMode is 'tracked' (tracked lighting data), should prefer stage kit group
       const cueWithoutAutoGen = registry.getCueImplementation(CueType.Cool_Automatic, 'tracked')
-      expect(cueWithoutAutoGen).toBeTruthy()
-      expect(cueWithoutAutoGen!.cueId).toBe('stagekit-cool-auto')
+      expect(cueWithoutAutoGen?.cueId).toBe('stagekit-cool-auto')
     })
   })
 
@@ -603,23 +584,19 @@ describe('CueRegistry', () => {
       registry.onSongStart()
 
       const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(firstCue).toBeTruthy()
-      const lockedGroupId = firstCue!.id.includes('group1') ? 'group1' : 'group2'
+      expect(['group1-cool-auto', 'group2-cool-auto']).toContain(firstCue?.cueId)
+      const lockedGroupId = firstCue?.cueId.startsWith('group1') ? 'group1' : 'group2'
 
       for (let i = 0; i < 3; i++) {
-        const cue = registry.getCueImplementation(CueType.Cool_Automatic)
-        expect(cue).toBeTruthy()
-        expect(cue!.id.includes(lockedGroupId)).toBe(true)
+        expect(registry.getCueImplementation(CueType.Cool_Automatic)).toBe(firstCue)
       }
 
-      const verseCue = registry.getCueImplementation(CueType.Verse)
-      expect(verseCue).toBeTruthy()
-      expect(verseCue!.id.includes(lockedGroupId)).toBe(true)
+      expect(registry.getCueImplementation(CueType.Verse)?.cueId).toBe(`${lockedGroupId}-verse`)
 
       registry.onSongEnd()
 
       const afterEndCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(afterEndCue).toBeTruthy()
+      expect(['group1-cool-auto', 'group2-cool-auto']).toContain(afterEndCue?.cueId)
     })
 
     it('with oncePerSong mode, uses default group as fallback when locked group does not have the cue', () => {
@@ -650,12 +627,10 @@ describe('CueRegistry', () => {
       registry.onSongStart()
 
       const coolCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(coolCue).toBeTruthy()
-      expect(coolCue!.id).toContain('custom-cool-auto')
+      expect(coolCue?.cueId).toBe('custom-cool-auto')
 
       const strobeCue = registry.getCueImplementation(CueType.Strobe_Fast)
-      expect(strobeCue).toBeTruthy()
-      expect(strobeCue!.id).toContain('default-strobe-fast')
+      expect(strobeCue?.cueId).toBe('default-strobe-fast')
     })
 
     it('with withinSong mode, onSongStart and onSongEnd do not change time-window behaviour', () => {
@@ -681,18 +656,14 @@ describe('CueRegistry', () => {
 
       registry.onSongStart()
       const firstCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(firstCue).toBeTruthy()
-      const firstGroupId = firstCue!.id.includes('group1') ? 'group1' : 'group2'
+      expect(['group1-cool-auto', 'group2-cool-auto']).toContain(firstCue?.cueId)
 
-      const secondCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(secondCue).toBeTruthy()
-      const secondGroupId = secondCue!.id.includes('group1') ? 'group1' : 'group2'
-      expect(secondGroupId).toBe(firstGroupId)
+      expect(registry.getCueImplementation(CueType.Cool_Automatic)).toBe(firstCue)
 
       registry.onSongEnd()
       registry.setCueConsistencyWindow(0)
       const thirdCue = registry.getCueImplementation(CueType.Cool_Automatic)
-      expect(thirdCue).toBeTruthy()
+      expect(['group1-cool-auto', 'group2-cool-auto']).toContain(thirdCue?.cueId)
     })
   })
 
