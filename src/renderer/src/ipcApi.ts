@@ -154,10 +154,12 @@ export {
   disableConsole,
   enableConsole,
   getClockRate,
+  getMasterOutput,
   getStageKitPriority,
   sendConsoleDmx,
   setClockRate,
   setConsoleFixtureConfig,
+  setMasterOutput,
   setStageKitPriority,
   updateConsoleChannel,
 } from './ipc/lighting'

@@ -17,6 +17,11 @@ import {
   WHITE_CHANNEL_MIX_MODES,
   type WhiteChannelMixMode,
 } from '../../photonics-dmx/types'
+import {
+  DEFAULT_MASTER_DIMMER_PERCENT,
+  MASTER_DIMMER_MAX_PERCENT,
+  MASTER_DIMMER_MIN_PERCENT,
+} from '../../photonics-dmx/controllers/MasterOutputState'
 
 /**
  * Application preferences (persisted in prefs.json).
@@ -101,6 +106,13 @@ export interface AppPreferences {
   whiteChannelMixMode?: WhiteChannelMixMode
   /** When false, YARG's venue post-processing leaves DMX colour output untouched. */
   venuePostProcessingEnabled?: boolean
+  /**
+   * Master dimmer, as a percent of full output, applied to every published colour and intensity.
+   * The blackout latch that sits beside it in the UI is session-only and deliberately absent here.
+   */
+  masterDimmerPercent?: number
+  /** When false, strobe cues are held back from the rig: no flash, no hardware strobe channel. */
+  strobeOutputEnabled?: boolean
   audioConfig?: AudioConfig
   activeAudioCueType?: AudioCueType
   audioGameMode?: AudioGameModeConfig
@@ -153,6 +165,22 @@ export function normalizeWhiteChannelMixMode(value: unknown): WhiteChannelMixMod
 
 /** Normalizes the persisted venue post-processing toggle. Absent means enabled. */
 export function normalizeVenuePostProcessingEnabled(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : true
+}
+
+/**
+ * Normalizes the persisted master dimmer level. Prefs loaded from disk bypass IPC validation, so
+ * anything non-numeric or out of range reads as full output rather than darkening the rig.
+ */
+export function normalizeMasterDimmerPercent(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_MASTER_DIMMER_PERCENT
+  }
+  return Math.max(MASTER_DIMMER_MIN_PERCENT, Math.min(MASTER_DIMMER_MAX_PERCENT, Math.round(value)))
+}
+
+/** Normalizes the persisted strobe output gate. Absent means strobes are enabled. */
+export function normalizeStrobeOutputEnabled(value: unknown): boolean {
   return typeof value === 'boolean' ? value : true
 }
 
@@ -219,6 +247,8 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   advancedModeEnabled: false,
   whiteChannelMixMode: DEFAULT_WHITE_CHANNEL_MIX_MODE,
   venuePostProcessingEnabled: true,
+  masterDimmerPercent: DEFAULT_MASTER_DIMMER_PERCENT,
+  strobeOutputEnabled: true,
   audioConfig: DEFAULT_AUDIO_CONFIG,
   cueEditorWindowState: {
     width: 1200,

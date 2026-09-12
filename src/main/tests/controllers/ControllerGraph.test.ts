@@ -9,6 +9,7 @@ jest.mock('../../utils/windowUtils', () => ({
 import { ControllerGraph, type ControllerGraphDeps } from '../../controllers/ControllerGraph'
 import { ChainFanout } from '../../controllers/ChainFanout'
 import { VenueFrameProcessor } from '../../../photonics-dmx/controllers/VenueFrameProcessor'
+import { MasterOutputState } from '../../../photonics-dmx/controllers/MasterOutputState'
 import type { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
 import type { CueHandler } from '../../../photonics-dmx/cueHandlers/CueHandler'
 
@@ -22,6 +23,7 @@ function makeGraph(prefs: Record<string, unknown> = {}): ControllerGraph {
     getSenderManager: jest.fn() as unknown as ControllerGraphDeps['getSenderManager'],
     chainFanout: new ChainFanout(),
     venueFrameProcessor: new VenueFrameProcessor(),
+    masterOutput: new MasterOutputState(),
   }
   return new ControllerGraph(deps)
 }

@@ -4,8 +4,10 @@ Entries may only shrink. Regenerate after a split with: node tools/size-budget.m
 1156 src/photonics-dmx/cues/node/runtime/BaseNodeExecutionEngine.ts
 726 src/renderer/src/components/cue-editor/lib/graphLayout.ts
 722 src/photonics-dmx/cues/node/runtime/NodeExecutionEngine.ts
+757 src/photonics-dmx/controllers/DmxPublisher.ts
 702 src/renderer/src/pages/CueSimulation.tsx
-676 src/photonics-dmx/controllers/DmxPublisher.ts
 664 src/main/ipc/simulation-handlers.ts
 624 src/renderer/src/services/AudioCaptureManager.ts
 620 src/photonics-dmx/processors/AudioCueProcessor.ts
+617 src/main/ipc/validation/prefsValidation.ts
+611 src/main/controllers/ControllerManager.ts

@@ -10,6 +10,7 @@ import {
 import type { DmxValuesPayload } from '../../shared/ipcTypes'
 import { DmxLightManager } from './DmxLightManager'
 import { blackoutUniverse, normaliseUniverseBuffer } from '../helpers/dmxHelpers'
+import { scaleDmxValueByPercent } from '../helpers/brightnessScaling'
 import { resolveMovingHeadAxes, StrobePeakLatch } from './publisherLightOutput'
 import { FixtureChannelWriter, type LightOutput } from './fixtureChannelWriter'
 import { SenderManager } from './SenderManager'
@@ -23,6 +24,7 @@ import type {
 import { VenueFrameProcessor } from './VenueFrameProcessor'
 import { WireSlotGovernor } from './wireSlotGovernor'
 import { getStrobeStateManager, StrobeStateManager } from './StrobeStateManager'
+import { MASTER_DIMMER_MAX_PERCENT, MasterOutputState } from './MasterOutputState'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('DmxPublisher')
 
@@ -64,6 +66,12 @@ export interface DmxPublisherOptions {
    * Whoever supplies it keeps the reference and drives it; the publisher only reads from it.
    */
   frameProcessor?: PublisherFrameProcessor
+  /**
+   * Master dimmer / blackout / strobe-gate controls. Same ownership rule as `frameProcessor`:
+   * the caller keeps the reference and mutates it, the publisher only reads. Omitting it gives a
+   * private instance at its defaults, which is full output with strobes enabled.
+   */
+  masterOutput?: MasterOutputState
 }
 
 /**
@@ -146,6 +154,16 @@ export class DmxPublisher {
   private _whiteChannelMixMode: WhiteChannelMixMode = DEFAULT_WHITE_CHANNEL_MIX_MODE
 
   private _frameProcessor: PublisherFrameProcessor
+  /** Master dimmer / blackout / strobe gate, read once per frame and never written here. */
+  private _masterOutput: MasterOutputState
+  /**
+   * Most recent light states handed to {@link publishNow}, so {@link refreshOutput} can re-emit
+   * the current look when a global control changes. Held by reference: in chain mode this is the
+   * publisher's own aggregated map, so it stays current for free.
+   */
+  private _lastPublishedLights: ReadonlyMap<string, Readonly<RGBIO>> = new Map()
+  /** Last buffer given to {@link setManualBuffer}, pre-gate, for the same reason. */
+  private _lastManualBuffer: Record<number, number> | null = null
   /** Re-pointed per rig rather than rebuilt. */
   private _frameContext: PublisherFrameContext = { nowMs: 0, rigId: '' }
   /** Reused across every fixture in a frame so the colour stage allocates nothing. */
@@ -180,6 +198,7 @@ export class DmxPublisher {
       this._whiteChannelMixMode = options.whiteChannelMixMode
     }
     this._frameProcessor = options.frameProcessor ?? new VenueFrameProcessor()
+    this._masterOutput = options.masterOutput ?? new MasterOutputState()
     this._governor = new WireSlotGovernor(senderManager, this._timing, this._minIntervalMs)
 
     this.publish = this.publish.bind(this)
@@ -256,18 +275,24 @@ export class DmxPublisher {
    * console page sees its own loopback.
    *
    * Values reach the wire exactly as given, with no brightness scaling: the console is a raw
-   * per-channel takeover, and calibration depends on reading back the number you typed.
+   * per-channel takeover, and calibration depends on reading back the number you typed. The master
+   * dimmer is excluded for that reason. Blackout is not: it is a safety control, and a console path
+   * that kept emitting through it would not be a blackout.
    */
   public setManualBuffer(buffer: Record<number, number>): void {
     if (this._isShutDown) {
       return
     }
     this._manualMode = true
+    this._lastManualBuffer = buffer
     this._resetGovernorAllSlots()
 
     // Normalise the input buffer once; broadcast to every enabled wire slot.
     const normalised = normaliseUniverseBuffer(buffer)
-    const out = Object.keys(normalised).length === 0 ? this._immediateBlackoutData : normalised
+    const out =
+      this._masterOutput.isBlackoutActive() || Object.keys(normalised).length === 0
+        ? this._immediateBlackoutData
+        : normalised
 
     for (const wireId of this._sender.getEnabledWireSenders()) {
       void this._sender.send(wireId, out)
@@ -308,6 +333,27 @@ export class DmxPublisher {
    */
   public setWhiteChannelMixMode(mode: WhiteChannelMixMode): void {
     this._whiteChannelMixMode = mode
+  }
+
+  /**
+   * Re-emit the current look after {@link MasterOutputState} changed. A running show would pick a
+   * new level up on its next frame anyway, but a rig idle between songs publishes nothing, and a
+   * blackout that waited for the next cue would not be a blackout. Console mode re-sends its last
+   * raw buffer through the same gate. The governor reset puts the re-emit on the leading edge
+   * rather than waiting out the current rate window.
+   */
+  public refreshOutput(): void {
+    if (this._isShutDown) {
+      return
+    }
+    this._resetGovernorAllSlots()
+    if (this._manualMode) {
+      if (this._lastManualBuffer !== null) {
+        this.setManualBuffer(this._lastManualBuffer)
+      }
+      return
+    }
+    this.publishNow(this._lastPublishedLights)
   }
 
   /**
@@ -366,6 +412,8 @@ export class DmxPublisher {
    * through their per-slot governor; the IPC payload goes through the separate IPC governor.
    */
   private publishNow(lights: ReadonlyMap<string, Readonly<RGBIO>>): void {
+    this._lastPublishedLights = lights
+
     // 1. Snapshot the set of currently-enabled wire-sender slots and reconcile state.
     const enabledWireSenders = this._sender.getEnabledWireSenders()
     const ipcEnabled = this._sender.isIpcEnabled()
@@ -389,8 +437,20 @@ export class DmxPublisher {
     // buffer is sparse).
     const ipcRigBuffers: Record<string, Record<number, number>> = {}
 
-    // 3. Strobe peak-hold state machine runs once per frame (across all rigs/lights).
-    const activeStrobeSlot = this._strobeStateManager.getActive()
+    // 3. Global output controls, read once for the whole frame.
+    //
+    // The strobe gate has to disarm two independent mechanisms. Treating the slot as inactive
+    // covers the hardware strobe-speed channel, which is driven from `activeStrobeSlot` below. It
+    // does NOT cover the opacity-driven flash: the blender has already folded that into the rgb /
+    // intensity values arriving here, so those lights are zeroed individually in the light loop,
+    // which is what `suppressedStrobeLightIds` is for.
+    const masterPercent = this._masterOutput.getOutputPercent()
+    const requestedStrobeSlot = this._strobeStateManager.getActive()
+    const strobeSuppressed =
+      requestedStrobeSlot != null && !this._masterOutput.isStrobeOutputEnabled()
+    const activeStrobeSlot = strobeSuppressed ? null : requestedStrobeSlot
+
+    // Strobe peak-hold state machine runs once per frame (across all rigs/lights).
     this._strobePeakLatch.beginFrame(activeStrobeSlot != null)
 
     // One timestamp for the whole frame, so a light reached by more than one rig neither advances
@@ -442,6 +502,10 @@ export class DmxPublisher {
 
       // Lights a strobe drives: the venue bypass below needs them, and so does `strobe-rgbw`.
       const strobeLightIds = activeStrobeSlot != null ? manager.getStrobeLightIds() : null
+      // The same set, but only while the strobe gate is holding a strobe back. Exactly one of the
+      // two is ever non-null, so a suppressed strobe gets none of the strobe-specific treatment
+      // above and is simply published dark.
+      const suppressedStrobeLightIds = strobeSuppressed ? manager.getStrobeLightIds() : null
 
       // Fixtures reached below via the light-states map. Anything left over (a fixture no cue has
       // addressed, or a strobe-group light excluded from cue targeting) gets its pinned `fixed`
@@ -506,6 +570,23 @@ export class DmxPublisher {
         g = held.green
         b = held.blue
         intensity = held.intensity
+
+        // Global output controls, applied to colour and intensity only, and after the latch above
+        // so it still tracks true cue peaks rather than freezing whatever the fader happened to
+        // read. Pan, tilt, strobe speed and pinned `fixed` channels are excluded by construction:
+        // they are written below from values this block never touches.
+        if (suppressedStrobeLightIds?.has(lightId) === true) {
+          r = 0
+          g = 0
+          b = 0
+          intensity = 0
+        }
+        if (masterPercent !== MASTER_DIMMER_MAX_PERCENT) {
+          r = scaleDmxValueByPercent(r, masterPercent)
+          g = scaleDmxValueByPercent(g, masterPercent)
+          b = scaleDmxValueByPercent(b, masterPercent)
+          intensity = scaleDmxValueByPercent(intensity, masterPercent)
+        }
 
         const isMovingHead = dmxLight.fixture === FixtureTypes.RGBMH
         const { panOut, tiltOut } = isMovingHead

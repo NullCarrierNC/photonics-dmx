@@ -6,6 +6,10 @@ import type { AppPreferences } from '../../../services/configuration/Configurati
 import type { CueDomain, CueDomainPrefs } from '../../../services/configuration/cueDomainTypes'
 import type { ValidationResult } from './primitives'
 import { WHITE_CHANNEL_MIX_MODES } from '../../../photonics-dmx/types'
+import {
+  MASTER_DIMMER_MAX_PERCENT,
+  MASTER_DIMMER_MIN_PERCENT,
+} from '../../../photonics-dmx/controllers/MasterOutputState'
 import { CUE_DOMAINS } from '../../../services/configuration/cueDomainTypes'
 import { DEFAULT_AUDIO_GAME_MODE } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import { clampDmxOutputRefreshRateHz } from '../../../shared/dmxOutputRefresh'
@@ -307,6 +311,8 @@ const APP_PREFERENCES_KEY_MAP: Record<keyof AppPreferences, true> = {
   audioPreviewWindowState: true,
   whiteChannelMixMode: true,
   venuePostProcessingEnabled: true,
+  masterDimmerPercent: true,
+  strobeOutputEnabled: true,
 }
 
 const APP_PREFERENCES_KEYS = new Set(
@@ -358,6 +364,21 @@ export function validatePreferencesPayload(
     typeof cleaned.venuePostProcessingEnabled !== 'boolean'
   ) {
     return { ok: false, error: 'venuePostProcessingEnabled must be a boolean' }
+  }
+
+  if ('masterDimmerPercent' in cleaned) {
+    const v = validateNumberInRange(
+      cleaned.masterDimmerPercent,
+      MASTER_DIMMER_MIN_PERCENT,
+      MASTER_DIMMER_MAX_PERCENT,
+      'masterDimmerPercent',
+    )
+    if (!v.ok) return v
+    cleaned.masterDimmerPercent = Math.round(v.value)
+  }
+
+  if ('strobeOutputEnabled' in cleaned && typeof cleaned.strobeOutputEnabled !== 'boolean') {
+    return { ok: false, error: 'strobeOutputEnabled must be a boolean' }
   }
 
   if ('globalDmxPublishingRateHz' in cleaned) {

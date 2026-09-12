@@ -2,6 +2,7 @@ import { ConfigurationManager } from '../../services/configuration/Configuration
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
 import { VenueFrameProcessor } from '../../photonics-dmx/controllers/VenueFrameProcessor'
+import { MasterOutputState } from '../../photonics-dmx/controllers/MasterOutputState'
 import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
 import { CueHandler } from '../../photonics-dmx/cueHandlers/CueHandler'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
@@ -96,6 +97,12 @@ export class ControllerManager {
    * reported survives a controller restart, and so publisher rebuilds do not drop it.
    */
   private readonly venueFrameProcessor = new VenueFrameProcessor()
+  /**
+   * Master dimmer, blackout latch and strobe output gate. Owned here for the same reason as
+   * {@link venueFrameProcessor}: a publisher rebuild must not release a blackout the operator
+   * armed, and the graph re-seeds only the two halves that persist.
+   */
+  private readonly masterOutput = new MasterOutputState()
   /** The built controller-object graph: chains, clock, publisher, cue handlers, loaders. */
   private readonly graph: ControllerGraph
 
@@ -141,6 +148,7 @@ export class ControllerManager {
         getSenderManager: () => this.senderLifecycle.getSenderManager(),
         chainFanout: this.chainFanout,
         venueFrameProcessor: this.venueFrameProcessor,
+        masterOutput: this.masterOutput,
       })
   }
 
@@ -433,6 +441,10 @@ export class ControllerManager {
   /** The venue post-processing stage, for callers driving or reporting the effect. */
   public getVenueFrameProcessor(): VenueFrameProcessor {
     return this.venueFrameProcessor
+  }
+
+  public getMasterOutput(): MasterOutputState {
+    return this.masterOutput
   }
 
   public getIsInitialized(): boolean {

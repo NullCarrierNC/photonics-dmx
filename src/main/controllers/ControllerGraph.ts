@@ -2,10 +2,13 @@ import { ConfigurationManager } from '../../services/configuration/Configuration
 import {
   normalizeWhiteChannelMixMode,
   normalizeVenuePostProcessingEnabled,
+  normalizeMasterDimmerPercent,
+  normalizeStrobeOutputEnabled,
 } from '../../services/configuration/configurationDefaults'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { DmxPublisher } from '../../photonics-dmx/controllers/DmxPublisher'
 import { VenueFrameProcessor } from '../../photonics-dmx/controllers/VenueFrameProcessor'
+import { MasterOutputState } from '../../photonics-dmx/controllers/MasterOutputState'
 import { SenderManager } from '../../photonics-dmx/controllers/SenderManager'
 import { LightingConfiguration, ConfigStrobeType } from '../../photonics-dmx/types'
 import { CueHandler } from '../../photonics-dmx/cueHandlers/CueHandler'
@@ -30,6 +33,7 @@ export interface ControllerGraphDeps {
   getSenderManager(): SenderManager
   chainFanout: ChainFanout
   venueFrameProcessor: VenueFrameProcessor
+  masterOutput: MasterOutputState
 }
 
 /**
@@ -192,9 +196,18 @@ export class ControllerGraph {
         config.getPreference('whiteChannelMixMode'),
       ),
       frameProcessor: this.deps.venueFrameProcessor,
+      masterOutput: this.deps.masterOutput,
     })
     this.deps.venueFrameProcessor.setVenuePostProcessingEnabled(
       normalizeVenuePostProcessingEnabled(config.getPreference('venuePostProcessingEnabled')),
+    )
+    // Re-seed the persisted half of the master output controls. Blackout is session-only and is
+    // deliberately left as the operator set it, so a restart cannot quietly re-open the rig.
+    this.deps.masterOutput.setDimmerPercent(
+      normalizeMasterDimmerPercent(config.getPreference('masterDimmerPercent')),
+    )
+    this.deps.masterOutput.setStrobeOutputEnabled(
+      normalizeStrobeOutputEnabled(config.getPreference('strobeOutputEnabled')),
     )
     // Subscribe the publisher to every chain's LightStateManager. Each chain's emission
     // writes its rig's lights into the publisher's aggregated map; a coalesced flush calls
