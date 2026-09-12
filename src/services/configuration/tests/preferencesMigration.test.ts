@@ -4,6 +4,7 @@ import {
   migratePrefsV3ToV4,
   migratePrefsV4ToV5,
   migratePrefsV5ToV6,
+  healStoredClockRate,
   healStoredSenderConfigs,
   repairCueDomains,
 } from '../preferencesMigration'
@@ -269,6 +270,23 @@ describe('healStoredSenderConfigs', () => {
     expect(out.sacnConfig?.useUnicast).toBe(true)
     expect(out.sacnConfig?.unicastDestination).toBe('10.0.0.4')
     expect(out.effectDebounce).toBe(9)
+  })
+})
+
+describe('healStoredClockRate', () => {
+  it('returns the same object when the stored rate is one the clock accepts', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, clockRate: 10 } as AppPreferences
+    expect(healStoredClockRate(prefs)).toBe(prefs)
+  })
+
+  it('brings a rate above the window down to the slowest the clock accepts', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, clockRate: 100, effectDebounce: 4 } as AppPreferences
+
+    const out = healStoredClockRate(prefs)
+
+    expect(out).not.toBe(prefs)
+    expect(out.clockRate).toBe(50)
+    expect(out.effectDebounce).toBe(4)
   })
 })
 

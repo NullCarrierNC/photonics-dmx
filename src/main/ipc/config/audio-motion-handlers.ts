@@ -14,6 +14,7 @@ import {
   validateStageKitPriority,
 } from '../inputValidation'
 import { createLogger } from '../../../shared/logger'
+import { CLOCK_RATE_MS_MAX, CLOCK_RATE_MS_MIN } from '../../../shared/clockRate'
 
 const log = createLogger('audio-motion-handlers')
 
@@ -197,7 +198,12 @@ export function registerAudioMotionConfigHandlers(
   })
 
   handleInvoke(ipcMain, CONFIG.SET_CLOCK_RATE, log, async (_, clockRate: unknown) => {
-    const rateValidation = validateNumberInRange(clockRate, 1, 100, 'clockRate')
+    const rateValidation = validateNumberInRange(
+      clockRate,
+      CLOCK_RATE_MS_MIN,
+      CLOCK_RATE_MS_MAX,
+      'clockRate',
+    )
     if (!rateValidation.ok) {
       return { success: false, error: rateValidation.error }
     }

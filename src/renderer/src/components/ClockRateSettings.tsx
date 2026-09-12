@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { getClockRate, setClockRate as saveClockRateToBackend } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
+import {
+  CLOCK_RATE_MS_DEFAULT,
+  CLOCK_RATE_MS_MAX,
+  CLOCK_RATE_MS_MIN,
+  clampClockRateMs,
+} from '../../../shared/clockRate'
 const log = createLogger('ClockRateSettings')
 
 const ClockRateSettings: React.FC = () => {
@@ -29,7 +35,7 @@ const ClockRateSettings: React.FC = () => {
     async (value: number) => {
       if (isSaving) return
 
-      const newValue = Math.max(1, Math.min(100, value)) // Clamp to 1-100
+      const newValue = clampClockRateMs(value)
       setClockRateValue(newValue)
 
       try {
@@ -56,7 +62,7 @@ const ClockRateSettings: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value) || 1
     // Only update the local state immediately, don't save on every keystroke
-    setClockRateValue(Math.max(1, Math.min(100, value)))
+    setClockRateValue(clampClockRateMs(value))
   }
 
   const handleInputBlur = () => {
@@ -86,8 +92,8 @@ const ClockRateSettings: React.FC = () => {
             <input
               type="number"
               id="clock-rate"
-              min="1"
-              max="100"
+              min={CLOCK_RATE_MS_MIN}
+              max={CLOCK_RATE_MS_MAX}
               step="1"
               value={clockRateValue}
               onChange={handleInputChange}
@@ -100,8 +106,9 @@ const ClockRateSettings: React.FC = () => {
           </div>
 
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Default is 10ms. Increase for better performance on slower systems. Range: 1-100ms but
-            you probably shouldn't go higher than 40ms.
+            Default is {CLOCK_RATE_MS_DEFAULT}ms. Increase for better performance on slower systems.
+            Range: {CLOCK_RATE_MS_MIN}-{CLOCK_RATE_MS_MAX}ms. A strobe faster than twice the clock
+            rate cannot be shown, so the higher settings suit slower looks.
           </p>
         </div>
       </div>

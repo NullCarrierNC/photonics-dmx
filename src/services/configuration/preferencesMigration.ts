@@ -1,6 +1,7 @@
 import { DEFAULT_PREFERENCES, type AppPreferences } from './configurationDefaults'
 import { REQUIRED_PREFERENCE_KEYS } from './configDataValidators'
 import { clampSacnUniverse } from '../../shared/sacnUniverse'
+import { clampClockRateMs } from '../../shared/clockRate'
 import {
   CUE_DOMAINS,
   type CueDomain,
@@ -340,6 +341,19 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * output off on this launch and every later one. Returns the preferences it was given when there
  * is nothing to bring back, so a load that changes nothing is not written out again.
  */
+/**
+ * Brings a stored clock rate back into the window the engine renders effects in, so a file written
+ * when the window was wider does not leave the tick slower than any effect can be shown at.
+ */
+export function healStoredClockRate(prefs: AppPreferences): AppPreferences {
+  const stored = prefs?.clockRate
+  if (typeof stored !== 'number') {
+    return prefs
+  }
+  const rate = clampClockRateMs(stored)
+  return rate === stored ? prefs : { ...prefs, clockRate: rate }
+}
+
 export function healStoredSenderConfigs(prefs: AppPreferences): AppPreferences {
   const sacn = prefs?.sacnConfig
   if (!isPlainObject(sacn) || typeof sacn.universe !== 'number') {

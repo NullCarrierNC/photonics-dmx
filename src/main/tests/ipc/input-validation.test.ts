@@ -1099,7 +1099,9 @@ describe('inputValidation', () => {
         const under = validatePreferencesPayload({ clockRate: 0 })
         expect(under.ok && under.value.clockRate).toBe(1)
         const over = validatePreferencesPayload({ clockRate: 9999 })
-        expect(over.ok && over.value.clockRate).toBe(100)
+        expect(over.ok && over.value.clockRate).toBe(50)
+        const justOver = validatePreferencesPayload({ clockRate: 51 })
+        expect(justOver.ok && justOver.value.clockRate).toBe(50)
       })
     })
 

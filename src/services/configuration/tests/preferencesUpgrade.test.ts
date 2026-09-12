@@ -57,6 +57,18 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.cueDomains.rb3Motion).toBeDefined()
   })
 
+  it('loads a stored clock rate slower than the window as the slowest in it', () => {
+    const appData = freshAppData()
+    seedPrefs(appData, 6, { ...DEFAULT_PREFERENCES, clockRate: 100, effectDebounce: 12 })
+
+    const onCorruptRecovery = jest.fn()
+    const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+    expect(onCorruptRecovery).not.toHaveBeenCalled()
+    expect(prefs.clockRate).toBe(50)
+    expect(prefs.effectDebounce).toBe(12)
+  })
+
   it('loads a stored sACN universe the protocol does not define as the lowest one it does', () => {
     const appData = freshAppData()
     seedPrefs(appData, 6, {

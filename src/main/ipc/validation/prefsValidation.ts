@@ -10,6 +10,7 @@ import { CUE_DOMAINS } from '../../../services/configuration/cueDomainTypes'
 import { DEFAULT_AUDIO_GAME_MODE } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import { clampDmxOutputRefreshRateHz } from '../../../shared/dmxOutputRefresh'
 import { SACN_UNIVERSE_MAX, SACN_UNIVERSE_MIN } from '../../../shared/sacnUniverse'
+import { clampClockRateMs } from '../../../shared/clockRate'
 import {
   isPlainObject,
   validateNumberInRange,
@@ -498,9 +499,9 @@ export function validatePreferencesPayload(
     if (typeof rate !== 'number' || !Number.isFinite(rate)) {
       return { ok: false, error: 'clockRate must be a finite number' }
     }
-    // Clamped to the window Clock itself accepts: a value outside it drives the tick scheduler off
-    // its interval, and the slider that produces this is already bounded the same way.
-    cleaned.clockRate = Math.round(Math.max(1, Math.min(100, rate)))
+    // Clamped to the window the engine renders effects in: a rate outside it drives the tick
+    // scheduler off its interval, and the field that produces this is bounded the same way.
+    cleaned.clockRate = clampClockRateMs(rate)
   }
 
   for (const key of [
