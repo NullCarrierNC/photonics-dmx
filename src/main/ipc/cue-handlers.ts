@@ -1,8 +1,8 @@
+import { handleInvoke } from './handleInvoke'
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { CueData } from '../../photonics-dmx/cues/types/cueTypes'
 import { sendToAllWindows } from '../utils/windowUtils'
-import { ipcError } from './ipcResult'
 import { CUE, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('cue-handlers')
@@ -34,34 +34,24 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   })
 
   // Disable YARG
-  ipcMain.handle(CUE.DISABLE_YARG, async () => {
-    try {
-      await controllerManager.disableYarg()
-      return { success: true }
-    } catch (error) {
-      log.error('Error disabling YARG:', error)
-      return ipcError(error)
-    }
+  handleInvoke(ipcMain, CUE.DISABLE_YARG, log, async () => {
+    await controllerManager.disableYarg()
+    return { success: true }
   })
 
   // Disable RB3
-  ipcMain.handle(CUE.DISABLE_RB3, async () => {
-    try {
-      await controllerManager.disableRb3()
-      return { success: true }
-    } catch (error) {
-      log.error('Error disabling RB3:', error)
-      return ipcError(error)
-    }
+  handleInvoke(ipcMain, CUE.DISABLE_RB3, log, async () => {
+    await controllerManager.disableRb3()
+    return { success: true }
   })
 
   // Get RB3 current mode
-  ipcMain.handle(CUE.RB3E_GET_MODE, () => {
+  handleInvoke(ipcMain, CUE.RB3E_GET_MODE, log, () => {
     return controllerManager.getListenerLifecycle().yargRb3.getRb3Mode()
   })
 
   // Get RB3 processor statistics
-  ipcMain.handle(CUE.RB3E_GET_STATS, () => {
+  handleInvoke(ipcMain, CUE.RB3E_GET_STATS, log, () => {
     return controllerManager.getListenerLifecycle().yargRb3.getRb3ProcessorStats()
   })
 
@@ -107,12 +97,12 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   })
 
   // Get YARG enabled state
-  ipcMain.handle(CUE.GET_YARG_ENABLED, () => {
+  handleInvoke(ipcMain, CUE.GET_YARG_ENABLED, log, () => {
     return controllerManager.getIsYargEnabled()
   })
 
   // Get RB3 enabled state
-  ipcMain.handle(CUE.GET_RB3_ENABLED, () => {
+  handleInvoke(ipcMain, CUE.GET_RB3_ENABLED, log, () => {
     return controllerManager.getIsRb3Enabled()
   })
 }

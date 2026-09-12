@@ -4,9 +4,12 @@ import {
   migratePrefsV3ToV4,
   migratePrefsV4ToV5,
   migratePrefsV5ToV6,
-  seedMissingCueDomains,
+  healStoredClockRate,
+  healStoredSenderConfigs,
+  repairCueDomains,
 } from '../preferencesMigration'
 import type { AppPreferences } from '../configurationDefaults'
+import { validateSenderEnablePayload } from '../../../main/ipc/validation/senderValidation'
 import {
   CUE_DOMAINS,
   createDefaultCueDomainPrefs,
@@ -240,10 +243,72 @@ describe('migratePrefsV5ToV6', () => {
   })
 })
 
-describe('seedMissingCueDomains', () => {
-  it('returns the same object when every cue domain is present', () => {
+describe('healStoredSenderConfigs', () => {
+  it('returns the same object when the stored sACN universe is one the protocol defines', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      sacnConfig: { universe: 4, useUnicast: false },
+    } as AppPreferences
+    expect(healStoredSenderConfigs(prefs)).toBe(prefs)
+  })
+
+  it('returns the same object when nothing stored a sACN block', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, sacnConfig: undefined } as AppPreferences
+    expect(healStoredSenderConfigs(prefs)).toBe(prefs)
+  })
+
+  it('brings a stored universe below the range up to the lowest sACN defines', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      effectDebounce: 9,
+      sacnConfig: { universe: 0, useUnicast: true, unicastDestination: '10.0.0.4' },
+    } as AppPreferences
+
+    const out = healStoredSenderConfigs(prefs)
+
+    expect(out).not.toBe(prefs)
+    expect(out.sacnConfig?.universe).toBe(1)
+    expect(out.sacnConfig?.useUnicast).toBe(true)
+    expect(out.sacnConfig?.unicastDestination).toBe('10.0.0.4')
+    expect(out.effectDebounce).toBe(9)
+  })
+})
+
+describe('a healed sACN universe starts a sender', () => {
+  it('heals a stored zero into a universe the enable payload accepts', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      sacnConfig: { universe: 0, useUnicast: false },
+    } as AppPreferences
+
+    const healed = healStoredSenderConfigs(prefs)
+    const check = validateSenderEnablePayload({ sender: 'sacn', ...healed.sacnConfig })
+
+    expect(check.ok).toBe(true)
+  })
+})
+
+describe('healStoredClockRate', () => {
+  it('returns the same object when the stored rate is one the clock accepts', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, clockRate: 10 } as AppPreferences
+    expect(healStoredClockRate(prefs)).toBe(prefs)
+  })
+
+  it('brings a rate above the window down to the slowest the clock accepts', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, clockRate: 100, effectDebounce: 4 } as AppPreferences
+
+    const out = healStoredClockRate(prefs)
+
+    expect(out).not.toBe(prefs)
+    expect(out.clockRate).toBe(50)
+    expect(out.effectDebounce).toBe(4)
+  })
+})
+
+describe('repairCueDomains', () => {
+  it('returns the same object when every cue domain is complete', () => {
     const prefs = { ...DEFAULT_PREFERENCES, cueDomains: createDefaultCueDomains() }
-    expect(seedMissingCueDomains(prefs)).toBe(prefs)
+    expect(repairCueDomains(prefs)).toBe(prefs)
   })
 
   it('seeds only the missing domains and preserves the rest', () => {
@@ -258,7 +323,7 @@ describe('seedMissingCueDomains', () => {
         audioMotion: all.audioMotion,
       },
     } as unknown as AppPreferences
-    const out = seedMissingCueDomains(prefs)
+    const out = repairCueDomains(prefs)
     expect(out).not.toBe(prefs)
     expect(out.effectDebounce).toBe(9)
     expect(out.cueDomains.yarg.enabledGroups).toEqual(['stagekit', 'mine'])
@@ -266,9 +331,58 @@ describe('seedMissingCueDomains', () => {
     expect(out.cueDomains.rb3Motion).toEqual(createDefaultCueDomainPrefs('rb3Motion'))
   })
 
+  it('completes a domain that is present but short of a required key', () => {
+    const all = createDefaultCueDomains()
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      clockRate: 42,
+      cueDomains: {
+        ...all,
+        rb3Motion: { enabledGroups: ['mine'], selectionMode: 'none' },
+      },
+    } as unknown as AppPreferences
+
+    const out = repairCueDomains(prefs)
+
+    expect(out.clockRate).toBe(42)
+    expect(out.cueDomains.rb3Motion.enabledGroups).toEqual(['mine'])
+    expect(out.cueDomains.rb3Motion.selectionMode).toBe('none')
+    expect(out.cueDomains.rb3Motion.knownGroups).toEqual([])
+    expect(out.cueDomains.rb3Motion.disabledCues).toEqual({})
+  })
+
+  it('replaces a required key stored in the wrong shape', () => {
+    const all = createDefaultCueDomains()
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      cueDomains: {
+        ...all,
+        audio: { ...all.audio, enabledGroups: 'not-an-array', disabledCues: 7 },
+      },
+    } as unknown as AppPreferences
+
+    const out = repairCueDomains(prefs)
+
+    expect(out.cueDomains.audio.enabledGroups).toEqual([])
+    expect(out.cueDomains.audio.disabledCues).toEqual({})
+  })
+
+  it('gives each repaired domain its own disabledCues', () => {
+    const all = createDefaultCueDomains()
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      cueDomains: { ...all, rb3: {} },
+    } as unknown as AppPreferences
+
+    const out = repairCueDomains(prefs)
+    out.cueDomains.rb3.disabledCues['group'] = ['cue']
+
+    expect(createDefaultCueDomainPrefs('rb3').disabledCues).toEqual({})
+  })
+
   it('leaves a malformed cueDomains untouched for validation to reject', () => {
     const prefs = { ...DEFAULT_PREFERENCES, cueDomains: null } as unknown as AppPreferences
-    expect(seedMissingCueDomains(prefs)).toBe(prefs)
+    expect(repairCueDomains(prefs)).toBe(prefs)
   })
 })
 

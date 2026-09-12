@@ -1,11 +1,18 @@
 /** @jest-environment jsdom */
 import { renderHook, waitFor } from '@testing-library/react'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../../../ipcApi'
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
-const readEffectFile = jest.fn()
-jest.mock('../../../ipcApi', () => ({
-  readEffectFile: (...args: unknown[]) => readEffectFile(...args),
-}))
+jest.mock(
+  '../../../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
+
+const readEffectFile = jest.mocked(ipcApi.readEffectFile)
 
 import { useEffectDefinitions } from './useEffectDefinitions'
 import type { EditorDocument } from '../lib/types'
@@ -28,7 +35,7 @@ const groupedEffectFiles = {
 
 describe('useEffectDefinitions', () => {
   beforeEach(() => {
-    readEffectFile.mockReset()
+    resetIpcApiMock()
   })
 
   it('starts empty and loads the definitions a cue references', async () => {
@@ -223,7 +230,7 @@ describe('useEffectDefinitions', () => {
           new Promise((resolve) => {
             resolveFirst = (value) => {
               firstSettled = true
-              resolve(value)
+              resolve(value as never)
             }
           }),
       )

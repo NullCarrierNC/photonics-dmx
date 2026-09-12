@@ -152,6 +152,44 @@ export function createDefaultDmxRig(): DmxRig {
  * keep importing it from `lightsLayoutHelpers`.
  */
 export { mapLightsToNewIdsForSave } from '../../../../photonics-dmx/helpers/rigImportExport'
+import { mapLightsToNewIdsForSave } from '../../../../photonics-dmx/helpers/rigImportExport'
+
+/**
+ * The config a save writes, from the lights currently on the editor canvas.
+ *
+ * Which lights count as strobes follows the strobe mode: none at all, every primary the user marked
+ * strobe capable, or the dedicated strobe group. Saved lights are given fresh ids, and a light that
+ * appears in two groups keeps one id across them.
+ */
+export function buildRigConfigForSave(
+  primaryLights: DmxLight[],
+  strobeType: ConfigStrobeType,
+  numLights: number | null,
+  layoutId: string,
+): LightingConfiguration {
+  let strobeSource: DmxLight[] = []
+  if (strobeType === ConfigStrobeType.AllCapable) {
+    strobeSource = primaryLights.filter((l) => l.isStrobeEnabled && l.group !== 'strobe')
+  } else if (strobeType === ConfigStrobeType.Dedicated) {
+    strobeSource = primaryLights.filter((l) => l.group === 'strobe')
+  }
+
+  const idMap: Record<string, string> = {}
+  return {
+    numLights: numLights || 0,
+    lightLayout: LIGHT_LAYOUTS.find((layout) => layout.id === layoutId) || LIGHT_LAYOUTS[0],
+    strobeType,
+    frontLights: mapLightsToNewIdsForSave(
+      primaryLights.filter((l) => l.group === 'front'),
+      idMap,
+    ),
+    backLights: mapLightsToNewIdsForSave(
+      primaryLights.filter((l) => l.group === 'back'),
+      idMap,
+    ),
+    strobeLights: mapLightsToNewIdsForSave(strobeSource, idMap),
+  }
+}
 
 export function lightingConfigsEqual(a: LightingConfiguration, b: LightingConfiguration): boolean {
   return equal(a, b)

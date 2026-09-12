@@ -3,11 +3,17 @@
  * Tracks progress through the node graph for one event execution.
  */
 
-import { ActionNode, BaseEventNode } from '../../types/nodeCueTypes'
+import { ActionNode, BaseEventNode, EffectRaiserNode } from '../../types/nodeCueTypes'
 import { CueData } from '../../types/cueTypes'
 import { AudioCueData } from '../../types/audioCueTypes'
 import { VariableValue, NodeCompletionCallback, ContextCompletionCallback } from './executionTypes'
 import { monotonicNowMs } from '../../../../shared/time'
+
+/**
+ * A node that can hold the context open while it waits: an action (or the dummy one a delay
+ * registers), or an effect raiser waiting for the effect it raised to go idle.
+ */
+export type BlockingNode = ActionNode | EffectRaiserNode
 
 export class ExecutionContext {
   public readonly id: string
@@ -16,7 +22,7 @@ export class ExecutionContext {
 
   private visitedNodes: Map<string, number> = new Map() // nodeId -> phase when last visited
   private phase: number = 0
-  private activeNodes: Map<string, ActionNode> = new Map() // Nodes waiting for completion
+  private activeNodes: Map<string, BlockingNode> = new Map() // Nodes waiting for completion
   /**
    * Depth counter incremented while a synchronous node-dispatch batch is in progress.
    * Prevents premature context disposal when a dead-end branch is encountered before
@@ -152,9 +158,10 @@ export class ExecutionContext {
   }
 
   /**
-   * Register an active action node (waiting for completion).
+   * Register an active node (waiting for completion): an action, a delay, or an effect raiser
+   * holding the context open until the effect it raised goes idle.
    */
-  public registerActiveAction(nodeId: string, actionNode: ActionNode): void {
+  public registerActiveAction(nodeId: string, actionNode: BlockingNode): void {
     this.activeNodes.set(nodeId, actionNode)
   }
 

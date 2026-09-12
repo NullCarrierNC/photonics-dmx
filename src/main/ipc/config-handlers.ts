@@ -1,6 +1,5 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
-import '../../photonics-dmx/cues'
 import { registerAudioMotionConfigHandlers } from './config/audio-motion-handlers'
 import { registerCueSelectionConfigHandlers } from './config/cue-selection-handlers'
 import { registerLightsRigsConfigHandlers } from './config/lights-rigs-handlers'

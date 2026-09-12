@@ -7,6 +7,7 @@ import {
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import PostProcessingStatus from './PostProcessingStatus'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import YargNoteGrid from './CuePreviewYarg/YargNoteGrid'
 import {
   getActiveYargMotionCue,
   getAvailableYargMotionCues,
@@ -16,6 +17,9 @@ import {
 } from '../ipcApi'
 import { useAtom } from 'jotai'
 import { currentCueStateAtom, yargListenerEnabledAtom } from '../atoms'
+
+/** How long the panel keeps a song's details after the last cue frame. */
+const IDLE_CLEAR_MS = 5000
 
 interface CuePreviewYargProps {
   className?: string
@@ -78,30 +82,27 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   const prevKeyframeRef = useRef<string | null>(null)
 
   // Refs for instrument note clear timers so sustained notes stay solid (cancel previous timer on new packet)
+  // Beat, measure and keyframe indicators clear on their own timer. Held in refs like the
+  // instrument ones below, so a fresh packet cancels the clear an older one scheduled rather than
+  // letting it blank an indicator that has just lit.
+  const beatClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const measureClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const keyframeClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Cue data only arrives when a cue is dispatched, and a song that ends sends no closing
+  // frame, so the panel gives a song up this long after its last frame.
+  const idleClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const guitarClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bassClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const keysClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const drumsClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // What the primary row is showing, read by the effect below without depending on it. Depending
+  // on the state it sets would restart the effect when its own clear timer fires, and the cue
+  // state atom still holds the last value, so the row would flip between the cue and blank for
+  // as long as the page stayed open.
+  const primaryCueNameRef = useRef<string>('')
   const primaryClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const secondaryClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const labelForInstrumentNote = (note: InstrumentNoteType) => {
-    switch (note) {
-      case InstrumentNoteType.Green:
-        return 'G'
-      case InstrumentNoteType.Red:
-        return 'R'
-      case InstrumentNoteType.Yellow:
-        return 'Y'
-      case InstrumentNoteType.Blue:
-        return 'B'
-      case InstrumentNoteType.Orange:
-        return 'O'
-      default:
-        return ''
-    }
-  }
 
   const loadMotionLabels = useCallback(async () => {
     try {
@@ -170,47 +171,29 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
     }
   }, [])
 
-  const labelForDrumNote = (note: DrumNoteType) => {
-    if (note === DrumNoteType.Kick) return 'KD'
-    switch (note) {
-      case DrumNoteType.GreenDrum:
-        return 'G'
-      case DrumNoteType.GreenCymbal:
-        return 'GC'
-      case DrumNoteType.RedDrum:
-        return 'R'
-      case DrumNoteType.YellowDrum:
-        return 'Y'
-      case DrumNoteType.YellowCymbal:
-        return 'YC'
-      case DrumNoteType.BlueDrum:
-        return 'B'
-      case DrumNoteType.BlueCymbal:
-        return 'BC'
-      default:
-        return ''
-    }
-  }
-
   // Update primary/secondary cue display based on cue state changes; clear after 100ms when no cue firing (same delay as notes)
   useEffect(() => {
     if (!cueState?.cueType || !cueState?.cueStyle) return
     const { cueType, cueStyle } = cueState
     if (cueStyle === 'primary') {
-      if (primaryCueName && primaryCueName !== cueType) {
+      if (primaryCueNameRef.current && primaryCueNameRef.current !== cueType) {
         clearTimeout(secondaryClearTimerRef.current ?? undefined)
         // eslint-disable-next-line react-hooks/set-state-in-effect -- sync display from IPC cue state
         setSecondaryCueName('')
       }
       clearTimeout(primaryClearTimerRef.current ?? undefined)
+      primaryCueNameRef.current = cueType
       setPrimaryCueName(cueType)
-      primaryClearTimerRef.current = setTimeout(() => setPrimaryCueName(''), 200)
+      primaryClearTimerRef.current = setTimeout(() => {
+        primaryCueNameRef.current = ''
+        setPrimaryCueName('')
+      }, 200)
     } else if (cueStyle === 'secondary') {
       clearTimeout(secondaryClearTimerRef.current ?? undefined)
       setSecondaryCueName(cueType)
       secondaryClearTimerRef.current = setTimeout(() => setSecondaryCueName(''), 200)
     }
-  }, [cueState, primaryCueName])
+  }, [cueState])
 
   // Handle manual indicators via props
   useEffect(() => {
@@ -263,11 +246,15 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
   // Listen for cue events when YARG listener is enabled or in simulation mode
   useEffect(() => {
-    if (!yargListenerEnabled && !simulationMode) {
-      // Clear data when listener is disabled and not in simulation mode
+    /**
+     * Puts the panel back to its waiting state.
+     *
+     * The previous-value refs go with it: they gate the change detection, so clearing them is
+     * what lets a song opening on the beat or keyframe the last one ended on light up.
+     */
+    const resetCueDetails = (): void => {
       clearTimeout(primaryClearTimerRef.current ?? undefined)
       clearTimeout(secondaryClearTimerRef.current ?? undefined)
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when listener disabled
       setCurrentCueData(null)
       setPrimaryCueName('')
       setSecondaryCueName('')
@@ -277,6 +264,13 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
       setLastBeatType(null)
       setLastMeasureType(null)
       setLastKeyframeType(null)
+      prevBeatRef.current = null
+      prevMeasureRef.current = undefined
+      prevKeyframeRef.current = null
+    }
+
+    if (!yargListenerEnabled && !simulationMode) {
+      resetCueDetails()
       return
     }
 
@@ -286,6 +280,12 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
     }
 
     const handleCueData = (cueData: CueData) => {
+      // Simulation drives one event at a time by hand, so the panel holds what the user just fired.
+      if (!simulationMode) {
+        clearTimeout(idleClearTimerRef.current ?? undefined)
+        idleClearTimerRef.current = setTimeout(resetCueDetails, IDLE_CLEAR_MS)
+      }
+
       // Beat detection - check for beat values in the beat property
       if (cueData.beat && cueData.beat !== 'Unknown') {
         if (cueData.beat !== prevBeatRef.current) {
@@ -294,8 +294,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
             setLastBeatType(cueData.beat)
             setBeatReceived(true)
 
-            // Clear beat indicator
-            setTimeout(() => {
+            clearTimeout(beatClearTimerRef.current ?? undefined)
+            beatClearTimerRef.current = setTimeout(() => {
               setBeatReceived(false)
             }, 200)
           }
@@ -304,8 +304,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
             setLastMeasureType('Measure Event')
             setMeasureReceived(true)
 
-            // Clear measure indicator
-            setTimeout(() => {
+            clearTimeout(measureClearTimerRef.current ?? undefined)
+            measureClearTimerRef.current = setTimeout(() => {
               setMeasureReceived(false)
             }, 250)
           }
@@ -323,8 +323,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
           setLastMeasureType(`Measure ${cueData.measureOrBeat}`)
           setMeasureReceived(true)
 
-          // Clear measure indicator after 500ms
-          setTimeout(() => {
+          clearTimeout(measureClearTimerRef.current ?? undefined)
+          measureClearTimerRef.current = setTimeout(() => {
             setMeasureReceived(false)
           }, 250)
         }
@@ -341,8 +341,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
             setLastKeyframeType(cueData.keyframe)
             setKeyframeReceived(true)
 
-            // Clear keyframe indicator after 500ms
-            setTimeout(() => {
+            clearTimeout(keyframeClearTimerRef.current ?? undefined)
+            keyframeClearTimerRef.current = setTimeout(() => {
               setKeyframeReceived(false)
             }, 250)
           }
@@ -420,6 +420,10 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
     return () => {
       setListenCueData(false)
       removeIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData)
+      clearTimeout(idleClearTimerRef.current ?? undefined)
+      clearTimeout(beatClearTimerRef.current ?? undefined)
+      clearTimeout(measureClearTimerRef.current ?? undefined)
+      clearTimeout(keyframeClearTimerRef.current ?? undefined)
       clearTimeout(guitarClearTimerRef.current ?? undefined)
       clearTimeout(bassClearTimerRef.current ?? undefined)
       clearTimeout(keysClearTimerRef.current ?? undefined)
@@ -545,175 +549,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
           {/* Instrument Notes Section */}
           <div className="mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Guitar */}
-              <div>
-                <p className="font-medium mb-1">Guitar</p>
-                <div className="flex flex-wrap gap-1">
-                  {[
-                    InstrumentNoteType.Green,
-                    InstrumentNoteType.Red,
-                    InstrumentNoteType.Yellow,
-                    InstrumentNoteType.Blue,
-                    InstrumentNoteType.Orange,
-                  ].map((note) => (
-                    <div
-                      key={String(note)}
-                      className={`w-6 h-6 rounded text-xs flex items-center justify-center font-bold ${
-                        activeInstrumentNotes.guitar.has(note)
-                          ? 'text-white' +
-                            (note === InstrumentNoteType.Green
-                              ? ' bg-green-500'
-                              : note === InstrumentNoteType.Red
-                                ? ' bg-red-500'
-                                : note === InstrumentNoteType.Yellow
-                                  ? ' bg-yellow-500'
-                                  : note === InstrumentNoteType.Blue
-                                    ? ' bg-blue-500'
-                                    : note === InstrumentNoteType.Orange
-                                      ? ' bg-orange-500'
-                                      : '')
-                          : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
-                      }`}>
-                      {labelForInstrumentNote(note)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bass */}
-              <div>
-                <p className="font-medium mb-1">Bass</p>
-                <div className="flex flex-wrap gap-1">
-                  {[
-                    InstrumentNoteType.Green,
-                    InstrumentNoteType.Red,
-                    InstrumentNoteType.Yellow,
-                    InstrumentNoteType.Blue,
-                    InstrumentNoteType.Orange,
-                  ].map((note) => (
-                    <div
-                      key={String(note)}
-                      className={`w-6 h-6 rounded text-xs flex items-center justify-center font-bold ${
-                        activeInstrumentNotes.bass.has(note)
-                          ? 'text-white' +
-                            (note === InstrumentNoteType.Green
-                              ? ' bg-green-500'
-                              : note === InstrumentNoteType.Red
-                                ? ' bg-red-500'
-                                : note === InstrumentNoteType.Yellow
-                                  ? ' bg-yellow-500'
-                                  : note === InstrumentNoteType.Blue
-                                    ? ' bg-blue-500'
-                                    : note === InstrumentNoteType.Orange
-                                      ? ' bg-orange-500'
-                                      : '')
-                          : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
-                      }`}>
-                      {labelForInstrumentNote(note)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Keys */}
-              <div>
-                <p className="font-medium mb-1">Keys</p>
-                <div className="flex flex-wrap gap-1">
-                  {[
-                    InstrumentNoteType.Green,
-                    InstrumentNoteType.Red,
-                    InstrumentNoteType.Yellow,
-                    InstrumentNoteType.Blue,
-                    InstrumentNoteType.Orange,
-                  ].map((note) => (
-                    <div
-                      key={String(note)}
-                      className={`w-6 h-6 rounded text-xs flex items-center justify-center font-bold ${
-                        activeInstrumentNotes.keys.has(note)
-                          ? 'text-white' +
-                            (note === InstrumentNoteType.Green
-                              ? ' bg-green-500'
-                              : note === InstrumentNoteType.Red
-                                ? ' bg-red-500'
-                                : note === InstrumentNoteType.Yellow
-                                  ? ' bg-yellow-500'
-                                  : note === InstrumentNoteType.Blue
-                                    ? ' bg-blue-500'
-                                    : note === InstrumentNoteType.Orange
-                                      ? ' bg-orange-500'
-                                      : '')
-                          : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
-                      }`}>
-                      {labelForInstrumentNote(note)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Drums */}
-              <div>
-                <p className="font-medium mb-1">Drums</p>
-                <div className="space-y-2">
-                  {/* GRYB Drum Colors */}
-                  <div className="flex flex-wrap gap-1">
-                    {[
-                      DrumNoteType.GreenDrum,
-                      DrumNoteType.RedDrum,
-                      DrumNoteType.YellowDrum,
-                      DrumNoteType.BlueDrum,
-                    ].map((note) => (
-                      <div
-                        key={String(note)}
-                        className={`w-6 h-6 rounded text-xs flex items-center justify-center font-bold ${
-                          activeInstrumentNotes.drums.has(note)
-                            ? 'text-white' +
-                              (note === DrumNoteType.GreenDrum
-                                ? ' bg-green-500'
-                                : note === DrumNoteType.RedDrum
-                                  ? ' bg-red-500'
-                                  : note === DrumNoteType.YellowDrum
-                                    ? ' bg-yellow-500'
-                                    : note === DrumNoteType.BlueDrum
-                                      ? ' bg-blue-500'
-                                      : '')
-                            : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
-                        }`}>
-                        {labelForDrumNote(note)}
-                      </div>
-                    ))}
-                  </div>
-                  {/* Cymbals and Kick */}
-                  <div className="flex flex-wrap gap-1">
-                    {[
-                      DrumNoteType.GreenCymbal,
-                      DrumNoteType.YellowCymbal,
-                      DrumNoteType.BlueCymbal,
-                      DrumNoteType.Kick,
-                    ].map((note) => (
-                      <div
-                        key={String(note)}
-                        className={`w-6 h-6 rounded text-xs flex items-center justify-center font-bold ${
-                          activeInstrumentNotes.drums.has(note)
-                            ? 'text-white' +
-                              (note === DrumNoteType.GreenCymbal
-                                ? ' bg-green-500'
-                                : note === DrumNoteType.YellowCymbal
-                                  ? ' bg-yellow-500'
-                                  : note === DrumNoteType.BlueCymbal
-                                    ? ' bg-blue-500'
-                                    : note === DrumNoteType.Kick
-                                      ? ' bg-orange-500'
-                                      : '')
-                            : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
-                        }`}>
-                        {labelForDrumNote(note)}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <YargNoteGrid activeInstrumentNotes={activeInstrumentNotes} />
           </div>
 
           {motionGlobalEnabled && (

@@ -1,21 +1,18 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import Rb3EnabledCueGroups from './Rb3EnabledCueGroups'
 
-jest.mock('../ipcApi', () => {
-  const actual = jest.requireActual<typeof import('../ipcApi')>('../ipcApi')
-  return {
-    ...actual,
-    getRb3CueGroups: jest.fn(),
-    getEnabledRb3CueGroups: jest.fn(),
-    getDisabledRb3Cues: jest.fn(),
-    setEnabledRb3CueGroups: jest.fn(),
-    setDisabledRb3Cues: jest.fn(),
-    getAvailableRb3Cues: jest.fn(),
-  }
-})
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
 const getRb3CueGroups = jest.mocked(ipcApi.getRb3CueGroups)
 const getEnabledRb3CueGroups = jest.mocked(ipcApi.getEnabledRb3CueGroups)
@@ -45,7 +42,7 @@ function seedHappyPath(): void {
 
 describe('Rb3EnabledCueGroups', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    resetIpcApiMock()
   })
 
   it('surfaces an inline error when lazy-loading RB3 cues fails, and Retry recovers', async () => {
@@ -59,8 +56,8 @@ describe('Rb3EnabledCueGroups', () => {
       },
     ])
 
-    render(<Rb3EnabledCueGroups />)
-    expect(screen.getByRole('heading', { name: /RB3 Lighting Cue Groups/i })).toBeTruthy()
+    renderWithProviders(<Rb3EnabledCueGroups />)
+    expect(screen.getByRole('heading', { name: /RB3 Lighting Cue Groups/i })).toBeInTheDocument()
     await screen.findByRole('button', { name: /RB3 Group 1/ })
 
     fireEvent.click(screen.getByRole('button', { name: /RB3 Group 1/ }))
@@ -69,15 +66,15 @@ describe('Rb3EnabledCueGroups', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /retry/i }))
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
-    expect(screen.getByText(/rb3 cue 1 desc/)).toBeTruthy()
+    expect(screen.getByText(/rb3 cue 1 desc/)).toBeInTheDocument()
   })
 
   it('surfaces an inline persistence error when the enabled-cue-group save fails', async () => {
     seedHappyPath()
     setEnabledRb3CueGroups.mockResolvedValueOnce({ success: false, error: 'rb3 save failed' })
 
-    render(<Rb3EnabledCueGroups />)
-    expect(screen.getByRole('heading', { name: /RB3 Lighting Cue Groups/i })).toBeTruthy()
+    renderWithProviders(<Rb3EnabledCueGroups />)
+    expect(screen.getByRole('heading', { name: /RB3 Lighting Cue Groups/i })).toBeInTheDocument()
     await screen.findByRole('button', { name: /RB3 Group 1/ })
 
     const enableCheckboxes = screen.getAllByRole('checkbox', { name: /Enable RB3 Group/ })
@@ -85,5 +82,35 @@ describe('Rb3EnabledCueGroups', () => {
 
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('rb3 save failed')
+  })
+
+  it('shows the RB3 wording for a cue and falls back to the YARG one', async () => {
+    getRb3CueGroups.mockResolvedValue([
+      { id: 'g1', name: 'Group One', description: '', cueTypes: [] },
+    ])
+    getEnabledRb3CueGroups.mockResolvedValue(['g1'])
+    getDisabledRb3Cues.mockResolvedValue({})
+    getAvailableRb3Cues.mockResolvedValue([
+      {
+        id: 'Chorus',
+        yargDescription: 'yarg wording',
+        rb3Description: 'rb3 wording',
+        groupName: 'Group One',
+      },
+      {
+        id: 'Verse',
+        yargDescription: 'shared wording',
+        rb3Description: '',
+        groupName: 'Group One',
+      },
+    ])
+
+    renderWithProviders(<Rb3EnabledCueGroups />)
+    await screen.findByText('Group One')
+    fireEvent.click(screen.getByRole('button', { name: /Group One/ }))
+
+    expect(await screen.findByText(/rb3 wording/)).toBeInTheDocument()
+    expect(screen.getByText(/shared wording/)).toBeInTheDocument()
+    expect(screen.queryByText(/yarg wording/)).toBeNull()
   })
 })

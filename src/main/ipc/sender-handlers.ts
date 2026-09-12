@@ -6,17 +6,37 @@ import { ipcError, ipcSuccess } from './ipcResult'
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { isPlainObject, validateSenderEnablePayload, validateSenderId } from './inputValidation'
 import { createLogger } from '../../shared/logger'
+import { handleInvoke } from './handleInvoke'
 
 const log = createLogger('Ipc.Sender')
+
+/**
+ * A sender id recoverable from a payload the validator rejected, so the renderer can be told which
+ * toggle to put back. Absent when the payload does not name a known sender.
+ */
+function senderIdFrom(data: unknown): string | null {
+  if (data === null || typeof data !== 'object' || !('sender' in data)) {
+    return null
+  }
+  const validated = validateSenderId((data as { sender: unknown }).sender)
+  return validated.ok ? validated.value : null
+}
 
 /**
  * Set up sender-related IPC handlers (enable/disable, sACN config, network interfaces).
  */
 export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  ipcMain.handle(LIGHT.SENDER_ENABLE, async (_, data: unknown) => {
+  handleInvoke(ipcMain, LIGHT.SENDER_ENABLE, log, async (_, data: unknown) => {
     const payloadValidation = validateSenderEnablePayload(data)
     if (!payloadValidation.ok) {
       sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, payloadValidation.error)
+      const rejected = senderIdFrom(data)
+      if (rejected) {
+        sendToAllWindows(RENDERER_RECEIVE.SENDER_START_FAILED, {
+          sender: rejected,
+          error: payloadValidation.error,
+        })
+      }
       return { success: false as const, error: payloadValidation.error }
     }
     const config = payloadValidation.value
@@ -40,7 +60,7 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
     }
   })
 
-  ipcMain.handle(LIGHT.SENDER_DISABLE, async (_, data: unknown) => {
+  handleInvoke(ipcMain, LIGHT.SENDER_DISABLE, log, async (_, data: unknown) => {
     if (data === null || typeof data !== 'object' || !('sender' in data)) {
       const msg = 'Invalid sender disable payload'
       sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, msg)
@@ -51,23 +71,11 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, senderValidation.error)
       return { success: false, error: senderValidation.error }
     }
-    try {
-      await controllerManager.getSenderManager().disableSender(senderValidation.value)
-      return ipcSuccess()
-    } catch (error) {
-      log.error('Error disabling sender:', error)
-      return ipcError(error)
-    }
+    await controllerManager.getSenderManager().disableSender(senderValidation.value)
+    return ipcSuccess()
   })
 
-  ipcMain.handle(LIGHT.SENDER_DISABLE_ALL, async () => {
-    const senderManager = controllerManager.getSenderManager()
-    const disabled = senderManager.getEnabledSenders()
-    await senderManager.disableAllSenders()
-    return { disabled }
-  })
-
-  ipcMain.handle(LIGHT.UPDATE_SACN_CONFIG, async (_, config: unknown) => {
+  handleInvoke(ipcMain, LIGHT.UPDATE_SACN_CONFIG, log, async (_, config: unknown) => {
     try {
       if (!isPlainObject(config)) {
         return { success: false, error: 'Invalid sACN config payload' }
@@ -90,11 +98,18 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true }
     } catch (error) {
       log.error('Error updating sACN configuration:', error)
-      throw error
+      // A restart disables the running sender before it builds the new one, so a configuration the
+      // driver refuses leaves sACN off. The renderer needs that to reach its toggle.
+      const failed = ipcError(error)
+      sendToAllWindows(RENDERER_RECEIVE.SENDER_START_FAILED, {
+        sender: 'sacn',
+        error: failed.error,
+      })
+      return failed
     }
   })
 
-  ipcMain.handle(LIGHT.UPDATE_ARTNET_CONFIG, async (_, config: unknown) => {
+  handleInvoke(ipcMain, LIGHT.UPDATE_ARTNET_CONFIG, log, async (_, config: unknown) => {
     try {
       if (!isPlainObject(config)) {
         return { success: false, error: 'Invalid Art-Net config payload' }
@@ -117,11 +132,16 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true }
     } catch (error) {
       log.error('Error updating Art-Net configuration:', error)
-      throw error
+      const failed = ipcError(error)
+      sendToAllWindows(RENDERER_RECEIVE.SENDER_START_FAILED, {
+        sender: 'artnet',
+        error: failed.error,
+      })
+      return failed
     }
   })
 
-  ipcMain.handle(LIGHT.GET_NETWORK_INTERFACES, async () => {
+  handleInvoke(ipcMain, LIGHT.GET_NETWORK_INTERFACES, log, async () => {
     try {
       const networkInterfaces = os.networkInterfaces()
       const interfaces: Array<{ name: string; value: string; family: string }> = []

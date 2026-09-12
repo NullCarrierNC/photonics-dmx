@@ -90,7 +90,7 @@ export class EffectManager implements IEffectManager {
       effectTransformer,
       lightTransitionController: this.lightTransitionController,
       persistentRuns: this.persistentRuns,
-      fireCompletionCallback: (name) => this.effectCallbacks.fire(name),
+      fireCompletionCallback: (name, cancelled) => this.effectCallbacks.fire(name, cancelled),
     })
 
     // Set this instance on the transition engine to allow it to start queued effects
@@ -100,7 +100,8 @@ export class EffectManager implements IEffectManager {
     this.systemEffects.setOnBlackoutCompleteCallback(() => {
       // Reset layer 0 effect tracking when a blackout completes
       this._lastCalled0LayerEffect = ''
-      //  console.debug("EffectManager: Reset _lastCalled0LayerEffect after blackout");
+      // The wipe bypassed the scheduler, so the waiters it left behind are released here.
+      this.effectCallbacks.cancelAll()
     })
   }
 
@@ -294,8 +295,10 @@ export class EffectManager implements IEffectManager {
     }
 
     if (policy.blockDuplicateName && this.isEffectRunning(name)) {
+      // Ordinary flow control rather than a fault. A held cue is called on every forwarded frame,
+      // so a chain that outlives one frame is refused around thirty times a second while it runs.
       const rigSuffix = this.rigLabel ? ` [rig: ${this.rigLabel}]` : ''
-      log.warn(
+      log.debug(
         `Not ${policy.verb.progressive} effect "${name}" because an effect with the same name is already running. Preventing timing issues.${rigSuffix}`,
       )
       return false
@@ -482,12 +485,11 @@ export class EffectManager implements IEffectManager {
     const activeEffects = this.layerManager.getActiveEffects().get(layer)
     if (!activeEffects) return
 
-    // Find and remove effects with the matching name
-    activeEffects.forEach((activeEffect, _lightId) => {
-      if (activeEffect.name === name) {
-        this.removeEffectByLayer(layer, true)
-      }
-    })
+    // One call covers the layer, and it starts each light's queued successor. Calling it per match
+    // re-entered the map being iterated, so a successor sharing the name drained the queue too.
+    if ([...activeEffects.values()].some((e) => e.name === name)) {
+      this.removeEffectByLayer(layer, true)
+    }
   }
 
   /**
@@ -573,7 +575,6 @@ export class EffectManager implements IEffectManager {
     }
 
     // Use our existing mechanism to add the effect on layer 0
-    //console.log(`EffectManager: Adding effect ${effect.id} with transitions: ${effect.transitions.length}`,color);
     this.addEffect('setState', effect)
   }
 

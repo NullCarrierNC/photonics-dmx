@@ -5,6 +5,7 @@
  * the primary it doubles. Plain fixtures keep the circle alone.
  */
 import { describe, expect, it, afterEach, jest } from '@jest/globals'
+import '@testing-library/jest-dom/jest-globals'
 import { render, screen, cleanup } from '@testing-library/react'
 import {
   ConfigStrobeType,
@@ -64,11 +65,11 @@ describe('LightsDmxPreview per-channel swatches', () => {
       <LightsDmxPreview lightingConfig={config(l)} dmxValues={{ 1: 255, 2: 0, 5: 128, 6: 200 }} />,
     )
 
-    expect(screen.getByLabelText('Red: 0')).toBeTruthy()
-    expect(screen.getByLabelText('Green: 0')).toBeTruthy()
-    expect(screen.getByLabelText('Blue: 0')).toBeTruthy()
-    expect(screen.getByLabelText('Amber: 128')).toBeTruthy()
-    expect(screen.getByLabelText('Red 2: 200')).toBeTruthy()
+    expect(screen.getByLabelText('Red: 0')).toBeInTheDocument()
+    expect(screen.getByLabelText('Green: 0')).toBeInTheDocument()
+    expect(screen.getByLabelText('Blue: 0')).toBeInTheDocument()
+    expect(screen.getByLabelText('Amber: 128')).toBeInTheDocument()
+    expect(screen.getByLabelText('Red 2: 200')).toBeInTheDocument()
     const red2Swatch = screen.getByLabelText('Red 2: 200')
     expect(red2Swatch.getAttribute('style')).toContain('background-color: rgb(200, 0, 0)')
     expect(red2Swatch.getAttribute('style')).toContain('border: 1px solid rgb(255, 0, 0)')
@@ -77,15 +78,15 @@ describe('LightsDmxPreview per-channel swatches', () => {
 
   it('shows the three primaries for a plain RGB fixture', () => {
     render(<LightsDmxPreview lightingConfig={config(light())} dmxValues={{ 1: 255, 2: 200 }} />)
-    expect(screen.getByLabelText('Red: 200')).toBeTruthy()
-    expect(screen.getByLabelText('Green: 0')).toBeTruthy()
-    expect(screen.getByLabelText('Blue: 0')).toBeTruthy()
+    expect(screen.getByLabelText('Red: 200')).toBeInTheDocument()
+    expect(screen.getByLabelText('Green: 0')).toBeInTheDocument()
+    expect(screen.getByLabelText('Blue: 0')).toBeInTheDocument()
   })
 
   it('leaves fixed channels out of a fixture swatch row', () => {
     const l = light([{ type: 'fixed', channel: 5, value: 200 }])
     render(<LightsDmxPreview lightingConfig={config(l)} dmxValues={{ 1: 255, 5: 200 }} />)
-    expect(screen.getByLabelText('Red: 0')).toBeTruthy()
+    expect(screen.getByLabelText('Red: 0')).toBeInTheDocument()
     expect(screen.queryByLabelText(/Fixed/)).toBeNull()
   })
 })

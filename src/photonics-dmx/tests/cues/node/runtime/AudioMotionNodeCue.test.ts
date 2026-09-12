@@ -21,6 +21,7 @@ import { createMockLightingConfig } from '../../../helpers/testFixtures'
 import { createSequencerHarness } from '../../../helpers/sequencerHarness'
 import type { AudioCueData } from '../../../../cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
+import { fakeLightingController } from '../../../helpers/fakeLightingController'
 
 function minimalMotionDefinition(): AudioMotionNodeCueDefinition {
   const ev: AudioEventNodeUnion = {
@@ -89,21 +90,7 @@ describe('AudioMotionNodeCue', () => {
   beforeEach(() => {
     const config = createMockLightingConfig()
     lightManager = new DmxLightManager(config)
-    sequencer = {
-      addEffect: jest.fn(),
-      setEffect: jest.fn(),
-      removeEffect: jest.fn(),
-      removeAllEffects: jest.fn(),
-      removeEffectByLayer: jest.fn(),
-      addEffectUnblockedName: jest.fn(),
-      setEffectUnblockedName: jest.fn(),
-      cancelPanTiltClear: jest.fn(),
-      addMotionPattern: jest.fn(),
-      removeMotionPattern: jest.fn(),
-      getMotionPattern: jest.fn(),
-      updateMotionPatternConfig: jest.fn(),
-      onBeat: jest.fn(),
-    } as unknown as ILightingController
+    sequencer = fakeLightingController()
   })
 
   it('omits lighting style (not primary/secondary/strobe)', () => {

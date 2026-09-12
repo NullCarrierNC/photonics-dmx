@@ -210,3 +210,62 @@ describe('ConfigFile rename retry', () => {
     expect(renameMock).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('ConfigFile.mutate', () => {
+  type Settings = { a: string; b: string }
+
+  /** Two writers that each read before awaiting, which is what update() alone cannot order. */
+  it('keeps both changes when two writers overlap', async () => {
+    const filename = `config-mutate-overlap-${Date.now()}.json`
+    const cf = new ConfigFile<Settings>(filename, { a: 'default', b: 'default' }, 1, {})
+
+    await Promise.all([
+      cf.mutate((current) => ({ ...current, a: 'from-first' })),
+      cf.mutate((current) => ({ ...current, b: 'from-second' })),
+    ])
+
+    expect(cf.get()).toEqual({ a: 'from-first', b: 'from-second' })
+    const onDisk = JSON.parse(
+      fs.readFileSync(path.join(testAppData, 'Photonics.rocks', filename), 'utf-8'),
+    )
+    expect(onDisk.data).toEqual({ a: 'from-first', b: 'from-second' })
+  })
+
+  it('runs each turn against the result of the one before it', async () => {
+    const filename = `config-mutate-order-${Date.now()}.json`
+    const cf = new ConfigFile<Settings>(filename, { a: '', b: '' }, 1, {})
+
+    await Promise.all(
+      ['1', '2', '3'].map((n) => cf.mutate((current) => ({ ...current, a: current.a + n }))),
+    )
+
+    expect(cf.get().a).toBe('123')
+  })
+
+  it('writes nothing when the change returns the value it was given', async () => {
+    const filename = `config-mutate-noop-${Date.now()}.json`
+    const cf = new ConfigFile<Settings>(filename, { a: 'x', b: 'y' }, 1, {})
+    await cf.mutate((current) => ({ ...current, a: 'written' }))
+    const filePath = path.join(testAppData, 'Photonics.rocks', filename)
+    const before = fs.statSync(filePath).mtimeMs
+
+    await cf.mutate((current) => current)
+
+    expect(fs.statSync(filePath).mtimeMs).toBe(before)
+    expect(cf.get().a).toBe('written')
+  })
+
+  it('lets the turns behind a failed one continue', async () => {
+    const filename = `config-mutate-failure-${Date.now()}.json`
+    const cf = new ConfigFile<Settings>(filename, { a: 'start', b: '' }, 1, {})
+
+    const failed = cf.mutate(() => {
+      throw new Error('change refused')
+    })
+
+    await expect(failed).rejects.toThrow('change refused')
+    await cf.mutate((current) => ({ ...current, a: 'after' }))
+
+    expect(cf.get().a).toBe('after')
+  })
+})

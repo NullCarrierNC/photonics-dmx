@@ -30,15 +30,15 @@ export interface CueAuthoringInvokeMap {
   }
   [NODE_CUES.LIST]: {
     request: void
-    response: NodeCueListSummary
+    response: NodeCueListSummary | IpcErrorResult
   }
   [NODE_CUES.RELOAD]: {
     request: void
-    response: NodeCueLoadResult
+    response: NodeCueLoadResult | IpcErrorResult
   }
   [NODE_CUES.READ]: {
     request: string
-    response: NodeCueFile
+    response: NodeCueFile | IpcErrorResult
   }
   [NODE_CUES.SAVE]: {
     request: { mode: NodeCueMode; filename: string; content: NodeCueFile }
@@ -56,7 +56,7 @@ export interface CueAuthoringInvokeMap {
   }
   [NODE_CUES.GET_CUE_TYPES]: {
     request: { mode: NodeCueMode; kind?: NodeCueKind }
-    response: string[]
+    response: string[] | IpcErrorResult
   }
   [NODE_CUES.IMPORT_PICK]: {
     request: NodeCueMode | undefined
@@ -72,15 +72,15 @@ export interface CueAuthoringInvokeMap {
   // ---- Effects ----
   [EFFECTS.LIST]: {
     request: void
-    response: EffectListSummary
+    response: EffectListSummary | IpcErrorResult
   }
   [EFFECTS.RELOAD]: {
     request: void
-    response: EffectLoadResult
+    response: EffectLoadResult | IpcErrorResult
   }
   [EFFECTS.READ]: {
     request: string
-    response: EffectFile
+    response: EffectFile | IpcErrorResult
   }
   [EFFECTS.SAVE]: {
     request: { mode: EffectMode; filename: string; content: EffectFile }

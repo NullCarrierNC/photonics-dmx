@@ -1,25 +1,8 @@
 export type Rb3GameState = 'InGame' | 'Menus'
 
-export type Rb3Platform = 'Xbox' | 'Xenia' | 'Wii' | 'Dolphin' | 'PS3' | 'RPCS3' | 'Unknown'
-
 export type Rb3TrackType = 'Guitar' | 'Bass' | 'Drums' | 'Vocals' | 'Keys' | 'Harmony' | 'Unknown'
 
 export type Rb3Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Expert' | 'Unknown'
-
-export interface Rb3BandMember {
-  exists: boolean
-  difficulty: Rb3Difficulty
-  trackType: Rb3TrackType
-}
-
-export interface Rb3BandInfo {
-  members: Rb3BandMember[]
-}
-
-export interface Rb3ModData {
-  identifyValue: string
-  string: string
-}
 
 export enum Rb3ePacketType {
   EVENT_ALIVE = 0, // string with build tag
@@ -51,7 +34,6 @@ export const RB3_SONG_SELECT_SCREEN = 'song_select_screen'
 export interface StageKitData {
   positions: number[] // LED positions derived from leftChannel: [0..7]
   color: string // colour bank: 'red' | 'green' | 'blue' | 'yellow' | 'off'
-  brightness: 'low' | 'medium' | 'high'
   fog: boolean
   strobeEffect?: 'slow' | 'medium' | 'fast' | 'fastest' | 'off'
   leftChannel: number // raw 8-bit LED position mask

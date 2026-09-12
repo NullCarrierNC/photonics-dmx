@@ -1,7 +1,7 @@
 import { EffectExecutionEngine } from '../../../../cues/node/runtime/EffectExecutionEngine'
 import { EffectCompiler } from '../../../../cues/node/compiler/EffectCompiler'
 import type { YargEffectDefinition } from '../../../../cues/types/nodeCueTypes'
-import { defaultCueData, type CueData } from '../../../../cues'
+import { defaultCueData, type CueData } from '../../../../cues/types/cueTypes'
 import { getColor } from '../../../../helpers/dmxHelpers'
 import { createSequencerHarness } from '../../../helpers/sequencerHarness'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'

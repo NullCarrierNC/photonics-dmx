@@ -12,6 +12,7 @@ import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { Rb3MenuFramePump } from './rb3MenuAnimation'
 import { Rb3GameModeManager, Rb3GameModeSchedulePayload } from './Rb3GameModeManager'
 import { createLogger } from '../../shared/logger'
+import { Rb3StrobeWatchdog, DEFAULT_STROBE_WATCHDOG_MS } from './rb3StrobeWatchdog'
 
 const log = createLogger('rb3-cue')
 
@@ -55,6 +56,8 @@ const DEFAULT_KEEPALIVE_MS = 33
 export interface Rb3StageKitCueProcessorOptions {
   /** Keepalive re-dispatch interval; null disables the timer (tests drive tick() directly). */
   keepaliveMs?: number | null
+  /** How long a strobe survives console silence before the keepalive drops it. 0 disables the cut. */
+  strobeWatchdogMs?: number
   /** Menu-look dispatch (the ChainFanout in production); drives the RB3 menu cue while in menus.
    *  Omitted in unit tests that only exercise the gameplay cue path. */
   menuDispatch?: Rb3MenuCueDispatch
@@ -95,6 +98,7 @@ export class Rb3StageKitCueProcessor {
   private listener: EventEmitter | null = null
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null
   private readonly keepaliveMs: number | null
+  private readonly strobeWatchdog: Rb3StrobeWatchdog
   private readonly menuDispatch: Rb3MenuCueDispatch | null
   // Menu-look pump: an immediate first frame (enterMenu already set inMenu), no restart on a
   // repeated start, frames gated on inMenu so a stale tick never paints over gameplay.
@@ -120,6 +124,10 @@ export class Rb3StageKitCueProcessor {
   ) {
     this.keepaliveMs =
       options.keepaliveMs === undefined ? DEFAULT_KEEPALIVE_MS : options.keepaliveMs
+    this.strobeWatchdog = new Rb3StrobeWatchdog(
+      options.strobeWatchdogMs ?? DEFAULT_STROBE_WATCHDOG_MS,
+      () => this.cutStrobe(),
+    )
     this.menuDispatch = options.menuDispatch ?? null
     this.gameModeManager = options.getMotionSwitchDurationRangeSec
       ? new Rb3GameModeManager(
@@ -182,8 +190,23 @@ export class Rb3StageKitCueProcessor {
     this.gameModeManager?.tick()
     void this.runtime.handleCue(CueType.RB3, this.buildFrame())
     if (this.strobeState !== 'Strobe_Off') {
+      if (this.strobeWatchdog.hasLapsed()) {
+        this.cutStrobe()
+        return
+      }
       void this.runtime.handleCue(STROBE_CUE[this.strobeState], this.buildFrame())
     }
+  }
+
+  /**
+   * Drop the strobe the keepalive has been sustaining. The slot is stopped as well as the state
+   * cleared, so the next tick has nothing to re-dispatch and the slot goes dark with it.
+   */
+  private cutStrobe(): void {
+    log.warn('Rb3StageKitCueProcessor: strobe outlived its packets, cutting it.')
+    this.strobeState = 'Strobe_Off'
+    this.runtime.stopActiveStrobe()
+    void this.runtime.handleCue(CueType.Strobe_Off, this.buildFrame())
   }
 
   private handleGameState(data: { gameState: string }): void {
@@ -263,6 +286,7 @@ export class Rb3StageKitCueProcessor {
       this.exitMenu()
     }
     this.started = true // a real packet is gameplay evidence; the keepalive may run
+    this.strobeWatchdog.packetSeen()
     this.syncSongSpan()
     const before = this.ledSnapshot()
 

@@ -11,6 +11,7 @@ import {
   extraChannelDisplayLabel,
   findDuplicateChannelNumbers,
 } from './lightChannelDisplay'
+import { DraftNumberField } from './controls/DraftField'
 
 interface ExtraChannelsEditorProps {
   light: DmxFixture
@@ -52,17 +53,11 @@ const ExtraChannelsEditor: React.FC<ExtraChannelsEditorProps> = ({ light, onChan
     emit(next)
   }
 
-  const handleChannelChange = (index: number, raw: string): void => {
-    let channel = Number(raw)
-    if (!Number.isFinite(channel)) channel = 1
-    channel = Math.min(512, Math.max(1, Math.round(channel)))
+  const handleChannelChange = (index: number, channel: number): void => {
     emit(extras.map((ec, i) => (i === index ? { ...ec, channel } : ec)))
   }
 
-  const handleValueChange = (index: number, raw: string): void => {
-    let value = Number(raw)
-    if (!Number.isFinite(value)) value = 0
-    value = Math.min(255, Math.max(0, Math.round(value)))
+  const handleValueChange = (index: number, value: number): void => {
     emit(extras.map((ec, i) => (i === index ? { ...ec, value } : ec)))
   }
 
@@ -97,13 +92,12 @@ const ExtraChannelsEditor: React.FC<ExtraChannelsEditorProps> = ({ light, onChan
                 </option>
               ))}
             </select>
-            <input
+            <DraftNumberField
               aria-label={`${label} DMX channel`}
-              type="number"
               min={1}
               max={512}
               value={extra.channel}
-              onChange={(e) => handleChannelChange(i, e.target.value)}
+              onCommit={(channel) => handleChannelChange(i, channel)}
               className={`p-2 border border-gray-300 rounded w-[100px] text-black ${
                 extra.channel === 0 ? 'text-red-500 font-bold' : ''
               }`}
@@ -111,14 +105,12 @@ const ExtraChannelsEditor: React.FC<ExtraChannelsEditorProps> = ({ light, onChan
             {extra.type === 'fixed' && (
               <span className="flex items-center space-x-1">
                 <span className="text-gray-600 dark:text-gray-400">=</span>
-                <input
+                <DraftNumberField
                   aria-label={`${label} held value`}
-                  title="DMX value 0–255 held on this channel whenever DMX output is running"
-                  type="number"
                   min={0}
                   max={255}
                   value={extra.value ?? 0}
-                  onChange={(e) => handleValueChange(i, e.target.value)}
+                  onCommit={(value) => handleValueChange(i, value)}
                   className="p-2 border border-gray-300 rounded w-[80px] text-black"
                 />
               </span>

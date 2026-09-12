@@ -23,12 +23,205 @@ function makeMotionCue(id: string): IAudioCue {
   }
 }
 
+/** A group holding one lighting cue per named cue type. */
+function group(id: string, cueTypes: string[]): Parameters<AudioCueRegistry['registerGroup']>[0] {
+  return {
+    id,
+    name: id,
+    description: '',
+    // The cue is named for its group so lookups can say which group answered, while cueType stays
+    // the map key the registry is asked for.
+    cues: new Map(cueTypes.map((t) => [t, { ...makeLightingCue(`${id}-${t}`), cueType: t }])),
+  }
+}
+
+/** A group holding only motion programs, one per named id. */
+function motionGroup(
+  id: string,
+  motionIds: string[],
+): Parameters<AudioCueRegistry['registerGroup']>[0] {
+  return {
+    id,
+    name: id,
+    description: '',
+    cues: new Map(),
+    motionCues: new Map(motionIds.map((m) => [m, makeMotionCue(`${id}-${m}`)])),
+  }
+}
+
 describe('AudioCueRegistry', () => {
   let registry: AudioCueRegistry
 
   beforeEach(() => {
     registry = AudioCueRegistry.getInstance()
     registry.reset()
+  })
+
+  describe('groups', () => {
+    it('enables each group as it is registered', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+      registry.registerGroup(group('b', ['Chorus']))
+
+      expect(registry.getAllGroups()).toEqual(['a', 'b'])
+      expect(registry.getEnabledGroups()).toEqual(['a', 'b'])
+    })
+
+    it('serves lighting fallbacks from the first group with lighting cues', () => {
+      registry.registerGroup(motionGroup('m', ['m1']))
+      registry.registerGroup(group('a', ['Chorus']))
+      registry.registerGroup(group('b', ['Chorus']))
+
+      expect(registry.getDefaultGroupId()).toBe('a')
+    })
+
+    it('serves motion fallbacks from the first group with motion programs', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+      registry.registerGroup(motionGroup('m', ['m1']))
+
+      expect(registry.getDefaultMotionGroupId()).toBe('m')
+    })
+
+    it('lets a flagged default hold the slot over the first group', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+      const flagged = group('b', ['Chorus'])
+      registry.registerGroup(flagged)
+
+      registry.applyGroupDesignations({ isDefault: true }, flagged)
+
+      expect(registry.getDefaultGroupId()).toBe('b')
+    })
+
+    it('hands the fallback to the next group able to serve it when its group goes', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+      registry.registerGroup(group('b', ['Chorus']))
+
+      registry.unregisterGroup('a')
+
+      expect(registry.getDefaultGroupId()).toBe('b')
+    })
+
+    it('leaves the enabled groups alone when a default is flagged', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+      registry.registerGroup(group('b', ['Chorus']))
+      registry.setEnabledGroups(['a'])
+
+      registry.setDefaultGroup('b')
+
+      expect(registry.getEnabledGroups()).toEqual(['a'])
+    })
+
+    it('drops the fallback designation with the group it pointed at', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+
+      expect(registry.unregisterGroup('a')).toBe(true)
+      expect(registry.getDefaultGroupId()).toBeNull()
+      expect(registry.unregisterGroup('a')).toBe(false)
+    })
+
+    it('keeps only the groups asked for', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+      registry.registerGroup(group('b', ['Chorus']))
+
+      registry.setEnabledGroups(['b', 'unknown'])
+
+      expect(registry.getEnabledGroups()).toEqual(['b'])
+    })
+
+    it('leaves nothing enabled when asked for nothing', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+
+      registry.setEnabledGroups([])
+
+      expect(registry.getEnabledGroups()).toEqual([])
+    })
+  })
+
+  describe('cue lookup', () => {
+    it('takes the cue from an enabled group', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+      registry.registerGroup(group('b', ['Chorus']))
+      registry.setEnabledGroups(['b'])
+
+      expect(registry.getCueImplementation('Chorus')?.id).toBe('id:b-Chorus')
+    })
+
+    it('falls back to the fallback group when no enabled group carries the cue', () => {
+      registry.registerGroup(group('a', ['Chorus', 'Verse']))
+      registry.registerGroup(group('b', ['Chorus']))
+      registry.setEnabledGroups(['b'])
+
+      expect(registry.getCueImplementation('Verse')?.id).toBe('id:a-Verse')
+    })
+
+    it('still plays the fallback group with nothing enabled', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+      registry.setEnabledGroups([])
+
+      expect(registry.getCueImplementation('Chorus')?.id).toBe('id:a-Chorus')
+    })
+
+    it('skips a cue the user turned off, in the fallback group too', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+      registry.setDisabledCues({ a: ['Chorus'] })
+
+      expect(registry.getCueImplementation('Chorus')).toBeNull()
+    })
+
+    it('reads a cue straight out of a named group', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+      registry.registerGroup(group('b', ['Chorus']))
+      registry.setEnabledGroups(['a'])
+
+      expect(registry.getCueImplementationFromGroup('Chorus', 'b')?.id).toBe('id:b-Chorus')
+      expect(registry.getCueImplementationFromGroup('Verse', 'b')).toBeNull()
+    })
+
+    it('falls back to the default group when a named group lacks the cue', () => {
+      registry.registerGroup(group('a', ['Chorus', 'Verse']))
+      registry.registerGroup(group('b', ['Chorus']))
+
+      expect(registry.getCueImplementationFromGroup('Verse', 'b')?.id).toBe('id:a-Verse')
+    })
+  })
+
+  describe('available cue types', () => {
+    it('reports what the enabled groups carry', () => {
+      registry.registerGroup(group('a', ['Chorus', 'Verse']))
+      registry.registerGroup(group('b', ['Stomp']))
+      registry.setEnabledGroups(['b'])
+
+      expect(registry.getAvailableCueTypes()).toEqual(['Stomp'])
+      expect(registry.getAvailableCueTypes(true).sort()).toEqual(['Chorus', 'Stomp', 'Verse'])
+    })
+
+    it('reports what the fallback group carries when the enabled groups carry none', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+      registry.setEnabledGroups([])
+
+      expect(registry.getAvailableCueTypes()).toEqual(['Chorus'])
+    })
+
+    it('omits a cue the user turned off', () => {
+      registry.registerGroup(group('a', ['Chorus', 'Verse']))
+      registry.setDisabledCues({ a: ['Verse'] })
+
+      expect(registry.getAvailableCueTypes()).toEqual(['Chorus'])
+    })
+  })
+
+  describe('cue details', () => {
+    it('re-reads a group that is registered again with different cues', () => {
+      registry.registerGroup(group('a', ['Chorus']))
+      expect(registry.getCueDetails('a').map((c) => c.id)).toEqual(['Chorus'])
+
+      registry.registerGroup(group('a', ['Chorus', 'Verse']))
+
+      expect(registry.getCueDetails('a').map((c) => c.id)).toEqual(['Chorus', 'Verse'])
+    })
+
+    it('answers with nothing for a group it does not hold', () => {
+      expect(registry.getCueDetails('missing')).toEqual([])
+    })
   })
 
   it('getGroupSummaries omits groups with no lighting cues (motion-only)', () => {

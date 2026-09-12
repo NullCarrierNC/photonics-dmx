@@ -39,8 +39,3 @@ export function getStrobeChannelLightsInConfig(config: LightingConfiguration): D
   }
   return out
 }
-
-/** True when at least one light in the rig drives a hardware strobe channel. */
-export function configHasStrobeChannelLights(config: LightingConfiguration): boolean {
-  return getStrobeChannelLightsInConfig(config).length > 0
-}

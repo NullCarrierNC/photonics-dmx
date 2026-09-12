@@ -22,6 +22,12 @@ import { SystemEffectsController } from '../../controllers/sequencer/SystemEffec
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
 import { Effect, EffectTransition } from '../../types'
 import { createMockTrackedLight, createMockRGBIP } from '../helpers/testFixtures'
+import {
+  resetLogConfiguration,
+  setLogSink,
+  setMinLogLevel,
+  type LogEntry,
+} from '../../../shared/logger'
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals'
 import {
   ILayerManager,
@@ -146,7 +152,6 @@ describe('EffectManager', () => {
       removeLightLayer: jest.fn(),
       getFinalLightState: jest.fn(),
       getLightState: jest.fn(),
-      resetLightStates: jest.fn(),
       clearAllTransitions: jest.fn(),
       beginClearingSequence: jest.fn(),
       endClearingSequence: jest.fn(),
@@ -594,7 +599,7 @@ describe('EffectManager', () => {
   })
 
   describe('addEffectUnblockedName', () => {
-    it('names the rig in the duplicate-name warning when the manager drives one', () => {
+    it('names the rig in the refusal it logs when the manager drives one', () => {
       const effectName = 'test-effect'
       const effect: Effect = {
         id: 'test-effect',
@@ -641,12 +646,20 @@ describe('EffectManager', () => {
         systemEffects as unknown as ISystemEffectsController,
         'Mix RGB&MH',
       )
-      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+      const entries: LogEntry[] = []
+      setMinLogLevel('debug')
+      setLogSink((entry) => entries.push(entry))
 
-      expect(labelled.addEffectUnblockedName(effectName, effect)).toBe(false)
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('[rig: Mix RGB&MH]'))
+      try {
+        expect(labelled.addEffectUnblockedName(effectName, effect)).toBe(false)
+      } finally {
+        resetLogConfiguration()
+      }
 
-      warn.mockRestore()
+      const refusal = entries.find((e) => e.message.includes('already running'))
+      expect(refusal?.message).toContain('[rig: Mix RGB&MH]')
+      // Held cues re-submit on every frame, so the refusal stays below the default level.
+      expect(refusal?.level).toBe('debug')
     })
 
     it('should not add effect if one with the same name exists on any layer', () => {
@@ -910,7 +923,7 @@ describe('EffectManager', () => {
       const firstState = firstCall[2] as LightEffectState
       const secondState = secondCall[2] as LightEffectState
 
-      expect(firstState.effectRunId).toBeTruthy()
+      expect(firstState.effectRunId).toMatch(/.+/)
       expect(secondState.effectRunId).toBe(firstState.effectRunId)
 
       // Complete the first light - should not restart yet
@@ -1080,6 +1093,25 @@ describe('EffectManager', () => {
 
       // Verify effect was removed (removeEffect calls removeEffectByLayer which calls removeActiveEffect for each light)
       expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(layer, 'test-light-1')
+    })
+
+    it('gives up the layer once however many lights are running the effect', () => {
+      // removeEffectByLayer clears the whole layer and starts each light's queued successor, so
+      // calling it per matching light re-entered the map being iterated. A successor sharing the
+      // name was then seen by that same loop and removed in turn, draining the queue.
+      const effectName = 'test-effect'
+      const layer = 1
+      const lightMap = new Map()
+      for (const lightId of ['light-1', 'light-2', 'light-3']) {
+        lightMap.set(lightId, { name: effectName, layer, lightId })
+      }
+      layerManager.getActiveEffects.mockReturnValue(new Map([[layer, lightMap]]))
+      const removeByLayer = jest.spyOn(effectManager, 'removeEffectByLayer')
+
+      effectManager.removeEffect(effectName, layer)
+
+      expect(removeByLayer).toHaveBeenCalledTimes(1)
+      removeByLayer.mockRestore()
     })
 
     it('should not remove an effect if name does not match', () => {

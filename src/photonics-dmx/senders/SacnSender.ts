@@ -1,7 +1,8 @@
 // src/senders/SacnSender.ts
 import { createLogger } from '../../shared/logger'
 import { hzToThrottleIntervalMs } from '../../shared/dmxOutputRefresh'
-import { BaseSender, SenderError } from './BaseSender'
+import { blackoutUniverse } from '../helpers/dmxHelpers'
+import { BaseSender } from './BaseSender'
 import { Sender } from 'sacn'
 import * as os from 'os'
 
@@ -24,11 +25,6 @@ export interface SacnConfig {
 export class SacnSender extends BaseSender {
   private sender: Sender | undefined
   private config: SacnConfig
-  private lastSendTimeMs: number = 0
-  private minIntervalMs: number = 0
-  /** Latest frame withheld by the rate limiter, flushed on the trailing edge so the last frame of a burst is not dropped. */
-  private pendingBuffer: Record<number, number> | null = null
-  private flushTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(config: SacnConfig = {}) {
     super()
@@ -124,19 +120,10 @@ export class SacnSender extends BaseSender {
     }
 
     // Cancel any queued trailing flush so it cannot fire after the sender closes.
-    if (this.flushTimer) {
-      clearTimeout(this.flushTimer)
-      this.flushTimer = null
-    }
-    this.pendingBuffer = null
+    this.cancelThrottledSend()
 
     try {
-      this.lastSendTimeMs = 0
-      const zeroBuffer: Record<number, number> = {}
-      for (let i = 1; i <= 512; i++) {
-        zeroBuffer[i] = 0
-      }
-      await this.send(zeroBuffer)
+      await this.send(blackoutUniverse())
     } catch (error) {
       log.error('Failed to send zero values before stopping:', error)
     } finally {
@@ -145,56 +132,20 @@ export class SacnSender extends BaseSender {
     }
   }
 
-  public async send(universeBuffer: Record<number, number>): Promise<void> {
+  public async send(universeBuffer: Record<number, number>): Promise<boolean> {
     try {
       this.verifySenderStarted()
 
-      if (this.minIntervalMs > 0) {
-        const now = performance.now()
-        const elapsed = now - this.lastSendTimeMs
-        if (elapsed < this.minIntervalMs && this.lastSendTimeMs !== 0) {
-          // Throttled: keep the latest frame and schedule a trailing-edge flush so the
-          // final frame of a burst still reaches the wire instead of being dropped. Snapshot
-          // the frame: the publisher reuses and mutates its slot buffer in place each frame, so
-          // holding it by reference would let the trailing flush send a newer frame than the one
-          // withheld. The buffer is a flat channel->value record, so a shallow copy suffices.
-          this.pendingBuffer = { ...universeBuffer }
-          if (!this.flushTimer) {
-            this.flushTimer = setTimeout(() => {
-              this.flushTimer = null
-              const buffer = this.pendingBuffer
-              this.pendingBuffer = null
-              if (buffer) {
-                void this.send(buffer)
-              }
-            }, this.minIntervalMs - elapsed)
-          }
-          return
-        }
-        this.lastSendTimeMs = now
+      if (this.throttleSend(universeBuffer)) {
+        return true
       }
 
-      // A frame that goes out now supersedes any queued trailing frame.
-      this.pendingBuffer = null
-
       await this.sender!.send({ payload: universeBuffer })
+      return true
     } catch (err: unknown) {
       log.error('SacnSender error:', err)
-      const errObj =
-        err && typeof err === 'object' ? (err as { code?: string; syscall?: string }) : null
-      const isNetworkError =
-        errObj &&
-        (errObj.code === 'EHOSTUNREACH' ||
-          errObj.code === 'EHOSTDOWN' ||
-          errObj.code === 'ENETUNREACH' ||
-          errObj.code === 'ETIMEDOUT' ||
-          errObj.syscall === 'send')
-      const errorEvent = new SenderError(err, {
-        senderId: 'sacn',
-        shouldDisable: Boolean(isNetworkError),
-        code: errObj && 'code' in errObj ? String(errObj.code) : undefined,
-      })
-      this.emitSenderError(errorEvent)
+      this.emitSenderError(this.toSenderError(err, 'sacn'))
+      return false
     }
   }
 
@@ -208,7 +159,7 @@ export class SacnSender extends BaseSender {
     return this.config.universe !== undefined ? this.config.universe : 1
   }
 
-  public getConfiguredPort(): number {
+  public override getConfiguredPort(): number {
     return 5568
   }
 }

@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest, beforeAll } from '@jest/globals'
-import { render, screen } from '@testing-library/react'
-import { Provider, createStore } from 'jotai'
+import { screen } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import LeftMenu from './LeftMenu'
 import { currentPageAtom, lightingPrefsAtom } from '../atoms'
 import { Pages } from '../types'
@@ -21,18 +21,19 @@ beforeAll(() => {
 })
 
 function renderLeftMenu(advancedModeEnabled: boolean) {
-  const store = createStore()
-  store.set(currentPageAtom, Pages.Status)
-  store.set(lightingPrefsAtom, { advancedModeEnabled })
-  return render(
-    <Provider store={store}>
-      <LeftMenu
-        isDarkMode={false}
-        toggleDarkMode={() => {}}
-        isCollapsed={false}
-        onToggleCollapse={() => {}}
-      />
-    </Provider>,
+  return renderWithProviders(
+    <LeftMenu
+      isDarkMode={false}
+      toggleDarkMode={() => {}}
+      isCollapsed={false}
+      onToggleCollapse={() => {}}
+    />,
+    {
+      seed: (set) => {
+        set(currentPageAtom, Pages.Status)
+        set(lightingPrefsAtom, { advancedModeEnabled })
+      },
+    },
   )
 }
 
@@ -45,7 +46,7 @@ describe('LeftMenu', () => {
 
   it('shows Spectrum Analyzer and Cue Editor when Advanced Mode is on', () => {
     renderLeftMenu(true)
-    expect(screen.getByText('Spectrum Analyzer')).toBeTruthy()
-    expect(screen.getByText('Cue Editor')).toBeTruthy()
+    expect(screen.getByText('Spectrum Analyzer')).toBeInTheDocument()
+    expect(screen.getByText('Cue Editor')).toBeInTheDocument()
   })
 })

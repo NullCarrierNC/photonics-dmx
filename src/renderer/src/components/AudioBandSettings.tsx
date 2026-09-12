@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { getAudioConfig, saveAudioConfig } from '../ipcApi'
+import React, { useMemo } from 'react'
 import { DEFAULT_AUDIO_BANDS } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
+import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 import {
   AUDIO_BAND_PRESETS,
   clonePresetBands,
@@ -12,9 +12,6 @@ import {
   AUDIO_BAND_GAIN_MIN,
   type AudioBandDefinition,
 } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
-import { createLogger } from '../../../shared/logger'
-
-const log = createLogger('AudioBandSettings')
 
 const PRESET_OPTIONS = (() => {
   const copy = [...AUDIO_BAND_PRESETS]
@@ -30,87 +27,44 @@ function isValidEightBandList(bands: unknown): bands is AudioBandDefinition[] {
 }
 
 const AudioBandSettings: React.FC = () => {
-  const [bands, setBands] = useState<AudioBandDefinition[]>(DEFAULT_AUDIO_BANDS)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
+  const audio = useAudioConfigFields({ bands: DEFAULT_AUDIO_BANDS })
+  // A stored list of the wrong length cannot drive eight rows, so the shipped bands stand in.
+  const bands = isValidEightBandList(audio.values.bands) ? audio.values.bands : DEFAULT_AUDIO_BANDS
+  const isSaving = audio.isSaving
 
   const matchedPresetId = useMemo(() => matchAudioBandPresetId(bands), [bands])
 
-  useEffect(() => {
-    const loadConfig = async () => {
-      try {
-        const config = await getAudioConfig()
-        if (config?.bands && isValidEightBandList(config.bands)) {
-          setBands(config.bands.map((b) => ({ ...b })))
-        }
-      } catch (error) {
-        log.error('Failed to load audio band settings:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadConfig()
-  }, [])
-
-  const handleSave = async (updatedBands: AudioBandDefinition[]) => {
+  const handleSave = (updatedBands: AudioBandDefinition[]): void => {
     if (isSaving) return
-
-    try {
-      setIsSaving(true)
-      const result = await saveAudioConfig({ bands: updatedBands })
-      if (!result.success) {
-        log.error('Failed to save audio band settings:', result.error)
-        const config = await getAudioConfig()
-        if (config?.bands && isValidEightBandList(config.bands)) {
-          setBands(config.bands.map((b) => ({ ...b })))
-        }
-      }
-    } catch (error) {
-      log.error('Failed to save audio band settings:', error)
-      const config = await getAudioConfig()
-      if (config?.bands && isValidEightBandList(config.bands)) {
-        setBands(config.bands.map((b) => ({ ...b })))
-      }
-    } finally {
-      setIsSaving(false)
-    }
+    void audio.save({ bands: updatedBands })
   }
 
-  const handlePresetChange = async (presetId: AudioBandPresetId) => {
-    const next = clonePresetBands(presetId)
-    setBands(next)
-    await handleSave(next)
+  const handlePresetChange = (presetId: AudioBandPresetId): void => {
+    handleSave(clonePresetBands(presetId))
   }
 
-  const handleGainChange = (index: number, value: number) => {
+  const handleGainChange = (index: number, value: number): void => {
     const clamped = Math.max(AUDIO_BAND_GAIN_MIN, Math.min(AUDIO_BAND_GAIN_MAX, value))
-    const newBands = bands.map((b, i) => (i === index ? { ...b, gain: clamped } : b))
-    setBands(newBands)
+    audio.set({ bands: bands.map((b, i) => (i === index ? { ...b, gain: clamped } : b)) })
   }
 
-  const handleGainBlur = () => {
+  const handleGainBlur = (): void => {
     handleSave(bands)
   }
 
-  const handleGainSliderChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value)
-    handleGainChange(index, value)
+  const handleGainSliderChange = (index: number, e: React.ChangeEvent<HTMLInputElement>): void => {
+    handleGainChange(index, parseFloat(e.target.value))
   }
 
-  const handleResetGains = async () => {
-    const next = bands.map((b) => ({ ...b, gain: 1.0 }))
-    setBands(next)
-    await handleSave(next)
+  const handleResetGains = (): void => {
+    handleSave(bands.map((b) => ({ ...b, gain: 1.0 })))
   }
 
-  const handleResetToShippedDefault = async () => {
-    const next = clonePresetBands('rhythm-game')
-    setBands(next)
-    await handleSave(next)
+  const handleResetToShippedDefault = (): void => {
+    handleSave(clonePresetBands('rhythm-game'))
   }
 
-  if (isLoading) {
+  if (!audio.loaded) {
     return <div className="text-gray-500 dark:text-gray-400">Loading band settings...</div>
   }
 
@@ -143,7 +97,7 @@ const AudioBandSettings: React.FC = () => {
             onChange={(e) => {
               const v = e.target.value
               if (v === 'custom') return
-              void handlePresetChange(v as AudioBandPresetId)
+              handlePresetChange(v as AudioBandPresetId)
             }}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
             {matchedPresetId === null && (
@@ -200,7 +154,7 @@ const AudioBandSettings: React.FC = () => {
                   step="0.1"
                   value={band.gain}
                   onChange={(e) => handleGainSliderChange(index, e)}
-                  onMouseUp={() => handleGainBlur()}
+                  onMouseUp={handleGainBlur}
                   disabled={isSaving}
                   aria-label={`${band.name} gain multiplier`}
                   className="flex-1 min-w-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
@@ -221,7 +175,7 @@ const AudioBandSettings: React.FC = () => {
                       Math.max(AUDIO_BAND_GAIN_MIN, Math.min(AUDIO_BAND_GAIN_MAX, value)),
                     )
                   }}
-                  onBlur={() => handleGainBlur()}
+                  onBlur={handleGainBlur}
                   disabled={isSaving}
                   className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center disabled:opacity-50 shrink-0"
                 />
@@ -234,14 +188,14 @@ const AudioBandSettings: React.FC = () => {
       <div className="flex flex-wrap justify-end gap-2">
         <button
           type="button"
-          onClick={() => void handleResetGains()}
+          onClick={handleResetGains}
           disabled={isSaving}
           className="px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-200 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 disabled:opacity-50 rounded-md transition-colors">
           Reset gains to 1.0x
         </button>
         <button
           type="button"
-          onClick={() => void handleResetToShippedDefault()}
+          onClick={handleResetToShippedDefault}
           disabled={isSaving}
           className="px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors">
           Reset to Rhythm Game preset

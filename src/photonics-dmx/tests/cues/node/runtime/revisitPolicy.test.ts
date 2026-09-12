@@ -19,7 +19,7 @@ import type {
   NetNodeCueDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import type { RevisitPolicy } from '../../../../cues/node/runtime/GraphExecutionPolicy'
-import { CueType, defaultCueData, type CueData } from '../../../../cues'
+import { CueType, defaultCueData, type CueData } from '../../../../cues/types/cueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
@@ -57,8 +57,8 @@ const makeMockSequencer = (): jest.Mocked<ILightingController> =>
     setEffectWithCallback: jest.fn(),
     addEffectUnblockedName: jest.fn().mockReturnValue(true),
     setEffectUnblockedName: jest.fn().mockReturnValue(true),
-    addEffectUnblockedNameWithCallback: jest.fn(),
-    setEffectUnblockedNameWithCallback: jest.fn(),
+    addEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
+    setEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
     removeEffectCallback: jest.fn(),
     removeEffect: jest.fn(),
     cancelPanTiltClear: jest.fn(),

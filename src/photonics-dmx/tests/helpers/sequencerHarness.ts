@@ -16,6 +16,12 @@ export class ManualTestClock {
   private currentTimeMs = 0
   private tickCount = 0
 
+  constructor(private readonly intervalMs: number = 10) {}
+
+  public getIntervalMs(): number {
+    return this.intervalMs
+  }
+
   public onTick(callback: (deltaTime: number) => void): void {
     this.callbacks.add(callback)
   }

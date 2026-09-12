@@ -55,6 +55,8 @@ export class ControllerLifecycle {
   private shutdownCompleted = false
   /** Set while a restart is in flight so overlapping callers share the one attempt. */
   private restartInFlight: Promise<void> | null = null
+  /** Set while an initialisation is in flight so overlapping callers share the one attempt. */
+  private initInFlight: Promise<void> | null = null
 
   /**
    * @param broadcastPhase Called on every real phase transition so the renderer can disable
@@ -104,6 +106,44 @@ export class ControllerLifecycle {
     return this.restartInFlight !== null
   }
 
+  /** Whether an initialisation is currently in flight. */
+  public isInitInFlight(): boolean {
+    return this.initInFlight !== null
+  }
+
+  /**
+   * Run an initialisation, memoized so overlapping callers share the one attempt. The cold start,
+   * the renderer's retry, console mode, the simulation handlers and the listener toggles all reach
+   * this, and several of them are already running inside a queued op, so this shares in flight
+   * rather than queueing: queueing it from inside a queued op would deadlock.
+   *
+   * The memo is assigned synchronously so a same-tick second call shares it, and cleared when the
+   * attempt settles either way, so a failed init can be retried.
+   */
+  public runSharedInit(work: () => Promise<void>): Promise<void> {
+    if (this.initInFlight) {
+      return this.initInFlight
+    }
+    const run = (async () => work())()
+    this.initInFlight = run.finally(() => {
+      this.initInFlight = null
+    })
+    return this.initInFlight
+  }
+
+  /**
+   * Wait for an in-flight initialisation to settle. Errors are swallowed: the caller only needs the
+   * graph to have stopped being built, and the init's owner surfaces its own failure.
+   */
+  public async awaitInitWork(): Promise<void> {
+    if (!this.initInFlight) return
+    try {
+      await this.initInFlight
+    } catch {
+      // The owner already logged / rethrew; we just needed to wait.
+    }
+  }
+
   /**
    * Run the one-and-only shutdown. A completed shutdown resolves immediately, an in-flight one is
    * shared with the new caller, and only a shutdown whose work resolves marks completion, so a
@@ -122,6 +162,9 @@ export class ControllerLifecycle {
     }
 
     const run = (async () => {
+      // A graph half built is a graph that tears down badly, so let a build already under way
+      // finish first. Init shares in flight rather than queueing, so this cannot deadlock.
+      await this.awaitInitWork()
       await work()
       this.shutdownCompleted = true
       this.setPhase('stopped')
@@ -149,14 +192,15 @@ export class ControllerLifecycle {
   }
 
   /**
-   * Wait for any in-flight restart (or shutdown) to settle before mutating audio lifecycle.
+   * Wait for any in-flight restart, shutdown or initialisation to settle before mutating audio
+   * lifecycle.
    * Errors from the in-flight operation are swallowed here so that the caller can still attempt
    * its own work; the operation that owns the promise is responsible for surfacing its error.
    *
    * Off-queue callers only. See the class comment for why a queued op must not call this.
    */
   public async awaitInFlightWork(): Promise<void> {
-    const pending = this.restartInFlight ?? this.shutdownPromise
+    const pending = this.restartInFlight ?? this.shutdownPromise ?? this.initInFlight
     if (!pending) return
     try {
       await pending

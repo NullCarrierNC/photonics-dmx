@@ -37,11 +37,22 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Typecheck is not bundling, so a rollup or terser failure is invisible until a version tag
+      # asks for an artifact. electron-vite build rather than npm run build, which typechecks again.
+      - name: Bundle
+        run: npx electron-vite build
+
       - name: Explicit any budget
         run: npm run any:budget
 
+      - name: Floating promise budget
+        run: npm run floating:budget
+
       - name: File size budget
         run: npm run size:budget
+
+      - name: Referenced paths are tracked
+        run: npm run paths:check
 
       - name: Security audit
         run: npm audit --audit-level=high
@@ -70,7 +81,7 @@ jobs:
         run: npm ci
 
       - name: Test
-        run: npm run test:coverage
+        run: npm run test:coverage -- --randomize
 
   all-checks-passed:
     name: all checks passed

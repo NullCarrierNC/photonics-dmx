@@ -14,11 +14,7 @@ import {
   DmxRig,
   DmxRigsConfig,
 } from '../../photonics-dmx/types'
-import {
-  migrateDmxRigsConfig,
-  migrateLightingConfiguration,
-  migrateUserLightsSchema,
-} from '../../photonics-dmx/helpers/lightingConfigMigration'
+import { migrateDmxRigsConfig } from '../../photonics-dmx/helpers/lightingConfigMigration'
 import { syncRigsConfigWithUserLights } from '../../photonics-dmx/helpers/rigTemplateSync'
 import equal from 'fast-deep-equal'
 
@@ -28,26 +24,16 @@ import {
   DEFAULT_AUDIO_GAME_MODE,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../photonics-dmx/listeners/Audio'
-import { DEFAULT_PREFERENCES, type AppPreferences } from './configurationDefaults'
+import { type AppPreferences } from './configurationDefaults'
 import { type CueDomain, type CueDomainPrefs, mergePartialCueDomains } from './cueDomainTypes'
-import {
-  applyLegacySenderFlatToNested,
-  hasStraySenderFlatKeys,
-  LEGACY_FLAT_SENDER_PREF_KEYS,
-} from './preferencesMigration'
+import { runStartupMigrations, type UserLightsConfig } from './startupMigrations'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('ConfigurationManager')
 
 export type { AppPreferences } from './configurationDefaults'
 export type { CueDomain, CueDomainPrefs } from './cueDomainTypes'
-
-/**
- * User's lights configuration interface
- */
-export interface UserLightsConfig {
-  lights: DmxFixture[]
-}
+export type { UserLightsConfig } from './startupMigrations'
 
 const DEFAULT_USER_LIGHTS: UserLightsConfig = {
   lights: [],
@@ -77,12 +63,6 @@ export class ConfigurationManager {
   private userLights: ConfigFile<UserLightsConfig>
   private lightingLayout: ConfigFile<LightingConfiguration>
   private dmxRigs: ConfigFile<DmxRigsConfig>
-  /**
-   * Last DmxRigsConfig getDmxRigs() scheduled to persist. Lets a read storm coalesce identical
-   * heal-writes while the async update() is still in flight (the in-memory config is not updated
-   * until save() resolves). Reset to null by other dmxRigs writers so a real change still persists.
-   */
-  private lastScheduledDmxRigsPersist: DmxRigsConfig | null = null
   private configCorruptRecovery: ConfigCorruptInfo[] = []
 
   /** Clears and returns batched config recovery events (for one main → renderer send). */
@@ -115,136 +95,12 @@ export class ConfigurationManager {
       validate: validateDmxRigsData,
     })
 
-    // Handle legacy lights format migration
-    this.migrateLegacyLightsFormat()
-    this.migrateUserLightsFixtureSchema()
-    this.migrateLightingLayoutFixtureSchema()
-    this.normalizeStraySenderFlatKeys()
-    this.migrateToDmxRigs()
-  }
-
-  /**
-   * One-time fixture-shape migrations for the user-defined fixture library (`MyLights`): the
-   * strobe-channel schema (legacy `rgb/s`/`rgbw/s` onto `channels.strobeChannel` + `strobeValues`,
-   * stray `channels.strobeSpeed` renamed) and the RGBW collapse (`rgbw`/`rgbw/mh` onto `rgb`/`rgb/mh`
-   * with the white channel re-expressed as an extra channel).
-   */
-  private migrateUserLightsFixtureSchema(): void {
-    const current = this.userLights.get()
-    if (!current || !Array.isArray(current.lights)) {
-      return
-    }
-    const { lights, changed } = migrateUserLightsSchema(current.lights)
-    if (!changed) {
-      return
-    }
-    this.userLights.applyLoadMigration({ ...current, lights })
-    log.info('[Photonics Config] Migrated user lights to the current fixture schema')
-  }
-
-  /**
-   * Same fixture-shape migrations for the standalone lighting layout. It is still served to the
-   * renderer and seeds the default rig on first run, so it must not keep serving fixture types the
-   * rest of the app no longer knows. The legacy `front-back` rename is deliberately skipped: that
-   * was the rigs' v1 migration, and a layout naming `front-back` today means the current semantic.
-   */
-  private migrateLightingLayoutFixtureSchema(): void {
-    const current = this.lightingLayout.get()
-    if (!current) {
-      return
-    }
-    const { config, changed } = migrateLightingConfiguration(current, { skipLegacyRename: true })
-    if (!changed) {
-      return
-    }
-    this.lightingLayout.applyLoadMigration(config)
-    log.info('[Photonics Config] Migrated lighting layout to the current fixture schema')
-  }
-
-  /**
-   * Migrates legacy lights format (array) to new format ({lights: [...]})
-   */
-  private migrateLegacyLightsFormat(): void {
-    const currentData = this.userLights.get()
-
-    // If already in new format, do nothing
-    if (currentData && Array.isArray(currentData.lights)) {
-      return
-    }
-
-    // If legacy format (just an array), migrate
-    if (Array.isArray(currentData)) {
-      const migratedData: UserLightsConfig = { lights: currentData }
-      this.userLights
-        .update(migratedData)
-        .catch((err) => log.error('[Photonics Config] Failed to persist migrated lights:', err))
-      log.info(`[Photonics Config] Migrated legacy lights format to new format`)
-    }
-  }
-
-  /**
-   * v4+ prefs already nest USB sender config; if `enttecProPort` / `openDmxPort` / `openDmxSpeed`
-   * appear (e.g. manual file edit or pre-v4 stragglers), fold them into `enttecProConfig` and
-   * `openDmxConfig` and persist. Normal migration runs in PreferencesConfigFile v3→v4.
-   */
-  private normalizeStraySenderFlatKeys(): void {
-    const full = { ...this.preferences.get() } as unknown as Record<string, unknown>
-    if (!hasStraySenderFlatKeys(full)) {
-      return
-    }
-
-    const base = { ...this.preferences.get() } as AppPreferences
-    for (const k of LEGACY_FLAT_SENDER_PREF_KEYS) {
-      delete (base as unknown as Record<string, unknown>)[k]
-    }
-    const next = applyLegacySenderFlatToNested(full, base)
-    this.preferences
-      .update(next)
-      .catch((err) => log.error('[Photonics Config] Failed to persist sender key cleanup:', err))
-  }
-
-  /**
-   * Migrates existing lighting layout to a default DMX rig
-   */
-  private migrateToDmxRigs(): void {
-    const currentRigs = this.dmxRigs.get()
-    const rigs = Array.isArray(currentRigs?.rigs) ? currentRigs.rigs : []
-
-    // If rigs already exist, no migration needed
-    if (rigs.length > 0) {
-      return
-    }
-
-    // Check if we have an existing layout to migrate
-    const existingLayout = this.lightingLayout.get() ?? ({} as LightingConfiguration)
-    const safeLayout: LightingConfiguration = {
-      numLights: existingLayout.numLights ?? 0,
-      lightLayout: existingLayout.lightLayout ?? { id: 'default-layout', label: 'Default Layout' },
-      strobeType: existingLayout.strobeType ?? ConfigStrobeType.None,
-      frontLights: Array.isArray(existingLayout.frontLights) ? existingLayout.frontLights : [],
-      backLights: Array.isArray(existingLayout.backLights) ? existingLayout.backLights : [],
-      strobeLights: Array.isArray(existingLayout.strobeLights) ? existingLayout.strobeLights : [],
-    }
-
-    // Only migrate if layout has actual lights configured
-    if (
-      safeLayout.numLights > 0 ||
-      safeLayout.frontLights.length > 0 ||
-      safeLayout.backLights.length > 0 ||
-      safeLayout.strobeLights.length > 0
-    ) {
-      const defaultRig: DmxRig = {
-        id: crypto.randomUUID(),
-        name: 'Default Rig',
-        active: true,
-        config: safeLayout,
-      }
-
-      this.dmxRigs
-        .update({ ...currentRigs, rigs: [defaultRig] })
-        .catch((err) => log.error('[Photonics Config] Failed to persist migrated DMX rigs:', err))
-      log.info('[Photonics Config] Migrated existing layout to default DMX rig')
-    }
+    runStartupMigrations({
+      preferences: this.preferences,
+      userLights: this.userLights,
+      lightingLayout: this.lightingLayout,
+      dmxRigs: this.dmxRigs,
+    })
   }
 
   // Preferences Methods
@@ -263,8 +119,7 @@ export class ConfigurationManager {
     key: K,
     value: AppPreferences[K],
   ): Promise<void> {
-    const current = this.preferences.get()
-    await this.preferences.update({ ...current, [key]: value })
+    await this.preferences.mutate((current) => ({ ...current, [key]: value }))
   }
 
   /**
@@ -278,25 +133,19 @@ export class ConfigurationManager {
    * Updates multiple preferences at once
    */
   async updatePreferences(updates: Partial<AppPreferences>): Promise<void> {
-    const currentPrefs = this.preferences.get()
-    let newPrefs: AppPreferences = { ...currentPrefs, ...updates }
-    if (updates.cueDomains) {
-      newPrefs = {
-        ...newPrefs,
-        cueDomains: mergePartialCueDomains(
-          currentPrefs.cueDomains,
-          updates.cueDomains as Partial<Record<CueDomain, Partial<CueDomainPrefs>>>,
-        ),
+    await this.preferences.mutate((currentPrefs) => {
+      let newPrefs: AppPreferences = { ...currentPrefs, ...updates }
+      if (updates.cueDomains) {
+        newPrefs = {
+          ...newPrefs,
+          cueDomains: mergePartialCueDomains(
+            currentPrefs.cueDomains,
+            updates.cueDomains as Partial<Record<CueDomain, Partial<CueDomainPrefs>>>,
+          ),
+        }
       }
-    }
-    await this.preferences.update(newPrefs)
-  }
-
-  /**
-   * Resets preferences to default values
-   */
-  async resetPreferencesToDefaults(): Promise<void> {
-    await this.preferences.update(DEFAULT_PREFERENCES)
+      return newPrefs
+    })
   }
 
   /**
@@ -304,13 +153,14 @@ export class ConfigurationManager {
    * `disabledCues` is present, it replaces the stored per-group map for that domain (important for IPC).
    */
   async updateCueDomain(domain: CueDomain, patch: Partial<CueDomainPrefs>): Promise<void> {
-    const current = this.preferences.get()
-    const base = current.cueDomains[domain]
-    const next: CueDomainPrefs = { ...base, ...patch }
-    if (Object.prototype.hasOwnProperty.call(patch, 'disabledCues') && patch.disabledCues) {
-      next.disabledCues = { ...patch.disabledCues }
-    }
-    await this.setPreference('cueDomains', { ...current.cueDomains, [domain]: next })
+    await this.preferences.mutate((current) => {
+      const base = current.cueDomains[domain]
+      const next: CueDomainPrefs = { ...base, ...patch }
+      if (Object.prototype.hasOwnProperty.call(patch, 'disabledCues') && patch.disabledCues) {
+        next.disabledCues = { ...patch.disabledCues }
+      }
+      return { ...current, cueDomains: { ...current.cueDomains, [domain]: next } }
+    })
   }
 
   /**
@@ -334,20 +184,33 @@ export class ConfigurationManager {
       : 'withinSong'
   }
 
-  getMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
-    const m = this.preferences.get().cueDomains.yargMotion.selectionMode
+  /**
+   * The motion selection mode stored for one domain, held to the three a motion domain can take.
+   *
+   * The schema allows a fourth mode that only means something for lighting, so a stored value has
+   * to be narrowed here rather than read straight through, or it reaches the renderer outside the
+   * union its channel declares.
+   */
+  private motionSelectionModeFor(
+    domain: 'yargMotion' | 'audioMotion' | 'rb3Motion',
+  ): 'oncePerSong' | 'perCueChange' | 'none' {
+    const m = this.preferences.get().cueDomains?.[domain]?.selectionMode
     if (m === 'oncePerSong' || m === 'perCueChange' || m === 'none') {
       return m
     }
     return 'perCueChange'
   }
 
+  getMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
+    return this.motionSelectionModeFor('yargMotion')
+  }
+
+  getRb3MotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
+    return this.motionSelectionModeFor('rb3Motion')
+  }
+
   getAudioMotionGroupSelectionMode(): 'oncePerSong' | 'perCueChange' | 'none' {
-    const m = this.preferences.get().cueDomains.audioMotion.selectionMode
-    if (m === 'oncePerSong' || m === 'perCueChange' || m === 'none') {
-      return m
-    }
-    return 'perCueChange'
+    return this.motionSelectionModeFor('audioMotion')
   }
 
   /**
@@ -355,12 +218,16 @@ export class ConfigurationManager {
    */
   async setMotionCueMinimumHoldMs(ms: number): Promise<void> {
     const clamped = Math.max(0, Math.min(600000, Math.round(ms)))
-    const c = this.preferences.get()
-    await this.setPreference('cueDomains', {
-      ...c.cueDomains,
-      yargMotion: { ...c.cueDomains.yargMotion, minimumHoldMs: clamped },
-      audioMotion: { ...c.cueDomains.audioMotion, minimumHoldMs: clamped },
-    })
+    // Read and write in the one turn, so a write that lands in between is not overwritten with the
+    // whole cueDomains object as it was before that write.
+    await this.preferences.mutate((current) => ({
+      ...current,
+      cueDomains: {
+        ...current.cueDomains,
+        yargMotion: { ...current.cueDomains.yargMotion, minimumHoldMs: clamped },
+        audioMotion: { ...current.cueDomains.audioMotion, minimumHoldMs: clamped },
+      },
+    }))
   }
 
   /**
@@ -450,8 +317,7 @@ export class ConfigurationManager {
     key: K,
     value: LightingConfiguration[K],
   ): Promise<void> {
-    const current = this.lightingLayout.get()
-    await this.lightingLayout.update({ ...current, [key]: value })
+    await this.lightingLayout.mutate((current) => ({ ...current, [key]: value }))
   }
 
   /**
@@ -488,13 +354,11 @@ export class ConfigurationManager {
    * Note: The 'enabled' field is never persisted (runtime-only state)
    */
   async updateAudioConfig(updates: Partial<AppPreferences['audioConfig']>): Promise<void> {
-    const current = this.getPreference('audioConfig') || {}
-    const updated = { ...current, ...updates }
-
-    const { enabled: _enabled, ...configToSave } = updated
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stripped audio config shape
-    await this.setPreference('audioConfig', configToSave as any)
+    await this.preferences.mutate((current) => {
+      const { enabled: _enabled, ...configToSave } = { ...(current.audioConfig ?? {}), ...updates }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stripped audio config shape
+      return { ...current, audioConfig: configToSave as any }
+    })
   }
 
   /**
@@ -510,8 +374,11 @@ export class ConfigurationManager {
   }
 
   async updateAudioGameModeConfig(updates: Partial<AudioGameModeConfig>): Promise<void> {
-    const merged = { ...this.getAudioGameModeConfig(), ...updates }
-    await this.setPreference('audioGameMode', merged)
+    await this.preferences.mutate((current) => {
+      const stored = current.audioGameMode
+      const base = stored ? { ...DEFAULT_AUDIO_GAME_MODE, ...stored } : DEFAULT_AUDIO_GAME_MODE
+      return { ...current, audioGameMode: { ...base, ...updates } }
+    })
   }
 
   // DMX Rigs Methods
@@ -531,22 +398,21 @@ export class ConfigurationManager {
       this.getUserLights(),
     )
     if (migrationChanged || syncChanged) {
-      // Coalesce identical heal-writes during a read storm. getActiveRigs/getDmxRig call this in
-      // bursts, and the in-memory config is not updated until the async update() resolves, so each
-      // call would otherwise re-detect the same change and schedule another identical write. Skip
-      // when an equal payload is already scheduled; other dmxRigs writers reset the memo so a real
-      // change still persists.
-      if (
-        this.lastScheduledDmxRigsPersist === null ||
-        !equal(this.lastScheduledDmxRigsPersist, synced)
-      ) {
-        this.lastScheduledDmxRigsPersist = synced
-        void this.dmxRigs
-          .update(synced)
-          .catch((err) =>
-            log.error('[Photonics Config] Failed to persist migrated/synced DMX rigs:', err),
-          )
-      }
+      // The heal is queued as a turn rather than written directly. Reads come in bursts, so several
+      // callers detect the same repair, and a turn both orders them behind any user edit in flight
+      // and re-derives the repair from the freshest data. A repair that is already applied by the
+      // time its turn runs returns the input unchanged and writes nothing.
+      void this.dmxRigs
+        .mutate((latest) => {
+          const healed = syncRigsConfigWithUserLights(
+            migrateDmxRigsConfig(latest).config,
+            this.getUserLights(),
+          ).config
+          return equal(healed, latest) ? latest : healed
+        })
+        .catch((err) =>
+          log.error('[Photonics Config] Failed to persist migrated/synced DMX rigs:', err),
+        )
     }
     return synced.rigs
   }
@@ -557,13 +423,13 @@ export class ConfigurationManager {
    * edits propagate to rig snapshots without waiting for the next process restart.
    */
   async syncRigsWithUserLights(): Promise<boolean> {
-    const current = this.dmxRigs.get()
-    const { config: synced, changed } = syncRigsConfigWithUserLights(current, this.getUserLights())
+    const { changed } = syncRigsConfigWithUserLights(this.dmxRigs.get(), this.getUserLights())
     if (!changed) {
       return false
     }
-    this.lastScheduledDmxRigsPersist = null
-    await this.dmxRigs.update(synced)
+    await this.dmxRigs.mutate(
+      (latest) => syncRigsConfigWithUserLights(latest, this.getUserLights()).config,
+    )
     return true
   }
 
@@ -585,31 +451,31 @@ export class ConfigurationManager {
    *   edit never changes which rigs are active as a side effect.
    */
   async saveDmxRig(rig: DmxRig, opts: { deactivateOthers?: boolean } = {}): Promise<void> {
-    const current = this.dmxRigs.get()
     const exclusive = opts.deactivateOthers === true && rig.active === true
-    const rigs = current.rigs.map((r) =>
-      exclusive && r.id !== rig.id && r.active ? { ...r, active: false } : r,
-    )
-    const existingIndex = rigs.findIndex((r) => r.id === rig.id)
+    await this.dmxRigs.mutate((current) => {
+      const rigs = current.rigs.map((r) =>
+        exclusive && r.id !== rig.id && r.active ? { ...r, active: false } : r,
+      )
+      const existingIndex = rigs.findIndex((r) => r.id === rig.id)
 
-    if (existingIndex >= 0) {
-      rigs[existingIndex] = rig
-    } else {
-      rigs.push(rig)
-    }
+      if (existingIndex >= 0) {
+        rigs[existingIndex] = rig
+      } else {
+        rigs.push(rig)
+      }
 
-    this.lastScheduledDmxRigsPersist = null
-    await this.dmxRigs.update({ ...current, rigs })
+      return { ...current, rigs }
+    })
   }
 
   /**
    * Deletes a DMX rig by ID
    */
   async deleteDmxRig(id: string): Promise<void> {
-    const current = this.dmxRigs.get()
-    const rigs = current.rigs.filter((rig) => rig.id !== id)
-    this.lastScheduledDmxRigsPersist = null
-    await this.dmxRigs.update({ ...current, rigs })
+    await this.dmxRigs.mutate((current) => ({
+      ...current,
+      rigs: current.rigs.filter((rig) => rig.id !== id),
+    }))
   }
 
   /**

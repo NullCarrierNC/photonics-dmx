@@ -1,7 +1,7 @@
 /**
  * Tests for GraphExecutionEngine (cue-graph policy). Key scenarios ported from
  * NodeExecutionEngine.test.ts to assert identical sequencer behaviour.
- * Includes regression coverage for sustained strobe/Frenzy (repeated same-cue).
+ * Covers sustained strobe/Frenzy (repeated same-cue).
  */
 
 import { beforeEach, describe, expect, it } from '@jest/globals'
@@ -25,6 +25,7 @@ import type { ILightingController } from '../../../controllers/sequencer/interfa
 import type { CueData } from '../../../cues/types/cueTypes'
 import type { NodeRuntimeCallbacks } from '../../../cues/node/runtime/executionTypes'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { fakeLightingController } from '../../helpers/fakeLightingController'
 
 const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
 
@@ -203,31 +204,30 @@ describe('GraphExecutionEngine', () => {
 
   beforeEach(() => {
     lightManager = new DmxLightManager(createMockLightingConfig())
-    sequencer = {
-      addEffect: jest.fn(),
-      setEffect: jest.fn(),
-      removeEffect: jest.fn(),
-      addEffectWithCallback: jest.fn((_name: string, _e: unknown, cb: () => void) => {
-        if (cb) setTimeout(cb, 0)
-      }),
-      setEffectWithCallback: jest.fn((_name: string, _e: unknown, cb: () => void) => {
-        if (cb) setTimeout(cb, 0)
-      }),
-      addEffectUnblockedNameWithCallback: jest.fn((_name: string, _e: unknown, cb: () => void) => {
-        if (cb) setTimeout(cb, 0)
-      }),
-      setEffectUnblockedNameWithCallback: jest.fn((_name: string, _e: unknown, cb: () => void) => {
-        if (cb) setTimeout(cb, 0)
-      }),
-      removeEffectCallback: jest.fn(),
-      blackout: jest.fn().mockResolvedValue(undefined),
-      onBeat: jest.fn(),
-      onMeasure: jest.fn(),
-      onKeyframe: jest.fn(),
-      addEffectUnblockedName: jest.fn().mockReturnValue(true),
-      setEffectUnblockedName: jest.fn().mockReturnValue(true),
-      removeEffectByLayer: jest.fn(),
-    } as unknown as ILightingController
+    sequencer = fakeLightingController({
+      addEffectWithCallback: (_name: string, _e: unknown, cb: (cancelled: boolean) => void) => {
+        if (cb) setTimeout(() => cb(false), 0)
+      },
+      setEffectWithCallback: (_name: string, _e: unknown, cb: (cancelled: boolean) => void) => {
+        if (cb) setTimeout(() => cb(false), 0)
+      },
+      addEffectUnblockedNameWithCallback: (
+        _name: string,
+        _e: unknown,
+        cb: (cancelled: boolean) => void,
+      ) => {
+        if (cb) setTimeout(() => cb(false), 0)
+        return true
+      },
+      setEffectUnblockedNameWithCallback: (
+        _name: string,
+        _e: unknown,
+        cb: (cancelled: boolean) => void,
+      ) => {
+        if (cb) setTimeout(() => cb(false), 0)
+        return true
+      },
+    })
     session = new CueSession()
     const def = minimalCueDefinition()
     session.initializeVariables(def.variables ?? [], [])

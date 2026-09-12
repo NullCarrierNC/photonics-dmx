@@ -2,7 +2,7 @@
 import { describe, expect, it, jest } from '@jest/globals'
 import { render, screen } from '@testing-library/react'
 import LogicNodeEditor from './LogicNodeEditor'
-import { LOGIC_NODE_FACTORIES } from '../../hooks/useNodeCreation'
+import { LOGIC_NODE_FACTORIES } from '../../lib/logicNodeFactories'
 import { NODE_LOGIC_TYPES } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 
 describe('LogicNodeEditor dispatch', () => {

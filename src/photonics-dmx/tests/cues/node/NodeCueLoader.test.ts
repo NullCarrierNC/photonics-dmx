@@ -4,7 +4,7 @@
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { NodeCueLoader } from '../../../cues/node/loader/NodeCueLoader'
 import { CueRegistry } from '../../../cues/registries/CueRegistry'
 import { AudioCueRegistry } from '../../../cues/registries/AudioCueRegistry'
@@ -26,6 +26,21 @@ import type {
 } from '../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../cues/types/cueTypes'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+
+/** Set by a test to hand the loader its directory listing back to front. */
+let mockReverseReaddir = false
+
+jest.mock('fs/promises', () => {
+  const actual = jest.requireActual<typeof import('fs/promises')>('fs/promises')
+  const readdir = actual.readdir as unknown as (...args: unknown[]) => Promise<unknown[]>
+  return {
+    ...actual,
+    readdir: async (...args: unknown[]) => {
+      const entries = await readdir(...args)
+      return mockReverseReaddir ? [...entries].reverse() : entries
+    },
+  }
+})
 
 /** A minimal RB3 lighting cue file (YARG-shaped, mode 'rb3') keyed to a real CueType. */
 function rb3LightingFile(
@@ -179,6 +194,7 @@ describe('NodeCueLoader', () => {
   })
 
   afterEach(() => {
+    mockReverseReaddir = false
     yargRegistry.reset()
     audioRegistry.reset()
     getCueRegistry('rb3').reset()
@@ -202,6 +218,37 @@ describe('NodeCueLoader', () => {
     expect(group!.motionCues?.get('m1')).toBeDefined()
 
     expect(loader.getAvailableCueTypes('yarg', 'motion')).toEqual([])
+  })
+
+  it('registers groups in name order, whatever order the directory lists them in', async () => {
+    const audioDir = path.join(tmpDir, 'node-data', 'cues', 'audio')
+    fs.mkdirSync(audioDir, { recursive: true })
+    const first = audioMotionOnlyFile()
+    first.group = { ...first.group, id: 'group-a', name: 'Group A' }
+    const second = audioMotionOnlyFile()
+    second.group = { ...second.group, id: 'group-b', name: 'Group B' }
+    fs.writeFileSync(path.join(audioDir, 'a-first.json'), JSON.stringify(first), 'utf-8')
+    fs.writeFileSync(path.join(audioDir, 'b-second.json'), JSON.stringify(second), 'utf-8')
+    mockReverseReaddir = true
+
+    await loader.loadAll()
+
+    expect(audioRegistry.getAllGroups()).toEqual(['group-a', 'group-b'])
+  })
+
+  it("honours an audio file's default flag over the first group", async () => {
+    const audioDir = path.join(tmpDir, 'node-data', 'cues', 'audio')
+    fs.mkdirSync(audioDir, { recursive: true })
+    const plain = audioMotionOnlyFile()
+    plain.group = { ...plain.group, id: 'group-a', name: 'Group A' }
+    const flagged = audioMotionOnlyFile()
+    flagged.group = { ...flagged.group, id: 'group-b', name: 'Group B', isDefault: true }
+    fs.writeFileSync(path.join(audioDir, 'a-plain.json'), JSON.stringify(plain), 'utf-8')
+    fs.writeFileSync(path.join(audioDir, 'b-flagged.json'), JSON.stringify(flagged), 'utf-8')
+
+    await loader.loadAll()
+
+    expect(audioRegistry.getDefaultMotionGroupId()).toBe('group-b')
   })
 
   it('routes a motion-only default claim to the motion default group', async () => {
@@ -372,6 +419,22 @@ describe('NodeCueLoader', () => {
     const group = audioRegistry.getGroup('loader-test-audio-cue-called')
     expect(group).toBeDefined()
     expect(group!.motionCues?.get('am-cue-called')).toBeDefined()
+  })
+
+  it('leaves an audio group turned off when its file is loaded again', async () => {
+    const file = audioMotionOnlyFile()
+    const audioDir = path.join(tmpDir, 'node-data', 'cues', 'audio')
+    fs.mkdirSync(audioDir, { recursive: true })
+    const filePath = path.join(audioDir, 'audio-motion-only.json')
+    fs.writeFileSync(filePath, JSON.stringify(file), 'utf-8')
+
+    await loader.loadAll()
+    expect(audioRegistry.getEnabledGroups()).toContain('loader-test-audio-motion')
+
+    audioRegistry.disableGroup('loader-test-audio-motion')
+    await loader.loadAll()
+
+    expect(audioRegistry.getEnabledGroups()).not.toContain('loader-test-audio-motion')
   })
 
   describe('cue file path resolution', () => {

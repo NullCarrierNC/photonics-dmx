@@ -3,16 +3,20 @@ productName: Photonics
 asar: true
 directories:
   buildResources: build
+# Everything the app loads at runtime resolves under out/, which the build writes. package.json is
+# what Electron reads for main, and the licence files travel with the app for GPL compliance.
+# Production node_modules are collected separately by electron-builder and must not be named here.
+# This list is what ships, so a working copy holding anything else packs the same app either way.
 files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintignore,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
-  - '!**/*.map'
-  - '!dist/**/*.map'
-  - '!node_modules/electron-debug'
+  - 'out/**'
+  - '!out/**/*.map'
+  # TypeScript build state, if an editor or a stray tsc run leaves any under out/. The project
+  # source paths it lists have no business in a shipped app.
+  - '!out/types/**'
+  - '!out/**/*.tsbuildinfo'
+  - 'package.json'
+  - 'LICENSE'
+  - 'THIRD-PARTY-LICENSES.md'
 asarUnpack:
   - '**/*.node'
   - '**/node_modules/@serialport'

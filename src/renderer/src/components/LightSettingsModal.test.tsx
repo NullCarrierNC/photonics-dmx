@@ -5,6 +5,7 @@
  * the page decides whether it needs confirming.
  */
 import { describe, expect, it, jest, afterEach } from '@jest/globals'
+import '@testing-library/jest-dom/jest-globals'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { FixtureTypes, type DmxFixture } from '../../../photonics-dmx/types'
 import LightSettingsModal from './LightSettingsModal'
@@ -52,12 +53,12 @@ describe('LightSettingsModal', () => {
 
   it('titles by the light being edited', () => {
     renderModal({ onDelete: noop })
-    expect(screen.getByText('Edit Front PAR')).toBeTruthy()
+    expect(screen.getByText('Edit Front PAR')).toBeInTheDocument()
   })
 
   it('titles as an add when the light cannot be deleted yet', () => {
     renderModal({ light: fixture({ id: null }) })
-    expect(screen.getByText('Add Light')).toBeTruthy()
+    expect(screen.getByText('Add Light')).toBeInTheDocument()
   })
 
   it('reports a cancel from the Cancel button, the backdrop and Escape alike', () => {

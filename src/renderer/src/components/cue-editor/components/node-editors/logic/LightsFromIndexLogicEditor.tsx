@@ -2,6 +2,7 @@ import React from 'react'
 import type { LightsFromIndexLogicNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
+import VariableSelect from './VariableSelect'
 
 export interface LightsFromIndexLogicEditorProps extends LogicEditorCommonProps {
   node: LightsFromIndexLogicNode
@@ -16,20 +17,13 @@ const LightsFromIndexLogicEditor: React.FC<LightsFromIndexLogicEditorProps> = ({
 
   return (
     <div className="space-y-2 text-xs">
-      <label className="flex flex-col font-medium">
-        Source Variable (light-array)
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.sourceVariable}
-          onChange={(event) => updateNode({ sourceVariable: event.target.value })}>
-          <option value="">-- Select light-array --</option>
-          {lightArrayVars.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
+      <VariableSelect
+        label="Source Variable (light-array)"
+        value={node.sourceVariable}
+        onChange={(name) => updateNode({ sourceVariable: name })}
+        variables={lightArrayVars}
+        placeholder="-- Select light-array --"
+      />
 
       <div className="space-y-1">
         <ValueSourceEditor
@@ -48,20 +42,12 @@ const LightsFromIndexLogicEditor: React.FC<LightsFromIndexLogicEditorProps> = ({
           )}
       </div>
 
-      <label className="flex flex-col font-medium">
-        Assign To
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.assignTo}
-          onChange={(event) => updateNode({ assignTo: event.target.value })}>
-          <option value="">-- Select variable --</option>
-          {lightArrayVars.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
+      <VariableSelect
+        label="Assign To"
+        value={node.assignTo}
+        onChange={(name) => updateNode({ assignTo: name })}
+        variables={lightArrayVars}
+      />
 
       <p className="text-[10px] text-gray-500 italic">
         Extracts lights from source array at specified indices. Supports single int, comma-separated

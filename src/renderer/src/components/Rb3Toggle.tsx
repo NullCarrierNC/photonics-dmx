@@ -1,5 +1,5 @@
 import { useAtom } from 'jotai'
-import { useEffect } from 'react'
+import { useEffect, useId } from 'react'
 import {
   rb3eListenerEnabledAtom,
   yargListenerEnabledAtom,
@@ -19,6 +19,7 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
   const [isRb3Enabled, setIsRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
   const [isYargEnabled] = useAtom(yargListenerEnabledAtom)
   const [isAudioEnabled, setIsAudioEnabled] = useAtom(audioListenerEnabledAtom)
+  const labelId = useId()
 
   useEffect(() => {
     // Initialize toggle state from system status
@@ -72,6 +73,7 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
   return (
     <div className="flex items-center mb-4  w-[190px] justify-between">
       <label
+        id={labelId}
         className={`mr-4 text-lg font-semibold ${
           isYargEnabled || isAudioEnabled || disabled
             ? 'text-gray-500'
@@ -80,6 +82,9 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
         Enable RB3E
       </label>
       <button
+        role="switch"
+        aria-checked={isRb3Enabled}
+        aria-labelledby={labelId}
         onClick={handleToggle}
         disabled={isYargEnabled || isAudioEnabled || disabled}
         className={`w-12 h-6 rounded-full ${

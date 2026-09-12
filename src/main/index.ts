@@ -1,16 +1,34 @@
 import * as path from 'path'
 import { app, BrowserWindow, dialog } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
-import { installDefaultSessionContentSecurityPolicy } from './rendererSessionSecurity'
+import {
+  installDefaultSessionContentSecurityPolicy,
+  installDefaultSessionPermissionHandlers,
+} from './rendererSessionSecurity'
 import { Application } from './application'
 import { createFileLogSink } from './logging/fileLogSink'
-import { consoleLogSink, createLogger, setLogSink, setMinLogLevel } from '../shared/logger'
+import {
+  consoleLogSink,
+  createLogger,
+  setLogSink,
+  setMinLogLevel,
+  setScopeMinLogLevel,
+} from '../shared/logger'
 
 const log = createLogger('Main')
 
 if (!app.isPackaged) {
   app.commandLine.appendSwitch('disable-http-cache')
 }
+
+/**
+ * Scopes kept at `info` when a packaged build raises the floor to `error`.
+ *
+ * These record what became of the user's own files: which one was loaded, what a migration
+ * rewrote, and what a recovery replaced. The failure itself logs at `error`, and these are the
+ * lines that say what took its place. A handful a launch, none of them on a frame path.
+ */
+const STARTUP_ACCOUNT_SCOPES = ['ConfigFile', 'ConfigurationManager', 'copyDefaultData']
 
 let closeFileLog: (() => Promise<void>) | null = null
 
@@ -23,8 +41,18 @@ function closeFileLogWithTimeout(): Promise<void> {
   return Promise.race([c(), new Promise<void>((resolve) => setTimeout(resolve, 500))])
 }
 
-// Global reference to application for error handling
+// Global reference to application for error handling. Null until `whenReady` builds it.
 let applicationInstance: Application | null = null
+
+/** Tell the user why there is no window, then stop. */
+function reportStartupFailure(err: unknown): void {
+  log.error('Failed to initialize application:', err)
+  dialog.showErrorBox(
+    'Photonics could not start',
+    `${err instanceof Error ? err.message : String(err)}\n\nLogs: ${path.join(app.getPath('appData'), 'Photonics.rocks', 'logs')}`,
+  )
+  app.exit(1)
+}
 
 // Global error handling: delegate network sender errors to ControllerManager for unified handling
 process.on('uncaughtException', (error: unknown) => {
@@ -40,10 +68,6 @@ process.on('unhandledRejection', (reason, _promise) => {
   log.error('Unhandled promise rejection:', reason)
 })
 
-// Create application instance
-const application = new Application()
-applicationInstance = application // Store reference for error handling
-
 // Handle clean shutdown on process signals
 process.on('SIGINT', async () => {
   log.info('Received SIGINT signal, shutting down gracefully...')
@@ -51,11 +75,13 @@ process.on('SIGINT', async () => {
   // Set a hard timeout to force exit after 2 seconds
   const forceExitTimeout = setTimeout(() => {
     log.error('Forced exit due to shutdown timeout!')
-    process.exit(1)
+    // The line explaining the forced exit is the one worth having, and it is still buffered in the
+    // stream at this point, so give the flush its chance before going.
+    void closeFileLogWithTimeout().finally(() => process.exit(1))
   }, 2000)
 
   try {
-    await application.shutdown()
+    await applicationInstance?.shutdown()
     await closeFileLogWithTimeout()
     clearTimeout(forceExitTimeout)
     app.quit()
@@ -75,11 +101,13 @@ process.on('SIGTERM', async () => {
   // Set a hard timeout to force exit after 2 seconds
   const forceExitTimeout = setTimeout(() => {
     log.error('Forced exit due to shutdown timeout!')
-    process.exit(1)
+    // The line explaining the forced exit is the one worth having, and it is still buffered in the
+    // stream at this point, so give the flush its chance before going.
+    void closeFileLogWithTimeout().finally(() => process.exit(1))
   }, 2000)
 
   try {
-    await application.shutdown()
+    await applicationInstance?.shutdown()
     await closeFileLogWithTimeout()
     clearTimeout(forceExitTimeout)
     app.quit()
@@ -92,21 +120,42 @@ process.on('SIGTERM', async () => {
   }
 })
 
-// Handle app lifecycle events
-app.whenReady().then(() => {
+/**
+ * Start writing to the daily log file, or carry on without it.
+ *
+ * The sink creates its directory up front, which fails on an unwritable appData or where something
+ * else already occupies the path. Losing the log file costs us diagnostics. Letting the throw out
+ * would cost the window, the error dialog and any way to quit, since everything that builds those
+ * runs later in the same callback.
+ */
+function startFileLogging(logsDir: string): void {
+  try {
+    const { sink: fileSink, close: fileLogClose } = createFileLogSink({ logsDir })
+    closeFileLog = fileLogClose
+    setLogSink((entry) => {
+      consoleLogSink(entry)
+      fileSink(entry)
+    })
+  } catch (err) {
+    log.error(`Cannot write logs to ${logsDir}, continuing without a log file:`, err)
+  }
+}
+
+/** Everything that builds the window, the IPC surface and the error dialog. */
+function onReady(): void {
   const logsDir = path.join(app.getPath('appData'), 'Photonics.rocks', 'logs')
-  const { sink: fileSink, close: fileLogClose } = createFileLogSink({ logsDir })
-  closeFileLog = fileLogClose
-  setLogSink((entry) => {
-    consoleLogSink(entry)
-    fileSink(entry)
-  })
+  startFileLogging(logsDir)
+  // Named while the floor is still info, so the log file records where it is.
+  log.info(`Writing logs to ${logsDir}`)
   if (!process.env.PHOTONICS_LOG_LEVEL && app.isPackaged) {
     setMinLogLevel('error')
+    for (const scope of STARTUP_ACCOUNT_SCOPES) {
+      setScopeMinLogLevel(scope, 'info')
+    }
   }
-  log.info(`Writing logs to ${logsDir}`)
 
   installDefaultSessionContentSecurityPolicy()
+  installDefaultSessionPermissionHandlers()
 
   // Set up the app
   electronApp.setAppUserModelId('rocks.photonics')
@@ -114,33 +163,56 @@ app.whenReady().then(() => {
   // Set app name
   app.name = 'Photonics'
 
+  // Built here rather than at module scope: the constructor reads configuration off disk and
+  // throws when that directory cannot be created, and a throw during module evaluation would
+  // skip the signal handlers, the window and this error path, leaving a process with no interface
+  // and no way to quit it.
+  try {
+    applicationInstance = new Application()
+    applicationInstance.flushLogs = closeFileLogWithTimeout
+  } catch (err) {
+    reportStartupFailure(err)
+    return
+  }
+
   // Initialize application. A controller failure resolves and leaves the window reporting the
   // failed phase, so a rejection here means the window or IPC could not be set up and there is
   // nothing left to report through. Say so and stop rather than idling with no interface.
-  application.init().catch((err) => {
-    log.error('Failed to initialize application:', err)
-    dialog.showErrorBox(
-      'Photonics could not start',
-      `${err instanceof Error ? err.message : String(err)}\n\nLogs: ${path.join(app.getPath('appData'), 'Photonics.rocks', 'logs')}`,
-    )
-    app.exit(1)
-  })
+  applicationInstance.init().catch(reportStartupFailure)
 
   // Default session handlers
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
-})
+}
+
+/**
+ * A second copy would share the configuration files with this one, bind the same UDP ports and
+ * write the same daily log against a byte counter neither knows about. The second launch hands the
+ * user back to this window instead.
+ */
+if (!app.requestSingleInstanceLock()) {
+  // Nothing is built yet, so there is nothing to shut down on the way out.
+  app.exit(0)
+} else {
+  app.on('second-instance', () => {
+    applicationInstance?.handleSecondInstance()
+  })
+
+  // Anything in onReady throwing would abort startup with no window and no way to quit, so report
+  // it the same way a failed Application build is reported.
+  app.whenReady().then(onReady).catch(reportStartupFailure)
+}
 
 // Handle window-all-closed event
 app.on('window-all-closed', () => {
-  application.handleAllWindowsClosed()
+  applicationInstance?.handleAllWindowsClosed()
 })
 
 // Handle activate event (macOS)
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    application.handleActivate()
+    applicationInstance?.handleActivate()
   }
 })
 
@@ -152,7 +224,7 @@ app.on('before-quit', async (event) => {
   // Perform our graceful shutdown
   log.info('Application is shutting down, cleaning up resources...')
   try {
-    await application.shutdown()
+    await applicationInstance?.shutdown()
     // Log the outcome BEFORE closing the file log, so both the success and failure messages are
     // actually written rather than logged into an already-closed sink.
     log.info('Graceful shutdown completed.')

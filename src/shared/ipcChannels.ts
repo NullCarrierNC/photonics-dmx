@@ -75,7 +75,6 @@ export const CUE = {
 export const LIGHT = {
   SENDER_ENABLE: 'sender-enable',
   SENDER_DISABLE: 'sender-disable',
-  SENDER_DISABLE_ALL: 'sender-disable-all',
   GET_SYSTEM_STATUS: 'get-system-status',
   GET_CUE_GROUPS: 'get-cue-groups',
   ENABLE_CUE_GROUP: 'enable-cue-group',
@@ -227,8 +226,6 @@ export const CHANNELS = {
   ...CONFIG,
 } as const
 
-export type ChannelName = (typeof CHANNELS)[keyof typeof CHANNELS]
-
 /** Every invokable channel group. Kept next to CHANNELS so a new group is added to both. */
 const INVOKE_CHANNEL_GROUPS = [
   NODE_CUES,
@@ -304,8 +301,6 @@ export const RENDERER_RECEIVE = {
   /** Controller-manager lifecycle phase changed (every transition between phases). */
   LIFECYCLE_PHASE_CHANGED: 'lifecycle:phase-changed',
 } as const
-
-export type RendererReceiveChannel = (typeof RENDERER_RECEIVE)[keyof typeof RENDERER_RECEIVE]
 
 /** Renderer -> main (main process listens). Use when main calls ipcMain.on(). */
 export const RENDERER_SEND = {

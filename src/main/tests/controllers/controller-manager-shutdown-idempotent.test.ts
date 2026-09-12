@@ -118,6 +118,30 @@ describe('ControllerManager.shutdown idempotency', () => {
     expect(manager.getLifecyclePhase()).toBe('stopped')
   })
 
+  it('darkens the rig before the listener teardown that might hang', async () => {
+    // Application.shutdown arms a hard exit over the whole sequence, and the listener disables are
+    // network and audio work. The publisher marks itself shut down before it blacks out, so
+    // running it first is what keeps a slow teardown from leaving the rig lit.
+    const order: string[] = []
+    const track = (name: string): jest.Mock =>
+      (jest.fn() as jest.Mock).mockImplementation(() => {
+        order.push(name)
+        return Promise.resolve()
+      })
+    const { manager } = makeManager({
+      publisherShutdown: track('publisher'),
+      disableYarg: track('yarg'),
+      disableRb3: track('rb3'),
+      disableAudio: track('audio'),
+      senderShutdown: track('senders'),
+    })
+
+    await manager.shutdown()
+
+    expect(order[0]).toBe('publisher')
+    expect(order).toEqual(['publisher', 'yarg', 'rb3', 'audio', 'senders'])
+  })
+
   it('a rejected teardown stays retryable, and a retry that succeeds completes the shutdown', async () => {
     const disposeChains = jest
       .fn()

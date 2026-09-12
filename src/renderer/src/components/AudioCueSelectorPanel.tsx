@@ -14,17 +14,12 @@ import {
 } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
 import type { AudioGameModeSchedulePayload } from '../../../shared/ipcTypes'
+import AudioCuePickers from './AudioCueSelectorPanel/AudioCuePickers'
+import AudioMotionPicker from './AudioCueSelectorPanel/AudioMotionPicker'
+import CurrentCueSummary from './AudioCueSelectorPanel/CurrentCueSummary'
+import type { AudioCueOption } from './AudioCueSelectorPanel/types'
 
 const log = createLogger('AudioCueSelectorPanel')
-
-interface AudioCueOption {
-  id: string
-  label: string
-  description: string
-  groupId: string
-  groupName: string
-  groupDescription?: string
-}
 
 interface CueStateResponse {
   success: boolean
@@ -37,8 +32,6 @@ interface CueStateResponse {
 interface AudioCueSelectorPanelProps {
   className?: string
 }
-
-const DROPDOWN_WIDTH = 'min-w-[220px] md:w-[240px]'
 
 /** Minimum time the strobe-firing indicator stays visible after an inactive edge. */
 const MIN_STROBE_DISPLAY_MS = 200
@@ -157,7 +150,8 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
           return a.groupName.localeCompare(b.groupName)
         })
         setAvailableCues(sortedCues)
-        const initialCueId = response.activeCueType ?? sortedCues[0]?.id ?? ''
+        // Main names no active cue with an empty string until it has picked one, so that falls back too.
+        const initialCueId = response.activeCueType || sortedCues[0]?.id || ''
         const initialGroupId =
           sortedCues.find((cue) => cue.id === initialCueId)?.groupId ?? sortedCues[0]?.groupId ?? ''
         setActiveCue(initialCueId || null)
@@ -502,235 +496,49 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
 
       {audioEnabled && !loading && availableCues.length > 0 && (
         <div className="space-y-4">
-          <div className="p-3 bg-gray-200 dark:bg-gray-700 rounded-lg">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                Current cue
-              </h3>
-              {gameModeEnabled && gameModeSchedule && (
-                <span
-                  className="shrink-0 text-sm font-medium tabular-nums text-gray-600 dark:text-gray-300"
-                  aria-live="polite">
-                  {gameModeSchedule.pending
-                    ? 'Waiting for beat...'
-                    : gameModeSchedule.deadlineMs != null
-                      ? `Next cue in ${gameModeRemainingSec}s`
-                      : null}
-                </span>
-              )}
-            </div>
-            <div className="overflow-x-auto">
-              {gameModeEnabled ? (
-                <div className="grid w-full min-w-[36rem] grid-cols-4 gap-3 sm:gap-4">
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-800 dark:text-gray-200">
-                      Lighting Cue Group
-                    </p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      {activeCueForGameMode?.groupName ?? '—'}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-800 dark:text-gray-200">Primary cue</p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      {activeCueForGameMode?.label ?? activeCue ?? '—'}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-800 dark:text-gray-200">Secondary cue</p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      {secondaryCueForGameMode?.label ?? secondaryCueType ?? 'None'}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-800 dark:text-gray-200">Strobe</p>
-                    <p
-                      className={`text-sm ${
-                        strobeFiringDisplay
-                          ? 'text-gray-900 dark:text-white'
-                          : 'text-gray-500 dark:text-gray-400'
-                      }`}>
-                      {strobeFiringDisplay
-                        ? strobeCueType
-                          ? availableCues.find((c) => c.id === strobeCueType)?.label ??
-                            strobeCueType
-                          : 'Active'
-                        : 'Inactive'}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid w-full grid-cols-2 gap-3 sm:gap-4">
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-800 dark:text-gray-200">
-                      Lighting Cue Group
-                    </p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      {selectedCue?.groupName ?? selectedGroupInfo?.name ?? '—'}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-800 dark:text-gray-200">Audio Cue</p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      {selectedCue?.label ?? selectedCueId ?? activeCue ?? '—'}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-            {motionGlobalEnabled && (
-              <div className="mt-3 pt-3 border-t border-gray-300 dark:border-gray-600">
-                <div className="overflow-x-auto">
-                  {gameModeEnabled ? (
-                    <div className="grid w-full min-w-[36rem] grid-cols-4 gap-3 sm:gap-4">
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-800 dark:text-gray-200">
-                          Motion Cue Group
-                        </p>
-                        <p className="text-sm text-gray-700 dark:text-gray-300">
-                          {motionPlayingGroupLabel ?? '—'}
-                        </p>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-800 dark:text-gray-200">Motion Cue</p>
-                        <p className="text-sm text-gray-700 dark:text-gray-300">
-                          {motionPlayingLabel ?? '—'}
-                        </p>
-                      </div>
-                      <div className="min-w-0" aria-hidden />
-                      <div className="min-w-0" aria-hidden />
-                    </div>
-                  ) : (
-                    <div className="grid w-full grid-cols-2 gap-3 sm:gap-4">
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-800 dark:text-gray-200">
-                          Motion Cue Group
-                        </p>
-                        <p className="text-sm text-gray-700 dark:text-gray-300">
-                          {motionPlayingGroupLabel ?? '—'}
-                        </p>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-800 dark:text-gray-200">Motion Cue</p>
-                        <p className="text-sm text-gray-700 dark:text-gray-300">
-                          {motionPlayingLabel ?? '—'}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          <CurrentCueSummary
+            gameModeEnabled={gameModeEnabled}
+            gameModeSchedule={gameModeSchedule}
+            gameModeRemainingSec={gameModeRemainingSec}
+            availableCues={availableCues}
+            activeCue={activeCue}
+            activeCueForGameMode={activeCueForGameMode}
+            secondaryCueType={secondaryCueType}
+            secondaryCueForGameMode={secondaryCueForGameMode}
+            strobeFiringDisplay={strobeFiringDisplay}
+            strobeCueType={strobeCueType}
+            selectedCue={selectedCue}
+            selectedCueId={selectedCueId}
+            selectedGroupInfo={selectedGroupInfo}
+            motionGlobalEnabled={motionGlobalEnabled}
+            motionPlayingGroupLabel={motionPlayingGroupLabel}
+            motionPlayingLabel={motionPlayingLabel}
+          />
 
           {!gameModeEnabled && (
-            <>
-              <div className="flex flex-col gap-4 md:flex-row">
-                <div className={`${DROPDOWN_WIDTH}`}>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Audio Cue Group
-                  </label>
-                  <select
-                    className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
-                    value={selectedGroupId || ''}
-                    onChange={(event) => handleGroupChange(event.target.value)}
-                    disabled={saving || groupOptions.length === 0}>
-                    <option value="" disabled>
-                      {groupOptions.length === 0 ? 'No groups available' : 'Choose a group'}
-                    </option>
-                    {groupOptions.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className={`${DROPDOWN_WIDTH}`}>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Audio Cue
-                  </label>
-                  <select
-                    className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
-                    value={selectedCueId || activeCue || ''}
-                    onChange={(event) => handleCueChange(event.target.value)}
-                    disabled={saving || cuesForSelectedGroup.length === 0}>
-                    <option value="" disabled>
-                      {cuesForSelectedGroup.length === 0
-                        ? 'No cues for this group'
-                        : 'Choose a cue'}
-                    </option>
-                    {cuesForSelectedGroup.map((cue) => (
-                      <option key={cue.id} value={cue.id}>
-                        {cue.label || cue.id}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {(selectedGroupInfo || selectedCue) && (
-                <div className="">
-                  {selectedGroupInfo && (
-                    <div>
-                      <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        <strong>Group Description:</strong>{' '}
-                        {selectedGroupInfo.description ||
-                          'No description available for this group.'}
-                      </div>
-                    </div>
-                  )}
-                  {selectedCue && (
-                    <div>
-                      <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        <strong>Cue Description:</strong>{' '}
-                        {selectedCue.description || 'No description available for this cue.'}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
+            <AudioCuePickers
+              groupOptions={groupOptions}
+              selectedGroupId={selectedGroupId}
+              onGroupChange={handleGroupChange}
+              cuesForSelectedGroup={cuesForSelectedGroup}
+              selectedCueId={selectedCueId}
+              activeCue={activeCue}
+              onCueChange={handleCueChange}
+              saving={saving}
+              selectedCue={selectedCue}
+              selectedGroupInfo={selectedGroupInfo}
+            />
           )}
           {!gameModeEnabled && motionGlobalEnabled && motionGroups.length > 0 && (
-            <div className="flex flex-col gap-4 md:flex-row">
-              <div className={`${DROPDOWN_WIDTH}`}>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Motion cue group
-                </label>
-                <select
-                  className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
-                  value={motionGroupId}
-                  onChange={(e) => void handleMotionGroupChange(e.target.value)}
-                  disabled={savingMotion || motionGroups.length === 0}>
-                  <option value="">Auto (random per primary cue change)</option>
-                  {motionGroups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className={`${DROPDOWN_WIDTH}`}>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Motion cue
-                </label>
-                <select
-                  className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
-                  value={motionCueId}
-                  onChange={(e) => void handleMotionCueChange(e.target.value)}
-                  disabled={savingMotion || !motionGroupId || motionCuesOptions.length === 0}>
-                  <option value="" disabled>
-                    {!motionGroupId ? 'Choose Auto or a group first' : 'Choose a motion cue'}
-                  </option>
-                  {motionCuesOptions.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name || c.id}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <AudioMotionPicker
+              motionGroups={motionGroups}
+              motionGroupId={motionGroupId}
+              onGroupChange={handleMotionGroupChange}
+              motionCuesOptions={motionCuesOptions}
+              motionCueId={motionCueId}
+              onCueChange={handleMotionCueChange}
+              savingMotion={savingMotion}
+            />
           )}
         </div>
       )}

@@ -1,31 +1,18 @@
 import {
   RGBIO,
   RgbDmxChannels,
-  StrobeDmxChannels,
-  MovingHeadDmxChannels,
-  DmxFixture,
   DmxRig,
   FixtureTypes,
-  DEFAULT_STROBE_CHANNEL_VALUES,
   DEFAULT_WHITE_CHANNEL_MIX_MODE,
-  normalizeFixtureConfig,
   WireSenderId,
   type WhiteChannelMixMode,
 } from '../types'
 import type { DmxValuesPayload } from '../../shared/ipcTypes'
 import { DmxLightManager } from './DmxLightManager'
-import {
-  castToChannelType,
-  mirrorDmxForMovingHeadInvert,
-  mirrorPercentAroundHome,
-  percentToDmx,
-} from '../helpers/dmxHelpers'
-import {
-  applyChannelMixPlan,
-  buildChannelMixPlan,
-  type ChannelMixPlan,
-} from '../helpers/colorChannelMixer'
-import { buildBrightnessScaleMap, scaleDmxValueByPercent } from '../helpers/brightnessScaling'
+import { blackoutUniverse, normaliseUniverseBuffer } from '../helpers/dmxHelpers'
+import { scaleDmxValueByPercent } from '../helpers/brightnessScaling'
+import { resolveMovingHeadAxes, StrobePeakLatch } from './publisherLightOutput'
+import { FixtureChannelWriter, type LightOutput } from './fixtureChannelWriter'
 import { SenderManager } from './SenderManager'
 import { LightStateManager, type LightStatesListener } from './sequencer/LightStateManager'
 import type {
@@ -35,6 +22,7 @@ import type {
   PublisherFrameRigView,
 } from './PublisherFrameProcessor'
 import { VenueFrameProcessor } from './VenueFrameProcessor'
+import { WireSlotGovernor } from './wireSlotGovernor'
 import { getStrobeStateManager, StrobeStateManager } from './StrobeStateManager'
 import { MASTER_DIMMER_MAX_PERCENT, MasterOutputState } from './MasterOutputState'
 import { createLogger } from '../../shared/logger'
@@ -94,48 +82,6 @@ export interface DmxPublisherOptions {
  * `channel * opacity`) and emits a constant `opacity: 1.0`. So peak brightness — not opacity —
  * is the signal that identifies the cue's highest-opacity moment.
  */
-interface StrobePeakColor {
-  red: number
-  green: number
-  blue: number
-  intensity: number
-}
-
-/**
- * Per-wire-sender working state. One instance per active wire-sender slot. The publisher merges
- * routed rig channels into `buffer` each frame, then runs the dirty-skip / leading / trailing
- * governor against that slot's own history. Slots are created lazily as senders become enabled
- * and discarded when senders are disabled.
- *
- * IPC has its own (simpler) governor — see {@link IpcGovernor} — because its payload shape is
- * a tagged per-rig structure rather than a flat channel buffer.
- */
-interface SenderSlotState {
-  /** Per-frame working buffer — rebuilt each `publishNow`, reused to limit GC. */
-  buffer: Record<number, number>
-  /** Wall time of the last actual send. 0 = none yet (leading edge fires immediately). */
-  lastSendTimeMs: number
-  /** Last buffer actually handed to the sender; used for dirty-skip. */
-  lastSentBuffer: Record<number, number>
-  hasLastSent: boolean
-  /** Snapshot of the most recent rate-limited frame, flushed by the trailing timer. */
-  pendingBuffer: Record<number, number>
-  hasPending: boolean
-  trailingTimer: TimerHandle | null
-}
-
-function makeSlotState(): SenderSlotState {
-  return {
-    buffer: {},
-    lastSendTimeMs: 0,
-    lastSentBuffer: {},
-    hasLastSent: false,
-    pendingBuffer: {},
-    hasPending: false,
-    trailingTimer: null,
-  }
-}
-
 /**
  * Lightweight rate cap for the IPC preview path. Mirrors `_minIntervalMs` but skips dirty-skip
  * (renderer tolerates redundant frames; comparing the multi-buffer payload isn't worth it) and
@@ -192,32 +138,17 @@ export class DmxPublisher {
   /** Microtask-coalesced publish: many chain emissions in one synchronous burst → one publish. */
   private _publishScheduled = false
   private _strobeStateManager: StrobeStateManager
-  private _immediateBlackoutData: Record<number, number> = {}
+  private _immediateBlackoutData: Record<number, number> = blackoutUniverse()
   /** When true, `publish` ignores light states; output comes only from `setManualBuffer`. */
   private _manualMode = false
-  /** Light ids already reported for out-of-range channel numbers, so the skip logs once per light
-   *  rather than every frame. */
-  private _reportedBadChannelLights = new Set<string>()
-  /**
-   * Per-fixture colour-mixing plans, keyed by fixture object identity. `syncDmxLightWithTemplate`
-   * replaces a fixture object immutably whenever its channels/extras change and returns the same
-   * reference otherwise, so object identity is a free dirty signal — no explicit invalidation, and
-   * the WeakMap drops entries for dropped rigs when they are garbage-collected. `null` means "no
-   * mixing needed" (per-channel path); it is cached too so we don't rebuild it every frame.
-   */
-  private _mixPlans = new WeakMap<DmxFixture, ChannelMixPlan | null>()
-  /** Per-fixture brightness scale maps, keyed on identity like {@link _mixPlans}. */
-  private _scaleMaps = new WeakMap<DmxFixture, Map<number, number> | null>()
-  /**
-   * Per-light peak colour seen since the current strobe became active. The stock strobe cues
-   * modulate opacity, which the blender bakes into rgb/intensity — so the brightest blended
-   * frame corresponds to the cue's peak (highest-opacity) moment. We hold that peak for the
-   * whole strobe so a hardware-strobe-channel light shows a steady color while its strobe
-   * channel does the chopping. Reset when the strobe cue ends.
-   */
-  private _strobePeakColors: Map<string, StrobePeakColor> = new Map()
-  /** Tracks whether a strobe was active on the previous publish, so we can clear the latch on transition. */
-  private _lastStrobeActive = false
+  /** Set once `shutdown` has sent the final blackout. Nothing may reach the wire afterwards. */
+  private _isShutDown = false
+  /** Turns each light's resolved colour into bytes at its fixture's addresses. */
+  private readonly _channelWriter = new FixtureChannelWriter()
+  /** Reused for every light in a frame, so handing one to the writer allocates nothing. */
+  private _lightOutput: LightOutput = { red: 0, green: 0, blue: 0, intensity: 0, pan: 0, tilt: 0 }
+  /** Steady colour for a fixture whose own strobe channel is chopping. */
+  private _strobePeakLatch = new StrobePeakLatch()
 
   /** How a `white` emitter is driven; see {@link WhiteChannelMixMode}. */
   private _whiteChannelMixMode: WhiteChannelMixMode = DEFAULT_WHITE_CHANNEL_MIX_MODE
@@ -233,7 +164,7 @@ export class DmxPublisher {
   private _lastPublishedLights: ReadonlyMap<string, Readonly<RGBIO>> = new Map()
   /** Last buffer given to {@link setManualBuffer}, pre-gate, for the same reason. */
   private _lastManualBuffer: Record<number, number> | null = null
-  /** Re-pointed per rig rather than rebuilt, like the channel-write closure below. */
+  /** Re-pointed per rig rather than rebuilt. */
   private _frameContext: PublisherFrameContext = { nowMs: 0, rigId: '' }
   /** Reused across every fixture in a frame so the colour stage allocates nothing. */
   private _frameColor: ProcessedLightColor = { r: 0, g: 0, b: 0, intensity: 0 }
@@ -243,7 +174,7 @@ export class DmxPublisher {
   private _minIntervalMs = 0
   private _timing: PublisherTiming = REAL_TIMING
   /** Per-wire-sender governor + working buffer state. */
-  private _slots: Map<WireSenderId, SenderSlotState> = new Map()
+  private readonly _governor: WireSlotGovernor
   /** Lightweight rate cap for the IPC preview path (separate from wire-slot governor). */
   private _ipc: IpcGovernor = { lastSendTimeMs: 0, pending: null, trailingTimer: null }
 
@@ -268,15 +199,11 @@ export class DmxPublisher {
     }
     this._frameProcessor = options.frameProcessor ?? new VenueFrameProcessor()
     this._masterOutput = options.masterOutput ?? new MasterOutputState()
+    this._governor = new WireSlotGovernor(senderManager, this._timing, this._minIntervalMs)
 
     this.publish = this.publish.bind(this)
     if (this._lightStateManager) {
       this._lightStateManager.onLightStatesUpdated(this.publish)
-    }
-
-    // Pre-build blackout buffer
-    for (let channel = 1; channel <= 512; channel++) {
-      this._immediateBlackoutData[channel] = 0
     }
   }
 
@@ -335,7 +262,7 @@ export class DmxPublisher {
    * mapping the desired channels to each DMX fixture's channels.
    */
   public publish = (lights: ReadonlyMap<string, Readonly<RGBIO>>): void => {
-    if (this._manualMode) {
+    if (this._manualMode || this._isShutDown) {
       return
     }
     this.publishNow(lights)
@@ -353,30 +280,22 @@ export class DmxPublisher {
    * that kept emitting through it would not be a blackout.
    */
   public setManualBuffer(buffer: Record<number, number>): void {
+    if (this._isShutDown) {
+      return
+    }
     this._manualMode = true
     this._lastManualBuffer = buffer
     this._resetGovernorAllSlots()
 
     // Normalise the input buffer once; broadcast to every enabled wire slot.
-    const normalised: Record<number, number> = {}
-    for (const [k, v] of Object.entries(buffer)) {
-      const ch = Number(k)
-      if (!Number.isFinite(ch) || ch < 1 || ch > 512) {
-        continue
-      }
-      normalised[ch] = Math.max(0, Math.min(255, Math.round(v)))
-    }
+    const normalised = normaliseUniverseBuffer(buffer)
     const out =
       this._masterOutput.isBlackoutActive() || Object.keys(normalised).length === 0
         ? this._immediateBlackoutData
         : normalised
 
     for (const wireId of this._sender.getEnabledWireSenders()) {
-      try {
-        this._sender.send(wireId, out)
-      } catch (error) {
-        log.error(`Failed to send manual DMX data to ${wireId}:`, error)
-      }
+      void this._sender.send(wireId, out)
     }
     if (this._sender.isIpcEnabled()) {
       this._dispatchIpc({ kind: 'manual', buffer: out })
@@ -404,6 +323,7 @@ export class DmxPublisher {
       return
     }
     this._minIntervalMs = next
+    this._governor.setMinIntervalMs(next)
     this._resetGovernorAllSlots()
   }
 
@@ -423,6 +343,9 @@ export class DmxPublisher {
    * rather than waiting out the current rate window.
    */
   public refreshOutput(): void {
+    if (this._isShutDown) {
+      return
+    }
     this._resetGovernorAllSlots()
     if (this._manualMode) {
       if (this._lastManualBuffer !== null) {
@@ -444,9 +367,11 @@ export class DmxPublisher {
 
     // Remove managers for rigs that are no longer active or have been deleted
     const currentRigIds = new Set(rigsToPublish.map((rig) => rig.id))
+    let removedAny = false
     for (const [rigId] of this._rigManagers) {
       if (!currentRigIds.has(rigId)) {
         this._rigManagers.delete(rigId)
+        removedAny = true
       }
     }
 
@@ -468,38 +393,16 @@ export class DmxPublisher {
         this._rigManagers.set(rig.id, { manager, rig })
       }
     }
-  }
 
-  /**
-   * Memoised colour-mixing plan for a fixture (see {@link _mixPlans}). `null` = no mixing needed;
-   * the caller writes each named channel directly instead.
-   */
-  private _getMixPlan(fixture: DmxFixture): ChannelMixPlan | null {
-    if (this._mixPlans.has(fixture)) return this._mixPlans.get(fixture)!
-    const plan = buildChannelMixPlan(fixture)
-    this._mixPlans.set(fixture, plan)
-    return plan
-  }
+    // Rig configuration just changed, so a fault the user has since fixed should be able to
+    // report again rather than staying suppressed for the life of the process.
+    this._channelWriter.resetFaultReports()
 
-  /** Memoised scale map for a fixture (see {@link _scaleMaps}); `null` = nothing scaled. */
-  private _getScaleMap(fixture: DmxFixture): Map<number, number> | null {
-    if (this._scaleMaps.has(fixture)) return this._scaleMaps.get(fixture)!
-    const scaleMap = buildBrightnessScaleMap(fixture)
-    this._scaleMaps.set(fixture, scaleMap)
-    return scaleMap
-  }
-
-  /**
-   * Reports a plan's excluded extra channels once per light. Shared by the per-light-state pass and
-   * the unvisited-fixture pass, so a fixture no cue addresses still explains its dead mode channel.
-   */
-  private _warnInvalidExtras(lightId: string, plan: ChannelMixPlan): void {
-    if (plan.invalidChannels.length === 0) return
-    if (this._reportedBadChannelLights.has(lightId)) return
-    this._reportedBadChannelLights.add(lightId)
-    log.warn(
-      `Light ${lightId}: skipping invalid extra channels: ${plan.invalidChannels.join(', ')}`,
-    )
+    // A dropped rig's channels are released on the next frame, so publish one now rather than
+    // waiting for a light state that may never arrive if the rig set is now empty.
+    if (removedAny && !this._manualMode) {
+      this.publishNow(this._aggregatedLights)
+    }
   }
 
   /**
@@ -514,7 +417,7 @@ export class DmxPublisher {
     // 1. Snapshot the set of currently-enabled wire-sender slots and reconcile state.
     const enabledWireSenders = this._sender.getEnabledWireSenders()
     const ipcEnabled = this._sender.isIpcEnabled()
-    this._reconcileSlots(new Set(enabledWireSenders))
+    this._governor.reconcile(new Set(enabledWireSenders))
 
     // If nobody's listening on the wire and IPC is off, there's nothing to do.
     if (enabledWireSenders.length === 0 && !ipcEnabled) {
@@ -523,7 +426,7 @@ export class DmxPublisher {
 
     // 2. Clear each wire slot's working buffer in place.
     for (const wireId of enabledWireSenders) {
-      const slot = this._ensureSlot(wireId)
+      const slot = this._governor.slotFor(wireId)
       for (const key of Object.keys(slot.buffer)) {
         delete slot.buffer[Number(key)]
       }
@@ -540,7 +443,7 @@ export class DmxPublisher {
     // covers the hardware strobe-speed channel, which is driven from `activeStrobeSlot` below. It
     // does NOT cover the opacity-driven flash: the blender has already folded that into the rgb /
     // intensity values arriving here, so those lights are zeroed individually in the light loop,
-    // which is what `_suppressedStrobeLightIds` is for.
+    // which is what `suppressedStrobeLightIds` is for.
     const masterPercent = this._masterOutput.getOutputPercent()
     const requestedStrobeSlot = this._strobeStateManager.getActive()
     const strobeSuppressed =
@@ -548,10 +451,7 @@ export class DmxPublisher {
     const activeStrobeSlot = strobeSuppressed ? null : requestedStrobeSlot
 
     // Strobe peak-hold state machine runs once per frame (across all rigs/lights).
-    if (this._lastStrobeActive && activeStrobeSlot == null) {
-      this._strobePeakColors.clear()
-    }
-    this._lastStrobeActive = activeStrobeSlot != null
+    this._strobePeakLatch.beginFrame(activeStrobeSlot != null)
 
     // One timestamp for the whole frame, so a light reached by more than one rig neither advances
     // its trail twice nor re-rolls its grain.
@@ -560,47 +460,6 @@ export class DmxPublisher {
 
     // Sort light IDs for consistent processing order
     const sortedLightIds = Array.from(lights.keys()).sort((a, b) => a.localeCompare(b))
-
-    // Single channel-write closure, reused by both the legacy per-channel switch and the colour
-    // mixer, so the clamp + 1–512 validation + wire-slot fanout + IPC write lives in one place. It
-    // closes over mutable locals re-pointed per rig/light rather than allocating a closure per light.
-    let curWireTargets: WireSenderId[] = []
-    let curIpcBuffer: Record<number, number> | null = null
-    let curLightId = ''
-    // Brightness trim for the light being written. Cleared before the fixed-channel passes, since
-    // a pinned constant must reach the wire verbatim even on a scaled colour address.
-    let curScaleMap: Map<number, number> | null = null
-    const writeChannel = (channelNumber: number, value: number, channelLabel: string): void => {
-      // DMX-addressable channels are 1–512; anything else (0 = unassigned template slot,
-      // NaN/negative/huge from a bad config already on disk) must not become a buffer key the wire
-      // senders index with. Skip and report once per light — not per frame. (Mixer-supplied channel
-      // numbers are pre-validated at plan build, so only the legacy switch reaches this branch.)
-      if (!Number.isInteger(channelNumber) || channelNumber < 1 || channelNumber > 512) {
-        if (!this._reportedBadChannelLights.has(curLightId)) {
-          this._reportedBadChannelLights.add(curLightId)
-          log.warn(
-            `Light ${curLightId}: channel "${channelLabel}" = ${channelNumber} is outside DMX 1-512; skipping`,
-          )
-        }
-        return
-      }
-      const clamped = Math.max(0, Math.min(255, value))
-      // Scaling is a property of the fixture, so the wire gets it and the IPC buffer keeps cue
-      // intent. The preview re-applies it on request, rounding through the same helper.
-      const scalePercent = curScaleMap?.get(channelNumber)
-      const wireValue =
-        scalePercent === undefined ? clamped : scaleDmxValueByPercent(clamped, scalePercent)
-      for (const wireId of curWireTargets) {
-        // _reconcileSlots ensured every enabled wire sender has slot state.
-        this._slots.get(wireId)!.buffer[channelNumber] = wireValue
-      }
-      if (curIpcBuffer !== null) {
-        curIpcBuffer[channelNumber] = clamped
-      }
-    }
-    // Stable adapter for the mixer's (channel, value) => void writer — one allocation per frame.
-    const mixWrite = (channelNumber: number, value: number): void =>
-      writeChannel(channelNumber, value, 'mixed channel')
 
     // 4. For each active rig, resolve its wire targets and write per-light channel values into
     //    each target wire slot's buffer AND into the rig's own IPC buffer.
@@ -623,8 +482,11 @@ export class DmxPublisher {
         continue
       }
 
-      curWireTargets = wireTargets
-      curIpcBuffer = ipcBuffer
+      // reconcile() ensured every enabled wire sender has slot state.
+      this._channelWriter.beginRig(
+        wireTargets.map((wireId) => this._governor.slotFor(wireId).buffer),
+        ipcBuffer,
+      )
 
       // Skipped entirely while no effect is running, which is the common case.
       let frameView: PublisherFrameRigView | null = null
@@ -657,8 +519,6 @@ export class DmxPublisher {
           continue
         }
         visitedLightIds.add(lightId)
-        curLightId = lightId
-        curScaleMap = this._getScaleMap(dmxLight)
 
         const lightChannels = dmxLight.channels as RgbDmxChannels
         const hasStrobeChannel = typeof lightChannels.strobeChannel === 'number'
@@ -700,30 +560,16 @@ export class DmxPublisher {
         // colour while its hardware strobe channel does the chopping, so we track the brightest
         // sample seen since the strobe became active and always emit that. Brightness metric is
         // max(intensity, r, g, b) so a future constant-intensity coloured strobe still latches.
-        if (strobeChannelActive) {
-          const currentLevel = Math.max(intensity, r, g, b)
-          const peak = this._strobePeakColors.get(lightId)
-          if (!peak) {
-            if (currentLevel > 0) {
-              this._strobePeakColors.set(lightId, { red: r, green: g, blue: b, intensity })
-            }
-            // else: pre-peak (first frame is fully dark) — emit as-is until a non-zero arrives.
-          } else {
-            const peakLevel = Math.max(peak.intensity, peak.red, peak.green, peak.blue)
-            if (currentLevel > peakLevel) {
-              // New brighter peak: store it and emit the current frame as-is.
-              this._strobePeakColors.set(lightId, { red: r, green: g, blue: b, intensity })
-            } else {
-              // Hold the established peak.
-              r = peak.red
-              g = peak.green
-              b = peak.blue
-              intensity = peak.intensity
-            }
-          }
-        } else if (this._strobePeakColors.has(lightId)) {
-          this._strobePeakColors.delete(lightId)
-        }
+        const held = this._strobePeakLatch.resolve(lightId, strobeChannelActive, {
+          red: r,
+          green: g,
+          blue: b,
+          intensity,
+        })
+        r = held.red
+        g = held.green
+        b = held.blue
+        intensity = held.intensity
 
         // Global output controls, applied to colour and intensity only, and after the latch above
         // so it still tracks true cue peaks rather than freezing whatever the fader happened to
@@ -743,138 +589,42 @@ export class DmxPublisher {
         }
 
         const isMovingHead = dmxLight.fixture === FixtureTypes.RGBMH
-        let panOut: number
-        let tiltOut: number
-        if (isMovingHead) {
-          const cfg = normalizeFixtureConfig(dmxLight.config)
-          const homePanDmxLogical = percentToDmx(cfg.panHome, cfg.panMin, cfg.panMax)
-          const homeTiltDmxLogical = percentToDmx(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
-          const homePanDmx = cfg.invertPan
-            ? mirrorDmxForMovingHeadInvert(homePanDmxLogical, cfg.panMin, cfg.panMax)
-            : homePanDmxLogical
-          const homeTiltDmx = cfg.invertTilt
-            ? mirrorDmxForMovingHeadInvert(homeTiltDmxLogical, cfg.tiltMin, cfg.tiltMax)
-            : homeTiltDmxLogical
-          if (pan != null) {
-            // Rig-level Horiz mirror: invert cue-driven pan around the fixture's calibrated home
-            // BEFORE percent→DMX, so a "look 15% stage-left of home" cue becomes
-            // "look 15% stage-right of home" on the mirrored rig. Idle home (pan == null) is
-            // untouched — mirror is a choreographic overlay, not a calibration override. Composes
-            // with cfg.invertPan, which is applied at the DMX layer below for hardware mounting.
-            const panEffective =
-              rig.mirrorHoriz === true ? mirrorPercentAroundHome(pan, cfg.panHome) : pan
-            const panDmx = percentToDmx(panEffective, cfg.panMin, cfg.panMax)
-            panOut = cfg.invertPan
-              ? mirrorDmxForMovingHeadInvert(panDmx, cfg.panMin, cfg.panMax)
-              : panDmx
-          } else {
-            panOut = homePanDmx
-          }
-          if (tilt != null) {
-            const tiltDmx = percentToDmx(tilt, cfg.tiltMin, cfg.tiltMax)
-            tiltOut = cfg.invertTilt
-              ? mirrorDmxForMovingHeadInvert(tiltDmx, cfg.tiltMin, cfg.tiltMax)
-              : tiltDmx
-          } else {
-            tiltOut = homeTiltDmx
-          }
-        } else {
-          panOut = pan ?? dmxLight.config?.panHome ?? 0
-          tiltOut = tilt ?? dmxLight.config?.tiltHome ?? 0
-        }
+        const { panOut, tiltOut } = isMovingHead
+          ? resolveMovingHeadAxes(dmxLight, rig, pan, tilt)
+          : {
+              panOut: pan ?? dmxLight.config?.panHome ?? 0,
+              tiltOut: tilt ?? dmxLight.config?.tiltHome ?? 0,
+            }
 
-        const channelsInput: { [key: string]: number } = {
-          red: r,
-          green: g,
-          blue: b,
-          masterDimmer: intensity,
-          pan: panOut,
-          tilt: tiltOut,
-        }
-
-        let dmxChannelData
-        try {
-          dmxChannelData = castToChannelType(dmxLight.fixture, channelsInput)
-        } catch (error) {
-          log.error(`Error casting channels for Light ID: ${lightId} - ${error}`)
-          continue
-        }
-
-        // Colour mixer owns the colour channels (named red/green/blue/white + any extras) when a
-        // plan exists; it decomposes the post-latch rgb into the fixture's declared emitters and
-        // writes the residual back to the named/extra rgb channels. `null` = no extras, so the
-        // per-channel switch below writes them directly. Runs after the cast so a cast throw still
-        // skips the whole light (above).
-        const mixPlan = this._getMixPlan(dmxLight)
-        if (mixPlan) {
-          this._warnInvalidExtras(lightId, mixPlan)
-          applyChannelMixPlan(mixPlan, r, g, b, mixWrite, additiveWhite)
-        }
-
-        for (const [channelName, channelNumber] of Object.entries(dmxLight.channels)) {
-          let value: number = 0
-
-          switch (channelName) {
-            case 'red':
-            case 'green':
-            case 'blue':
-              // Owned by the mixer when a plan exists; otherwise fall through to the legacy write.
-              if (mixPlan) continue
-              value = (dmxChannelData as RgbDmxChannels)[channelName]
-              break
-            case 'masterDimmer':
-              value = (dmxChannelData as RgbDmxChannels | StrobeDmxChannels).masterDimmer
-              break
-            case 'pan':
-              value = (dmxChannelData as MovingHeadDmxChannels).pan
-              break
-            case 'tilt':
-              value = (dmxChannelData as MovingHeadDmxChannels).tilt
-              break
-            case 'strobeChannel':
-              if (strobeChannelActive && activeStrobeSlot) {
-                const values = dmxLight.strobeValues ?? DEFAULT_STROBE_CHANNEL_VALUES
-                value = values[activeStrobeSlot]
-              } else {
-                value = 0
-              }
-              break
-            default:
-              continue
-          }
-
-          writeChannel(channelNumber, value, channelName)
-        }
-
-        // Fixed channels are emitted every published frame, last: a `fixed` channel that collides
-        // with one of this fixture's own base channels wins, matching the unvisited pass below and
-        // the console/calibration seeds. (The editor warns about duplicate numbers but doesn't
-        // block them, so this state reaches the wire.)
-        if (mixPlan) {
-          curScaleMap = null
-          for (const fw of mixPlan.fixedWrites) writeChannel(fw.channel, fw.value, 'fixed channel')
-        }
+        const output = this._lightOutput
+        output.red = r
+        output.green = g
+        output.blue = b
+        output.intensity = intensity
+        output.pan = panOut
+        output.tilt = tiltOut
+        this._channelWriter.writeLight(
+          lightId,
+          dmxLight,
+          output,
+          strobeChannelActive ? activeStrobeSlot : null,
+          additiveWhite,
+        )
       }
 
       // Unvisited-fixture pass: emit pinned `fixed` channels for planned fixtures no light state
       // addressed this frame (pre-first-cue lights, or strobe-group lights excluded from cue
       // targeting). Colour/mixable channels legitimately need a state, so only fixed writes fire.
-      curScaleMap = null
-      for (const [lightId, fixture] of manager.getAllDmxLights()) {
-        if (visitedLightIds.has(lightId)) continue
-        const plan = this._getMixPlan(fixture)
-        if (!plan) continue
-        curLightId = lightId
-        this._warnInvalidExtras(lightId, plan)
-        for (const fw of plan.fixedWrites) writeChannel(fw.channel, fw.value, 'fixed channel')
-      }
+      this._channelWriter.writeUnvisitedFixed(manager.getAllDmxLights(), visitedLightIds)
     }
 
-    // 5. Dispatch each wire slot that received writes through its per-slot governor.
+    // 5. Release channels that stopped being addressed, then dispatch each wire slot through its
+    //    per-slot governor. A slot with nothing left to say sends nothing.
     for (const wireId of enabledWireSenders) {
-      const slot = this._slots.get(wireId)!
+      const slot = this._governor.slotFor(wireId)
+      this._governor.releaseUnwrittenChannels(slot)
       if (Object.keys(slot.buffer).length > 0) {
-        this._dispatchSender(wireId, slot)
+        this._governor.dispatch(wireId, slot)
       }
     }
 
@@ -902,116 +652,6 @@ export class DmxPublisher {
       }
     }
     return targets
-  }
-
-  private _ensureSlot(wireId: WireSenderId): SenderSlotState {
-    let slot = this._slots.get(wireId)
-    if (!slot) {
-      slot = makeSlotState()
-      this._slots.set(wireId, slot)
-    }
-    return slot
-  }
-
-  /**
-   * Removes governor state for wire-sender slots that are no longer enabled (cancelling any
-   * in-flight trailing timer). Called once per frame; cheap because the active set is small.
-   * A stale trailing timer that already fired before this point will hit a disabled slot in
-   * `SenderManager.send`, which silently no-ops.
-   */
-  private _reconcileSlots(activeIds: Set<WireSenderId>): void {
-    for (const [wireId, slot] of this._slots) {
-      if (!activeIds.has(wireId)) {
-        this._cancelTrailingFor(slot)
-        this._slots.delete(wireId)
-      }
-    }
-  }
-
-  /**
-   * Per-wire-slot output governor. `publishNow` always runs every frame (the strobe peak-hold
-   * state machine depends on seeing every blended frame), but the actual wire send is governed
-   * here so weak adapters aren't fed at the render tick rate.
-   *
-   *  - Governor disabled (no `outputRateHz`): legacy behaviour — send every frame, no dirty-skip.
-   *  - Dirty-skip: identical to the last sent frame for this slot → don't send.
-   *  - Rate gate: leading-edge send when the slot's interval has elapsed; otherwise snapshot the
-   *    frame and arm a single trailing timer so the latest state is always flushed (no stale tail).
-   *
-   * Each slot has its own `lastSendTimeMs` and dirty-skip cache, so traffic on one sender does
-   * not suppress traffic on another. `_minIntervalMs` is a global Hz preference shared across
-   * all slots.
-   */
-  private _dispatchSender(wireId: WireSenderId, slot: SenderSlotState): void {
-    if (this._minIntervalMs <= 0) {
-      this._sendToSender(wireId, slot, slot.buffer)
-      return
-    }
-
-    if (slot.hasLastSent && this._buffersEqual(slot.buffer, slot.lastSentBuffer)) {
-      // Latest intent already matches the wire for this slot: nothing to send, and any earlier
-      // deferred frame for this slot is now superseded — drop it so the trailing timer can't
-      // flush a stale value.
-      this._cancelTrailingFor(slot)
-      return
-    }
-
-    const now = this._timing.now()
-    const elapsed = now - slot.lastSendTimeMs
-    if (!slot.hasLastSent || elapsed >= this._minIntervalMs) {
-      this._cancelTrailingFor(slot)
-      slot.lastSendTimeMs = now
-      this._sendToSender(wireId, slot, slot.buffer)
-      return
-    }
-
-    // Within the rate window: keep the latest frame and arm a trailing flush if not already.
-    this._snapshotInto(slot.pendingBuffer, slot.buffer)
-    slot.hasPending = true
-    if (slot.trailingTimer === null) {
-      const delay = this._minIntervalMs - elapsed
-      slot.trailingTimer = this._timing.setTimer(() => this._flushTrailingFor(wireId, slot), delay)
-    }
-  }
-
-  /** Trailing-timer callback: emit the most recent rate-limited frame for this slot. */
-  private _flushTrailingFor(wireId: WireSenderId, slot: SenderSlotState): void {
-    slot.trailingTimer = null
-    if (!slot.hasPending) {
-      return
-    }
-    slot.hasPending = false
-    if (slot.hasLastSent && this._buffersEqual(slot.pendingBuffer, slot.lastSentBuffer)) {
-      return
-    }
-    slot.lastSendTimeMs = this._timing.now()
-    this._sendToSender(wireId, slot, slot.pendingBuffer)
-  }
-
-  /** Hand a buffer to the wire sender for one slot and record it for dirty-skip. */
-  private _sendToSender(
-    wireId: WireSenderId,
-    slot: SenderSlotState,
-    buffer: Record<number, number>,
-  ): void {
-    try {
-      this._sender.send(wireId, buffer)
-    } catch (error) {
-      log.error(`Failed to send DMX data to ${wireId}:`, error)
-      return
-    }
-    if (this._minIntervalMs > 0) {
-      this._snapshotInto(slot.lastSentBuffer, buffer)
-      slot.hasLastSent = true
-    }
-  }
-
-  private _cancelTrailingFor(slot: SenderSlotState): void {
-    if (slot.trailingTimer !== null) {
-      this._timing.clearTimer(slot.trailingTimer)
-      slot.trailingTimer = null
-    }
-    slot.hasPending = false
   }
 
   /**
@@ -1067,42 +707,11 @@ export class DmxPublisher {
     this._ipc.pending = null
   }
 
-  /** Reset governor state across all slots so cue output resumes cleanly (leading-edge). */
+  /** Reset governor state so cue output resumes cleanly on a leading edge. */
   private _resetGovernorAllSlots(): void {
-    for (const slot of this._slots.values()) {
-      this._cancelTrailingFor(slot)
-      slot.lastSendTimeMs = 0
-      slot.hasLastSent = false
-      for (const key of Object.keys(slot.lastSentBuffer)) {
-        delete slot.lastSentBuffer[Number(key)]
-      }
-    }
+    this._governor.resetAll()
     this._cancelTrailingIpc()
     this._ipc.lastSendTimeMs = 0
-  }
-
-  /** Copy `src` into the persistent `dest` object (clear-then-fill) to keep allocations down. */
-  private _snapshotInto(dest: Record<number, number>, src: Record<number, number>): void {
-    for (const key of Object.keys(dest)) {
-      delete dest[Number(key)]
-    }
-    for (const [k, v] of Object.entries(src)) {
-      dest[Number(k)] = v
-    }
-  }
-
-  private _buffersEqual(a: Record<number, number>, b: Record<number, number>): boolean {
-    const aKeys = Object.keys(a)
-    const bKeys = Object.keys(b)
-    if (aKeys.length !== bKeys.length) {
-      return false
-    }
-    for (const k of aKeys) {
-      if (a[Number(k)] !== b[Number(k)]) {
-        return false
-      }
-    }
-    return true
   }
 
   public async shutdown(): Promise<void> {
@@ -1119,15 +728,15 @@ export class DmxPublisher {
       }
       this._chainSubscriptions = []
       this._aggregatedLights.clear()
+      // Set before the blackout below, so a flush queued earlier finds the publisher shut down
+      // and drops its write.
+      this._isShutDown = true
+      this._rigManagers.clear()
 
       // Send a final blackout to every enabled wire sender. Blackout must hit every sender
       // regardless of per-rig routing.
       for (const wireId of this._sender.getEnabledWireSenders()) {
-        try {
-          this._sender.send(wireId, this._immediateBlackoutData)
-        } catch (err) {
-          log.error(`Error sending final blackout to ${wireId}:`, err)
-        }
+        void this._sender.send(wireId, this._immediateBlackoutData)
       }
       // Mirror the blackout on the IPC preview so the renderer sees the final state.
       if (this._sender.isIpcEnabled()) {
@@ -1137,10 +746,7 @@ export class DmxPublisher {
       log.info('DmxPublisher sent final blackout signal')
 
       // Cancel any in-flight trailing timers so we don't keep the event loop alive.
-      for (const slot of this._slots.values()) {
-        this._cancelTrailingFor(slot)
-      }
-      this._slots.clear()
+      this._governor.dispose()
 
       log.info('DmxPublisher has been successfully shut down.')
     } catch (error) {

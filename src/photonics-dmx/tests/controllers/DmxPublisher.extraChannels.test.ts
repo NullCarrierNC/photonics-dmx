@@ -28,13 +28,13 @@ function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
 }
 
 function makeMockSender(ipc = false): {
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<void>>
+  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
   getEnabledWireSenders: () => string[]
   isIpcEnabled: () => boolean
 } {
   return {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<void>>(() =>
-      Promise.resolve(),
+    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
+      Promise.resolve(true),
     ),
     getEnabledWireSenders: () => ['sacn'],
     isIpcEnabled: () => ipc,
@@ -325,7 +325,7 @@ describe('DmxPublisher extra channels', () => {
     ])
     ctx.publisher.publish(new Map([['l1', rgbio({ red: 255, green: 191, intensity: 255 })]]))
     const buf = ctx.lastWire()
-    expect(buf[5]).toBeUndefined()
+    expect(buf[5]).toBe(0) // amber is released rather than left holding its last value
     expect(buf[2]).toBe(255) // full red again (legacy path)
   })
 })

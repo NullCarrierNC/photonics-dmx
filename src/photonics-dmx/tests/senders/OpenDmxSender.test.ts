@@ -30,6 +30,9 @@ describe('OpenDmxSender', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    mockStart.mockReset().mockImplementation(() => Promise.resolve())
+    mockWriteChannels.mockReset()
+    mockStop.mockReset().mockImplementation(() => Promise.resolve())
     sender = new OpenDmxSender(
       '/dev/ttyUSB0',
       { dmxSpeed: 40 },

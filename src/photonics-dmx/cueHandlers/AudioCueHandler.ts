@@ -337,7 +337,7 @@ export class AudioCueHandler extends EventEmitter {
       if (this.currentStrobeCue) {
         this.currentStrobeCue.onStop?.()
         this.currentStrobeCue = null
-        getStrobeStateManager().setActive(null)
+        getStrobeStateManager().setActive(null, 'audio')
       }
       return
     }
@@ -350,7 +350,7 @@ export class AudioCueHandler extends EventEmitter {
       if (this.currentStrobeCue) {
         this.currentStrobeCue.onStop?.()
         this.currentStrobeCue = null
-        getStrobeStateManager().setActive(null)
+        getStrobeStateManager().setActive(null, 'audio')
       }
       return
     }
@@ -362,7 +362,7 @@ export class AudioCueHandler extends EventEmitter {
     // Audio strobe cues aren't bucketed into discrete slow/medium/fast/fastest speeds the way YARG
     // cues are; map any active audio strobe to the medium slot. A future refinement could let each
     // audio strobe cue declare its preferred slot.
-    getStrobeStateManager().setActive('medium')
+    getStrobeStateManager().setActive('medium', 'audio')
   }
 
   /**
@@ -388,7 +388,7 @@ export class AudioCueHandler extends EventEmitter {
     }
     // Unconditional: an interrupted audio strobe (processing stops with no explicit clear) must
     // not leave the process-wide StrobeStateManager stuck on a slot.
-    getStrobeStateManager().setActive(null)
+    getStrobeStateManager().setActive(null, 'audio')
     stopAndClear(this.currentMotionCue)
     this.currentMotionCue = null
     this.currentMotionCueStartTime = null

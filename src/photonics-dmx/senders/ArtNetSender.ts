@@ -1,7 +1,8 @@
-import { DMX, ArtnetDriver, IUniverseDriver } from 'dmx-ts'
+import { ArtnetDriver } from 'dmx-ts'
 import { createLogger } from '../../shared/logger'
 import { hzToThrottleIntervalMs } from '../../shared/dmxOutputRefresh'
-import { BaseSender, SenderError } from './BaseSender'
+import { SenderError } from './BaseSender'
+import { DmxTsSender } from './DmxTsSender'
 
 const log = createLogger('ArtNetSender')
 
@@ -19,15 +20,7 @@ export interface ArtNetSenderOptions {
   maxOutputRate?: number
 }
 
-export class ArtNetSender extends BaseSender {
-  private dmx: DMX = new DMX()
-  private universe?: IUniverseDriver
-  private lastSendTimeMs: number = 0
-  private minIntervalMs: number = 0
-  /** Latest frame withheld by the rate limiter, flushed by {@link flushTimer}. */
-  private pendingBuffer: Record<number, number> | null = null
-  private flushTimer: NodeJS.Timeout | null = null
-
+export class ArtNetSender extends DmxTsSender {
   constructor(
     private host: string = '127.0.0.1',
     private options: ArtNetSenderOptions = {
@@ -40,7 +33,7 @@ export class ArtNetSender extends BaseSender {
       maxOutputRate: ARTNET_DEFAULT_MAX_OUTPUT_RATE,
     },
   ) {
-    super()
+    super('ArtNet', log)
     const rate = this.options.maxOutputRate ?? ARTNET_DEFAULT_MAX_OUTPUT_RATE
     this.minIntervalMs = hzToThrottleIntervalMs(rate)
   }
@@ -64,107 +57,25 @@ export class ArtNetSender extends BaseSender {
     }
   }
 
-  public async stop(): Promise<void> {
-    if (!this.universe) {
-      return
-    }
-
-    log.info(`Stopping ArtNet sender on host ${this.host}...`)
-
-    // Drop any withheld frame and its flush timer BEFORE the blackout write, so the last frame on
-    // the wire is the blackout rather than a stale queued cue frame.
-    if (this.flushTimer) {
-      clearTimeout(this.flushTimer)
-      this.flushTimer = null
-    }
-    this.pendingBuffer = null
-
-    try {
-      this.lastSendTimeMs = 0
-      // Blackout all 512 channels through send(), which converts the 1-based DMX channels to the
-      // 0-based keys dmxnet expects (its prepChannel rejects channel 512).
-      const zeroPayload: Record<number, number> = {}
-      for (let channel = 1; channel <= 512; channel++) {
-        zeroPayload[channel] = 0
-      }
-      try {
-        await this.send(zeroPayload)
-        log.info('Sent zero values to all ArtNet channels')
-      } catch (err) {
-        log.error('Failed to send zero values before stopping:', err)
-      }
-
-      // Give a small delay to ensure commands are sent
-      await new Promise((resolve) => setTimeout(resolve, 100))
-
-      // Clean up all event listeners first
-      try {
-        this.removeAllSendErrorListeners()
-        if (this.dmx) {
-          this.dmx.removeAllListeners()
-        }
-        log.info('Removed all event listeners')
-      } catch (err) {
-        log.error('Error removing event listeners:', err)
-      }
-
-      // Close the DMX connection
-      try {
-        if (this.dmx) {
-          await this.dmx.close()
-          log.info('ArtNet connection closed')
-        }
-      } catch (err) {
-        log.error('Error during ArtNet close:', err)
-
-        // If close fails, we'll try forcibly clearing references
-        try {
-          this.universe = undefined
-          await new Promise((resolve) => setTimeout(resolve, 100))
-        } catch (innerErr) {
-          log.error('Error during failsafe cleanup:', innerErr)
-        }
-      }
-    } catch (outerErr) {
-      log.error('Unhandled error during ArtNetSender stop:', outerErr)
-    } finally {
-      // Final cleanup, clear all references
-      this.universe = undefined
-      log.info('ArtNetSender cleanup completed')
-    }
+  protected describeTarget(): string {
+    return `host ${this.host}`
   }
 
-  public async send(universeBuffer: Record<number, number>): Promise<void> {
+  /**
+   * The blackout goes through send(), which converts the 1-based DMX channels to the 0-based keys
+   * dmxnet expects (its prepChannel rejects channel 512).
+   */
+  protected async writeBlackout(buffer: Record<number, number>): Promise<void> {
+    await this.send(buffer)
+  }
+
+  public async send(universeBuffer: Record<number, number>): Promise<boolean> {
     try {
       this.verifySenderStarted()
 
-      if (this.minIntervalMs > 0) {
-        const now = performance.now()
-        const elapsed = now - this.lastSendTimeMs
-        if (elapsed < this.minIntervalMs && this.lastSendTimeMs !== 0) {
-          // Throttled: keep the latest frame and schedule a trailing-edge flush so the
-          // final frame of a burst still reaches the wire instead of being dropped. Snapshot
-          // the frame: the publisher reuses and mutates its slot buffer in place each frame, so
-          // holding it by reference would let the trailing flush send a newer frame than the one
-          // withheld. The buffer is a flat channel->value record, so a shallow copy suffices.
-          this.pendingBuffer = { ...universeBuffer }
-          if (!this.flushTimer) {
-            this.flushTimer = setTimeout(() => {
-              this.flushTimer = null
-              const buffer = this.pendingBuffer
-              this.pendingBuffer = null
-              if (buffer) {
-                void this.send(buffer)
-              }
-            }, this.minIntervalMs - elapsed)
-          }
-          return
-        }
-        this.lastSendTimeMs = now
+      if (this.throttleSend(universeBuffer)) {
+        return true
       }
-
-      // A frame that goes out now supersedes any queued trailing frame.
-      this.pendingBuffer = null
 
       // Convert from 1-based DMX indexing to 0-based ArtNet indexing
       const convertedBuffer: Record<number, number> = {}
@@ -174,23 +85,11 @@ export class ArtNetSender extends BaseSender {
       }
 
       this.universe!.update(convertedBuffer)
+      return true
     } catch (err: unknown) {
       log.error('ArtNetSender error:', err)
-      const errObj =
-        err && typeof err === 'object' ? (err as { code?: string; syscall?: string }) : null
-      const isNetworkError =
-        errObj &&
-        (errObj.code === 'EHOSTUNREACH' ||
-          errObj.code === 'EHOSTDOWN' ||
-          errObj.code === 'ENETUNREACH' ||
-          errObj.code === 'ETIMEDOUT' ||
-          errObj.syscall === 'send')
-      const errorEvent = new SenderError(err, {
-        senderId: 'artnet',
-        shouldDisable: Boolean(isNetworkError),
-        code: errObj && 'code' in errObj ? String(errObj.code) : undefined,
-      })
-      this.emitSenderError(errorEvent)
+      this.emitSenderError(this.toSenderError(err, 'artnet'))
+      return false
     }
   }
 
@@ -204,7 +103,7 @@ export class ArtNetSender extends BaseSender {
     return this.options.universe || 1
   }
 
-  public getConfiguredPort(): number {
+  public override getConfiguredPort(): number {
     return this.options.port ?? 6454
   }
 }

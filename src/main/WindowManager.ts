@@ -237,6 +237,10 @@ export class WindowManager {
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
+        // Audio capture and analysis run in this window and drive the show. Chromium throttles
+        // timers and frames in a hidden window, which is exactly the case where a game is running
+        // full-screen in front of it.
+        backgroundThrottling: false,
       },
     })
 
@@ -474,6 +478,21 @@ export class WindowManager {
    */
   public getMainWindow(): BrowserWindow | null {
     return this.mainWindow
+  }
+
+  /**
+   * Brings the main window to the front, creating it if there is none.
+   */
+  public focusMainWindow(): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+      this.createMainWindow()
+      return
+    }
+    if (this.mainWindow.isMinimized()) {
+      this.mainWindow.restore()
+    }
+    this.mainWindow.show()
+    this.mainWindow.focus()
   }
 
   /**

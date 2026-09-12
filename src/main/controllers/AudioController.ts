@@ -283,8 +283,7 @@ export class AudioController {
   }> {
     const registry = AudioCueRegistry.getInstance()
     const enabledGroupIds = registry.getEnabledGroups()
-    const targetGroups =
-      enabledGroupIds.length > 0 ? enabledGroupIds : registry.getRegisteredGroups()
+    const targetGroups = enabledGroupIds.length > 0 ? enabledGroupIds : registry.getAllGroups()
     const cueMap = new Map<
       AudioCueType,
       {

@@ -20,6 +20,7 @@ import type { TrackedLight } from '../../../types'
 import { type FixtureConfig, DEFAULT_MOVING_HEAD_FIXTURE_CONFIG } from '../../../types'
 import { RENDERER_RECEIVE } from '../../../../shared/ipcChannels'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { fakeLightingController } from '../../helpers/fakeLightingController'
 
 /** Minimal fixture config for test TrackedLight objects */
 type MinimalLightConfig = Partial<FixtureConfig>
@@ -59,55 +60,27 @@ describe('NodeExecutionEngine', () => {
 
   beforeEach(() => {
     // Create mock sequencer
-    mockSequencer = {
-      addEffect: jest.fn(),
-      replaceEffect: jest.fn(),
-      addEffectWithCallback: jest.fn((_name, _effect, callback) => {
-        if (callback) setTimeout(() => callback(), 1)
-      }),
-      setEffectWithCallback: jest.fn((_name, _effect, callback) => {
-        if (callback) setTimeout(() => callback(), 1)
-      }),
-      addEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
-        if (callback) setTimeout(() => callback(), 1)
-      }),
-      // Blocking set-position submits through this one and reads the applied result.
-      replaceEffectWithCallback: jest.fn((_name, _effect, callback) => {
-        if (callback) setTimeout(() => callback(), 1)
+    mockSequencer = fakeLightingController({
+      addEffectWithCallback: (_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(false), 1)
+      },
+      setEffectWithCallback: (_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(false), 1)
+      },
+      addEffectUnblockedNameWithCallback: (_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(false), 1)
         return true
-      }),
-      setEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
-        if (callback) setTimeout(() => callback(), 1)
-      }),
-      removeEffectCallback: jest.fn(),
-      setEffect: jest.fn(),
-      removeEffect: jest.fn(),
-      removeAllEffects: jest.fn(),
-      removeEffectByLayer: jest.fn(),
-      addEffectUnblockedName: jest.fn(),
-      setEffectUnblockedName: jest.fn(),
-      getActiveEffectsForLight: jest.fn(),
-      isLayerFreeForLight: jest.fn(),
-      setState: jest.fn(),
-      onBeat: jest.fn(),
-      onMeasure: jest.fn(),
-      onKeyframe: jest.fn(),
-      onDrumNote: jest.fn(),
-      onGuitarNote: jest.fn(),
-      onBassNote: jest.fn(),
-      onKeysNote: jest.fn(),
-      blackout: jest.fn(),
-      cancelBlackout: jest.fn(),
-      enableDebug: jest.fn(),
-      debugLightLayers: jest.fn(),
-      shutdown: jest.fn(),
-      cancelPanTiltClear: jest.fn(),
-      schedulePanTiltClear: jest.fn(),
-      addMotionPattern: jest.fn(),
-      getMotionPattern: jest.fn().mockReturnValue(undefined),
-      removeMotionPattern: jest.fn(),
-      updateMotionPatternConfig: jest.fn(),
-    } as unknown as ILightingController
+      },
+      // Blocking set-position submits through this one and reads the applied result.
+      replaceEffectWithCallback: (_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(false), 1)
+        return true
+      },
+      setEffectUnblockedNameWithCallback: (_name, _effect, callback) => {
+        if (callback) setTimeout(() => callback(false), 1)
+        return true
+      },
+    })
 
     mockLightManager = {
       getLights: jest.fn().mockReturnValue([
@@ -1161,7 +1134,7 @@ describe('NodeExecutionEngine', () => {
       expect(mockSequencer.addEffect).toHaveBeenCalled()
     })
 
-    it('resolves effect raiser literal parameter values with correct types (score cue regression)', () => {
+    it('resolves effect raiser literal parameter values with correct types', () => {
       const scoreLikeEffect: YargEffectDefinition = {
         id: 'score-like-effect',
         mode: 'yarg',
@@ -2579,13 +2552,16 @@ describe('NodeExecutionEngine', () => {
   })
 
   describe('Lights From Index Node', () => {
-    it('should extract single light from array using index', () => {
-      const mockLights = [
-        { id: 'light0', position: 0, config: {} as MinimalLightConfig },
-        { id: 'light1', position: 1, config: {} as MinimalLightConfig },
-        { id: 'light2', position: 2, config: {} as MinimalLightConfig },
-        { id: 'light3', position: 3, config: {} as MinimalLightConfig },
-      ]
+    it.each([
+      ['picks the light at the index', 4, 2],
+      ['wraps an index past the end of the array', 3, 5],
+      ['wraps a negative index back from the end', 3, -1],
+    ] as const)('%s', (_label, lightCount, index) => {
+      const mockLights = Array.from({ length: lightCount }, (_, i) => ({
+        id: `light${i}`,
+        position: i,
+        config: {} as MinimalLightConfig,
+      }))
 
       mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights)
 
@@ -2608,7 +2584,7 @@ describe('NodeExecutionEngine', () => {
         type: 'logic',
         logicType: 'lights-from-index',
         sourceVariable: 'allLights',
-        index: { source: 'literal', value: 2 },
+        index: { source: 'literal', value: index },
         assignTo: 'selectedLight',
       }
 
@@ -2669,192 +2645,6 @@ describe('NodeExecutionEngine', () => {
       const selectedLight = cueLevelVarStore.get('selectedLight')
       expect(selectedLight).toBeDefined()
       expect(selectedLight?.type).toBe('light-array')
-      expect(selectedLight?.value).toEqual([mockLights[2]])
-    })
-
-    it('should handle wraparound for out-of-bounds index', () => {
-      const mockLights = [
-        { id: 'light0', position: 0, config: {} as MinimalLightConfig },
-        { id: 'light1', position: 1, config: {} as MinimalLightConfig },
-        { id: 'light2', position: 2, config: {} as MinimalLightConfig },
-      ]
-
-      mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights)
-
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
-      const configNode: LogicNode = {
-        id: 'config1',
-        type: 'logic',
-        logicType: 'config-data',
-        dataProperty: 'front-lights-array',
-        assignTo: 'allLights',
-      }
-
-      const indexNode: LogicNode = {
-        id: 'lights-index1',
-        type: 'logic',
-        logicType: 'lights-from-index',
-        sourceVariable: 'allLights',
-        index: { source: 'literal', value: 5 },
-        assignTo: 'selectedLight',
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Intro,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [],
-          logic: [configNode, indexNode],
-        },
-        connections: [
-          { from: 'event1', to: 'config1' },
-          { from: 'config1', to: 'lights-index1' },
-        ],
-        variables: [
-          { name: 'allLights', type: 'light-array', scope: 'cue', initialValue: [] },
-          { name: 'selectedLight', type: 'light-array', scope: 'cue', initialValue: [] },
-        ],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([[eventNode.id, eventNode]]),
-        actionMap: new Map(),
-        logicMap: new Map<string, LogicNode>([
-          [configNode.id, configNode],
-          [indexNode.id, indexNode],
-        ]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'config1' }]],
-          ['config1', [{ from: 'config1', to: 'lights-index1' }]],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
-      )
-
-      engine.startExecution(eventNode, createCueData('Strong'))
-
-      const selectedLight = cueLevelVarStore.get('selectedLight')
-      expect(selectedLight).toBeDefined()
-      expect(selectedLight?.type).toBe('light-array')
-      // Index 5 with array length 3 should wrap to index 2 (5 % 3 = 2)
-      expect(selectedLight?.value).toEqual([mockLights[2]])
-    })
-
-    it('should handle negative index with wraparound', () => {
-      const mockLights = [
-        { id: 'light0', position: 0, config: {} as MinimalLightConfig },
-        { id: 'light1', position: 1, config: {} as MinimalLightConfig },
-        { id: 'light2', position: 2, config: {} as MinimalLightConfig },
-      ]
-
-      mockLightManager.getLightsInGroup = jest.fn().mockReturnValue(mockLights)
-
-      const eventNode: NetEventNode = {
-        id: 'event1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
-      const configNode: LogicNode = {
-        id: 'config1',
-        type: 'logic',
-        logicType: 'config-data',
-        dataProperty: 'front-lights-array',
-        assignTo: 'allLights',
-      }
-
-      const indexNode: LogicNode = {
-        id: 'lights-index1',
-        type: 'logic',
-        logicType: 'lights-from-index',
-        sourceVariable: 'allLights',
-        index: { source: 'literal', value: -1 },
-        assignTo: 'selectedLight',
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'test-cue',
-        name: 'Test Cue',
-        kind: 'lighting',
-        cueType: CueType.Intro,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [],
-          logic: [configNode, indexNode],
-        },
-        connections: [
-          { from: 'event1', to: 'config1' },
-          { from: 'config1', to: 'lights-index1' },
-        ],
-        variables: [
-          { name: 'allLights', type: 'light-array', scope: 'cue', initialValue: [] },
-          { name: 'selectedLight', type: 'light-array', scope: 'cue', initialValue: [] },
-        ],
-      }
-
-      const compiledCue: CompiledNetCue = {
-        definition,
-        mode: 'yarg',
-        eventMap: new Map([[eventNode.id, eventNode]]),
-        actionMap: new Map(),
-        logicMap: new Map<string, LogicNode>([
-          [configNode.id, configNode],
-          [indexNode.id, indexNode],
-        ]),
-        eventRaiserMap: new Map(),
-        eventListenerMap: new Map(),
-        effectRaiserMap: new Map(),
-        eventDefinitions: [],
-        adjacency: new Map([
-          ['event1', [{ from: 'event1', to: 'config1' }]],
-          ['config1', [{ from: 'config1', to: 'lights-index1' }]],
-        ]),
-      }
-
-      const engine = new NodeExecutionEngine(
-        compiledCue,
-        'test-cue',
-        mockSequencer,
-        mockLightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
-        definition.variables,
-      )
-
-      engine.startExecution(eventNode, createCueData('Strong'))
-
-      const selectedLight = cueLevelVarStore.get('selectedLight')
-      expect(selectedLight).toBeDefined()
-      expect(selectedLight?.type).toBe('light-array')
-      // Index -1 should wrap to the last element (index 2)
       expect(selectedLight?.value).toEqual([mockLights[2]])
     })
   })

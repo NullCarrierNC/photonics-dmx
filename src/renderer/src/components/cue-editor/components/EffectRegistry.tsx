@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useId } from 'react'
+import Modal from '../../Modal'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
 import type { EffectReference } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
@@ -32,6 +33,7 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
   const [availableEffects, setAvailableEffects] = useState<EffectSummary[]>([])
   const [selectedFile, setSelectedFile] = useState<string>('')
   const [loadingEffects, setLoadingEffects] = useState(false)
+  const dialogTitleId = useId()
 
   // Load available effect files when dialog opens
   useEffect(() => {
@@ -239,118 +241,114 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
       </div>
 
       {showDialog && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          onClick={closeDialog}>
-          <div
-            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 max-w-md w-full mx-4"
-            onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold mb-3">
-              {editingEffect ? 'Edit Effect Reference' : 'Import Effect'}
-            </h3>
-            <div className="space-y-3">
-              {!editingEffect && (
-                <>
-                  <label className="flex flex-col text-xs font-medium">
-                    Select Effect File *
-                    <select
-                      className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
-                      value={selectedFile}
-                      onChange={(e) => handleFileSelect(e.target.value)}>
-                      <option value="">-- Choose an effect file --</option>
-                      {availableFiles.map((file) => (
-                        <option key={file.path} value={file.path}>
-                          {file.groupName} ({file.mode.toUpperCase()}) - {file.effectCount}{' '}
-                          effect(s)
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-[10px] text-gray-500 mt-0.5">
-                      Select the file containing the effect you want to import
-                    </span>
-                  </label>
-
-                  <label className="flex flex-col text-xs font-medium">
-                    Select Effect *
-                    <select
-                      className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
-                      value={availableEffects.find((e) => e.name === formData.name)?.id || ''}
-                      onChange={(e) => handleEffectSelect(e.target.value)}
-                      disabled={!selectedFile || loadingEffects}>
-                      <option value="">
-                        {loadingEffects ? '-- Loading effects...' : '-- Choose an effect --'}
-                      </option>
-                      {availableEffects.map((effect) => (
-                        <option key={effect.id} value={effect.id}>
-                          {effect.name} {effect.description && `- ${effect.description}`}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-[10px] text-gray-500 mt-0.5">
-                      Select which effect from the file to import
-                    </span>
-                  </label>
-                </>
-              )}
-
-              <label className="flex flex-col text-xs font-medium">
-                Effect ID *
-                <input
-                  type="text"
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
-                  value={formData.effectId || ''}
-                  onChange={(e) => setFormData({ ...formData, effectId: e.target.value })}
-                  placeholder="e.g., strobe-1"
-                  disabled={!!editingEffect}
-                />
-                <span className="text-[10px] text-gray-500 mt-0.5">
-                  Unique identifier for referencing this effect (defaults to effect name)
-                </span>
-              </label>
-
-              <label className="flex flex-col text-xs font-medium">
-                Display Name *
-                <input
-                  type="text"
-                  className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
-                  value={formData.name || ''}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Strobe Effect"
-                />
-                <span className="text-[10px] text-gray-500 mt-0.5">
-                  Display name for this effect reference
-                </span>
-              </label>
-
-              {editingEffect && (
+        <Modal
+          onClose={closeDialog}
+          labelledBy={dialogTitleId}
+          panelClassName="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 max-w-md w-full mx-4">
+          <h3 id={dialogTitleId} className="text-lg font-semibold mb-3">
+            {editingEffect ? 'Edit Effect Reference' : 'Import Effect'}
+          </h3>
+          <div className="space-y-3">
+            {!editingEffect && (
+              <>
                 <label className="flex flex-col text-xs font-medium">
-                  Effect File ID
-                  <input
-                    type="text"
-                    className="mt-1 rounded border px-2 py-1 bg-gray-100 dark:bg-gray-600 dark:border-gray-600 cursor-not-allowed"
-                    value={formData.effectFileId || ''}
-                    disabled
-                  />
+                  Select Effect File *
+                  <select
+                    className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
+                    value={selectedFile}
+                    onChange={(e) => handleFileSelect(e.target.value)}>
+                    <option value="">-- Choose an effect file --</option>
+                    {availableFiles.map((file) => (
+                      <option key={file.path} value={file.path}>
+                        {file.groupName} ({file.mode.toUpperCase()}) - {file.effectCount} effect(s)
+                      </option>
+                    ))}
+                  </select>
                   <span className="text-[10px] text-gray-500 mt-0.5">
-                    Cannot be changed after import
+                    Select the file containing the effect you want to import
                   </span>
                 </label>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                className="px-3 py-1 text-xs border rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                onClick={closeDialog}>
-                Cancel
-              </button>
-              <button
-                className="px-3 py-1 text-xs bg-cyan-600 text-white rounded hover:bg-cyan-700"
-                onClick={handleSave}>
-                {editingEffect ? 'Save' : 'Import'}
-              </button>
-            </div>
+
+                <label className="flex flex-col text-xs font-medium">
+                  Select Effect *
+                  <select
+                    className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
+                    value={availableEffects.find((e) => e.name === formData.name)?.id || ''}
+                    onChange={(e) => handleEffectSelect(e.target.value)}
+                    disabled={!selectedFile || loadingEffects}>
+                    <option value="">
+                      {loadingEffects ? '-- Loading effects...' : '-- Choose an effect --'}
+                    </option>
+                    {availableEffects.map((effect) => (
+                      <option key={effect.id} value={effect.id}>
+                        {effect.name} {effect.description && `- ${effect.description}`}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-[10px] text-gray-500 mt-0.5">
+                    Select which effect from the file to import
+                  </span>
+                </label>
+              </>
+            )}
+
+            <label className="flex flex-col text-xs font-medium">
+              Effect ID *
+              <input
+                type="text"
+                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
+                value={formData.effectId || ''}
+                onChange={(e) => setFormData({ ...formData, effectId: e.target.value })}
+                placeholder="e.g., strobe-1"
+                disabled={!!editingEffect}
+              />
+              <span className="text-[10px] text-gray-500 mt-0.5">
+                Unique identifier for referencing this effect (defaults to effect name)
+              </span>
+            </label>
+
+            <label className="flex flex-col text-xs font-medium">
+              Display Name *
+              <input
+                type="text"
+                className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
+                value={formData.name || ''}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Strobe Effect"
+              />
+              <span className="text-[10px] text-gray-500 mt-0.5">
+                Display name for this effect reference
+              </span>
+            </label>
+
+            {editingEffect && (
+              <label className="flex flex-col text-xs font-medium">
+                Effect File ID
+                <input
+                  type="text"
+                  className="mt-1 rounded border px-2 py-1 bg-gray-100 dark:bg-gray-600 dark:border-gray-600 cursor-not-allowed"
+                  value={formData.effectFileId || ''}
+                  disabled
+                />
+                <span className="text-[10px] text-gray-500 mt-0.5">
+                  Cannot be changed after import
+                </span>
+              </label>
+            )}
           </div>
-        </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button
+              className="px-3 py-1 text-xs border rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={closeDialog}>
+              Cancel
+            </button>
+            <button
+              className="px-3 py-1 text-xs bg-cyan-600 text-white rounded hover:bg-cyan-700"
+              onClick={handleSave}>
+              {editingEffect ? 'Save' : 'Import'}
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   )

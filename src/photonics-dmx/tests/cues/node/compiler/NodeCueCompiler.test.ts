@@ -1,11 +1,10 @@
 /**
- * Tests for NodeCueCompiler: calculateActionDuration, unreachable actions, effects-only cue.
+ * Tests for NodeCueCompiler: unreachable actions, effects-only cue.
  */
 
 import {
   NodeCueCompiler,
   NodeCueCompilationError,
-  calculateActionDuration,
 } from '../../../../cues/node/compiler/NodeCueCompiler'
 import type { NetNodeCueDefinition, ActionNode } from '../../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../../cues/types/cueTypes'
@@ -39,36 +38,6 @@ function minimalAction(id: string, overrides?: Partial<ActionNode['timing']>): A
 }
 
 describe('NodeCueCompiler', () => {
-  describe('calculateActionDuration', () => {
-    it('returns sum of waitForTime + duration + waitUntilTime when all are literal', () => {
-      const action = minimalAction('a1', {
-        waitForTime: { source: 'literal', value: 100 },
-        duration: { source: 'literal', value: 250 },
-        waitUntilTime: { source: 'literal', value: 50 },
-      })
-      expect(calculateActionDuration(action)).toBe(400)
-    })
-
-    it('clamps negative values to zero per term', () => {
-      const action = minimalAction('a1', {
-        waitForTime: { source: 'literal', value: -10 },
-        duration: { source: 'literal', value: 100 },
-        waitUntilTime: { source: 'literal', value: -5 },
-      })
-      expect(calculateActionDuration(action)).toBe(100)
-    })
-
-    it('uses default for variable-source fields at compile time', () => {
-      const action = minimalAction('a1', {
-        waitForTime: { source: 'variable', name: 't1' },
-        duration: { source: 'variable', name: 'dur' },
-        waitUntilTime: { source: 'variable', name: 't2' },
-      })
-      // Variable sources use default per term at compile time: 0+200+0
-      expect(calculateActionDuration(action)).toBe(200)
-    })
-  })
-
   describe('compileYargCue', () => {
     it('throws when action node is unreachable from any event', () => {
       const definition: NetNodeCueDefinition = {

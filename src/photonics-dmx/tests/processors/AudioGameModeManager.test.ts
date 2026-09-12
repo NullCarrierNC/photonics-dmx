@@ -72,3 +72,31 @@ describe('AudioGameModeManager.ensureValidPrimary', () => {
     expect(onSwitch).toHaveBeenCalledWith('audio-c')
   })
 })
+
+describe('AudioGameModeManager dwell', () => {
+  beforeEach(() => {
+    availableTypes = ['audio-a', 'audio-b']
+  })
+
+  it('never schedules a switch behind the clock', () => {
+    // The IPC validator rejects a range like this, but the countdown does not rely on it.
+    const random = jest.spyOn(Math, 'random').mockReturnValue(0)
+    try {
+      const mgr = new AudioGameModeManager({
+        enabled: true,
+        cueDurationMin: -10,
+        cueDurationMax: -5,
+      })
+      const deadlines: Array<number | null> = []
+      mgr.setOnScheduleChange((info) => deadlines.push(info.deadlineMs))
+      const before = Date.now()
+
+      mgr.start()
+
+      expect(deadlines[0]).not.toBeNull()
+      expect(deadlines[0] as number).toBeGreaterThanOrEqual(before)
+    } finally {
+      random.mockRestore()
+    }
+  })
+})

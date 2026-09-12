@@ -22,7 +22,7 @@ import {
 import type { DmxValuesPayload } from '../../../shared/ipcTypes'
 
 interface MockSender {
-  send: jest.Mock<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<void>>
+  send: jest.Mock<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<boolean>>
   sendIpc: jest.Mock<(payload: DmxValuesPayload) => void>
   getEnabledWireSenders: jest.Mock<() => WireSenderId[]>
   isIpcEnabled: jest.Mock<() => boolean>
@@ -30,8 +30,8 @@ interface MockSender {
 
 function makeMockSender(opts: { wireSenders: WireSenderId[]; ipcEnabled?: boolean }): MockSender {
   return {
-    send: jest.fn<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<void>>(() =>
-      Promise.resolve(),
+    send: jest.fn<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<boolean>>(() =>
+      Promise.resolve(true),
     ),
     sendIpc: jest.fn<(payload: DmxValuesPayload) => void>(),
     getEnabledWireSenders: jest.fn<() => WireSenderId[]>(() => [...opts.wireSenders]),
@@ -158,14 +158,14 @@ describe('DmxPublisher mid-flight rig add/remove', () => {
     await flushMicrotasks()
     expect(sender.send).not.toHaveBeenCalled()
 
-    // Rig A's next emission carries only Rig A's channels — Rig B's stale aggregated state
-    // was cleared by setRigChains.
+    // Rig A's next emission carries Rig A's values, and Rig B's channels are driven to zero
+    // rather than dropped, so its fixtures go dark instead of holding their last frame.
     lsmA.setLightState('la', rgbio({ red: 250, intensity: 200 }))
     lsmA.publishLightStates()
     await flushMicrotasks()
     const buf = lastBufferFor(sender, 'sacn')!
-    expect(Object.keys(buf).sort()).toEqual(['1', '2', '3', '4'])
     expect(buf).toMatchObject({ 1: 200, 2: 250 })
+    expect(buf).toMatchObject({ 10: 0, 11: 0, 12: 0, 13: 0 })
   })
 
   it('updateActiveRigs alone (without setRigChains) stops a removed rig from reaching the wire', async () => {

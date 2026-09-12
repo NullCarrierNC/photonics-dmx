@@ -10,8 +10,10 @@
  * the raw working config never equals the normalized saved rig and the flag stays stuck true.
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
-import { render, screen, fireEvent, act, waitFor, cleanup } from '@testing-library/react'
-import { Provider, createStore } from 'jotai'
+import { screen, fireEvent, act, waitFor, cleanup } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../ipcApi'
 import { randomUUID as nodeRandomUUID } from 'node:crypto'
 import {
   activeDmxLightsConfigAtom,
@@ -37,17 +39,17 @@ if (typeof (globalThis.crypto as Crypto | undefined)?.randomUUID !== 'function')
   })
 }
 
-const getDmxRigsMock = jest.fn(async () => [] as DmxRig[])
-const getDmxRigMock = jest.fn(async (_id: string) => null as DmxRig | null)
-const saveDmxRigMock = jest.fn(
-  async (_rig: DmxRig) => ({ success: true }) as { success: boolean; error?: string },
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
 )
 
-jest.mock('../ipcApi', () => ({
-  getDmxRigs: () => getDmxRigsMock(),
-  getDmxRig: (id: string) => getDmxRigMock(id),
-  saveDmxRig: (rig: DmxRig) => saveDmxRigMock(rig),
-}))
+const getDmxRigsMock = jest.mocked(ipcApi.getDmxRigs)
+const getDmxRigMock = jest.mocked(ipcApi.getDmxRig)
+const saveDmxRigMock = jest.mocked(ipcApi.saveDmxRig)
 jest.mock('../hooks/useConfirm', () => ({ useConfirm: () => async () => true }))
 // Presentational children are irrelevant to the save/dirty flow; stub them to keep the test focused.
 jest.mock('../components/LightLayoutPreview', () => ({ __esModule: true, default: () => null }))
@@ -64,6 +66,15 @@ jest.mock('./LightsLayout/LightsLayoutRigSection', () => ({
 }))
 
 // Imported after the mocks are set up.
+const importRigModalRenders: Array<{ defaultName: string }> = []
+jest.mock('./LightsLayout/components/ImportRigModal', () => ({
+  __esModule: true,
+  default: (props: { defaultName: string }) => {
+    importRigModalRenders.push({ defaultName: props.defaultName })
+    return null
+  },
+}))
+
 import LightsLayout from './LightsLayout'
 
 const fixture = {
@@ -129,9 +140,7 @@ let lastSavedRig: DmxRig | null = null
 
 beforeEach(() => {
   lastSavedRig = null
-  getDmxRigsMock.mockReset()
-  getDmxRigMock.mockReset()
-  saveDmxRigMock.mockReset()
+  resetIpcApiMock()
   // Reads return the un-normalized rig until a save happens (page loads clean), then the normalized
   // rig (strobeValues materialized) — the canonical shape the dirty check compares against.
   getDmxRigsMock.mockImplementation(async () => [
@@ -149,20 +158,17 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 function renderPage() {
-  const store = createStore()
-  store.set(activeRigIdAtom, 'r1')
-  store.set(dmxRigsAtom, [initialRig])
-  store.set(activeDmxLightsConfigAtom, initialRig.config)
-  // myValidDmxLightsAtom (the editor's usable fixtures) is derived from myDmxLightsAtom, filtering
-  // to fixtures whose channels are all > 0 — the fixture below qualifies.
-  store.set(myDmxLightsAtom, [fixture])
-  store.set(lightingPrefsAtom, {})
-  render(
-    <Provider store={store}>
-      <LightsLayout />
-    </Provider>,
-  )
-  return store
+  return renderWithProviders(<LightsLayout />, {
+    seed: (set) => {
+      set(activeRigIdAtom, 'r1')
+      set(dmxRigsAtom, [initialRig])
+      set(activeDmxLightsConfigAtom, initialRig.config)
+      // myValidDmxLightsAtom (the editor's usable fixtures) is derived from myDmxLightsAtom,
+      // filtering to fixtures whose channels are all above 0, and the fixture below qualifies.
+      set(myDmxLightsAtom, [fixture])
+      set(lightingPrefsAtom, {})
+    },
+  }).store
 }
 
 describe('LightsLayout — unsaved-changes flag', () => {
@@ -170,7 +176,7 @@ describe('LightsLayout — unsaved-changes flag', () => {
     const store = renderPage()
 
     // Page loads clean: both sides come from the same un-normalized read.
-    await waitFor(() => expect(screen.getByText('Save Changes')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Save Changes')).toBeInTheDocument())
     await waitFor(() => expect(store.get(lightsLayoutHasUnsavedChangesAtom)).toBe(false))
 
     await act(async () => {
@@ -186,5 +192,17 @@ describe('LightsLayout — unsaved-changes flag', () => {
     })
 
     await waitFor(() => expect(store.get(lightsLayoutHasUnsavedChangesAtom)).toBe(false))
+  })
+})
+
+describe('LightsLayout import dialog', () => {
+  it('does not build the import dialog until there is an import to name', async () => {
+    // The dialog seeds its name field when it mounts. Kept mounted behind an isOpen prop it
+    // seeded from nothing, so it later opened empty with Import unavailable. Rendering null while
+    // closed hides that from the DOM, so the check is whether it was built at all.
+    renderPage()
+    await act(async () => {})
+
+    expect(importRigModalRenders).toHaveLength(0)
   })
 })

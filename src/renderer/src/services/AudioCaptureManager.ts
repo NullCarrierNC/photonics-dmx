@@ -18,10 +18,7 @@ import {
   extractAll,
   extractBandFeatures,
 } from '../../../photonics-dmx/listeners/Audio/SpectralFeatureExtractor'
-import {
-  MultibandOnsetDetector,
-  type BandOnsetConfig,
-} from '../../../photonics-dmx/listeners/Audio/MultibandOnsetDetector'
+import { MultibandOnsetDetector } from '../../../photonics-dmx/listeners/Audio/MultibandOnsetDetector'
 import { MelBandAnalyser } from '../../../photonics-dmx/listeners/Audio/MelBandAnalyser'
 import { computeChromagram } from '../../../photonics-dmx/listeners/Audio/ChromaAnalyser'
 import { KeyDetector } from '../../../photonics-dmx/listeners/Audio/KeyDetector'
@@ -29,8 +26,19 @@ import { getBandEnergy } from '../../../photonics-dmx/listeners/Audio/bandEnergy
 import { getDefaultStore } from 'jotai'
 import { audioDataAtom } from '../atoms'
 import { sendAudioData } from '../ipcApi'
+import { buildBinToBandMap } from './audioBandMapping'
+import { previewFrameChanged } from './audioPreviewFrame'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('AudioCaptureManager')
+
+/**
+ * Analysis rate. This drives FFT, beat detection and the frames sent to main, so it is the show
+ * rate and must not depend on the display: requestAnimationFrame is throttled to about 1Hz when
+ * the window is hidden, which is exactly the case where a game is running full-screen in front of
+ * it, and it also ties the analysis rate to the monitor's refresh rate.
+ */
+const ANALYSIS_RATE_HZ = 60
+const ANALYSIS_INTERVAL_MS = Math.round(1000 / ANALYSIS_RATE_HZ)
 
 const store = getDefaultStore()
 
@@ -63,9 +71,16 @@ export class AudioCaptureManager {
   private analyser: AnalyserNode | null = null
   private stream: MediaStream | null = null
   private source: MediaStreamAudioSourceNode | null = null
-  private animationFrameId: number | null = null
+  private analysisTimer: ReturnType<typeof setInterval> | null = null
   private config: AudioConfig
   private isCapturing = false
+
+  /** Serialises device opens so two starts cannot hold two devices. */
+  private startQueue: Promise<void> = Promise.resolve()
+  /** True while a device is being opened, which tells an early stop from an idle one. */
+  private opening = false
+  /** Moved on by every start and every stop, so an opening device knows it is no longer wanted. */
+  private startGeneration = 0
 
   /** Smoothed energy for display only; not used for beat thresholds */
   private smoothedEnergy = 0
@@ -86,14 +101,16 @@ export class AudioCaptureManager {
   // Cached band gains array (indexed by band index 0-7)
   private bandGains: number[] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
-  // Debug logging (log status every ~60 frames ≈ 1 second at 60fps)
+  // Debug logging (log status once a second at the analysis rate)
   private frameCounter = 0
-  private readonly DEBUG_LOG_INTERVAL = 60
+  private readonly DEBUG_LOG_INTERVAL = ANALYSIS_RATE_HZ
 
-  // Throttling for UI updates (update atom every 2 frames = 30fps)
+  // Throttling for UI updates: the preview atom is written at half the analysis rate.
   private readonly UI_UPDATE_THROTTLE = 2
   private uiUpdateCounter = 0
   private lastAudioData: AudioLightingData | null = null
+  private frequencyBuffer: Uint8Array | null = null
+  private timeDomainBuffer: Float32Array | null = null
   private readonly VALUE_CHANGE_THRESHOLD = 0.01 // Only update if values changed by >1%
 
   constructor(config?: Partial<AudioConfig>) {
@@ -105,14 +122,30 @@ export class AudioCaptureManager {
   }
 
   /**
-   * Start audio capture from the specified device (or default)
+   * Start audio capture from the specified device (or default).
+   *
+   * Opening a device is awaited, so starts are queued behind each other and a stop that arrives
+   * during one is honoured by {@link openDevice} rather than lost.
    */
   async start(deviceId?: string): Promise<void> {
+    const requested = ++this.startGeneration
+    const open = (): Promise<void> => this.openDevice(deviceId, requested)
+    const attempt = this.startQueue.then(open, open)
+    this.startQueue = attempt.catch(() => undefined)
+    await attempt
+  }
+
+  private async openDevice(deviceId: string | undefined, requested: number): Promise<void> {
+    if (requested !== this.startGeneration) {
+      log.info('Skipping an audio start that was superseded before it opened a device')
+      return
+    }
     if (this.isCapturing) {
       log.warn('AudioCaptureManager is already capturing')
       return
     }
 
+    this.opening = true
     try {
       log.info('Starting audio capture...', deviceId ? `device: ${deviceId}` : 'default device')
 
@@ -123,6 +156,14 @@ export class AudioCaptureManager {
 
       this.stream = await navigator.mediaDevices.getUserMedia(constraints)
       log.info('Microphone access granted')
+
+      // The device is live from here on. A stop that arrived while it was opening moved the
+      // generation on, and this is the first moment we can act on it.
+      if (requested !== this.startGeneration) {
+        log.info('Audio capture was stopped while the device was opening')
+        this.releasePartialStart()
+        return
+      }
 
       // Create Web Audio API context
       this.audioContext = new AudioContext()
@@ -153,11 +194,16 @@ export class AudioCaptureManager {
       this.rebuildBinToBandMap()
 
       // Start analysis loop
+      this.analysisTimer = setInterval(() => this.analyzeAudio(), ANALYSIS_INTERVAL_MS)
       this.analyzeAudio()
 
       log.info('Audio capture started successfully')
     } catch (error) {
       log.error('Failed to start audio capture:', error)
+      // The device is live from getUserMedia onward, but the capturing flag is only set once
+      // everything downstream is built, and stop() bails on that flag. Anything failing in
+      // between would leave the microphone open with no way left to close it.
+      this.releasePartialStart()
 
       if (error instanceof DOMException) {
         if (error.name === 'NotAllowedError') {
@@ -188,14 +234,44 @@ export class AudioCaptureManager {
 
       // For non-DOMException errors, preserve the original error
       throw error
+    } finally {
+      this.opening = false
     }
   }
 
   /**
    * Stop audio capture and clean up resources
    */
+  /** Give back whatever a failed start had already taken. */
+  private releasePartialStart(): void {
+    try {
+      this.source?.disconnect()
+      this.stream?.getTracks().forEach((track) => track.stop())
+      void this.audioContext?.close()
+      if (this.analysisTimer !== null) {
+        clearInterval(this.analysisTimer)
+      }
+    } catch (error) {
+      log.error('Failed to release a partly started capture:', error)
+    }
+    this.source = null
+    this.stream = null
+    this.audioContext = null
+    this.analyser = null
+    this.melBandAnalyser = null
+    this.analysisTimer = null
+    this.isCapturing = false
+  }
+
   stop(): void {
+    // Moving the generation on tells a start that is still opening a device to release it.
+    this.startGeneration += 1
+
     if (!this.isCapturing) {
+      if (this.opening) {
+        log.info('Stopping audio capture before the device has finished opening')
+        return
+      }
       log.warn('AudioCaptureManager is not capturing')
       return
     }
@@ -205,10 +281,10 @@ export class AudioCaptureManager {
     // Clear audio data atom
     store.set(audioDataAtom, null)
 
-    // Cancel animation frame
-    if (this.animationFrameId !== null) {
-      cancelAnimationFrame(this.animationFrameId)
-      this.animationFrameId = null
+    // Stop the analysis loop
+    if (this.analysisTimer !== null) {
+      clearInterval(this.analysisTimer)
+      this.analysisTimer = null
     }
 
     // Disconnect and stop stream
@@ -260,57 +336,21 @@ export class AudioCaptureManager {
     }
   }
 
-  /**
-   * Rebuild bin-to-band mapping cache
-   * Called when bands config changes or when audio context is initialized
-   */
+  /** Rebuilds the bin-to-band cache from the live context, clearing it when there is none. */
   private rebuildBinToBandMap(): void {
     if (!this.audioContext || !this.analyser) {
       this.binToBandMap = null
       return
     }
-
-    const sampleRate = this.audioContext.sampleRate
-    const fftSize = this.analyser.fftSize
-    const binSize = sampleRate / fftSize
-    const binCount = this.analyser.frequencyBinCount
-
-    // Create mapping array
-    this.binToBandMap = new Int8Array(binCount)
-    this.binToBandMap.fill(-1) // -1 means no band matches
-
-    // Extract band gains for quick lookup
-    this.bandGains = this.config.bands.map((band) => band.gain)
-
-    // For each bin, find which band it belongs to
-    for (let binIndex = 0; binIndex < binCount; binIndex++) {
-      // Calculate centre frequency of this bin
-      const centreFreq = binIndex * binSize
-
-      // Find matching band (minHz <= centreFreq < maxHz)
-      for (let bandIndex = 0; bandIndex < this.config.bands.length; bandIndex++) {
-        const band = this.config.bands[bandIndex]
-        if (centreFreq >= band.minHz && centreFreq < band.maxHz) {
-          this.binToBandMap[binIndex] = bandIndex
-          break
-        }
-      }
-      // If no band matches (e.g., sub-20 Hz), binToBandMap[binIndex] remains -1
-    }
-
-    const onsetConfigs: BandOnsetConfig[] = this.config.bands.map((band) => ({
-      id: band.id,
-      startBin: Math.floor(band.minHz / binSize),
-      endBin: Math.min(Math.ceil(band.maxHz / binSize), binCount),
-    }))
-    this.multibandOnset.reconfigure(onsetConfigs)
-
-    log.info('Rebuilt bin-to-band mapping', {
-      binCount,
-      sampleRate,
-      fftSize,
-      binSize: binSize.toFixed(2),
-    })
+    const mapping = buildBinToBandMap(
+      this.audioContext.sampleRate,
+      this.analyser.fftSize,
+      this.analyser.frequencyBinCount,
+      this.config.bands,
+    )
+    this.binToBandMap = mapping.binToBandMap
+    this.bandGains = mapping.bandGains
+    this.multibandOnset.reconfigure(mapping.onsetConfigs)
   }
 
   /**
@@ -366,10 +406,17 @@ export class AudioCaptureManager {
     }
     this.lastFrameTime = now
 
-    // Get frequency data from analyser (built-in FFT)
-    const dataArray = new Uint8Array(this.analyser.frequencyBinCount)
+    // Get frequency data from analyser (built-in FFT). The buffers are reused across frames, so
+    // the loop allocates nothing at the analysis rate.
+    if (!this.frequencyBuffer || this.frequencyBuffer.length !== this.analyser.frequencyBinCount) {
+      this.frequencyBuffer = new Uint8Array(this.analyser.frequencyBinCount)
+    }
+    if (!this.timeDomainBuffer || this.timeDomainBuffer.length !== this.analyser.fftSize) {
+      this.timeDomainBuffer = new Float32Array(this.analyser.fftSize)
+    }
+    const dataArray = this.frequencyBuffer
     this.analyser.getByteFrequencyData(dataArray)
-    const timeDomainArray = new Float32Array(this.analyser.fftSize)
+    const timeDomainArray = this.timeDomainBuffer
     this.analyser.getFloatTimeDomainData(timeDomainArray)
 
     // Calculate frequency bands and include raw FFT data (byte data is linear 0-255, IPC-safe)
@@ -391,7 +438,10 @@ export class AudioCaptureManager {
         this.uiUpdateCounter = 0
       }
 
-      const pushToPreviewAtom = beatChanged || (shouldUpdateUI && this.shouldUpdateAtom(audioData))
+      const pushToPreviewAtom =
+        beatChanged ||
+        (shouldUpdateUI &&
+          previewFrameChanged(this.lastAudioData, audioData, this.VALUE_CHANGE_THRESHOLD))
 
       if (pushToPreviewAtom) {
         store.set(audioDataAtom, audioData)
@@ -409,57 +459,6 @@ export class AudioCaptureManager {
         beat: audioData.beatDetected ? 'YES' : 'no',
       })
     }
-
-    // Continue loop
-    this.animationFrameId = requestAnimationFrame(() => this.analyzeAudio())
-  }
-
-  /**
-   * Check if atom should be updated based on value changes
-   * Only updates if values changed significantly or beat detection changed
-   */
-  private shouldUpdateAtom(newData: AudioLightingData): boolean {
-    if (!this.lastAudioData) {
-      return true // First update
-    }
-
-    // Always update if beat detection changed
-    if (newData.beatDetected !== this.lastAudioData.beatDetected) {
-      return true
-    }
-
-    // Always update if BPM or BPM confidence changed
-    if (newData.bpm !== this.lastAudioData.bpm) return true
-    if ((newData.bpmConfidence ?? 0) !== (this.lastAudioData.bpmConfidence ?? 0)) return true
-
-    // Check overall energy change
-    const energyDiff = Math.abs(newData.energy - this.lastAudioData.energy)
-    if (energyDiff > this.VALUE_CHANGE_THRESHOLD) return true
-
-    // Check if rawFrequencyData changed (for EQ preview bars)
-    // Sample a few bins to detect changes without full array comparison
-    const newRaw = newData.rawFrequencyData
-    const oldRaw = this.lastAudioData.rawFrequencyData
-    if (newRaw && oldRaw && newRaw.length === oldRaw.length) {
-      // Sample bins at low, mid, and high frequencies to detect changes
-      const sampleIndices = [
-        0, // First bin (lowest frequency)
-        Math.floor(newRaw.length / 2), // Middle bin
-        newRaw.length - 1, // Last bin (highest frequency)
-      ]
-      for (const idx of sampleIndices) {
-        const diff = Math.abs(newRaw[idx] - oldRaw[idx])
-        if (diff > 2) {
-          // Changed by more than 2 units (out of 255) - significant enough to update
-          return true
-        }
-      }
-    } else if (newRaw !== oldRaw) {
-      // Array reference changed or length mismatch - update
-      return true
-    }
-
-    return false
   }
 
   /**

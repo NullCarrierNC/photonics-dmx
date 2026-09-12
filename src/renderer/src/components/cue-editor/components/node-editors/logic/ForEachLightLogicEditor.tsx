@@ -1,6 +1,7 @@
 import React from 'react'
 import type { ForEachLightLogicNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
+import VariableSelect from './VariableSelect'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 
 export interface ForEachLightLogicEditorProps extends LogicEditorCommonProps {
@@ -18,51 +19,26 @@ const ForEachLightLogicEditor: React.FC<ForEachLightLogicEditorProps> = ({
 
   return (
     <div className="space-y-2 text-xs">
-      <label className="flex flex-col font-medium">
-        Source Variable (light-array)
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.sourceVariable}
-          onChange={(event) => updateNode({ sourceVariable: event.target.value })}>
-          <option value="">-- Select light-array --</option>
-          {lightArrayVars.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex flex-col font-medium">
-        Current Light Variable (light-array)
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.currentLightVariable}
-          onChange={(event) => updateNode({ currentLightVariable: event.target.value })}>
-          <option value="">-- Select variable --</option>
-          {lightArrayVars.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.scope})
-            </option>
-          ))}
-        </select>
-        <span className="text-[10px] text-gray-500 mt-0.5">
-          Holds current light(s) for this iteration (one element or a group if Group Size is set).
-        </span>
-      </label>
-      <label className="flex flex-col font-medium">
-        Current Index Variable (number)
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.currentIndexVariable}
-          onChange={(event) => updateNode({ currentIndexVariable: event.target.value })}>
-          <option value="">-- Select variable --</option>
-          {numberVars.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
+      <VariableSelect
+        label="Source Variable (light-array)"
+        value={node.sourceVariable}
+        onChange={(name) => updateNode({ sourceVariable: name })}
+        variables={lightArrayVars}
+        placeholder="-- Select light-array --"
+      />
+      <VariableSelect
+        label="Current Light Variable (light-array)"
+        value={node.currentLightVariable}
+        onChange={(name) => updateNode({ currentLightVariable: name })}
+        variables={lightArrayVars}
+        hint="Holds current light(s) for this iteration (one element or a group if Group Size is set)."
+      />
+      <VariableSelect
+        label="Current Index Variable (number)"
+        value={node.currentIndexVariable}
+        onChange={(name) => updateNode({ currentIndexVariable: name })}
+        variables={numberVars}
+      />
       <div className="space-y-1">
         <label className="flex items-center gap-2 cursor-pointer font-medium">
           <input

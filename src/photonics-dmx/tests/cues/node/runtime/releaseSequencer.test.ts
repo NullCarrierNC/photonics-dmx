@@ -3,7 +3,7 @@
  * sequencer can be garbage collected. Without this hook the cue instance (a registry
  * singleton) would accumulate one stale state entry per `restartControllers` cycle.
  */
-import { describe, expect, it, jest } from '@jest/globals'
+import { describe, expect, it } from '@jest/globals'
 
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import { monotonicNowMs } from '../../../../../shared/time'
@@ -24,29 +24,10 @@ import type { CueData } from '../../../../cues/types/cueTypes'
 import type { AudioCueData } from '../../../../cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
 import type { AudioEventNodeUnion } from '../../../../cues/types/nodeCueTypes'
+import { fakeLightingController } from '../../../helpers/fakeLightingController'
 
 function makeSequencerStub(): ILightingController {
-  return {
-    addEffect: jest.fn(),
-    setEffect: jest.fn(),
-    removeEffect: jest.fn(),
-    removeAllEffects: jest.fn(),
-    removeEffectByLayer: jest.fn(),
-    removeEffectCallback: jest.fn(),
-    addEffectUnblockedName: jest.fn(),
-    setEffectUnblockedName: jest.fn(),
-    addEffectUnblockedNameWithCallback: jest.fn(),
-    setEffectUnblockedNameWithCallback: jest.fn(),
-    addEffectWithCallback: jest.fn(),
-    setEffectWithCallback: jest.fn(),
-    cancelPanTiltClear: jest.fn(),
-    schedulePanTiltClear: jest.fn(),
-    addMotionPattern: jest.fn(),
-    removeMotionPattern: jest.fn(),
-    getMotionPattern: jest.fn(),
-    updateMotionPatternConfig: jest.fn(),
-    onBeat: jest.fn(),
-  } as unknown as ILightingController
+  return fakeLightingController()
 }
 
 function minimalYargCueData(): CueData {
@@ -204,7 +185,7 @@ describe('releaseSequencer drops per-sequencer state', () => {
     cue.execute(minimalYargCueData(), seqA, lightManager)
     cue.execute(minimalYargCueData(), seqB, lightManager)
 
-    // The states map is private; cast to peek for this regression assertion.
+    // The states map is private, so cast to peek at it.
     const states = (cue as unknown as { states: Map<ILightingController, unknown> }).states
     expect(states.size).toBe(2)
 

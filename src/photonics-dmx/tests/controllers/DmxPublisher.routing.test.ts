@@ -54,7 +54,7 @@ interface SendCall {
 }
 
 interface MockSender {
-  send: jest.Mock<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<void>>
+  send: jest.Mock<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<boolean>>
   sendIpc: jest.Mock<(payload: DmxValuesPayload) => void>
   getEnabledWireSenders: jest.Mock<() => WireSenderId[]>
   isIpcEnabled: jest.Mock<() => boolean>
@@ -62,8 +62,8 @@ interface MockSender {
 
 function makeMockSender(opts: { wireSenders: WireSenderId[]; ipcEnabled?: boolean }): MockSender {
   return {
-    send: jest.fn<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<void>>(() =>
-      Promise.resolve(),
+    send: jest.fn<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<boolean>>(() =>
+      Promise.resolve(true),
     ),
     sendIpc: jest.fn<(payload: DmxValuesPayload) => void>(),
     getEnabledWireSenders: jest.fn<() => WireSenderId[]>(() => [...opts.wireSenders]),
@@ -212,10 +212,9 @@ describe('DmxPublisher per-rig sender routing', () => {
   })
 
   it('IPC sees a separate buffer for every active rig (no merging, no collisions)', () => {
-    // This is the regression test for the channel-collision bug: when Rig A and Rig B both
-    // write to the same channel number (because they target different physical universes),
-    // the IPC payload must keep each rig's buffer independent so the renderer can pick one
-    // without the other's values leaking in.
+    // Rig A and Rig B both write to the same channel number because they target different
+    // physical universes. The IPC payload keeps each rig's buffer independent, so the renderer
+    // can pick one without the other's values leaking in.
     const sender = makeMockSender({ wireSenders: ['sacn', 'opendmx'], ipcEnabled: true })
     const publisher = new DmxPublisher(
       sender as unknown as SenderManager,
@@ -239,9 +238,8 @@ describe('DmxPublisher per-rig sender routing', () => {
   })
 
   it('two rigs routed to the same sender: last-writer-wins on overlapping channels', () => {
-    // Channel overlap on the same sender is a documented user error — we don't try to fix it
-    // here. The contract is "last write wins by iteration order"; this test pins that behaviour
-    // so it can't regress silently.
+    // Channel overlap on the same sender is a documented user error and is left alone here. The
+    // contract is "last write wins by iteration order".
     const sender = makeMockSender({ wireSenders: ['sacn'] })
     const publisher = new DmxPublisher(
       sender as unknown as SenderManager,

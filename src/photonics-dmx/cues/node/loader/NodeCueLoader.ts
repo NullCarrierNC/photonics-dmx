@@ -8,25 +8,15 @@ import {
   NodeCueMode,
   NetNodeCueFile,
   NodeCueKind,
-  NetEventNode,
-  AudioEventNodeUnion,
 } from '../../types/nodeCueTypes'
-import { NodeCueCompilationError, NodeCueCompiler } from '../compiler/NodeCueCompiler'
 import { CueRegistry } from '../../registries/CueRegistry'
-import { AudioCueRegistry, AudioCueGroup } from '../../registries/AudioCueRegistry'
-import type { ICueGroup } from '../../interfaces/INetCueGroup'
-import { INetCue } from '../../interfaces/INetCue'
-import { LightingNodeCue } from '../runtime/LightingNodeCue'
-import { MotionNodeCue } from '../runtime/MotionNodeCue'
-import { AudioNodeCue } from '../runtime/AudioNodeCue'
-import { AudioMotionNodeCue } from '../runtime/AudioMotionNodeCue'
-import { CueType } from '../../types/cueTypes'
+import { AudioCueRegistry } from '../../registries/AudioCueRegistry'
 import { AudioCueType } from '../../types/audioCueTypes'
-import { IAudioCue } from '../../interfaces/IAudioCue'
 import { EffectRegistry } from '../runtime/EffectRegistry'
 import { EffectCompiler } from '../compiler/EffectCompiler'
 import type { EffectLoader } from './EffectLoader'
 import { migrateLegacyBearings } from './migrateLegacyBearings'
+import { buildAudioGroup, buildNetGroup, type CueGroupBuildContext } from './cueGroupBuilders'
 import type { EffectMode, EffectReference } from '../../types/nodeCueTypes'
 import { createLogger } from '../../../../shared/logger'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
@@ -127,7 +117,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     super(options.baseDir, 'cues', ['yarg', 'audio', 'rb3'])
   }
 
-  protected onBeforeLoadAll(): void {
+  protected override onBeforeLoadAll(): void {
     this.customAudioCueTypes.clear()
   }
 
@@ -275,11 +265,14 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     file: NodeCueFile,
     compileErrors: string[],
   ): Promise<void> {
-    let wasAudioGroupEnabled = false
+    // Registering a group enables it, so an audio file that is being reloaded would put back a
+    // group the user had turned off. Null means this file has not been loaded before, where
+    // enabled is the right starting point.
+    let audioGroupWasEnabled: boolean | null = null
     if (mode === 'audio') {
       const existing = this.fileRegistrations.get(filePath)
       if (existing) {
-        wasAudioGroupEnabled = this.options.registries.audio
+        audioGroupWasEnabled = this.options.registries.audio
           .getEnabledGroups()
           .includes(existing.groupId)
       }
@@ -298,7 +291,7 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       // Both net modes compile through the same path and differ only in which registry instance
       // they load into, which the per-mode map supplies.
       const registry = this.options.registries[mode]
-      const group = await this.buildNetGroup(file as NetNodeCueFile, compileErrors)
+      const group = await buildNetGroup(file as NetNodeCueFile, compileErrors, this.buildContext())
       registry.registerGroup(group)
       registry.applyGroupDesignations(file.group, group)
     } else {
@@ -306,11 +299,13 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       // parameter, so nothing else here narrows `file` off the union. The cue loop needs it too,
       // because `cueTypeId` is the audio cue's identifier and the net cues have no such field.
       const audioFile = file as AudioNodeCueFile
-      const group = await this.buildAudioGroup(audioFile, compileErrors)
+      const group = await buildAudioGroup(audioFile, compileErrors, this.buildContext())
       this.options.registries.audio.registerGroup(group)
-      if (wasAudioGroupEnabled) {
-        this.options.registries.audio.enableGroup(group.id)
+      this.options.registries.audio.applyGroupDesignations(audioFile.group, group)
+      if (audioGroupWasEnabled === false) {
+        this.options.registries.audio.disableGroup(group.id)
       }
+
       audioFile.cues.forEach((cue) => {
         if (cue.kind === 'lighting') {
           this.customAudioCueTypes.add(cue.cueTypeId)
@@ -340,165 +335,6 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     )
 
     this.fileRegistrations.delete(filePath)
-  }
-
-  private async buildNetGroup(file: NetNodeCueFile, compileErrors: string[]): Promise<ICueGroup> {
-    const cueMap = new Map<CueType, INetCue>()
-    const motionMap = new Map<string, INetCue>()
-
-    for (const cue of file.cues) {
-      if (cue.kind === 'lighting') {
-        if (cueMap.has(cue.cueType)) {
-          throw new NodeCueCompilationError(
-            `Duplicate cueType '${cue.cueType}' in group '${file.group.name}'.`,
-          )
-        }
-        try {
-          const compiled = NodeCueCompiler.compileCue<NetEventNode>(cue, file.mode)
-          compiled.groupVariables = file.group.variables ?? []
-          const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], file.mode)
-          const callbacks = this.options.getNodeRuntimeCallbacks?.()
-          cueMap.set(
-            cue.cueType,
-            new LightingNodeCue(
-              file.group.id,
-              compiled,
-              effectRegistry,
-              callbacks,
-              this.options.runtimeBroadcaster,
-            ),
-          )
-        } catch (err) {
-          log.warn(`Skipping cue '${cue.cueType}':`, err)
-          compileErrors.push(
-            `cue '${cue.cueType}': ${err instanceof Error ? err.message : String(err)}`,
-          )
-        }
-      } else {
-        if (motionMap.has(cue.id)) {
-          throw new NodeCueCompilationError(
-            `Duplicate motion cue id '${cue.id}' in group '${file.group.name}'.`,
-          )
-        }
-        try {
-          const compiled = NodeCueCompiler.compileCue<NetEventNode>(cue, file.mode)
-          compiled.groupVariables = file.group.variables ?? []
-          const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], file.mode)
-          const callbacks = this.options.getNodeRuntimeCallbacks?.()
-          motionMap.set(
-            cue.id,
-            new MotionNodeCue(
-              file.group.id,
-              compiled,
-              effectRegistry,
-              callbacks,
-              this.options.runtimeBroadcaster,
-            ),
-          )
-        } catch (err) {
-          log.warn(`Skipping motion cue '${cue.id}':`, err)
-          compileErrors.push(
-            `motion cue '${cue.id}': ${err instanceof Error ? err.message : String(err)}`,
-          )
-        }
-      }
-    }
-
-    if (cueMap.size === 0 && motionMap.size === 0) {
-      throw new NodeCueCompilationError(
-        'Group must contain at least one lighting or motion cue definition.',
-      )
-    }
-
-    const result: ICueGroup = {
-      id: file.group.id,
-      name: file.group.name,
-      description: file.group.description,
-      cues: cueMap,
-    }
-    if (motionMap.size > 0) {
-      result.motionCues = motionMap
-    }
-    return result
-  }
-
-  private async buildAudioGroup(
-    file: AudioNodeCueFile,
-    compileErrors: string[],
-  ): Promise<AudioCueGroup> {
-    const cueMap = new Map<AudioCueType, IAudioCue>()
-    const motionMap = new Map<string, IAudioCue>()
-
-    for (const cue of file.cues) {
-      if (cue.kind === 'lighting') {
-        if (cueMap.has(cue.cueTypeId)) {
-          throw new NodeCueCompilationError(
-            `Duplicate audio cue id '${cue.cueTypeId}' in group '${file.group.name}'.`,
-          )
-        }
-        try {
-          const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')
-          compiled.groupVariables = file.group.variables ?? []
-          const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio')
-          cueMap.set(
-            cue.cueTypeId,
-            new AudioNodeCue(
-              file.group.id,
-              compiled,
-              effectRegistry,
-              this.options.runtimeBroadcaster,
-            ),
-          )
-        } catch (err) {
-          log.warn(`Skipping audio cue '${cue.cueTypeId}':`, err)
-          compileErrors.push(
-            `audio cue '${cue.cueTypeId}': ${err instanceof Error ? err.message : String(err)}`,
-          )
-        }
-      } else {
-        if (motionMap.has(cue.id)) {
-          throw new NodeCueCompilationError(
-            `Duplicate audio motion cue id '${cue.id}' in group '${file.group.name}'.`,
-          )
-        }
-        try {
-          const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(cue, 'audio')
-          compiled.groupVariables = file.group.variables ?? []
-          const effectRegistry = await this.buildEffectRegistry(cue.effects ?? [], 'audio')
-          motionMap.set(
-            cue.id,
-            new AudioMotionNodeCue(
-              file.group.id,
-              compiled,
-              effectRegistry,
-              this.options.runtimeBroadcaster,
-            ),
-          )
-        } catch (err) {
-          log.warn(`Skipping audio motion cue '${cue.id}':`, err)
-          compileErrors.push(
-            `audio motion cue '${cue.id}': ${err instanceof Error ? err.message : String(err)}`,
-          )
-        }
-      }
-    }
-
-    if (cueMap.size === 0 && motionMap.size === 0) {
-      throw new NodeCueCompilationError(
-        'Group must contain at least one lighting or motion audio cue definition.',
-      )
-    }
-
-    const result: AudioCueGroup = {
-      id: file.group.id,
-      name: file.group.name,
-      description: file.group.description ?? 'Node-based audio cues',
-      cues: cueMap,
-    }
-    if (motionMap.size > 0) {
-      result.motionCues = motionMap
-    }
-    return result
   }
 
   /**
@@ -562,6 +398,15 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       'Node cue path',
       'Node cue file path must be under one of the cue directories.',
     )
+  }
+
+  /** What the group builders need from this loader. */
+  private buildContext(): CueGroupBuildContext {
+    return {
+      runtimeBroadcaster: this.options.runtimeBroadcaster,
+      getNodeRuntimeCallbacks: this.options.getNodeRuntimeCallbacks,
+      buildEffectRegistry: (effects, mode) => this.buildEffectRegistry(effects, mode),
+    }
   }
 
   private async buildEffectRegistry(

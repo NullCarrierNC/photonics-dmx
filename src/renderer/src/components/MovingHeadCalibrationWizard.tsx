@@ -1,37 +1,31 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import Modal from './Modal'
 import {
   DmxLight,
   FixtureConfig,
-  FixtureTypes,
   LightingConfiguration,
   normalizeFixtureConfig,
   RgbMovingHeadDmxChannels,
 } from '../../../photonics-dmx/types'
 import {
-  mirrorDmxForMovingHeadInvert,
-  percentToDmx,
-} from '../../../photonics-dmx/helpers/dmxHelpers'
-import {
   motorDegFromPanDmx,
   motorDegFromTiltDmx,
   rawDmxToLogicalHomePercent,
 } from '../../../photonics-dmx/helpers/movingHeadCalibration'
-import { getDmxPreviewLightColorCss } from './dmxPreviewLightColor'
+import { buildInitialConsoleBuffer } from './movingHeadCalibrationBuffer'
+import { DmxSlider } from './MovingHeadCalibrationWizard/DmxSlider'
 import {
-  enableConsole,
-  disableConsole,
-  sendConsoleDmx,
-  setConsoleFixtureConfig,
-  enableSender,
-} from '../ipcApi'
-import type { IpcSenderConfig } from '../../../photonics-dmx/types'
-import { panTiltDmxToSphericalXY, panTiltDmxToWizardMotorSpaceXY } from './LightsDmxPreview'
+  STAGE_LABELS_READY_STEP,
+  WizardBeamPreview,
+} from './MovingHeadCalibrationWizard/WizardBeamPreview'
+import { enableConsole, disableConsole, sendConsoleDmx, setConsoleFixtureConfig } from '../ipcApi'
 import SacnToggle from './SacnToggle'
 import ArtNetToggle from './ArtNetToggle'
 import EnttecProToggle from './EnttecProToggle'
 import OpenDmxToggle from './OpenDmxToggle'
 import LightsDmxPreview3D from './LightsDmxPreview3D'
 import { MotorEdgeHomeWarnings } from './MotorEdgeHomeWarnings'
+import { useIpcPreviewSender } from '@renderer/hooks/useIpcPreviewSender'
 
 const STEP_TITLES = [
   'Pan range',
@@ -48,155 +42,6 @@ const REVIEW_STEP = STEP_TITLES.length - 1
 
 /** Steps where the user must press a capture button before Next is enabled. */
 const STEPS_REQUIRING_SET_CAPTURE = new Set([4, 5, 6])
-
-function channelsRecord(light: DmxLight): Record<string, number> {
-  return light.channels as unknown as Record<string, number>
-}
-
-function buildInitialConsoleBuffer(light: DmxLight): Record<number, number> {
-  const cfg = normalizeFixtureConfig(light.config)
-  const ch = channelsRecord(light)
-  const buf: Record<number, number> = {}
-  for (const [name, addr] of Object.entries(ch)) {
-    if (typeof addr !== 'number' || addr < 1 || addr > 512) continue
-    switch (name) {
-      case 'masterDimmer':
-        buf[addr] = 255
-        break
-      case 'pan': {
-        const logicalDmx = percentToDmx(cfg.panHome, cfg.panMin, cfg.panMax)
-        buf[addr] = cfg.invertPan
-          ? mirrorDmxForMovingHeadInvert(logicalDmx, cfg.panMin, cfg.panMax)
-          : logicalDmx
-        break
-      }
-      case 'tilt': {
-        const logicalDmx = percentToDmx(cfg.tiltHome, cfg.tiltMin, cfg.tiltMax)
-        buf[addr] = cfg.invertTilt
-          ? mirrorDmxForMovingHeadInvert(logicalDmx, cfg.tiltMin, cfg.tiltMax)
-          : logicalDmx
-        break
-      }
-      case 'red':
-      case 'green':
-      case 'blue':
-      case 'white':
-        buf[addr] = 255
-        break
-      default:
-        buf[addr] = 0
-    }
-  }
-  // Added channels also run in console manual mode: hold fixed/mode channels at their value so a
-  // moving head that needs a pinned mode channel lights up, and park colour extras dark.
-  for (const extra of light.extraChannels ?? []) {
-    if (typeof extra.channel !== 'number' || extra.channel < 1 || extra.channel > 512) continue
-    buf[extra.channel] = extra.type === 'fixed' ? Math.max(0, Math.min(255, extra.value ?? 0)) : 0
-  }
-  return buf
-}
-
-function DmxSlider(props: {
-  label: string
-  value: number
-  onChange: (v: number) => void
-  disabled?: boolean
-}) {
-  const { label, value, onChange, disabled } = props
-  const v = Math.max(0, Math.min(255, Math.round(value)))
-  return (
-    <div className="flex flex-col gap-1 w-full">
-      <div className="flex justify-between text-sm text-gray-700 dark:text-gray-300">
-        <span>{label}</span>
-        <span className="font-mono">{v}</span>
-      </div>
-      <input
-        type="range"
-        min={0}
-        max={255}
-        value={v}
-        disabled={disabled}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full disabled:opacity-50"
-      />
-    </div>
-  )
-}
-
-/** First step index where pan/tilt stage references are captured; Home uses stage-relative preview. */
-const STAGE_LABELS_READY_STEP = 6
-
-function WizardBeamPreview({
-  light,
-  buffer,
-  config,
-  step,
-}: {
-  light: DmxLight
-  buffer: Record<number, number>
-  config: FixtureConfig
-  step: number
-}) {
-  const ch = light.channels as RgbMovingHeadDmxChannels
-  const pan = buffer[ch.pan] ?? 0
-  const tilt = buffer[ch.tilt] ?? 0
-
-  const stageLabelsReady = step >= STAGE_LABELS_READY_STEP
-  const rawConsoleConfig: FixtureConfig = { ...config, invertPan: false, invertTilt: false }
-  const { xPct, yPct } =
-    step < STAGE_LABELS_READY_STEP
-      ? panTiltDmxToWizardMotorSpaceXY(pan, tilt, rawConsoleConfig)
-      : panTiltDmxToSphericalXY(pan, tilt, config)
-
-  // Shared with the DMX previews, so added colour channels (white, amber, UV) tint the wizard
-  // swatch the same way they tint the stage preview.
-  const bg =
-    light.fixture === FixtureTypes.RGBMH
-      ? getDmxPreviewLightColorCss(light, buffer)
-      : 'rgb(40,40,40)'
-
-  const baseCircleClasses =
-    'w-14 h-14 rounded-full flex items-center justify-center text-sm font-semibold shadow-md relative overflow-hidden'
-
-  const labelClass = 'text-[9px] font-medium text-gray-600 dark:text-gray-400 select-none'
-
-  return (
-    <div className="flex flex-col items-center gap-1 shrink-0">
-      <span className="text-xs text-gray-600 dark:text-gray-400">
-        {stageLabelsReady ? 'Beam direction' : 'Motor position'}
-      </span>
-      <div className="relative flex items-center justify-center w-[5.5rem] h-[5.5rem]">
-        {stageLabelsReady ? (
-          <>
-            <span className={`absolute -top-0.5 left-1/2 -translate-x-1/2 ${labelClass}`}>US</span>
-            <span className={`absolute bottom-0 left-1/2 -translate-x-1/2 ${labelClass}`}>DS</span>
-            <span className={`absolute left-0 top-1/2 -translate-y-1/2 ${labelClass}`}>SR</span>
-            <span className={`absolute right-0 top-1/2 -translate-y-1/2 ${labelClass}`}>SL</span>
-          </>
-        ) : (
-          <span
-            className={`absolute -bottom-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap ${labelClass}`}>
-            approx. until calibrated
-          </span>
-        )}
-        <div className={baseCircleClasses} style={{ backgroundColor: bg }}>
-          <div
-            className="absolute rounded-full bg-red-500 z-10"
-            style={{
-              width: 6,
-              height: 6,
-              left: `${xPct}%`,
-              top: `${yPct}%`,
-              transform: 'translate(-50%, -50%)',
-              border: '3px solid black',
-              boxSizing: 'content-box',
-            }}
-          />
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export interface MovingHeadCalibrationWizardProps {
   light: DmxLight
@@ -250,10 +95,12 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
     [],
   )
 
+  // The wizard drives fixtures live, so it needs the preview stream for as long as it is open.
+  useIpcPreviewSender()
+
   useEffect(() => {
     let cancelled = false
     const snapshot = light
-    enableSender({ sender: 'ipc' } as IpcSenderConfig)
     ;(async () => {
       setInitError(null)
       const result = await enableConsole(rigId)
@@ -610,77 +457,72 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={() => void handleCancel()}
-      role="presentation">
-      <div
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-labelledby="mh-cal-title">
-        <h2 id="mh-cal-title" className="text-xl font-bold mb-1 text-gray-900 dark:text-gray-100">
-          Calibrate {light.name}
-        </h2>
-        <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-          Live DMX console mode — output is manual until you close this wizard.
-        </p>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-3">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">DMX Output</span>
-          <SacnToggle compact />
-          <ArtNetToggle compact />
-          <EnttecProToggle compact />
-          <OpenDmxToggle compact />
-        </div>
-        {progress}
-        <div className="flex flex-col sm:flex-row gap-4 mb-4">
-          <div className="flex-1 min-w-0">{body}</div>
-          {preview && <div className="flex justify-center sm:justify-end">{preview}</div>}
-        </div>
-        <div className="flex flex-wrap gap-2 justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-600">
-          <button
-            type="button"
-            onClick={() => void handleCancel()}
-            className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 text-sm">
-            Cancel
-          </button>
-          <div className="flex gap-2">
-            {step > 0 && step <= REVIEW_STEP && (
-              <button
-                type="button"
-                onClick={() => setStep((s) => Math.max(0, s - 1))}
-                disabled={!consoleReady && step > 0}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-500 text-sm disabled:opacity-50">
-                Back
-              </button>
-            )}
-            {step < REVIEW_STEP && (
-              <button
-                type="button"
-                onClick={() => setStep((s) => s + 1)}
-                disabled={!canAdvance}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm disabled:opacity-50">
-                Next
-              </button>
-            )}
-            {step === REVIEW_STEP && consoleReady && (
-              <button
-                type="button"
-                onClick={() => void handleSave()}
-                disabled={saving || !!initError}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm disabled:opacity-50">
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            )}
-          </div>
-        </div>
-        {consoleReady && step >= STAGE_LABELS_READY_STEP && (
-          <div className="mt-4">
-            <LightsDmxPreview3D lightingConfig={wizard3dLightingConfig} dmxValues={consoleBuffer} />
-          </div>
-        )}
+    <Modal
+      onClose={() => void handleCancel()}
+      labelledBy="mh-cal-title"
+      backdropClassName="p-4"
+      panelClassName="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
+      <h2 id="mh-cal-title" className="text-xl font-bold mb-1 text-gray-900 dark:text-gray-100">
+        Calibrate {light.name}
+      </h2>
+      <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+        Live DMX console mode — output is manual until you close this wizard.
+      </p>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-3">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">DMX Output</span>
+        <SacnToggle compact />
+        <ArtNetToggle compact />
+        <EnttecProToggle compact />
+        <OpenDmxToggle compact />
       </div>
-    </div>
+      {progress}
+      <div className="flex flex-col sm:flex-row gap-4 mb-4">
+        <div className="flex-1 min-w-0">{body}</div>
+        {preview && <div className="flex justify-center sm:justify-end">{preview}</div>}
+      </div>
+      <div className="flex flex-wrap gap-2 justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-600">
+        <button
+          type="button"
+          onClick={() => void handleCancel()}
+          className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 text-sm">
+          Cancel
+        </button>
+        <div className="flex gap-2">
+          {step > 0 && step <= REVIEW_STEP && (
+            <button
+              type="button"
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
+              disabled={!consoleReady && step > 0}
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-500 text-sm disabled:opacity-50">
+              Back
+            </button>
+          )}
+          {step < REVIEW_STEP && (
+            <button
+              type="button"
+              onClick={() => setStep((s) => s + 1)}
+              disabled={!canAdvance}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm disabled:opacity-50">
+              Next
+            </button>
+          )}
+          {step === REVIEW_STEP && consoleReady && (
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={saving || !!initError}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          )}
+        </div>
+      </div>
+      {consoleReady && step >= STAGE_LABELS_READY_STEP && (
+        <div className="mt-4">
+          <LightsDmxPreview3D lightingConfig={wizard3dLightingConfig} dmxValues={consoleBuffer} />
+        </div>
+      )}
+    </Modal>
   )
 }
 

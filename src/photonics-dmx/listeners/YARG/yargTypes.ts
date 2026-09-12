@@ -127,31 +127,6 @@ export const V5_FIXED_PACKET_SIZE = 51
 export const MAX_KNOWN_DATAGRAM_VERSION = DatagramVersionByte.FogRemainingDuration
 export const MIN_SUPPORTED_DATAGRAM_VERSION = DatagramVersionByte.CameraCut
 
-/** Performer bitmask for Spotlight and Singalong bytes (Guitar=1, Bass=2, Drums=4, Vocals=8, Keyboard=16). */
-export enum PerformerByte {
-  None = 0,
-  Guitar = 1 << 0,
-  Bass = 1 << 1,
-  Drums = 1 << 2,
-  Vocals = 1 << 3,
-  Keyboard = 1 << 4,
-}
-
-/** Camera cut constraint flags (byte 44). */
-export enum CameraCutConstraintByte {
-  None = 0,
-  OnlyClose = 1,
-  OnlyFar = 2,
-  NoClose = 4,
-  NoBehind = 8,
-}
-
-/** Camera cut priority (byte 45). */
-export enum CameraCutPriorityByte {
-  Normal = 0,
-  Directed = 1,
-}
-
 /** Camera cut subject (byte 46). */
 export enum CameraCutSubjectByte {
   Crowd = 0,

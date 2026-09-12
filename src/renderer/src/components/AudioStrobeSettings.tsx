@@ -1,74 +1,14 @@
-import React, { useState, useEffect } from 'react'
-import type { AudioConfig } from '../../../shared/ipcTypes'
-import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getAudioConfig, saveAudioConfig } from '../ipcApi'
-import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('AudioStrobeSettings')
+import React from 'react'
+import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 
 const AudioStrobeSettings: React.FC = () => {
-  const [strobeEnabled, setStrobeEnabled] = useState(false)
-  const [strobeTriggerThreshold, setStrobeTriggerThreshold] = useState(0.8)
-  const [strobeProbability, setStrobeProbability] = useState(100)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-
-  const strobeOff = !strobeEnabled
-
-  useEffect(() => {
-    const loadConfig = async () => {
-      try {
-        const config = await getAudioConfig()
-        setStrobeEnabled(config?.strobeEnabled ?? false)
-        setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)
-        setStrobeProbability(config?.strobeProbability ?? 100)
-      } catch (error) {
-        log.error('Failed to load strobe settings:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    void loadConfig()
-  }, [])
-
-  useEffect(() => {
-    const onConfigUpdate = (config: AudioConfig | undefined) => {
-      if (!config) return
-      setStrobeEnabled(config.strobeEnabled ?? false)
-      setStrobeTriggerThreshold(config.strobeTriggerThreshold ?? 0.8)
-      setStrobeProbability(config.strobeProbability ?? 100)
-    }
-    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onConfigUpdate)
-    return () => removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onConfigUpdate)
-  }, [])
-
-  const persistStrobe = async (
-    updates: Partial<
-      Pick<AudioConfig, 'strobeEnabled' | 'strobeTriggerThreshold' | 'strobeProbability'>
-    >,
-  ) => {
-    if (isSaving) return
-    try {
-      setIsSaving(true)
-      const result = await saveAudioConfig(updates)
-      if (!result.success) {
-        log.error('Failed to save strobe settings:', result.error)
-        const config = await getAudioConfig()
-        setStrobeEnabled(config?.strobeEnabled ?? false)
-        setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)
-        setStrobeProbability(config?.strobeProbability ?? 100)
-      }
-    } catch (error) {
-      log.error('Failed to save strobe settings:', error)
-      const config = await getAudioConfig()
-      setStrobeEnabled(config?.strobeEnabled ?? false)
-      setStrobeTriggerThreshold(config?.strobeTriggerThreshold ?? 0.8)
-      setStrobeProbability(config?.strobeProbability ?? 100)
-    } finally {
-      setIsSaving(false)
-    }
-  }
+  const audio = useAudioConfigFields({
+    strobeEnabled: false,
+    strobeTriggerThreshold: 0.8,
+    strobeProbability: 100,
+  })
+  const { strobeEnabled, strobeTriggerThreshold, strobeProbability } = audio.values
+  const commit = (): void => void audio.commit()
 
   const thresholdRangeStyle = {
     background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${strobeTriggerThreshold * 100}%, #e5e7eb ${strobeTriggerThreshold * 100}%, #e5e7eb 100%)`,
@@ -78,7 +18,8 @@ const AudioStrobeSettings: React.FC = () => {
     background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${strobeProbability}%, #e5e7eb ${strobeProbability}%, #e5e7eb 100%)`,
   } as const
 
-  const strobeControlsDisabled = isLoading || isSaving || strobeOff
+  const busy = !audio.loaded || audio.isSaving
+  const strobeControlsDisabled = busy || !strobeEnabled
 
   return (
     <div className="space-y-4">
@@ -92,12 +33,8 @@ const AudioStrobeSettings: React.FC = () => {
             type="checkbox"
             className="form-checkbox h-5 w-5 rounded text-blue-600"
             checked={strobeEnabled}
-            disabled={isLoading || isSaving}
-            onChange={(e) => {
-              const next = e.target.checked
-              setStrobeEnabled(next)
-              void persistStrobe({ strobeEnabled: next })
-            }}
+            disabled={busy}
+            onChange={(e) => void audio.save({ strobeEnabled: e.target.checked })}
           />
           <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
             Strobe enabled
@@ -112,7 +49,7 @@ const AudioStrobeSettings: React.FC = () => {
               Strobe trigger threshold
             </label>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Normalised total energy (0–1) above which the strobe can activate. (Higher is louder)
+              Normalised total energy (0-1) above which the strobe can activate. (Higher is louder)
             </p>
           </div>
           <div className="flex items-center space-x-4">
@@ -125,10 +62,10 @@ const AudioStrobeSettings: React.FC = () => {
               style={thresholdRangeStyle}
               value={strobeTriggerThreshold}
               disabled={strobeControlsDisabled}
-              onChange={(e) => setStrobeTriggerThreshold(Number(e.target.value))}
-              onMouseUp={() => void persistStrobe({ strobeTriggerThreshold })}
-              onTouchEnd={() => void persistStrobe({ strobeTriggerThreshold })}
-              onBlur={() => void persistStrobe({ strobeTriggerThreshold })}
+              onChange={(e) => audio.set({ strobeTriggerThreshold: Number(e.target.value) })}
+              onMouseUp={commit}
+              onTouchEnd={commit}
+              onBlur={commit}
             />
             <input
               type="number"
@@ -140,10 +77,10 @@ const AudioStrobeSettings: React.FC = () => {
               onChange={(e) => {
                 const value = parseFloat(e.target.value)
                 if (Number.isFinite(value)) {
-                  setStrobeTriggerThreshold(Math.max(0, Math.min(1, value)))
+                  audio.set({ strobeTriggerThreshold: Math.max(0, Math.min(1, value)) })
                 }
               }}
-              onBlur={() => void persistStrobe({ strobeTriggerThreshold })}
+              onBlur={commit}
               className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
               aria-label="Strobe trigger threshold numeric"
             />
@@ -169,10 +106,10 @@ const AudioStrobeSettings: React.FC = () => {
               style={probabilityRangeStyle}
               value={strobeProbability}
               disabled={strobeControlsDisabled}
-              onChange={(e) => setStrobeProbability(Number(e.target.value))}
-              onMouseUp={() => void persistStrobe({ strobeProbability })}
-              onTouchEnd={() => void persistStrobe({ strobeProbability })}
-              onBlur={() => void persistStrobe({ strobeProbability })}
+              onChange={(e) => audio.set({ strobeProbability: Number(e.target.value) })}
+              onMouseUp={commit}
+              onTouchEnd={commit}
+              onBlur={commit}
             />
             <input
               type="number"
@@ -184,10 +121,10 @@ const AudioStrobeSettings: React.FC = () => {
               onChange={(e) => {
                 const value = parseFloat(e.target.value)
                 if (Number.isFinite(value)) {
-                  setStrobeProbability(Math.max(0, Math.min(100, Math.round(value))))
+                  audio.set({ strobeProbability: Math.max(0, Math.min(100, Math.round(value))) })
                 }
               }}
-              onBlur={() => void persistStrobe({ strobeProbability })}
+              onBlur={commit}
               className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
               aria-label="Strobe probability percent"
             />

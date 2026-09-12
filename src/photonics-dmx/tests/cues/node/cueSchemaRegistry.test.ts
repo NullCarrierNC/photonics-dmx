@@ -41,9 +41,12 @@ const file = (mode: string, cues: unknown[]) => ({
   cues,
 })
 
+beforeEach(() => {
+  __resetCueSchemaRegistryForTests()
+})
+
 describe('cue schema registry', () => {
   beforeEach(() => {
-    __resetCueSchemaRegistryForTests()
     setGroupSchema(GROUP)
   })
 

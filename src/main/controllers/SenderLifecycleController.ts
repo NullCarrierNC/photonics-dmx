@@ -17,6 +17,7 @@ import {
   artNetBaseRefreshIntervalMs,
   dmxOutputRefreshRateHzFromUnknownPayload,
 } from '../../shared/dmxOutputRefresh'
+import { validateStoredArtNetConfig, validateStoredSacnConfig } from '../ipc/inputValidation'
 
 const log = createLogger('SenderLifecycle')
 
@@ -85,17 +86,13 @@ export class SenderLifecycleController {
   }
 
   /** Enabled-state of each output sender, for status displays and diagnostics. */
-  public getOutputSenderStatus(): {
-    sacn: boolean
-    artnet: boolean
-    enttecpro: boolean
-    ipc: boolean
-  } {
+  public getOutputSenderStatus(): OutputSenderStateSnapshot {
     const sm = this.getSenderManager()
     return {
       sacn: sm.isSenderEnabled('sacn'),
       artnet: sm.isSenderEnabled('artnet'),
       enttecpro: sm.isSenderEnabled('enttecpro'),
+      opendmx: sm.isSenderEnabled('opendmx'),
       ipc: sm.isSenderEnabled('ipc'),
     }
   }
@@ -162,28 +159,43 @@ export class SenderLifecycleController {
     }
 
     if (sendersToRestore.sacn) {
-      const sc = prefs.sacnConfig
-      const hz = dmxOutputRefreshRateHzFromUnknownPayload({
-        refreshRateHz: sc?.refreshRateHz,
-      })
-      try {
-        await sm.enableSender('sacn', 'sacn', {
-          sender: 'sacn',
-          universe: sc?.universe ?? 1,
-          networkInterface: sc?.networkInterface || undefined,
-          useUnicast: sc?.useUnicast ?? false,
-          unicastDestination: sc?.unicastDestination || undefined,
-          maxOutputRate: hz,
-          minRefreshRate: hz,
+      // Checked again on the way out, because the file is editable by hand and what it holds is
+      // not necessarily what a write path would accept today.
+      const stored = validateStoredSacnConfig(prefs.sacnConfig ?? {})
+      if (!stored.ok) {
+        log.error(
+          `Leaving the sACN sender off, its stored configuration is invalid: ${stored.error}`,
+        )
+      } else {
+        const sc = stored.value
+        const hz = dmxOutputRefreshRateHzFromUnknownPayload({
+          refreshRateHz: sc.refreshRateHz,
         })
-        log.info('Restored sACN sender from preferences')
-      } catch (err) {
-        log.error('Failed to restore sACN sender after restart:', err)
+        try {
+          await sm.enableSender('sacn', 'sacn', {
+            sender: 'sacn',
+            universe: sc.universe ?? 1,
+            networkInterface: sc.networkInterface || undefined,
+            useUnicast: sc.useUnicast ?? false,
+            unicastDestination: sc.unicastDestination || undefined,
+            maxOutputRate: hz,
+            minRefreshRate: hz,
+          })
+          log.info('Restored sACN sender from preferences')
+        } catch (err) {
+          log.error('Failed to restore sACN sender after restart:', err)
+        }
       }
     }
 
     if (sendersToRestore.artnet) {
-      const ac = prefs.artNetConfig
+      const stored = validateStoredArtNetConfig(prefs.artNetConfig ?? {})
+      if (!stored.ok) {
+        log.error(
+          `Leaving the Art-Net sender off, its stored configuration is invalid: ${stored.error}`,
+        )
+      }
+      const ac = stored.ok ? stored.value : undefined
       if (ac?.host) {
         const hz = dmxOutputRefreshRateHzFromUnknownPayload({
           refreshRateHz: ac.refreshRateHz,

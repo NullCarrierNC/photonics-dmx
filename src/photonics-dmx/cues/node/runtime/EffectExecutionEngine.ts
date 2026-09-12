@@ -66,11 +66,13 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     ) {
       if (this.firingIdle) return
       this.firingIdle = true
-      try {
-        this.onIdleCallback()
-      } finally {
-        this.firingIdle = false
-      }
+      queueMicrotask(() => {
+        try {
+          this.onIdleCallback?.()
+        } finally {
+          this.firingIdle = false
+        }
+      })
     }
   }
 
@@ -219,7 +221,10 @@ export class EffectExecutionEngine extends BaseNodeExecutionEngine {
     // one, each from its own execution context, so all authored entry points run.
     const effectListeners = Array.from(this.compiledEffect.effectListenerMap.values())
     if (effectListeners.length === 0) {
+      // Nothing will run, so report idle rather than leaving the raiser waiting on a run that
+      // never starts. The compiler rejects such an effect; a hand-built one can still reach here.
       log.warn('No effect listener found in effect')
+      this.maybeFireIdle()
       return
     }
 

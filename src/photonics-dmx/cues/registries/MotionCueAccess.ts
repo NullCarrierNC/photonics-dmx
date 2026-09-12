@@ -1,10 +1,7 @@
-import { type MotionCueRef } from '../types/cueTypes'
+import type { MotionCueRef } from '../types/cueTypes'
 import type { MotionGroupSelectionMode } from '../types/nodeCueTypes'
-import { ICueGroup } from '../interfaces/INetCueGroup'
-import { INetCue } from '../interfaces/INetCue'
-import { MotionNodeCue } from '../node/runtime/MotionNodeCue'
 import { MotionSelectionState } from './MotionSelectionState'
-import { CueGroupCatalog } from './CueGroupCatalog'
+import type { CatalogGroup, CueGroupCatalog } from './CueGroupCatalog'
 import {
   findMotionCueRefIn,
   motionCueDetailsFor,
@@ -14,22 +11,35 @@ import {
   type MotionGroupInfo,
 } from './cueRegistrySupport'
 
-/**
- * The motion-cue surface behind CueRegistry: motion group enablement, selection mode, per-song
- * state, and motion program resolution. Group storage is answered by the injected catalog; the
- * per-motion selection state lives in MotionSelectionState.
- */
-export class MotionCueAccess {
-  private readonly motionState = new MotionSelectionState<INetCue>()
+/** A group the motion surface can serve: a catalog group with a display name for the pickers. */
+export interface MotionCapableGroup<K extends string, V> extends CatalogGroup<K, V> {
+  name: string
+  description?: string
+  motionCues?: Map<string, V>
+}
 
-  constructor(private readonly catalog: CueGroupCatalog) {}
+/**
+ * The motion-cue surface behind a cue registry: motion group enablement, selection mode, per-song
+ * state, and motion program resolution. Group storage is answered by the injected catalog and the
+ * per-motion selection state lives in MotionSelectionState.
+ *
+ * Generic over the cue family, so the net registries and the audio registry serve motion the same
+ * way. Each supplies only how its cues read in the motion-cue picker.
+ */
+export class MotionCueAccess<K extends string, V, G extends MotionCapableGroup<K, V>> {
+  private readonly motionState = new MotionSelectionState<V>()
+
+  constructor(
+    private readonly catalog: CueGroupCatalog<K, V, G>,
+    private readonly describe: (cue: V) => MotionCueDetail,
+  ) {}
 
   public reset(): void {
     this.motionState.reset()
   }
 
   /** Track a newly registered group's motion programs. */
-  public onRegisterGroup(group: ICueGroup): void {
+  public onRegisterGroup(group: G): void {
     this.motionState.onRegisterGroup(group.id, group.motionCues?.size ?? 0)
   }
 
@@ -54,7 +64,7 @@ export class MotionCueAccess {
     this.motionState.onMotionSongEnd()
   }
 
-  public getRandomMotionCue(): INetCue | null {
+  public getRandomMotionCue(): V | null {
     return this.motionState.getRandomMotionCue(
       (id) => this.catalog.getGroup(id),
       this.catalog.getDefaultMotionGroupId(),
@@ -65,7 +75,7 @@ export class MotionCueAccess {
    * Resolve a specific motion program when manual selection is active.
    * Returns null if the group is not motion-enabled, the cue is disabled, or the id is unknown.
    */
-  public getMotionCueImplementation(ref: MotionCueRef): INetCue | null {
+  public getMotionCueImplementation(ref: MotionCueRef): V | null {
     return resolveMotionCue(
       this.catalog.getGroup(ref.groupId),
       ref,
@@ -75,7 +85,7 @@ export class MotionCueAccess {
   }
 
   /** Locate group/cue ids for a motion cue instance (for UI / IPC metadata). */
-  public findMotionCueRef(cue: INetCue): MotionCueRef | null {
+  public findMotionCueRef(cue: V): MotionCueRef | null {
     return findMotionCueRefIn(this.catalog.groupsIterable(), cue)
   }
 
@@ -84,11 +94,7 @@ export class MotionCueAccess {
   }
 
   public getMotionCueDetails(groupId: string): MotionCueDetail[] {
-    return motionCueDetailsFor(this.catalog.getGroup(groupId)?.motionCues, (cue) => ({
-      id: cue.cueId,
-      name: cue instanceof MotionNodeCue ? cue.name : cue.cueId,
-      description: cue.description ?? '',
-    }))
+    return motionCueDetailsFor(this.catalog.getGroup(groupId)?.motionCues, this.describe)
   }
 
   public setDisabledMotionCues(map: Record<string, string[]>): void {
@@ -107,7 +113,7 @@ export class MotionCueAccess {
     return this.motionState.getEnabledMotionGroups()
   }
 
-  /** Group ids that have at least one YARG motion program registered. */
+  /** Group ids that have at least one motion program registered. */
   public getRegisteredMotionGroupIds(): string[] {
     return this.motionState.getRegisteredMotionGroupIds(this.catalog.groupsIterable())
   }

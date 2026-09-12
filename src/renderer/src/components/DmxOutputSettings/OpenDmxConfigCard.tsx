@@ -1,12 +1,13 @@
 import React from 'react'
 import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../../../shared/dmxOutputRefresh'
 import CollapsibleSenderCard from './CollapsibleSenderCard'
+import { DraftNumberField, DraftTextField } from '../controls/DraftField'
 
 interface OpenDmxConfigCardProps {
   comPort: string
   refreshRate: number
-  onComPortChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  onRefreshRateChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onComPortChange: (port: string) => void
+  onRefreshRateChange: (hz: number) => void
   expanded: boolean
   onToggle: () => void
 }
@@ -29,10 +30,10 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
           COM:
         </label>
-        <input
-          type="text"
+        <DraftTextField
+          aria-label="COM"
           value={comPort}
-          onChange={onComPortChange}
+          onCommit={onComPortChange}
           className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-64 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           placeholder="COM4"
         />
@@ -41,10 +42,10 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
           Refresh Rate:
         </label>
-        <input
-          type="number"
+        <DraftNumberField
+          aria-label="Refresh Rate"
           value={refreshRate}
-          onChange={onRefreshRateChange}
+          onCommit={onRefreshRateChange}
           min={1}
           max={44}
           className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"

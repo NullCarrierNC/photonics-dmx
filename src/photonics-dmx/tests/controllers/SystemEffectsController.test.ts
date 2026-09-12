@@ -16,12 +16,16 @@ import { Sequencer } from '../../controllers/sequencer/Sequencer'
 import { Clock } from '../../controllers/sequencer/Clock'
 import { createMockRGBIP } from '../helpers/testFixtures'
 import { afterEach, beforeEach, describe, jest, it, expect } from '@jest/globals'
-import { DmxFixture, FixtureTypes } from '../../types'
 
 jest.mock('../../controllers/sequencer/LightTransitionController')
 jest.mock('../../controllers/sequencer/LayerManager')
 jest.mock('../../controllers/sequencer/Sequencer')
 jest.mock('../../controllers/sequencer/Clock')
+
+/** How many times the controller said a blackout was already running. */
+function refusalsLogged(warn: jest.SpiedFunction<typeof console.warn>): number {
+  return warn.mock.calls.filter(([line]) => String(line).includes('already in progress')).length
+}
 
 describe('SystemEffectsController', () => {
   let lightTransitionController: jest.Mocked<LightTransitionController>
@@ -37,28 +41,9 @@ describe('SystemEffectsController', () => {
       removeTransitionsByLayer: jest.fn(),
       getLightState: jest.fn().mockReturnValue(createMockRGBIP()),
       getFinalLightState: jest.fn().mockReturnValue(createMockRGBIP()),
-      getLightStateManagerTrackedLights: jest.fn().mockReturnValue([
-        {
-          id: 'moving-head-1',
-          position: 1,
-          fixture: {
-            id: 'moving-head-1',
-            name: 'Moving Head 1',
-            fixture: FixtureTypes.RGBMH,
-            channels: { red: 1, green: 2, blue: 3, pan: 4, tilt: 5 },
-          } as DmxFixture,
-        },
-        {
-          id: 'rgb-fixture-1',
-          position: 2,
-          fixture: {
-            id: 'rgb-fixture-1',
-            name: 'RGB Fixture 1',
-            fixture: FixtureTypes.RGB,
-            channels: { red: 1, green: 2, blue: 3 },
-          } as DmxFixture,
-        },
-      ]),
+      getLightStateManagerTrackedLights: jest
+        .fn()
+        .mockReturnValue(['moving-head-1', 'rgb-fixture-1']),
       getAllLightIds: jest.fn().mockReturnValue(['moving-head-1', 'rgb-fixture-1']),
       immediateBlackout: jest.fn(),
     } as unknown as jest.Mocked<LightTransitionController>
@@ -203,6 +188,28 @@ describe('SystemEffectsController', () => {
     })
   })
 
+  describe('a rig with no lights', () => {
+    beforeEach(() => {
+      ;(lightTransitionController.getLightStateManagerTrackedLights as jest.Mock).mockReturnValue(
+        [],
+      )
+    })
+
+    it('still wipes the effects and reports the blackout done', async () => {
+      const onComplete = jest.fn()
+      systemEffectsController.setOnBlackoutCompleteCallback(onComplete)
+
+      const done = systemEffectsController.blackout(100)
+      await jest.advanceTimersByTimeAsync(500)
+      await done
+
+      expect(layerManager.removeActiveEffect).toHaveBeenCalled()
+      expect(layerManager.removeQueuedEffect).toHaveBeenCalled()
+      expect(onComplete).toHaveBeenCalledTimes(1)
+      expect(systemEffectsController.isBlackoutActive()).toBe(false)
+    })
+  })
+
   describe('cancel race', () => {
     it('a cancelled blackout never runs its terminal wipe or forced black', async () => {
       const blackoutPromise = systemEffectsController.blackout(1000)
@@ -239,6 +246,35 @@ describe('SystemEffectsController', () => {
       expect(layerManager.removeActiveEffect).toHaveBeenCalled()
       expect(onComplete).toHaveBeenCalledTimes(1)
       expect(systemEffectsController.isBlackoutActive()).toBe(false)
+    })
+
+    it('reports a refused request once for the blackout that is running', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const running = systemEffectsController.blackout(1000)
+      for (let request = 0; request < 6; request += 1) {
+        void systemEffectsController.blackout(500)
+      }
+      await jest.advanceTimersByTimeAsync(1500)
+      await running
+
+      expect(refusalsLogged(warn)).toBe(1)
+      warn.mockRestore()
+    })
+
+    it('reports again for the next blackout', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+      for (let run = 0; run < 2; run += 1) {
+        const running = systemEffectsController.blackout(1000)
+        void systemEffectsController.blackout(500)
+        void systemEffectsController.blackout(500)
+        await jest.advanceTimersByTimeAsync(1500)
+        await running
+      }
+
+      expect(refusalsLogged(warn)).toBe(2)
+      warn.mockRestore()
     })
 
     it('dispose mid-blackout clears the timers and skips the wipe', async () => {

@@ -12,6 +12,7 @@ import { Rb3StageKitDirectProcessor } from '../../processors/Rb3StageKitDirectPr
 import { ChainFanout } from '../../controllers/ChainFanout'
 import type { RigChain } from '../../controllers/RigChain'
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
+import { fakeLightingController } from '../helpers/fakeLightingController'
 
 function makeFourLightConfig() {
   return createMockLightingConfig({
@@ -46,42 +47,10 @@ function makeSequencerStub(): {
   const setState = jest.fn()
   const blackout = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
   return {
-    ctrl: {
-      addEffect: jest.fn(),
-      setEffect: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-      addEffectWithCallback: jest.fn(),
-      setEffectWithCallback: jest.fn(),
-      addEffectUnblockedNameWithCallback: jest.fn(),
-      setEffectUnblockedNameWithCallback: jest.fn(),
-      removeEffectCallback: jest.fn(),
-      removeEffect: jest.fn(),
-      removeAllEffects: jest.fn(),
-      removeEffectByLayer: jest.fn(),
-      addEffectUnblockedName: jest.fn(),
-      setEffectUnblockedName: jest.fn(),
-      getActiveEffectsForLight: jest.fn(),
-      isLayerFreeForLight: jest.fn(),
+    ctrl: fakeLightingController({
       setState,
-      onBeat: jest.fn(),
-      onMeasure: jest.fn(),
-      onKeyframe: jest.fn(),
-      onDrumNote: jest.fn(),
-      onGuitarNote: jest.fn(),
-      onBassNote: jest.fn(),
-      onKeysNote: jest.fn(),
       blackout,
-      cancelBlackout: jest.fn(),
-      enableDebug: jest.fn(),
-      debugLightLayers: jest.fn(),
-      schedulePanTiltClear: jest.fn(),
-      cancelPanTiltClear: jest.fn(),
-      addMotionPattern: jest.fn(),
-      removeMotionPattern: jest.fn(),
-      getMotionPattern: jest.fn(),
-      updateMotionPatternConfig: jest.fn(),
-      replaceEffect: jest.fn(),
-      shutdown: jest.fn(),
-    } as unknown as ILightingController,
+    }),
     setState,
     blackout,
   }
@@ -165,7 +134,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1],
       color: 'red',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     // Drain microtasks (Promise.allSettled) before the blending timer fires.
@@ -198,7 +166,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1, 2, 3, 4, 5, 6, 7],
       color: 'blue',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     await Promise.resolve()
@@ -243,7 +210,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1],
       color: 'red',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     await Promise.resolve()
@@ -295,7 +261,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0],
       color: 'off',
-      brightness: 'medium',
       strobeEffect: 'medium',
       timestamp: Date.now(),
     })
@@ -309,13 +274,13 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     expect(aIds).toContain('a-f0')
     expect(bIds).toContain('b-f0')
 
-    // Effect names include the rig id — two rigs running medium strobes don't collide.
+    // Effect names include the rig id, so two rigs running medium strobes don't collide.
     const status = processor.getStatus()
     const aHits = status.activeStrobeEffects.filter((s) =>
-      s.startsWith('stagekit-strobe-a-medium-'),
+      s.startsWith('stagekit-strobe-a-medium:'),
     )
     const bHits = status.activeStrobeEffects.filter((s) =>
-      s.startsWith('stagekit-strobe-b-medium-'),
+      s.startsWith('stagekit-strobe-b-medium:'),
     )
     expect(aHits).toHaveLength(1)
     expect(bHits).toHaveLength(1)
@@ -358,7 +323,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0],
       color: 'off',
-      brightness: 'medium',
       strobeEffect: 'medium',
       timestamp: Date.now(),
     })
@@ -405,7 +369,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1],
       color: 'red',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     await Promise.resolve()
@@ -416,7 +379,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0],
       color: 'off',
-      brightness: 'medium',
       strobeEffect: 'slow',
       timestamp: Date.now(),
     })
@@ -457,7 +419,8 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     const blend = processor.getColorBlendingInfo('red')
     expect(blend.color).toBe('red')
     expect(blend.description).toBe('Single color: red')
-    expect(blend.blendedColor).toBeTruthy()
+    // With no active rig the processor answers null, so a value means a rig blended it.
+    expect(blend.blendedColor).not.toBeNull()
   })
 
   it('refreshRigs adds processors for new chains and disposes processors for removed ones', async () => {
@@ -487,7 +450,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1],
       color: 'red',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     await Promise.resolve()
@@ -505,7 +467,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1],
       color: 'green',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     // Drain the synchronous fanout Promise.allSettled before the blending timer fires.
@@ -525,7 +486,6 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     networkListener.emit('stagekit:data', {
       positions: [0, 1],
       color: 'blue',
-      brightness: 'medium',
       timestamp: Date.now(),
     })
     await Promise.resolve()

@@ -1,21 +1,4 @@
 import { useState, useMemo, useEffect, useCallback, useLayoutEffect, useRef } from 'react'
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-  defaultDropAnimationSideEffects,
-  type DragEndEvent,
-  type DragOverEvent,
-  type DragStartEvent,
-  type DropAnimation,
-  type ClientRect,
-} from '@dnd-kit/core'
-import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import LightLayoutPreview from '../components/LightLayoutPreview'
 import { findSharedChannelNumbers } from '../components/lightChannelDisplay'
 import { useAtom, useSetAtom } from 'jotai'
@@ -39,7 +22,6 @@ import {
 } from '@renderer/atoms'
 import LightsLayoutRigSection from './LightsLayout/LightsLayoutRigSection'
 import LightsLayoutForm from './LightsLayout/LightsLayoutForm'
-import LightChannelAssignmentSection from './LightsLayout/LightChannelAssignmentSection'
 import LightsLayoutIntro from './LightsLayout/LightsLayoutIntro'
 import ImportRigModal from './LightsLayout/components/ImportRigModal'
 import { useRigImportExport } from './LightsLayout/useRigImportExport'
@@ -49,15 +31,16 @@ import {
   isTwoRowPrimaryLayout,
   splitLights,
   createDmxLightInstance,
-  mapLightsToNewIdsForSave,
+  buildRigConfigForSave,
   lightingConfigsEqual,
 } from './LightsLayout/lightsLayoutHelpers'
 import {
   reassignNonStrobeGroups,
   mapDedicatedStrobeGroupRows,
 } from './LightsLayout/lightsLayoutState'
-import { reorderWithinGroup, swapAcrossGroups } from './LightsLayout/lightLayoutDnd'
 import { useLightsLayoutRig } from './LightsLayout/useLightsLayoutRig'
+import { useLightsLayoutDrag } from './LightsLayout/useLightsLayoutDrag'
+import LightsLayoutCanvas from './LightsLayout/LightsLayoutCanvas'
 import { useLightsLayoutActiveConfigSync } from './LightsLayout/useLightsLayoutActiveConfigSync'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from '../hooks/useConfirm'
@@ -109,8 +92,6 @@ const LightsLayout = () => {
 
   const [highlightedLight, setHighlightedLight] = useState<number | null>(null)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
-  const [activeDragLight, setActiveDragLight] = useState<DmxLight | null>(null)
-  const overRectRef = useRef<ClientRect | null>(null)
 
   const [allPrimaryLights, setAllPrimaryLights] = useState<DmxLight[]>(() => {
     const front = activeConfig?.frontLights || []
@@ -302,19 +283,6 @@ const LightsLayout = () => {
     }
   }, [availableLayouts, selectedLayout])
 
-  // Memos for Front and Back Columns (sorted by global position for stable grid order after swaps)
-  const frontLights = useMemo(() => {
-    return allPrimaryLights
-      .filter((l) => l.group === 'front')
-      .sort((a, b) => a.position - b.position)
-  }, [allPrimaryLights])
-
-  const backLights = useMemo(() => {
-    return allPrimaryLights
-      .filter((l) => l.group === 'back')
-      .sort((a, b) => a.position - b.position)
-  }, [allPrimaryLights])
-
   /** Working rig config for previews (matches save shape). */
   const currentLightingConfig = useMemo<LightingConfiguration>(() => {
     const lightLayout =
@@ -409,70 +377,7 @@ const LightsLayout = () => {
     )
   }
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
-
-  const handleDragStart = useCallback(
-    (event: DragStartEvent) => {
-      overRectRef.current = null
-      const id = String(event.active.id)
-      setActiveDragLight(allPrimaryLights.find((l) => l.id === id) ?? null)
-    },
-    [allPrimaryLights],
-  )
-
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    overRectRef.current = event.over?.rect ?? null
-  }, [])
-
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    setActiveDragLight(null)
-    const { active, over } = event
-    overRectRef.current = null
-    if (!over || active.id === over.id) return
-    const sourceGroup = active.data.current?.group as 'front' | 'back' | undefined
-    const targetGroup = over.data.current?.group as 'front' | 'back' | undefined
-    if (!sourceGroup || !targetGroup) return
-    setAllPrimaryLights((prev) =>
-      sourceGroup === targetGroup
-        ? reorderWithinGroup(prev, sourceGroup, String(active.id), String(over.id))
-        : swapAcrossGroups(prev, String(active.id), String(over.id)),
-    )
-  }, [])
-
-  const handleDragCancel = useCallback(() => {
-    setActiveDragLight(null)
-    overRectRef.current = null
-  }, [])
-
-  const dropAnimation: DropAnimation = useMemo(
-    () => ({
-      duration: 220,
-      easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-      keyframes: ({ active, transform }) => {
-        const target = overRectRef.current
-        const source = active.rect
-        if (!target || !source) {
-          return [
-            { transform: CSS.Transform.toString(transform.initial) },
-            { transform: CSS.Transform.toString(transform.final) },
-          ]
-        }
-        const dx = target.left - source.left
-        const dy = target.top - source.top
-        return [
-          { transform: CSS.Transform.toString(transform.initial) },
-          { transform: `translate3d(${dx}px, ${dy}px, 0)` },
-        ]
-      },
-      sideEffects: defaultDropAnimationSideEffects({
-        styles: { active: { opacity: '0' } },
-      }),
-    }),
-    [],
-  )
+  const drag = useLightsLayoutDrag(allPrimaryLights, setAllPrimaryLights)
 
   const handleLightClick = (lightPosition: number) => {
     setHighlightedLight(lightPosition)
@@ -484,35 +389,12 @@ const LightsLayout = () => {
       return
     }
 
-    // Decide final strobe set based on the strobe mode
-    let finalStrobe: DmxLight[] = []
-
-    if (selectedStrobe === ConfigStrobeType.AllCapable) {
-      // All primary lights that are strobe-enabled
-      finalStrobe = allPrimaryLights.filter((l) => l.isStrobeEnabled && l.group !== 'strobe')
-    } else if (selectedStrobe === ConfigStrobeType.Dedicated) {
-      // Only dedicated strobe group
-      finalStrobe = allPrimaryLights.filter((l) => l.group === 'strobe')
-    }
-    // If "None", finalStrobe remains empty
-
-    const finalFront = allPrimaryLights.filter((l) => l.group === 'front')
-    const finalBack = allPrimaryLights.filter((l) => l.group === 'back')
-
-    const idMap: Record<string, string> = {}
-
-    const frontWithNewIds = mapLightsToNewIdsForSave(finalFront, idMap)
-    const backWithNewIds = mapLightsToNewIdsForSave(finalBack, idMap)
-    const strobeWithNewIds = mapLightsToNewIdsForSave(finalStrobe, idMap)
-
-    const updatedConfig: LightingConfiguration = {
-      numLights: selectedCount || 0,
-      lightLayout: LIGHT_LAYOUTS.find((layout) => layout.id === selectedLayout) || LIGHT_LAYOUTS[0],
-      strobeType: selectedStrobe,
-      frontLights: frontWithNewIds,
-      backLights: backWithNewIds,
-      strobeLights: strobeWithNewIds,
-    }
+    const updatedConfig = buildRigConfigForSave(
+      allPrimaryLights,
+      selectedStrobe,
+      selectedCount,
+      selectedLayout,
+    )
 
     const currentRig = rigs.find((r) => r.id === activeRigId)
     if (!currentRig) {
@@ -576,21 +458,18 @@ const LightsLayout = () => {
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
       <ToastContainer toasts={toasts} onDismiss={hideToast} />
-      <ImportRigModal
-        isOpen={pendingImport !== null}
-        sourceBasename={pendingImport?.sourceBasename ?? ''}
-        defaultName={pendingImport?.defaultName ?? ''}
-        existingRigNamesLower={new Set(rigs.map((r) => r.name.trim().toLowerCase()))}
-        summary={
-          pendingImport?.summary ?? {
-            templatesToAddCount: 0,
-            templatesReusedCount: 0,
-            orphanCount: 0,
-          }
-        }
-        onCancel={clearPendingImport}
-        onSave={(name) => void commitPendingImport(name)}
-      />
+      {pendingImport !== null && (
+        <ImportRigModal
+          key={pendingImport.sourceBasename}
+          isOpen
+          sourceBasename={pendingImport.sourceBasename}
+          defaultName={pendingImport.defaultName}
+          existingRigNamesLower={new Set(rigs.map((r) => r.name.trim().toLowerCase()))}
+          summary={pendingImport.summary}
+          onCancel={clearPendingImport}
+          onSave={(name) => void commitPendingImport(name)}
+        />
+      )}
       <LightsLayoutIntro
         headerRight={
           advancedModeEnabled ? (
@@ -667,104 +546,20 @@ const LightsLayout = () => {
             selectedStrobe={selectedStrobe}
           />
 
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragEnd={handleDragEnd}
-            onDragCancel={handleDragCancel}>
-            <div className="mt-8 space-y-8">
-              {sharedRigChannels.length > 0 && (
-                <div
-                  role="status"
-                  className="rounded border border-amber-500 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-                  {sharedRigChannels.length === 1
-                    ? `DMX channel ${sharedRigChannels[0]} is used by more than one light in this rig.`
-                    : `DMX channels ${sharedRigChannels.join(', ')} are each used by more than one light in this rig.`}{' '}
-                  This will cause a conflict between the lights and incorrect lighting output.
-                </div>
-              )}
-              <LightChannelAssignmentSection
-                title={
-                  selectedLayout === 'stacked'
-                    ? rigName
-                      ? `${rigName} - Top Lights`
-                      : 'Top Lights'
-                    : rigName
-                      ? `${rigName} - Front Lights`
-                      : 'Front Lights'
-                }
-                lights={frontLights}
-                myLights={myFixtures}
-                rigId={activeRigId}
-                lightingConfig={currentLightingConfig}
-                onLightChange={handleLightChange}
-                highlightedLight={highlightedLight}
-                onLightClick={handleLightClick}
-                lightLabel={(light, index) =>
-                  selectedLayout === 'stacked'
-                    ? `Top ${index + 1} (Position ${light.position})`
-                    : `Front ${index + 1} (Position ${light.position})`
-                }
-                isStacked={selectedLayout === 'stacked'}
-                sectionGroup="front"
-              />
-
-              {isTwoRowPrimaryLayout(selectedLayout) && backLights.length > 0 && (
-                <LightChannelAssignmentSection
-                  title={
-                    selectedLayout === 'stacked'
-                      ? rigName
-                        ? `${rigName} - Bottom Lights`
-                        : 'Bottom Lights'
-                      : rigName
-                        ? `${rigName} - Back Lights`
-                        : 'Back Lights'
-                  }
-                  lights={backLights}
-                  myLights={myFixtures}
-                  rigId={activeRigId}
-                  lightingConfig={currentLightingConfig}
-                  onLightChange={handleLightChange}
-                  highlightedLight={highlightedLight}
-                  onLightClick={handleLightClick}
-                  lightLabel={(light, index) =>
-                    selectedLayout === 'stacked'
-                      ? `Bottom ${index + 1} (Position ${light.position})`
-                      : `Back ${index + 1} (Position ${light.position})`
-                  }
-                  isStacked={selectedLayout === 'stacked'}
-                  sectionGroup="back"
-                />
-              )}
-
-              {selectedStrobe === ConfigStrobeType.Dedicated &&
-                allPrimaryLights.filter((l) => l.group === 'strobe').length > 0 && (
-                  <LightChannelAssignmentSection
-                    title="Dedicated Strobe Lights"
-                    lights={allPrimaryLights.filter((l) => l.group === 'strobe')}
-                    myLights={myFixtures}
-                    rigId={activeRigId}
-                    lightingConfig={currentLightingConfig}
-                    onLightChange={handleLightChange}
-                    highlightedLight={highlightedLight}
-                    onLightClick={handleLightClick}
-                    lightLabel={(light) => `Dedicated Strobe (Position ${light.position})`}
-                    isStacked={selectedLayout === 'stacked'}
-                  />
-                )}
-            </div>
-            <DragOverlay dropAnimation={dropAnimation}>
-              {activeDragLight ? (
-                <div className="max-w-[440px] rounded-lg shadow-2xl border-2 border-blue-500 bg-gray-300 dark:bg-[#303548] p-4 pointer-events-none">
-                  <div className="text-center font-semibold text-gray-800 dark:text-gray-200">
-                    {activeDragLight.label} (Position {activeDragLight.position})
-                  </div>
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+          <LightsLayoutCanvas
+            drag={drag}
+            sharedRigChannels={sharedRigChannels}
+            rigName={rigName}
+            selectedLayout={selectedLayout}
+            selectedStrobe={selectedStrobe}
+            allPrimaryLights={allPrimaryLights}
+            currentLightingConfig={currentLightingConfig}
+            myFixtures={myFixtures}
+            activeRigId={activeRigId}
+            highlightedLight={highlightedLight}
+            onLightClick={handleLightClick}
+            onLightChange={handleLightChange}
+          />
 
           {/* Success Message */}
           {showSuccessMessage && (

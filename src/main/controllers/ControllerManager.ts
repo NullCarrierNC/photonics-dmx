@@ -28,6 +28,7 @@ import { RegistryInitializer } from './RegistryInitializer'
 import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycle'
 import { ControllerGraph } from './ControllerGraph'
 import { runControllerRestart } from './controllerRestart'
+import { runControllerShutdown } from './controllerShutdown'
 import {
   buildControllerCollaborators,
   type ControllerCollaborators,
@@ -39,12 +40,6 @@ import { CUE_DOMAIN_BINDINGS, applyAllEnabledGroupsFromConfig } from './cueDomai
 import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import type { MotionCueRef } from '../../photonics-dmx/cues/types/cueTypes'
 import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
-// Import all cue sets to register with registry
-import '../../photonics-dmx/cues'
-import { createLogger } from '../../shared/logger'
-
-const log = createLogger('ControllerManager')
-
 /**
  * Runtime lifecycle of the main-process controller graph.
  *
@@ -195,13 +190,17 @@ export class ControllerManager {
     return this.lifecycle.phase
   }
 
-  /**
-   * Initialize all controllers and systems
-   */
+  /** Initialize all controllers and systems. */
   public async init(): Promise<void> {
     if (this.isInitialized) {
       return
     }
+    // The cold start, a retry, console mode, the simulation handlers and the listener toggles can
+    // all ask for a graph at once, and they should get the same one.
+    await this.lifecycle.runSharedInit(() => this.buildGraph())
+  }
+
+  private async buildGraph(): Promise<void> {
     if (this.lifecycle.phase === 'shuttingDown' || this.lifecycle.phase === 'stopped') {
       throw new LifecycleAbortedError(
         `ControllerManager.init aborted: shutdown in progress or already complete (phase=${this.lifecycle.phase})`,
@@ -265,6 +264,7 @@ export class ControllerManager {
   public async enableYarg(): Promise<void> {
     await this.lifecycle.runOp(async () => {
       await this.lifecycle.awaitShutdownWork()
+      await this.listenerLifecycle.audio.disableAudio()
       await this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
     })
   }
@@ -288,6 +288,7 @@ export class ControllerManager {
       await this.lifecycle.awaitShutdownWork()
       await this.stopTestEffect()
       this.onSimulationPreempt?.()
+      await this.listenerLifecycle.audio.disableAudio()
       await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
     })
   }
@@ -311,53 +312,17 @@ export class ControllerManager {
    * `awaitShutdownWork`, so draining the queue here would deadlock.
    */
   public async shutdown(): Promise<void> {
-    return this.lifecycle.runExclusiveShutdown(async () => {
-      // 'shuttingDown' is allowed so a retry after a failed teardown can run again.
-      this.lifecycle.assertPhase(
-        ['initializing', 'running', 'restarting', 'consoleMode', 'failed', 'shuttingDown'],
-        'shutdown',
-      )
-      this.lifecycle.setPhase('shuttingDown')
-      log.info('ControllerManager shutdown: starting')
-
-      // Shutdown in reverse order of initialization
-      try {
-        await this.listenerLifecycle.yargRb3.disableYarg()
-        log.info('ControllerManager shutdown: YARG disabled')
-      } catch (err) {
-        log.error('Error disabling YARG:', err)
-      }
-
-      try {
-        await this.listenerLifecycle.yargRb3.disableRb3()
-        log.info('ControllerManager shutdown: RB3 disabled')
-      } catch (err) {
-        log.error('Error disabling RB3:', err)
-      }
-
-      try {
-        await this.listenerLifecycle.audio.disableAudio()
-        log.info('ControllerManager shutdown: Audio disabled')
-      } catch (err) {
-        log.error('Error disabling Audio:', err)
-      }
-
-      await this.graph.disposeLoaders()
-      this.graph.shutdownDomainCueHandlerRefs()
-      await this.graph.disposeChainsForShutdown()
-      await this.graph.shutdownPublisherSafe()
-      this.graph.destroyClock()
-
-      try {
-        await this.senderLifecycle.shutdownSenderOnAppExit()
-        log.info('ControllerManager shutdown: sender manager stopped')
-      } catch (err) {
-        log.error('Error shutting down sender manager:', err)
-      }
-
-      this.isInitialized = false
-      log.info('ControllerManager shutdown: completed')
-    })
+    return this.lifecycle.runExclusiveShutdown(() =>
+      runControllerShutdown({
+        lifecycle: this.lifecycle,
+        graph: this.graph,
+        listenerLifecycle: this.listenerLifecycle,
+        senderLifecycle: this.senderLifecycle,
+        setInitialized: (value) => {
+          this.isInitialized = value
+        },
+      }),
+    )
   }
 
   // Getters for controllers
@@ -555,6 +520,8 @@ export class ControllerManager {
    */
   public async enableAudio(): Promise<void> {
     await this.lifecycle.awaitInFlightWork()
+    await this.listenerLifecycle.yargRb3.disableYarg()
+    await this.listenerLifecycle.yargRb3.disableRb3()
     await this.listenerLifecycle.audio.enableAudio(this.isInitialized, () => this.init())
   }
 

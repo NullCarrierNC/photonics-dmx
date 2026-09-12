@@ -28,7 +28,7 @@ export interface CueRuntime {
   /**
    * Stop any active strobe and clear per-frame edge baselines at a session boundary, so the next
    * session's first frame compares against a clean baseline rather than a stale one. Required rather
-   * than optional: a runtime that wraps another (see CompositeCueRuntime) has to forward both of
+   * than optional: a runtime that wraps another has to forward both of
    * these, and as optional members a missing forward is a silent no-op instead of a type error.
    */
   resetSessionState(): void

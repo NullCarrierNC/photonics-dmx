@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { getAudioConfig, saveAudioConfig } from '../ipcApi'
+import React, { useCallback, useEffect, useState } from 'react'
+import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('AudioDeviceSelector')
 
@@ -8,38 +8,21 @@ interface AudioDevice {
   label: string
 }
 
+/** The stored config leaves deviceId unset for the system default, the select needs a value. */
+const DEFAULT_DEVICE = 'default'
+
 const AudioDeviceSelector: React.FC = () => {
+  const audio = useAudioConfigFields({ deviceId: undefined as string | undefined })
+  const selectedDeviceId = audio.values.deviceId || DEFAULT_DEVICE
   const [devices, setDevices] = useState<AudioDevice[]>([])
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('default')
   const [isLoading, setIsLoading] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Load config and devices on mount
-  useEffect(() => {
-    const loadConfigAndDevices = async () => {
-      try {
-        // Load saved config
-        const config = await getAudioConfig()
-        setSelectedDeviceId(config?.deviceId || 'default')
-
-        // Load available devices
-        await loadDevices()
-      } catch (error) {
-        log.error('Failed to load audio config:', error)
-        setError('Failed to load audio configuration')
-      }
-    }
-
-    loadConfigAndDevices()
-  }, [])
-
-  const loadDevices = async () => {
+  const loadDevices = useCallback(async (): Promise<void> => {
     setIsLoading(true)
     setError(null)
 
     try {
-      // Use Web Audio API to enumerate devices
       const deviceList = await navigator.mediaDevices.enumerateDevices()
       const audioInputs = deviceList
         .filter((d) => d.kind === 'audioinput')
@@ -56,43 +39,25 @@ const AudioDeviceSelector: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  const handleDeviceChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (isSaving) return
+  useEffect(() => {
+    void loadDevices()
+  }, [loadDevices])
+
+  const handleDeviceChange = async (e: React.ChangeEvent<HTMLSelectElement>): Promise<void> => {
+    if (audio.isSaving) return
 
     const newDeviceId = e.target.value
-    setSelectedDeviceId(newDeviceId)
+    const outcome = await audio.save({
+      deviceId: newDeviceId === DEFAULT_DEVICE ? undefined : newDeviceId,
+    })
 
-    try {
-      setIsSaving(true)
-      const result = await saveAudioConfig({
-        deviceId: newDeviceId === 'default' ? undefined : newDeviceId,
-      })
-
-      if (!result.success) {
-        log.error('Failed to save audio device:', result.error)
-        setError('Failed to save device selection')
-
-        // Revert on failure
-        const config = await getAudioConfig()
-        setSelectedDeviceId(config?.deviceId || 'default')
-      } else if (result.warning) {
-        // The device was saved, so the selection stands, but capture is not running on it.
-        log.warn('Audio device saved with a warning:', result.warning)
-        setError(result.warning)
-      } else {
-        setError(null)
-      }
-    } catch (error) {
-      log.error('Failed to save audio device:', error)
+    if (!outcome.ok) {
       setError('Failed to save device selection')
-
-      // Revert on failure
-      const config = await getAudioConfig()
-      setSelectedDeviceId(config?.deviceId || 'default')
-    } finally {
-      setIsSaving(false)
+    } else {
+      // The device was stored, so the selection stands, but capture is not running on it.
+      setError(outcome.warning ?? null)
     }
   }
 
@@ -108,8 +73,8 @@ const AudioDeviceSelector: React.FC = () => {
         <select
           id="audio-device"
           value={selectedDeviceId}
-          onChange={handleDeviceChange}
-          disabled={isLoading || isSaving}
+          onChange={(e) => void handleDeviceChange(e)}
+          disabled={isLoading || audio.isSaving}
           className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
           <option value="default">System Default Audio Input</option>
           {devices.map((device) => (
@@ -120,8 +85,8 @@ const AudioDeviceSelector: React.FC = () => {
         </select>
         <button
           type="button"
-          onClick={loadDevices}
-          disabled={isLoading || isSaving}
+          onClick={() => void loadDevices()}
+          disabled={isLoading || audio.isSaving}
           className="px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors"
           title="Refresh device list">
           {isLoading ? 'Loading...' : 'Refresh'}
@@ -134,7 +99,7 @@ const AudioDeviceSelector: React.FC = () => {
         </div>
       )}
 
-      {isSaving && <p className="text-xs text-blue-500 dark:text-blue-400 mt-2">Saving...</p>}
+      {audio.isSaving && <p className="text-xs text-blue-500 dark:text-blue-400 mt-2">Saving...</p>}
 
       {devices.length === 0 && !isLoading && !error && (
         <p className="text-xs text-yellow-500 dark:text-yellow-400 mt-2">

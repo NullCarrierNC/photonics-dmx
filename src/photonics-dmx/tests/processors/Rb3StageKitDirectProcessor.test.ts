@@ -8,12 +8,15 @@ import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { Rb3MenuCueHandler } from '../../cueHandlers/Rb3MenuCueHandler'
 import { Rb3StageKitDirectProcessor } from '../../processors/Rb3StageKitDirectProcessor'
+import { DEFAULT_STAGEKIT_CONFIG } from '../../listeners/RB3/StageKitTypes'
 import { ChainFanout } from '../../controllers/ChainFanout'
 import type { RigChain } from '../../controllers/RigChain'
 import { getColor } from '../../helpers/dmxHelpers'
 import { CueData } from '../../cues/types/cueTypes'
 import { Effect, RGBIO } from '../../types'
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
+import { performance as perfHooks } from 'perf_hooks'
+import { fakeLightingController } from '../helpers/fakeLightingController'
 
 const MENU_BASE = 'rb3-menu-base'
 const menuLight = (i: number) => `rb3-menu-light-${i}`
@@ -67,7 +70,6 @@ function emitStageKit(emitter: EventEmitter): void {
   emitter.emit('stagekit:data', {
     positions: [0, 1],
     color: 'red',
-    brightness: 'medium',
     timestamp: Date.now(),
   })
 }
@@ -86,10 +88,10 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
   let menuHandler: Rb3MenuCueHandler
   let processor: Rb3StageKitDirectProcessor
   let addEffect: jest.Mock
-  let setEffect: jest.Mock
+  let setEffect: jest.Mock<ILightingController['setEffect']>
   let removeEffect: jest.Mock
   let setState: jest.Mock
-  let blackout: jest.Mock
+  let blackout: jest.Mock<ILightingController['blackout']>
 
   beforeEach(() => {
     jest.useFakeTimers()
@@ -101,47 +103,18 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     lightManager = new DmxLightManager(makeFourLightConfig())
 
     addEffect = jest.fn()
-    setEffect = jest.fn().mockImplementation(() => Promise.resolve())
+    setEffect = jest.fn<ILightingController['setEffect']>(() => Promise.resolve())
     removeEffect = jest.fn()
     setState = jest.fn()
-    blackout = jest.fn().mockImplementation(() => Promise.resolve())
+    blackout = jest.fn<ILightingController['blackout']>(() => Promise.resolve())
 
-    photonicsSequencer = {
+    photonicsSequencer = fakeLightingController({
       addEffect,
       setEffect,
-      addEffectWithCallback: jest.fn(),
-      setEffectWithCallback: jest.fn(),
-      addEffectUnblockedNameWithCallback: jest.fn(),
-      setEffectUnblockedNameWithCallback: jest.fn(),
-      removeEffectCallback: jest.fn(),
       removeEffect,
-      removeAllEffects: jest.fn(),
-      removeEffectByLayer: jest.fn(),
-      addEffectUnblockedName: jest.fn(),
-      setEffectUnblockedName: jest.fn(),
-      getActiveEffectsForLight: jest.fn(),
-      isLayerFreeForLight: jest.fn(),
       setState,
-      onBeat: jest.fn(),
-      onMeasure: jest.fn(),
-      onKeyframe: jest.fn(),
-      onDrumNote: jest.fn(),
-      onGuitarNote: jest.fn(),
-      onBassNote: jest.fn(),
-      onKeysNote: jest.fn(),
       blackout,
-      cancelBlackout: jest.fn(),
-      enableDebug: jest.fn(),
-      debugLightLayers: jest.fn(),
-      schedulePanTiltClear: jest.fn(),
-      cancelPanTiltClear: jest.fn(),
-      addMotionPattern: jest.fn(),
-      removeMotionPattern: jest.fn(),
-      getMotionPattern: jest.fn(),
-      updateMotionPatternConfig: jest.fn(),
-      replaceEffect: jest.fn(),
-      shutdown: jest.fn(),
-    } as unknown as ILightingController
+    })
 
     menuHandler = new Rb3MenuCueHandler(lightManager, photonicsSequencer)
     // Single-rig fanout: the processor builds one Rb3StageKitRigProcessor from the chain.
@@ -196,7 +169,6 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
       networkListener.emit('stagekit:data', {
         positions,
         color,
-        brightness: 'medium',
         timestamp: Date.now(),
       })
     }
@@ -295,5 +267,137 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     for (let i = 0; i < 4; i++) {
       expect(removeEffect).toHaveBeenCalledWith(menuLight(i), 1 + i)
     }
+  })
+})
+
+describe('StageKit direct mode configuration', () => {
+  it('carries only the settings something reads', () => {
+    expect(Object.keys(DEFAULT_STAGEKIT_CONFIG).sort()).toEqual([
+      'debug',
+      'enabled',
+      'strobeWatchdogMs',
+    ])
+  })
+})
+
+describe('StageKit strobe watchdog', () => {
+  let networkListener: EventEmitter
+  let processor: Rb3StageKitDirectProcessor
+  const WINDOW_MS = 2000
+
+  /** A rig with a strobe fixture, so a strobe command produces a real effect to observe. */
+  function makeStrobeRigConfig() {
+    return createMockLightingConfig({
+      numLights: 4,
+      frontLights: [
+        createMockDmxLight({ id: 's-f0', position: 0, fixtureId: 's-f0', isStrobeEnabled: true }),
+        createMockDmxLight({ id: 's-f1', position: 1, fixtureId: 's-f1' }),
+        createMockDmxLight({ id: 's-f2', position: 2, fixtureId: 's-f2' }),
+        createMockDmxLight({ id: 's-f3', position: 3, fixtureId: 's-f3' }),
+      ],
+      backLights: [],
+      strobeLights: [
+        createMockDmxLight({ id: 's-f0', position: 0, fixtureId: 's-f0', isStrobeEnabled: true }),
+      ],
+    })
+  }
+
+  function emitStrobe(speed: 'slow' | 'medium' | 'fast' | 'fastest'): void {
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      strobeEffect: speed,
+      timestamp: Date.now(),
+    })
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers()
+    jest.setSystemTime(0)
+    // monotonicNowMs reads perf_hooks performance, which is a different object from the global
+    // one fake timers install, so the spy has to go on the module the clock actually calls.
+    jest.spyOn(perfHooks, 'now').mockImplementation(() => Date.now())
+    jest.spyOn(console, 'log').mockImplementation(() => {})
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+    networkListener = new EventEmitter()
+    const lightManager = new DmxLightManager(makeStrobeRigConfig())
+    const sequencer = fakeLightingController()
+    const chainFanout = new ChainFanout()
+    chainFanout.setChains([
+      {
+        rigId: 'strobe-rig',
+        isPrimary: true,
+        dmxLightManager: lightManager,
+        sequencer,
+        cueHandlers: { yarg: null, rb3: null },
+        audioCueHandler: null,
+        rb3MenuCueHandler: null,
+      } as unknown as RigChain,
+    ])
+    processor = new Rb3StageKitDirectProcessor(chainFanout, { strobeWatchdogMs: WINDOW_MS })
+    processor.startListening(networkListener)
+  })
+
+  afterEach(() => {
+    processor.stopListening(networkListener)
+    processor.destroy()
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+  })
+
+  it('cuts a strobe the console stopped talking about', () => {
+    emitStrobe('fastest')
+    expect(processor.getStatus().hasActiveStrobeEffects).toBe(true)
+
+    jest.advanceTimersByTime(WINDOW_MS + 500)
+
+    expect(processor.getStatus().hasActiveStrobeEffects).toBe(false)
+  })
+
+  it('leaves a strobe running while packets keep arriving', () => {
+    emitStrobe('fast')
+
+    for (let elapsed = 0; elapsed < WINDOW_MS * 3; elapsed += WINDOW_MS / 2) {
+      jest.advanceTimersByTime(WINDOW_MS / 2)
+      emitStrobe('fast')
+    }
+
+    expect(processor.getStatus().hasActiveStrobeEffects).toBe(true)
+  })
+
+  it('stays quiet when no strobe is running', () => {
+    networkListener.emit('stagekit:data', { positions: [0], color: 'red', timestamp: Date.now() })
+
+    jest.advanceTimersByTime(WINDOW_MS * 2)
+
+    expect(processor.getStatus().hasActiveStrobeEffects).toBe(false)
+  })
+
+  it('runs one strobe however many times the console repeats the packet', () => {
+    for (let i = 0; i < 10; i++) {
+      emitStrobe('fast')
+    }
+
+    expect(processor.getStatus().activeStrobeEffects).toHaveLength(1)
+  })
+
+  it('swaps to the new rate when the console changes strobe speed', () => {
+    emitStrobe('slow')
+    emitStrobe('fastest')
+
+    const running = processor.getStatus().activeStrobeEffects
+    expect(running).toHaveLength(1)
+    expect(running[0]).toContain('fastest')
+  })
+
+  it('starts a fresh strobe after one is cut and the console asks again', () => {
+    emitStrobe('fast')
+    jest.advanceTimersByTime(WINDOW_MS + 500)
+    expect(processor.getStatus().hasActiveStrobeEffects).toBe(false)
+
+    emitStrobe('fast')
+
+    expect(processor.getStatus().activeStrobeEffects).toHaveLength(1)
   })
 })

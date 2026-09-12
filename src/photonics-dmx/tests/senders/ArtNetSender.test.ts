@@ -80,6 +80,37 @@ describe('ArtNetSender', () => {
       // The send method catches errors and emits them, so we expect it to not throw
       await expect(artNetSender.send(universeBuffer)).resolves.not.toThrow()
     })
+
+    it('says the frame did not reach the wire when it was not started', async () => {
+      // The publisher skips a frame identical to the last one it believes the wire holds, so a
+      // failure reported as success leaves a static scene stuck on a frame that never arrived.
+      await expect(artNetSender.send({ 1: 255 })).resolves.toBe(false)
+    })
+
+    it('says the frame reached the wire on a good send', async () => {
+      await artNetSender.start()
+
+      await expect(artNetSender.send({ 1: 255 })).resolves.toBe(true)
+    })
+
+    it('says a frame the throttle held back still counts as delivered', async () => {
+      // The trailing flush puts it on the wire, so the publisher's cache is right either way.
+      const throttled = new ArtNetSender('127.0.0.1', {
+        universe: 1,
+        net: 0,
+        subnet: 0,
+        subuni: 0,
+        port: 6454,
+        base_refresh_interval: 1000,
+        maxOutputRate: 40,
+      })
+      await throttled.start()
+      await throttled.send({ 1: 1 })
+
+      await expect(throttled.send({ 1: 2 })).resolves.toBe(true)
+
+      await throttled.stop()
+    })
   })
 
   describe('stop', () => {

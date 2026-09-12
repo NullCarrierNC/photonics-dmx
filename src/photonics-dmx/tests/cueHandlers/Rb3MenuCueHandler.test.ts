@@ -2,6 +2,7 @@ import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { Rb3MenuCueHandler } from '../../cueHandlers/Rb3MenuCueHandler'
 import { createMockTrackedLight } from '../helpers/testFixtures'
+import { fakeLightingController } from '../helpers/fakeLightingController'
 
 describe('Rb3MenuCueHandler', () => {
   let addEffect: jest.Mock
@@ -17,7 +18,11 @@ describe('Rb3MenuCueHandler', () => {
     addEffect = jest.fn()
     setEffect = jest.fn().mockResolvedValue(undefined)
     removeEffect = jest.fn()
-    sequencer = { addEffect, setEffect, removeEffect } as unknown as ILightingController
+    sequencer = fakeLightingController({
+      addEffect,
+      setEffect,
+      removeEffect,
+    })
     return new Rb3MenuCueHandler(lightManager, sequencer)
   }
 

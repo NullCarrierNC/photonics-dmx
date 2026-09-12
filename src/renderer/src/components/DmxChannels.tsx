@@ -7,6 +7,7 @@ import {
   normalizeFixtureConfig,
 } from '../../../photonics-dmx/types'
 import { sortBaseChannelEntries } from './lightChannelDisplay'
+import { DraftNumberField } from './controls/DraftField'
 
 function fixtureConfigLabel(key: string): string {
   if (key === 'panDirectionCW') {
@@ -76,26 +77,12 @@ const DmxChannels: React.FC<DmxChannelsProps> = ({ light, onChannelChange }) => 
               {allowZero ? fixtureConfigLabel(channelName) : channelLabel(channelName)}:
             </label>
             {typeof value === 'number' ? (
-              <input
+              <DraftNumberField
                 id={channelName}
-                type="number"
                 min={boundsFor(channelName).min}
                 max={boundsFor(channelName).max}
                 value={value}
-                onChange={(e) => {
-                  const { min, max } = boundsFor(channelName)
-                  let newValue = Number(e.target.value)
-
-                  // Handle invalid inputs (e.g., empty string)
-                  if (isNaN(newValue)) {
-                    newValue = min
-                  }
-
-                  // Clamp the value within the allowed range
-                  newValue = Math.min(max, Math.max(min, Math.round(newValue)))
-
-                  onChannelChange(channelName, newValue)
-                }}
+                onCommit={(newValue) => onChannelChange(channelName, newValue)}
                 className={`p-2 border ${
                   allowZero ? 'border-gray-300' : 'border-gray-300'
                 } rounded w-[100px] text-black ${

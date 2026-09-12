@@ -1,7 +1,7 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { LIGHT } from '../../shared/ipcChannels'
-import { ipcError } from './ipcResult'
+import { handleInvoke } from './handleInvoke'
 import { validateMasterOutputPayload } from './inputValidation'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('master-output-handlers')
@@ -21,34 +21,29 @@ export function setupMasterOutputHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
 ): void {
-  ipcMain.handle(LIGHT.GET_MASTER_OUTPUT, () => {
+  handleInvoke(ipcMain, LIGHT.GET_MASTER_OUTPUT, log, () => {
     return controllerManager.getMasterOutput().getSnapshot()
   })
 
-  ipcMain.handle(LIGHT.SET_MASTER_OUTPUT, (_, data: unknown) => {
-    try {
-      const validation = validateMasterOutputPayload(data)
-      if (!validation.ok) {
-        return { success: false as const, error: validation.error }
-      }
-
-      const master = controllerManager.getMasterOutput()
-      if (validation.value.dimmerPercent !== undefined) {
-        master.setDimmerPercent(validation.value.dimmerPercent)
-      }
-      if (validation.value.blackout !== undefined) {
-        master.setBlackout(validation.value.blackout)
-      }
-      if (validation.value.strobeOutputEnabled !== undefined) {
-        master.setStrobeOutputEnabled(validation.value.strobeOutputEnabled)
-      }
-
-      controllerManager.getDmxPublisher()?.refreshOutput()
-
-      return { success: true as const, state: master.getSnapshot() }
-    } catch (error) {
-      log.error('Error updating master output:', error)
-      return ipcError(error)
+  handleInvoke(ipcMain, LIGHT.SET_MASTER_OUTPUT, log, (_, data: unknown) => {
+    const validation = validateMasterOutputPayload(data)
+    if (!validation.ok) {
+      return { success: false as const, error: validation.error }
     }
+
+    const master = controllerManager.getMasterOutput()
+    if (validation.value.dimmerPercent !== undefined) {
+      master.setDimmerPercent(validation.value.dimmerPercent)
+    }
+    if (validation.value.blackout !== undefined) {
+      master.setBlackout(validation.value.blackout)
+    }
+    if (validation.value.strobeOutputEnabled !== undefined) {
+      master.setStrobeOutputEnabled(validation.value.strobeOutputEnabled)
+    }
+
+    controllerManager.getDmxPublisher()?.refreshOutput()
+
+    return { success: true as const, state: master.getSnapshot() }
   })
 }

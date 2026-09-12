@@ -337,6 +337,10 @@ export class Sequencer implements ILightingController {
     this.effectManager.setState(lights, color, time)
   }
 
+  public getFrameIntervalMs(): number {
+    return this.clock.getIntervalMs()
+  }
+
   public schedulePanTiltClear(): void {
     this.transitionEngine.schedulePanTiltClear()
   }

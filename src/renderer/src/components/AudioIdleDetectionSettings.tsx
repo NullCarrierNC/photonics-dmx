@@ -1,10 +1,12 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import type { AudioConfig, AudioGameModeConfig } from '../../../shared/ipcTypes'
+import React, { useEffect, useState } from 'react'
+import type { AudioGameModeConfig } from '../../../shared/ipcTypes'
 import type { Brightness, Color } from '../../../photonics-dmx/types'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getAudioConfig, saveAudioConfig, getAudioGameMode } from '../ipcApi'
-import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
+import { getAudioGameMode } from '../ipcApi'
+import { registerIpcListener } from '../utils/ipcHelpers'
 import { DEFAULT_AUDIO_IDLE_DETECTION } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
+import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
+import { DraftNumberField } from './controls/DraftField'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('AudioIdleDetectionSettings')
 
@@ -29,119 +31,41 @@ const COLORS: Color[] = [
 
 const BRIGHTNESS: Brightness[] = ['low', 'medium', 'high', 'max', 'linear']
 
-const THRESHOLD_PERSIST_DEBOUNCE_MS = 300
-
 const AudioIdleDetectionSettings: React.FC = () => {
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const audio = useAudioConfigFields({ idleDetection: DEFAULT_AUDIO_IDLE_DETECTION })
+  const idle = audio.values.idleDetection
   const [gameModeEnabled, setGameModeEnabled] = useState(false)
-  const [idleEnabled, setIdleEnabled] = useState(DEFAULT_AUDIO_IDLE_DETECTION.enabled)
-  const [thresholdPct, setThresholdPct] = useState(DEFAULT_AUDIO_IDLE_DETECTION.thresholdPct)
-  const [minIdleSeconds, setMinIdleSeconds] = useState(DEFAULT_AUDIO_IDLE_DETECTION.minIdleSeconds)
-  const [resumeSeconds, setResumeSeconds] = useState(DEFAULT_AUDIO_IDLE_DETECTION.resumeSeconds)
-  const [idleColor, setIdleColor] = useState<Color>(DEFAULT_AUDIO_IDLE_DETECTION.idleColor)
-  const [idleBrightness, setIdleBrightness] = useState<Brightness>(
-    DEFAULT_AUDIO_IDLE_DETECTION.idleBrightness,
-  )
 
-  const thresholdPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const applyIdleFromConfig = useCallback((config: AudioConfig | undefined) => {
-    if (!config?.idleDetection) return
-    const id = config.idleDetection
-    setIdleEnabled(id.enabled)
-    setThresholdPct(id.thresholdPct)
-    setMinIdleSeconds(id.minIdleSeconds)
-    setResumeSeconds(id.resumeSeconds)
-    setIdleColor(id.idleColor)
-    setIdleBrightness(id.idleBrightness)
-  }, [])
-
+  // Game mode lives outside the audio config and gates this whole section.
   useEffect(() => {
-    const load = async () => {
+    let cancelled = false
+    void (async () => {
       try {
-        const [audioCfg, gm] = await Promise.all([getAudioConfig(), getAudioGameMode()])
-        applyIdleFromConfig(audioCfg)
-        setGameModeEnabled(gm.enabled)
+        const gm = await getAudioGameMode()
+        if (!cancelled) setGameModeEnabled(gm.enabled)
       } catch (e) {
-        log.error('Failed to load idle detection settings', e)
-      } finally {
-        setLoading(false)
+        log.error('Failed to load game mode', e)
       }
-    }
-    void load()
-
-    const onAudio = (config: AudioConfig | undefined) => applyIdleFromConfig(config)
-    const onGm = (cfg: AudioGameModeConfig) => setGameModeEnabled(cfg.enabled)
-    addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onAudio)
-    addIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, onGm)
+    })()
+    const stop = registerIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, (cfg) =>
+      setGameModeEnabled((cfg as AudioGameModeConfig).enabled),
+    )
     return () => {
-      removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onAudio)
-      removeIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, onGm)
-    }
-  }, [applyIdleFromConfig])
-
-  const persist = useCallback(
-    async (patch: Partial<AudioConfig['idleDetection']>) => {
-      if (saving) return
-      setSaving(true)
-      try {
-        const base = await getAudioConfig()
-        const merged = {
-          ...(base?.idleDetection ?? DEFAULT_AUDIO_IDLE_DETECTION),
-          ...patch,
-        }
-        const result = await saveAudioConfig({ idleDetection: merged })
-        if (!result.success) {
-          log.error('Failed to save idle detection:', result.error)
-          const cfg = await getAudioConfig()
-          applyIdleFromConfig(cfg)
-        }
-      } catch (e) {
-        log.error('Failed to save idle detection', e)
-        const cfg = await getAudioConfig()
-        applyIdleFromConfig(cfg)
-      } finally {
-        setSaving(false)
-      }
-    },
-    [saving, applyIdleFromConfig],
-  )
-
-  const schedulePersistThreshold = useCallback(
-    (v: number) => {
-      if (thresholdPersistTimerRef.current !== null) {
-        clearTimeout(thresholdPersistTimerRef.current)
-      }
-      thresholdPersistTimerRef.current = setTimeout(() => {
-        thresholdPersistTimerRef.current = null
-        void persist({ thresholdPct: v })
-      }, THRESHOLD_PERSIST_DEBOUNCE_MS)
-    },
-    [persist],
-  )
-
-  useEffect(() => {
-    if (!idleEnabled && thresholdPersistTimerRef.current !== null) {
-      clearTimeout(thresholdPersistTimerRef.current)
-      thresholdPersistTimerRef.current = null
-    }
-  }, [idleEnabled])
-
-  useEffect(() => {
-    return () => {
-      if (thresholdPersistTimerRef.current !== null) {
-        clearTimeout(thresholdPersistTimerRef.current)
-        thresholdPersistTimerRef.current = null
-      }
+      cancelled = true
+      stop()
     }
   }, [])
 
-  if (loading) {
+  const write = (patch: Partial<typeof idle>): void => {
+    void audio.save({ idleDetection: { ...idle, ...patch } })
+  }
+
+  if (!audio.loaded) {
     return <p className="text-sm text-gray-600 dark:text-gray-400">Loading idle detection…</p>
   }
 
-  const disabled = saving
+  const disabled = audio.isSaving
+  const fieldsDisabled = disabled || !idle.enabled
 
   return (
     <div className="space-y-4">
@@ -158,13 +82,9 @@ const AudioIdleDetectionSettings: React.FC = () => {
         <input
           id="idle-detection-enabled"
           type="checkbox"
-          checked={idleEnabled}
+          checked={idle.enabled}
           disabled={disabled}
-          onChange={(e) => {
-            const v = e.target.checked
-            setIdleEnabled(v)
-            void persist({ enabled: v })
-          }}
+          onChange={(e) => write({ enabled: e.target.checked })}
         />
         <label
           htmlFor="idle-detection-enabled"
@@ -175,7 +95,7 @@ const AudioIdleDetectionSettings: React.FC = () => {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Minimum overall energy threshold ({thresholdPct}%)
+          Minimum overall energy threshold ({idle.thresholdPct}%)
         </label>
         <input
           type="range"
@@ -183,55 +103,52 @@ const AudioIdleDetectionSettings: React.FC = () => {
           max={100}
           step={1}
           className="w-full max-w-md h-2 rounded-lg appearance-none cursor-pointer accent-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          value={thresholdPct}
-          disabled={disabled || !idleEnabled}
-          onChange={(e) => {
-            const v = Math.max(0, Math.min(100, Math.round(Number(e.target.value))))
-            setThresholdPct(v)
-            schedulePersistThreshold(v)
-          }}
+          value={idle.thresholdPct}
+          disabled={fieldsDisabled}
+          onChange={(e) =>
+            audio.saveSoon({
+              idleDetection: {
+                ...idle,
+                thresholdPct: Math.max(0, Math.min(100, Math.round(Number(e.target.value)))),
+              },
+            })
+          }
         />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor="idle-min-seconds"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Minimum low-energy time (seconds)
           </label>
-          <input
-            type="number"
+          <DraftNumberField
+            id="idle-min-seconds"
             min={0}
             max={600}
             step={1}
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
-            value={minIdleSeconds}
-            disabled={disabled || !idleEnabled}
-            onChange={(e) => setMinIdleSeconds(Number(e.target.value))}
-            onBlur={() => {
-              const v = Math.max(0, Math.min(600, Math.round(minIdleSeconds)))
-              setMinIdleSeconds(v)
-              void persist({ minIdleSeconds: v })
-            }}
+            value={idle.minIdleSeconds}
+            disabled={fieldsDisabled}
+            onCommit={(minIdleSeconds) => write({ minIdleSeconds })}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor="idle-resume-seconds"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Resume time (seconds)
           </label>
-          <input
-            type="number"
+          <DraftNumberField
+            id="idle-resume-seconds"
             min={0}
             max={60}
             step={1}
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
-            value={resumeSeconds}
-            disabled={disabled || !idleEnabled}
-            onChange={(e) => setResumeSeconds(Number(e.target.value))}
-            onBlur={() => {
-              const v = Math.max(0, Math.min(60, Math.round(resumeSeconds)))
-              setResumeSeconds(v)
-              void persist({ resumeSeconds: v })
-            }}
+            value={idle.resumeSeconds}
+            disabled={fieldsDisabled}
+            onCommit={(resumeSeconds) => write({ resumeSeconds })}
           />
         </div>
       </div>
@@ -243,13 +160,9 @@ const AudioIdleDetectionSettings: React.FC = () => {
           </label>
           <select
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
-            value={idleColor}
-            disabled={disabled || !idleEnabled}
-            onChange={(e) => {
-              const v = e.target.value as Color
-              setIdleColor(v)
-              void persist({ idleColor: v })
-            }}>
+            value={idle.idleColor}
+            disabled={fieldsDisabled}
+            onChange={(e) => write({ idleColor: e.target.value as Color })}>
             {COLORS.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -263,13 +176,9 @@ const AudioIdleDetectionSettings: React.FC = () => {
           </label>
           <select
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
-            value={idleBrightness}
-            disabled={disabled || !idleEnabled}
-            onChange={(e) => {
-              const v = e.target.value as Brightness
-              setIdleBrightness(v)
-              void persist({ idleBrightness: v })
-            }}>
+            value={idle.idleBrightness}
+            disabled={fieldsDisabled}
+            onChange={(e) => write({ idleBrightness: e.target.value as Brightness })}>
             {BRIGHTNESS.map((b) => (
               <option key={b} value={b}>
                 {b}

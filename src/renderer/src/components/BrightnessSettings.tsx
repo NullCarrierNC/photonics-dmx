@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
-import { savePrefs } from '../ipcApi'
-import { createLogger } from '../../../shared/logger'
-const log = createLogger('BrightnessSettings')
+import { persistPrefs } from '../ipc/persistPrefs'
+import { DraftNumberField } from './controls/DraftField'
 
 const BrightnessSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
@@ -14,6 +13,7 @@ const BrightnessSettings: React.FC = () => {
     max: 255,
   })
   const [isLoaded, setIsLoaded] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Load brightness settings from preferences
   useEffect(() => {
@@ -27,20 +27,22 @@ const BrightnessSettings: React.FC = () => {
     }
   }, [prefs.brightness, prefs])
 
+  // The slider previews as it moves and saves when the user lets go, so one drag is one write
+  // rather than one per tick.
+  const previewBrightness = (level: keyof typeof localBrightness, value: number): void => {
+    setLocalBrightness((prev) => ({ ...prev, [level]: value }))
+  }
+
   const handleBrightnessChange = async (level: keyof typeof localBrightness, value: number) => {
     const newBrightness = { ...localBrightness, [level]: value }
     setLocalBrightness(newBrightness)
+    setSaveError(null)
 
-    try {
-      await savePrefs({ brightness: newBrightness })
-
-      // Update the preferences atom to reflect the change
+    if (await persistPrefs({ brightness: newBrightness }, 'the brightness levels', setSaveError)) {
       setPrefs((prev) => ({
         ...prev,
         brightness: newBrightness,
       }))
-    } catch (error) {
-      log.error('Failed to save brightness configuration:', error)
     }
   }
 
@@ -53,17 +55,15 @@ const BrightnessSettings: React.FC = () => {
     }
 
     setLocalBrightness(defaultBrightness)
+    setSaveError(null)
 
-    try {
-      await savePrefs({ brightness: defaultBrightness })
-
-      // Update the preferences atom to reflect the change
+    if (
+      await persistPrefs({ brightness: defaultBrightness }, 'the brightness levels', setSaveError)
+    ) {
       setPrefs((prev) => ({
         ...prev,
         brightness: defaultBrightness,
       }))
-    } catch (error) {
-      log.error('Failed to reset brightness configuration:', error)
     }
   }
 
@@ -141,28 +141,36 @@ const BrightnessSettings: React.FC = () => {
                 min="0"
                 max="255"
                 value={localBrightness[key]}
-                onChange={(e) => handleBrightnessChange(key, parseInt(e.target.value))}
+                onChange={(e) => previewBrightness(key, parseInt(e.target.value))}
+                onMouseUp={(e) => void handleBrightnessChange(key, parseInt(e.currentTarget.value))}
+                onTouchEnd={(e) =>
+                  void handleBrightnessChange(key, parseInt(e.currentTarget.value))
+                }
+                onKeyUp={(e) => void handleBrightnessChange(key, parseInt(e.currentTarget.value))}
                 className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
                 style={{
                   background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(localBrightness[key] / 255) * 100}%, #e5e7eb ${(localBrightness[key] / 255) * 100}%, #e5e7eb 100%)`,
                 }}
               />
 
-              <input
-                type="number"
-                min="0"
-                max="255"
+              <DraftNumberField
+                min={0}
+                max={255}
                 value={localBrightness[key]}
-                onChange={(e) => {
-                  const value = Math.max(0, Math.min(255, parseInt(e.target.value) || 0))
-                  handleBrightnessChange(key, value)
-                }}
+                onCommit={(value) => void handleBrightnessChange(key, value)}
+                aria-label={`${label} level`}
                 className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
               />
             </div>
           </div>
         ))}
       </div>
+
+      {saveError && (
+        <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
+          {saveError}
+        </p>
+      )}
 
       <div className="mt-3 pt-4 border-t border-gray-200 dark:border-gray-600">
         <button

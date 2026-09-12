@@ -16,12 +16,14 @@ import { mirrorDmxForMovingHeadInvert, percentToDmx } from '../../helpers/dmxHel
  * publisher dispatches per slot, so tests assert against the single 'sacn' send call.
  */
 function makeMockSenderManager(): {
-  send: ReturnType<typeof jest.fn>
-  getEnabledWireSenders: ReturnType<typeof jest.fn>
-  isIpcEnabled: ReturnType<typeof jest.fn>
+  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
+  getEnabledWireSenders: jest.Mock<() => string[]>
+  isIpcEnabled: jest.Mock<() => boolean>
 } {
   return {
-    send: jest.fn().mockImplementation(() => Promise.resolve()),
+    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
+      Promise.resolve(true),
+    ),
     getEnabledWireSenders: jest.fn(() => ['sacn']),
     isIpcEnabled: jest.fn(() => false),
   }
@@ -314,5 +316,18 @@ describe('DmxPublisher', () => {
     mockSenderManager.send.mockClear()
     publisher.publish(lights)
     expect(mockSenderManager.send).toHaveBeenCalled()
+  })
+
+  it('setManualBuffer stays quiet once the publisher has shut down', async () => {
+    // The publisher is torn down first now, so the rest of the app shutdown is a window in which a
+    // late console message could otherwise re-light the rig after its final blackout.
+    const config = createMockLightingConfig()
+    publisher.updateActiveRigs([{ id: 'r1', name: 'R1', active: true, config }])
+    await publisher.shutdown()
+    mockSenderManager.send.mockClear()
+
+    publisher.setManualBuffer({ 1: 255, 2: 255 })
+
+    expect(mockSenderManager.send).not.toHaveBeenCalled()
   })
 })

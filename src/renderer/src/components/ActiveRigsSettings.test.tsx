@@ -10,8 +10,10 @@
  * silently stuck on a routing decision the user can no longer see.
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
-import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
-import { Provider, createStore } from 'jotai'
+import { screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
+import { refused, resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import * as ipcApi from '../ipcApi'
 import { dmxRigsAtom, lightingPrefsAtom } from '../atoms'
 import {
   ConfigStrobeType,
@@ -20,18 +22,18 @@ import {
   type WireSenderId,
 } from '../../../photonics-dmx/types'
 
-// Mock ipcApi before importing the component under test.
-const getDmxRigsMock = jest.fn(async () => [] as DmxRig[])
-const saveDmxRigMock = jest.fn(async (_rig: DmxRig) => undefined)
-const deleteDmxRigMock = jest.fn(async (_id: string) => undefined)
-const savePrefsMock = jest.fn(async (_p: Record<string, unknown>) => undefined)
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
-jest.mock('../ipcApi', () => ({
-  getDmxRigs: (...args: unknown[]) => getDmxRigsMock(...(args as [] as [])),
-  saveDmxRig: (rig: DmxRig) => saveDmxRigMock(rig),
-  deleteDmxRig: (id: string) => deleteDmxRigMock(id),
-  savePrefs: (p: Record<string, unknown>) => savePrefsMock(p),
-}))
+const getDmxRigsMock = jest.mocked(ipcApi.getDmxRigs)
+const saveDmxRigMock = jest.mocked(ipcApi.saveDmxRig)
+const deleteDmxRigMock = jest.mocked(ipcApi.deleteDmxRig)
+const savePrefsMock = jest.mocked(ipcApi.savePrefs)
 
 // Imported after the mock is set up.
 import ActiveRigsSettings from './ActiveRigsSettings'
@@ -55,28 +57,19 @@ function makeRig(id: string, name: string, outputs?: WireSenderId[], active = tr
   return rig
 }
 
-function renderWith(opts: {
-  rigs: DmxRig[]
-  allowMultipleActiveRigs: boolean
-}): ReturnType<typeof createStore> {
-  const store = createStore()
-  store.set(dmxRigsAtom, opts.rigs)
-  store.set(lightingPrefsAtom, { allowMultipleActiveRigs: opts.allowMultipleActiveRigs })
+function renderWith(opts: { rigs: DmxRig[]; allowMultipleActiveRigs: boolean }) {
   // Initial getDmxRigs call should return the same set (the component refetches on mount).
   getDmxRigsMock.mockResolvedValueOnce(opts.rigs)
-  render(
-    <Provider store={store}>
-      <ActiveRigsSettings />
-    </Provider>,
-  )
-  return store
+  return renderWithProviders(<ActiveRigsSettings />, {
+    seed: (set) => {
+      set(dmxRigsAtom, opts.rigs)
+      set(lightingPrefsAtom, { allowMultipleActiveRigs: opts.allowMultipleActiveRigs })
+    },
+  }).store
 }
 
 beforeEach(() => {
-  getDmxRigsMock.mockReset()
-  saveDmxRigMock.mockReset()
-  deleteDmxRigMock.mockReset()
-  savePrefsMock.mockReset()
+  resetIpcApiMock()
 })
 
 afterEach(() => {
@@ -95,7 +88,7 @@ function outputsColumnHeader(): HTMLElement | null {
 describe('ActiveRigsSettings — routing UI gate', () => {
   it('hides the Outputs column with a single rig (multi-rig pref irrelevant)', async () => {
     renderWith({ rigs: [makeRig('r1', 'Solo')], allowMultipleActiveRigs: true })
-    await waitFor(() => expect(screen.queryByText('Solo')).toBeTruthy())
+    await waitFor(() => expect(screen.queryByText('Solo')).toBeInTheDocument())
     expect(outputsColumnHeader()).toBeNull()
   })
 
@@ -104,12 +97,12 @@ describe('ActiveRigsSettings — routing UI gate', () => {
       rigs: [makeRig('r1', 'Rig A'), makeRig('r2', 'Rig B')],
       allowMultipleActiveRigs: false,
     })
-    await waitFor(() => expect(screen.queryByText('Rig A')).toBeTruthy())
+    await waitFor(() => expect(screen.queryByText('Rig A')).toBeInTheDocument())
     expect(outputsColumnHeader()).toBeNull()
     // Discoverability hint should appear in this state.
     expect(
       screen.queryByText(/Enable this to route specific rigs to specific DMX outputs/i),
-    ).toBeTruthy()
+    ).toBeInTheDocument()
   })
 
   it('shows the Outputs column with two rigs and allowMultipleActiveRigs on', async () => {
@@ -117,8 +110,8 @@ describe('ActiveRigsSettings — routing UI gate', () => {
       rigs: [makeRig('r1', 'Rig A'), makeRig('r2', 'Rig B')],
       allowMultipleActiveRigs: true,
     })
-    await waitFor(() => expect(screen.queryByText('Rig A')).toBeTruthy())
-    expect(outputsColumnHeader()).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('Rig A')).toBeInTheDocument())
+    expect(outputsColumnHeader()).toBeInTheDocument()
   })
 })
 
@@ -127,7 +120,7 @@ describe('ActiveRigsSettings — clears outputs on UI-hide transitions', () => {
     const rigA = makeRig('r1', 'Rig A', ['sacn'])
     const rigB = makeRig('r2', 'Rig B', ['opendmx'])
     renderWith({ rigs: [rigA, rigB], allowMultipleActiveRigs: true })
-    await waitFor(() => expect(screen.queryByText('Rig A')).toBeTruthy())
+    await waitFor(() => expect(screen.queryByText('Rig A')).toBeInTheDocument())
 
     // Click delete on Rig B, then confirm.
     const deleteButtons = screen.getAllByText('Delete')
@@ -154,7 +147,7 @@ describe('ActiveRigsSettings — clears outputs on UI-hide transitions', () => {
     const rigA = makeRig('r1', 'Rig A') // outputs undefined
     const rigB = makeRig('r2', 'Rig B', ['opendmx'])
     renderWith({ rigs: [rigA, rigB], allowMultipleActiveRigs: true })
-    await waitFor(() => expect(screen.queryByText('Rig A')).toBeTruthy())
+    await waitFor(() => expect(screen.queryByText('Rig A')).toBeInTheDocument())
 
     const deleteButtons = screen.getAllByText('Delete')
     await act(async () => {
@@ -174,7 +167,7 @@ describe('ActiveRigsSettings — clears outputs on UI-hide transitions', () => {
     const rigA = makeRig('r1', 'Rig A', ['sacn'])
     const rigB = makeRig('r2', 'Rig B', ['opendmx'])
     renderWith({ rigs: [rigA, rigB], allowMultipleActiveRigs: true })
-    await waitFor(() => expect(screen.queryByText('Rig A')).toBeTruthy())
+    await waitFor(() => expect(screen.queryByText('Rig A')).toBeInTheDocument())
 
     // Toggle the pref off.
     const checkbox = screen.getByLabelText(/Allow Multiple Active Rigs/i) as HTMLInputElement
@@ -202,16 +195,16 @@ describe('ActiveRigsSettings — mirror controls', () => {
 
   it('renders Mirror column with Horiz and Vert checkboxes for a single rig (no multi-rig gate)', async () => {
     renderWith({ rigs: [makeRig('r1', 'Solo')], allowMultipleActiveRigs: false })
-    await waitFor(() => expect(screen.queryByText('Solo')).toBeTruthy())
-    expect(screen.queryByRole('columnheader', { name: /Mirror/i })).toBeTruthy()
-    expect(mirrorCheckbox('r1', 'horiz')).toBeTruthy()
-    expect(mirrorCheckbox('r1', 'vert')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('Solo')).toBeInTheDocument())
+    expect(screen.queryByRole('columnheader', { name: /Mirror/i })).toBeInTheDocument()
+    expect(mirrorCheckbox('r1', 'horiz')).toBeInTheDocument()
+    expect(mirrorCheckbox('r1', 'vert')).toBeInTheDocument()
     expect(mirrorCheckbox('r1', 'horiz').checked).toBe(false)
   })
 
   it('toggling Horiz dispatches a save with mirrorHoriz: true', async () => {
     renderWith({ rigs: [makeRig('r1', 'Solo')], allowMultipleActiveRigs: false })
-    await waitFor(() => expect(screen.queryByText('Solo')).toBeTruthy())
+    await waitFor(() => expect(screen.queryByText('Solo')).toBeInTheDocument())
 
     await act(async () => {
       fireEvent.click(mirrorCheckbox('r1', 'horiz'))
@@ -230,7 +223,7 @@ describe('ActiveRigsSettings — mirror controls', () => {
       mirrorHoriz: true,
     }
     renderWith({ rigs: [rig], allowMultipleActiveRigs: false })
-    await waitFor(() => expect(screen.queryByText('Solo')).toBeTruthy())
+    await waitFor(() => expect(screen.queryByText('Solo')).toBeInTheDocument())
     expect(mirrorCheckbox('r1', 'horiz').checked).toBe(true)
 
     await act(async () => {
@@ -245,7 +238,7 @@ describe('ActiveRigsSettings — mirror controls', () => {
 
   it('mirrorHoriz and mirrorVert toggles are independent', async () => {
     renderWith({ rigs: [makeRig('r1', 'Solo')], allowMultipleActiveRigs: false })
-    await waitFor(() => expect(screen.queryByText('Solo')).toBeTruthy())
+    await waitFor(() => expect(screen.queryByText('Solo')).toBeInTheDocument())
 
     await act(async () => {
       fireEvent.click(mirrorCheckbox('r1', 'vert'))
@@ -255,5 +248,18 @@ describe('ActiveRigsSettings — mirror controls', () => {
     const saved = saveDmxRigMock.mock.calls.at(-1)![0] as DmxRig
     expect(saved.mirrorVert).toBe(true)
     expect('mirrorHoriz' in saved).toBe(false)
+  })
+
+  it('leaves the rigs alone when the multi-rig preference is refused', async () => {
+    jest
+      .mocked(ipcApi.savePrefs)
+      .mockImplementation((() => Promise.resolve(refused('read only'))) as never)
+    const rigs = [makeRig('r1', 'One', ['sacn']), makeRig('r2', 'Two')]
+    renderWith({ rigs, allowMultipleActiveRigs: true })
+
+    fireEvent.click(await screen.findByLabelText('Allow Multiple Active Rigs'))
+
+    await screen.findByRole('alert')
+    expect(jest.mocked(ipcApi.saveDmxRig)).not.toHaveBeenCalled()
   })
 })

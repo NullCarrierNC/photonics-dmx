@@ -1,4 +1,5 @@
 import { describe, expect, it } from '@jest/globals'
+import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import {
@@ -13,6 +14,7 @@ import {
   validateLightingConfiguration,
   validateMotionSelectionMode,
   validateNumberInRange,
+  validateOpenablePath,
   validatePathUnderAllowedRoots,
   validatePreferencesPayload,
   validateRigMirrorFlag,
@@ -348,6 +350,13 @@ describe('inputValidation', () => {
       }
     })
 
+    it('holds a sacn enable payload to the universes the protocol defines', () => {
+      expect(validateSenderEnablePayload({ sender: 'sacn', universe: 0 }).ok).toBe(false)
+      expect(validateSenderEnablePayload({ sender: 'sacn', universe: 1 }).ok).toBe(true)
+      expect(validateSenderEnablePayload({ sender: 'sacn', universe: 63999 }).ok).toBe(true)
+      expect(validateSenderEnablePayload({ sender: 'sacn', universe: 64000 }).ok).toBe(false)
+    })
+
     it('accepts sacn legacy maxOutputRate and clamps Hz into 10–44', () => {
       const result = validateSenderEnablePayload({
         sender: 'sacn',
@@ -585,6 +594,47 @@ describe('inputValidation', () => {
     it('rejects path when allowed roots is empty', () => {
       const result = validatePathUnderAllowedRoots('/tmp/foo', [])
       expect(result.ok).toBe(false)
+    })
+  })
+
+  describe('validateOpenablePath', () => {
+    const allowedRoots = [os.tmpdir()]
+    const under = (name: string) => path.join(os.tmpdir(), name)
+
+    it('accepts the file types the app opens', () => {
+      for (const name of ['library.json', 'notes.txt', 'photonics.log', 'readme.md', 'rows.csv']) {
+        expect(validateOpenablePath(under(name), allowedRoots).ok).toBe(true)
+      }
+    })
+
+    it('refuses to hand an executable to the system handler', () => {
+      for (const name of ['installer.exe', 'run.sh', 'payload.command', 'link.lnk', 'go.bat']) {
+        expect(validateOpenablePath(under(name), allowedRoots).ok).toBe(false)
+      }
+    })
+
+    it('accepts a plain directory, which opens a file manager', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'photonics-openable-'))
+      try {
+        expect(validateOpenablePath(dir, allowedRoots).ok).toBe(true)
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it('refuses a directory carrying an extension, which is what a macOS bundle is', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'photonics-openable-'))
+      const bundle = path.join(dir, 'Something.app')
+      fs.mkdirSync(bundle)
+      try {
+        expect(validateOpenablePath(bundle, allowedRoots).ok).toBe(false)
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it('still refuses a path outside the allowed roots', () => {
+      expect(validateOpenablePath('/etc/hosts.json', allowedRoots).ok).toBe(false)
     })
 
     describe('channel bounds', () => {
@@ -878,6 +928,64 @@ describe('inputValidation', () => {
       if (r.ok) expect(r.value.sacnConfig?.refreshRateHz).toBe(DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT)
     })
 
+    it('refuses an Art-Net host that is not an address', () => {
+      // The stored host reaches the driver verbatim on the next launch, so a bad one keeps sending
+      // the rig's output somewhere else.
+      for (const host of ['10.0.0.5 ; rm -rf /', 'http://10.0.0.5', '10.0.0.5/24', '-leading']) {
+        const r = validatePreferencesPayload({ artNetConfig: { host } })
+        expect(r.ok).toBe(false)
+      }
+    })
+
+    it('accepts an Art-Net host as an address or a hostname, trimmed', () => {
+      for (const [host, stored] of [
+        ['10.0.0.5', '10.0.0.5'],
+        ['  10.0.0.5  ', '10.0.0.5'],
+        ['fe80::1', 'fe80::1'],
+        ['lighting-desk.local', 'lighting-desk.local'],
+        ['', ''],
+      ]) {
+        const r = validatePreferencesPayload({ artNetConfig: { host } })
+        expect(r.ok).toBe(true)
+        if (r.ok) expect(r.value.artNetConfig?.host).toBe(stored)
+      }
+    })
+
+    it('holds the Art-Net addressing fields in range', () => {
+      const inRange = { universe: 32767, net: 127, subnet: 15, subuni: 15, port: 65535 }
+      expect(validatePreferencesPayload({ artNetConfig: inRange }).ok).toBe(true)
+
+      for (const [field, value] of Object.entries({
+        universe: 32768,
+        net: 128,
+        subnet: 16,
+        subuni: 16,
+        port: 0,
+      })) {
+        const r = validatePreferencesPayload({ artNetConfig: { [field]: value } })
+        expect(r.ok).toBe(false)
+      }
+    })
+
+    it('refuses a sACN unicast destination that is not an address', () => {
+      const r = validatePreferencesPayload({
+        sacnConfig: { unicastDestination: 'not a host!' },
+      })
+      expect(r.ok).toBe(false)
+    })
+
+    it('holds the sACN universe in range', () => {
+      expect(validatePreferencesPayload({ sacnConfig: { universe: 1 } }).ok).toBe(true)
+      expect(validatePreferencesPayload({ sacnConfig: { universe: 63999 } }).ok).toBe(true)
+      expect(validatePreferencesPayload({ sacnConfig: { universe: 64000 } }).ok).toBe(false)
+      expect(validatePreferencesPayload({ sacnConfig: { universe: 0 } }).ok).toBe(false)
+      expect(validatePreferencesPayload({ sacnConfig: { universe: -1 } }).ok).toBe(false)
+    })
+
+    it('rejects a non-boolean sACN useUnicast', () => {
+      expect(validatePreferencesPayload({ sacnConfig: { useUnicast: 'yes' } }).ok).toBe(false)
+    })
+
     it('rejects non-number sacnConfig.refreshRateHz', () => {
       const payload: Record<string, unknown> = {
         sacnConfig: { refreshRateHz: 'fast' },
@@ -991,7 +1099,9 @@ describe('inputValidation', () => {
         const under = validatePreferencesPayload({ clockRate: 0 })
         expect(under.ok && under.value.clockRate).toBe(1)
         const over = validatePreferencesPayload({ clockRate: 9999 })
-        expect(over.ok && over.value.clockRate).toBe(100)
+        expect(over.ok && over.value.clockRate).toBe(50)
+        const justOver = validatePreferencesPayload({ clockRate: 51 })
+        expect(justOver.ok && justOver.value.clockRate).toBe(50)
       })
     })
 

@@ -4,6 +4,7 @@ import type {
   CreatePairsType,
 } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
+import VariableSelect from './VariableSelect'
 
 export interface CreatePairsLogicEditorProps extends LogicEditorCommonProps {
   node: CreatePairsLogicNode
@@ -29,35 +30,20 @@ const CreatePairsLogicEditor: React.FC<CreatePairsLogicEditorProps> = ({
         </select>
       </label>
 
-      <label className="flex flex-col font-medium">
-        Source Variable (light-array)
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.sourceVariable}
-          onChange={(event) => updateNode({ sourceVariable: event.target.value })}>
-          <option value="">-- Select light-array --</option>
-          {lightArrayVars.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
+      <VariableSelect
+        label="Source Variable (light-array)"
+        value={node.sourceVariable}
+        onChange={(name) => updateNode({ sourceVariable: name })}
+        variables={lightArrayVars}
+        placeholder="-- Select light-array --"
+      />
 
-      <label className="flex flex-col font-medium">
-        Assign To (light-array variable)
-        <select
-          className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-          value={node.assignTo}
-          onChange={(event) => updateNode({ assignTo: event.target.value })}>
-          <option value="">-- Select variable --</option>
-          {lightArrayVars.map((v) => (
-            <option key={v.name} value={v.name}>
-              {v.name} ({v.scope})
-            </option>
-          ))}
-        </select>
-      </label>
+      <VariableSelect
+        label="Assign To (light-array variable)"
+        value={node.assignTo}
+        onChange={(name) => updateNode({ assignTo: name })}
+        variables={lightArrayVars}
+      />
 
       <p className="text-[10px] text-gray-500 italic">
         {node.pairType === 'diagonal'

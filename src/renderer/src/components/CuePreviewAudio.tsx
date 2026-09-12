@@ -7,7 +7,7 @@ import { DEFAULT_AUDIO_BANDS } from '../../../photonics-dmx/listeners/Audio/Audi
 import { EQ_BAND_COLORS } from '../lib/audioEqBandColors'
 import AudioSensitivityControls from './AudioSensitivityControls'
 
-// Map Color type to RGB values for preview bars (matches AudioColorMapping.tsx)
+// Map Color type to RGB values for the preview bars.
 const COLOR_TO_RGB: Record<Color, string> = {
   red: 'rgb(255, 0, 0)',
   blue: 'rgb(0, 0, 255)',

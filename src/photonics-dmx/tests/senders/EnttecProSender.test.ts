@@ -57,6 +57,22 @@ describe('EnttecProSender', () => {
       expect(payload[256]).toBe(0)
       expect(payload[512]).toBe(0)
     })
+
+    it('still lets go of the universe when the driver will not close', async () => {
+      const { DMX } = jest.requireMock('dmx-ts') as { DMX: jest.Mock }
+      DMX.mockImplementationOnce(() => ({
+        addUniverse: jest.fn().mockResolvedValue({ update: mockUpdate, close: mockClose }),
+        removeAllListeners: jest.fn(),
+        close: jest.fn().mockRejectedValue(new Error('port gone')),
+      }))
+      const failing = new EnttecProSender('COM1', { dmxSpeed: 40 }, 'uni1', 0)
+      await failing.start()
+
+      await expect(failing.stop()).resolves.toBeUndefined()
+
+      // Holding no universe, it reports a send as failed rather than writing to a closed port.
+      await expect(failing.send({ 1: 1 })).resolves.toBe(false)
+    })
   })
 
   describe('error handling', () => {

@@ -1,3 +1,4 @@
+import { handleInvoke } from './handleInvoke'
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
@@ -65,8 +66,7 @@ const MOTION_DOMAINS: readonly MotionDomainSpec[] = [
     label: 'RB3',
     prefsDomain: 'rb3Motion',
     registry: () => getCueRegistry('rb3'),
-    getSelectionMode: (config) =>
-      config.getPreference('cueDomains').rb3Motion.selectionMode ?? 'perCueChange',
+    getSelectionMode: (config) => config.getRb3MotionGroupSelectionMode(),
     channels: {
       groups: LIGHT.GET_RB3_MOTION_CUE_GROUPS,
       availableCues: LIGHT.GET_AVAILABLE_RB3_MOTION_CUES,
@@ -85,7 +85,7 @@ export function setupMotionGroupHandlers(
   controllerManager: ControllerManager,
 ): void {
   for (const spec of MOTION_DOMAINS) {
-    ipcMain.handle(spec.channels.groups, async () => {
+    handleInvoke(ipcMain, spec.channels.groups, log, async () => {
       try {
         return spec.registry().getMotionGroupsInfo()
       } catch (error) {
@@ -94,7 +94,7 @@ export function setupMotionGroupHandlers(
       }
     })
 
-    ipcMain.handle(spec.channels.availableCues, async (_, groupId?: unknown) => {
+    handleInvoke(ipcMain, spec.channels.availableCues, log, async (_, groupId?: unknown) => {
       try {
         const registry = spec.registry()
         const resolvedGroupId = typeof groupId === 'string' ? groupId : undefined
@@ -112,30 +112,20 @@ export function setupMotionGroupHandlers(
       }
     })
 
-    ipcMain.handle(spec.channels.getSelectionMode, async () => {
-      try {
-        return { success: true, mode: spec.getSelectionMode(controllerManager.getConfig()) }
-      } catch (error) {
-        log.error(`Error getting ${spec.label} motion group selection mode:`, error)
-        return ipcError(error)
-      }
+    handleInvoke(ipcMain, spec.channels.getSelectionMode, log, async () => {
+      return { success: true, mode: spec.getSelectionMode(controllerManager.getConfig()) }
     })
 
-    ipcMain.handle(spec.channels.setSelectionMode, async (_, mode: unknown) => {
-      try {
-        const validation = validateMotionSelectionMode(mode)
-        if (!validation.ok) {
-          return ipcError(new Error(validation.error))
-        }
-        await controllerManager
-          .getConfig()
-          .updateCueDomain(spec.prefsDomain, { selectionMode: validation.value })
-        spec.registry().setMotionSelectionMode(validation.value)
-        return { success: true, mode: validation.value }
-      } catch (error) {
-        log.error(`Error setting ${spec.label} motion group selection mode:`, error)
-        return ipcError(error)
+    handleInvoke(ipcMain, spec.channels.setSelectionMode, log, async (_, mode: unknown) => {
+      const validation = validateMotionSelectionMode(mode)
+      if (!validation.ok) {
+        return ipcError(new Error(validation.error))
       }
+      await controllerManager
+        .getConfig()
+        .updateCueDomain(spec.prefsDomain, { selectionMode: validation.value })
+      spec.registry().setMotionSelectionMode(validation.value)
+      return { success: true, mode: validation.value }
     })
   }
 }

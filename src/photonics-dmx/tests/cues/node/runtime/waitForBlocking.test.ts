@@ -1,9 +1,8 @@
 /**
- * Regression tests for the fix that makes a `waitForCondition` gate block downstream graph
- * execution (previously only `waitUntilCondition` did). An action gated solely by `waitFor`
- * must submit via the blocking (...WithCallback) path and must not run downstream nodes
- * until the effect's completion callback fires. Covers both the cue (NodeExecutionEngine)
- * and effect (EffectExecutionEngine) engines, single-action and chain.
+ * A `waitForCondition` gate blocks downstream graph execution, as `waitUntilCondition` does. An
+ * action gated solely by `waitFor` submits through the blocking (...WithCallback) path and runs no
+ * downstream node until the effect's completion callback fires. Covers both the cue
+ * (NodeExecutionEngine) and effect (EffectExecutionEngine) engines, single-action and chain.
  */
 import { jest } from '@jest/globals'
 import { NodeExecutionEngine } from '../../../../cues/node/runtime/NodeExecutionEngine'
@@ -18,7 +17,7 @@ import type {
   NetNodeCueDefinition,
   YargEffectDefinition,
 } from '../../../../cues/types/nodeCueTypes'
-import { CueType, defaultCueData, type CueData } from '../../../../cues'
+import { CueType, defaultCueData, type CueData } from '../../../../cues/types/cueTypes'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
@@ -85,8 +84,8 @@ const makeMockSequencer = (): jest.Mocked<ILightingController> =>
     setEffectWithCallback: jest.fn(),
     addEffectUnblockedName: jest.fn().mockReturnValue(true),
     setEffectUnblockedName: jest.fn().mockReturnValue(true),
-    addEffectUnblockedNameWithCallback: jest.fn(),
-    setEffectUnblockedNameWithCallback: jest.fn(),
+    addEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
+    setEffectUnblockedNameWithCallback: jest.fn().mockReturnValue(true),
     removeEffectCallback: jest.fn(),
     removeEffect: jest.fn(),
     cancelPanTiltClear: jest.fn(),
@@ -110,6 +109,7 @@ function captureBlockingCallbacks(sequencer: jest.Mocked<ILightingController>): 
   ;(sequencer.addEffectUnblockedNameWithCallback as jest.Mock).mockImplementation(
     (_name, _effect, cb) => {
       if (cb) callbacks.push(cb as () => void)
+      return true
     },
   )
   return callbacks

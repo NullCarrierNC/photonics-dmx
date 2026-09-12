@@ -15,6 +15,7 @@ import {
   OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
   hzToThrottleIntervalMs,
 } from '../../shared/dmxOutputRefresh'
+import { blackoutUniverse } from '../helpers/dmxHelpers'
 import { BaseSender, SenderError } from './BaseSender'
 import { usleep } from './usleep'
 
@@ -36,6 +37,31 @@ interface OpenDmxDeviceOptions {
  */
 function dmxSpeedToIntervalMs(dmxSpeed: number): number {
   return hzToThrottleIntervalMs(dmxSpeed) || 1000 / OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
+}
+
+/** How long the stop path waits for the blackout frame to reach the port before closing it. */
+const FINAL_FRAME_TIMEOUT_MS = 100
+
+/**
+ * Puts the buffer the device currently holds on the port once, bounded so a device that has gone
+ * away cannot hold the stop open.
+ */
+async function sendFinalFrame(device: EnttecOpenDMXUSBDevice): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      device._sendUniverse(),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, FINAL_FRAME_TIMEOUT_MS)
+      }),
+    ])
+  } catch (err) {
+    log.error('OpenDMX blackout frame failed to reach the port:', err)
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer)
+    }
+  }
 }
 
 /** Minimal device interface used by OpenDmxSender (and by tests for injection). */
@@ -102,12 +128,12 @@ class OpenDmxDeviceAdapter implements IOpenDmxDeviceAdapter {
     if (this.onError) {
       device.off('error', this.onError)
     }
-    const zeroPayload: Record<number, number> = {}
-    for (let ch = 1; ch <= 512; ch++) {
-      zeroPayload[ch] = 0
-    }
-    device.setChannels(zeroPayload, true)
+    // Clearing the buffer first means an in-flight pass of the device's send loop already carries
+    // zeros. Stopping that loop is what makes the cleared buffer stay unsent, so the frame goes out
+    // here instead, before the port closes.
+    device.setChannels(blackoutUniverse(), true)
     device.stopSending()
+    await sendFinalFrame(device)
 
     type PortWithClose = {
       isOpen: boolean
@@ -211,11 +237,12 @@ export class OpenDmxSender extends BaseSender {
     }
   }
 
-  public async send(universeBuffer: Record<number, number>): Promise<void> {
+  public async send(universeBuffer: Record<number, number>): Promise<boolean> {
     try {
       this.verifySenderStarted()
       this.device!.writeChannels(universeBuffer)
       this.consecutiveSendFailures = 0
+      return true
     } catch (err) {
       log.error('OpenDmxSender error:', err)
       // Per-frame USB writes can fail transiently, so a single failure only reports; a sustained
@@ -225,6 +252,7 @@ export class OpenDmxSender extends BaseSender {
       const shouldDisable = this.consecutiveSendFailures >= OpenDmxSender.MAX_SEND_FAILURES
       const errorEvent = new SenderError(err, { senderId: 'opendmx', shouldDisable })
       this.emitSenderError(errorEvent)
+      return false
     }
   }
 

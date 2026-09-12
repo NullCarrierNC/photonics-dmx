@@ -79,7 +79,7 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
     // even if no cue handler was active to clear it during its own shutdown.
     // Prevents a stale strobe slot from driving hardware-strobe-channel
     // lights after an input-platform switch.
-    getStrobeStateManager().setActive(null)
+    getStrobeStateManager().reset()
 
     // Drop process-scoped state bound to the engine/registry being rebuilt (e.g. an active laser sim
     // cue + its render tick). Each callback is wrapped so one consumer's failure can neither abort the
@@ -152,7 +152,9 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
       await ctx.listenerLifecycle.yargRb3.enableRb3(ctx.isInitialized(), () => ctx.init())
     }
 
-    if (wasAudioEnabled) {
+    // One input drives the rig at a time, so a snapshot holding audio beside a network listener
+    // comes back as the listener alone rather than as both.
+    if (wasAudioEnabled && !wasYargEnabled && !wasRb3Enabled) {
       await ctx.listenerLifecycle.audio.enableAudio(ctx.isInitialized(), () => ctx.init())
     }
 

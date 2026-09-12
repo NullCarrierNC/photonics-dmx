@@ -1,6 +1,6 @@
 import React from 'react'
-import { DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT } from '../../../../shared/dmxOutputRefresh'
 import CollapsibleSenderCard from './CollapsibleSenderCard'
+import { DraftNumberField, DraftTextField } from '../controls/DraftField'
 
 export interface ArtNetConfig {
   host: string
@@ -12,6 +12,9 @@ export interface ArtNetConfig {
   /** Unified refresh rate (Hz); 10–44. */
   refreshRateHz: number
 }
+
+const FIELD_CLASS =
+  'border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white'
 
 interface ArtNetConfigCardProps {
   config: ArtNetConfig
@@ -38,11 +41,11 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
           Host:
         </label>
-        <input
-          type="text"
+        <DraftTextField
+          aria-label="Host"
           value={config.host}
-          onChange={(e) => onConfigChange('host', e.target.value)}
-          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          onCommit={(host) => onConfigChange('host', host)}
+          className={`${FIELD_CLASS} w-32`}
           placeholder="127.0.0.1"
         />
       </div>
@@ -51,39 +54,39 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
             Net:
           </label>
-          <input
-            type="number"
+          <DraftNumberField
+            aria-label="Net"
             value={config.net}
-            onChange={(e) => onConfigChange('net', parseInt(e.target.value) || 0)}
-            className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            min="0"
-            max="255"
+            onCommit={(value) => onConfigChange('net', value)}
+            className={`${FIELD_CLASS} w-32`}
+            min={0}
+            max={255}
           />
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
             Subnet:
           </label>
-          <input
-            type="number"
+          <DraftNumberField
+            aria-label="Subnet"
             value={config.subnet}
-            onChange={(e) => onConfigChange('subnet', parseInt(e.target.value) || 0)}
-            className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            min="0"
-            max="255"
+            onCommit={(value) => onConfigChange('subnet', value)}
+            className={`${FIELD_CLASS} w-32`}
+            min={0}
+            max={255}
           />
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
             Universe:
           </label>
-          <input
-            type="number"
+          <DraftNumberField
+            aria-label="Universe"
             value={config.universe}
-            onChange={(e) => onConfigChange('universe', parseInt(e.target.value) || 0)}
-            className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            min="0"
-            max="255"
+            onCommit={(value) => onConfigChange('universe', value)}
+            className={`${FIELD_CLASS} w-32`}
+            min={0}
+            max={255}
           />
           <p className="text-xs text-gray-500 dark:text-gray-400 ml-2">
             (ArtNet universes start at 0)
@@ -93,13 +96,13 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
             Sub Universe:
           </label>
-          <input
-            type="number"
+          <DraftNumberField
+            aria-label="Sub Universe"
             value={config.subuni}
-            onChange={(e) => onConfigChange('subuni', parseInt(e.target.value) || 0)}
-            className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            min="0"
-            max="255"
+            onCommit={(value) => onConfigChange('subuni', value)}
+            className={`${FIELD_CLASS} w-32`}
+            min={0}
+            max={255}
           />
         </div>
       </div>
@@ -107,13 +110,13 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
           Port:
         </label>
-        <input
-          type="number"
+        <DraftNumberField
+          aria-label="Port"
           value={config.port}
-          onChange={(e) => onConfigChange('port', parseInt(e.target.value) || 6454)}
-          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          min="1024"
-          max="65535"
+          onCommit={(port) => onConfigChange('port', port)}
+          className={`${FIELD_CLASS} w-32`}
+          min={1024}
+          max={65535}
         />
       </div>
       <div className="space-y-1">
@@ -121,16 +124,11 @@ export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
             Refresh Rate:
           </label>
-          <input
-            type="number"
+          <DraftNumberField
+            aria-label="Refresh Rate"
             value={config.refreshRateHz}
-            onChange={(e) =>
-              onConfigChange(
-                'refreshRateHz',
-                parseInt(e.target.value, 10) || DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
-              )
-            }
-            className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            onCommit={(hz) => onConfigChange('refreshRateHz', hz)}
+            className={`${FIELD_CLASS} w-20`}
             min={10}
             max={44}
           />

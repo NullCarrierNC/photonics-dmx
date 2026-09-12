@@ -1,8 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals'
-import {
-  gimbalCompensatedPanTiltOffsetsDeg,
-  MotionPatternEngine,
-} from '../../controllers/sequencer/MotionPatternEngine'
+import { MotionPatternEngine } from '../../controllers/sequencer/MotionPatternEngine'
+import { gimbalCompensatedPanTiltOffsetsDeg } from '../../controllers/sequencer/motionGeometry'
 import {
   type ResolvedMotionPatternSetting,
   resolvePositionToAbsolutePercent,
@@ -1482,11 +1480,11 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
   })
 
   /**
-   * Regression for fixtures with asymmetric tiltStageDeg (≠ tiltRangeDeg/2).
+   * Fixtures with an asymmetric tiltStageDeg (≠ tiltRangeDeg/2).
    *
-   * The old code gate on shouldMirrorTiltForStageRelative required tiltStageDeg to equal
-   * tiltRangeDeg/2. Fixtures with any other value (e.g. tiltStageDeg=93° on a 180° fixture) were
-   * never mirrored, breaking stage-relative parity. The new code drops that condition.
+   * shouldMirrorTiltForStageRelative decides on invertTilt and tiltHome alone, so a fixture such
+   * as tiltStageDeg=93° on a 180° fixture is mirrored like any other and keeps stage-relative
+   * parity.
    *
    * Fixture notes:
    *   Top: floor, tiltHome=76%, tiltStageDeg=93° → phi0=+43.8° (home above pole)
@@ -1592,15 +1590,12 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
   })
 
   /**
-   * Regression for the orbit direction unification fix.
+   * Orbit direction does not depend on the sign of phi0.
    *
-   * Before the phaseSign fix, the orbit's pan direction depended on sign(phi0). A phi0<0 fixture
-   * (home below the tilt pole) would orbit CCW in stage space while phi0>0 fixtures orbited CW,
-   * because panTiltOffsetsFromBeam's +180° azimuth offset for phi0<0 inverts the motor travel
-   * direction relative to the sphere orbit's e2 component.
-   *
-   * The fix negates the phase when phi0<0 so the e2 traversal direction is reversed, cancelling
-   * the azimuth flip and restoring CW stage rotation.
+   * panTiltOffsetsFromBeam's +180° azimuth offset for phi0<0 (home below the tilt pole)
+   * inverts the motor travel direction relative to the sphere orbit's e2 component. The gimbal
+   * negates the phase when phi0<0, which reverses the e2 traversal and cancels that flip, so
+   * every fixture orbits CW in stage space.
    *
    * Direction is verified via the shoelace signed area of the closed orbit on the preview disc,
    * sampled over one full period. After gimbal `phaseSign`, stage-CW is unified, but the disc
@@ -1642,19 +1637,38 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
     }
   }
 
-  it('circle direction: phi0<0 floor fixture (real-rig Light 2) orbits CW', () => {
-    const light2Config: FixtureConfig = {
+  it.each([
+    [
+      'phi0<0 floor fixture (real-rig Light 2)',
+      {
+        panHome: 34,
+        panDirectionCW: false,
+        panStageDeg: 0,
+        tiltHome: 24,
+        tiltStageDeg: 90,
+        invertPan: false,
+        invertTilt: false,
+      },
+    ],
+    [
+      'phi0>0 truss fixture (real-rig Light 6)',
+      {
+        panHome: 67,
+        panDirectionCW: true,
+        panStageDeg: 540,
+        tiltHome: 76,
+        tiltStageDeg: 93,
+        invertPan: true,
+        invertTilt: true,
+      },
+    ],
+  ] as const)('circle direction: %s orbits CW', (_label, calibration) => {
+    const config: FixtureConfig = {
       ...defaultMh,
-      panHome: 34,
       panMax: 255,
       panRangeDeg: 540,
-      panDirectionCW: false,
-      panStageDeg: 0,
-      tiltHome: 24,
       tiltRangeDeg: 180,
-      tiltStageDeg: 90,
-      invertPan: false,
-      invertTilt: false,
+      ...calibration,
     }
     const circlePattern = resolveMotionPattern(
       {
@@ -1665,32 +1679,6 @@ describe('full pipeline: inverted fixture motion to preview stage position', () 
       } as NodeMotionPatternSetting,
       makeExecutionContext(),
     )
-    assertCircleCW(light2Config, circlePattern)
-  })
-
-  it('circle direction: phi0>0 truss fixture (real-rig Light 6) orbits CW', () => {
-    const light6Config: FixtureConfig = {
-      ...defaultMh,
-      panHome: 67,
-      panMax: 255,
-      panRangeDeg: 540,
-      panDirectionCW: true,
-      panStageDeg: 540,
-      tiltHome: 76,
-      tiltRangeDeg: 180,
-      tiltStageDeg: 93,
-      invertPan: true,
-      invertTilt: true,
-    }
-    const circlePattern = resolveMotionPattern(
-      {
-        pattern: { source: 'literal', value: 'circle' },
-        bearing: { source: 'literal', value: 180 },
-        speed: { source: 'literal', value: 1 },
-        size: { source: 'literal', value: 20 },
-      } as NodeMotionPatternSetting,
-      makeExecutionContext(),
-    )
-    assertCircleCW(light6Config, circlePattern)
+    assertCircleCW(config, circlePattern)
   })
 })

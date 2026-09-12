@@ -33,7 +33,6 @@ import {
   startRb3TestEffect,
   stopTestEffect,
   getPrefs,
-  savePrefs,
   getCueGroups,
   getRb3CueGroups,
   getAvailableCues,
@@ -47,7 +46,21 @@ import {
   stopMotionCueSimulation,
 } from '../ipcApi'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
+import { useDebouncedSave } from '@renderer/hooks/useDebouncedSave'
+import { persistPrefs } from '../ipc/persistPrefs'
+import type { AppPreferences } from '../../../shared/ipcTypes'
 import { createLogger } from '../../../shared/logger'
+
+type SimulationSettings = NonNullable<AppPreferences['simulationSettings']>
+
+/** How long the selections have to stop changing before they are stored. */
+const SETTINGS_QUIET_MS = 500
+import {
+  instrumentNotePayload,
+  simulationContext,
+  type SimulationContext,
+} from './CueSimulation/simulationPayload'
+
 const log = createLogger('CueSimulation')
 
 type CueRegistryType = 'YARG' | 'RB3E'
@@ -110,9 +123,12 @@ const CueSimulation: React.FC = () => {
   const isInitialMount = useRef(true)
   const isFullyInitialized = useRef(false)
   const isLoadingFromPrefs = useRef(false)
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const hasLoadedSavedEffect = useRef(false)
-  const savedEffectIdRef = useRef<string | null>(null)
+  const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null)
+  // The effect to restore and the group it belongs to. Carrying the group is what makes the
+  // restore independent of when the load flag clears: the group arrives as a state update, so by
+  // the time the effects below run the flag has already gone false and cannot be used to tell a
+  // restored group apart from one the user picked.
+  const savedEffectRef = useRef<{ groupId: string; effectId: string } | null>(null)
   const postProcessingSimulationActiveRef = useRef(false)
 
   useEffect(() => {
@@ -168,10 +184,6 @@ const CueSimulation: React.FC = () => {
           log.error('Error clearing simulated post-processing on unmount:', error)
         })
       }
-      // Clear any pending save timeout
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
     }
   }, [])
 
@@ -205,7 +217,10 @@ const CueSimulation: React.FC = () => {
               const group = allGroups.find((g: CueGroup) => g.id === savedSettings.groupId)
               if (group && isYargVisualCueGroup(group)) {
                 if (savedSettings.effectId) {
-                  savedEffectIdRef.current = savedSettings.effectId
+                  savedEffectRef.current = {
+                    groupId: savedSettings.groupId,
+                    effectId: savedSettings.effectId,
+                  }
                 }
                 setSelectedGroupId(savedSettings.groupId)
                 setSelectedGroup(group.name)
@@ -225,35 +240,32 @@ const CueSimulation: React.FC = () => {
     loadSettings()
   }, [])
 
-  // Save simulation settings when they change (debounced)
-  const saveSettings = useCallback(() => {
+  // The page remembers what was last simulated. A selection changes as fast as the user clicks, so
+  // the write waits for the clicking to stop and still goes out if the page is left first.
+  const writeSimulationSettings = useCallback(
+    (settings: SimulationSettings) =>
+      persistPrefs({ simulationSettings: settings }, 'the simulation settings', (message) =>
+        setSettingsSaveError(message),
+      ),
+    [],
+  )
+  const settingsSaver = useDebouncedSave(writeSimulationSettings, { quietMs: SETTINGS_QUIET_MS })
+
+  useEffect(() => {
     if (isLoadingFromPrefs.current) {
-      return // Don't save during initial load
+      return
     }
-
-    // Clear any pending save
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-    }
-
-    // Debounce the save operation
-    saveTimeoutRef.current = setTimeout(async () => {
-      try {
-        await savePrefs({
-          simulationSettings: {
-            registryType: selectedRegistryType,
-            groupId: selectedGroupId,
-            effectId: selectedEffect?.id || null,
-            venueSize: selectedVenueSize,
-            bpm: selectedBpm,
-            instrument: selectedInstrument,
-          },
-        })
-      } catch (error) {
-        log.error('Error saving simulation settings:', error)
-      }
-    }, 500) // 500ms debounce
+    setSettingsSaveError(null)
+    settingsSaver.saveSoon({
+      registryType: selectedRegistryType,
+      groupId: selectedGroupId,
+      effectId: selectedEffect?.id || null,
+      venueSize: selectedVenueSize,
+      bpm: selectedBpm,
+      instrument: selectedInstrument,
+    })
   }, [
+    settingsSaver,
     selectedRegistryType,
     selectedGroupId,
     selectedEffect?.id,
@@ -262,18 +274,11 @@ const CueSimulation: React.FC = () => {
     selectedInstrument,
   ])
 
-  // Save settings when they change
-  useEffect(() => {
-    if (!isLoadingFromPrefs.current) {
-      saveSettings()
-    }
-  }, [saveSettings])
-
   // Load saved effect after group is loaded and effects are available
   useEffect(() => {
     const loadSavedEffect = async () => {
-      // Only load if we have a saved effect ID and haven't loaded it yet
-      if (!selectedGroupId || !savedEffectIdRef.current || hasLoadedSavedEffect.current) {
+      const saved = savedEffectRef.current
+      if (!saved || saved.groupId !== selectedGroupId) {
         return
       }
 
@@ -286,44 +291,36 @@ const CueSimulation: React.FC = () => {
               : await getAvailableCues(selectedGroupId)
           if (availableEffects && availableEffects.length > 0) {
             const savedEffect = availableEffects.find(
-              (e: EffectSelector) => e.id === savedEffectIdRef.current,
+              (e: EffectSelector) => e.id === saved.effectId,
             )
             if (savedEffect) {
               setSelectedEffect(savedEffect)
-              hasLoadedSavedEffect.current = true
-              savedEffectIdRef.current = null // Clear after loading
-            } else {
-              // Effect not found in this group, clear it
-              hasLoadedSavedEffect.current = true
-              savedEffectIdRef.current = null
             }
+            // Either it was restored or this group no longer offers it. Done either way.
+            savedEffectRef.current = null
           } else if (retries > 0) {
             // Effects not loaded yet, retry after a short delay
             setTimeout(() => checkForEffects(retries - 1), 200)
           } else {
-            hasLoadedSavedEffect.current = true
-            savedEffectIdRef.current = null
+            savedEffectRef.current = null
           }
         } catch (error) {
           log.error('Error loading saved effect:', error)
-          hasLoadedSavedEffect.current = true
-          savedEffectIdRef.current = null
+          savedEffectRef.current = null
         }
       }
 
       checkForEffects()
     }
 
-    if (selectedGroupId && savedEffectIdRef.current) {
-      loadSavedEffect()
-    }
+    loadSavedEffect()
   }, [selectedGroupId, selectedRegistryType])
 
-  // Reset the hasLoadedSavedEffect flag when group changes (user-initiated change)
+  // Moving to a different group than the saved effect belongs to abandons the restore.
   useEffect(() => {
-    if (!isLoadingFromPrefs.current) {
-      hasLoadedSavedEffect.current = false
-      savedEffectIdRef.current = null
+    const saved = savedEffectRef.current
+    if (saved && saved.groupId !== selectedGroupId) {
+      savedEffectRef.current = null
     }
   }, [selectedGroupId])
 
@@ -389,47 +386,30 @@ const CueSimulation: React.FC = () => {
     }
   }
 
+  const simulationContextNow = (): SimulationContext =>
+    simulationContext(selectedVenueSize, selectedBpm, selectedGroupId, selectedEffect)
+
   const handleSimulateBeat = async () => {
-    await simulateBeat({
-      venueSize: selectedVenueSize,
-      bpm: selectedBpm,
-      cueGroup: selectedGroupId,
-      effectId: selectedEffect?.id || null,
-    })
+    await simulateBeat(simulationContextNow())
     // Simply turn on the indicator, the useTimeoutEffect will reset it
     setShowBeatIndicator(true)
   }
 
   const handleSimulateKeyframe = async () => {
-    await simulateKeyframe({
-      venueSize: selectedVenueSize,
-      bpm: selectedBpm,
-      cueGroup: selectedGroupId,
-      effectId: selectedEffect?.id || null,
-    })
+    await simulateKeyframe(simulationContextNow())
     setShowKeyframeIndicator(true)
   }
 
   const handleSimulateMeasure = async () => {
-    await simulateMeasure({
-      venueSize: selectedVenueSize,
-      bpm: selectedBpm,
-      cueGroup: selectedGroupId,
-      effectId: selectedEffect?.id || null,
-    })
+    await simulateMeasure(simulationContextNow())
     setShowMeasureIndicator(true)
   }
 
   const handleSimulateInstrumentNote = async (noteType: string) => {
     try {
-      await simulateInstrumentNote({
-        instrument: selectedInstrument,
-        noteType: noteType,
-        venueSize: selectedVenueSize,
-        bpm: selectedBpm,
-        cueGroup: selectedGroupId,
-        effectId: selectedEffect?.id || null,
-      })
+      await simulateInstrumentNote(
+        instrumentNotePayload(simulationContextNow(), selectedInstrument, noteType),
+      )
     } catch (error) {
       log.error('Error simulating instrument note:', error)
     }
@@ -538,6 +518,12 @@ const CueSimulation: React.FC = () => {
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
       <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Cue Simulation</h1>
+
+      {settingsSaveError && (
+        <p className="mb-4 text-sm text-red-600 dark:text-red-400" role="alert">
+          {settingsSaveError}
+        </p>
+      )}
 
       {/* Photonics input/output toggle component as the first thing */}
       <DmxSettingsAccordion startOpen={true} />

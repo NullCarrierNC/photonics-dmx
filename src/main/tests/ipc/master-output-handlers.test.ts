@@ -43,23 +43,23 @@ describe('master output handlers', () => {
     jest.clearAllMocks()
   })
 
-  it('reports the current state', () => {
+  it('reports the current state', async () => {
     const { master } = setup()
     master.setDimmerPercent(60)
     master.setBlackout(true)
 
-    expect(getHandler(LIGHT.GET_MASTER_OUTPUT)({}, undefined)).toEqual({
+    expect(await getHandler(LIGHT.GET_MASTER_OUTPUT)({}, undefined)).toEqual({
       dimmerPercent: 60,
       blackout: true,
       strobeOutputEnabled: true,
     })
   })
 
-  it('applies a partial update and refreshes output', () => {
+  it('applies a partial update and refreshes output', async () => {
     const { master, refreshOutput } = setup()
     master.setDimmerPercent(80)
 
-    const result = getHandler(LIGHT.SET_MASTER_OUTPUT)({}, { blackout: true })
+    const result = await getHandler(LIGHT.SET_MASTER_OUTPUT)({}, { blackout: true })
 
     expect(result).toEqual({
       success: true,
@@ -70,10 +70,10 @@ describe('master output handlers', () => {
     expect(refreshOutput).toHaveBeenCalledTimes(1)
   })
 
-  it('applies all three fields together', () => {
+  it('applies all three fields together', async () => {
     const { master, refreshOutput } = setup()
 
-    getHandler(LIGHT.SET_MASTER_OUTPUT)(
+    await getHandler(LIGHT.SET_MASTER_OUTPUT)(
       {},
       { dimmerPercent: 25, blackout: true, strobeOutputEnabled: false },
     )
@@ -86,28 +86,30 @@ describe('master output handlers', () => {
     expect(refreshOutput).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects an out-of-range level without touching state or output', () => {
+  it('rejects an out-of-range level without touching state or output', async () => {
     const { master, refreshOutput } = setup()
     master.setDimmerPercent(70)
 
-    const result = getHandler(LIGHT.SET_MASTER_OUTPUT)({}, { dimmerPercent: 300 })
+    const result = await getHandler(LIGHT.SET_MASTER_OUTPUT)({}, { dimmerPercent: 300 })
 
     expect(result).toMatchObject({ success: false })
     expect(master.getDimmerPercent()).toBe(70)
     expect(refreshOutput).not.toHaveBeenCalled()
   })
 
-  it('rejects a payload it does not recognise', () => {
+  it('rejects a payload it does not recognise', async () => {
     const { refreshOutput } = setup()
 
-    expect(getHandler(LIGHT.SET_MASTER_OUTPUT)({}, { nonsense: 1 })).toMatchObject({
+    expect(await getHandler(LIGHT.SET_MASTER_OUTPUT)({}, { nonsense: 1 })).toMatchObject({
       success: false,
     })
-    expect(getHandler(LIGHT.SET_MASTER_OUTPUT)({}, 'blackout')).toMatchObject({ success: false })
+    expect(await getHandler(LIGHT.SET_MASTER_OUTPUT)({}, 'blackout')).toMatchObject({
+      success: false,
+    })
     expect(refreshOutput).not.toHaveBeenCalled()
   })
 
-  it('still applies the change when no publisher has been built yet', () => {
+  it('still applies the change when no publisher has been built yet', async () => {
     const master = new MasterOutputState()
     const controllerManager = {
       getMasterOutput: () => master,
@@ -115,7 +117,7 @@ describe('master output handlers', () => {
     }
     setupMasterOutputHandlers(mockIpcMain as never, controllerManager as never)
 
-    const result = getHandler(LIGHT.SET_MASTER_OUTPUT)({}, { blackout: true })
+    const result = await getHandler(LIGHT.SET_MASTER_OUTPUT)({}, { blackout: true })
 
     expect(result).toMatchObject({ success: true })
     expect(master.isBlackoutActive()).toBe(true)

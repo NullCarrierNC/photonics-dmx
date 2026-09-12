@@ -1,25 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { getDefaultStore, useAtom } from 'jotai'
 import {
-  DmxFixture,
   DmxLight,
   DmxRig,
-  ExtraChannel,
   LightingConfiguration,
   ConfigStrobeType,
-  FixtureTypes,
-  IpcSenderConfig,
 } from '../../../photonics-dmx/types'
-import { deriveExtraChannelsForMaster } from '../../../photonics-dmx/helpers/rigTemplateSync'
 import { extraChannelDisplayLabel } from '../components/lightChannelDisplay'
-import {
-  getDmxRig,
-  getDmxRigs,
-  enableConsole,
-  disableConsole,
-  sendConsoleDmx,
-  enableSender,
-} from '../ipcApi'
+import { getDmxRig, getDmxRigs, enableConsole, disableConsole, sendConsoleDmx } from '../ipcApi'
 import {
   lightingPrefsAtom,
   myDmxLightsAtom,
@@ -34,140 +22,20 @@ import ArtNetToggle from '../components/ArtNetToggle'
 import EnttecProToggle from '../components/EnttecProToggle'
 import OpenDmxToggle from '../components/OpenDmxToggle'
 import { useRigDmxValues } from '../hooks/useRigDmxValues'
+import { useIpcPreviewSender } from '@renderer/hooks/useIpcPreviewSender'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('DmxConsole')
 
-function channelSortKey(name: string): number {
-  const order = ['masterDimmer', 'red', 'green', 'blue', 'white', 'strobeChannel', 'pan', 'tilt']
-  if (name === 'md') {
-    return 0
-  }
-  const i = order.indexOf(name)
-  return i === -1 ? order.length : i
-}
-
-function channelsAsRecord(channels: DmxFixture['channels']): Record<string, number> {
-  return channels as unknown as Record<string, number>
-}
-
-/**
- * Resolves the channel set to display for a rig light. The shape (which channels exist) comes from
- * the live fixture template — so e.g. enabling "Strobe Channel?" on a template in MyLights surfaces
- * the new channel here immediately, without needing to re-pick the fixture in LightsLayout. The
- * channel NUMBERS are computed by applying the same offset-from-master-dimmer model used elsewhere
- * (e.g. {@link createDmxLightInstance}, {@link LightChannelsConfig}).
- *
- * Falls back to the light's persisted channels when no template is found (legacy / orphaned light).
- */
-function getTemplateAlignedChannels(
-  light: DmxLight,
-  templates: DmxFixture[],
-): Record<string, number> {
-  const template = templates.find((t) => t.id === light.fixtureId)
-  const persisted = channelsAsRecord(light.channels)
-  if (!template) {
-    return persisted
-  }
-  const templateChannels = channelsAsRecord(template.channels)
-  const templateMaster = templateChannels.masterDimmer ?? 0
-  const lightMaster = persisted.masterDimmer ?? templateMaster
-  const out: Record<string, number> = {}
-  for (const [name, templateValue] of Object.entries(templateChannels)) {
-    if (name === 'masterDimmer') {
-      out[name] = lightMaster
-    } else {
-      // Prefer the persisted offset if present (user may have nudged a single channel); otherwise
-      // derive from the template's offset relative to its master dimmer.
-      const persistedValue = persisted[name]
-      if (typeof persistedValue === 'number') {
-        out[name] = persistedValue
-      } else {
-        const offset = templateValue - templateMaster
-        out[name] = lightMaster + offset
-      }
-    }
-  }
-  return out
-}
-
-/**
- * Offset-aligned extra channels for a console light, derived from its live template the same way
- * {@link getTemplateAlignedChannels} derives the base channels. Falls back to the light's persisted
- * extras when no template resolves.
- */
-function getTemplateAlignedExtraChannels(light: DmxLight, templates: DmxFixture[]): ExtraChannel[] {
-  const template = templates.find((t) => t.id === light.fixtureId)
-  if (!template) {
-    return light.extraChannels ?? []
-  }
-  const templateChannels = channelsAsRecord(template.channels)
-  const templateMaster = templateChannels.masterDimmer ?? 0
-  const lightMaster = channelsAsRecord(light.channels).masterDimmer ?? templateMaster
-  return deriveExtraChannelsForMaster(template.extraChannels, templateMaster, lightMaster) ?? []
-}
-
-/**
- * DMX buffer seeding pinned "fixed" channels for every light in a rig. Console manual mode bypasses
- * the publisher's per-frame fixed writes, so without this a fixture whose mode/macro channel must be
- * held at a constant would go dark for the whole console session.
- */
-function buildConsoleFixedSeed(
-  config: LightingConfiguration,
-  templates: DmxFixture[],
-): Record<number, number> {
-  const seed: Record<number, number> = {}
-  const allLights = [...config.frontLights, ...config.backLights, ...config.strobeLights]
-  for (const light of allLights) {
-    for (const extra of getTemplateAlignedExtraChannels(light as DmxLight, templates)) {
-      if (extra.type === 'fixed' && extra.channel >= 1 && extra.channel <= 512) {
-        seed[extra.channel] = Math.max(0, Math.min(255, extra.value ?? 0))
-      }
-    }
-  }
-  return seed
-}
-
-function getEffectiveChannelEntries(
-  light: DmxLight,
-  templates: DmxFixture[],
-  overrides?: Record<string, number>,
-): Array<[string, number]> {
-  const channels = getTemplateAlignedChannels(light, templates)
-  const effective = overrides ? { ...channels, ...overrides } : channels
-  return (Object.entries(effective) as Array<[string, number]>).sort(
-    (a, b) => channelSortKey(a[0]) - channelSortKey(b[0]),
-  )
-}
-
-function isLightModified(
-  light: DmxLight,
-  templates: DmxFixture[],
-  overrides?: Record<string, number>,
-): boolean {
-  if (!overrides) {
-    return false
-  }
-  const baseline = getTemplateAlignedChannels(light, templates)
-  return Object.entries(overrides).some(([name, num]) => baseline[name] !== num)
-}
-
-function channelLabel(name: string): string {
-  if (name === 'md' || name === 'masterDimmer') {
-    return 'MasterDimmer'
-  }
-  if (name === 'strobeChannel') {
-    return 'Strobe Speed'
-  }
-  return name
-}
-
-function isPanTiltChannelName(name: string): boolean {
-  return name === 'pan' || name === 'tilt'
-}
-
-function isMovingHeadFixture(fixture: FixtureTypes): boolean {
-  return fixture === FixtureTypes.RGBMH
-}
+import {
+  buildConsoleFixedSeed,
+  channelLabel,
+  getEffectiveChannelEntries,
+  getTemplateAlignedChannels,
+  getTemplateAlignedExtraChannels,
+  isLightModified,
+  isMovingHeadFixture,
+  isPanTiltChannelName,
+} from './dmxConsoleChannels'
 
 const DmxConsole: React.FC = () => {
   const [rigs, setRigs] = useState<DmxRig[]>([])
@@ -187,6 +55,9 @@ const DmxConsole: React.FC = () => {
     {},
   )
   const consoleEnabledRef = useRef(false)
+  // An enable that is still in flight owns console mode just as much as an open one does, so the
+  // unmount cleanup waits for it rather than leaving the publisher in manual output.
+  const enableInFlightRef = useRef<Promise<unknown> | null>(null)
   // Mirror the currently-selected rig id into a ref so the long-lived DMX_VALUES listener can
   // pick the right per-rig buffer from `kind: 'rigs'` payloads without re-registering on every
   // rig switch.
@@ -251,17 +122,7 @@ const DmxConsole: React.FC = () => {
     }
   }, [selectedRigId])
 
-  useEffect(() => {
-    let cancelled = false
-    void enableSender({ sender: 'ipc' } as IpcSenderConfig).catch((err) => {
-      if (!cancelled) {
-        log.error('Failed to enable IPC preview sender', err)
-      }
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  useIpcPreviewSender()
 
   // `kind: 'manual'` is the console-takeover/blackout loopback (shown as-is); `kind: 'rigs'`
   // carries one buffer per rig, of which we show the currently-selected rig's own universe.
@@ -271,6 +132,11 @@ const DmxConsole: React.FC = () => {
 
   useEffect(() => {
     return () => {
+      const pending = enableInFlightRef.current
+      if (pending) {
+        void pending.then(() => disableConsole())
+        return
+      }
       if (consoleEnabledRef.current) {
         void disableConsole()
       }
@@ -305,7 +171,14 @@ const DmxConsole: React.FC = () => {
       setActionError('Rig is still loading — try again in a moment')
       return
     }
-    const result = await enableConsole(selectedRigId)
+    const pending = enableConsole(selectedRigId)
+    enableInFlightRef.current = pending
+    let result: Awaited<typeof pending>
+    try {
+      result = await pending
+    } finally {
+      enableInFlightRef.current = null
+    }
     if (result.success) {
       // Seed pinned fixed/mode channels so fixtures that need them light up during the session.
       const seed = buildConsoleFixedSeed(selectedRig.config, myLights)
@@ -372,14 +245,11 @@ const DmxConsole: React.FC = () => {
       return nextGlobal
     })
 
-    setConsoleBuffer((prev) => {
-      const next = { ...prev }
-      const moved = next[previousChannel] ?? 0
-      delete next[previousChannel]
-      next[clamped] = moved
-      sendConsoleDmx(next)
-      return next
-    })
+    const next = { ...consoleBuffer }
+    const moved = next[previousChannel] ?? 0
+    delete next[previousChannel]
+    next[clamped] = moved
+    pushConsoleBuffer(next)
   }
 
   const renderFixtureCard = (light: DmxLight) => {

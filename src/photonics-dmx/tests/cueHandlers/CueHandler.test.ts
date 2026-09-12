@@ -1,5 +1,5 @@
 /**
- * Regression: re-enabling YARG mid-song must replay the current cue.
+ * Re-enabling YARG mid-song replays the current cue.
  *
  * `LightingNodeCue` instances are singletons in `CueRegistry`, so their
  * `CueSession` (which gates `cue-started`) survives a YARG disable. The handler's
@@ -20,6 +20,7 @@ import {
   getStrobeStateManager,
   __resetStrobeStateManagerForTests,
 } from '../../controllers/StrobeStateManager'
+import { fakeLightingController } from '../helpers/fakeLightingController'
 
 type CueLifecycleMocks = {
   execute: jest.Mock
@@ -37,22 +38,7 @@ function makeFakeCue(style: CueStyle, id: string): INetCue & CueLifecycleMocks {
 }
 
 function makeSequencer(): ILightingController {
-  return {
-    schedulePanTiltClear: jest.fn(),
-    cancelPanTiltClear: jest.fn(),
-    blackout: jest.fn(),
-    onBeat: jest.fn(),
-    onMeasure: jest.fn(),
-    onKeyframe: jest.fn(),
-    onKeyframeFirst: jest.fn(),
-    onKeyframeNext: jest.fn(),
-    onKeyframePrevious: jest.fn(),
-    onDrumNote: jest.fn(),
-    onGuitarNote: jest.fn(),
-    onBassNote: jest.fn(),
-    onKeysNote: jest.fn(),
-    onVocalNote: jest.fn(),
-  } as unknown as ILightingController
+  return fakeLightingController()
 }
 
 function makeLightManager(): DmxLightManager {
@@ -76,7 +62,7 @@ describe('CueHandler shutdown lifecycle', () => {
     jest.restoreAllMocks()
   })
 
-  it('shutdown stops a primary cue that was activated via handleCue (regression: mid-song re-enable replays cue-started)', async () => {
+  it('shutdown stops a primary cue that was activated via handleCue', async () => {
     const primary = makeFakeCue(CueStyle.Primary, 'primary:Frenzy')
     jest.spyOn(registry, 'getCueImplementation').mockReturnValue(primary)
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
@@ -130,7 +116,7 @@ describe('CueHandler shutdown lifecycle', () => {
   it('shutdown clears shared strobe state even when no strobe cue was active (Fix 2)', () => {
     __resetStrobeStateManagerForTests()
     // Simulate a stale slot left by a prior interrupted strobe (no Strobe_Off received).
-    getStrobeStateManager().setActive('fast')
+    getStrobeStateManager().setActive('fast', 'net')
     expect(getStrobeStateManager().getActive()).toBe('fast')
 
     const handler = new CueHandler(makeLightManager(), makeSequencer())

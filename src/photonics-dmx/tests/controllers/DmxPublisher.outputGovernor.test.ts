@@ -54,7 +54,7 @@ function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
 
 interface Ctx {
   publisher: DmxPublisher
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<void>>
+  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
   timing: FakeTiming
   publish: (light: RGBIO) => void
   lastBuffer: () => Record<number, number>
@@ -66,8 +66,8 @@ interface Ctx {
  * which exercises the same code paths as the legacy single-buffer pipeline.
  */
 function setup(outputRateHz?: number): Ctx {
-  const send = jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<void>>(() =>
-    Promise.resolve(),
+  const send = jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
+    Promise.resolve(true),
   )
   const mockSenderManager = {
     send,
@@ -161,6 +161,31 @@ describe('DmxPublisher output governor', () => {
       ctx.timing.advance(50) // well past the interval
       ctx.publish(rgbio({ red: 100 })) // identical
       expect(ctx.send).toHaveBeenCalledTimes(1) // not re-sent
+    })
+
+    it('holds the dirty-skip across a microtask when the send reports delivery', async () => {
+      // The cache is retracted on a failed send, which resolves a turn later. Asserting without
+      // waiting for that turn would pass whatever the sender reported.
+      ctx.publish(rgbio({ red: 100 }))
+      await Promise.resolve()
+
+      ctx.timing.advance(50)
+      ctx.publish(rgbio({ red: 100 }))
+
+      expect(ctx.send).toHaveBeenCalledTimes(1)
+    })
+
+    it('sends the frame again when the last one did not reach the wire', async () => {
+      // A static scene sends nothing further of its own accord, so a frame lost to a transient
+      // driver failure would never be retried if the cache kept claiming the wire holds it.
+      ctx.send.mockResolvedValueOnce(false)
+      ctx.publish(rgbio({ red: 100 }))
+      await Promise.resolve()
+
+      ctx.timing.advance(50)
+      ctx.publish(rgbio({ red: 100 }))
+
+      expect(ctx.send).toHaveBeenCalledTimes(2)
     })
 
     it('coalesces over-rate frames and flushes the latest via the trailing timer', () => {

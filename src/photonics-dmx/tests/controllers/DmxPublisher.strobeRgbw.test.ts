@@ -23,13 +23,13 @@ function rgbio(overrides: Partial<RGBIO> = {}): RGBIO {
 }
 
 function makeMockSender(): {
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<void>>
+  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
   getEnabledWireSenders: () => string[]
   isIpcEnabled: () => boolean
 } {
   return {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<void>>(() =>
-      Promise.resolve(),
+    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
+      Promise.resolve(true),
     ),
     getEnabledWireSenders: () => ['sacn'],
     isIpcEnabled: () => false,
@@ -136,7 +136,7 @@ const WHITE_FLASH = rgbio({ red: 255, green: 255, blue: 255, intensity: 255 })
 describe('DmxPublisher — RGBW strobes drive white and rgb together', () => {
   it('fires every emitter on a strobe-group RGBW while a strobe holds the slot', () => {
     const ctx = setup([STROBE_RGBW])
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
     const buf = ctx.publish({ s1: WHITE_FLASH })
     expect(buf[5]).toBe(255)
     expect([buf[2], buf[3], buf[4]]).toEqual([255, 255, 255])
@@ -145,7 +145,7 @@ describe('DmxPublisher — RGBW strobes drive white and rgb together', () => {
 
   it('keeps the flash hue — a red strobe does not gain white', () => {
     const ctx = setup([STROBE_RGBW])
-    ctx.strobe.setActive('fastest')
+    ctx.strobe.setActive('fastest', 'net')
     const buf = ctx.publish({ s1: rgbio({ red: 255, intensity: 255 }) })
     expect(buf[5]).toBe(0)
     expect([buf[2], buf[3], buf[4]]).toEqual([255, 0, 0])
@@ -153,10 +153,10 @@ describe('DmxPublisher — RGBW strobes drive white and rgb together', () => {
 
   it('substitutes on the same fixture once the strobe releases the slot', () => {
     const ctx = setup([STROBE_RGBW])
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
     expect(ctx.publish({ s1: WHITE_FLASH })[2]).toBe(255)
 
-    ctx.strobe.setActive(null)
+    ctx.strobe.setActive(null, 'net')
     const buf = ctx.publish({ s1: WHITE_FLASH })
     expect(buf[5]).toBe(255)
     expect([buf[2], buf[3], buf[4]]).toEqual([0, 0, 0])
@@ -170,7 +170,7 @@ describe('DmxPublisher — RGBW strobes drive white and rgb together', () => {
       extraChannels: [{ type: 'white', channel: 15 }],
     }
     const ctx = setup([STROBE_RGBW, front])
-    ctx.strobe.setActive('medium')
+    ctx.strobe.setActive('medium', 'net')
     const buf = ctx.publish({ s1: WHITE_FLASH, f1: WHITE_FLASH })
     expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([255, 255, 255, 255])
     expect([buf[15], buf[12], buf[13], buf[14]]).toEqual([255, 0, 0, 0])
@@ -178,21 +178,21 @@ describe('DmxPublisher — RGBW strobes drive white and rgb together', () => {
 
   it('leaves everything substituting on a rig whose strobe mode is None', () => {
     const ctx = setup([{ ...STROBE_RGBW, group: 'front' }], ConfigStrobeType.None)
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
     const buf = ctx.publish({ s1: WHITE_FLASH })
     expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([255, 0, 0, 0])
   })
 
   it('honours the isStrobeEnabled gate on a strobe-group fixture', () => {
     const ctx = setup([{ ...STROBE_RGBW, isStrobeEnabled: false }])
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
     const buf = ctx.publish({ s1: WHITE_FLASH })
     expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([255, 0, 0, 0])
   })
 
   it('leaves a plain RGB strobe fixture on the per-channel path', () => {
     const ctx = setup([{ id: 's1', channels: RGB, group: 'strobe', isStrobeEnabled: true }])
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
     const buf = ctx.publish({ s1: WHITE_FLASH })
     expect([buf[2], buf[3], buf[4]]).toEqual([255, 255, 255])
     expect(Object.keys(buf).sort()).toEqual(['1', '2', '3', '4'])
@@ -200,7 +200,7 @@ describe('DmxPublisher — RGBW strobes drive white and rgb together', () => {
 
   it('fires every emitter on a Dedicated rig too', () => {
     const ctx = setup([STROBE_RGBW], ConfigStrobeType.Dedicated)
-    ctx.strobe.setActive('slow')
+    ctx.strobe.setActive('slow', 'net')
     const buf = ctx.publish({ s1: WHITE_FLASH })
     expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([255, 255, 255, 255])
   })
@@ -220,7 +220,7 @@ describe('DmxPublisher — RGBW strobes drive white and rgb together', () => {
       ],
       ConfigStrobeType.Dedicated,
     )
-    ctx.strobe.setActive('medium')
+    ctx.strobe.setActive('medium', 'net')
     const buf = ctx.publish({ s1: WHITE_FLASH })
     expect(buf[6]).toBe(DEFAULT_STROBE_CHANNEL_VALUES.medium)
     expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([255, 255, 255, 255])
@@ -234,7 +234,7 @@ describe('DmxPublisher — RGBW strobes drive white and rgb together', () => {
         strobeValues: { slow: 10, medium: 20, fast: 30, fastest: 40 },
       },
     ])
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
     // Peak frame sets the latch; the dark frame that follows holds it.
     ctx.publish({ s1: WHITE_FLASH })
     const buf = ctx.publish({ s1: rgbio() })
@@ -249,7 +249,7 @@ describe('DmxPublisher — White Channel Mix Mode', () => {
   it("keeps a strobing light on substitution under 'w-only'", () => {
     const ctx = setup([STROBE_RGBW])
     ctx.publisher.setWhiteChannelMixMode('w-only')
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
     const buf = ctx.publish({ s1: WHITE_FLASH })
     expect([buf[5], buf[2], buf[3], buf[4]]).toEqual([255, 0, 0, 0])
   })
@@ -267,7 +267,7 @@ describe('DmxPublisher — White Channel Mix Mode', () => {
       ConfigStrobeType.Dedicated,
     )
     ctx.publisher.setWhiteChannelMixMode('w-only')
-    ctx.strobe.setActive('medium')
+    ctx.strobe.setActive('medium', 'net')
     const buf = ctx.publish({ s1: WHITE_FLASH })
     // The hardware chop still runs; only the colour mixing changes.
     expect(buf[6]).toBe(DEFAULT_STROBE_CHANNEL_VALUES.medium)

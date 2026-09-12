@@ -5,6 +5,7 @@
  * when none remain), and the Additional Channels section is present.
  */
 import { describe, expect, it, jest, afterEach } from '@jest/globals'
+import '@testing-library/jest-dom/jest-globals'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { FixtureTypes, type DmxFixture, type ExtraChannel } from '../../../photonics-dmx/types'
 import LightSettings from './LightSettings'
@@ -77,6 +78,6 @@ describe('LightSettings fixture-type switch with extra channels', () => {
 
   it('renders the Additional Channels section', () => {
     render(<LightSettings currentLight={fixture(FixtureTypes.RGB)} setCurrentLight={jest.fn()} />)
-    expect(screen.getByText('Additional Channels')).toBeTruthy()
+    expect(screen.getByText('Additional Channels')).toBeInTheDocument()
   })
 })

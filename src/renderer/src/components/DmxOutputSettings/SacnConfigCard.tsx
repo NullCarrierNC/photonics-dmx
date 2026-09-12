@@ -1,6 +1,7 @@
 import React from 'react'
-import { DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT } from '../../../../shared/dmxOutputRefresh'
 import CollapsibleSenderCard from './CollapsibleSenderCard'
+import { DraftNumberField, DraftTextField } from '../controls/DraftField'
+import { SACN_UNIVERSE_MAX, SACN_UNIVERSE_MIN } from '../../../../shared/sacnUniverse'
 
 export interface SacnConfig {
   universe: number
@@ -10,6 +11,9 @@ export interface SacnConfig {
   /** Unified refresh rate (Hz); 10–44. */
   refreshRateHz: number
 }
+
+const FIELD_CLASS =
+  'border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white'
 
 interface SacnConfigCardProps {
   config: SacnConfig
@@ -37,16 +41,16 @@ export const SacnConfigCard: React.FC<SacnConfigCardProps> = ({
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
             Universe:
           </label>
-          <input
-            type="number"
+          <DraftNumberField
+            aria-label="Universe"
             value={config.universe}
-            onChange={(e) => onConfigChange('universe', parseInt(e.target.value) || 1)}
-            className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            min="0"
-            max="63999"
+            onCommit={(universe) => onConfigChange('universe', universe)}
+            className={`${FIELD_CLASS} w-20`}
+            min={SACN_UNIVERSE_MIN}
+            max={SACN_UNIVERSE_MAX}
           />
           <p className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-            (sACN universes start at 1)
+            ({SACN_UNIVERSE_MIN} to {SACN_UNIVERSE_MAX})
           </p>
         </div>
         <div className="space-y-1">
@@ -54,16 +58,11 @@ export const SacnConfigCard: React.FC<SacnConfigCardProps> = ({
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
               Refresh Rate:
             </label>
-            <input
-              type="number"
+            <DraftNumberField
+              aria-label="Refresh Rate"
               value={config.refreshRateHz}
-              onChange={(e) =>
-                onConfigChange(
-                  'refreshRateHz',
-                  parseInt(e.target.value, 10) || DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
-                )
-              }
-              className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              onCommit={(hz) => onConfigChange('refreshRateHz', hz)}
+              className={`${FIELD_CLASS} w-20`}
               min={10}
               max={44}
             />
@@ -109,11 +108,11 @@ export const SacnConfigCard: React.FC<SacnConfigCardProps> = ({
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-20 shrink-0">
                 Destination IP:
               </label>
-              <input
-                type="text"
+              <DraftTextField
+                aria-label="Destination IP"
                 value={config.unicastDestination ?? ''}
-                onChange={(e) => onConfigChange('unicastDestination', e.target.value)}
-                className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-48 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                onCommit={(destination) => onConfigChange('unicastDestination', destination)}
+                className={`${FIELD_CLASS} w-48`}
                 placeholder="192.168.1.100"
               />
             </div>

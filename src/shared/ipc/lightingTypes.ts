@@ -17,7 +17,13 @@ export interface LightingInvokeMap {
           success: true
           isYargEnabled: boolean
           isRb3Enabled: boolean
-          senderStatus: { sacn: boolean; artnet: boolean; enttecpro: boolean; ipc: boolean }
+          senderStatus: {
+            sacn: boolean
+            artnet: boolean
+            enttecpro: boolean
+            opendmx: boolean
+            ipc: boolean
+          }
         }
       | IpcErrorResult
   }

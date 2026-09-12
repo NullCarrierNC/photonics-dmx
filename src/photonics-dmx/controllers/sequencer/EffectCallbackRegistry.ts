@@ -30,12 +30,22 @@ export class EffectCallbackRegistry {
     return this.callbacks.size
   }
 
-  /** Fire and drop the callback for `name`, if one is held. */
+  /**
+   * Fire and drop the callback for `name`, if one is held.
+   *
+   * Callbacks run inside the frame, so a waiter that throws is contained here. Letting it out
+   * costs the rest of that frame: the effects finishing beside it never hear, their queued
+   * successors never start, and the lights hold what they had.
+   */
   public fire(name: string, cancelled = false): void {
     const callback = this.callbacks.get(name)
     if (callback) {
       this.callbacks.delete(name)
-      callback(cancelled)
+      try {
+        callback(cancelled)
+      } catch (err) {
+        log.error(`Error in completion callback for effect "${name}":`, err)
+      }
     }
   }
 

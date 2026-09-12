@@ -5,7 +5,7 @@
  * the same group in parallel stay isolated.
  */
 
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { beforeEach, describe, expect, it } from '@jest/globals'
 import { NodeCueCompiler } from '../../../../cues/node/compiler/NodeCueCompiler'
 import type {
   NetNodeCueDefinition,
@@ -19,6 +19,7 @@ import type { CueSession } from '../../../../cues/node/runtime/CueSession'
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { createMockLightingConfig } from '../../../helpers/testFixtures'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { fakeLightingController } from '../../../helpers/fakeLightingController'
 
 function cueWithSharedGroupVar(id: string, cueType: CueType): NetNodeCueDefinition {
   const event: NetEventNode = { id: 'ev-start', type: 'event', eventType: 'cue-started' }
@@ -58,19 +59,7 @@ function cueWithSharedGroupVar(id: string, cueType: CueType): NetNodeCueDefiniti
 }
 
 function makeSequencer(): ILightingController {
-  return {
-    addEffect: jest.fn(),
-    setEffect: jest.fn(),
-    removeEffect: jest.fn(),
-    addEffectUnblockedName: jest.fn().mockReturnValue(true),
-    setEffectUnblockedName: jest.fn().mockReturnValue(true),
-    removeEffectByLayer: jest.fn(),
-    removeEffectCallback: jest.fn(),
-    blackout: jest.fn(),
-    onBeat: jest.fn(),
-    onMeasure: jest.fn(),
-    onKeyframe: jest.fn(),
-  } as unknown as ILightingController
+  return fakeLightingController()
 }
 
 type Internals = { states: Map<ILightingController, { session: CueSession }> }

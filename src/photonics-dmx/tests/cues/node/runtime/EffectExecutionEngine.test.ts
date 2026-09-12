@@ -6,6 +6,9 @@ import type { ILightingController } from '../../../../controllers/sequencer/inte
 import type { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
 
+/** The idle callback is queued as a microtask, so let it run before asserting on it. */
+const flushIdle = (): Promise<void> => Promise.resolve()
+
 describe('EffectExecutionEngine', () => {
   let mockSequencer: jest.Mocked<ILightingController>
   let mockLightManager: jest.Mocked<DmxLightManager>
@@ -52,9 +55,11 @@ describe('EffectExecutionEngine', () => {
       setEffectUnblockedName: jest.fn().mockReturnValue(true),
       addEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
         setTimeout(() => callback(), 0)
+        return true
       }),
       setEffectUnblockedNameWithCallback: jest.fn((_name, _effect, callback) => {
         setTimeout(() => callback(), 0)
+        return true
       }),
       removeEffectCallback: jest.fn(),
       removeEffect: jest.fn(),
@@ -214,7 +219,7 @@ describe('EffectExecutionEngine', () => {
       expect(() => engine.triggerEffect(createCueData())).not.toThrow()
     })
 
-    it('preserves delay timing and color in transitions when params are delay and 500/200 (score cue regression)', async () => {
+    it('preserves delay timing and color in transitions when params are delay and 500/200', async () => {
       const effect: YargEffectDefinition = {
         id: 'score-like-effect',
         mode: 'yarg',
@@ -339,7 +344,7 @@ describe('EffectExecutionEngine', () => {
       expect(firstTransition.transform.color.green).toBeGreaterThan(0)
     })
 
-    it('second trigger still applies delay params (regression: stop then start score)', async () => {
+    it('second trigger still applies delay params on a restart', async () => {
       const effect: YargEffectDefinition = {
         id: 'score-like',
         mode: 'yarg',
@@ -1156,7 +1161,7 @@ describe('EffectExecutionEngine', () => {
       layout: { nodePositions: {} },
     })
 
-    it('does not stack overflow when onIdle re-triggers triggerEffect synchronously', () => {
+    it('does not stack overflow when onIdle re-triggers triggerEffect synchronously', async () => {
       const compiledEffect = EffectCompiler.compile(createSyncMinimalEffect())
       const engine = new EffectExecutionEngine(
         compiledEffect,
@@ -1174,6 +1179,28 @@ describe('EffectExecutionEngine', () => {
       engine.setOnIdle(onIdle)
 
       expect(() => engine.triggerEffect(cueData)).not.toThrow()
+      await flushIdle()
+      expect(onIdle).toHaveBeenCalledTimes(1)
+    })
+
+    it('queues the idle callback instead of running it inside the trigger', async () => {
+      const compiledEffect = EffectCompiler.compile(createSyncMinimalEffect())
+      const engine = new EffectExecutionEngine(
+        compiledEffect,
+        mockSequencer,
+        mockLightManager,
+        noopRuntimeBroadcaster(),
+        {},
+        createCueData(),
+        { callerMode: 'yarg' },
+      )
+      const onIdle = jest.fn()
+      engine.setOnIdle(onIdle)
+
+      engine.triggerEffect(createCueData())
+
+      expect(onIdle).not.toHaveBeenCalled()
+      await flushIdle()
       expect(onIdle).toHaveBeenCalledTimes(1)
     })
   })
@@ -1253,7 +1280,7 @@ describe('EffectExecutionEngine', () => {
       layout: { nodePositions: {} },
     })
 
-    it('does not fire idle until all pending callback-backed submissions complete', () => {
+    it('does not fire idle until all pending callback-backed submissions complete', async () => {
       const callbacks: Array<(cancelled: boolean) => void> = []
       mockSequencer.addEffectUnblockedNameWithCallback.mockImplementation(
         (_name, _effect, callback) => {
@@ -1277,12 +1304,15 @@ describe('EffectExecutionEngine', () => {
       engine.triggerEffect(createCueData())
 
       expect(callbacks).toHaveLength(2)
+      await flushIdle()
       expect(onIdle).not.toHaveBeenCalled()
 
       callbacks[0](false)
+      await flushIdle()
       expect(onIdle).not.toHaveBeenCalled()
 
       callbacks[1](false)
+      await flushIdle()
       expect(onIdle).toHaveBeenCalledTimes(1)
     })
 

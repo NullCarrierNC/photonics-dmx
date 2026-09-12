@@ -33,7 +33,13 @@ const TRAIL_FLOOR = 0.1
 const MIN_VISIBLE_FLASH = 32
 
 /** How deep the flicker standing in for scan lines swings. */
-const SCANLINE_FLICKER = 0.06
+const SCANLINE_FLICKER = 0.075
+
+/**
+ * How often that flicker re-rolls. Slower than film grain, because a swing gone in a frame reads as
+ * nothing on a real fixture.
+ */
+const SCANLINE_PERIOD_MS = 41.25
 
 export interface VenueColor {
   r: number
@@ -64,6 +70,8 @@ export interface VenueEffectSpec {
   choppyHz?: number
   /** Peak fraction a light's level swings by between grain samples. */
   grainAmount?: number
+  /** Interval the grain swing is re-rolled on. Defaults to {@link GRAIN_PERIOD_MS}. */
+  grainPeriodMs?: number
   /** Spreads colour from bright fixtures onto the fixtures either side of them. */
   bloom?: VenueBloomSpec
 }
@@ -204,7 +212,7 @@ export const VENUE_EFFECT_SPECS: Readonly<Record<PostProcessing, VenueEffectSpec
   Unknown: {},
   Mirror: {},
   Bloom: { bloom: { threshold: 0.25, selfGain: 0.5, spill: 0.35 } },
-  Scanlines: { grainAmount: SCANLINE_FLICKER },
+  Scanlines: { grainAmount: SCANLINE_FLICKER, grainPeriodMs: SCANLINE_PERIOD_MS },
   Bright: { brightness: 1.15 },
   Contrast: { contrast: 1.35 },
   Posterize: { posterize: 4 },
@@ -226,16 +234,22 @@ export const VENUE_EFFECT_SPECS: Readonly<Record<PostProcessing, VenueEffectSpec
   Contrast_Red: { matrix: channelGain(1.25, 0.8, 0.8), contrast: 1.3 },
   Contrast_Green: { matrix: channelGain(0.8, 1.25, 0.8), contrast: 1.3 },
   Contrast_Blue: { matrix: channelGain(0.8, 0.8, 1.25), contrast: 1.3 },
-  Scanlines_BlackAndWhite: { matrix: greyscale(), grainAmount: SCANLINE_FLICKER },
+  Scanlines_BlackAndWhite: {
+    matrix: greyscale(),
+    grainAmount: SCANLINE_FLICKER,
+    grainPeriodMs: SCANLINE_PERIOD_MS,
+  },
   Scanlines_Blue: {
     matrix: lumaTint(0, 0.7, 2.0),
     contrast: 1.2,
     grainAmount: SCANLINE_FLICKER,
+    grainPeriodMs: SCANLINE_PERIOD_MS,
   },
   Scanlines_Security: {
     matrix: lumaTint(0, 1.0, 0.65),
     contrast: 1.2,
     grainAmount: SCANLINE_FLICKER,
+    grainPeriodMs: SCANLINE_PERIOD_MS,
   },
   Grainy_Film: { exposure: -0.75, grainAmount: 0.05 },
   Grainy_ChromaticAbberation: { matrix: desaturate(0.35), grainAmount: 0.05 },
@@ -333,14 +347,6 @@ export function isVenueEffectActive(state: PostProcessing): boolean {
     spec.grainAmount !== undefined ||
     spec.bloom !== undefined
   )
-}
-
-/**
- * The bloom settings for a state, or `null` when it does not spread light. Callers use the null
- * case to stay on the cheaper per-light path.
- */
-export function venueBloomSpec(state: PostProcessing): VenueBloomSpec | null {
-  return (VENUE_EFFECT_SPECS[state] ?? VENUE_EFFECT_SPECS.Default).bloom ?? null
 }
 
 /** True for a value the transform recognises. */
@@ -494,7 +500,7 @@ export class VenuePostProcessor {
       ti = lut[ti]
     }
 
-    const { trailMs, choppyHz, grainAmount } = this._spec
+    const { trailMs, choppyHz, grainAmount, grainPeriodMs } = this._spec
     const hasTemporalStage =
       trailMs !== undefined || choppyHz !== undefined || grainAmount !== undefined
     if (strobeFlash || !hasTemporalStage) {
@@ -508,7 +514,7 @@ export class VenuePostProcessor {
     const light = this._stateFor(lightId)
 
     if (grainAmount !== undefined) {
-      const bucket = Math.floor(nowMs / GRAIN_PERIOD_MS)
+      const bucket = Math.floor(nowMs / (grainPeriodMs ?? GRAIN_PERIOD_MS))
       const swing = 1 + grainAmount * (hash01(light.idHash, bucket) * 2 - 1)
       tr = clampByte(tr * swing)
       tg = clampByte(tg * swing)

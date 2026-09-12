@@ -63,9 +63,21 @@ const cueDomainsSchema = (() => {
   }
 })()
 
+/**
+ * Top-level preference keys the schema demands. A stored file missing any of these fails
+ * validation and is moved aside, so the load-time seeding uses this same list to fill them in.
+ */
+export const REQUIRED_PREFERENCE_KEYS = [
+  'effectDebounce',
+  'complex',
+  'cueDomains',
+  'cueConsistencyWindow',
+  'clockRate',
+] as const
+
 const appPreferencesDataSchema = {
   type: 'object',
-  required: ['effectDebounce', 'complex', 'cueDomains', 'cueConsistencyWindow', 'clockRate'],
+  required: [...REQUIRED_PREFERENCE_KEYS],
   properties: {
     effectDebounce: { type: 'number' },
     complex: { type: 'boolean' },

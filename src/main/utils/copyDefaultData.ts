@@ -1,6 +1,9 @@
 import { app } from 'electron'
 import * as fs from 'fs/promises'
 import * as path from 'path'
+import { createLogger } from '../../shared/logger'
+
+const log = createLogger('copyDefaultData')
 
 const COPYFILE_EXCL = fs.constants.COPYFILE_EXCL
 
@@ -26,6 +29,39 @@ export async function copyDefaultData(resourcesPath: string, appDataBase: string
   await copyDirectory(sourceDir, appDataBase)
 }
 
+/**
+ * Writes JSON through a temp file and a rename, so a process killed mid-write leaves either the
+ * previous file or the new one. A truncated file would parse-fail on the next launch and be
+ * skipped by the guard below every time after that, leaving the cue permanently dead.
+ */
+async function writeJsonAtomic(destPath: string, data: Record<string, unknown>): Promise<void> {
+  const tempPath = `${destPath}.tmp.${process.pid}-${Date.now()}`
+  try {
+    await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8')
+    await fs.rename(tempPath, destPath)
+  } catch (error) {
+    await fs.rm(tempPath, { force: true }).catch(() => {})
+    throw error
+  }
+}
+
+/**
+ * Rename a file that will not parse out of the way, keeping a timestamped copy.
+ *
+ * The same shape ConfigFile uses when it recovers a corrupt config: the bytes are kept, so a file
+ * the user had edited is recoverable rather than gone.
+ */
+async function quarantineCorruptFile(filePath: string): Promise<void> {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const asideName = `${filePath}.corrupt-${stamp}`
+  try {
+    await fs.rename(filePath, asideName)
+    log.error(`Seeded file ${filePath} would not parse, kept as ${asideName} and seeded again`)
+  } catch (err) {
+    log.error(`Could not move the unparsable ${filePath} aside, seeding over it:`, err)
+  }
+}
+
 async function copyDirectory(sourceDir: string, destBase: string): Promise<void> {
   const entries = await fs.readdir(sourceDir, { withFileTypes: true })
 
@@ -38,8 +74,17 @@ async function copyDirectory(sourceDir: string, destBase: string): Promise<void>
       await copyDirectory(sourcePath, destPath)
     } else if (entry.isFile()) {
       if (entry.name.toLowerCase().endsWith('.json')) {
-        const sourceRaw = await fs.readFile(sourcePath, 'utf-8')
-        const sourceObj = JSON.parse(sourceRaw) as Record<string, unknown>
+        let sourceObj: Record<string, unknown>
+        try {
+          const sourceRaw = await fs.readFile(sourcePath, 'utf-8')
+          sourceObj = JSON.parse(sourceRaw) as Record<string, unknown>
+        } catch (error) {
+          // One unreadable bundled file must not stop the rest from being seeded, which is what
+          // an unguarded parse here did: it failed the whole controller init and left the engine
+          // down rather than short one cue library.
+          log.error(`Skipping unreadable bundled file ${sourcePath}:`, error)
+          continue
+        }
         if (sourceObj.bundled !== true) sourceObj.bundled = true
 
         const destExists = await fs
@@ -48,13 +93,25 @@ async function copyDirectory(sourceDir: string, destBase: string): Promise<void>
           .catch(() => false)
 
         if (!destExists) {
-          await fs.writeFile(destPath, JSON.stringify(sourceObj, null, 2), 'utf-8')
+          await writeJsonAtomic(destPath, sourceObj)
         } else {
           let destObj: Record<string, unknown>
           try {
             const destRaw = await fs.readFile(destPath, 'utf-8')
             destObj = JSON.parse(destRaw) as Record<string, unknown>
-          } catch {
+          } catch (err) {
+            // Unreadable is a different problem from unparsable. A permissions or IO failure will
+            // fail the rewrite too, so leave it and say so.
+            if ((err as NodeJS.ErrnoException)?.code) {
+              log.error(`Cannot read seeded file ${destPath}, leaving it alone:`, err)
+              continue
+            }
+            // Corrupt content. Move it aside and seed again, rather than skipping it on every
+            // launch from here on, which left the cue dead for the life of the install. Kept
+            // rather than overwritten, because the ownership marker is inside the body that would
+            // not parse, so there is no telling whether the user had made it theirs.
+            await quarantineCorruptFile(destPath)
+            await writeJsonAtomic(destPath, sourceObj)
             continue
           }
           if (destObj.bundled !== true) {
@@ -63,7 +120,7 @@ async function copyDirectory(sourceDir: string, destBase: string): Promise<void>
           const sourceVersion = typeof sourceObj.cueVersion === 'number' ? sourceObj.cueVersion : 0
           const destVersion = typeof destObj.cueVersion === 'number' ? destObj.cueVersion : 0
           if (sourceVersion > destVersion) {
-            await fs.writeFile(destPath, JSON.stringify(sourceObj, null, 2), 'utf-8')
+            await writeJsonAtomic(destPath, sourceObj)
           }
         }
       } else {

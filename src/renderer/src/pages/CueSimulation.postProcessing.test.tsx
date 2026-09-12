@@ -4,8 +4,8 @@
  * preference on. With the preference off the value would be ignored, so showing it would mislead.
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
-import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/react'
-import { Provider, createStore } from 'jotai'
+import { screen, cleanup, waitFor, fireEvent } from '@testing-library/react'
+import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import {
   audioListenerEnabledAtom,
   lightingPrefsAtom,
@@ -47,21 +47,16 @@ import CueSimulation from './CueSimulation'
 
 const PICKER_LABEL = 'Effect'
 
-function renderWith(
-  prefs: Record<string, unknown>,
-  options: { yargEnabled?: boolean } = {},
-): ReturnType<typeof render> {
-  const store = createStore()
-  store.set(lightingPrefsAtom, prefs)
-  store.set(audioListenerEnabledAtom, false)
-  store.set(rb3eListenerEnabledAtom, false)
-  store.set(yargListenerEnabledAtom, options.yargEnabled ?? false)
-  store.set(previewRigIdAtom, null)
-  return render(
-    <Provider store={store}>
-      <CueSimulation />
-    </Provider>,
-  )
+function renderWith(prefs: Record<string, unknown>, options: { yargEnabled?: boolean } = {}) {
+  return renderWithProviders(<CueSimulation />, {
+    seed: (set) => {
+      set(lightingPrefsAtom, prefs)
+      set(audioListenerEnabledAtom, false)
+      set(rb3eListenerEnabledAtom, false)
+      set(yargListenerEnabledAtom, options.yargEnabled ?? false)
+      set(previewRigIdAtom, null)
+    },
+  })
 }
 
 function postProcessingCalls(): unknown[] {
@@ -81,13 +76,13 @@ describe('Cue Simulation venue post-processing picker', () => {
 
   it('shows the picker when the preference has never been set', async () => {
     renderWith({})
-    await waitFor(() => expect(screen.getByText('Venue Post-Processing')).toBeTruthy())
-    expect(screen.getByLabelText(PICKER_LABEL)).toBeTruthy()
+    await waitFor(() => expect(screen.getByText('Venue Post-Processing')).toBeInTheDocument())
+    expect(screen.getByLabelText(PICKER_LABEL)).toBeInTheDocument()
   })
 
   it('shows the picker when the preference is on', async () => {
     renderWith({ venuePostProcessingEnabled: true })
-    await waitFor(() => expect(screen.getByText('Venue Post-Processing')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Venue Post-Processing')).toBeInTheDocument())
   })
 
   it('hides the picker when the preference is off', async () => {
@@ -98,20 +93,20 @@ describe('Cue Simulation venue post-processing picker', () => {
 
   it('disables the picker while YARG owns live input', async () => {
     renderWith({}, { yargEnabled: true })
-    await waitFor(() => expect(screen.getByLabelText(PICKER_LABEL)).toBeTruthy())
+    await waitFor(() => expect(screen.getByLabelText(PICKER_LABEL)).toBeInTheDocument())
     expect((screen.getByLabelText(PICKER_LABEL) as HTMLSelectElement).disabled).toBe(true)
   })
 
   it('does not clear post-processing on unmount when nothing was simulated', async () => {
     const view = renderWith({ venuePostProcessingEnabled: true })
-    await waitFor(() => expect(screen.getByLabelText(PICKER_LABEL)).toBeTruthy())
+    await waitFor(() => expect(screen.getByLabelText(PICKER_LABEL)).toBeInTheDocument())
     view.unmount()
     expect(postProcessingCalls()).toEqual([])
   })
 
   it('clears simulated post-processing on unmount after the picker changed it', async () => {
     const view = renderWith({ venuePostProcessingEnabled: true })
-    await waitFor(() => expect(screen.getByLabelText(PICKER_LABEL)).toBeTruthy())
+    await waitFor(() => expect(screen.getByLabelText(PICKER_LABEL)).toBeInTheDocument())
 
     fireEvent.change(screen.getByLabelText(PICKER_LABEL), { target: { value: 'BlackAndWhite' } })
     await waitFor(() => expect(postProcessingCalls()).toContain('BlackAndWhite'))

@@ -8,6 +8,7 @@
   "include": [
     "src/renderer/src/env.d.ts",
     "src/preload/*.d.ts",
+    "src/preload/**/*.test.ts",
     "src/shared/**/*.ts",
     "src/main/logging/**/*.ts",
     "src/main/tests/**/*.ts",
@@ -15,7 +16,9 @@
     "src/photonics-dmx/**/*.test.ts",
     "src/services/**/tests/**/*.ts",
     "src/renderer/src/**/*.test.ts",
-    "src/renderer/src/**/*.test.tsx"
+    "src/renderer/src/**/*.test.tsx",
+    "src/renderer/src/tests/**/*.ts",
+    "src/renderer/src/tests/**/*.tsx"
   ],
   "exclude": ["node_modules", "out", "dist", "coverage"]
 }

@@ -29,10 +29,24 @@ function rgbFixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
 }
 
 describe('DmxChannels', () => {
+  it('reports a channel number when the user leaves the field, not per keystroke', () => {
+    const onChannelChange = jest.fn()
+    render(<DmxChannels light={rgbFixture()} onChannelChange={onChannelChange} />)
+    const field = screen.getByLabelText('red:')
+
+    fireEvent.change(field, { target: { value: '4' } })
+    fireEvent.change(field, { target: { value: '40' } })
+    expect(onChannelChange).not.toHaveBeenCalled()
+
+    fireEvent.blur(field)
+    expect(onChannelChange).toHaveBeenCalledWith('red', 40)
+  })
+
   it('accepts a channel number in the top half of the universe', () => {
     const onChannelChange = jest.fn()
     render(<DmxChannels light={rgbFixture()} onChannelChange={onChannelChange} />)
     fireEvent.change(screen.getByLabelText('red:'), { target: { value: '400' } })
+    fireEvent.blur(screen.getByLabelText('red:'))
     expect(onChannelChange).toHaveBeenCalledWith('red', 400)
   })
 
@@ -40,6 +54,7 @@ describe('DmxChannels', () => {
     const onChannelChange = jest.fn()
     render(<DmxChannels light={rgbFixture()} onChannelChange={onChannelChange} />)
     fireEvent.change(screen.getByLabelText('red:'), { target: { value: '900' } })
+    fireEvent.blur(screen.getByLabelText('red:'))
     expect(onChannelChange).toHaveBeenCalledWith('red', 512)
   })
 
@@ -63,6 +78,7 @@ describe('DmxChannels', () => {
     const panHome = screen.getByLabelText('panHome:')
     expect(panHome.getAttribute('max')).toBe('100')
     fireEvent.change(panHome, { target: { value: '400' } })
+    fireEvent.blur(panHome)
     expect(onChannelChange).toHaveBeenCalledWith('panHome', 100)
   })
 

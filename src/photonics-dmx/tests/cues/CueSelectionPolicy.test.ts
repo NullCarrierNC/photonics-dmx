@@ -4,7 +4,10 @@ jest.mock('../../../shared/time', () => ({
   monotonicNowMs: () => mockNowMs,
 }))
 
-import { CueGroupCatalog } from '../../cues/registries/CueGroupCatalog'
+import {
+  CueGroupCatalog,
+  type LightingCueGroupCatalog,
+} from '../../cues/registries/CueGroupCatalog'
 import { CueSelectionPolicy, CueStateUpdate } from '../../cues/registries/CueSelectionPolicy'
 import { INetCue, CueStyle } from '../../cues/interfaces/INetCue'
 import { ICueGroup } from '../../cues/interfaces/INetCueGroup'
@@ -41,7 +44,7 @@ const cueGroup = (id: string, style: CueStyle, cueTypes: CueType[]): ICueGroup =
 })
 
 describe('CueSelectionPolicy', () => {
-  let catalog: CueGroupCatalog
+  let catalog: LightingCueGroupCatalog
   let policy: CueSelectionPolicy
   let seen: CueStateUpdate[]
 
@@ -52,7 +55,7 @@ describe('CueSelectionPolicy', () => {
 
   beforeEach(() => {
     mockNowMs = 100000
-    catalog = new CueGroupCatalog()
+    catalog = new CueGroupCatalog<CueType, INetCue, ICueGroup>()
     policy = new CueSelectionPolicy(catalog)
     seen = []
     policy.setStateUpdateCallback((state) => seen.push(state))
@@ -111,9 +114,9 @@ describe('CueSelectionPolicy', () => {
       policy.onSongStart()
       policy.setCueConsistencyWindow(0)
 
-      const first = policy.selectCue(CueType.Chorus)!
+      const first = policy.selectCue(CueType.Chorus)
       const lockedGroup = seen[0].groupId
-      expect(first).toBeTruthy()
+      expect(first).toBe(catalog.getGroup(lockedGroup)?.cues.get(CueType.Chorus))
       for (let i = 0; i < 10; i++) {
         policy.selectCue(CueType.Chorus)
         policy.selectCue(CueType.Verse)
@@ -121,7 +124,10 @@ describe('CueSelectionPolicy', () => {
       expect(seen.every((u) => u.groupId === lockedGroup)).toBe(true)
 
       policy.onSongEnd()
-      expect(policy.selectCue(CueType.Chorus)).toBeTruthy()
+      const chorusCues = ['groupA', 'groupB'].map((id) =>
+        catalog.getGroup(id)?.cues.get(CueType.Chorus),
+      )
+      expect(chorusCues).toContain(policy.selectCue(CueType.Chorus))
     })
   })
 

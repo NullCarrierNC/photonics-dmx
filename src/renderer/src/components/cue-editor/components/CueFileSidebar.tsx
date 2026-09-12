@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import ConfirmModal from '../../ConfirmModal'
 import { FaTrash } from 'react-icons/fa'
 import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type { EffectFileSummary } from '../../../../../photonics-dmx/cues/node/loader/EffectLoader'
@@ -171,42 +172,27 @@ const CueFileSidebar: React.FC<Props> = ({
         (() => {
           const target = items.find((i) => i.id === pendingRemoveId)
           return (
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="remove-confirm-title">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 max-w-sm text-sm space-y-3">
-                <p id="remove-confirm-title" className="font-semibold">
-                  Remove {isEffectMode ? 'effect' : 'cue'}?
-                </p>
-                <p className="text-gray-600 dark:text-gray-400">
+            <ConfirmModal
+              isOpen
+              title={`Remove ${isEffectMode ? 'effect' : 'cue'}?`}
+              message={
+                <>
                   Remove <span className="font-medium">{target?.name ?? pendingRemoveId}</span> from
                   this file?
-                </p>
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isEffectMode) {
-                        onRemoveEffect(pendingRemoveId)
-                      } else {
-                        onRemoveCue(pendingRemoveId)
-                      }
-                      setPendingRemoveId(null)
-                    }}
-                    className="px-3 py-1.5 text-sm font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
-                    Remove
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingRemoveId(null)}
-                    className="px-3 py-1.5 text-sm font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400">
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
+                </>
+              }
+              confirmLabel="Remove"
+              danger
+              onConfirm={() => {
+                if (isEffectMode) {
+                  onRemoveEffect(pendingRemoveId)
+                } else {
+                  onRemoveCue(pendingRemoveId)
+                }
+                setPendingRemoveId(null)
+              }}
+              onCancel={() => setPendingRemoveId(null)}
+            />
           )
         })()}
     </aside>

@@ -1,1 +1,1 @@
-npm run typecheck && npm run any:budget && npm run size:budget && npm test
+npm run lint:check && npm run format:check && npm run typecheck && npm run any:budget && npm run floating:budget && npm run size:budget && npm run paths:check && npm test

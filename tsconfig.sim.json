@@ -10,7 +10,11 @@
     "types": ["node"],
     "baseUrl": "./"
   },
-  "include": ["src/photonics-dmx/sim/**/*.ts"],
+  "include": [
+    "src/photonics-dmx/**/*.ts",
+    "src/renderer/src/components/cue-editor/lib/graphLayout.ts",
+    "tools/node-graph-prettier.ts"
+  ],
   "ts-node": {
     "transpileOnly": true
   }

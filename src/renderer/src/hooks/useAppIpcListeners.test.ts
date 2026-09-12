@@ -2,6 +2,7 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import * as ipcHelpers from '../utils/ipcHelpers'
 import * as ipcApi from '../ipcApi'
+import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { useAppIpcListeners, type UseAppIpcListenersParams } from './useAppIpcListeners'
 import { useYargErrorHandler } from './useYargErrorHandler'
@@ -20,17 +21,13 @@ jest.mock('../../../shared/logger', () => {
   }
 })
 
-jest.mock('../ipcApi', () => {
-  const actual = jest.requireActual<typeof import('../ipcApi')>('../ipcApi')
-  return {
-    ...actual,
-    getAppVersion: jest.fn().mockResolvedValue('9.9.9'),
-    getPrefs: jest.fn().mockResolvedValue({}),
-    getValidationErrors: jest.fn().mockResolvedValue([]),
-    getCorruptRecoveryEvents: jest.fn().mockResolvedValue({ files: [] }),
-    saveLightLayout: jest.fn().mockResolvedValue(undefined),
-  }
-})
+jest.mock(
+  '../ipcApi',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcApiMock')>(
+      '@renderer/tests/helpers/ipcApiMock',
+    ).ipcApiMock,
+)
 
 const getAppVersion = jest.mocked(ipcApi.getAppVersion)
 const getPrefs = jest.mocked(ipcApi.getPrefs)
@@ -77,6 +74,11 @@ beforeAll(() => {
 describe('useAppIpcListeners', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    resetIpcApiMock()
+    getAppVersion.mockResolvedValue('9.9.9')
+    getPrefs.mockResolvedValue({} as never)
+    getValidationErrors.mockResolvedValue([])
+    getCorruptRecoveryEvents.mockResolvedValue({ files: [] } as never)
   })
 
   it('does not call saveLightLayout (layout is persisted from LightsLayout / explicit save only)', async () => {

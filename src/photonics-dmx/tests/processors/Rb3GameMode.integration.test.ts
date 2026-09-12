@@ -26,7 +26,6 @@ function colourPacket(color: string, positions: number[]): unknown {
   return {
     positions,
     color,
-    brightness: 'medium',
     fog: false,
     leftChannel: positions.reduce((m, p) => m | (1 << p), 0),
     rightChannel: 0x80,

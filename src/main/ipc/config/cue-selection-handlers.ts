@@ -12,6 +12,7 @@ import { ipcError } from '../ipcResult'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { validateOptionalStringArray, validateDisabledCuesMap } from '../inputValidation'
 import { createLogger } from '../../../shared/logger'
+import { handleInvoke } from '../handleInvoke'
 const log = createLogger('cue-selection-handlers')
 
 type ChangedEvent = (typeof RENDERER_RECEIVE)[keyof typeof RENDERER_RECEIVE]
@@ -60,7 +61,7 @@ function registerCueGroupDomain(
     return run
   }
 
-  ipcMain.handle(spec.channels.getEnabled, () =>
+  handleInvoke(ipcMain, spec.channels.getEnabled, log, () =>
     serialize(async () => {
       const config = controllerManager.getConfig()
       const reconciled = await reconcileAndApplyGroups(binding, config)
@@ -68,7 +69,7 @@ function registerCueGroupDomain(
     }),
   )
 
-  ipcMain.handle(spec.channels.setEnabled, (_, groupIds: unknown) =>
+  handleInvoke(ipcMain, spec.channels.setEnabled, log, (_, groupIds: unknown) =>
     serialize(async () => {
       try {
         const validation = validateOptionalStringArray(groupIds, 'groupIds')
@@ -92,7 +93,7 @@ function registerCueGroupDomain(
     }),
   )
 
-  ipcMain.handle(spec.channels.getDisabled, () =>
+  handleInvoke(ipcMain, spec.channels.getDisabled, log, () =>
     serialize(async () => {
       const disabled = controllerManager.getConfig().getPreference('cueDomains')[
         domain
@@ -102,7 +103,7 @@ function registerCueGroupDomain(
     }),
   )
 
-  ipcMain.handle(spec.channels.setDisabled, (_, payload: unknown) =>
+  handleInvoke(ipcMain, spec.channels.setDisabled, log, (_, payload: unknown) =>
     serialize(async () => {
       try {
         const validation = validateDisabledCuesMap(payload, spec.disabledLabel)

@@ -7,6 +7,7 @@ import {
   getEnabledRb3CueGroups,
   getRb3CueGroups,
 } from '../ipcApi'
+import { DraftNumberField } from './controls/DraftField'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('CueRegistrySelector')
 
@@ -168,14 +169,13 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           BPM
         </label>
-        <input
-          type="number"
-          min="60"
-          max="200"
+        <DraftNumberField
+          aria-label="BPM"
+          min={60}
+          max={200}
           value={selectedBpm}
-          onChange={(e) => onBpmChange(parseInt(e.target.value) || 120)}
-          className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200 h-10"
-          style={{ width: '80px' }}
+          onCommit={onBpmChange}
+          className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200 h-10 w-20"
           disabled={!selectedGroupId}
         />
       </div>

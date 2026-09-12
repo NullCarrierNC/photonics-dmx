@@ -1,5 +1,5 @@
 import { useAtom } from 'jotai'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import {
   yargListenerEnabledAtom,
   rb3eListenerEnabledAtom,
@@ -32,6 +32,7 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
   const [isSaving, setIsSaving] = useState(false)
   const [gameModeEnabled, setGameModeEnabled] = useState(false)
   const [gameModeSaving, setGameModeSaving] = useState(false)
+  const labelId = useId()
 
   const refreshGameMode = useCallback(async () => {
     try {
@@ -156,6 +157,7 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
     <div className={className ?? 'mb-4 min-w-[190px] max-w-[220px]'}>
       <div className="flex items-center justify-between">
         <label
+          id={labelId}
           className={`mr-4 text-lg font-semibold ${
             isYargEnabled || isRb3Enabled || disabled
               ? 'text-gray-500'
@@ -165,6 +167,9 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
         </label>
         <button
           type="button"
+          role="switch"
+          aria-checked={isAudioEnabled}
+          aria-labelledby={labelId}
           onClick={handleToggle}
           disabled={isYargEnabled || isRb3Enabled || disabled || isSaving}
           className={`w-12 h-6 rounded-full ${
@@ -186,6 +191,9 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
           <span className="text-xs text-gray-600 dark:text-gray-400 shrink-0">Manual / Game</span>
           <button
             type="button"
+            role="switch"
+            aria-checked={gameModeEnabled}
+            aria-label="Game mode"
             onClick={handleGameModeSwitch}
             disabled={disabled || gameModeSaving}
             title={gameModeEnabled ? 'Game: cues cycle automatically' : 'Manual: pick a cue'}

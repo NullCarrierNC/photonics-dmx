@@ -22,6 +22,7 @@ import { AUDIO_IDLE_EFFECT_NAME, AUDIO_IDLE_LAYER } from '../../processors/audio
 import { AudioLightingData } from '../../listeners/Audio/AudioTypes'
 import { noopRuntimeBroadcaster } from '../../runtime/broadcaster'
 import type { AudioSecondaryRuntime } from '../../processors/AudioSecondaryRuntime'
+import { fakeLightingController } from '../helpers/fakeLightingController'
 
 const TEST_GROUP = 'audio-cue-processor-test-group'
 
@@ -94,16 +95,7 @@ describe('AudioCueProcessor', () => {
 
     const config = createMockLightingConfig()
     lightManager = new DmxLightManager(config)
-    sequencer = {
-      addEffect: jest.fn(),
-      setEffect: jest.fn(),
-      removeEffect: jest.fn(),
-      removeAllEffects: jest.fn(),
-      removeEffectByLayer: jest.fn(),
-      addEffectUnblockedName: jest.fn(),
-      setEffectUnblockedName: jest.fn(),
-      onBeat: jest.fn(),
-    } as unknown as ILightingController
+    sequencer = fakeLightingController()
 
     const audioConfig = {
       ...DEFAULT_AUDIO_CONFIG,

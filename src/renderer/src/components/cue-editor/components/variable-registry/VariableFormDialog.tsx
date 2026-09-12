@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useId } from 'react'
+import Modal from '../../../Modal'
 import type {
   VariableDefinition,
   VariableType,
@@ -8,6 +9,7 @@ import type {
 import { VARIABLE_TYPES } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { TrackedLight, Color } from '../../../../../../photonics-dmx/types'
 import ColorListEditor from '../shared/ColorListEditor'
+import { DraftNumberField } from '../../../controls/DraftField'
 import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
 import {
   AUDIO_EVENT_OPTIONS,
@@ -120,12 +122,13 @@ function getInitialValueInput(
     case 'number':
     default:
       return (
-        <input
-          type="number"
-          step="0.1"
+        <DraftNumberField
+          step={0.1}
+          // A cue variable holds whatever the author needs, so keep the precision they type.
+          decimals={6}
           className="rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={(value as number) ?? 0}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          onCommit={onChange}
         />
       )
   }
@@ -143,6 +146,7 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
   isEffectMode,
   editingVar,
 }) => {
+  const titleId = useId()
   if (!isOpen) return null
 
   const handleTypeChange = (newType: VariableType) => {
@@ -156,92 +160,94 @@ const VariableFormDialog: React.FC<VariableFormDialogProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-96 max-w-full">
-        <h3 className="font-semibold text-lg mb-4">{title}</h3>
-        <div className="space-y-3">
-          <label className="flex flex-col font-medium text-sm">
-            Name
-            <input
-              type="text"
-              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={formData.name ?? ''}
-              onChange={(e) => onFormDataChange({ ...formData, name: e.target.value })}
-              placeholder="variableName"
-              pattern="[a-zA-Z_][a-zA-Z0-9_]*"
-              disabled={!!editingVar}
-            />
-            <span className="text-[10px] text-gray-500 mt-1">
-              Must start with letter or underscore
-            </span>
-          </label>
+    <Modal
+      onClose={onCancel}
+      labelledBy={titleId}
+      closeOnBackdrop={false}
+      panelClassName="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-96 max-w-full">
+      <h3 id={titleId} className="font-semibold text-lg mb-4">
+        {title}
+      </h3>
+      <div className="space-y-3">
+        <label className="flex flex-col font-medium text-sm">
+          Name
+          <input
+            type="text"
+            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+            value={formData.name ?? ''}
+            onChange={(e) => onFormDataChange({ ...formData, name: e.target.value })}
+            placeholder="variableName"
+            pattern="[a-zA-Z_][a-zA-Z0-9_]*"
+            disabled={!!editingVar}
+          />
+          <span className="text-[10px] text-gray-500 mt-1">
+            Must start with letter or underscore
+          </span>
+        </label>
 
-          <label className="flex flex-col font-medium text-sm">
-            Type
-            <select
-              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={formData.type ?? 'number'}
-              onChange={(e) => handleTypeChange(e.target.value as VariableType)}>
-              {VARIABLE_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-                </option>
-              ))}
-            </select>
-          </label>
+        <label className="flex flex-col font-medium text-sm">
+          Type
+          <select
+            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+            value={formData.type ?? 'number'}
+            onChange={(e) => handleTypeChange(e.target.value as VariableType)}>
+            {VARIABLE_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+              </option>
+            ))}
+          </select>
+        </label>
 
-          <label className="flex flex-col font-medium text-sm">
-            Initial Value
-            {getInitialValueInput(
-              (formData.type as VariableType) ?? 'number',
-              formData.initialValue,
-              (val) => onFormDataChange({ ...formData, initialValue: val }),
-              activeMode,
-              cueKind,
-            )}
-          </label>
-
-          <label className="flex flex-col font-medium text-sm">
-            Description (optional)
-            <input
-              type="text"
-              className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              value={formData.description ?? ''}
-              onChange={(e) => onFormDataChange({ ...formData, description: e.target.value })}
-              placeholder="What this variable is for"
-            />
-          </label>
-
-          {isEffectMode && (
-            <label className="flex items-center gap-2 font-medium text-sm">
-              <input
-                type="checkbox"
-                checked={formData.isParameter ?? false}
-                onChange={(e) => onFormDataChange({ ...formData, isParameter: e.target.checked })}
-                className="rounded"
-              />
-              <span>Is Parameter</span>
-              <span className="text-[10px] text-gray-500 font-normal">
-                (Expose as effect input)
-              </span>
-            </label>
+        <label className="flex flex-col font-medium text-sm">
+          Initial Value
+          {getInitialValueInput(
+            (formData.type as VariableType) ?? 'number',
+            formData.initialValue,
+            (val) => onFormDataChange({ ...formData, initialValue: val }),
+            activeMode,
+            cueKind,
           )}
-        </div>
+        </label>
 
-        <div className="flex gap-2 mt-6">
-          <button
-            className="flex-1 px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-500"
-            onClick={onSave}>
-            Save
-          </button>
-          <button
-            className="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
-            onClick={onCancel}>
-            Cancel
-          </button>
-        </div>
+        <label className="flex flex-col font-medium text-sm">
+          Description (optional)
+          <input
+            type="text"
+            className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
+            value={formData.description ?? ''}
+            onChange={(e) => onFormDataChange({ ...formData, description: e.target.value })}
+            placeholder="What this variable is for"
+          />
+        </label>
+
+        {isEffectMode && (
+          <label className="flex items-center gap-2 font-medium text-sm">
+            <input
+              type="checkbox"
+              checked={formData.isParameter ?? false}
+              onChange={(e) => onFormDataChange({ ...formData, isParameter: e.target.checked })}
+              className="rounded"
+            />
+            <span>Is Parameter</span>
+            <span className="text-[10px] text-gray-500 font-normal">(Expose as effect input)</span>
+          </label>
+        )}
       </div>
-    </div>
+
+      <div className="flex gap-2 mt-6">
+        <button
+          className="flex-1 px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-500"
+          onClick={onSave}>
+          Save
+        </button>
+        <button
+          className="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+          onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </Modal>
   )
 }
 

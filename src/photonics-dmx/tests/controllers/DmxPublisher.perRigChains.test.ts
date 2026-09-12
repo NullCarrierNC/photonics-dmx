@@ -20,7 +20,7 @@ import {
 import type { DmxValuesPayload } from '../../../shared/ipcTypes'
 
 interface MockSender {
-  send: jest.Mock<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<void>>
+  send: jest.Mock<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<boolean>>
   sendIpc: jest.Mock<(payload: DmxValuesPayload) => void>
   getEnabledWireSenders: jest.Mock<() => WireSenderId[]>
   isIpcEnabled: jest.Mock<() => boolean>
@@ -28,8 +28,8 @@ interface MockSender {
 
 function makeMockSender(opts: { wireSenders: WireSenderId[]; ipcEnabled?: boolean }): MockSender {
   return {
-    send: jest.fn<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<void>>(() =>
-      Promise.resolve(),
+    send: jest.fn<(slotId: WireSenderId, buffer: Record<number, number>) => Promise<boolean>>(() =>
+      Promise.resolve(true),
     ),
     sendIpc: jest.fn<(payload: DmxValuesPayload) => void>(),
     getEnabledWireSenders: jest.fn<() => WireSenderId[]>(() => [...opts.wireSenders]),

@@ -133,3 +133,159 @@ describe('collectEventReferencesFromFlow', () => {
     expect(collectEventReferencesFromFlow(nodes, 'drop')).toEqual([])
   })
 })
+
+describe('collectVariableReferences, field by field', () => {
+  const v = fromVariable('v')
+
+  it('checks every field an action node can bind', () => {
+    const action = {
+      target: { groups: v, filter: v },
+      color: { name: v, brightness: v, blendMode: v, opacity: v },
+      layer: v,
+      timing: {
+        waitForTime: v,
+        waitForConditionCount: v,
+        duration: v,
+        waitUntilTime: v,
+        waitUntilConditionCount: v,
+        level: v,
+        easing: v,
+      },
+    } as unknown as ActionNode
+    const nodes = [node('action-1', { kind: 'action', payload: action })]
+
+    expect(collectVariableReferences(nodes, 'v')).toEqual(
+      [
+        'target.groups',
+        'target.filter',
+        'color.name',
+        'color.brightness',
+        'color.blendMode',
+        'color.opacity',
+        'layer',
+        'timing.waitForTime',
+        'timing.waitForConditionCount',
+        'timing.duration',
+        'timing.waitUntilTime',
+        'timing.waitUntilConditionCount',
+        'timing.level',
+        'timing.easing',
+      ].map((detail) => `Action Node action-1 (${detail})`),
+    )
+  })
+
+  it.each([
+    [
+      'variable',
+      { varName: 'v', value: v, assignments: [{ varName: 'v', value: v }] },
+      ['varName', 'value', 'assignments.varName', 'assignments.value'],
+    ],
+    ['math', { left: v, right: v, assignTo: 'v' }, ['left', 'right', 'assignTo']],
+    ['conditional', { left: v, right: v }, ['left', 'right']],
+    ['cue-data', { assignTo: 'v' }, ['assignTo']],
+    ['config-data', { assignTo: 'v' }, ['assignTo']],
+    [
+      'lights-from-index',
+      { sourceVariable: 'v', index: v, assignTo: 'v' },
+      ['sourceVariable', 'index', 'assignTo'],
+    ],
+    ['color-from-index', { colors: v, index: v, assignTo: 'v' }, ['colors', 'index', 'assignTo']],
+    ['array-length', { sourceVariable: 'v', assignTo: 'v' }, ['sourceVariable', 'assignTo']],
+    ['reverse-lights', { sourceVariable: 'v', assignTo: 'v' }, ['sourceVariable', 'assignTo']],
+    ['create-pairs', { sourceVariable: 'v', assignTo: 'v' }, ['sourceVariable', 'assignTo']],
+    ['reverse-colors', { sourceVariable: 'v', assignTo: 'v' }, ['sourceVariable', 'assignTo']],
+    ['shuffle-colors', { sourceVariable: 'v', assignTo: 'v' }, ['sourceVariable', 'assignTo']],
+    ['shuffle-lights', { sourceVariable: 'v', assignTo: 'v' }, ['sourceVariable', 'assignTo']],
+    [
+      'concat-lights',
+      { sourceVariables: ['a', 'v'], assignTo: 'v' },
+      ['sourceVariables', 'assignTo'],
+    ],
+    [
+      'concat-colors',
+      { sourceVariables: ['a', 'v'], assignTo: 'v' },
+      ['sourceVariables', 'assignTo'],
+    ],
+    ['build-ring', { assignTo: 'v', assignGroupSize: 'v' }, ['assignTo', 'assignGroupSize']],
+    ['delay', { delayTime: v }, ['delayTime']],
+    ['debugger', { message: v, variablesToLog: ['v'] }, ['message', 'variablesToLog']],
+    ['clamp', { value: v, min: v, max: v, assignTo: 'v' }, ['value', 'min', 'max', 'assignTo']],
+    ['select-from-list', { index: v, assignTo: 'v' }, ['index', 'assignTo']],
+    [
+      'pulse',
+      { interval: v, anchorVar: 'v', assignTo: 'v', assignPhase: 'v' },
+      ['interval', 'anchorVar', 'assignTo', 'assignPhase'],
+    ],
+    ['frame-gate', { divisor: v }, ['divisor']],
+    [
+      'tempo',
+      {
+        assignBeatMs: 'v',
+        assignBarMs: 'v',
+        assignPhraseMs: 'v',
+        assignCycles: 'v',
+        beatsPerBar: v,
+        barsPerPhrase: v,
+        minBeatMs: v,
+        maxBeatMs: v,
+        fallbackBeatMs: v,
+      },
+      [
+        'assignBeatMs',
+        'assignBarMs',
+        'assignPhraseMs',
+        'assignCycles',
+        'beatsPerBar',
+        'barsPerPhrase',
+        'minBeatMs',
+        'maxBeatMs',
+        'fallbackBeatMs',
+      ],
+    ],
+    [
+      'indexed-variable',
+      { varName: 'v', index: v, value: v, assignTo: 'v' },
+      ['varName', 'index', 'value', 'assignTo'],
+    ],
+    [
+      'led-changed',
+      { assignIndex: 'v', assignColor: 'v', assignEdge: 'v' },
+      ['assignIndex', 'assignColor', 'assignEdge'],
+    ],
+    [
+      'random',
+      {
+        sourceVariable: 'v',
+        min: v,
+        max: v,
+        count: v,
+        assignTo: 'v',
+        rolls: [{ sourceVariable: 'v', min: v, max: v, count: v, assignTo: 'v' }],
+      },
+      [
+        'sourceVariable',
+        'min',
+        'max',
+        'count',
+        'assignTo',
+        'rolls.sourceVariable',
+        'rolls.min',
+        'rolls.max',
+        'rolls.count',
+        'rolls.assignTo',
+      ],
+    ],
+    [
+      'for-each-light',
+      { sourceVariable: 'v', currentLightVariable: 'v', currentIndexVariable: 'v', groupSize: v },
+      ['sourceVariable', 'currentLightVariable', 'currentIndexVariable', 'groupSize'],
+    ],
+  ])('checks every field a %s logic node reads', (logicType, fields, details) => {
+    const logic = { logicType, ...fields } as unknown as LogicNode
+    const nodes = [node('logic-1', { kind: 'logic', payload: logic })]
+
+    expect(collectVariableReferences(nodes, 'v')).toEqual(
+      details.map((detail) => `Logic Node (${logicType}) logic-1 (${detail})`),
+    )
+  })
+})

@@ -9,6 +9,7 @@ import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { ChainFanout } from '../../controllers/ChainFanout'
 import type { RigChain } from '../../controllers/RigChain'
 import { createMockLightingConfig } from '../helpers/testFixtures'
+import { fakeLightingController } from '../helpers/fakeLightingController'
 
 describe('ProcessorManager', () => {
   let mockLightManager: DmxLightManager
@@ -23,35 +24,7 @@ describe('ProcessorManager', () => {
 
     const config = createMockLightingConfig()
     mockLightManager = new DmxLightManager(config)
-    mockSequencer = {
-      addEffect: jest.fn(),
-      setEffect: jest.fn(),
-      addEffectWithCallback: jest.fn(),
-      setEffectWithCallback: jest.fn(),
-      addEffectUnblockedNameWithCallback: jest.fn(),
-      setEffectUnblockedNameWithCallback: jest.fn(),
-      removeEffectCallback: jest.fn(),
-      removeEffect: jest.fn(),
-      removeAllEffects: jest.fn(),
-      removeEffectByLayer: jest.fn(),
-      addEffectUnblockedName: jest.fn(),
-      setEffectUnblockedName: jest.fn(),
-      getActiveEffectsForLight: jest.fn(),
-      isLayerFreeForLight: jest.fn(),
-      setState: jest.fn(),
-      onBeat: jest.fn(),
-      onMeasure: jest.fn(),
-      onKeyframe: jest.fn(),
-      onDrumNote: jest.fn(),
-      onGuitarNote: jest.fn(),
-      onBassNote: jest.fn(),
-      onKeysNote: jest.fn(),
-      blackout: jest.fn(),
-      cancelBlackout: jest.fn(),
-      enableDebug: jest.fn(),
-      debugLightLayers: jest.fn(),
-      shutdown: jest.fn(),
-    } as unknown as ILightingController
+    mockSequencer = fakeLightingController()
 
     // Single-rig fanout for these tests — they exercise the manager's lifecycle, not the
     // multi-rig render path (that's covered by Rb3StageKitDirectProcessor.multiRig.test).

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { getYargFallbackCueTimeMs, setYargFallbackCueTimeMs } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
+import { DraftNumberField } from './controls/DraftField'
 
 const log = createLogger('YargFallbackSettings')
 
@@ -80,18 +81,13 @@ const YargFallbackSettings: React.FC = () => {
           Fallback Time
         </label>
         <div className="flex items-center space-x-4">
-          <input
-            type="number"
+          <DraftNumberField
             id="yarg-fallback-time"
             min={MIN_SECONDS}
             max={MAX_SECONDS}
             step={1}
             value={seconds}
-            onChange={(e) => {
-              const v = parseInt(e.target.value, 10)
-              setSeconds(Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, Number.isNaN(v) ? 0 : v)))
-            }}
-            onBlur={() => handleChange(seconds)}
+            onCommit={(value) => void handleChange(value)}
             disabled={isLoading || isSaving}
             className="w-28 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
             placeholder="20"

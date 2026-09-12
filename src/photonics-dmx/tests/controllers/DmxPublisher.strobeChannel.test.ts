@@ -39,7 +39,7 @@ function makeBrightRgbio(overrides: Partial<RGBIO> = {}): RGBIO {
 interface ScenarioContext {
   publisher: DmxPublisher
   sender: {
-    send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<void>>
+    send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
     getEnabledWireSenders: () => string[]
     isIpcEnabled: () => boolean
   }
@@ -54,13 +54,13 @@ interface ScenarioContext {
  * arg of the (slotId, buffer) call signature.
  */
 function makeMockSender(): {
-  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<void>>
+  send: jest.Mock<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>
   getEnabledWireSenders: () => string[]
   isIpcEnabled: () => boolean
 } {
   return {
-    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<void>>(() =>
-      Promise.resolve(),
+    send: jest.fn<(slotId: string, buffer: Record<number, number>) => Promise<boolean>>(() =>
+      Promise.resolve(true),
     ),
     getEnabledWireSenders: () => ['sacn'],
     isIpcEnabled: () => false,
@@ -151,13 +151,13 @@ describe('DmxPublisher strobe-channel runtime', () => {
   })
 
   it('writes the per-cue speed value to the strobe channel for the active slot', () => {
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
     const lights = new Map<string, RGBIO>([['light-1', makeBrightRgbio()]])
     ctx.publisher.publish(lights)
 
     expect(ctx.lastBuffer()[5]).toBe(180)
 
-    ctx.strobe.setActive('slow')
+    ctx.strobe.setActive('slow', 'net')
     ctx.publisher.publish(lights)
     expect(ctx.lastBuffer()[5]).toBe(30)
   })
@@ -166,7 +166,7 @@ describe('DmxPublisher strobe-channel runtime', () => {
     // Models the real post-blend stream the publisher sees: stock strobe cues flash opacity,
     // which the blender folds into rgb/intensity. So a strobe-channel light sees: peak white
     // burst -> dimming as opacity fades -> the underlying primary cue when opacity hits 0.
-    ctx.strobe.setActive('medium')
+    ctx.strobe.setActive('medium', 'net')
     const peak = makeBrightRgbio() // {255,64,0,i255} — opacity 1 moment
     const fading: RGBIO = {
       red: 128,
@@ -203,7 +203,7 @@ describe('DmxPublisher strobe-channel runtime', () => {
   })
 
   it('promotes to a brighter peak if a later frame exceeds the stored peak', () => {
-    ctx.strobe.setActive('slow')
+    ctx.strobe.setActive('slow', 'net')
     const dim: RGBIO = {
       red: 80,
       green: 0,
@@ -227,11 +227,11 @@ describe('DmxPublisher strobe-channel runtime', () => {
   })
 
   it('clears the peak when the strobe cue ends and lets RGB flow unchanged', () => {
-    ctx.strobe.setActive('medium')
+    ctx.strobe.setActive('medium', 'net')
     ctx.publisher.publish(new Map([['light-1', makeBrightRgbio()]])) // peak = {255,64,0,255}
     ctx.publisher.publish(new Map([['light-1', makeBlackRgbio()]])) // holds peak
 
-    ctx.strobe.setActive(null)
+    ctx.strobe.setActive(null, 'net')
     ctx.publisher.publish(new Map([['light-1', makeBlackRgbio()]]))
     const buf = ctx.lastBuffer()
     expect(buf[2]).toBe(0)
@@ -240,7 +240,7 @@ describe('DmxPublisher strobe-channel runtime', () => {
   })
 
   it('writes the cue frame as-is when the very first strobe frame is dark (pre-peak)', () => {
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
     ctx.publisher.publish(new Map<string, RGBIO>([['light-1', makeBlackRgbio()]]))
     const buf = ctx.lastBuffer()
     expect(buf[1]).toBe(0)
@@ -266,7 +266,7 @@ describe('DmxPublisher strobe-channel runtime', () => {
       },
     ])
 
-    strobe.setActive('fastest')
+    strobe.setActive('fastest', 'net')
     publisher.publish(new Map<string, RGBIO>([['light-1', makeBrightRgbio()]]))
     const [, buf] = sender.send.mock.calls[0]!
     expect((buf as Record<number, number>)[5]).toBe(255) // DEFAULT_STROBE_CHANNEL_VALUES.fastest
@@ -319,7 +319,7 @@ describe('DmxPublisher dedicated STROBE fixtures', () => {
       },
     }
     publisher.updateActiveRigs([strobeRig])
-    strobe.setActive('fast')
+    strobe.setActive('fast', 'net')
 
     publisher.publish(new Map<string, RGBIO>([['pure-strobe-1', makeBrightRgbio()]]))
     // Calls are (slotId, buffer); buffer is at index [1].
@@ -338,7 +338,7 @@ describe('DmxPublisher dedicated STROBE fixtures', () => {
 describe('DmxPublisher strobe-channel guards', () => {
   it('lights without a strobe channel keep flashing RGB (no latch override applied)', () => {
     const ctx = setupScenario({ withStrobeChannel: false, isStrobeEnabled: true })
-    ctx.strobe.setActive('medium')
+    ctx.strobe.setActive('medium', 'net')
 
     ctx.publisher.publish(new Map<string, RGBIO>([['light-1', makeBrightRgbio()]]))
     ctx.publisher.publish(new Map<string, RGBIO>([['light-1', makeBlackRgbio()]]))
@@ -352,7 +352,7 @@ describe('DmxPublisher strobe-channel guards', () => {
 
   it('lights with strobeChannel but isStrobeEnabled false do not engage the strobe-channel path', () => {
     const ctx = setupScenario({ withStrobeChannel: true, isStrobeEnabled: false })
-    ctx.strobe.setActive('fast')
+    ctx.strobe.setActive('fast', 'net')
 
     ctx.publisher.publish(new Map<string, RGBIO>([['light-1', makeBrightRgbio()]]))
     ctx.publisher.publish(new Map<string, RGBIO>([['light-1', makeBlackRgbio()]]))

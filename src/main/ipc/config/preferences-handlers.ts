@@ -5,29 +5,30 @@ import { ipcError } from '../ipcResult'
 import { CONFIG } from '../../../shared/ipcChannels'
 import { validatePreferencesPayload } from '../inputValidation'
 import { createLogger } from '../../../shared/logger'
+import { handleInvoke } from '../handleInvoke'
 const log = createLogger('preferences-handlers')
 
 export function registerPreferencesDiagnosticsConfigHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
 ): void {
-  ipcMain.handle(CONFIG.GET_APP_VERSION, () => {
+  handleInvoke(ipcMain, CONFIG.GET_APP_VERSION, log, () => {
     return app.getVersion()
   })
 
-  ipcMain.handle(CONFIG.GET_VALIDATION_ERRORS, () => {
+  handleInvoke(ipcMain, CONFIG.GET_VALIDATION_ERRORS, log, () => {
     return controllerManager.flushValidationErrors()
   })
 
-  ipcMain.handle(CONFIG.GET_CORRUPT_RECOVERY_EVENTS, () => {
+  handleInvoke(ipcMain, CONFIG.GET_CORRUPT_RECOVERY_EVENTS, log, () => {
     return { files: controllerManager.getConfig().drainConfigCorruptRecovery() }
   })
 
-  ipcMain.handle(CONFIG.GET_PREFS, async () => {
+  handleInvoke(ipcMain, CONFIG.GET_PREFS, log, async () => {
     return controllerManager.getConfig().getAllPreferences()
   })
 
-  ipcMain.handle(CONFIG.SAVE_PREFS, async (_, updates: unknown) => {
+  handleInvoke(ipcMain, CONFIG.SAVE_PREFS, log, async (_, updates: unknown) => {
     try {
       const validation = validatePreferencesPayload(updates)
       if (!validation.ok) {

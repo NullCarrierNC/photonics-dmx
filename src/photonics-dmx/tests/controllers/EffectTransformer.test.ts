@@ -87,8 +87,8 @@ describe('EffectTransformer', () => {
 
       // Verify the result
       expect(result.size).toBe(2) // Two layers: 1 and 2
-      expect(result.has(1)).toBeTruthy()
-      expect(result.has(2)).toBeTruthy()
+      expect(result.has(1)).toBe(true)
+      expect(result.has(2)).toBe(true)
 
       // Layer 1 should have two transitions
       const layer1Transitions = result.get(1)
@@ -142,7 +142,7 @@ describe('EffectTransformer', () => {
       const result = transformer.groupTransitionsByLayer(transitions)
 
       expect(result.size).toBe(1) // One layer: 1
-      expect(result.has(1)).toBeTruthy()
+      expect(result.has(1)).toBe(true)
 
       // Layer 1 should have two transitions
       const layer1Transitions = result.get(1)

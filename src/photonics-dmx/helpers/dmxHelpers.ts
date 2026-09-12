@@ -10,6 +10,33 @@ import {
 } from '../types'
 
 /**
+ * A universe buffer holding only addresses that exist, at values a fixture can take.
+ *
+ * Callers hand these in from outside the engine, so channels outside 1-512 are dropped rather than
+ * written and every value is rounded into 0-255.
+ */
+export function normaliseUniverseBuffer(buffer: Record<number, number>): Record<number, number> {
+  const normalised: Record<number, number> = {}
+  for (const [key, value] of Object.entries(buffer)) {
+    const channel = Number(key)
+    if (!Number.isFinite(channel) || channel < 1 || channel > 512) {
+      continue
+    }
+    normalised[channel] = Math.max(0, Math.min(255, Math.round(value)))
+  }
+  return normalised
+}
+
+/** A fresh universe buffer with all 512 channels at zero, for blacking a universe out. */
+export function blackoutUniverse(): Record<number, number> {
+  const buffer: Record<number, number> = {}
+  for (let channel = 1; channel <= 512; channel++) {
+    buffer[channel] = 0
+  }
+  return buffer
+}
+
+/**
  * Converts a normalised percentage (0–100) to a DMX value (0–255) within the fixture's
  * configured min/max range. 0% = min, 100% = max.
  */
@@ -77,14 +104,6 @@ export function mirrorDmxForMovingHeadInvert(
  */
 export function logicalPanDir(c: { panDirectionCW: boolean; invertPan: boolean }): 1 | -1 {
   return c.panDirectionCW !== c.invertPan ? 1 : -1
-}
-
-/**
- * Logical tilt direction for stage-relative math.
- * Up-firing fixtures use motor-positive tilt as logical-positive; down-firing fixtures invert it.
- */
-export function logicalTiltDir(c: { invertTilt: boolean }): 1 | -1 {
-  return c.invertTilt ? -1 : 1
 }
 
 /**

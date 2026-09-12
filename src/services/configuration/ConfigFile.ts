@@ -63,6 +63,10 @@ export class ConfigFile<T> {
   // Serializes saves so only one writeFile+rename is in flight per file at a time,
   // avoiding concurrent renames racing the same destination.
   private saveChain: Promise<void> = Promise.resolve()
+  // Serializes whole read-modify-write turns. `saveChain` only orders the writes, which is not
+  // enough on its own: `update` publishes `this.data` after its write resolves, so two callers
+  // that each read before awaiting both start from the pre-write value and the later write wins.
+  private mutateChain: Promise<unknown> = Promise.resolve()
 
   constructor(
     filename: string,
@@ -158,7 +162,18 @@ export class ConfigFile<T> {
         `[Photonics Config] Not writing default config to ${this.filePath}: could not move corrupt file aside; using in-memory defaults so the app can start.`,
       )
     }
-    return this.defaultData
+    return this.freshDefaults()
+  }
+
+  /**
+   * A private copy of the shipped defaults.
+   *
+   * `defaultData` is a module singleton, and what comes back from here becomes `this.data` and is
+   * handed to every reader, so returning it directly would let one in-place edit anywhere change
+   * the defaults for the rest of the process, and the next recovery would write that to disk.
+   */
+  private freshDefaults(): T {
+    return structuredClone(this.defaultData)
   }
 
   /**
@@ -170,7 +185,7 @@ export class ConfigFile<T> {
       this.save(this.defaultData).catch((err) =>
         log.error(`[Photonics Config] Failed to save default config to ${this.filePath}:`, err),
       )
-      return this.defaultData
+      return this.freshDefaults()
     }
 
     let fileContent: string
@@ -394,6 +409,32 @@ export class ConfigFile<T> {
       this.data = previous
       throw err
     }
+  }
+
+  /**
+   * Applies `change` to the current data and saves the result as one serialized turn, so a
+   * concurrent mutation cannot read the same starting value and overwrite this one. Use this
+   * instead of `get()` followed by `update()` for anything carrying user edits.
+   *
+   * `change` runs against the freshest data and must return the new value rather than mutating
+   * its argument. Returning the input unchanged skips the write.
+   */
+  async mutate(change: (current: T) => T): Promise<void> {
+    const turn = async (): Promise<void> => {
+      const next = change(this.data)
+      if (next === this.data) {
+        return
+      }
+      await this.update(next)
+    }
+    // Both arms run the turn: a rejected predecessor must not skip this one.
+    const run = this.mutateChain.then(turn, turn)
+    // A failed turn must not poison the ones behind it.
+    this.mutateChain = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
   }
 
   /**

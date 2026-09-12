@@ -3,6 +3,7 @@
  * the engine-blocking delay, and the debugger tap.
  */
 
+import { beatDurationMs } from '../../../../helpers/tempo'
 import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import {
   TEMPO_DEFAULTS,
@@ -142,10 +143,10 @@ export const tempoHandler: LogicHandler<'tempo'> = (logicNode, ctx) => {
   }
 
   const bpm = Number(extractCueDataValue('bpm', context.cueData, cueId, mode))
-  const beatMsRaw =
-    bpm > 0
-      ? Math.round(60000 / bpm)
-      : numOr(logicNode.fallbackBeatMs, TEMPO_DEFAULTS.fallbackBeatMs)
+  const beatMsRaw = beatDurationMs(
+    bpm,
+    numOr(logicNode.fallbackBeatMs, TEMPO_DEFAULTS.fallbackBeatMs),
+  )
   const beatMs = Math.min(
     Math.max(beatMsRaw, numOr(logicNode.minBeatMs, TEMPO_DEFAULTS.minBeatMs)),
     numOr(logicNode.maxBeatMs, TEMPO_DEFAULTS.maxBeatMs),

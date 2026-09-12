@@ -106,10 +106,7 @@ license.data
 public.key 
 
 docs/
-# Everything in scripts/ is local-only except the shared build tooling named below. The
-# directory's contents are excluded rather than the directory itself, so these can be re-included.
-scripts/*
-!scripts/any-budget.mjs
-!scripts/node-graph-prettier.mjs
-!scripts/size-budget.mjs
-!scripts/sizeBudgetCore.cjs
+# Local-only: cue and asset generators, many of them the only copy. Nothing in here is committed
+# and nothing committed may depend on it. Tooling that package.json, a hook or a workflow runs lives
+# in tools/, which is tracked in full.
+scripts/

@@ -82,6 +82,21 @@ describe('ConfigurationManager', () => {
       await configManager.updatePreferences({ effectDebounce: 50, complex: false })
       expect(fsPromises.writeFile).toHaveBeenCalled()
     })
+
+    test('holds a motion selection mode to the three a motion domain can take', async () => {
+      // withinSong is legal in the schema but only means something for lighting, so reading a
+      // motion domain straight through would answer outside the union its channel declares.
+      await configManager.updateCueDomain('rb3Motion', { selectionMode: 'withinSong' })
+      expect(configManager.getRb3MotionGroupSelectionMode()).toBe('perCueChange')
+
+      await configManager.updateCueDomain('yargMotion', { selectionMode: 'withinSong' })
+      expect(configManager.getMotionGroupSelectionMode()).toBe('perCueChange')
+    })
+
+    test('keeps a motion selection mode the domain does take', async () => {
+      await configManager.updateCueDomain('rb3Motion', { selectionMode: 'oncePerSong' })
+      expect(configManager.getRb3MotionGroupSelectionMode()).toBe('oncePerSong')
+    })
   })
 
   describe('User Lights', () => {
@@ -651,6 +666,41 @@ describe('ConfigurationManager', () => {
       const cm = new ConfigurationManager()
       const changed = await cm.syncRigsWithUserLights()
       expect(changed).toBe(false)
+    })
+  })
+
+  describe('overlapping preference writers', () => {
+    test('two audio writers both survive', async () => {
+      await Promise.all([
+        configManager.updateAudioConfig({ sensitivity: 3 }),
+        configManager.updateAudioConfig({ noiseFloor: 40 }),
+      ])
+
+      const stored = configManager.getPreference('audioConfig')
+      expect(stored?.sensitivity).toBe(3)
+      expect(stored?.noiseFloor).toBe(40)
+    })
+
+    test('two game mode writers both survive', async () => {
+      await Promise.all([
+        configManager.updateAudioGameModeConfig({ enabled: true }),
+        configManager.updateAudioGameModeConfig({ cueDurationMax: 42 }),
+      ])
+
+      const stored = configManager.getAudioGameModeConfig()
+      expect(stored.enabled).toBe(true)
+      expect(stored.cueDurationMax).toBe(42)
+    })
+
+    test('a hold time written beside a domain change keeps both', async () => {
+      await Promise.all([
+        configManager.setMotionCueMinimumHoldMs(7000),
+        configManager.updateCueDomain('yargMotion', { probabilityPercent: 25 }),
+      ])
+
+      const domains = configManager.getAllPreferences().cueDomains
+      expect(domains.yargMotion.minimumHoldMs).toBe(7000)
+      expect(domains.yargMotion.probabilityPercent).toBe(25)
     })
   })
 })

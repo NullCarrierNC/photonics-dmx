@@ -318,17 +318,23 @@ export class SenderManager {
    * @param slotId Which wire-sender slot to send to.
    * @param universeBuffer Complete DMX universe buffer (channel -> value mapping).
    */
-  public send(slotId: WireSenderId, universeBuffer: Record<number, number>): void {
+  public send(slotId: WireSenderId, universeBuffer: Record<number, number>): Promise<boolean> {
     const sender = this.enabledSenders.get(slotId)
     if (!sender) {
-      return
+      return Promise.resolve(false)
     }
-    Promise.resolve(sender.send(universeBuffer)).catch((error) => {
-      log.error(`Error sending data with ${sender.constructor.name}:`, error)
-      if (error instanceof SenderError && error.shouldDisable) {
-        this.handleSenderError(error)
-      }
-    })
+    // A sender answers whether the frame reached the wire, and reports the reason separately
+    // through its error emitter. The rejection arm is for a sender that throws outright.
+    return Promise.resolve(sender.send(universeBuffer)).then(
+      (delivered) => delivered,
+      (error) => {
+        log.error(`Error sending data with ${sender.constructor.name}:`, error)
+        if (error instanceof SenderError && error.shouldDisable) {
+          this.handleSenderError(error)
+        }
+        return false
+      },
+    )
   }
 
   /**

@@ -1,22 +1,39 @@
 # Photonics DMX Tests
 
-This directory contains the core photonics-dmx test suite. Additional tests live in `src/main/tests/` (IPC handlers)
-and `src/services/configuration/tests/` (ConfigurationManager, ConfigFile).
+This directory contains the core photonics-dmx test suite. Tests also live alongside the code they
+cover elsewhere in the tree: `src/main/tests/` (controllers, IPC handlers, tooling),
+`src/services/configuration/tests/` (ConfigurationManager, ConfigFile, migrations),
+`src/photonics-dmx/helpers/` (colocated helper tests), `src/preload/`, and throughout
+`src/renderer/`.
+
+`jest.config.js` takes `src` as its root and picks up any `.test.ts`/`.tsx` or `.spec` file under
+it, so a new test needs no registration. `jest.setup.ts` in this directory runs before each suite.
+Coverage is collected over all of `src/**`, tested or not, so the headline percentage reflects the
+whole source rather than only the files a test happens to import.
 
 ## Test Layout
 
-| Location       | Scope                                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------------ |
-| `controllers/` | Sequencer, EffectManager, LayerManager, LightTransitionController, TransitionEngine, Clock, etc. |
-| `cues/`        | Cue registry, lifecycle, node compiler/runtime, validation                                       |
-| `senders/`     | IpcSender, ArtNetSender, SacnSender                                                              |
-| `listeners/`   | YargNetworkListener                                                                              |
-| `processors/`  | ProcessorManager                                                                                 |
-| `integration/` | End-to-end sequencer behavior and lighting integration                                           |
-| `helpers/`     | sequencerHarness (createSequencerHarness, ManualTestClock), dmxHelpers                           |
+| Location       | Scope                                                                                                                                                |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `controllers/` | Sequencer, EffectManager, LayerManager, LightTransitionController, TransitionEngine, Clock, DmxPublisher, ChainFanout, RigChain, blending and motion |
+| `cues/`        | Cue registries and selection, cue lifecycle, and the node system under `node/` (compiler, loader, runtime, utils)                                    |
+| `cueHandlers/` | CueHandler, CompositeCueRuntime, Rb3MenuCueHandler                                                                                                   |
+| `effects/`     | The programmatic effect builders in `effects/`                                                                                                       |
+| `audio/`       | Beat detection, chroma and mel band analysis, key detection, spectral features                                                                       |
+| `senders/`     | IpcSender, ArtNetSender, SacnSender, EnttecProSender, OpenDmxSender, usleep                                                                          |
+| `listeners/`   | YARG and RB3E network listeners, and both packet parsers                                                                                             |
+| `processors/`  | ProcessorManager, the RB3 direct, cue and game modes, and the audio processor                                                                        |
+| `constants/`   | Cue data property metadata                                                                                                                           |
+| `integration/` | End-to-end sequencer behaviour, RB3 lighting, venue post-processing, motion                                                                          |
+| `sim/`         | The headless cue simulator and its golden comparisons                                                                                                |
+| `goldens/`     | Golden cue cases and their fixture JSON                                                                                                              |
+| `helpers/`     | Shared harnesses and fixtures                                                                                                                        |
 
-The `sequencerHarness.ts` helper provides an integration test harness for spinning up a Sequencer with mock
-components. Use it when testing cue dispatch, effect lifecycle, or layer behavior.
+`helpers/sequencerHarness.ts` provides an integration test harness for spinning up a Sequencer with
+mock components (`createSequencerHarness`, `ManualTestClock`). Use it when testing cue dispatch,
+effect lifecycle, or layer behaviour. Alongside it, `testFixtures.ts` and `multiRigFixtures.ts` build
+light rigs, `effectRegistry.ts` seeds a registry, and `rb3CueFile.ts` and `yargPacket.ts` build
+inputs for the two net domains.
 
 ## Running Tests
 
@@ -29,127 +46,39 @@ npm run test:watch
 
 # With coverage
 npm run test:coverage
+
+# Headless cue simulation
+npm run sim
 ```
 
----
+## Colour Blending
 
-# Color Blending Tests
+Layer blending is covered at two levels.
 
-This section documents the color blending tests that validate layer blending behavior.
+`controllers/lightBlending.test.ts` drives the maths directly: `blendWithOpacity` for each blend
+mode, `interpolate` and `interpolateFloat`, and the easing curves. Anything about how two layers
+combine is provable here without running a sequencer.
 
-## Test Files
+`controllers/ColorBlendingAnalysis.ts`, with its accompanying test, walks a blend step by step and
+prints the calculation. Reach for it when a result is surprising and the question is which layer or
+which opacity produced it.
 
-### ReplaceBlendModeFade.test.ts
+Worked examples of each blend mode, with the arithmetic, are in the
+[core README](../README.md#blend-mode-examples).
 
-Tests the interaction of `blendMode: 'replace'` with fading effects:
+### Blend Modes
 
-- Validates that higher layers properly reveal lower layers during fades
-- Ensures no additive blending occurs when using replace mode
-- Tests cross-fading behavior between colors
-
-### ColorBlendingAnalysis.ts
-
-A detailed analysis tool that:
-
-- Calculates expected blending results using opacity and blend modes
-- Shows step-by-step blending calculations
-- Identifies potential issues with opacity values
-- Helps diagnose why blending might not work as expected
-
-## Running the Tests
-
-### Quick Analysis (Recommended First)
-
-Run just the analysis to see what should happen:
-
-```bash
-npm run test:color-analysis
-```
-
-This will show you:
-
-- Expected blending calculations
-- Opacity analysis
-- Potential issues
-- Step-by-step blending process
-
-### Full Test Suite
-
-Run the complete test suite (see "Running Tests" above):
-
-```bash
-npm test
-```
-
-This will:
-
-- Run all tests including color blending validation
-- Test opacity-based blending behavior
-- Validate blend mode interactions
-- Ensure proper layer behavior
-
-## What to Look For
-
-### Expected Result
-
-Blue (R:0, G:0, B:100) + Green (R:0, G:100, B:0) with `blendMode: 'add'` should = Cyan (R:0, G:100, B:100)
-
-### Key Behaviors to Validate
-
-1. **Opacity Values**: 0.0 = transparent, 1.0 = fully opaque
-2. **Layer Order**: Higher layers should blend on top of lower layers
-3. **Blend Modes**: Each mode has distinct blending behavior
-
-### Common Test Scenarios
-
-- `blendMode: 'replace'` with fading - should reveal underlying colors
-- `blendMode: 'add'` with partial opacity - should blend colors naturally
-- Layer transitions - should respect opacity and blend mode settings
-
-## Debugging Steps
-
-1. **Run the analysis first** to see what should happen
-2. **Check opacity values** - they control blending contribution
-3. **Verify blend modes** - ensure correct blending algorithm is used
-4. **Examine final states** - compare actual vs expected results
-5. **Check individual layers** - verify each layer has correct color values
-
-## Understanding the Blending
-
-The system uses an opacity-based blending approach:
-
-### Opacity-Based System
-
-- **opacity**: 0.0 to 1.0, controls contribution strength
-- **blendMode**: How colors interact ('replace', 'add', 'multiply', 'overlay', 'mix' = alpha crossfade)
-- **Intuitive**: 0.5 opacity = 50% contribution
-- **Predictable**: Colors blend naturally based on blend mode
-
-## Blend Modes
-
-- **replace**: Overwrites lower layer colors (default)
-- **add**: Adds to lower layer colors (good for additive blending)
-- **multiply**: Multiplies with lower layer colors (good for darkening)
-- **overlay**: Combines multiply and screen blending (good for contrast)
+- **replace**: Overwrites lower layer colours (default). Opacity scales the replacing colour
+- **add**: Adds to lower layer colours (good for additive blending)
 - **mix**: Alpha-crossfades between the lower layers and this layer by opacity
 
-## For Proper Additive Blending (Blue + Green = Cyan)
+An unrecognised mode falls through to `replace`.
 
-```typescript
-blue.opacity = 1.0 // Full contribution
-blue.blendMode = 'add' // Additive blending
+### Key Behaviours to Validate
 
-green.opacity = 1.0 // Full contribution
-green.blendMode = 'add' // Additive blending
-```
+1. **Opacity values**: 0.0 is transparent, 1.0 is fully opaque
+2. **Layer order**: Higher layers blend on top of lower layers
+3. **Blend modes**: Each mode has distinct blending behaviour
 
-## Test Coverage
-
-The test suite covers:
-
-- Basic opacity blending behavior
-- Blend mode interactions
-- Layer order validation
-- Fade effect behavior
-- Cross-fading scenarios
-- Edge cases and error conditions
+For additive blending, blue (R:0, G:0, B:100) plus green (R:0, G:100, B:0) with `blendMode: 'add'`
+and full opacity on both gives cyan (R:0, G:100, B:100).

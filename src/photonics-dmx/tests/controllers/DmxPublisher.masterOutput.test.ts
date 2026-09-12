@@ -228,7 +228,7 @@ describe('DmxPublisher master dimmer', () => {
       master,
       strobeManager,
     )
-    strobeManager.setActive('fast')
+    strobeManager.setActive('fast', 'net')
 
     publisher.publish(
       new Map<string, RGBIO>([['l1', rgbio({ red: 255, green: 255, blue: 255, intensity: 255 })]]),
@@ -255,7 +255,7 @@ describe('DmxPublisher master dimmer', () => {
       master,
       strobeManager,
     )
-    strobeManager.setActive('medium')
+    strobeManager.setActive('medium', 'net')
 
     publisher.publish(new Map<string, RGBIO>([['l1', rgbio({ red: 200, intensity: 200 })]]))
     // Off-phase of the flash: the latch replays the peak, which is then dimmed by the same 50%.
@@ -377,7 +377,7 @@ describe('DmxPublisher strobe output gate', () => {
     master.setStrobeOutputEnabled(false)
     const strobeManager = new StrobeStateManager()
     const { publisher, wire } = setup([STROBE_LIGHT], master, strobeManager)
-    strobeManager.setActive('fast')
+    strobeManager.setActive('fast', 'net')
 
     publisher.publish(
       new Map<string, RGBIO>([
@@ -398,7 +398,7 @@ describe('DmxPublisher strobe output gate', () => {
   it('passes the strobe through untouched while the gate is open', () => {
     const strobeManager = new StrobeStateManager()
     const { publisher, wire } = setup([STROBE_LIGHT], new MasterOutputState(), strobeManager)
-    strobeManager.setActive('fast')
+    strobeManager.setActive('fast', 'net')
 
     publisher.publish(
       new Map<string, RGBIO>([
@@ -419,7 +419,7 @@ describe('DmxPublisher strobe output gate', () => {
       master,
       strobeManager,
     )
-    strobeManager.setActive('fast')
+    strobeManager.setActive('fast', 'net')
 
     publisher.publish(
       new Map<string, RGBIO>([
@@ -457,7 +457,7 @@ describe('DmxPublisher strobe output gate', () => {
       master,
       strobeManager,
     )
-    strobeManager.setActive('medium')
+    strobeManager.setActive('medium', 'net')
 
     publisher.publish(
       new Map<string, RGBIO>([

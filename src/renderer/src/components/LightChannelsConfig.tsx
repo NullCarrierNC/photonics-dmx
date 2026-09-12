@@ -13,15 +13,16 @@ import {
   normalizeFixtureConfig,
   LightingConfiguration,
 } from '../../../photonics-dmx/types'
+import { DraftNumberField } from './controls/DraftField'
 import { LightIcon } from './LightIcon'
 import { castToChannelType } from '../../../photonics-dmx/helpers/dmxHelpers'
 import {
   deriveBaseChannelsForMaster,
   deriveExtraChannelsForMaster,
   maxMasterDimmerForTemplate,
-  templateChannelSpan,
 } from '../../../photonics-dmx/helpers/rigTemplateSync'
 import { extraChannelDisplayLabel, sortBaseChannelEntries } from './lightChannelDisplay'
+import { resolveMasterDimmer } from './lightChannelMaster'
 import { BsArrowsMove, BsLightningFill } from 'react-icons/bs'
 import MovingHeadCalibrationWizard from './MovingHeadCalibrationWizard'
 import { createLogger } from '../../../shared/logger'
@@ -164,70 +165,47 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
    * Handles changes to the main Master Dimmer channel.
    */
   const handleMasterDimmerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (light && localChannels) {
-      let newMasterValue = Number(e.target.value)
-      // DMX channels are 1-based; reject values less than 1
-      if (!Number.isFinite(newMasterValue) || newMasterValue < 1) {
-        newMasterValue = 1
-      }
-      // Find the fixture template to get the original offsets
-      const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId)
-      if (!fixtureTemplate) {
-        log.warn(`fixtureId (${light.fixtureId}) not found in myLights.`)
-        return
-      }
-
-      // Cap so the whole fixture fits in the universe and the rig stays saveable. The cap is
-      // announced rather than applied silently: the user typed this number, so a value that comes
-      // back different needs a reason attached.
-      const maxMaster = maxMasterDimmerForTemplate(fixtureTemplate)
-      if (newMasterValue > maxMaster) {
-        newMasterValue = maxMaster
-        setMasterDimmerNotice({
-          lightId: light.id,
-          message: `Capped at ${maxMaster} so all ${templateChannelSpan(fixtureTemplate) + 1} channels fit within the ${DMX_CHANNEL_MAX}-channel universe.`,
-        })
-      } else {
-        setMasterDimmerNotice(null)
-      }
-
-      const templateChannels = fixtureTemplate.channels
-      const updatedChannels = deriveBaseChannelsForMaster(fixtureTemplate, newMasterValue)
-
-      const castChannels = castToChannelType(fixtureTemplate.fixture, updatedChannels)
-      setLocalChannels({ ...castChannels })
-
-      const extras = deriveExtraChannelsForMaster(
-        fixtureTemplate.extraChannels,
-        templateChannels.masterDimmer,
-        newMasterValue,
-      )
-      setLocalExtraChannels(extras ?? null)
-
-      const updatedLight: DmxLight = {
-        ...light,
-        channels: { ...castChannels },
-      }
-      // Set/delete (not omit-on-spread): the spread copies the rig light's existing extraChannels,
-      // so we must explicitly drop them when the template now has none, or a stale key persists.
-      if (extras) updatedLight.extraChannels = extras
-      else delete updatedLight.extraChannels
-      onChange(updatedLight)
+    if (!light || !localChannels) {
+      return
     }
+    const fixtureTemplate = myLights.find((fixture) => fixture.id === light.fixtureId)
+    if (!fixtureTemplate) {
+      log.warn(`fixtureId (${light.fixtureId}) not found in myLights.`)
+      return
+    }
+
+    const resolved = resolveMasterDimmer(fixtureTemplate, Number(e.target.value))
+    setMasterDimmerNotice(
+      resolved.cappedMessage ? { lightId: light.id, message: resolved.cappedMessage } : null,
+    )
+    setLocalChannels({ ...resolved.channels })
+    setLocalExtraChannels(resolved.extraChannels)
+
+    const updatedLight: DmxLight = { ...light, channels: { ...resolved.channels } }
+    // Set/delete (not omit-on-spread): the spread copies the rig light's existing extraChannels,
+    // so we must explicitly drop them when the template now has none, or a stale key persists.
+    if (resolved.extraChannels) updatedLight.extraChannels = resolved.extraChannels
+    else delete updatedLight.extraChannels
+    onChange(updatedLight)
   }
 
   /**
    * Handles updates for any property in the config.
-   * For number fields, the value is parsed to a number.
-   * For boolean fields (invertPan / invertTilt / panDirectionCW), the value is taken from the checkbox.
+   *
+   * Number fields arrive already held inside their bounds, and only once the user has finished
+   * with them, so an entry part way to a legal value is never written. Boolean fields
+   * (invertPan / invertTilt / panDirectionCW) come from a checkbox.
    */
-  const handleConfigChange = (key: keyof FixtureConfig, value: string | boolean) => {
+  const handleConfigChange = (key: keyof FixtureConfig, value: number | boolean) => {
     if (light && localConfig) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- config value can be number or string
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- config value can be number or boolean
       let updatedValue: any = value
       if (key !== 'invertPan' && key !== 'invertTilt' && key !== 'panDirectionCW') {
         const { min, max } = fixtureConfigFieldBounds(key, localConfig)
-        updatedValue = Math.max(min, Math.min(max, Math.round(Number(value))))
+        const numeric = Number(value)
+        updatedValue = Number.isFinite(numeric)
+          ? Math.max(min, Math.min(max, Math.round(numeric)))
+          : localConfig[key]
       }
       const updatedConfig = { ...localConfig, [key]: updatedValue }
       setLocalConfig(updatedConfig)
@@ -496,14 +474,12 @@ const LightChannelsConfig: React.FC<LightChannelsConfigProps> = ({
                       className="ml-2"
                     />
                   ) : (
-                    <input
-                      type="number"
+                    <DraftNumberField
+                      aria-label={key}
                       min={fixtureConfigFieldBounds(key as keyof FixtureConfig, localConfig).min}
                       max={fixtureConfigFieldBounds(key as keyof FixtureConfig, localConfig).max}
                       value={value as number}
-                      onChange={(e) =>
-                        handleConfigChange(key as keyof FixtureConfig, e.target.value)
-                      }
+                      onCommit={(next) => handleConfigChange(key as keyof FixtureConfig, next)}
                       className="w-16 p-1 border border-gray-300 dark:border-gray-700 rounded text-black dark:text-white dark:bg-gray-700 text-right"
                     />
                   )}

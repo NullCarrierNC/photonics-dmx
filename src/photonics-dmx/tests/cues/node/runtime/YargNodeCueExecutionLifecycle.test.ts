@@ -12,17 +12,19 @@ import type { NodeRuntimeCallbacks } from '../../../../cues/node/runtime/executi
 import { DmxLightManager } from '../../../../controllers/DmxLightManager'
 import { createMockLightingConfig } from '../../../helpers/testFixtures'
 import type { ILightingController } from '../../../../controllers/sequencer/interfaces'
+import { fakeLightingController } from '../../../helpers/fakeLightingController'
 
 type RecordedCall = { method: 'addEffect' | 'setEffect'; name: string }
 
 function createRecordingSequencer(): { sequencer: ILightingController; recorded: RecordedCall[] } {
   const recorded: RecordedCall[] = []
-  const sequencer = {
+  const sequencer = fakeLightingController({
     addEffect: (name: string) => {
       recorded.push({ method: 'addEffect', name })
     },
     setEffect: (name: string) => {
       recorded.push({ method: 'setEffect', name })
+      return Promise.resolve()
     },
     addEffectUnblockedName: (name: string) => {
       recorded.push({ method: 'addEffect', name })
@@ -32,31 +34,42 @@ function createRecordingSequencer(): { sequencer: ILightingController; recorded:
       recorded.push({ method: 'setEffect', name })
       return true
     },
-    removeEffect: () => {},
-    addEffectWithCallback: (name: string, _effect: unknown, callback: () => void) => {
+    addEffectWithCallback: (
+      name: string,
+      _effect: unknown,
+      callback: (cancelled: boolean) => void,
+    ) => {
       recorded.push({ method: 'addEffect', name })
-      callback()
+      callback(false)
     },
-    setEffectWithCallback: (name: string, _effect: unknown, callback: () => void) => {
+    setEffectWithCallback: (
+      name: string,
+      _effect: unknown,
+      callback: (cancelled: boolean) => void,
+    ) => {
       recorded.push({ method: 'setEffect', name })
-      callback()
+      callback(false)
     },
-    addEffectUnblockedNameWithCallback: (name: string, _effect: unknown, callback: () => void) => {
+    addEffectUnblockedNameWithCallback: (
+      name: string,
+      _effect: unknown,
+      callback: (cancelled: boolean) => void,
+    ) => {
       recorded.push({ method: 'addEffect', name })
-      callback()
+      callback(false)
+      return true
     },
-    setEffectUnblockedNameWithCallback: (name: string, _effect: unknown, callback: () => void) => {
+    setEffectUnblockedNameWithCallback: (
+      name: string,
+      _effect: unknown,
+      callback: (cancelled: boolean) => void,
+    ) => {
       recorded.push({ method: 'setEffect', name })
-      callback()
+      callback(false)
+      return true
     },
-    removeEffectCallback: () => {},
-    blackout: () => Promise.resolve(),
-    onBeat: () => {},
-    onMeasure: () => {},
-    onKeyframe: () => {},
-    removeEffectByLayer: () => {},
-  }
-  return { sequencer: sequencer as unknown as ILightingController, recorded }
+  })
+  return { sequencer: sequencer, recorded }
 }
 
 function createSetColorAction(duration: number): ActionNode {

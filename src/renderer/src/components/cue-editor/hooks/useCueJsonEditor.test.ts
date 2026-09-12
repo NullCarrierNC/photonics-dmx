@@ -12,7 +12,7 @@ jest.mock('../lib/cueTransforms', () => ({
   updateEffectDocumentFromFlow: (...args: unknown[]) => updateEffectDocumentFromFlow(...args),
 }))
 
-jest.mock('../lib/graphPrettier', () => ({
+jest.mock('../lib/graphLayout', () => ({
   layoutGraph: (...args: unknown[]) => layoutGraph(...args),
 }))
 

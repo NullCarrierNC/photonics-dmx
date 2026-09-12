@@ -14,7 +14,6 @@ import {
   senderSacnEnabledAtom,
   senderArtNetEnabledAtom,
   senderEnttecProEnabledAtom,
-  senderIpcEnabledAtom,
   LightingPreferences,
   senderOpenDmxEnabledAtom,
   openDmxComPortAtom,
@@ -41,9 +40,9 @@ import { ConfirmModalHost } from './components/ConfirmModalHost'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useDarkMode } from './DarkModeProvider'
 import type { CueStateUpdatePayload, NodeCueRuntimeErrorPayload } from '../../shared/ipcTypes'
+import { persistPrefs } from './ipc/persistPrefs'
 import {
   setAudioEnabled,
-  savePrefs,
   getLightLibrary,
   getMyLights,
   getLightLayout,
@@ -81,7 +80,6 @@ export const App = (): JSX.Element => {
   const setArtNetEnabled = useSetAtom(senderArtNetEnabledAtom)
   const setEnttecProEnabled = useSetAtom(senderEnttecProEnabledAtom)
   const setOpenDmxEnabled = useSetAtom(senderOpenDmxEnabledAtom)
-  const setIpcEnabled = useSetAtom(senderIpcEnabledAtom)
   const setYargEnabled = useSetAtom(yargListenerEnabledAtom)
   const setRb3Enabled = useSetAtom(rb3eListenerEnabledAtom)
   const [appVer, setAppVer] = useState('')
@@ -183,7 +181,7 @@ export const App = (): JSX.Element => {
           setOpenDmxEnabled(false)
           break
         case 'ipc':
-          setIpcEnabled(false)
+          // The preview sender carries no toggle in the UI, so the toast below is the whole report.
           break
         default:
           log.warn(`Unknown sender type in failure notification: ${data.sender}`)
@@ -197,14 +195,7 @@ export const App = (): JSX.Element => {
             : data.sender.toUpperCase()
       showToast(`Failed to start ${senderName} sender: ${data.error}`, 'error', 5000)
     },
-    [
-      setSacnEnabled,
-      setArtNetEnabled,
-      setEnttecProEnabled,
-      setOpenDmxEnabled,
-      setIpcEnabled,
-      showToast,
-    ],
+    [setSacnEnabled, setArtNetEnabled, setEnttecProEnabled, setOpenDmxEnabled, showToast],
   )
 
   // Handler for sender network errors (invalid destinations, etc.)
@@ -349,11 +340,9 @@ export const App = (): JSX.Element => {
   const handleToggleLeftMenu = async (): Promise<void> => {
     const newCollapsed = !isLeftMenuCollapsed
     setIsLeftMenuCollapsed(newCollapsed)
-    try {
-      await savePrefs({ leftMenuCollapsed: newCollapsed })
-    } catch (error) {
-      log.error('Failed to save left menu collapsed state:', error)
-    }
+    await persistPrefs({ leftMenuCollapsed: newCollapsed }, 'the menu state', (message) =>
+      showToast(message, 'error', 5000),
+    )
   }
 
   // Load light library effect

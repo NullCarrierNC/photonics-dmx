@@ -41,11 +41,6 @@ export interface ExecutionState {
 }
 
 /**
- * Effect completion callback.
- */
-export type EffectCompletionCallback = () => void
-
-/**
  * Optional runtime callbacks for debug/error emission. When provided,
  * the engine uses them in preference to {@link RuntimeBroadcaster}; when absent,
  * engines fall back to main-process emission.

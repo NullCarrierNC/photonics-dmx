@@ -1,3 +1,4 @@
+import { applyWaitUntil } from './waitUntil'
 import { Effect, EffectTransition, normalizeFixtureConfig, RGBIO, TrackedLight } from '../../types'
 import { IEffectTransformer, ILayerManager, LightEffectState } from './interfaces'
 import { LightTransitionController } from './LightTransitionController'
@@ -13,7 +14,7 @@ export interface EffectSchedulerDeps {
   lightTransitionController: LightTransitionController
   persistentRuns: PersistentRunRegistry
   /** Fire the completion callback held for this effect, once its last light finishes. */
-  fireCompletionCallback(name: string): void
+  fireCompletionCallback(name: string, cancelled?: boolean): void
 }
 
 /**
@@ -176,17 +177,11 @@ export class EffectScheduler {
           // frame so the LTC has a chance to blend this layer before it is torn down.
           lightEffect.lastEndState = color
           lightEffect.state = 'waitingUntil'
-          if (firstTransition.waitUntilCondition === 'delay') {
-            lightEffect.transitionStartTime = currentTime
-            const count = firstTransition.waitUntilConditionCount ?? 1
-            const delayMs = count > 0 ? count * firstTransition.waitUntilTime : 0
-            lightEffect.waitEndTime = currentTime + delayMs
-          } else if (firstTransition.waitUntilCondition === 'none') {
+          if (firstTransition.waitUntilCondition === 'none') {
             // Intentionally left as 'waitingUntil' — handleWaitingUntil will advance on the
             // next updateTransitions call, after the current frame's blend pass has run.
           } else {
-            lightEffect.transitionStartTime = currentTime
-            lightEffect.waitEndTime = currentTime
+            applyWaitUntil(lightEffect, firstTransition, currentTime)
           }
         }
       } else if (firstTransition.waitForCondition === 'delay') {
@@ -233,7 +228,7 @@ export class EffectScheduler {
               effectRunId,
             })
           } else {
-            this.removeEffectByLayer(layer, false)
+            this.removeEffectForLight(layer, lightId, false)
             this.layerManager.removeQueuedEffect(layer, lightId)
             this.startEffect(
               name,
@@ -315,17 +310,44 @@ export class EffectScheduler {
    * @param shouldRemoveTransitions Whether to remove transition (colour) data too
    */
   public removeEffectByLayer(layer: number, shouldRemoveTransitions: boolean): void {
-    // Get all active effects for this layer
+    const activeEffects = this.layerManager.getActiveEffects().get(layer)
+    if (!activeEffects) return
+    // Snapshotted, because the removal below starts queued successors back into this same map.
+    this.removeEffectsForLights(layer, Array.from(activeEffects.keys()), shouldRemoveTransitions)
+  }
+
+  /**
+   * Displaces the active effect on one light, leaving the rest of the layer running.
+   *
+   * What a submission needs when it takes a slot from a different effect: clearing the whole layer
+   * there would evict lights the same submission had already started, and fire their completion
+   * callbacks as cancelled while their transitions were still in flight.
+   */
+  public removeEffectForLight(
+    layer: number,
+    lightId: string,
+    shouldRemoveTransitions: boolean,
+  ): void {
+    this.removeEffectsForLights(layer, [lightId], shouldRemoveTransitions)
+  }
+
+  private removeEffectsForLights(
+    layer: number,
+    lightIds: string[],
+    shouldRemoveTransitions: boolean,
+  ): void {
     const activeEffects = this.layerManager.getActiveEffects().get(layer)
     if (!activeEffects) return
 
-    // Convert to array to avoid modifying the map while iterating
-    const lightIds = Array.from(activeEffects.keys())
     const lightsToCleanup: string[] = []
+    const evicted = new Set<string>()
 
     // Process each light's effect on this layer
     for (const lightId of lightIds) {
       const effectState = activeEffects.get(lightId)
+      if (effectState) {
+        evicted.add(effectState.name)
+      }
       if (effectState?.effectRunId) {
         this.persistentRuns.cancel(effectState.effectRunId)
       }
@@ -353,6 +375,14 @@ export class EffectScheduler {
     if (lightsToCleanup.length > 0) {
       for (const lightId of lightsToCleanup) {
         this.lightTransitionController.removeLightLayer(lightId, layer)
+      }
+    }
+
+    // An evicted effect never reaches onLightEffectComplete, so tell its waiter the run ended here.
+    // A queued run of the same name taking the slot means the effect is still going, so skip those.
+    for (const name of evicted) {
+      if (!this.isEffectRunningAnywhere(name)) {
+        this.deps.fireCompletionCallback(name, true)
       }
     }
   }

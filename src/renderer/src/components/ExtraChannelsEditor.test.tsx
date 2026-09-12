@@ -4,6 +4,7 @@
  * undefined normalisation (never persist []), the collision warning, and the STROBE-only picker.
  */
 import { describe, expect, it, jest } from '@jest/globals'
+import '@testing-library/jest-dom/jest-globals'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { afterEach } from '@jest/globals'
 import { FixtureTypes, type DmxFixture, type ExtraChannel } from '../../../photonics-dmx/types'
@@ -78,7 +79,7 @@ describe('ExtraChannelsEditor', () => {
         onChange={jest.fn()}
       />,
     )
-    expect(screen.getByText(/assigned more than once/)).toBeTruthy()
+    expect(screen.getByText(/assigned more than once/)).toBeInTheDocument()
   })
 
   it('offers only Fixed value on a dedicated strobe fixture', () => {
@@ -92,6 +93,24 @@ describe('ExtraChannelsEditor', () => {
     expect(Array.from(options).map((o) => o.textContent)).toEqual(['Fixed value'])
   })
 
+  it('reports a channel number when the user leaves the field, not per keystroke', () => {
+    const onChange = jest.fn()
+    render(
+      <ExtraChannelsEditor
+        light={fixture(FixtureTypes.RGB, [{ type: 'amber', channel: 5 }])}
+        onChange={onChange}
+      />,
+    )
+    const field = screen.getByLabelText('Amber DMX channel')
+
+    fireEvent.change(field, { target: { value: '1' } })
+    fireEvent.change(field, { target: { value: '12' } })
+    expect(onChange).not.toHaveBeenCalled()
+
+    fireEvent.blur(field)
+    expect(onChange).toHaveBeenCalledWith([{ type: 'amber', channel: 12 }])
+  })
+
   it('accepts a channel number above 255 (the model allows 1–512)', () => {
     const onChange = jest.fn()
     render(
@@ -101,6 +120,7 @@ describe('ExtraChannelsEditor', () => {
       />,
     )
     fireEvent.change(screen.getByLabelText('Amber DMX channel'), { target: { value: '400' } })
+    fireEvent.blur(screen.getByLabelText('Amber DMX channel'))
     expect(onChange).toHaveBeenCalledWith([{ type: 'amber', channel: 400 }])
   })
 
@@ -113,6 +133,7 @@ describe('ExtraChannelsEditor', () => {
       />,
     )
     fireEvent.change(screen.getByLabelText('Amber DMX channel'), { target: { value: '600' } })
+    fireEvent.blur(screen.getByLabelText('Amber DMX channel'))
     expect(onChange).toHaveBeenCalledWith([{ type: 'amber', channel: 512 }])
   })
 })

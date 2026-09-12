@@ -18,6 +18,7 @@
     "paths": {
       "@renderer/*": ["src/renderer/src/*"]
     },
+    "noImplicitOverride": true,
     "strictNullChecks": true,
     "noImplicitAny": true
   }

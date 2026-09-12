@@ -1,5 +1,5 @@
 import { useAtom } from 'jotai'
-import { useEffect } from 'react'
+import { useEffect, useId } from 'react'
 import {
   yargListenerEnabledAtom,
   rb3eListenerEnabledAtom,
@@ -19,6 +19,7 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
   const [isYargEnabled, setIsYargEnabled] = useAtom(yargListenerEnabledAtom)
   const [isRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
   const [isAudioEnabled, setIsAudioEnabled] = useAtom(audioListenerEnabledAtom)
+  const labelId = useId()
 
   useEffect(() => {
     // Initialize toggle state from system status
@@ -71,6 +72,7 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
   return (
     <div className="flex items-center mb-4 w-[190px] justify-between">
       <label
+        id={labelId}
         className={`mr-4 text-lg font-semibold ${
           isRb3Enabled || isAudioEnabled || disabled
             ? 'text-gray-500'
@@ -79,6 +81,9 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
         Enable YARG
       </label>
       <button
+        role="switch"
+        aria-checked={isYargEnabled}
+        aria-labelledby={labelId}
         onClick={handleToggle}
         disabled={isRb3Enabled || isAudioEnabled || disabled}
         className={`w-12 h-6 rounded-full ${

@@ -8,19 +8,16 @@ import {
   type ListenerCoordinatorDeps,
 } from '../../controllers/ListenerCoordinator'
 import { DmxLightManager } from '../../../photonics-dmx/controllers/DmxLightManager'
-import { ILightingController } from '../../../photonics-dmx/controllers/sequencer/interfaces'
 import { ChainFanout } from '../../../photonics-dmx/controllers/ChainFanout'
 import { noopRuntimeBroadcaster } from '../../../photonics-dmx/runtime/broadcaster'
 import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
 import { getCueRegistry } from '../../../photonics-dmx/cues/registries/cueRegistries'
 import { CueHandler } from '../../../photonics-dmx/cueHandlers/CueHandler'
 import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
+import { fakeLightingController } from '../../../photonics-dmx/tests/helpers/fakeLightingController'
 
 function makeDeps(): ListenerCoordinatorDeps {
-  const effects = {
-    removeAllEffects: jest.fn(),
-    blackout: jest.fn<() => Promise<void>>().mockImplementation(() => Promise.resolve()),
-  } as unknown as ILightingController
+  const effects = fakeLightingController()
   const dmx = {} as DmxLightManager
   // Stub a single rig chain that exposes the effects controller as its sequencer so the
   // disable paths' blackout loops have something to call.

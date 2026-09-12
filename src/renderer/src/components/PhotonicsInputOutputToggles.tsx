@@ -92,15 +92,6 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
               </div>
             </div>
           )}
-
-          {/*
-          Manual cue style selection is disabled: RB and YARG will automatically select the matching cue handler.
-          Leaving this here so when I revisit RB3 Cue handling I can switch between LED or cue based effects.
-
-          <div className="flex flex-row gap-8 items-start mt-6">
-            <CueStyleToggle />
-          </div>
-            */}
         </div>
       )}
     </div>
