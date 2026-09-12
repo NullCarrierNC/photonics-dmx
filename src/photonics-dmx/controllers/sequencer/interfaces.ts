@@ -375,6 +375,13 @@ export interface ILightingController {
   setState(lights: TrackedLight[], color: RGBIO, time: number): void
 
   /**
+   * Milliseconds between frames. A caller that changes state on its own timer reads this to stay
+   * inside what a frame can show: two changes between frames are sampled once, so the same one
+   * wins every time and the light holds it.
+   */
+  getFrameIntervalMs(): number
+
+  /**
    * Next frame: clear pan/tilt from layer state so fixtures use home in DmxPublisher.
    * Used when motion cues stop without a replacement.
    */

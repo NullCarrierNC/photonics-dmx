@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals'
 import type { ILightingController } from '../../controllers/sequencer/interfaces'
+import { CLOCK_RATE_MS_DEFAULT } from '../../../shared/clockRate'
 
 type Member = keyof ILightingController
 
@@ -28,6 +29,7 @@ const accepting: ILightingController = {
   holdOcclusion: () => {},
   getActiveEffectsForLight: () => new Map(),
   isLayerFreeForLight: () => true,
+  getFrameIntervalMs: () => CLOCK_RATE_MS_DEFAULT,
   setState: () => {},
   schedulePanTiltClear: () => {},
   cancelPanTiltClear: () => {},

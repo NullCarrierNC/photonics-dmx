@@ -57,6 +57,11 @@ export class Clock {
     this.lastUpdateTime = this.startTime
   }
 
+  /** Milliseconds between frames, which is the finest change anything downstream can show. */
+  getIntervalMs(): number {
+    return this.intervalMs
+  }
+
   /**
    * Register a callback to be called on each timing update
    * @param callback Function to call with delta time in milliseconds

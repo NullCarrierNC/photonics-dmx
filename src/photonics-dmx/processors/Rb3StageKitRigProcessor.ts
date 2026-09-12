@@ -131,22 +131,32 @@ export class Rb3StageKitRigProcessor {
     }
 
     const white = getColor('white', 'max')
-    let strobeInterval: number
+    let nominalInterval: number
     switch (strobeType) {
       case 'slow':
-        strobeInterval = 200
+        nominalInterval = 200
         break
       case 'medium':
-        strobeInterval = 100
+        nominalInterval = 100
         break
       case 'fast':
-        strobeInterval = 50
+        nominalInterval = 50
         break
       case 'fastest':
-        strobeInterval = 25
+        nominalInterval = 25
         break
       default:
-        strobeInterval = 100
+        nominalInterval = 100
+    }
+
+    // Each half of a flash needs a frame to start in and a frame to be shown in. Asked to go
+    // faster than that, the frames all sample the same half and the lights hold it, so the run
+    // slows to what the frame can show.
+    const strobeInterval = Math.max(nominalInterval, this.sequencer.getFrameIntervalMs() * 2)
+    if (strobeInterval !== nominalInterval) {
+      log.info(
+        `Rig ${this.rigId}: ${strobeType} strobe runs at ${strobeInterval}ms, the fastest this clock rate renders`,
+      )
     }
 
     // The name carries the rigId so two rigs running the same strobe type don't collide, and
