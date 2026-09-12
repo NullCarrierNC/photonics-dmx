@@ -55,6 +55,9 @@ const DmxConsole: React.FC = () => {
     {},
   )
   const consoleEnabledRef = useRef(false)
+  // An enable that is still in flight owns console mode just as much as an open one does, so the
+  // unmount cleanup waits for it rather than leaving the publisher in manual output.
+  const enableInFlightRef = useRef<Promise<unknown> | null>(null)
   // Mirror the currently-selected rig id into a ref so the long-lived DMX_VALUES listener can
   // pick the right per-rig buffer from `kind: 'rigs'` payloads without re-registering on every
   // rig switch.
@@ -129,6 +132,11 @@ const DmxConsole: React.FC = () => {
 
   useEffect(() => {
     return () => {
+      const pending = enableInFlightRef.current
+      if (pending) {
+        void pending.then(() => disableConsole())
+        return
+      }
       if (consoleEnabledRef.current) {
         void disableConsole()
       }
@@ -163,7 +171,14 @@ const DmxConsole: React.FC = () => {
       setActionError('Rig is still loading — try again in a moment')
       return
     }
-    const result = await enableConsole(selectedRigId)
+    const pending = enableConsole(selectedRigId)
+    enableInFlightRef.current = pending
+    let result: Awaited<typeof pending>
+    try {
+      result = await pending
+    } finally {
+      enableInFlightRef.current = null
+    }
     if (result.success) {
       // Seed pinned fixed/mode channels so fixtures that need them light up during the session.
       const seed = buildConsoleFixedSeed(selectedRig.config, myLights)
@@ -230,14 +245,11 @@ const DmxConsole: React.FC = () => {
       return nextGlobal
     })
 
-    setConsoleBuffer((prev) => {
-      const next = { ...prev }
-      const moved = next[previousChannel] ?? 0
-      delete next[previousChannel]
-      next[clamped] = moved
-      sendConsoleDmx(next)
-      return next
-    })
+    const next = { ...consoleBuffer }
+    const moved = next[previousChannel] ?? 0
+    delete next[previousChannel]
+    next[clamped] = moved
+    pushConsoleBuffer(next)
   }
 
   const renderFixtureCard = (light: DmxLight) => {

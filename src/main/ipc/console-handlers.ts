@@ -1,9 +1,10 @@
 import { createLogger } from '../../shared/logger'
 import { handleInvoke } from './handleInvoke'
-import { IpcMain } from 'electron'
+import { IpcMain, type WebContents } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
 import { LIGHT } from '../../shared/ipcChannels'
 import { isPlainObject } from './inputValidation'
+import { bindConsoleModeToRenderer } from '../controllers/consoleRendererBinding'
 import type { FixtureConfig } from '../../photonics-dmx/types'
 
 const log = createLogger('console-handlers')
@@ -12,11 +13,20 @@ const log = createLogger('console-handlers')
  * DMX Console: exclusive manual buffer mode and channel configuration updates.
  */
 export function setupConsoleHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
-  handleInvoke(ipcMain, LIGHT.CONSOLE_ENABLE, log, async (_, data: unknown) => {
+  // The page each console session is bound to, so re-enabling from the same page does not stack
+  // another set of listeners on it.
+  let boundSender: WebContents | null = null
+
+  handleInvoke(ipcMain, LIGHT.CONSOLE_ENABLE, log, async (event, data: unknown) => {
     if (!isPlainObject(data) || typeof data.rigId !== 'string' || data.rigId.trim() === '') {
       return { success: false as const, error: 'Invalid console enable payload' }
     }
-    return await controllerManager.enableConsoleMode(data.rigId)
+    const result = await controllerManager.enableConsoleMode(data.rigId)
+    if (result.success && boundSender !== event.sender) {
+      boundSender = event.sender
+      bindConsoleModeToRenderer(event.sender, () => controllerManager.disableConsoleMode())
+    }
+    return result
   })
 
   handleInvoke(ipcMain, LIGHT.CONSOLE_DISABLE, log, async () => {
