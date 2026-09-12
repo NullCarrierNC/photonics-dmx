@@ -158,7 +158,6 @@ export {
   sendConsoleDmx,
   setClockRate,
   setConsoleFixtureConfig,
-  setRb3ProcessingMode,
   setStageKitPriority,
   updateConsoleChannel,
 } from './ipc/lighting'

@@ -2,9 +2,7 @@
  * Direct lighting control: stage kit, clock rate, and the manual DMX console buffer.
  */
 import type { FixtureConfig } from '../../../photonics-dmx/types'
-import type { ProcessingMode } from '../../../photonics-dmx/processors/ProcessorManager'
 import { CONFIG, LIGHT } from '../../../shared/ipcChannels'
-import { savePrefs } from './config'
 
 // ---------------------------------------------------------------------------
 // Stage kit
@@ -14,9 +12,6 @@ export const getStageKitPriority = () => window.api.invoke(CONFIG.GET_STAGE_KIT_
 
 export const setStageKitPriority = (priority: 'prefer-for-tracked' | 'random' | 'never') =>
   window.api.invoke(CONFIG.SET_STAGE_KIT_PRIORITY, priority)
-
-export const setRb3ProcessingMode = (processingMode: ProcessingMode) =>
-  savePrefs({ rb3Prefs: { processingMode } })
 
 // ---------------------------------------------------------------------------
 // Clock rate

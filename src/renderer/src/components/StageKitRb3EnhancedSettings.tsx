@@ -1,11 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom, rb3eListenerEnabledAtom } from '../atoms'
-import { setRb3ProcessingMode } from '../ipcApi'
+import { persistPrefs } from '../ipc/persistPrefs'
 import type { ProcessingMode } from '../../../photonics-dmx/processors/ProcessorManager'
-import { createLogger } from '../../../shared/logger'
-
-const log = createLogger('StageKitRb3EnhancedSettings')
 
 const modeOptions = [
   { value: 'direct', label: 'Direct (Stage Kit)' },
@@ -25,17 +22,20 @@ const StageKitRb3EnhancedSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
   const [isRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
   const mode = prefs.rb3Prefs?.processingMode ?? 'direct'
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const handleModeChange = async (processingMode: ProcessingMode) => {
-    setPrefs((prev) => ({
-      ...prev,
-      rb3Prefs: { ...prev.rb3Prefs, processingMode },
-    }))
-    try {
-      await setRb3ProcessingMode(processingMode)
-      log.info(`RB3 processing mode changed to: ${processingMode}`)
-    } catch (error) {
-      log.error('Failed to save RB3 processing mode:', error)
+    setSaveError(null)
+    const saved = await persistPrefs(
+      { rb3Prefs: { processingMode } },
+      'the RB3 processing mode',
+      setSaveError,
+    )
+    if (saved) {
+      setPrefs((prev) => ({
+        ...prev,
+        rb3Prefs: { ...prev.rb3Prefs, processingMode },
+      }))
     }
   }
 
@@ -77,6 +77,11 @@ const StageKitRb3EnhancedSettings: React.FC = () => {
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
               {getModeDescription(mode)}
             </p>
+            {saveError && (
+              <p className="text-sm text-red-600 dark:text-red-400 mt-2" role="alert">
+                {saveError}
+              </p>
+            )}
             {isRb3Enabled && (
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
                 Toggle RB3E off and on again to apply a mode change.
