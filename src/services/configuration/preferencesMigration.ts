@@ -1,5 +1,6 @@
 import { DEFAULT_PREFERENCES, type AppPreferences } from './configurationDefaults'
 import { REQUIRED_PREFERENCE_KEYS } from './configDataValidators'
+import { clampSacnUniverse } from '../../shared/sacnUniverse'
 import {
   CUE_DOMAINS,
   type CueDomain,
@@ -330,6 +331,25 @@ export function seedMissingRequiredPrefs(prefs: AppPreferences): AppPreferences 
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === 'object' && !Array.isArray(value)
+}
+
+/**
+ * Brings stored sender settings that the drivers cannot use back into range.
+ *
+ * A universe outside what sACN defines makes the sender throw as it is built, which leaves the
+ * output off on this launch and every later one. Returns the preferences it was given when there
+ * is nothing to bring back, so a load that changes nothing is not written out again.
+ */
+export function healStoredSenderConfigs(prefs: AppPreferences): AppPreferences {
+  const sacn = prefs?.sacnConfig
+  if (!isPlainObject(sacn) || typeof sacn.universe !== 'number') {
+    return prefs
+  }
+  const universe = clampSacnUniverse(sacn.universe)
+  if (universe === sacn.universe) {
+    return prefs
+  }
+  return { ...prefs, sacnConfig: { ...sacn, universe } }
 }
 
 /**

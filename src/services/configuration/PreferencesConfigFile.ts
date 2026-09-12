@@ -2,6 +2,7 @@ import { ConfigFile, type ConfigFileHooks } from './ConfigFile'
 import type { AppPreferences } from './configurationDefaults'
 import { DEFAULT_PREFERENCES } from './configurationDefaults'
 import {
+  healStoredSenderConfigs,
   migratePrefsV3ToV4,
   migratePrefsV4ToV5,
   migratePrefsV5ToV6,
@@ -15,13 +16,15 @@ import { validateAppPreferencesData } from './configDataValidators'
  * refresh of the settings whose shipped defaults changed, and a v5 → v6 seeding of the `rb3` /
  * `rb3Motion` cue domains for files that predate them. On every load, top-level keys the schema
  * requires are seeded from the defaults and every cue domain is completed, so a file short of one
- * of them keeps the rest of its settings instead of being moved aside.
+ * of them keeps the rest of its settings instead of being moved aside. Stored sender settings a
+ * driver cannot use are brought back into range in the same pass.
  */
 export class PreferencesConfigFile extends ConfigFile<AppPreferences> {
   constructor(hooks: ConfigFileHooks<AppPreferences> = {}) {
     super('prefs.json', DEFAULT_PREFERENCES, 6, {
       validate: validateAppPreferencesData,
-      normalizeLoaded: (data) => repairCueDomains(seedMissingRequiredPrefs(data)),
+      normalizeLoaded: (data) =>
+        healStoredSenderConfigs(repairCueDomains(seedMissingRequiredPrefs(data))),
       ...hooks,
     })
   }

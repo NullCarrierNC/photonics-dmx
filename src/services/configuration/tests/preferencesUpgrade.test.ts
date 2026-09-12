@@ -57,6 +57,22 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.cueDomains.rb3Motion).toBeDefined()
   })
 
+  it('loads a stored sACN universe the protocol does not define as the lowest one it does', () => {
+    const appData = freshAppData()
+    seedPrefs(appData, 6, {
+      ...DEFAULT_PREFERENCES,
+      effectDebounce: 33,
+      sacnConfig: { ...DEFAULT_PREFERENCES.sacnConfig, universe: 0 },
+    })
+
+    const onCorruptRecovery = jest.fn()
+    const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+    expect(onCorruptRecovery).not.toHaveBeenCalled()
+    expect(prefs.sacnConfig?.universe).toBe(1)
+    expect(prefs.effectDebounce).toBe(33)
+  })
+
   it('seeds cue domains missing from a same-version v6 file instead of wiping it', () => {
     const appData = freshAppData()
     const all = createDefaultCueDomains()

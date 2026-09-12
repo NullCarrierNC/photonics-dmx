@@ -4,6 +4,7 @@ import {
   migratePrefsV3ToV4,
   migratePrefsV4ToV5,
   migratePrefsV5ToV6,
+  healStoredSenderConfigs,
   repairCueDomains,
 } from '../preferencesMigration'
 import type { AppPreferences } from '../configurationDefaults'
@@ -237,6 +238,37 @@ describe('migratePrefsV5ToV6', () => {
     const once = migratePrefsV5ToV6(DEFAULT_PREFERENCES, DEFAULT_PREFERENCES)
     const again = migratePrefsV5ToV6(once, DEFAULT_PREFERENCES)
     expect(again).toEqual(once)
+  })
+})
+
+describe('healStoredSenderConfigs', () => {
+  it('returns the same object when the stored sACN universe is one the protocol defines', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      sacnConfig: { universe: 4, useUnicast: false },
+    } as AppPreferences
+    expect(healStoredSenderConfigs(prefs)).toBe(prefs)
+  })
+
+  it('returns the same object when nothing stored a sACN block', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, sacnConfig: undefined } as AppPreferences
+    expect(healStoredSenderConfigs(prefs)).toBe(prefs)
+  })
+
+  it('brings a stored universe below the range up to the lowest sACN defines', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      effectDebounce: 9,
+      sacnConfig: { universe: 0, useUnicast: true, unicastDestination: '10.0.0.4' },
+    } as AppPreferences
+
+    const out = healStoredSenderConfigs(prefs)
+
+    expect(out).not.toBe(prefs)
+    expect(out.sacnConfig?.universe).toBe(1)
+    expect(out.sacnConfig?.useUnicast).toBe(true)
+    expect(out.sacnConfig?.unicastDestination).toBe('10.0.0.4')
+    expect(out.effectDebounce).toBe(9)
   })
 })
 
