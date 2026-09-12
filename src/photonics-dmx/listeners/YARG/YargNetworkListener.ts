@@ -6,6 +6,7 @@ import {
   StrobeState,
   CueType,
   isCueType,
+  isMenuSideCueType,
   isNonDrivingCueType,
   InstrumentNoteType,
   DrumNoteType,
@@ -399,23 +400,30 @@ export class YargNetworkListener extends EventEmitter {
 
     const cueType = YargCueData.lightingCue
     if (cueType && isCueType(cueType)) {
-      // Fallback window: real cues and the first blackout/no-cue of a run reset the window.
-      // A continuing run of non-driving cues does not — songs that only stream blackouts
-      // fall through to the Fallback poller.
-      const nonDriving = isNonDrivingCueType(cueType)
-      const continuingBlackoutRun = nonDriving && this.inNonDrivingRun
-      if (continuingBlackoutRun) {
-        // Non-driving run: don't reset the window; suppress while Fallback owns the look.
-        if (!this.fallbackActive) {
+      // During gameplay a menu-side cue describes a screen the player has left, so it is
+      // dropped and the song-start blackout holds. Practice keeps it, having had no blackout
+      // of its own. Dropping a cue touches no fallback state, so the window keeps running
+      // for a chart that never sends one.
+      const staleMenuCue = YargCueData.currentScene === 'Gameplay' && isMenuSideCueType(cueType)
+      if (!staleMenuCue) {
+        // Fallback window: real cues and the first blackout/no-cue of a run reset the window.
+        // A continuing run of non-driving cues does not, so songs that only stream blackouts
+        // fall through to the Fallback poller.
+        const nonDriving = isNonDrivingCueType(cueType)
+        const continuingBlackoutRun = nonDriving && this.inNonDrivingRun
+        if (continuingBlackoutRun) {
+          // Non-driving run: don't reset the window; suppress while Fallback owns the look.
+          if (!this.fallbackActive) {
+            this.cueHandler.handleCue(cueType, YargCueData)
+          }
+        } else {
+          // Driving cue (or first blackout of a run): reset the window and clear active Fallback.
+          this.lastCueReceivedAt = monotonicNowMs()
+          this.fallbackActive = false
           this.cueHandler.handleCue(cueType, YargCueData)
         }
-      } else {
-        // Driving cue (or first blackout of a run): reset the window and clear active Fallback.
-        this.lastCueReceivedAt = monotonicNowMs()
-        this.fallbackActive = false
-        this.cueHandler.handleCue(cueType, YargCueData)
+        this.inNonDrivingRun = nonDriving
       }
-      this.inNonDrivingRun = nonDriving
     } else {
       log.warn(`Unknown lighting cue value received: ${YargCueData.lightingCue}`)
     }

@@ -17,10 +17,12 @@ export type { Beat, CueData, PostProcessing, SongSection, StrobeState } from './
 
 export {
   CueType,
+  MENU_SIDE_CUE_TYPES,
   NON_DRIVING_CUE_TYPES,
   STROBE_CUE_TYPES,
   cueTypeToStrobeSlot,
   isCueType,
+  isMenuSideCueType,
   isNonDrivingCueType,
   isStrobeCueType,
   lightingCueMap,

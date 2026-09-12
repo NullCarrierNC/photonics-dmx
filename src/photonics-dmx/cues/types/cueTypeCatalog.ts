@@ -92,6 +92,18 @@ export function isNonDrivingCueType(cueType: CueType): boolean {
 }
 
 /**
+ * Cues that belong to YARG's own screens rather than to a chart. YARG keeps reporting the menu cue
+ * for the opening frames of a song, until the chart's first lighting event, so one of these arriving
+ * while a song is on screen describes a screen the player has already left.
+ */
+export const MENU_SIDE_CUE_TYPES: readonly CueType[] = [CueType.Menu, CueType.Score] as const
+
+/** True for cues that belong to a YARG screen rather than a chart (see MENU_SIDE_CUE_TYPES). */
+export function isMenuSideCueType(cueType: CueType): boolean {
+  return MENU_SIDE_CUE_TYPES.includes(cueType)
+}
+
+/**
  * Maps a strobe CueType to its speed slot. Returns null for {@link CueType.Strobe_Off} and any
  * non-strobe cue type.
  */

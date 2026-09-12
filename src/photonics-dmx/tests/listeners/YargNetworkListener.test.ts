@@ -211,6 +211,84 @@ describe('YargNetworkListener', () => {
     })
   })
 
+  describe('menu cues once a song is on screen', () => {
+    const dispatchedCues = (): unknown[] => cueHandler.handleCue.mock.calls.map((c) => c[0])
+
+    /** Puts the listener at the menu, then clears what the menu itself dispatched. */
+    const startAtTheMenu = (): void => {
+      listener.processCueData({
+        ...defaultCueData,
+        currentScene: 'Menu',
+        lightingCue: CueType.Menu,
+        beat: 'Off',
+        keyframe: 'Off',
+      })
+      cueHandler.handleCue.mockClear()
+    }
+
+    const frame = (
+      scene: CueData['currentScene'],
+      cue: CueType,
+      beat: CueData['beat'],
+    ): CueData => ({
+      ...defaultCueData,
+      currentScene: scene,
+      pauseState: 'Unpaused',
+      lightingCue: cue,
+      beat,
+      keyframe: 'Off',
+    })
+
+    it('blacks out and leaves the menu cue alone while gameplay is running', () => {
+      startAtTheMenu()
+
+      listener.processCueData(frame('Gameplay', CueType.Menu, 'Off'))
+      listener.processCueData(frame('Gameplay', CueType.Menu, 'Strong'))
+      listener.processCueData(frame('Gameplay', CueType.Menu, 'Off'))
+
+      expect(dispatchedCues()).toContain(CueType.Blackout_Fast)
+      expect(dispatchedCues()).not.toContain(CueType.Menu)
+    })
+
+    it('dispatches the chart cue that follows it', () => {
+      startAtTheMenu()
+
+      listener.processCueData(frame('Gameplay', CueType.Menu, 'Off'))
+      listener.processCueData(frame('Gameplay', CueType.Menu, 'Strong'))
+      listener.processCueData(frame('Gameplay', CueType.Verse, 'Off'))
+
+      expect(dispatchedCues()).toEqual([CueType.Blackout_Fast, CueType.Verse])
+    })
+
+    it('dispatches the menu cue while the menu is showing', () => {
+      listener.processCueData(frame('Menu', CueType.Menu, 'Off'))
+
+      expect(cueHandler.handleCue).toHaveBeenCalledWith(
+        CueType.Menu,
+        expect.objectContaining({ currentScene: 'Menu' }),
+      )
+    })
+
+    it('leaves practice mode alone', () => {
+      startAtTheMenu()
+
+      listener.processCueData(frame('Practice', CueType.Menu, 'Off'))
+
+      expect(dispatchedCues()).toContain(CueType.Menu)
+    })
+
+    it.each([CueType.Blackout_Fast, CueType.NoCue])(
+      'still dispatches %s while gameplay is running',
+      (cue) => {
+        startAtTheMenu()
+
+        listener.processCueData(frame('Gameplay', cue, 'Off'))
+
+        expect(dispatchedCues()).toContain(cue)
+      },
+    )
+  })
+
   describe('scene transitions (song start / song end)', () => {
     it('calls notifySongStart when transitioning Menu -> Gameplay', () => {
       const notifySongStartSpy = jest.spyOn(cueHandler, 'notifySongStart')
@@ -711,6 +789,21 @@ describe('YargNetworkListener', () => {
       }
 
       expect(dispatchedCues()).not.toContain(CueType.Fallback)
+    })
+
+    it('triggers the fallback while YARG streams the menu cue during gameplay', () => {
+      // A song whose chart never sends a cue streams the menu cue for its whole length. Those are
+      // dropped during gameplay, and dropping one must leave the window running so the fallback
+      // still takes the rig.
+      for (let elapsed = 0; elapsed < FALLBACK_MS * 2; elapsed += 200) {
+        fbListener.processCueData(
+          gameplayFrame(CueType.Menu, { beat: elapsed % 400 === 0 ? 'Strong' : 'Off' }),
+        )
+        jest.advanceTimersByTime(200)
+      }
+
+      expect(dispatchedCues()).toContain(CueType.Fallback)
+      expect(dispatchedCues()).not.toContain(CueType.Menu)
     })
 
     it.each([CueType.Blackout_Fast, CueType.NoCue])(

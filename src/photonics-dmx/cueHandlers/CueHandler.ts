@@ -355,9 +355,6 @@ class CueHandler extends EventEmitter {
         this._sequencer.blackout(0)
         this.emit('cueHandled', historicCueData)
         return
-      case CueType.Menu:
-      //      this.stopCurrentCue();
-      //     break;
     }
 
     // Get implementation from registry
