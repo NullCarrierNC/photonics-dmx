@@ -175,6 +175,26 @@ describe('setupSenderHandlers', () => {
       expect(restartSender).toHaveBeenCalledWith('sacn', validated)
     })
 
+    it('tells the renderer when the restart leaves sACN off', async () => {
+      setupSenderHandlers(mockIpcMain as any, mockControllerManager as any)
+      validateEnable.mockReturnValue({
+        ok: true,
+        value: { sender: 'sacn' as const, universe: 2 },
+      })
+      getEnabledSenders.mockReturnValue(['sacn'])
+      restartSender.mockRejectedValueOnce(new Error('universe must be between 1-63999'))
+
+      const h = getHandler(LIGHT.UPDATE_SACN_CONFIG)
+      const r = (await h(null, { universe: 2 })) as { success: boolean; error?: string }
+
+      expect(r.success).toBe(false)
+      expect(r.error).toContain('universe must be between 1-63999')
+      expect(sendToAllWindows).toHaveBeenCalledWith(RENDERER_RECEIVE.SENDER_START_FAILED, {
+        sender: 'sacn',
+        error: expect.stringContaining('universe must be between 1-63999'),
+      })
+    })
+
     it('does not restart when sACN is not enabled', async () => {
       setupSenderHandlers(mockIpcMain as any, mockControllerManager as any)
       validateEnable.mockReturnValue({

@@ -98,7 +98,14 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true }
     } catch (error) {
       log.error('Error updating sACN configuration:', error)
-      throw error
+      // A restart disables the running sender before it builds the new one, so a configuration the
+      // driver refuses leaves sACN off. The renderer needs that to reach its toggle.
+      const failed = ipcError(error)
+      sendToAllWindows(RENDERER_RECEIVE.SENDER_START_FAILED, {
+        sender: 'sacn',
+        error: failed.error,
+      })
+      return failed
     }
   })
 
@@ -125,7 +132,12 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       return { success: true }
     } catch (error) {
       log.error('Error updating Art-Net configuration:', error)
-      throw error
+      const failed = ipcError(error)
+      sendToAllWindows(RENDERER_RECEIVE.SENDER_START_FAILED, {
+        sender: 'artnet',
+        error: failed.error,
+      })
+      return failed
     }
   })
 

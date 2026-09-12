@@ -472,6 +472,27 @@ describe('DmxOutputSettings sACN configuration', () => {
     )
   })
 
+  it('says so on screen when the running sender will not take the change', async () => {
+    await renderPanel(sacnOpen(), { sacn: true })
+    updateSacnConfigMock.mockResolvedValueOnce({
+      success: false,
+      error: 'universe must be between 1-63999',
+    } as never)
+
+    commit(universeInput(), '9')
+
+    expect(await screen.findByText(/could not apply the sACN configuration/i)).toBeInTheDocument()
+  })
+
+  it('says so on screen when the running sender cannot be reached', async () => {
+    await renderPanel(sacnOpen(), { sacn: true })
+    updateSacnConfigMock.mockRejectedValueOnce(new Error('bridge gone'))
+
+    commit(universeInput(), '9')
+
+    expect(await screen.findByText(/could not apply the sACN configuration/i)).toBeInTheDocument()
+  })
+
   it('saves without pushing when the sender is not running', async () => {
     await renderPanel(sacnOpen())
 

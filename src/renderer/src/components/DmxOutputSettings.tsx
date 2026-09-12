@@ -38,6 +38,7 @@ import {
 } from './DmxOutputSettings/outputConfig'
 import { applySenderRunState } from '../ipc/senderSwitch'
 import { persistPrefs } from '../ipc/persistPrefs'
+import { wasRefused } from '../ipc/ipcResult'
 import { useToast } from '../hooks/useToast'
 import ToastContainer from './Toast'
 import type { AppPreferences } from '../../../shared/ipcTypes'
@@ -81,6 +82,26 @@ const DmxOutputSettings: React.FC = () => {
   const persist = useCallback(
     (updates: Partial<AppPreferences>, what: string) =>
       persistPrefs(updates, what, (message) => showToast(message, 'error', 5000)),
+    [showToast],
+  )
+
+  /**
+   * Hands a committed configuration to the sender that is already running, reporting on screen
+   * when it will not take it. A refused change leaves that sender stopped, so silence here reads
+   * as output that simply went away.
+   */
+  const applyToRunningSender = useCallback(
+    async (apply: () => Promise<unknown>, what: string) => {
+      try {
+        const result = await apply()
+        if (wasRefused(result)) {
+          showToast(`Could not apply ${what}. ${result.error ?? ''}`.trim(), 'error', 5000)
+        }
+      } catch (error) {
+        log.error(`Failed to apply ${what}:`, error)
+        showToast(`Could not apply ${what}.`, 'error', 5000)
+      }
+    },
     [showToast],
   )
 
@@ -252,11 +273,7 @@ const DmxOutputSettings: React.FC = () => {
     }))
 
     if (isArtNetEnabled) {
-      try {
-        await updateArtNetConfig(newConfig)
-      } catch (error) {
-        log.error('Failed to apply the ArtNet configuration:', error)
-      }
+      await applyToRunningSender(() => updateArtNetConfig(newConfig), 'the ArtNet configuration')
     }
   }
 
@@ -349,11 +366,7 @@ const DmxOutputSettings: React.FC = () => {
 
     // Update the running sender if sACN is enabled
     if (isSacnEnabled) {
-      try {
-        await updateSacnConfig(newConfig)
-      } catch (error) {
-        log.error('Failed to apply the sACN configuration:', error)
-      }
+      await applyToRunningSender(() => updateSacnConfig(newConfig), 'the sACN configuration')
     }
   }
 
