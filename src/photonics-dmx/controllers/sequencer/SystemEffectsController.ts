@@ -77,7 +77,13 @@ export class SystemEffectsController implements ISystemEffectsController {
    * @returns A promise that resolves when the blackout is complete.
    */
   public async blackout(duration: number): Promise<void> {
-    if (this.isBlackingOut) {
+    if (duration === 0) {
+      // Dark now is what the caller asked for, so it takes over a fade rather than queueing behind
+      // one. The fade's terminal wipe is generation gated, and cancelling moves the generation on.
+      if (this.isBlackingOut) {
+        this.cancelBlackout()
+      }
+    } else if (this.isBlackingOut) {
       log.warn(`Blackout is already in progress. Ignoring the new blackout request.`)
       return
     }
@@ -240,6 +246,9 @@ export class SystemEffectsController implements ISystemEffectsController {
     if (this.isBlackingOut) {
       log.warn('Cancelling in-progress blackout.')
       this.isBlackingOut = false
+      // The fade's continuation checks the generation as well as the flag, so move it on here and
+      // whatever follows the cancel cannot be wiped by the fade it replaced.
+      this.generation++
       this.clearPendingBlackout()
       this.lightTransitionController.removeTransitionsByLayer(255)
       // The overlay lives above 255 so the sweep leaves it, but re-assert anyway: a cancel resumes

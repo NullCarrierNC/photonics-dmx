@@ -93,4 +93,31 @@ describe('timed blackout', () => {
 
     await expect(done).resolves.toBeUndefined()
   })
+
+  it('goes dark at once when an instant blackout lands during a fade', () => {
+    lightEverything('settled-look')
+
+    void harness.sequencer.blackout(500)
+    harness.advanceBy(100)
+    expect(anyLit()).toBe(true)
+
+    void harness.sequencer.blackout(0)
+    harness.advanceBy(10)
+
+    expect(anyLit()).toBe(false)
+  })
+
+  it('leaves a look that starts after an instant blackout alone', () => {
+    lightEverything('settled-look')
+
+    void harness.sequencer.blackout(500)
+    harness.advanceBy(100)
+    void harness.sequencer.blackout(0)
+    harness.advanceBy(10)
+
+    lightEverything('look-after')
+    harness.advanceBy(500)
+
+    expect(anyLit()).toBe(true)
+  })
 })
