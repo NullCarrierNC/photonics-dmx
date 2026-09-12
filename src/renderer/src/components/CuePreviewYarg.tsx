@@ -18,6 +18,9 @@ import {
 import { useAtom } from 'jotai'
 import { currentCueStateAtom, yargListenerEnabledAtom } from '../atoms'
 
+/** How long the panel keeps a song's details after the last cue frame. */
+const IDLE_CLEAR_MS = 5000
+
 interface CuePreviewYargProps {
   className?: string
   showBeatIndicator?: boolean
@@ -85,6 +88,9 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   const beatClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const measureClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const keyframeClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Cue data only arrives when a cue is dispatched, and a song that ends sends no closing
+  // frame, so the panel gives a song up this long after its last frame.
+  const idleClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const guitarClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bassClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const keysClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -240,11 +246,15 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
   // Listen for cue events when YARG listener is enabled or in simulation mode
   useEffect(() => {
-    if (!yargListenerEnabled && !simulationMode) {
-      // Clear data when listener is disabled and not in simulation mode
+    /**
+     * Puts the panel back to its waiting state.
+     *
+     * The previous-value refs go with it: they gate the change detection, so clearing them is
+     * what lets a song opening on the beat or keyframe the last one ended on light up.
+     */
+    const resetCueDetails = (): void => {
       clearTimeout(primaryClearTimerRef.current ?? undefined)
       clearTimeout(secondaryClearTimerRef.current ?? undefined)
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when listener disabled
       setCurrentCueData(null)
       setPrimaryCueName('')
       setSecondaryCueName('')
@@ -254,6 +264,13 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
       setLastBeatType(null)
       setLastMeasureType(null)
       setLastKeyframeType(null)
+      prevBeatRef.current = null
+      prevMeasureRef.current = undefined
+      prevKeyframeRef.current = null
+    }
+
+    if (!yargListenerEnabled && !simulationMode) {
+      resetCueDetails()
       return
     }
 
@@ -263,6 +280,12 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
     }
 
     const handleCueData = (cueData: CueData) => {
+      // Simulation drives one event at a time by hand, so the panel holds what the user just fired.
+      if (!simulationMode) {
+        clearTimeout(idleClearTimerRef.current ?? undefined)
+        idleClearTimerRef.current = setTimeout(resetCueDetails, IDLE_CLEAR_MS)
+      }
+
       // Beat detection - check for beat values in the beat property
       if (cueData.beat && cueData.beat !== 'Unknown') {
         if (cueData.beat !== prevBeatRef.current) {
@@ -332,9 +355,6 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
       // Handle instrument notes (ref-tracked timers so sustained notes stay solid; each new packet cancels previous clear)
       if (cueData.guitarNotes && cueData.guitarNotes.length > 0) {
         const guitarNotes = cueData.guitarNotes.filter((note) => note !== InstrumentNoteType.None)
-        clearTimeout(beatClearTimerRef.current ?? undefined)
-        clearTimeout(measureClearTimerRef.current ?? undefined)
-        clearTimeout(keyframeClearTimerRef.current ?? undefined)
         clearTimeout(guitarClearTimerRef.current ?? undefined)
         setActiveInstrumentNotes((prev) => ({
           ...prev,
@@ -400,6 +420,10 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
     return () => {
       setListenCueData(false)
       removeIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData)
+      clearTimeout(idleClearTimerRef.current ?? undefined)
+      clearTimeout(beatClearTimerRef.current ?? undefined)
+      clearTimeout(measureClearTimerRef.current ?? undefined)
+      clearTimeout(keyframeClearTimerRef.current ?? undefined)
       clearTimeout(guitarClearTimerRef.current ?? undefined)
       clearTimeout(bassClearTimerRef.current ?? undefined)
       clearTimeout(keysClearTimerRef.current ?? undefined)

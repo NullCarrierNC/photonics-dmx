@@ -330,3 +330,126 @@ describe('CuePreviewYarg beat indicator', () => {
     expect(screen.queryByText('Waiting for beat...')).toBeNull()
   })
 })
+
+/** The panel, plus a way to hand it one cue frame. */
+function renderPanelWithSender(): (data: CueData) => Promise<void> {
+  renderWithProviders(<CuePreviewYarg />, {
+    seed: (set) => set(yargListenerEnabledAtom, true),
+  })
+  return async (data: CueData) => {
+    await act(async () => {
+      listeners.get(RENDERER_RECEIVE.CUE_HANDLED)?.(data)
+    })
+  }
+}
+
+describe('CuePreviewYarg indicators against a note stream', () => {
+  beforeEach(() => {
+    listeners.clear()
+    jest.clearAllMocks()
+    jest.useFakeTimers()
+  })
+
+  afterEach(() => {
+    cleanup()
+    jest.useRealTimers()
+  })
+
+  it('clears the beat once the beats stop, while notes keep arriving', async () => {
+    const send = renderPanelWithSender()
+    await send(cueData({ beat: 'Strong' }))
+
+    // A played note carries no beat of its own, so the beat it follows still has to expire.
+    await act(async () => {
+      jest.advanceTimersByTime(100)
+    })
+    await send(cueData({ guitarNotes: [InstrumentNoteType.Green] }))
+    await act(async () => {
+      jest.advanceTimersByTime(300)
+    })
+
+    expect(screen.getByText('Waiting for beat...')).toBeInTheDocument()
+  })
+
+  it('clears the measure once the measures stop, while notes keep arriving', async () => {
+    const send = renderPanelWithSender()
+    await send(cueData({ beat: 'Measure' }))
+
+    await act(async () => {
+      jest.advanceTimersByTime(100)
+    })
+    await send(cueData({ guitarNotes: [InstrumentNoteType.Red] }))
+    await act(async () => {
+      jest.advanceTimersByTime(400)
+    })
+
+    expect(screen.getByText('Waiting for measure...')).toBeInTheDocument()
+  })
+
+  it('clears the keyframe once the keyframes stop, while notes keep arriving', async () => {
+    const send = renderPanelWithSender()
+    await send(cueData({ keyframe: 'Next' }))
+
+    await act(async () => {
+      jest.advanceTimersByTime(100)
+    })
+    await send(cueData({ guitarNotes: [InstrumentNoteType.Blue] }))
+    await act(async () => {
+      jest.advanceTimersByTime(400)
+    })
+
+    expect(screen.queryByText('Next')).toBeNull()
+  })
+})
+
+describe('CuePreviewYarg when the cue data stops', () => {
+  beforeEach(() => {
+    listeners.clear()
+    jest.clearAllMocks()
+    jest.useFakeTimers()
+  })
+
+  afterEach(() => {
+    cleanup()
+    jest.useRealTimers()
+  })
+
+  it('goes back to waiting when nothing arrives for the idle window', async () => {
+    const send = renderPanelWithSender()
+    await send(cueData({ postProcessing: 'Scanlines_Blue' }))
+    expect(screen.getByText('Scanlines Blue')).toBeInTheDocument()
+
+    await act(async () => {
+      jest.advanceTimersByTime(6000)
+    })
+
+    expect(screen.getByText('No active YARG cue')).toBeInTheDocument()
+    expect(screen.queryByText('Scanlines Blue')).toBeNull()
+  })
+
+  it('holds the details while frames keep arriving', async () => {
+    const send = renderPanelWithSender()
+    await send(cueData({ postProcessing: 'Scanlines_Blue' }))
+
+    for (let frame = 0; frame < 3; frame += 1) {
+      await act(async () => {
+        jest.advanceTimersByTime(4000)
+      })
+      await send(cueData({ postProcessing: 'Scanlines_Blue' }))
+    }
+
+    expect(screen.getByText('Scanlines Blue')).toBeInTheDocument()
+  })
+
+  it('shows a beat the next song opens on, after an idle spell', async () => {
+    const send = renderPanelWithSender()
+    await send(cueData({ beat: 'Strong' }))
+
+    await act(async () => {
+      jest.advanceTimersByTime(6000)
+    })
+    await send(cueData({ beat: 'Strong' }))
+
+    expect(screen.getByText('Strong')).toBeInTheDocument()
+  })
+})
