@@ -16,3 +16,95 @@
 .dark .selector {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23ffffff' d='M5.5 7l4 4 4-4h-8z'/%3E%3C/svg%3E");
 }
+
+/* Vertical console fader: a recessed slot with a rectangular cap, full output at the top. */
+.console-fader {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  cursor: pointer;
+  margin: 0;
+}
+
+.console-fader:focus {
+  outline: none;
+}
+
+.console-fader::-webkit-slider-runnable-track {
+  width: 6px;
+  border-radius: 3px;
+  background: #111827;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* In dark mode the sidebar is the slot's own colour, so the slot gets a rim to stand out. */
+.dark .console-fader::-webkit-slider-runnable-track {
+  background: #030712;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 0 1px #4b5563;
+}
+
+/* The dark band across the middle of the cap is the line a fader value is read from. */
+.console-fader::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 40px;
+  height: 18px;
+  margin-left: -17px;
+  border: 1px solid #374151;
+  border-radius: 2px;
+  background: linear-gradient(
+    to bottom,
+    #9ca3af 0%,
+    #f3f4f6 35%,
+    #f3f4f6 44%,
+    #1f2937 44%,
+    #1f2937 56%,
+    #f3f4f6 56%,
+    #d1d5db 100%
+  );
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.4);
+}
+
+.console-fader:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+}
+
+/* Scrollbar drawn in the content background's colours, in light and dark mode. */
+.app-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.app-scrollbar::-webkit-scrollbar-track,
+.app-scrollbar::-webkit-scrollbar-corner {
+  background: #e5e7eb;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #9ca3af;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #6b7280;
+}
+
+.dark .app-scrollbar::-webkit-scrollbar-track,
+.dark .app-scrollbar::-webkit-scrollbar-corner {
+  background: #1f2937;
+}
+
+.dark .app-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #4b5563;
+}
+
+.dark .app-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #6b7280;
+}

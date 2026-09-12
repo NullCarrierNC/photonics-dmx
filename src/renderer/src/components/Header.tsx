@@ -4,6 +4,7 @@ import { currentPageAtom } from './../atoms'
 import { Pages } from './../types'
 
 import { FiHelpCircle } from 'react-icons/fi'
+import { MASTER_OUTPUT_SIDEBAR_WIDTH_PX } from './MasterOutputSidebar'
 
 const Header: React.FC = () => {
   const [currentPage] = useAtom(currentPageAtom)
@@ -25,12 +26,14 @@ const Header: React.FC = () => {
   }
 
   return (
-    <div className="flex items-center justify-between p-4 w-full">
+    <div className="flex items-center justify-between py-4 pl-4 w-full">
       <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
         {pageTitles[currentPage] || currentPage}
       </h1>
+      {/* As wide as the master output sidebar below it, so the icon centres over that column. */}
       <button
-        className="ml-auto flex items-center text-white font-bold hover:text-gray-300 focus:outline-none"
+        className="ml-auto flex items-center justify-center shrink-0 text-white font-bold hover:text-gray-300 focus:outline-none"
+        style={{ width: MASTER_OUTPUT_SIDEBAR_WIDTH_PX }}
         aria-label="Help">
         <a href="https://photonics.rocks/quickstart-guide/" target="_blank">
           <FiHelpCircle size={32} className="text-white" />

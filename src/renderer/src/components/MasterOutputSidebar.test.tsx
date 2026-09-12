@@ -54,9 +54,8 @@ describe('MasterOutputSidebar', () => {
     await renderSidebar()
 
     await waitFor(() => expect(screen.getByText('45%')).toBeTruthy())
-    // Blackout has no prefs value at all, so main is the only place this could come from.
     expect(screen.getByText('Blacked Out')).toBeTruthy()
-    expect(screen.getByText('Strobe Off')).toBeTruthy()
+    expect(screen.getByText('Strobes Disabled')).toBeTruthy()
   })
 
   it('applies a fader move live but only writes prefs when the gesture ends', async () => {
@@ -66,7 +65,6 @@ describe('MasterOutputSidebar', () => {
     fireEvent.change(fader, { target: { value: '60' } })
 
     await waitFor(() => expect(setsMasterOutput()).toContainEqual({ dimmerPercent: 60 }))
-    // A drag would otherwise rewrite prefs.json once per pixel.
     expect(savedPrefs()).toHaveLength(0)
 
     fireEvent.mouseUp(fader)
@@ -76,7 +74,7 @@ describe('MasterOutputSidebar', () => {
   it('toggles blackout live and never persists it', async () => {
     await renderSidebar()
 
-    fireEvent.click(screen.getByText('Blackout'))
+    fireEvent.click(screen.getByText('Blackout (Off)'))
 
     await waitFor(() => expect(setsMasterOutput()).toContainEqual({ blackout: true }))
     expect(savedPrefs()).toHaveLength(0)
@@ -86,10 +84,10 @@ describe('MasterOutputSidebar', () => {
   it('toggles the strobe gate live and persists it', async () => {
     await renderSidebar()
 
-    fireEvent.click(screen.getByText('Strobe On'))
+    fireEvent.click(screen.getByText('Strobes Enabled'))
 
     await waitFor(() => expect(setsMasterOutput()).toContainEqual({ strobeOutputEnabled: false }))
     await waitFor(() => expect(savedPrefs()).toContainEqual({ strobeOutputEnabled: false }))
-    expect(screen.getByText('Strobe Off')).toBeTruthy()
+    expect(screen.getByText('Strobes Disabled')).toBeTruthy()
   })
 })

@@ -23,7 +23,9 @@ import {
 } from './atoms'
 import squareLogo from './assets/images/photonics-icon.png'
 import LeftMenu from './components/LeftMenu'
-import MasterOutputSidebar from './components/MasterOutputSidebar'
+import MasterOutputSidebar, {
+  MASTER_OUTPUT_SIDEBAR_WIDTH_PX,
+} from './components/MasterOutputSidebar'
 import HeaderProjects from './components/Header'
 import StatusBar from './components/StatusBar'
 import { AppPageRouter } from './components/AppPageRouter'
@@ -430,9 +432,6 @@ export const App = (): JSX.Element => {
   }, [])
 
   const sidebarWidth = isLeftMenuCollapsed ? 80 : 218
-  // Matches MasterOutputSidebar's fixed width; the content column reserves it the same way it
-  // reserves the left sidebar, since both are `fixed` and out of normal flow.
-  const masterOutputWidth = 72
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900 text-black dark:text-gray-200">
@@ -466,30 +465,36 @@ export const App = (): JSX.Element => {
         </div>
       </div>
 
-      {/* Right Content Area */}
+      {/* Right Content Area. Both sidebars are `fixed` and out of normal flow, so margins reserve
+          their width: the left one for the whole column, the master output one only below the
+          header, which runs the full width above it. */}
       <div
         className="flex-grow flex flex-col h-screen transition-all duration-300"
-        style={{ marginLeft: `${sidebarWidth}px`, marginRight: `${masterOutputWidth}px` }}>
+        style={{ marginLeft: `${sidebarWidth}px` }}>
         {/* Main Content Header */}
-        <div className="h-16 bg-gray-800 dark:bg-gray-950 text-white flex items-center justify-center z-10">
+        <div className="h-16 shrink-0 bg-gray-800 dark:bg-gray-950 text-white flex items-center justify-center z-10">
           <HeaderProjects />
         </div>
 
-        {/* Controller-failure notice, above the page so it shows whichever page is open */}
-        <LifecycleFailedBanner />
+        <div
+          className="flex-grow flex flex-col min-h-0"
+          style={{ marginRight: `${MASTER_OUTPUT_SIDEBAR_WIDTH_PX}px` }}>
+          {/* Controller-failure notice, above the page so it shows whichever page is open */}
+          <LifecycleFailedBanner />
 
-        {/* Scrollable Content Area - Using flex-grow to fill available space */}
-        <div className="flex-grow overflow-y-auto bg-gray-200 dark:bg-gray-800">
-          <ErrorBoundary name="AppContent">
-            <SenderErrorIndicator />
-            <ErrorBoundary key={currentPage} name={`Page:${currentPage}`}>
-              <AppPageRouter currentPage={currentPage} />
+          {/* Scrollable Content Area - Using flex-grow to fill available space */}
+          <div className="flex-grow overflow-y-auto app-scrollbar bg-gray-200 dark:bg-gray-800">
+            <ErrorBoundary name="AppContent">
+              <SenderErrorIndicator />
+              <ErrorBoundary key={currentPage} name={`Page:${currentPage}`}>
+                <AppPageRouter currentPage={currentPage} />
+              </ErrorBoundary>
             </ErrorBoundary>
-          </ErrorBoundary>
-        </div>
+          </div>
 
-        {/* Status Bar - Positioned at the bottom of the flex container */}
-        <StatusBar />
+          {/* Status Bar - Positioned at the bottom of the flex container */}
+          <StatusBar />
+        </div>
       </div>
       <MasterOutputSidebar />
       <ToastContainer toasts={toasts} onDismiss={hideToast} />

@@ -429,7 +429,7 @@ describe('DmxPublisher strobe output gate', () => {
     )
 
     expect(wire()[2]).toBe(0)
-    // The rest of the rig keeps running its cue; only the strobe is held back.
+    // The rest of the rig keeps running its cue, and only the strobe is held back.
     expect(wire()[11]).toBe(200)
     expect(wire()[12]).toBe(180)
   })

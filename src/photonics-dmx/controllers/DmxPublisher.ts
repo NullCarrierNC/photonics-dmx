@@ -154,7 +154,7 @@ export class DmxPublisher {
   private _whiteChannelMixMode: WhiteChannelMixMode = DEFAULT_WHITE_CHANNEL_MIX_MODE
 
   private _frameProcessor: PublisherFrameProcessor
-  /** Master dimmer / blackout / strobe gate; read once per frame, never written here. */
+  /** Master dimmer / blackout / strobe gate, read once per frame and never written here. */
   private _masterOutput: MasterOutputState
   /**
    * Most recent light states handed to {@link publishNow}, so {@link refreshOutput} can re-emit

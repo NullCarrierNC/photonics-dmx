@@ -24,7 +24,7 @@ import {
   MASTER_DIMMER_MIN_PERCENT,
 } from '../../../photonics-dmx/controllers/MasterOutputState'
 
-/** Fields a SET_MASTER_OUTPUT payload may carry. All optional; see the channel's request type. */
+/** Fields a SET_MASTER_OUTPUT payload may carry. All optional, see the channel's request type. */
 export interface MasterOutputUpdate {
   dimmerPercent?: number
   blackout?: boolean

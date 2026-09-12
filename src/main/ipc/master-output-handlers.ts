@@ -14,8 +14,8 @@ const log = createLogger('master-output-handlers')
  * output is frame-driven, but a rig sitting idle between songs publishes nothing on its own.
  *
  * Persistence is deliberately not handled here. The dimmer level and the strobe gate ride
- * SAVE_PREFS from the renderer so a fader drag does not write prefs.json once per pixel; blackout
- * is session-only and never persists.
+ * SAVE_PREFS from the renderer, which saves once a fader drag ends. Blackout is session-only and
+ * never persists.
  */
 export function setupMasterOutputHandlers(
   ipcMain: IpcMain,
