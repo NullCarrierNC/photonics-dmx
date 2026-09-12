@@ -252,6 +252,7 @@ export class ControllerManager {
   public async enableYarg(): Promise<void> {
     await this.lifecycle.runOp(async () => {
       await this.lifecycle.awaitShutdownWork()
+      await this.listenerLifecycle.audio.disableAudio()
       await this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
     })
   }
@@ -275,6 +276,7 @@ export class ControllerManager {
       await this.lifecycle.awaitShutdownWork()
       await this.stopTestEffect()
       this.onSimulationPreempt?.()
+      await this.listenerLifecycle.audio.disableAudio()
       await this.listenerLifecycle.yargRb3.enableRb3(this.isInitialized, () => this.init())
     })
   }
@@ -502,6 +504,8 @@ export class ControllerManager {
    */
   public async enableAudio(): Promise<void> {
     await this.lifecycle.awaitInFlightWork()
+    await this.listenerLifecycle.yargRb3.disableYarg()
+    await this.listenerLifecycle.yargRb3.disableRb3()
     await this.listenerLifecycle.audio.enableAudio(this.isInitialized, () => this.init())
   }
 

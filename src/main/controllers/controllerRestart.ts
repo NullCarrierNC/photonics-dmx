@@ -152,7 +152,9 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
       await ctx.listenerLifecycle.yargRb3.enableRb3(ctx.isInitialized(), () => ctx.init())
     }
 
-    if (wasAudioEnabled) {
+    // One input drives the rig at a time, so a snapshot holding audio beside a network listener
+    // comes back as the listener alone rather than as both.
+    if (wasAudioEnabled && !wasYargEnabled && !wasRb3Enabled) {
       await ctx.listenerLifecycle.audio.enableAudio(ctx.isInitialized(), () => ctx.init())
     }
 
