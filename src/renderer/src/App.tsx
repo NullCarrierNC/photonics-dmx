@@ -39,9 +39,9 @@ import { ConfirmModalHost } from './components/ConfirmModalHost'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useDarkMode } from './DarkModeProvider'
 import type { CueStateUpdatePayload, NodeCueRuntimeErrorPayload } from '../../shared/ipcTypes'
+import { persistPrefs } from './ipc/persistPrefs'
 import {
   setAudioEnabled,
-  savePrefs,
   getLightLibrary,
   getMyLights,
   getLightLayout,
@@ -339,11 +339,9 @@ export const App = (): JSX.Element => {
   const handleToggleLeftMenu = async (): Promise<void> => {
     const newCollapsed = !isLeftMenuCollapsed
     setIsLeftMenuCollapsed(newCollapsed)
-    try {
-      await savePrefs({ leftMenuCollapsed: newCollapsed })
-    } catch (error) {
-      log.error('Failed to save left menu collapsed state:', error)
-    }
+    await persistPrefs({ leftMenuCollapsed: newCollapsed }, 'the menu state', (message) =>
+      showToast(message, 'error', 5000),
+    )
   }
 
   // Load light library effect

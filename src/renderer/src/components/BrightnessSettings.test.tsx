@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
-import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import { refused, resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import { lightingPrefsAtom } from '../atoms'
 import BrightnessSettings from './BrightnessSettings'
@@ -57,5 +57,16 @@ describe('BrightnessSettings', () => {
         expect.objectContaining({ brightness: expect.objectContaining({ low: 77 }) }),
       ),
     )
+  })
+
+  it('says so when a level cannot be saved', async () => {
+    savePrefs.mockImplementation((() => Promise.resolve(refused('read only'))) as never)
+    renderPanel()
+    const box = screen.getByLabelText('Low level')
+
+    fireEvent.change(box, { target: { value: '77' } })
+    fireEvent.blur(box)
+
+    await screen.findByRole('alert')
   })
 })

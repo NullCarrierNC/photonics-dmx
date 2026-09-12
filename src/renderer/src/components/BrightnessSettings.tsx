@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
-import { savePrefs } from '../ipcApi'
-import { createLogger } from '../../../shared/logger'
+import { persistPrefs } from '../ipc/persistPrefs'
 import { DraftNumberField } from './controls/DraftField'
-const log = createLogger('BrightnessSettings')
 
 const BrightnessSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
@@ -15,6 +13,7 @@ const BrightnessSettings: React.FC = () => {
     max: 255,
   })
   const [isLoaded, setIsLoaded] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Load brightness settings from preferences
   useEffect(() => {
@@ -37,17 +36,13 @@ const BrightnessSettings: React.FC = () => {
   const handleBrightnessChange = async (level: keyof typeof localBrightness, value: number) => {
     const newBrightness = { ...localBrightness, [level]: value }
     setLocalBrightness(newBrightness)
+    setSaveError(null)
 
-    try {
-      await savePrefs({ brightness: newBrightness })
-
-      // Update the preferences atom to reflect the change
+    if (await persistPrefs({ brightness: newBrightness }, 'the brightness levels', setSaveError)) {
       setPrefs((prev) => ({
         ...prev,
         brightness: newBrightness,
       }))
-    } catch (error) {
-      log.error('Failed to save brightness configuration:', error)
     }
   }
 
@@ -60,17 +55,15 @@ const BrightnessSettings: React.FC = () => {
     }
 
     setLocalBrightness(defaultBrightness)
+    setSaveError(null)
 
-    try {
-      await savePrefs({ brightness: defaultBrightness })
-
-      // Update the preferences atom to reflect the change
+    if (
+      await persistPrefs({ brightness: defaultBrightness }, 'the brightness levels', setSaveError)
+    ) {
       setPrefs((prev) => ({
         ...prev,
         brightness: defaultBrightness,
       }))
-    } catch (error) {
-      log.error('Failed to reset brightness configuration:', error)
     }
   }
 
@@ -172,6 +165,12 @@ const BrightnessSettings: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {saveError && (
+        <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
+          {saveError}
+        </p>
+      )}
 
       <div className="mt-3 pt-4 border-t border-gray-200 dark:border-gray-600">
         <button

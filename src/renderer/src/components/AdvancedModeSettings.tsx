@@ -1,14 +1,12 @@
 import React, { useCallback, useState } from 'react'
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
-import { savePrefs } from '../ipcApi'
-import { createLogger } from '../../../shared/logger'
-
-const log = createLogger('AdvancedModeSettings')
+import { persistPrefs } from '../ipc/persistPrefs'
 
 const AdvancedModeSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const enabled = prefs.advancedModeEnabled ?? false
 
@@ -16,17 +14,15 @@ const AdvancedModeSettings: React.FC = () => {
     async (next: boolean) => {
       if (saving) return
       setSaving(true)
-      try {
-        await savePrefs({ advancedModeEnabled: next })
+      setSaveError(null)
+      const saved = await persistPrefs({ advancedModeEnabled: next }, 'Advanced Mode', setSaveError)
+      if (saved) {
         setPrefs((prev) => ({
           ...prev,
           advancedModeEnabled: next,
         }))
-      } catch (e) {
-        log.error('Failed to save Advanced Mode preference', e)
-      } finally {
-        setSaving(false)
       }
+      setSaving(false)
     },
     [saving, setPrefs],
   )
@@ -78,6 +74,11 @@ const AdvancedModeSettings: React.FC = () => {
           Enable Advanced Mode
         </span>
       </label>
+      {saveError && (
+        <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
+          {saveError}
+        </p>
+      )}
     </div>
   )
 }

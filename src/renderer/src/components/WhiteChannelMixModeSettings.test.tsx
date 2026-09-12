@@ -6,7 +6,7 @@
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
 import { screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
-import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import { refused, resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import { lightingPrefsAtom } from '../atoms'
 import WhiteChannelMixModeSettings from './WhiteChannelMixModeSettings'
@@ -58,5 +58,15 @@ describe('WhiteChannelMixModeSettings', () => {
 
     await waitFor(() => expect(savePrefs).toHaveBeenCalledWith({ whiteChannelMixMode: 'w-only' }))
     await waitFor(() => expect(store.get(lightingPrefsAtom).whiteChannelMixMode).toBe('w-only'))
+  })
+
+  it('says so when the save is refused, and leaves the mode as it was', async () => {
+    savePrefs.mockImplementation((() => Promise.resolve(refused('read only'))) as never)
+    const store = renderWith({ whiteChannelMixMode: 'always-rgbw' })
+
+    fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'strobe-rgbw' } })
+
+    await screen.findByRole('alert')
+    expect(store.get(lightingPrefsAtom).whiteChannelMixMode).toBe('always-rgbw')
   })
 })

@@ -1,14 +1,11 @@
 import React, { useCallback, useState } from 'react'
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
-import { savePrefs } from '../ipcApi'
+import { persistPrefs } from '../ipc/persistPrefs'
 import {
   DEFAULT_WHITE_CHANNEL_MIX_MODE,
   type WhiteChannelMixMode,
 } from '../../../photonics-dmx/types'
-import { createLogger } from '../../../shared/logger'
-
-const log = createLogger('WhiteChannelMixModeSettings')
 
 const MODE_OPTIONS: { value: WhiteChannelMixMode; label: string }[] = [
   { value: 'always-rgbw', label: 'Always RGBW' },
@@ -30,6 +27,7 @@ function modeDescription(mode: WhiteChannelMixMode): string {
 const WhiteChannelMixModeSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const mode = prefs.whiteChannelMixMode ?? DEFAULT_WHITE_CHANNEL_MIX_MODE
 
@@ -37,14 +35,16 @@ const WhiteChannelMixModeSettings: React.FC = () => {
     async (next: WhiteChannelMixMode) => {
       if (saving) return
       setSaving(true)
-      try {
-        await savePrefs({ whiteChannelMixMode: next })
+      setSaveError(null)
+      const saved = await persistPrefs(
+        { whiteChannelMixMode: next },
+        'the White Channel Mix Mode',
+        setSaveError,
+      )
+      if (saved) {
         setPrefs((prev) => ({ ...prev, whiteChannelMixMode: next }))
-      } catch (e) {
-        log.error('Failed to save White Channel Mix Mode preference', e)
-      } finally {
-        setSaving(false)
       }
+      setSaving(false)
     },
     [saving, setPrefs],
   )
@@ -77,6 +77,11 @@ const WhiteChannelMixModeSettings: React.FC = () => {
         ))}
       </select>
       <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{modeDescription(mode)}</p>
+      {saveError && (
+        <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
+          {saveError}
+        </p>
+      )}
     </div>
   )
 }

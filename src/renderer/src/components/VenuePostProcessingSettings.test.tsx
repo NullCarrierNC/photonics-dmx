@@ -6,7 +6,7 @@
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
 import { screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
-import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import { refused, resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import { lightingPrefsAtom } from '../atoms'
 import VenuePostProcessingSettings from './VenuePostProcessingSettings'
@@ -65,5 +65,15 @@ describe('VenuePostProcessingSettings', () => {
     await waitFor(() => expect(savePrefs).toHaveBeenCalled())
     expect(screen.getByLabelText(LABEL)).toBeChecked()
     expect(store.get(lightingPrefsAtom).venuePostProcessingEnabled).toBeUndefined()
+  })
+
+  it('says so when the save is refused, and leaves the setting as it was', async () => {
+    savePrefs.mockImplementation((() => Promise.resolve(refused('read only'))) as never)
+    const store = renderWith({ venuePostProcessingEnabled: true })
+
+    fireEvent.click(screen.getByLabelText(LABEL))
+
+    await screen.findByRole('alert')
+    expect(store.get(lightingPrefsAtom).venuePostProcessingEnabled).toBe(true)
   })
 })

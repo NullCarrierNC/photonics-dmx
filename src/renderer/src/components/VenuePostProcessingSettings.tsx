@@ -1,15 +1,12 @@
 import React, { useCallback, useState } from 'react'
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
-import { savePrefs } from '../ipcApi'
-import { wasRefused } from '../ipc/ipcResult'
-import { createLogger } from '../../../shared/logger'
-
-const log = createLogger('VenuePostProcessingSettings')
+import { persistPrefs } from '../ipc/persistPrefs'
 
 const VenuePostProcessingSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const enabled = prefs.venuePostProcessingEnabled ?? true
 
@@ -17,21 +14,19 @@ const VenuePostProcessingSettings: React.FC = () => {
     async (next: boolean) => {
       if (saving) return
       setSaving(true)
-      try {
-        const result = await savePrefs({ venuePostProcessingEnabled: next })
-        if (wasRefused(result)) {
-          log.error('Failed to save Venue Post-Processing preference', result.error)
-          return
-        }
+      setSaveError(null)
+      const saved = await persistPrefs(
+        { venuePostProcessingEnabled: next },
+        'Venue Post-Processing',
+        setSaveError,
+      )
+      if (saved) {
         setPrefs((prev) => ({
           ...prev,
           venuePostProcessingEnabled: next,
         }))
-      } catch (e) {
-        log.error('Failed to save Venue Post-Processing preference', e)
-      } finally {
-        setSaving(false)
       }
+      setSaving(false)
     },
     [saving, setPrefs],
   )
@@ -62,6 +57,11 @@ const VenuePostProcessingSettings: React.FC = () => {
           Apply venue post-processing to lights
         </span>
       </label>
+      {saveError && (
+        <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
+          {saveError}
+        </p>
+      )}
     </div>
   )
 }
