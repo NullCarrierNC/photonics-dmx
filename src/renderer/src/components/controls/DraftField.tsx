@@ -84,8 +84,24 @@ interface DraftNumberFieldProps extends DraftFieldBaseProps {
   min?: number
   max?: number
   step?: number
+  /** Decimal places to keep. Whole numbers by default, since most of these are counts or channels. */
+  decimals?: number
+  /**
+   * Report a value the field already held. Wanted where committing does something beyond storing a
+   * number, e.g. restarting the controllers, so the user can ask for that again.
+   */
+  commitWhenUnchanged?: boolean
   /** Given the typed number, held inside min and max. */
   onCommit: (value: number) => void
+}
+
+/** Whole numbers unless the field asks for decimals, which the fractional audio fields do. */
+function roundTo(value: number, decimals: number | undefined): number {
+  if (decimals === undefined) {
+    return Math.round(value)
+  }
+  const factor = 10 ** decimals
+  return Math.round(value * factor) / factor
 }
 
 /** A number entry that clamps and reports when the user has finished, not as they type. */
@@ -94,6 +110,8 @@ export const DraftNumberField: React.FC<DraftNumberFieldProps> = ({
   min,
   max,
   step,
+  decimals,
+  commitWhenUnchanged = false,
   onCommit,
   className,
   ...rest
@@ -120,9 +138,10 @@ export const DraftNumberField: React.FC<DraftNumberFieldProps> = ({
       setDraft(String(value))
       return
     }
-    const clamped = Math.max(min ?? -Infinity, Math.min(max ?? Infinity, Math.round(parsed)))
+    const rounded = roundTo(parsed, decimals)
+    const clamped = Math.max(min ?? -Infinity, Math.min(max ?? Infinity, rounded))
     setDraft(String(clamped))
-    if (clamped !== value) {
+    if (clamped !== value || commitWhenUnchanged) {
       onCommit(clamped)
     }
   }
