@@ -350,6 +350,13 @@ describe('inputValidation', () => {
       }
     })
 
+    it('holds a sacn enable payload to the universes the protocol defines', () => {
+      expect(validateSenderEnablePayload({ sender: 'sacn', universe: 0 }).ok).toBe(false)
+      expect(validateSenderEnablePayload({ sender: 'sacn', universe: 1 }).ok).toBe(true)
+      expect(validateSenderEnablePayload({ sender: 'sacn', universe: 63999 }).ok).toBe(true)
+      expect(validateSenderEnablePayload({ sender: 'sacn', universe: 64000 }).ok).toBe(false)
+    })
+
     it('accepts sacn legacy maxOutputRate and clamps Hz into 10–44', () => {
       const result = validateSenderEnablePayload({
         sender: 'sacn',
@@ -968,8 +975,10 @@ describe('inputValidation', () => {
     })
 
     it('holds the sACN universe in range', () => {
+      expect(validatePreferencesPayload({ sacnConfig: { universe: 1 } }).ok).toBe(true)
       expect(validatePreferencesPayload({ sacnConfig: { universe: 63999 } }).ok).toBe(true)
       expect(validatePreferencesPayload({ sacnConfig: { universe: 64000 } }).ok).toBe(false)
+      expect(validatePreferencesPayload({ sacnConfig: { universe: 0 } }).ok).toBe(false)
       expect(validatePreferencesPayload({ sacnConfig: { universe: -1 } }).ok).toBe(false)
     })
 

@@ -1,6 +1,7 @@
 import React from 'react'
 import CollapsibleSenderCard from './CollapsibleSenderCard'
 import { DraftNumberField, DraftTextField } from '../controls/DraftField'
+import { SACN_UNIVERSE_MAX, SACN_UNIVERSE_MIN } from '../../../../shared/sacnUniverse'
 
 export interface SacnConfig {
   universe: number
@@ -45,11 +46,11 @@ export const SacnConfigCard: React.FC<SacnConfigCardProps> = ({
             value={config.universe}
             onCommit={(universe) => onConfigChange('universe', universe)}
             className={`${FIELD_CLASS} w-20`}
-            min={0}
-            max={63999}
+            min={SACN_UNIVERSE_MIN}
+            max={SACN_UNIVERSE_MAX}
           />
           <p className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-            (sACN universes start at 1)
+            ({SACN_UNIVERSE_MIN} to {SACN_UNIVERSE_MAX})
           </p>
         </div>
         <div className="space-y-1">

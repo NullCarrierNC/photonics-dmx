@@ -17,6 +17,7 @@ import {
   artNetBaseRefreshIntervalMs,
   dmxOutputRefreshRateHzFromUnknownPayload,
 } from '../../../shared/dmxOutputRefresh'
+import { SACN_UNIVERSE_MAX, SACN_UNIVERSE_MIN } from '../../../shared/sacnUniverse'
 import { isPlainObject, isNonEmptyString, validateNumberInRange } from './primitives'
 
 const SENDER_IDS = new Set(['sacn', 'ipc', 'enttecpro', 'artnet', 'opendmx'])
@@ -115,8 +116,15 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
 
     case 'sacn': {
       const universeNum =
-        data.universe !== undefined && data.universe !== null ? Number(data.universe) : 1
-      const universeValidation = validateNumberInRange(universeNum, 0, 63999, 'SACN universe')
+        data.universe !== undefined && data.universe !== null
+          ? Number(data.universe)
+          : SACN_UNIVERSE_MIN
+      const universeValidation = validateNumberInRange(
+        universeNum,
+        SACN_UNIVERSE_MIN,
+        SACN_UNIVERSE_MAX,
+        'SACN universe',
+      )
       if (!universeValidation.ok) {
         return universeValidation
       }

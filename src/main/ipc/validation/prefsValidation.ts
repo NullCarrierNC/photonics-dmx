@@ -9,6 +9,7 @@ import { WHITE_CHANNEL_MIX_MODES } from '../../../photonics-dmx/types'
 import { CUE_DOMAINS } from '../../../services/configuration/cueDomainTypes'
 import { DEFAULT_AUDIO_GAME_MODE } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import { clampDmxOutputRefreshRateHz } from '../../../shared/dmxOutputRefresh'
+import { SACN_UNIVERSE_MAX, SACN_UNIVERSE_MIN } from '../../../shared/sacnUniverse'
 import {
   isPlainObject,
   validateNumberInRange,
@@ -132,9 +133,6 @@ const ART_NET_NUMERIC_BOUNDS = [
   ['port', 1, 65535],
 ] as const
 
-/** Highest sACN universe number the protocol defines. */
-const SACN_UNIVERSE_MAX = 63999
-
 /**
  * Checks a stored Art-Net block, on the way in and again on the way back out.
  *
@@ -191,7 +189,7 @@ export function validateStoredSacnConfig(value: unknown): ValidationResult<Store
   if (next.universe !== undefined) {
     const universe = validateNumberInRange(
       next.universe,
-      0,
+      SACN_UNIVERSE_MIN,
       SACN_UNIVERSE_MAX,
       'sacnConfig.universe',
     )
