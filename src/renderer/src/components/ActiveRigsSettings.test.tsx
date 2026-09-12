@@ -12,7 +12,7 @@
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
 import { screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
-import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
+import { refused, resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import { dmxRigsAtom, lightingPrefsAtom } from '../atoms'
 import {
@@ -248,5 +248,18 @@ describe('ActiveRigsSettings — mirror controls', () => {
     const saved = saveDmxRigMock.mock.calls.at(-1)![0] as DmxRig
     expect(saved.mirrorVert).toBe(true)
     expect('mirrorHoriz' in saved).toBe(false)
+  })
+
+  it('leaves the rigs alone when the multi-rig preference is refused', async () => {
+    jest
+      .mocked(ipcApi.savePrefs)
+      .mockImplementation((() => Promise.resolve(refused('read only'))) as never)
+    const rigs = [makeRig('r1', 'One', ['sacn']), makeRig('r2', 'Two')]
+    renderWith({ rigs, allowMultipleActiveRigs: true })
+
+    fireEvent.click(await screen.findByLabelText('Allow Multiple Active Rigs'))
+
+    await screen.findByRole('alert')
+    expect(jest.mocked(ipcApi.saveDmxRig)).not.toHaveBeenCalled()
   })
 })

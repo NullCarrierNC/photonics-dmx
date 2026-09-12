@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useAtom } from 'jotai'
 import { dmxRigsAtom, lightingPrefsAtom } from '../atoms'
 import { DmxRig, WIRE_SENDER_IDS, WireSenderId } from '../../../photonics-dmx/types'
-import { getDmxRigs, saveDmxRig, deleteDmxRig, savePrefs } from '../ipcApi'
+import { getDmxRigs, saveDmxRig, deleteDmxRig } from '../ipcApi'
+import { persistPrefs } from '../ipc/persistPrefs'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('ActiveRigsSettings')
 
@@ -81,6 +82,7 @@ const ActiveRigsSettings: React.FC = () => {
   const [rigs, setRigs] = useAtom(dmxRigsAtom)
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const allowMultipleActiveRigs = prefs.allowMultipleActiveRigs ?? false
   // Routing is per-rig and only meaningful when at least two rigs exist AND the user has opted
@@ -147,8 +149,18 @@ const ActiveRigsSettings: React.FC = () => {
   }
 
   const handleAllowMultipleActiveRigsChange = async (enabled: boolean) => {
+    setSaveError(null)
+    // Turning this off goes on to deactivate rigs and strip their routing, so a refused write has
+    // to stop here rather than leave the rigs rearranged for a preference that never stored.
+    const saved = await persistPrefs(
+      { allowMultipleActiveRigs: enabled },
+      'the multiple active rigs setting',
+      setSaveError,
+    )
+    if (!saved) {
+      return
+    }
     try {
-      await savePrefs({ allowMultipleActiveRigs: enabled })
       setPrefs((prev) => ({
         ...prev,
         allowMultipleActiveRigs: enabled,
@@ -259,6 +271,12 @@ const ActiveRigsSettings: React.FC = () => {
         <br />
         <strong>CAUTION: multiple rig support is experimental and may not work as intended.</strong>
       </p>
+
+      {saveError && (
+        <p className="mb-4 text-sm text-red-600 dark:text-red-400" role="alert">
+          {saveError}
+        </p>
+      )}
 
       <div className="mb-4">
         <div className="flex items-center gap-2 mb-2">
