@@ -31,6 +31,7 @@ import {
   SelectionModeField,
 } from './CueConsistencySettings/fields'
 import { useProbabilitySaver } from './CueConsistencySettings/useProbabilitySaver'
+import { DraftNumberField } from './controls/DraftField'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('CueConsistencySettings')
@@ -460,8 +461,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           placeholder="5000"
           help="Minimum time to hold a motion cue after it starts. Prevents thrashing if the lighting cue flip-flops very rapidly. Changes faster than this value will be ignored, and the next change will be used."
           disabled={isLoading || isSaving || !motionGloballyEnabled}
-          onChange={setMotionMinHoldMsState}
-          onCommit={() => handleMotionMinHoldChange(motionMinHoldMs)}
+          onCommit={(value) => void handleMotionMinHoldChange(value)}
         />
         <SelectionModeField
           id="rb3-cue-group-selection-mode"
@@ -520,35 +520,30 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
             RB3 motion switch timer (random range)
           </label>
           <div className="flex items-center space-x-3">
-            <input
-              type="number"
+            <DraftNumberField
               id="rb3-motion-duration"
-              min="0"
-              max="600"
-              step="1"
+              min={0}
+              max={600}
+              step={1}
               value={rb3MotionDurationMin}
-              onChange={(e) =>
-                setRb3MotionDurationMin(
-                  Math.max(0, Math.min(600, parseInt(e.target.value, 10) || 0)),
-                )
-              }
-              onBlur={() => handleRb3DurationChange(rb3MotionDurationMin, rb3MotionDurationMax)}
+              onCommit={(value) => {
+                setRb3MotionDurationMin(value)
+                void handleRb3DurationChange(value, rb3MotionDurationMax)
+              }}
               className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading || isSaving || !motionGloballyEnabled}
             />
             <span className="text-sm text-gray-600 dark:text-gray-400">to</span>
-            <input
-              type="number"
-              min="0"
-              max="600"
-              step="1"
+            <DraftNumberField
+              aria-label="RB3 motion switch timer upper bound"
+              min={0}
+              max={600}
+              step={1}
               value={rb3MotionDurationMax}
-              onChange={(e) =>
-                setRb3MotionDurationMax(
-                  Math.max(0, Math.min(600, parseInt(e.target.value, 10) || 0)),
-                )
-              }
-              onBlur={() => handleRb3DurationChange(rb3MotionDurationMin, rb3MotionDurationMax)}
+              onCommit={(value) => {
+                setRb3MotionDurationMax(value)
+                void handleRb3DurationChange(rb3MotionDurationMin, value)
+              }}
               className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading || isSaving || !motionGloballyEnabled}
             />
@@ -569,8 +564,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           placeholder="5000"
           help="Floor on how soon a switch can re-pick, independent of the switch timer above."
           disabled={isLoading || isSaving || !motionGloballyEnabled}
-          onChange={setRb3MotionMinHoldMsState}
-          onCommit={() => handleRb3MinHoldChange(rb3MotionMinHoldMs)}
+          onCommit={(value) => void handleRb3MinHoldChange(value)}
         />
       </div>
     </div>

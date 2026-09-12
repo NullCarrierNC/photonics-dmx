@@ -9,6 +9,7 @@ import type {
 import { VARIABLE_TYPES } from '../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { TrackedLight, Color } from '../../../../../../photonics-dmx/types'
 import ColorListEditor from '../shared/ColorListEditor'
+import { DraftNumberField } from '../../../controls/DraftField'
 import { COLOR_OPTIONS } from '../../../../../../photonics-dmx/constants/options'
 import {
   AUDIO_EVENT_OPTIONS,
@@ -121,12 +122,13 @@ function getInitialValueInput(
     case 'number':
     default:
       return (
-        <input
-          type="number"
-          step="0.1"
+        <DraftNumberField
+          step={0.1}
+          // A cue variable holds whatever the author needs, so keep the precision they type.
+          decimals={6}
           className="rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={(value as number) ?? 0}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          onCommit={onChange}
         />
       )
   }

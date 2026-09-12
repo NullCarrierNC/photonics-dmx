@@ -92,6 +92,44 @@ afterEach(() => {
   jest.useRealTimers()
 })
 
+describe('CueConsistencySettings number fields', () => {
+  it('saves a hold time when the user leaves the field, not per keystroke', async () => {
+    await renderPanel({ motionGloballyEnabled: true })
+    const box = control<HTMLInputElement>('motion-min-hold-ms')
+
+    fireEvent.change(box, { target: { value: '8' } })
+    fireEvent.change(box, { target: { value: '8000' } })
+    expect(mocks.setMotionCueMinHoldMs).not.toHaveBeenCalled()
+
+    fireEvent.blur(box)
+    await waitFor(() => expect(mocks.setMotionCueMinHoldMs).toHaveBeenCalledWith(8000))
+  })
+
+  it('leaves a saved hold time alone when the field is cleared', async () => {
+    await renderPanel({ motionGloballyEnabled: true })
+    const box = control<HTMLInputElement>('motion-min-hold-ms')
+
+    fireEvent.change(box, { target: { value: '' } })
+    fireEvent.blur(box)
+
+    expect(mocks.setMotionCueMinHoldMs).not.toHaveBeenCalled()
+    expect(box.value).toBe('5000')
+  })
+
+  it('saves the switch timer range when the user leaves a bound', async () => {
+    await renderPanel({ motionGloballyEnabled: true })
+    const lower = control<HTMLInputElement>('rb3-motion-duration')
+
+    fireEvent.change(lower, { target: { value: '9' } })
+    expect(mocks.setRb3MotionCueDuration).not.toHaveBeenCalled()
+
+    fireEvent.blur(lower)
+    await waitFor(() =>
+      expect(mocks.setRb3MotionCueDuration).toHaveBeenCalledWith({ min: 9, max: 20 }),
+    )
+  })
+})
+
 describe('CueConsistencySettings load', () => {
   it('reads every preference it renders, in one pass', async () => {
     await renderPanel()

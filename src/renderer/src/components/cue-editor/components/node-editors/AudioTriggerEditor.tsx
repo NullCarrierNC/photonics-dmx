@@ -15,6 +15,7 @@ import {
   triggerMatchesInstrumentPreset,
 } from '../../lib/audioTriggerPresets'
 import { AUDIO_TRIGGER_PROPERTY_DOCS, DOC_BLOCK_CLASS } from './eventNodeDocs'
+import { DraftNumberField } from '../../../controls/DraftField'
 
 const DEFAULT_TRIGGER_COLOR = '#60a5fa'
 
@@ -140,43 +141,43 @@ const AudioTriggerEditor: React.FC<AudioTriggerEditorProps> = ({ trigger, update
       <label className="flex flex-col font-medium">
         Frequency range (Hz)
         <div className="mt-1 flex gap-1">
-          <input
-            type="number"
+          <DraftNumberField
+            aria-label="Lowest frequency (Hz)"
             min={20}
             max={20000}
             step={10}
-            readOnly={hasActivePreset}
+            disabled={hasActivePreset}
             className={`w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700 ${
               hasActivePreset ? 'cursor-not-allowed opacity-60' : ''
             }`}
             value={trigger.frequencyRange?.minHz ?? 120}
-            onChange={(e) =>
+            onCommit={(minHz) =>
               patchTrigger({
                 frequencyRange: {
                   ...trigger.frequencyRange,
-                  minHz: Number(e.target.value),
+                  minHz,
                   maxHz: trigger.frequencyRange?.maxHz ?? 500,
                 },
               })
             }
           />
           <span className="self-center">-</span>
-          <input
-            type="number"
+          <DraftNumberField
+            aria-label="Highest frequency (Hz)"
             min={20}
             max={20000}
             step={10}
-            readOnly={hasActivePreset}
+            disabled={hasActivePreset}
             className={`w-full rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700 ${
               hasActivePreset ? 'cursor-not-allowed opacity-60' : ''
             }`}
             value={trigger.frequencyRange?.maxHz ?? 500}
-            onChange={(e) =>
+            onCommit={(maxHz) =>
               patchTrigger({
                 frequencyRange: {
                   ...trigger.frequencyRange,
                   minHz: trigger.frequencyRange?.minHz ?? 120,
-                  maxHz: Number(e.target.value),
+                  maxHz,
                 },
               })
             }
@@ -235,13 +236,13 @@ const AudioTriggerEditor: React.FC<AudioTriggerEditorProps> = ({ trigger, update
       </label>
       <label className="flex flex-col font-medium">
         Hold time (ms)
-        <input
-          type="number"
+        <DraftNumberField
+          aria-label="Hold time (ms)"
           min={0}
           step={10}
           className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
           value={trigger.holdMs ?? 0}
-          onChange={(e) => patchTrigger({ holdMs: Math.max(0, Number(e.target.value) || 0) })}
+          onCommit={(holdMs) => patchTrigger({ holdMs })}
         />
         <div className={DOC_BLOCK_CLASS}>
           {AUDIO_TRIGGER_PROPERTY_DOCS.holdMs.description}

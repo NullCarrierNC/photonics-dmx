@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
-import { waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
@@ -95,5 +95,26 @@ describe('CueRegistrySelector', () => {
     )
 
     await waitFor(() => expect(onGroupChange).toHaveBeenCalledWith(['rb3-stagekit']))
+  })
+
+  it('reports a BPM when the user leaves the field, not per keystroke', async () => {
+    const onBpmChange = jest.fn()
+    renderWithProviders(
+      <CueRegistrySelector
+        {...baseProps}
+        onBpmChange={onBpmChange}
+        onGroupChange={jest.fn()}
+        selectedGroupId="yarg-stagekit"
+        selectedRegistryType="YARG"
+      />,
+    )
+    const field = await screen.findByLabelText('BPM')
+
+    fireEvent.change(field, { target: { value: '1' } })
+    fireEvent.change(field, { target: { value: '140' } })
+    expect(onBpmChange).not.toHaveBeenCalled()
+
+    fireEvent.blur(field)
+    expect(onBpmChange).toHaveBeenCalledWith(140)
   })
 })

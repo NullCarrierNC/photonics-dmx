@@ -4,6 +4,7 @@
  * Saving, and putting a value back when a save is refused, stays with the panel.
  */
 import React from 'react'
+import { DraftNumberField } from '../controls/DraftField'
 
 const LABEL_CLASS = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'
 const HELP_CLASS = 'text-xs text-gray-500 dark:text-gray-400 mt-2'
@@ -118,12 +119,11 @@ interface BoundedNumberFieldProps {
   placeholder: string
   help: React.ReactNode
   disabled: boolean
-  /** Given the typed number already held inside min and max. */
-  onChange: (value: number) => void
-  onCommit: () => void
+  /** Given the typed number, held inside min and max. */
+  onCommit: (value: number) => void
 }
 
-/** A number entry held inside its range as it is typed, saved when it loses focus. */
+/** A number entry held inside its range, saved when the user has finished with it. */
 export const BoundedNumberField: React.FC<BoundedNumberFieldProps> = ({
   id,
   label,
@@ -135,7 +135,6 @@ export const BoundedNumberField: React.FC<BoundedNumberFieldProps> = ({
   placeholder,
   help,
   disabled,
-  onChange,
   onCommit,
 }) => (
   <div>
@@ -143,18 +142,13 @@ export const BoundedNumberField: React.FC<BoundedNumberFieldProps> = ({
       {label}
     </label>
     <div className="flex items-center space-x-4">
-      <input
-        type="number"
+      <DraftNumberField
         id={id}
         min={min}
         max={max}
         step={step}
         value={value}
-        onChange={(event) => {
-          const typed = parseInt(event.target.value, 10) || 0
-          onChange(Math.max(min, Math.min(max, typed)))
-        }}
-        onBlur={onCommit}
+        onCommit={onCommit}
         className={`w-32 ${INPUT_CLASS}`}
         disabled={disabled}
         placeholder={placeholder}
