@@ -22,6 +22,11 @@ jest.mock('../../controllers/sequencer/LayerManager')
 jest.mock('../../controllers/sequencer/Sequencer')
 jest.mock('../../controllers/sequencer/Clock')
 
+/** How many times the controller said a blackout was already running. */
+function refusalsLogged(warn: jest.SpiedFunction<typeof console.warn>): number {
+  return warn.mock.calls.filter(([line]) => String(line).includes('already in progress')).length
+}
+
 describe('SystemEffectsController', () => {
   let lightTransitionController: jest.Mocked<LightTransitionController>
   let layerManager: jest.Mocked<LayerManager>
@@ -241,6 +246,35 @@ describe('SystemEffectsController', () => {
       expect(layerManager.removeActiveEffect).toHaveBeenCalled()
       expect(onComplete).toHaveBeenCalledTimes(1)
       expect(systemEffectsController.isBlackoutActive()).toBe(false)
+    })
+
+    it('reports a refused request once for the blackout that is running', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const running = systemEffectsController.blackout(1000)
+      for (let request = 0; request < 6; request += 1) {
+        void systemEffectsController.blackout(500)
+      }
+      await jest.advanceTimersByTimeAsync(1500)
+      await running
+
+      expect(refusalsLogged(warn)).toBe(1)
+      warn.mockRestore()
+    })
+
+    it('reports again for the next blackout', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+      for (let run = 0; run < 2; run += 1) {
+        const running = systemEffectsController.blackout(1000)
+        void systemEffectsController.blackout(500)
+        void systemEffectsController.blackout(500)
+        await jest.advanceTimersByTimeAsync(1500)
+        await running
+      }
+
+      expect(refusalsLogged(warn)).toBe(2)
+      warn.mockRestore()
     })
 
     it('dispose mid-blackout clears the timers and skips the wipe', async () => {

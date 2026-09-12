@@ -19,6 +19,8 @@ export class SystemEffectsController implements ISystemEffectsController {
   private pendingResolvers: Set<() => void> = new Set()
   /** Bumped at each blackout start; a continuation whose generation is stale must not touch state. */
   private generation = 0
+  /** Whether the running blackout has already reported a request it refused. */
+  private reportedRefusal = false
 
   // Callback for blackout completion events (both immediate and timed)
   private onBlackoutCompleteCallback: (() => void) | null = null
@@ -84,7 +86,12 @@ export class SystemEffectsController implements ISystemEffectsController {
         this.cancelBlackout()
       }
     } else if (this.isBlackingOut) {
-      log.warn(`Blackout is already in progress. Ignoring the new blackout request.`)
+      // A cue streaming blackouts asks again on every frame, so the refusal is reported once for
+      // the run that refused it.
+      if (!this.reportedRefusal) {
+        this.reportedRefusal = true
+        log.warn('Blackout is already in progress. Ignoring this and any further requests.')
+      }
       return
     }
 
@@ -106,6 +113,7 @@ export class SystemEffectsController implements ISystemEffectsController {
     }
 
     this.isBlackingOut = true
+    this.reportedRefusal = false
     const generation = ++this.generation
 
     log.info(`Initiating blackout for ${duration}ms.`)
