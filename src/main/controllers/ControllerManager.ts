@@ -182,13 +182,17 @@ export class ControllerManager {
     return this.lifecycle.phase
   }
 
-  /**
-   * Initialize all controllers and systems
-   */
+  /** Initialize all controllers and systems. */
   public async init(): Promise<void> {
     if (this.isInitialized) {
       return
     }
+    // The cold start, a retry, console mode, the simulation handlers and the listener toggles can
+    // all ask for a graph at once, and they should get the same one.
+    await this.lifecycle.runSharedInit(() => this.buildGraph())
+  }
+
+  private async buildGraph(): Promise<void> {
     if (this.lifecycle.phase === 'shuttingDown' || this.lifecycle.phase === 'stopped') {
       throw new LifecycleAbortedError(
         `ControllerManager.init aborted: shutdown in progress or already complete (phase=${this.lifecycle.phase})`,
