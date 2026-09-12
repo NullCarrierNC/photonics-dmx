@@ -668,4 +668,39 @@ describe('ConfigurationManager', () => {
       expect(changed).toBe(false)
     })
   })
+
+  describe('overlapping preference writers', () => {
+    test('two audio writers both survive', async () => {
+      await Promise.all([
+        configManager.updateAudioConfig({ sensitivity: 3 }),
+        configManager.updateAudioConfig({ noiseFloor: 40 }),
+      ])
+
+      const stored = configManager.getPreference('audioConfig')
+      expect(stored?.sensitivity).toBe(3)
+      expect(stored?.noiseFloor).toBe(40)
+    })
+
+    test('two game mode writers both survive', async () => {
+      await Promise.all([
+        configManager.updateAudioGameModeConfig({ enabled: true }),
+        configManager.updateAudioGameModeConfig({ cueDurationMax: 42 }),
+      ])
+
+      const stored = configManager.getAudioGameModeConfig()
+      expect(stored.enabled).toBe(true)
+      expect(stored.cueDurationMax).toBe(42)
+    })
+
+    test('a hold time written beside a domain change keeps both', async () => {
+      await Promise.all([
+        configManager.setMotionCueMinimumHoldMs(7000),
+        configManager.updateCueDomain('yargMotion', { probabilityPercent: 25 }),
+      ])
+
+      const domains = configManager.getAllPreferences().cueDomains
+      expect(domains.yargMotion.minimumHoldMs).toBe(7000)
+      expect(domains.yargMotion.probabilityPercent).toBe(25)
+    })
+  })
 })

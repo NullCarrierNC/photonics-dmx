@@ -218,12 +218,16 @@ export class ConfigurationManager {
    */
   async setMotionCueMinimumHoldMs(ms: number): Promise<void> {
     const clamped = Math.max(0, Math.min(600000, Math.round(ms)))
-    const c = this.preferences.get()
-    await this.setPreference('cueDomains', {
-      ...c.cueDomains,
-      yargMotion: { ...c.cueDomains.yargMotion, minimumHoldMs: clamped },
-      audioMotion: { ...c.cueDomains.audioMotion, minimumHoldMs: clamped },
-    })
+    // Read and write in the one turn, so a write that lands in between is not overwritten with the
+    // whole cueDomains object as it was before that write.
+    await this.preferences.mutate((current) => ({
+      ...current,
+      cueDomains: {
+        ...current.cueDomains,
+        yargMotion: { ...current.cueDomains.yargMotion, minimumHoldMs: clamped },
+        audioMotion: { ...current.cueDomains.audioMotion, minimumHoldMs: clamped },
+      },
+    }))
   }
 
   /**
@@ -350,13 +354,11 @@ export class ConfigurationManager {
    * Note: The 'enabled' field is never persisted (runtime-only state)
    */
   async updateAudioConfig(updates: Partial<AppPreferences['audioConfig']>): Promise<void> {
-    const current = this.getPreference('audioConfig') || {}
-    const updated = { ...current, ...updates }
-
-    const { enabled: _enabled, ...configToSave } = updated
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stripped audio config shape
-    await this.setPreference('audioConfig', configToSave as any)
+    await this.preferences.mutate((current) => {
+      const { enabled: _enabled, ...configToSave } = { ...(current.audioConfig ?? {}), ...updates }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stripped audio config shape
+      return { ...current, audioConfig: configToSave as any }
+    })
   }
 
   /**
@@ -372,8 +374,11 @@ export class ConfigurationManager {
   }
 
   async updateAudioGameModeConfig(updates: Partial<AudioGameModeConfig>): Promise<void> {
-    const merged = { ...this.getAudioGameModeConfig(), ...updates }
-    await this.setPreference('audioGameMode', merged)
+    await this.preferences.mutate((current) => {
+      const stored = current.audioGameMode
+      const base = stored ? { ...DEFAULT_AUDIO_GAME_MODE, ...stored } : DEFAULT_AUDIO_GAME_MODE
+      return { ...current, audioGameMode: { ...base, ...updates } }
+    })
   }
 
   // DMX Rigs Methods
