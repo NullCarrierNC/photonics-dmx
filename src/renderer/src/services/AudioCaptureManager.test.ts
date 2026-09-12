@@ -320,6 +320,83 @@ describe('AudioCaptureManager stop', () => {
   })
 })
 
+describe('AudioCaptureManager start and stop overlap', () => {
+  /** Holds the first device request open until the test lets it through. */
+  function gateFirstDeviceRequest(): { open: () => void } {
+    let release: (() => void) | null = null
+    let gated = true
+    getUserMedia.mockImplementation(() => {
+      if (!gated) {
+        return Promise.resolve(stream)
+      }
+      gated = false
+      return new Promise((resolve) => {
+        release = () => resolve(stream)
+      })
+    })
+    return { open: () => release?.() }
+  }
+
+  /** Waits for the manager to have asked the browser for a device. */
+  async function deviceRequested(): Promise<void> {
+    for (let attempt = 0; attempt < 20 && getUserMedia.mock.calls.length === 0; attempt++) {
+      await Promise.resolve()
+    }
+  }
+
+  it('gives the microphone back when a stop lands while the device is opening', async () => {
+    const gate = gateFirstDeviceRequest()
+    const manager = new AudioCaptureManager()
+    const starting = manager.start()
+    await deviceRequested()
+
+    manager.stop()
+    gate.open()
+    await starting
+
+    expect(manager.isActive()).toBe(false)
+    expect(track.stop).toHaveBeenCalled()
+    expect(audioContextCalls).toBe(0)
+    expect(pendingFrames()).toBe(0)
+    expect(sendAudioData).not.toHaveBeenCalled()
+  })
+
+  it('opens one device when two starts overlap', async () => {
+    const gate = gateFirstDeviceRequest()
+    const manager = new AudioCaptureManager()
+    const first = manager.start()
+    const second = manager.start()
+    await deviceRequested()
+
+    gate.open()
+    await Promise.all([first, second])
+
+    expect(getUserMedia).toHaveBeenCalledTimes(1)
+    expect(audioContextCalls).toBe(1)
+    expect(pendingFrames()).toBe(1)
+
+    manager.stop()
+
+    expect(pendingFrames()).toBe(0)
+    expect(track.stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens the device again when a stop and a start land while it is opening', async () => {
+    const gate = gateFirstDeviceRequest()
+    const manager = new AudioCaptureManager()
+    const first = manager.start()
+    await deviceRequested()
+
+    manager.stop()
+    const second = manager.start()
+    gate.open()
+    await Promise.all([first, second])
+
+    expect(manager.isActive()).toBe(true)
+    expect(pendingFrames()).toBe(1)
+  })
+})
+
 describe('AudioCaptureManager devices', () => {
   it('offers only the audio inputs', async () => {
     enumerateDevices.mockResolvedValue([

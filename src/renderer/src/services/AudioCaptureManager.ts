@@ -75,6 +75,13 @@ export class AudioCaptureManager {
   private config: AudioConfig
   private isCapturing = false
 
+  /** Serialises device opens so two starts cannot hold two devices. */
+  private startQueue: Promise<void> = Promise.resolve()
+  /** True while a device is being opened, which tells an early stop from an idle one. */
+  private opening = false
+  /** Moved on by every start and every stop, so an opening device knows it is no longer wanted. */
+  private startGeneration = 0
+
   /** Smoothed energy for display only; not used for beat thresholds */
   private smoothedEnergy = 0
 
@@ -115,14 +122,30 @@ export class AudioCaptureManager {
   }
 
   /**
-   * Start audio capture from the specified device (or default)
+   * Start audio capture from the specified device (or default).
+   *
+   * Opening a device is awaited, so starts are queued behind each other and a stop that arrives
+   * during one is honoured by {@link openDevice} rather than lost.
    */
   async start(deviceId?: string): Promise<void> {
+    const requested = ++this.startGeneration
+    const open = (): Promise<void> => this.openDevice(deviceId, requested)
+    const attempt = this.startQueue.then(open, open)
+    this.startQueue = attempt.catch(() => undefined)
+    await attempt
+  }
+
+  private async openDevice(deviceId: string | undefined, requested: number): Promise<void> {
+    if (requested !== this.startGeneration) {
+      log.info('Skipping an audio start that was superseded before it opened a device')
+      return
+    }
     if (this.isCapturing) {
       log.warn('AudioCaptureManager is already capturing')
       return
     }
 
+    this.opening = true
     try {
       log.info('Starting audio capture...', deviceId ? `device: ${deviceId}` : 'default device')
 
@@ -133,6 +156,14 @@ export class AudioCaptureManager {
 
       this.stream = await navigator.mediaDevices.getUserMedia(constraints)
       log.info('Microphone access granted')
+
+      // The device is live from here on. A stop that arrived while it was opening moved the
+      // generation on, and this is the first moment we can act on it.
+      if (requested !== this.startGeneration) {
+        log.info('Audio capture was stopped while the device was opening')
+        this.releasePartialStart()
+        return
+      }
 
       // Create Web Audio API context
       this.audioContext = new AudioContext()
@@ -203,6 +234,8 @@ export class AudioCaptureManager {
 
       // For non-DOMException errors, preserve the original error
       throw error
+    } finally {
+      this.opening = false
     }
   }
 
@@ -231,7 +264,14 @@ export class AudioCaptureManager {
   }
 
   stop(): void {
+    // Moving the generation on tells a start that is still opening a device to release it.
+    this.startGeneration += 1
+
     if (!this.isCapturing) {
+      if (this.opening) {
+        log.info('Stopping audio capture before the device has finished opening')
+        return
+      }
       log.warn('AudioCaptureManager is not capturing')
       return
     }
