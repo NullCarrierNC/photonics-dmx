@@ -6,6 +6,8 @@ import { describe, expect, it, jest } from '@jest/globals'
 import { EventEmitter } from 'node:events'
 import type { WebContents } from 'electron'
 import { bindConsoleModeToRenderer } from '../../controllers/consoleRendererBinding'
+import { ConsoleModeController } from '../../controllers/ConsoleModeController'
+import type { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
 
 function fakeWebContents(): { emitter: EventEmitter; webContents: WebContents } {
   const emitter = new EventEmitter()
@@ -63,5 +65,32 @@ describe('console mode follows the page that opened it', () => {
     emitter.emit('destroyed')
 
     expect(disable).toHaveBeenCalledTimes(1)
+  })
+
+  it('takes DMX output back off the manual buffer when the page reloads', async () => {
+    const setManualBuffer = jest.fn()
+    const clearManualBuffer = jest.fn()
+    const consoleMode = new ConsoleModeController({
+      getConfig: () => ({ getDmxRig: () => ({ id: 'rig-1' }) }) as unknown as ConfigurationManager,
+      ensureInitialized: async () => {},
+      getDmxPublisher: () => ({ setManualBuffer, clearManualBuffer }),
+      getListenerSnapshot: () => ({ yarg: false, rb3: false }),
+      getIsAudioEnabled: () => false,
+      pauseYarg: async () => {},
+      pauseRb3: async () => {},
+      pauseAudio: async () => {},
+      refreshActiveRigs: () => {},
+      restartControllers: async () => {},
+    })
+    await consoleMode.enableConsoleMode('rig-1')
+    expect(setManualBuffer).toHaveBeenCalled()
+
+    const { emitter, webContents } = fakeWebContents()
+    bindConsoleModeToRenderer(webContents, () => consoleMode.disableConsoleMode())
+    emitter.emit('did-start-navigation', { isMainFrame: true, isSameDocument: false })
+    await Promise.resolve()
+
+    expect(clearManualBuffer).toHaveBeenCalled()
+    expect(consoleMode.getConsoleRestore()).toBeNull()
   })
 })

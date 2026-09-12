@@ -106,6 +106,14 @@ describe('RB3 strobe against the frame it renders in', () => {
     expect(run.whiteAfterStop).toBe(false)
   })
 
+  it('flashes the fastest strobe on a clock halfway through the window', async () => {
+    const run = await runStrobe(25, 'fastest')
+
+    expect(run.flashes).toBeGreaterThanOrEqual(12)
+    expect(run.whiteMs).toBeLessThan(WINDOW_MS * 0.75)
+    expect(run.whiteAfterStop).toBe(false)
+  })
+
   it('flashes at the rate it asks for when the frame can show it', async () => {
     const run = await runStrobe(10, 'fastest')
 

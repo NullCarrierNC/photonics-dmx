@@ -9,6 +9,7 @@ import {
   repairCueDomains,
 } from '../preferencesMigration'
 import type { AppPreferences } from '../configurationDefaults'
+import { validateSenderEnablePayload } from '../../../main/ipc/validation/senderValidation'
 import {
   CUE_DOMAINS,
   createDefaultCueDomainPrefs,
@@ -270,6 +271,20 @@ describe('healStoredSenderConfigs', () => {
     expect(out.sacnConfig?.useUnicast).toBe(true)
     expect(out.sacnConfig?.unicastDestination).toBe('10.0.0.4')
     expect(out.effectDebounce).toBe(9)
+  })
+})
+
+describe('a healed sACN universe starts a sender', () => {
+  it('heals a stored zero into a universe the enable payload accepts', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      sacnConfig: { universe: 0, useUnicast: false },
+    } as AppPreferences
+
+    const healed = healStoredSenderConfigs(prefs)
+    const check = validateSenderEnablePayload({ sender: 'sacn', ...healed.sacnConfig })
+
+    expect(check.ok).toBe(true)
   })
 })
 
