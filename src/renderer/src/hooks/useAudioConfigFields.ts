@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useDebouncedSave } from './useDebouncedSave'
 import { getAudioConfig, saveAudioConfig } from '../ipcApi'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
@@ -59,9 +60,8 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
   // field list is what matters, and that does not change.
   const fields = useRef(Object.keys(defaults) as K[])
   const loading = useRef<Promise<void> | null>(null)
-  // A debounced save holds one timer and the values from before the burst began, so a revert goes
-  // back to what was stored rather than to the middle of a drag, along with the fields it touched.
-  const quietTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // A debounced save holds the values from before the burst began, so a revert goes back to what
+  // was stored rather than to the middle of a drag, along with the fields it touched.
   const burstPrevious = useRef<T | null>(null)
   const burstFields = useRef<Set<K>>(new Set())
 
@@ -163,15 +163,8 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
     [apply],
   )
 
-  const cancelPending = useCallback((): void => {
-    if (quietTimer.current !== null) {
-      clearTimeout(quietTimer.current)
-      quietTimer.current = null
-    }
-  }, [])
-
-  /** Write whatever a debounced burst was holding, if one is still pending. */
-  const flushPending = useCallback((): void => {
+  /** Write what the burst left behind, putting back only the fields it touched if that is refused. */
+  const writeBurst = useCallback(async (): Promise<void> => {
     if (burstPrevious.current === null) {
       return
     }
@@ -183,26 +176,11 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
     for (const key of touched) {
       revert[key] = before[key]
     }
-    void (async () => {
-      await loading.current
-      await persist(latest.current, revert)
-    })()
+    await loading.current
+    await persist(latest.current, revert)
   }, [persist])
 
-  // Held in a ref so the unmount write uses the current flush, not the one from the first render.
-  const flushRef = useRef(flushPending)
-  useEffect(() => {
-    flushRef.current = flushPending
-  }, [flushPending])
-
-  // A burst that has not settled is written on the way out rather than dropped, so leaving a tab
-  // within the quiet window does not silently lose the change.
-  useEffect(() => {
-    return () => {
-      cancelPending()
-      flushRef.current()
-    }
-  }, [cancelPending])
+  const burstSaver = useDebouncedSave<void>(writeBurst, { quietMs: SAVE_QUIET_MS })
 
   const saveSoon = useCallback(
     (patch: Partial<T>, quietMs: number = SAVE_QUIET_MS): void => {
@@ -213,13 +191,11 @@ export function useAudioConfigFields<K extends keyof AudioConfig>(
         burstFields.current.add(key)
       }
       apply(patch)
-      cancelPending()
-      quietTimer.current = setTimeout(() => {
-        quietTimer.current = null
-        flushPending()
-      }, quietMs)
+      // The values to write are held on the panel's own state, so the burst carries no value of
+      // its own, only the fact that one is due.
+      burstSaver.saveSoon(undefined, quietMs)
     },
-    [apply, cancelPending, flushPending],
+    [apply, burstSaver],
   )
 
   const commit = useCallback(async (): Promise<AudioSaveOutcome> => {

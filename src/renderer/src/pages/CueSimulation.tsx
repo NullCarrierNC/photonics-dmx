@@ -33,7 +33,6 @@ import {
   startRb3TestEffect,
   stopTestEffect,
   getPrefs,
-  savePrefs,
   getCueGroups,
   getRb3CueGroups,
   getAvailableCues,
@@ -47,7 +46,15 @@ import {
   stopMotionCueSimulation,
 } from '../ipcApi'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
+import { useDebouncedSave } from '@renderer/hooks/useDebouncedSave'
+import { persistPrefs } from '../ipc/persistPrefs'
+import type { AppPreferences } from '../../../shared/ipcTypes'
 import { createLogger } from '../../../shared/logger'
+
+type SimulationSettings = NonNullable<AppPreferences['simulationSettings']>
+
+/** How long the selections have to stop changing before they are stored. */
+const SETTINGS_QUIET_MS = 500
 import {
   instrumentNotePayload,
   simulationContext,
@@ -116,7 +123,7 @@ const CueSimulation: React.FC = () => {
   const isInitialMount = useRef(true)
   const isFullyInitialized = useRef(false)
   const isLoadingFromPrefs = useRef(false)
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null)
   // The effect to restore and the group it belongs to. Carrying the group is what makes the
   // restore independent of when the load flag clears: the group arrives as a state update, so by
   // the time the effects below run the flag has already gone false and cannot be used to tell a
@@ -177,10 +184,6 @@ const CueSimulation: React.FC = () => {
           log.error('Error clearing simulated post-processing on unmount:', error)
         })
       }
-      // Clear any pending save timeout
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
     }
   }, [])
 
@@ -237,35 +240,32 @@ const CueSimulation: React.FC = () => {
     loadSettings()
   }, [])
 
-  // Save simulation settings when they change (debounced)
-  const saveSettings = useCallback(() => {
+  // The page remembers what was last simulated. A selection changes as fast as the user clicks, so
+  // the write waits for the clicking to stop and still goes out if the page is left first.
+  const writeSimulationSettings = useCallback(
+    (settings: SimulationSettings) =>
+      persistPrefs({ simulationSettings: settings }, 'the simulation settings', (message) =>
+        setSettingsSaveError(message),
+      ),
+    [],
+  )
+  const settingsSaver = useDebouncedSave(writeSimulationSettings, { quietMs: SETTINGS_QUIET_MS })
+
+  useEffect(() => {
     if (isLoadingFromPrefs.current) {
-      return // Don't save during initial load
+      return
     }
-
-    // Clear any pending save
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-    }
-
-    // Debounce the save operation
-    saveTimeoutRef.current = setTimeout(async () => {
-      try {
-        await savePrefs({
-          simulationSettings: {
-            registryType: selectedRegistryType,
-            groupId: selectedGroupId,
-            effectId: selectedEffect?.id || null,
-            venueSize: selectedVenueSize,
-            bpm: selectedBpm,
-            instrument: selectedInstrument,
-          },
-        })
-      } catch (error) {
-        log.error('Error saving simulation settings:', error)
-      }
-    }, 500) // 500ms debounce
+    setSettingsSaveError(null)
+    settingsSaver.saveSoon({
+      registryType: selectedRegistryType,
+      groupId: selectedGroupId,
+      effectId: selectedEffect?.id || null,
+      venueSize: selectedVenueSize,
+      bpm: selectedBpm,
+      instrument: selectedInstrument,
+    })
   }, [
+    settingsSaver,
     selectedRegistryType,
     selectedGroupId,
     selectedEffect?.id,
@@ -273,13 +273,6 @@ const CueSimulation: React.FC = () => {
     selectedBpm,
     selectedInstrument,
   ])
-
-  // Save settings when they change
-  useEffect(() => {
-    if (!isLoadingFromPrefs.current) {
-      saveSettings()
-    }
-  }, [saveSettings])
 
   // Load saved effect after group is loaded and effects are available
   useEffect(() => {
@@ -525,6 +518,12 @@ const CueSimulation: React.FC = () => {
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
       <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Cue Simulation</h1>
+
+      {settingsSaveError && (
+        <p className="mb-4 text-sm text-red-600 dark:text-red-400" role="alert">
+          {settingsSaveError}
+        </p>
+      )}
 
       {/* Photonics input/output toggle component as the first thing */}
       <DmxSettingsAccordion startOpen={true} />

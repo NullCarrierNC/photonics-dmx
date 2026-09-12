@@ -7,6 +7,7 @@
  * A pending write still goes out when the panel unmounts, without touching state that has gone.
  */
 import { useCallback, useEffect, useRef } from 'react'
+import { useDebouncedSave } from '../../hooks/useDebouncedSave'
 import { createLogger } from '../../../../shared/logger'
 
 const log = createLogger('CueConsistencySettings')
@@ -30,29 +31,26 @@ export function useProbabilitySaver(
   apply: (percent: number) => void,
   label: string,
 ): ProbabilitySaver {
-  const pending = useRef<{
-    timer: ReturnType<typeof setTimeout> | null
-    pendingValue: number | null
-    lastSentValue: number | null
-  }>({ timer: null, pendingValue: null, lastSentValue: null })
+  // What main answered with is what the slider ends up showing, and what an unmoved slider is
+  // compared against, so the write records it back.
+  const recordStored = useRef<(percent: number) => void>(() => {})
+  // The panel may be gone by the time a write answers, so the value is applied through whatever
+  // the flush was given rather than straight to state.
+  const applyAnswer = useRef(apply)
+  useEffect(() => {
+    applyAnswer.current = apply
+  }, [apply])
 
-  const send = useCallback(
-    async (applyServerValue: (percent: number) => void) => {
-      const next = pending.current.pendingValue
-      if (next == null) return
-      if (next === pending.current.lastSentValue) {
-        pending.current.pendingValue = null
-        return
-      }
-      pending.current.pendingValue = null
+  const write = useCallback(
+    async (percent: number): Promise<void> => {
       const take = (result: PercentResult): void => {
         if (result.success && typeof result.percent === 'number') {
-          pending.current.lastSentValue = result.percent
-          applyServerValue(result.percent)
+          recordStored.current(result.percent)
+          applyAnswer.current(result.percent)
         }
       }
       try {
-        const result = await save(next)
+        const result = await save(percent)
         if (result.success) {
           take(result)
         } else {
@@ -71,50 +69,34 @@ export function useProbabilitySaver(
     [save, reload, label],
   )
 
-  const onCommit = useCallback(() => {
-    if (pending.current.timer) {
-      clearTimeout(pending.current.timer)
-      pending.current.timer = null
-    }
-    void send(apply)
-  }, [send, apply])
+  const saver = useDebouncedSave(write, {
+    quietMs: PROBABILITY_SAVE_DEBOUNCE_MS,
+    isEqual: (a, b) => a === b,
+  })
 
   const onChange = useCallback(
     (percent: number) => {
       const clamped = Math.max(0, Math.min(100, Math.round(percent)))
       apply(clamped)
-      pending.current.pendingValue = clamped
-      if (pending.current.timer) {
-        clearTimeout(pending.current.timer)
-      }
-      pending.current.timer = setTimeout(() => {
-        pending.current.timer = null
-        onCommit()
-      }, PROBABILITY_SAVE_DEBOUNCE_MS)
+      saver.saveSoon(clamped)
     },
-    [apply, onCommit],
+    [apply, saver],
   )
 
-  // Held in a ref so the unmount write uses the current save, not the one from the first render.
-  const sendRef = useRef(send)
-  useEffect(() => {
-    sendRef.current = send
-  }, [send])
+  const onCommit = useCallback(() => {
+    saver.flush()
+  }, [saver])
 
   useEffect(() => {
-    const state = pending
-    return () => {
-      if (state.current.timer) {
-        clearTimeout(state.current.timer)
-        state.current.timer = null
-      }
-      void sendRef.current(() => {})
-    }
-  }, [])
+    recordStored.current = saver.seed
+  }, [saver])
 
-  const seed = useCallback((percent: number) => {
-    pending.current.lastSentValue = percent
-  }, [])
+  const seed = useCallback(
+    (percent: number) => {
+      saver.seed(percent)
+    },
+    [saver],
+  )
 
   return { onChange, onCommit, seed }
 }
