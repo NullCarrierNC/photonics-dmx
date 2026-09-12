@@ -74,6 +74,8 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             value={sensitivity}
             onChange={(e) => audio.set({ sensitivity: parseFloat(e.target.value) })}
             onMouseUp={commitSensitivity}
+            onTouchEnd={commitSensitivity}
+            onKeyUp={commitSensitivity}
             disabled={controlsDisabled}
             className={rangeClassName}
             style={sensitivityRangeStyle}
@@ -111,6 +113,8 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             value={noiseFloor}
             onChange={(e) => audio.set({ noiseFloor: parseFloat(e.target.value) })}
             onMouseUp={commitNoiseFloor}
+            onTouchEnd={commitNoiseFloor}
+            onKeyUp={commitNoiseFloor}
             disabled={controlsDisabled}
             className={rangeClassName}
             style={noiseFloorRangeStyle}
@@ -167,6 +171,7 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
               onChange={(e) => audio.set({ strobeTriggerThreshold: Number(e.target.value) })}
               onMouseUp={commitStrobe}
               onTouchEnd={commitStrobe}
+              onKeyUp={commitStrobe}
               disabled={strobeControlsDisabled}
               className={compactStrobeRangeClassName}
               style={strobeTriggerRangeStyle}
@@ -205,6 +210,7 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
               onChange={(e) => audio.set({ strobeProbability: Number(e.target.value) })}
               onMouseUp={commitStrobe}
               onTouchEnd={commitStrobe}
+              onKeyUp={commitStrobe}
               disabled={strobeControlsDisabled}
               className={compactStrobeRangeClassName}
               style={strobeProbabilityRangeStyle}
@@ -255,6 +261,8 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             value={sensitivity}
             onChange={(e) => audio.set({ sensitivity: parseFloat(e.target.value) })}
             onMouseUp={commitSensitivity}
+            onTouchEnd={commitSensitivity}
+            onKeyUp={commitSensitivity}
             disabled={controlsDisabled}
             className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
             style={sensitivityRangeStyle}
@@ -300,6 +308,8 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
             value={noiseFloor}
             onChange={(e) => audio.set({ noiseFloor: parseFloat(e.target.value) })}
             onMouseUp={commitNoiseFloor}
+            onTouchEnd={commitNoiseFloor}
+            onKeyUp={commitNoiseFloor}
             disabled={controlsDisabled}
             className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
             style={noiseFloorRangeStyle}
