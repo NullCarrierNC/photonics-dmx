@@ -93,6 +93,24 @@ describe('ExtraChannelsEditor', () => {
     expect(Array.from(options).map((o) => o.textContent)).toEqual(['Fixed value'])
   })
 
+  it('reports a channel number when the user leaves the field, not per keystroke', () => {
+    const onChange = jest.fn()
+    render(
+      <ExtraChannelsEditor
+        light={fixture(FixtureTypes.RGB, [{ type: 'amber', channel: 5 }])}
+        onChange={onChange}
+      />,
+    )
+    const field = screen.getByLabelText('Amber DMX channel')
+
+    fireEvent.change(field, { target: { value: '1' } })
+    fireEvent.change(field, { target: { value: '12' } })
+    expect(onChange).not.toHaveBeenCalled()
+
+    fireEvent.blur(field)
+    expect(onChange).toHaveBeenCalledWith([{ type: 'amber', channel: 12 }])
+  })
+
   it('accepts a channel number above 255 (the model allows 1–512)', () => {
     const onChange = jest.fn()
     render(
@@ -102,6 +120,7 @@ describe('ExtraChannelsEditor', () => {
       />,
     )
     fireEvent.change(screen.getByLabelText('Amber DMX channel'), { target: { value: '400' } })
+    fireEvent.blur(screen.getByLabelText('Amber DMX channel'))
     expect(onChange).toHaveBeenCalledWith([{ type: 'amber', channel: 400 }])
   })
 
@@ -114,6 +133,7 @@ describe('ExtraChannelsEditor', () => {
       />,
     )
     fireEvent.change(screen.getByLabelText('Amber DMX channel'), { target: { value: '600' } })
+    fireEvent.blur(screen.getByLabelText('Amber DMX channel'))
     expect(onChange).toHaveBeenCalledWith([{ type: 'amber', channel: 512 }])
   })
 })
