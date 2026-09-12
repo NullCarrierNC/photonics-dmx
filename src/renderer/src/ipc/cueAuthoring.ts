@@ -9,7 +9,28 @@ import type {
   NodeCueMode,
 } from '../../../shared/ipcTypes'
 import { EFFECTS, NODE_CUES } from '../../../shared/ipcChannels'
-import { orThrow } from './ipcResult'
+import { orThrow, wasRefused } from './ipcResult'
+
+/** The verdict every validator answers with, whatever else it carries alongside. */
+interface CueValidation {
+  valid: boolean
+  errors: string[]
+}
+
+/**
+ * A refusal carries an error rather than a verdict, and the editor reads the verdict either way,
+ * so a refusal is reported as the file not being usable, with the reason main gave.
+ */
+function asValidation<T extends CueValidation>(result: T | { success: false; error: string }): T {
+  if (wasRefused(result)) {
+    const refusal: CueValidation = {
+      valid: false,
+      errors: [result.error ?? 'Validation was refused without a reason'],
+    }
+    return refusal as T
+  }
+  return result as T
+}
 
 // Listing, reloading and reading answer with a payload that has no error arm of its own, so a
 // refusal becomes a throw here rather than reaching a caller as a value it cannot read.
@@ -40,7 +61,7 @@ export const saveNodeCueFile = (payload: {
 export const deleteNodeCueFile = (filePath: string) => window.api.invoke(NODE_CUES.DELETE, filePath)
 
 export const validateNodeCue = (payload: { path?: string; content?: NodeCueFile }) =>
-  window.api.invoke(NODE_CUES.VALIDATE, payload)
+  window.api.invoke(NODE_CUES.VALIDATE, payload).then(asValidation)
 
 export const getNodeCueTypes = (mode: NodeCueMode, kind?: NodeCueKind) =>
   window.api.invoke(NODE_CUES.GET_CUE_TYPES, { mode, kind }).then(orThrow)
@@ -70,7 +91,7 @@ export const saveEffectFile = (payload: {
 export const deleteEffectFile = (filePath: string) => window.api.invoke(EFFECTS.DELETE, filePath)
 
 export const validateEffect = (payload: { path?: string; content?: EffectFile }) =>
-  window.api.invoke(EFFECTS.VALIDATE, payload)
+  window.api.invoke(EFFECTS.VALIDATE, payload).then(asValidation)
 
 export const pickEffectImportFile = (mode?: EffectMode) =>
   window.api.invoke(EFFECTS.IMPORT_PICK, mode)
