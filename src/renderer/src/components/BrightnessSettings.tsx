@@ -3,6 +3,7 @@ import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
 import { savePrefs } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
+import { DraftNumberField } from './controls/DraftField'
 const log = createLogger('BrightnessSettings')
 
 const BrightnessSettings: React.FC = () => {
@@ -26,6 +27,12 @@ const BrightnessSettings: React.FC = () => {
       setIsLoaded(true)
     }
   }, [prefs.brightness, prefs])
+
+  // The slider previews as it moves and saves when the user lets go, so one drag is one write
+  // rather than one per tick.
+  const previewBrightness = (level: keyof typeof localBrightness, value: number): void => {
+    setLocalBrightness((prev) => ({ ...prev, [level]: value }))
+  }
 
   const handleBrightnessChange = async (level: keyof typeof localBrightness, value: number) => {
     const newBrightness = { ...localBrightness, [level]: value }
@@ -141,22 +148,24 @@ const BrightnessSettings: React.FC = () => {
                 min="0"
                 max="255"
                 value={localBrightness[key]}
-                onChange={(e) => handleBrightnessChange(key, parseInt(e.target.value))}
+                onChange={(e) => previewBrightness(key, parseInt(e.target.value))}
+                onMouseUp={(e) => void handleBrightnessChange(key, parseInt(e.currentTarget.value))}
+                onTouchEnd={(e) =>
+                  void handleBrightnessChange(key, parseInt(e.currentTarget.value))
+                }
+                onKeyUp={(e) => void handleBrightnessChange(key, parseInt(e.currentTarget.value))}
                 className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
                 style={{
                   background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(localBrightness[key] / 255) * 100}%, #e5e7eb ${(localBrightness[key] / 255) * 100}%, #e5e7eb 100%)`,
                 }}
               />
 
-              <input
-                type="number"
-                min="0"
-                max="255"
+              <DraftNumberField
+                min={0}
+                max={255}
                 value={localBrightness[key]}
-                onChange={(e) => {
-                  const value = Math.max(0, Math.min(255, parseInt(e.target.value) || 0))
-                  handleBrightnessChange(key, value)
-                }}
+                onCommit={(value) => void handleBrightnessChange(key, value)}
+                aria-label={`${label} level`}
                 className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
               />
             </div>

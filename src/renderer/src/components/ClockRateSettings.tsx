@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { getClockRate, setClockRate as saveClockRateToBackend } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
+import { DraftNumberField } from './controls/DraftField'
 import {
   CLOCK_RATE_MS_DEFAULT,
   CLOCK_RATE_MS_MAX,
@@ -59,17 +60,6 @@ const ClockRateSettings: React.FC = () => {
     [isSaving],
   )
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value) || 1
-    // Only update the local state immediately, don't save on every keystroke
-    setClockRateValue(clampClockRateMs(value))
-  }
-
-  const handleInputBlur = () => {
-    // Save when the user finishes editing (loses focus)
-    handleClockRateChange(clockRateValue)
-  }
-
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 dark:border-gray-700">
       <h2 className="text-xl font-semibold mb-4 border-b pb-2 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600">
@@ -89,15 +79,16 @@ const ClockRateSettings: React.FC = () => {
             Clock Rate
           </label>
           <div className="flex items-center space-x-4">
-            <input
-              type="number"
+            <DraftNumberField
               id="clock-rate"
               min={CLOCK_RATE_MS_MIN}
               max={CLOCK_RATE_MS_MAX}
-              step="1"
+              step={1}
               value={clockRateValue}
-              onChange={handleInputChange}
-              onBlur={handleInputBlur}
+              // Committing restarts the controllers, so the same rate asked for twice is a request
+              // to restart, not a no-op.
+              commitWhenUnchanged
+              onCommit={(value) => void handleClockRateChange(value)}
               className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading || isSaving}
               placeholder="10"

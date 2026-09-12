@@ -48,6 +48,25 @@ describe('ClockRateSettings', () => {
     await waitFor(() => expect(setClockRateMock).toHaveBeenCalledWith(50))
   })
 
+  it('leaves the saved rate alone when the field is cleared', async () => {
+    const field = await renderPanel()
+
+    fireEvent.change(field, { target: { value: '' } })
+    fireEvent.blur(field)
+
+    expect(setClockRateMock).not.toHaveBeenCalled()
+    expect(field).toHaveValue(10)
+  })
+
+  it('saves the rate again when the same one is asked for', async () => {
+    const field = await renderPanel()
+
+    fireEvent.change(field, { target: { value: '10' } })
+    fireEvent.blur(field)
+
+    await waitFor(() => expect(setClockRateMock).toHaveBeenCalledWith(10))
+  })
+
   it('saves a rate inside the window as typed', async () => {
     const field = await renderPanel()
 

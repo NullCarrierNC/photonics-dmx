@@ -6,6 +6,7 @@ import { getAudioGameMode } from '../ipcApi'
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { DEFAULT_AUDIO_IDLE_DETECTION } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
+import { DraftNumberField } from './controls/DraftField'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('AudioIdleDetectionSettings')
 
@@ -117,43 +118,37 @@ const AudioIdleDetectionSettings: React.FC = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor="idle-min-seconds"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Minimum low-energy time (seconds)
           </label>
-          <input
-            type="number"
+          <DraftNumberField
+            id="idle-min-seconds"
             min={0}
             max={600}
             step={1}
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
             value={idle.minIdleSeconds}
             disabled={fieldsDisabled}
-            onChange={(e) =>
-              audio.set({ idleDetection: { ...idle, minIdleSeconds: Number(e.target.value) } })
-            }
-            onBlur={() =>
-              write({ minIdleSeconds: Math.max(0, Math.min(600, Math.round(idle.minIdleSeconds))) })
-            }
+            onCommit={(minIdleSeconds) => write({ minIdleSeconds })}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor="idle-resume-seconds"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Resume time (seconds)
           </label>
-          <input
-            type="number"
+          <DraftNumberField
+            id="idle-resume-seconds"
             min={0}
             max={60}
             step={1}
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-200"
             value={idle.resumeSeconds}
             disabled={fieldsDisabled}
-            onChange={(e) =>
-              audio.set({ idleDetection: { ...idle, resumeSeconds: Number(e.target.value) } })
-            }
-            onBlur={() =>
-              write({ resumeSeconds: Math.max(0, Math.min(60, Math.round(idle.resumeSeconds))) })
-            }
+            onCommit={(resumeSeconds) => write({ resumeSeconds })}
           />
         </div>
       </div>
