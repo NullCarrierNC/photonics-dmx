@@ -120,4 +120,95 @@ describe('timed blackout', () => {
 
     expect(anyLit()).toBe(true)
   })
+
+  it('does not leave the completed fade behind to hide a later add-only submission', async () => {
+    lightEverything('settled-look')
+
+    const done = harness.sequencer.blackout(50)
+    // Long enough for the fade's own +16ms completion timer to have fired.
+    harness.advanceBy(80)
+    await done
+    expect(anyLit()).toBe(false)
+
+    // A non-clearing submission (unlike setEffect, this never touches layer 255 itself), the way
+    // a secondary or effect-raiser cue resubmits its look every frame.
+    harness.sequencer.addEffect(
+      'after-blackout',
+      getEffectSingleColor({
+        color: WHITE,
+        duration: 0,
+        lights: harness.lightManager.getLights(['front', 'back'], 'all'),
+        layer: 101,
+      }),
+      true,
+    )
+    harness.advanceBy(50)
+
+    expect(anyLit()).toBe(true)
+  })
+
+  it("fades from the light's actual blended colour, not layer 0, when nothing is on layer 0", () => {
+    // The look lives on a layer above 0, so layer 0 itself holds no state at all.
+    void harness.sequencer.setEffect(
+      'raised-look',
+      getEffectSingleColor({
+        color: WHITE,
+        duration: 0,
+        lights: harness.lightManager.getLights(['front', 'back'], 'all'),
+        layer: 5,
+      }),
+      true,
+    )
+    harness.advanceBy(50)
+    expect(anyLit()).toBe(true)
+
+    void harness.sequencer.blackout(100)
+    harness.advanceBy(1)
+
+    // Barely into a 100ms fade: still close to the original colour rather than already black,
+    // which is what reading layer 0's (empty) state as the fade's start colour would produce.
+    const sampleId = harness.allLightIds[0]
+    expect(harness.getLightState(sampleId)?.intensity ?? 0).toBeGreaterThan(200)
+  })
+
+  /** A persistent look above layer 0, the way a primary cue leaves its effects up when it stops. */
+  const lightRaisedLook = (): void => {
+    void harness.sequencer.setEffect(
+      'raised-look',
+      getEffectSingleColor({
+        color: WHITE,
+        duration: 0,
+        lights: harness.lightManager.getLights(['front', 'back'], 'all'),
+        layer: 5,
+      }),
+      true,
+    )
+    harness.advanceBy(50)
+  }
+
+  it('keeps a look above layer 0 dark once the fade has completed', async () => {
+    lightRaisedLook()
+    expect(anyLit()).toBe(true)
+
+    const done = harness.sequencer.blackout(50)
+    harness.advanceBy(80)
+    await done
+    harness.advanceBy(100)
+
+    expect(anyLit()).toBe(false)
+  })
+
+  it('stays dark through a held slow blackout that restarts its fade', async () => {
+    lightRaisedLook()
+
+    // A chart-held Blackout_Slow asks again on every frame; each request after a completed fade
+    // starts a new one.
+    for (let i = 0; i < 6; i++) {
+      const done = harness.sequencer.blackout(50)
+      harness.advanceBy(80)
+      await done
+      harness.advanceBy(20)
+      expect(anyLit()).toBe(false)
+    }
+  })
 })

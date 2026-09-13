@@ -259,6 +259,153 @@ describe('AudioCueProcessor', () => {
     expect(processor.getEffectiveSecondaryCueType()).toBe('proc-secondary')
   })
 
+  it('rolls the strobe probability once per rising edge above threshold, not every frame', async () => {
+    const strobeCue = registry.getCueImplementation('proc-strobe')!
+    // 0.5 * 100 = 50, which fails any probability below 50: the roll never succeeds here.
+    const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.5)
+
+    const fakeChain = {
+      rigId: 'stub-low-prob',
+      isPrimary: true,
+      dmxLightManager: lightManager,
+      sequencer,
+      cueHandlers: { yarg: null, rb3: null },
+      audioCueHandler: null,
+      rb3MenuCueHandler: null,
+    } as unknown as RigChain
+    const chainFanout = new ChainFanout()
+    chainFanout.setChains([fakeChain])
+
+    const lowProbProcessor = new AudioCueProcessor(
+      chainFanout,
+      noopRuntimeBroadcaster(),
+      {
+        ...DEFAULT_AUDIO_CONFIG,
+        strobeEnabled: true,
+        strobeTriggerThreshold: 0.5,
+        strobeProbability: 10,
+      },
+      'proc-primary',
+      'proc-secondary',
+      () => 5000,
+    )
+    lowProbProcessor.start()
+
+    lowProbProcessor.processAudioData(minimalLightingData(0.9))
+    await flushAudioFrame()
+    const callsAfterFirstFrame = randomSpy.mock.calls.length
+    expect(callsAfterFirstFrame).toBeGreaterThan(0)
+    expect(strobeCue.execute).not.toHaveBeenCalled()
+
+    // Energy stays above threshold for two more frames: without rolling once per rising edge,
+    // this would call Math.random again on each of them and, over enough frames, the strobe would
+    // fire on most loud passages even at a 10% probability instead of roughly one in ten.
+    lowProbProcessor.processAudioData(minimalLightingData(0.9))
+    await flushAudioFrame()
+    lowProbProcessor.processAudioData(minimalLightingData(0.9))
+    await flushAudioFrame()
+    expect(randomSpy.mock.calls.length).toBe(callsAfterFirstFrame)
+    expect(lowProbProcessor.getEffectiveStrobeCueType()).toBeNull()
+
+    // Dropping back below threshold and rising again is a new edge, so it rolls once more.
+    lowProbProcessor.processAudioData(minimalLightingData(0.1))
+    await flushAudioFrame()
+    lowProbProcessor.processAudioData(minimalLightingData(0.9))
+    await flushAudioFrame()
+    expect(randomSpy.mock.calls.length).toBeGreaterThan(callsAfterFirstFrame)
+
+    lowProbProcessor.shutdown()
+    randomSpy.mockRestore()
+  })
+
+  describe('strobe release hysteresis', () => {
+    const makeStrobeProcessor = (strobeProbability: number): AudioCueProcessor => {
+      const fakeChain = {
+        rigId: 'stub-hysteresis',
+        isPrimary: true,
+        dmxLightManager: lightManager,
+        sequencer,
+        cueHandlers: { yarg: null, rb3: null },
+        audioCueHandler: null,
+        rb3MenuCueHandler: null,
+      } as unknown as RigChain
+      const chainFanout = new ChainFanout()
+      chainFanout.setChains([fakeChain])
+      return new AudioCueProcessor(
+        chainFanout,
+        noopRuntimeBroadcaster(),
+        {
+          ...DEFAULT_AUDIO_CONFIG,
+          strobeEnabled: true,
+          strobeTriggerThreshold: 0.5,
+          strobeProbability,
+        },
+        'proc-primary',
+        'proc-secondary',
+        () => 5000,
+      )
+    }
+
+    const feed = async (processor: AudioCueProcessor, energies: number[]): Promise<void> => {
+      for (const energy of energies) {
+        processor.processAudioData(minimalLightingData(energy))
+        await flushAudioFrame()
+      }
+    }
+
+    it('rolls once while energy jitters around the threshold, and again after a real drop', async () => {
+      const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.5)
+      const processor = makeStrobeProcessor(10)
+      processor.start()
+
+      await feed(processor, [0.9])
+      const callsAfterRise = randomSpy.mock.calls.length
+      expect(callsAfterRise).toBeGreaterThan(0)
+
+      await feed(processor, [0.49, 0.51, 0.48, 0.52, 0.47, 0.53])
+      expect(randomSpy.mock.calls.length).toBe(callsAfterRise)
+
+      await feed(processor, [0.3, 0.9])
+      expect(randomSpy.mock.calls.length).toBeGreaterThan(callsAfterRise)
+
+      processor.shutdown()
+      randomSpy.mockRestore()
+    })
+
+    it('holds an active strobe through a dip that stays above the release level', async () => {
+      const processor = makeStrobeProcessor(100)
+      processor.start()
+
+      await feed(processor, [0.9])
+      expect(processor.getEffectiveStrobeCueType()).not.toBeNull()
+
+      await feed(processor, [0.48])
+      expect(processor.getEffectiveStrobeCueType()).not.toBeNull()
+
+      await feed(processor, [0.3])
+      expect(processor.getEffectiveStrobeCueType()).toBeNull()
+
+      processor.shutdown()
+    })
+
+    it('rolls again after a stop and restart while the audio is still loud', async () => {
+      const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.5)
+      const processor = makeStrobeProcessor(10)
+      processor.start()
+      await feed(processor, [0.9])
+      const callsBeforeRestart = randomSpy.mock.calls.length
+
+      processor.stop()
+      processor.start()
+      await feed(processor, [0.9])
+
+      expect(randomSpy.mock.calls.length).toBeGreaterThan(callsBeforeRestart)
+
+      processor.shutdown()
+      randomSpy.mockRestore()
+    })
+  })
+
   it('tees each frame to the secondary runtime with the lighting cue types', async () => {
     const runtime = makeSecondaryRuntime()
     processor.setSecondaryRuntime(runtime)

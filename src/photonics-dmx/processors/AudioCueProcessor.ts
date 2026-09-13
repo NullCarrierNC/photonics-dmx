@@ -24,6 +24,13 @@ import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 const log = createLogger('AudioCueProcessor')
 
 /**
+ * Fraction of the strobe trigger threshold that energy has to fall to (or below) before a strobe
+ * ends and the next rise can roll again. The gap keeps energy that hovers around the threshold
+ * from counting as a stream of separate loud passages.
+ */
+const STROBE_RELEASE_FRACTION = 0.9
+
+/**
  * AudioCueProcessor - Processes audio data using cue-based system
  *
  * This processor receives audio analysis data from the renderer process (via IPC)
@@ -44,6 +51,9 @@ export class AudioCueProcessor {
   private gameModeManager: AudioGameModeManager | null = null
   private strobeActive = false
   private strobeCueType: AudioCueType | null = null
+  /** Whether the probability roll already ran for the current loud passage, so a failed roll does
+   *  not re-evaluate every frame and strobe on most loud passages regardless of odds. */
+  private strobeRolledForThisPeak = false
   private onStrobeStateChange: ((active: boolean) => void) | null = null
   private onGameModeCueChange: ((cueType: AudioCueType) => void) | null = null
   private onGameModeScheduleChange: ((info: AudioGameModeSchedulePayload) => void) | null = null
@@ -152,6 +162,7 @@ export class AudioCueProcessor {
     } else {
       this.strobeCueType = null
     }
+    this.strobeRolledForThisPeak = false
     this.chainFanout.audioStop()
     this.registry.onMotionSongEnd()
 
@@ -587,6 +598,7 @@ export class AudioCueProcessor {
         this.strobeCueType = null
         this.strobeActive = false
       }
+      this.strobeRolledForThisPeak = false
       if (strobeBefore !== this.strobeActive) {
         this.onStrobeStateChange?.(this.strobeActive)
       }
@@ -594,23 +606,32 @@ export class AudioCueProcessor {
     }
 
     const energy = audioData.energy
-    const above = energy > this.config.strobeTriggerThreshold
+    const threshold = this.config.strobeTriggerThreshold
+    const above = energy > threshold
+    const released = energy <= threshold * STROBE_RELEASE_FRACTION
 
     if (above && !this.strobeActive) {
-      const prob = this.config.strobeProbability ?? 100
-      if (prob < 100 && Math.random() * 100 >= prob) {
-        return
+      // Roll once per loud passage, not once per frame, or a low probability still strobes on
+      // almost every loud passage instead of the configured fraction of them.
+      if (!this.strobeRolledForThisPeak) {
+        this.strobeRolledForThisPeak = true
+        const prob = this.config.strobeProbability ?? 100
+        if (prob >= 100 || Math.random() * 100 < prob) {
+          const available = this.registry.getAvailableCueTypes()
+          const all = available.length > 0 ? available : this.registry.getAvailableCueTypes(true)
+          const chosen = pickStrobeCueType(this.registry, all)
+          if (chosen && this.registry.getCueImplementation(chosen)) {
+            this.strobeCueType = chosen
+            this.strobeActive = true
+          }
+        }
       }
-      const available = this.registry.getAvailableCueTypes()
-      const all = available.length > 0 ? available : this.registry.getAvailableCueTypes(true)
-      const chosen = pickStrobeCueType(this.registry, all)
-      if (chosen && this.registry.getCueImplementation(chosen)) {
-        this.strobeCueType = chosen
-        this.strobeActive = true
+    } else if (released) {
+      if (this.strobeActive) {
+        this.strobeCueType = null
+        this.strobeActive = false
       }
-    } else if (!above && this.strobeActive) {
-      this.strobeCueType = null
-      this.strobeActive = false
+      this.strobeRolledForThisPeak = false
     }
 
     if (strobeBefore !== this.strobeActive) {

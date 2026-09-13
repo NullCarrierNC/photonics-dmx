@@ -57,6 +57,52 @@ describe('CueGroupCatalog', () => {
     expect(catalog.getActiveGroups()).toEqual(['a'])
   })
 
+  it('keeps a disabled group disabled when a reload unregisters and registers it again', () => {
+    catalog.register(group('a', [CueType.Chorus]))
+    catalog.register(group('b', [CueType.Chorus]))
+    catalog.disableGroup('b')
+
+    catalog.unregister('a')
+    catalog.unregister('b')
+    catalog.register(group('a', [CueType.Chorus]))
+    catalog.register(group('b', [CueType.Chorus]))
+
+    expect(catalog.getEnabledGroups()).toEqual(['a'])
+    expect(catalog.getActiveGroups()).toEqual(['a'])
+  })
+
+  it('keeps an enabled but inactive group inactive across a re-register', () => {
+    catalog.register(group('a', [CueType.Chorus]))
+    catalog.register(group('b', [CueType.Chorus]))
+    catalog.setActiveGroups(['a'])
+
+    catalog.unregister('b')
+    catalog.register(group('b', [CueType.Chorus]))
+
+    expect(catalog.getEnabledGroups().sort()).toEqual(['a', 'b'])
+    expect(catalog.getActiveGroups()).toEqual(['a'])
+  })
+
+  it('does not re-enable a disabled group registered again without an unregister', () => {
+    catalog.register(group('a', [CueType.Chorus]))
+    catalog.disableGroup('a')
+
+    catalog.register(group('a', [CueType.Chorus, CueType.Verse]))
+
+    expect(catalog.getEnabledGroups()).toEqual([])
+  })
+
+  it('forgets remembered membership once preferences are cleared', () => {
+    catalog.register(group('a', [CueType.Chorus]))
+    catalog.disableGroup('a')
+    catalog.unregister('a')
+
+    catalog.clearPreferences()
+    catalog.register(group('a', [CueType.Chorus]))
+
+    expect(catalog.getEnabledGroups()).toEqual(['a'])
+  })
+
   it('unregister drops the group and any default or stage kit designation', () => {
     catalog.register(group('a', [CueType.Chorus]))
     catalog.setDefaultGroup('a')

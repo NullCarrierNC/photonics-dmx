@@ -55,13 +55,7 @@ export function useEdgeManagement({
             const inheritedWaitForCondition =
               sourceEvent.eventType === 'cue-started' || sourceEvent.eventType === 'cue-called'
                 ? 'none'
-                : (sourceEvent.eventType as
-                    | 'none'
-                    | 'delay'
-                    | 'beat'
-                    | 'measure'
-                    | 'half-beat'
-                    | 'keyframe')
+                : (sourceEvent.eventType as 'none' | 'delay' | 'beat' | 'measure' | 'keyframe')
             targetAction.timing = {
               ...createDefaultActionTiming(),
               ...(targetAction.timing ?? {}),

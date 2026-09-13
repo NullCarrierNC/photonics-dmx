@@ -1,6 +1,6 @@
 import { applyWaitUntil, delayWaitMs } from './waitUntil'
 import { performance } from 'perf_hooks'
-import { EffectTransition, normalizeFixtureConfig, RGBIO } from '../../types'
+import { EffectTransition, RGBIO } from '../../types'
 import { LightTransitionController } from './LightTransitionController'
 import { FrameContext, LightEffectState, ILayerManager, ITransitionEngine } from './interfaces'
 import { IEffectManager } from './interfaces'
@@ -364,16 +364,11 @@ export class TransitionEngine implements ITransitionEngine {
       }
     }
 
-    const color = { ...transition.transform.color }
-    if (light.config) {
-      const cfg = normalizeFixtureConfig(light.config)
-      if (color.pan === undefined) {
-        color.pan = cfg.panHome
-      }
-      if (color.tilt === undefined) {
-        color.tilt = cfg.tiltHome
-      }
-    }
+    // A colour with no pan/tilt of its own is left as-is: the publisher already parks any undriven
+    // axis at the fixture's configured home, so a colour-only transition on a layer above a
+    // position or motion layer does not need to (and must not) carry a pan/tilt value that would
+    // win the blend and drag the head to home for the transition's duration.
+    const color = transition.transform.color
 
     this.lightTransitionController.setTransition(
       light.id,

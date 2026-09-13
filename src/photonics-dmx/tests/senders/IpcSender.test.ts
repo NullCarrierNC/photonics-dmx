@@ -50,4 +50,27 @@ describe('IpcSender', () => {
     await localSender.send({ kind: 'rigs', rigBuffers: { 'rig-a': { 1: 100, 2: 200 } } })
     expect(mockEmit).not.toHaveBeenCalled()
   })
+
+  it('logs a sustained no-receivers stretch once instead of on every publish tick', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    const hasReceivers = jest.fn<() => boolean>().mockReturnValue(false)
+    const localSender = new IpcSender({ emit: mockEmit }, hasReceivers)
+    await localSender.start()
+
+    // Every enabled window closing (harmless on macOS, which keeps running with no windows) used
+    // to log this at error level on every rate-capped publish tick, filling the daily log file.
+    for (let i = 0; i < 10; i++) {
+      await localSender.send({ kind: 'rigs', rigBuffers: {} })
+    }
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+
+    // A window reopening resumes delivery and re-arms the report for the next gap.
+    hasReceivers.mockReturnValue(true)
+    await localSender.send({ kind: 'rigs', rigBuffers: {} })
+    hasReceivers.mockReturnValue(false)
+    await localSender.send({ kind: 'rigs', rigBuffers: {} })
+    expect(errorSpy).toHaveBeenCalledTimes(2)
+
+    errorSpy.mockRestore()
+  })
 })

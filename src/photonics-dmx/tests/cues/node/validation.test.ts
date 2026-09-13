@@ -696,6 +696,69 @@ describe('Node cue validation', () => {
     warnSpy.mockRestore()
   })
 
+  it("migrates a removed 'half-beat' event and wait condition to 'beat' and warns once per file", () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    // Untyped on purpose: 'half-beat' is legacy data no longer accepted by NetNodeCueDefinition's
+    // event/wait-condition types, which is exactly the file this migration exists to still load.
+    const definition = {
+      id: 'legacy-half-beat-cue',
+      name: 'Legacy Half Beat',
+      description: '',
+      kind: 'lighting',
+      cueType: CueType.Chorus,
+      style: 'primary',
+      nodes: {
+        events: [{ id: 'event-1', type: 'event', eventType: 'half-beat' }],
+        actions: [
+          {
+            id: 'action-1',
+            type: 'action',
+            effectType: 'set-color',
+            target: {
+              groups: { source: 'literal', value: 'front' },
+              filter: { source: 'literal', value: 'all' },
+            },
+            color: {
+              name: { source: 'literal', value: 'blue' },
+              brightness: { source: 'literal', value: 'medium' },
+              blendMode: { source: 'literal', value: 'replace' },
+            },
+            timing: {
+              waitForCondition: { source: 'literal', value: 'half-beat' },
+              waitForTime: { source: 'literal', value: 0 },
+              duration: { source: 'literal', value: 200 },
+              waitUntilCondition: { source: 'literal', value: 'none' },
+              waitUntilTime: { source: 'literal', value: 0 },
+              easing: { source: 'literal', value: 'sinInOut' },
+              level: { source: 'literal', value: 1 },
+            },
+          },
+        ],
+      },
+      connections: [{ from: 'event-1', to: 'action-1' }],
+      layout: { nodePositions: {} },
+    }
+
+    const result = validateYargNodeCueFile({
+      version: 1,
+      mode: 'yarg',
+      group: { id: 'legacy-half-beat-group', name: 'Legacy' },
+      cues: [definition],
+    })
+
+    expect(result.valid).toBe(true)
+    if (!result.valid || !result.data) {
+      throw new Error('expected valid result with data')
+    }
+    expect(result.data.cues[0].nodes.events[0].eventType).toBe('beat')
+    const action = result.data.cues[0].nodes.actions[0] as {
+      timing: { waitForCondition: { value: unknown } }
+    }
+    expect(action.timing.waitForCondition.value).toBe('beat')
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("deprecated 'half-beat'"))
+    warnSpy.mockRestore()
+  })
+
   it('validates audio node cue with cue-started event type', () => {
     const definition: AudioNodeCueDefinition = {
       id: 'audio-cue-started',
@@ -1996,6 +2059,32 @@ describe('Node cue validation', () => {
       })
       expect(result.valid).toBe(true)
       expect(result.data?.effects).toHaveLength(1)
+    })
+
+    it("migrates a removed 'half-beat' event to 'beat' in an effect file and warns once", () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+      const result = validateYargEffectFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'legacy-half-beat-effect-group', name: 'Legacy Effect Group' },
+        effects: [
+          {
+            id: 'eff-1',
+            name: 'Test Effect',
+            mode: 'yarg',
+            nodes: {
+              events: [{ id: 'e1', type: 'event', eventType: 'half-beat' }],
+              actions: [],
+            },
+            connections: [],
+          },
+        ],
+      })
+      expect(result.valid).toBe(true)
+      const events = result.data?.effects[0].nodes.events as { eventType: string }[] | undefined
+      expect(events?.[0].eventType).toBe('beat')
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("deprecated 'half-beat'"))
+      warnSpy.mockRestore()
     })
 
     it('rejects duplicate effect ids (semantic)', () => {

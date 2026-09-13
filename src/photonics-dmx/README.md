@@ -151,7 +151,7 @@ Available wait conditions include:
 
 - `none`: No waiting, transition starts immediately
 - `delay`: Wait for a fixed time period
-- `beat`, `half-beat`, `measure`: Wait for a point on the tempo grid
+- `beat`, `measure`: Wait for a point on the tempo grid
 - `keyframe`, `keyframe-first`, `keyframe-next`, `keyframe-previous`: Wait for a keyframe advance. The specific event and the generic `keyframe` both fire, so a cue can wait on a direction or on any advance.
 - Instrument-specific events: `guitar-open`, `guitar-green`, `guitar-red`, etc, with the same set for `bass-` and `keys-`
 - Drum events: `drum-kick`, `drum-red`, `drum-yellow`, `drum-blue`, `drum-green`, and cymbal events

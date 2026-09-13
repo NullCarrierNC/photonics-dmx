@@ -129,6 +129,42 @@ describe('CueSelectionPolicy', () => {
       )
       expect(chorusCues).toContain(policy.selectCue(CueType.Chorus))
     })
+
+    it('does not lock on a fallback selection, even once the default group turns active again', () => {
+      // A fallback selection can only ever come from a group that getRandomCueFromActiveGroups
+      // did NOT already treat as a normal active candidate, i.e. one that is registered but not
+      // currently active (see getActiveGroupsImplementing). If it later becomes active for a
+      // shared cue type, the lock must still be free to seed at random between it and any other
+      // active group, rather than having already been pinned to it by the earlier fallback pick.
+      const trials = 30
+      const groupsSeenForChorus = new Set<string>()
+
+      for (let i = 0; i < trials; i++) {
+        const trialCatalog = new CueGroupCatalog<CueType, INetCue, ICueGroup>()
+        const trialPolicy = new CueSelectionPolicy(trialCatalog)
+        trialCatalog.register(cueGroup('groupA', CueStyle.Primary, [CueType.Chorus, CueType.Verse]))
+        trialCatalog.register(
+          cueGroup('def', CueStyle.Primary, [CueType.Chorus, CueType.Verse, CueType.BigRockEnding]),
+        )
+        trialCatalog.setDefaultGroup('def')
+        // Only 'def' implements BigRockEnding, and it starts inactive, so this can only resolve
+        // as a fallback.
+        trialCatalog.setActiveGroups(['groupA'])
+        trialPolicy.setCueGroupSelectionMode('oncePerSong')
+        trialPolicy.onSongStart()
+
+        const fallback = trialPolicy.selectCue(CueType.BigRockEnding)
+        expect(fallback!.cueId).toBe('def-BigRockEnding')
+
+        // The user (or a group-rotation feature) re-enables the default group mid-song.
+        trialCatalog.setActiveGroups(['groupA', 'def'])
+        const chorus = trialPolicy.selectCue(CueType.Chorus)!
+        groupsSeenForChorus.add(chorus.cueId.startsWith('groupA') ? 'groupA' : 'def')
+      }
+
+      // Wrongly seeding the lock from the earlier fallback would force every trial onto 'def'.
+      expect(groupsSeenForChorus.has('groupA')).toBe(true)
+    })
   })
 
   describe('role accounting', () => {
