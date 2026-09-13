@@ -23,9 +23,9 @@ import type { NetCueDataProperty } from '../types/nodeCueTypes'
 import { monotonicNowMs } from '../../../shared/time'
 
 /**
- * Whether a per-frame `cueData`-derived condition fires this frame: beat / half-beat / measure,
- * keyframe (any) and directional keyframe-first/next/previous, and the vocal-note, LED, fog and
- * instrument-note edges.
+ * Whether a per-frame `cueData`-derived condition fires this frame: beat / measure, keyframe (any)
+ * and directional keyframe-first/next/previous, and the vocal-note, LED, fog and instrument-note
+ * edges.
  *
  * `triggerOnColorChange` is the per-node opt-in for led-N edges to also fire on a same-position
  * bank-colour change. It defaults off, so a caller with no node keeps plain on/off edge semantics.
@@ -40,9 +40,6 @@ export function isNetEventTriggered(
   }
   if (eventType === 'beat') {
     return cueData.beat === 'Strong' || cueData.beat === 'Weak' || cueData.beat === 'Measure'
-  }
-  if (eventType === 'half-beat') {
-    return cueData.beat === 'Strong' || cueData.beat === 'Weak'
   }
   if (eventType === 'keyframe') {
     return (

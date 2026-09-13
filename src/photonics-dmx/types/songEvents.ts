@@ -24,7 +24,6 @@ export type NodeSystemEvent = (typeof NODE_SYSTEM_EVENTS)[number]
 export const YARG_SONG_EVENTS = [
   'beat',
   'measure',
-  'half-beat',
   'keyframe',
   'keyframe-first',
   'keyframe-next',

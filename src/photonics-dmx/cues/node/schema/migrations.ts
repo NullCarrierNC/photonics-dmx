@@ -25,11 +25,59 @@ function migrateEasingInActions(actions: unknown[]): unknown[] {
   })
 }
 
+/**
+ * `half-beat` was removed: nothing ever released a sequencer wait on it (only `beat` does), and as
+ * an event it only ever meant "any Strong or Weak beat", the same thing `beat` already means.
+ * Rewrites event nodes and action wait-condition literals from `half-beat` to `beat` so an existing
+ * file keeps loading and behaving the same way instead of failing schema validation. Mutates the
+ * given `nodes` object in place; returns whether anything was changed.
+ */
+function migrateHalfBeatEventsAndActions(nodes: unknown): boolean {
+  if (!nodes || typeof nodes !== 'object') {
+    return false
+  }
+  let changed = false
+  const n = nodes as { events?: unknown[]; actions?: unknown[] }
+
+  if (Array.isArray(n.events)) {
+    for (const ev of n.events) {
+      if (!ev || typeof ev !== 'object') continue
+      const e = ev as { eventType?: string }
+      if (e.eventType === 'half-beat') {
+        e.eventType = 'beat'
+        changed = true
+      }
+    }
+  }
+
+  if (Array.isArray(n.actions)) {
+    for (const act of n.actions) {
+      if (!act || typeof act !== 'object') continue
+      const timing = (act as { timing?: unknown }).timing
+      if (!timing || typeof timing !== 'object') continue
+      const t = timing as { waitForCondition?: unknown; waitUntilCondition?: unknown }
+      for (const vs of [t.waitForCondition, t.waitUntilCondition]) {
+        if (!vs || typeof vs !== 'object') continue
+        const v = vs as { source?: string; value?: unknown }
+        if (v.source === 'literal' && v.value === 'half-beat') {
+          v.value = 'beat'
+          changed = true
+        }
+      }
+    }
+  }
+
+  return changed
+}
+
 export function migrateEasingInNodeCueFile(value: unknown): unknown {
   if (!value || typeof value !== 'object' || !Array.isArray((value as { cues?: unknown }).cues)) {
     return value
   }
-  const file = value as { cues: Array<{ nodes?: { actions?: unknown[] } }> }
+  const file = value as {
+    group?: { id?: string }
+    cues: Array<{ nodes?: { actions?: unknown[] } }>
+  }
   const migratedCues = file.cues.map((cue) => {
     const actions = cue.nodes?.actions
     if (!Array.isArray(actions)) return cue
@@ -43,6 +91,19 @@ export function migrateEasingInNodeCueFile(value: unknown): unknown {
   })
   const out = { ...file, cues: migratedCues }
   migrateLegacyBearings(out)
+
+  let halfBeatChanged = false
+  for (const cue of out.cues) {
+    if (migrateHalfBeatEventsAndActions((cue as { nodes?: unknown }).nodes)) {
+      halfBeatChanged = true
+    }
+  }
+  if (halfBeatChanged) {
+    log.warn(
+      `[cue file] '${file.group?.id ?? '(unknown)'}': deprecated 'half-beat' was renamed to 'beat' (it always meant any Strong or Weak beat). Re-save in the editor to clear this warning.`,
+    )
+  }
+
   return out
 }
 
@@ -54,7 +115,10 @@ export function migrateEasingInEffectFile(value: unknown): unknown {
   ) {
     return value
   }
-  const file = value as { effects: Array<{ nodes?: { actions?: unknown[] } }> }
+  const file = value as {
+    group?: { id?: string }
+    effects: Array<{ nodes?: { actions?: unknown[] } }>
+  }
   const migratedEffects = file.effects.map((effect) => {
     const actions = effect.nodes?.actions
     if (!Array.isArray(actions)) return effect
@@ -66,7 +130,21 @@ export function migrateEasingInEffectFile(value: unknown): unknown {
       },
     }
   })
-  return { ...file, effects: migratedEffects }
+  const out = { ...file, effects: migratedEffects }
+
+  let halfBeatChanged = false
+  for (const effect of out.effects) {
+    if (migrateHalfBeatEventsAndActions((effect as { nodes?: unknown }).nodes)) {
+      halfBeatChanged = true
+    }
+  }
+  if (halfBeatChanged) {
+    log.warn(
+      `[effect file] '${file.group?.id ?? '(unknown)'}': deprecated 'half-beat' was renamed to 'beat' (it always meant any Strong or Weak beat). Re-save in the editor to clear this warning.`,
+    )
+  }
+
+  return out
 }
 
 /**

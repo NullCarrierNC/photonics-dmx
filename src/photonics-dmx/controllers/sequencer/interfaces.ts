@@ -462,6 +462,8 @@ export interface ILightingController {
   // System effects methods
   blackout(duration: number): Promise<void>
   cancelBlackout(): void
+  /** Whether a timed blackout is still fading. */
+  isBlackoutActive(): boolean
 
   // Debug methods
   enableDebug(enable: boolean, refreshRateMs?: number): void

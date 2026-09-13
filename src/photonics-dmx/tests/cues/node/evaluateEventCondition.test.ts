@@ -24,12 +24,6 @@ describe('evaluateEventCondition', () => {
     expect(evaluateEventCondition('yarg', 'measure', frame({ beat: 'Strong' }))).toBe(false)
   })
 
-  it('excludes Measure from half-beat', () => {
-    expect(evaluateEventCondition('yarg', 'half-beat', frame({ beat: 'Strong' }))).toBe(true)
-    expect(evaluateEventCondition('yarg', 'half-beat', frame({ beat: 'Weak' }))).toBe(true)
-    expect(evaluateEventCondition('yarg', 'half-beat', frame({ beat: 'Measure' }))).toBe(false)
-  })
-
   it('fires the generic keyframe on all three directions and each directional on its own', () => {
     for (const keyframe of ['First', 'Next', 'Previous'] as const) {
       expect(evaluateEventCondition('yarg', 'keyframe', frame({ keyframe }))).toBe(true)
@@ -180,5 +174,7 @@ describe('evaluateEventCondition', () => {
     expect(evaluateEventCondition('yarg', 'cue-called', frame())).toBe(false)
     expect(evaluateEventCondition('yarg', 'none', frame())).toBe(false)
     expect(evaluateEventCondition('yarg', 'not-a-condition', frame())).toBe(false)
+    // half-beat was removed: nothing ever released a sequencer wait on it, only 'beat' does.
+    expect(evaluateEventCondition('yarg', 'half-beat', frame({ beat: 'Strong' }))).toBe(false)
   })
 })

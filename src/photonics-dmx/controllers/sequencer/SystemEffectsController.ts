@@ -96,19 +96,7 @@ export class SystemEffectsController implements ISystemEffectsController {
     }
 
     if (duration === 0) {
-      // Clear all active effects and queues for all layers
-      const allLayers = this.layerManager.getAllLayers()
-      for (const layer of allLayers) {
-        this.layerManager.removeActiveEffect(layer, 'all')
-        this.layerManager.removeQueuedEffect(layer, 'all')
-      }
-      this.lightTransitionController.immediateBlackout()
-
-      // Trigger the immediate blackout callback if registered
-      if (this.onBlackoutCompleteCallback) {
-        this.onBlackoutCompleteCallback()
-      }
-
+      this.wipeToBlack()
       return
     }
 
@@ -160,10 +148,13 @@ export class SystemEffectsController implements ISystemEffectsController {
             layer: blackoutLayer,
           }
 
+          // Fade from the light's current blended output, not its layer-0 state: a colour effect
+          // on a higher layer (or no layer-0 state at all) would otherwise pop or snap to black at
+          // the start of the fade instead of dimming smoothly from what is actually on screen.
           this.lightTransitionController.setTransition(
             lightId,
             blackoutLayer,
-            this.lightTransitionController.getLightState(lightId, 0),
+            currentLightState ?? this.lightTransitionController.getLightState(lightId, 0),
             blackoutTransition.transform.color,
             blackoutTransition.transform.duration,
             blackoutTransition.transform.easing,
@@ -189,51 +180,10 @@ export class SystemEffectsController implements ISystemEffectsController {
         return
       }
 
-      // Clear all effects and force black state
-      const allLayers = this.layerManager.getAllLayers()
-      for (const layer of allLayers) {
-        this.layerManager.removeActiveEffect(layer, 'all')
-        this.layerManager.removeQueuedEffect(layer, 'all')
-      }
-
-      // Force immediate black state for all lights while preserving pan/tilt
-      allLightIds.forEach((lightId) => {
-        // Get current state to check for existing pan/tilt values
-        const currentLightState = this.lightTransitionController.getFinalLightState(lightId)
-
-        // Create a base black state
-        const blackState: RGBIO = {
-          red: 0,
-          green: 0,
-          blue: 0,
-          intensity: 0,
-          opacity: 1.0,
-          blendMode: 'replace',
-        }
-
-        // Only preserve pan/tilt for fixtures that already have them
-        if (currentLightState && currentLightState.pan !== undefined) {
-          blackState.pan = currentLightState.pan
-        }
-
-        if (currentLightState && currentLightState.tilt !== undefined) {
-          blackState.tilt = currentLightState.tilt
-        }
-
-        this.lightTransitionController.setTransition(
-          lightId,
-          0, // Use base layer
-          undefined, // No start state needed for immediate effect
-          blackState,
-          0, // Instant
-          'linear',
-        )
-      })
-
-      // Trigger the callback after timed blackout completes as well
-      if (this.onBlackoutCompleteCallback) {
-        this.onBlackoutCompleteCallback()
-      }
+      // The same wipe as an instant blackout. Deleting the effects alone would leave their layer
+      // states in the transition controller (a primary cue keeps its effects up when it stops), and
+      // they would reappear the moment the fade's own layer-255 black was gone.
+      this.wipeToBlack()
     } catch (error) {
       log.error('An error occurred during blackout:', error)
     } finally {
@@ -259,8 +209,21 @@ export class SystemEffectsController implements ISystemEffectsController {
       this.generation++
       this.clearPendingBlackout()
       this.lightTransitionController.removeTransitionsByLayer(255)
-      // The overlay lives above 255 so the sweep leaves it, but re-assert anyway: a cancel resumes
     }
+  }
+
+  /**
+   * Drops every effect, queue and layer state and publishes black, keeping each moving head's
+   * pan/tilt. Ends both the instant blackout and a completed fade.
+   */
+  private wipeToBlack(): void {
+    for (const layer of this.layerManager.getAllLayers()) {
+      this.layerManager.removeActiveEffect(layer, 'all')
+      this.layerManager.removeQueuedEffect(layer, 'all')
+    }
+    this.layerManager.clearAllLayerStates()
+    this.lightTransitionController.immediateBlackout()
+    this.onBlackoutCompleteCallback?.()
   }
 
   /**

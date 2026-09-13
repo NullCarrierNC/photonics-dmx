@@ -452,6 +452,11 @@ export class Sequencer implements ILightingController {
     this.systemEffectsController.cancelBlackout()
   }
 
+  /** Whether a timed blackout is still fading. */
+  public isBlackoutActive(): boolean {
+    return this.systemEffectsController.isBlackoutActive()
+  }
+
   /**
    * Holds or releases an opaque overlay above every cue layer, occluding the rig without stopping
    * it. See {@link SystemEffectsController.holdOcclusion}.

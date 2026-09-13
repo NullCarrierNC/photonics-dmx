@@ -207,7 +207,10 @@ export class CueSelectionPolicy {
 
     const cue = this.catalog.cueFrom(selection.groupId, cueType)!
 
-    if (this.lockSelectionsForSong && this.lockedGroupIdForSong === null) {
+    // A fallback selection means no active group implements this cue type, so it landed on the
+    // default group only because something has to serve it. It does not seed the song lock, which
+    // would otherwise pin every later cue in the song to that group once it turns active.
+    if (this.lockSelectionsForSong && this.lockedGroupIdForSong === null && !selection.isFallback) {
       this.lockedGroupIdForSong = selection.groupId
     }
 

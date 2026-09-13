@@ -18,6 +18,11 @@ const log = createLogger('IpcSender')
  */
 export class IpcSender {
   private enabled: boolean = false
+  /** Whether the current run of skipped sends has already logged its reason. Reset on the next
+   *  successful send, so closing every window while a preview stays enabled (harmless on macOS,
+   *  where the app keeps running with no windows) reports once instead of on every publish tick. */
+  private reportedNotEnabled = false
+  private reportedNoReceivers = false
 
   public constructor(
     private readonly broadcaster: RuntimeBroadcaster,
@@ -39,15 +44,23 @@ export class IpcSender {
    */
   public async send(payload: DmxValuesPayload): Promise<void> {
     if (!this.enabled) {
-      log.error('IPC Sender: Not enabled')
+      if (!this.reportedNotEnabled) {
+        this.reportedNotEnabled = true
+        log.error('IPC Sender: Not enabled')
+      }
       return
     }
 
     if (!this.hasReceivers()) {
-      log.error('IPC Sender: No browser window available when sending')
+      if (!this.reportedNoReceivers) {
+        this.reportedNoReceivers = true
+        log.error('IPC Sender: No browser window available when sending')
+      }
       return
     }
 
+    this.reportedNotEnabled = false
+    this.reportedNoReceivers = false
     this.broadcaster.emit(RENDERER_RECEIVE.DMX_VALUES, payload)
   }
 }

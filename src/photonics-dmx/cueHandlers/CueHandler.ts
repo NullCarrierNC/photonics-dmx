@@ -82,6 +82,14 @@ class CueHandler extends EventEmitter {
   private previousCueData?: Partial<CueData>
   /** Tracks whether any vocal/harmony part was active on the previous frame, for note-on/off edge detection. */
   private wasVocalActive = false
+  /**
+   * Set while a chart-driven Blackout_Slow holds, so the next resolved non-strobe cue can end the
+   * sequencer's fade before it executes: the fade is almost always still running (YARG keeps
+   * re-dispatching), and its blackout gate would otherwise refuse that cue's first submission.
+   * The fade ends in an instant blackout rather than a cancel, because a cancel uncovers the
+   * previous cue's look until the new cue first draws, which can be a beat or a measure away.
+   */
+  private pendingSlowBlackoutEnd = false
 
   public setManualMotionRef(ref: MotionCueRef | null): void {
     this.manualMotionRef = ref
@@ -168,6 +176,7 @@ class CueHandler extends EventEmitter {
   public resetInputEdgeState(): void {
     this.previousCueData = undefined
     this.wasVocalActive = false
+    this.pendingSlowBlackoutEnd = false
   }
 
   /** Stops the active strobe slot without disturbing per-frame edge baselines. */
@@ -326,16 +335,19 @@ class CueHandler extends EventEmitter {
     // Special cases that need to be handled differently
     switch (cueType) {
       case CueType.Blackout_Fast:
+        this.pendingSlowBlackoutEnd = false
         this.stopCurrentCue()
         this._sequencer.blackout(0)
         this.emit('cueHandled', historicCueData)
         return
       case CueType.Blackout_Slow:
+        this.pendingSlowBlackoutEnd = true
         this.stopCurrentCue()
         this._sequencer.blackout(500)
         this.emit('cueHandled', historicCueData)
         return
       case CueType.Blackout_Spotlight:
+        this.pendingSlowBlackoutEnd = false
         this.stopCurrentCue()
         this._sequencer.blackout(0)
         this.emit('cueHandled', historicCueData)
@@ -351,6 +363,7 @@ class CueHandler extends EventEmitter {
         this.emit('cueHandled', historicCueData)
         return
       case CueType.NoCue:
+        this.pendingSlowBlackoutEnd = false
         this.stopCurrentCue()
         this._sequencer.blackout(0)
         this.emit('cueHandled', historicCueData)
@@ -374,6 +387,20 @@ class CueHandler extends EventEmitter {
 
     if (cue) {
       const incomingIsSecondary = cue.style === CueStyle.Secondary
+
+      // End a running fade before this cue executes (see the field comment). Beyond the chart's
+      // Blackout_Slow, a new primary cue also ends a fade the previous cue's own blackout action
+      // started, which would refuse the new cue's first submission the same way. Strobes run on top
+      // of whatever is already showing and must not touch it.
+      const incomingIsNewPrimary =
+        !incomingIsStrobe && !incomingIsSecondary && this.currentPrimaryCue !== cue
+      if (
+        (this.pendingSlowBlackoutEnd && !incomingIsStrobe) ||
+        (incomingIsNewPrimary && this._sequencer.isBlackoutActive())
+      ) {
+        this.pendingSlowBlackoutEnd = false
+        void this._sequencer.blackout(0)
+      }
 
       if (incomingIsStrobe) {
         // Strobes run on top of primary and secondary overlays; track separately so Strobe_Off only clears strobes.

@@ -560,3 +560,180 @@ describe('CueHandler forced primary group (RB3 game-mode rotation)', () => {
     expect(strobe.execute).toHaveBeenCalled()
   })
 })
+
+describe('CueHandler chart-driven Blackout_Slow handoff', () => {
+  let registry: CueRegistry
+
+  beforeEach(() => {
+    registry = CueRegistry.getInstance()
+    __resetStrobeStateManagerForTests()
+    jest.restoreAllMocks()
+    jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
+  })
+
+  /** Call order of each instant blackout the handler asked the sequencer for. */
+  const instantBlackoutOrders = (sequencer: ILightingController): number[] => {
+    const mock = sequencer.blackout as jest.Mock
+    return mock.mock.calls.flatMap((args, i) =>
+      args[0] === 0 ? [mock.mock.invocationCallOrder[i]] : [],
+    )
+  }
+
+  it('ends the fade in an instant blackout before the next resolved non-strobe cue executes', async () => {
+    const sequencer = makeSequencer()
+    const handler = new CueHandler(makeLightManager(), sequencer)
+    handler.setMotionEnabled(false)
+
+    await handler.handleCue(
+      CueType.Blackout_Slow,
+      gameplayCueData({ lightingCue: CueType.Blackout_Slow }),
+    )
+    expect(instantBlackoutOrders(sequencer)).toHaveLength(0)
+
+    const next = makeFakeCue(CueStyle.Primary, 'primary:Frenzy')
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(next)
+
+    await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
+
+    // The fade has to end before the cue executes, or its clearing submission is refused by the
+    // sequencer's own blackout gate and the rig can stay dark for the cue's whole run. A cancel
+    // would uncover the previous look instead of black, so it must not be the way it ends.
+    const orders = instantBlackoutOrders(sequencer)
+    expect(orders).toHaveLength(1)
+    const executeOrder = (next.execute as jest.Mock).mock.invocationCallOrder[0]
+    expect(orders[0]).toBeLessThan(executeOrder)
+    expect(sequencer.cancelBlackout).not.toHaveBeenCalled()
+  })
+
+  it('does not end the fade for a strobe cue arriving while the blackout holds', async () => {
+    const sequencer = makeSequencer()
+    const handler = new CueHandler(makeLightManager(), sequencer)
+    handler.setMotionEnabled(false)
+
+    await handler.handleCue(
+      CueType.Blackout_Slow,
+      gameplayCueData({ lightingCue: CueType.Blackout_Slow }),
+    )
+
+    const strobe = makeFakeCue(CueStyle.Secondary, 'strobe:Strobe_Fast')
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(strobe)
+
+    await handler.handleCue(
+      CueType.Strobe_Fast,
+      gameplayCueData({ lightingCue: CueType.Blackout_Slow, strobeState: 'Strobe_Fast' }),
+    )
+
+    expect(instantBlackoutOrders(sequencer)).toHaveLength(0)
+    expect(strobe.execute).toHaveBeenCalled()
+  })
+
+  it('only ends the fade once, not on every repeated dispatch of the cue that follows', async () => {
+    const sequencer = makeSequencer()
+    const handler = new CueHandler(makeLightManager(), sequencer)
+    handler.setMotionEnabled(false)
+
+    await handler.handleCue(
+      CueType.Blackout_Slow,
+      gameplayCueData({ lightingCue: CueType.Blackout_Slow }),
+    )
+
+    const next = makeFakeCue(CueStyle.Primary, 'primary:Frenzy')
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(next)
+
+    await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
+    await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
+
+    expect(instantBlackoutOrders(sequencer)).toHaveLength(1)
+  })
+
+  it('does not blackout again after an instant blackout, which already ended the fade itself', async () => {
+    const sequencer = makeSequencer()
+    const handler = new CueHandler(makeLightManager(), sequencer)
+    handler.setMotionEnabled(false)
+
+    await handler.handleCue(
+      CueType.Blackout_Slow,
+      gameplayCueData({ lightingCue: CueType.Blackout_Slow }),
+    )
+    await handler.handleCue(
+      CueType.Blackout_Fast,
+      gameplayCueData({ lightingCue: CueType.Blackout_Fast }),
+    )
+
+    const next = makeFakeCue(CueStyle.Primary, 'primary:Frenzy')
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(next)
+    await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
+
+    // The one instant blackout is Blackout_Fast's own.
+    expect(instantBlackoutOrders(sequencer)).toHaveLength(1)
+  })
+})
+
+describe('CueHandler cue change during a cue-driven fade', () => {
+  let registry: CueRegistry
+
+  beforeEach(() => {
+    registry = CueRegistry.getInstance()
+    __resetStrobeStateManagerForTests()
+    jest.restoreAllMocks()
+    jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
+  })
+
+  const fadingSequencer = (): ILightingController =>
+    fakeLightingController({ isBlackoutActive: () => true })
+
+  const instantBlackouts = (sequencer: ILightingController): unknown[][] =>
+    (sequencer.blackout as jest.Mock).mock.calls.filter((args) => args[0] === 0)
+
+  it('ends the fade before a different primary cue executes', async () => {
+    const sequencer = fadingSequencer()
+    const handler = new CueHandler(makeLightManager(), sequencer)
+    handler.setMotionEnabled(false)
+
+    const first = makeFakeCue(CueStyle.Primary, 'primary:Verse')
+    const implementation = jest.spyOn(registry, 'getCueImplementation').mockReturnValue(first)
+    await handler.handleCue(CueType.Verse, gameplayCueData({ lightingCue: CueType.Verse }))
+    ;(sequencer.blackout as jest.Mock).mockClear()
+
+    const next = makeFakeCue(CueStyle.Primary, 'primary:Chorus')
+    implementation.mockReturnValue(next)
+    await handler.handleCue(CueType.Chorus, gameplayCueData({ lightingCue: CueType.Chorus }))
+
+    expect(instantBlackouts(sequencer)).toHaveLength(1)
+    const blackoutOrder = (sequencer.blackout as jest.Mock).mock.invocationCallOrder[0]
+    const executeOrder = (next.execute as jest.Mock).mock.invocationCallOrder[0]
+    expect(blackoutOrder).toBeLessThan(executeOrder)
+  })
+
+  it("leaves a fade alone while the same primary cue keeps running, since it is the cue's own", async () => {
+    const sequencer = fadingSequencer()
+    const handler = new CueHandler(makeLightManager(), sequencer)
+    handler.setMotionEnabled(false)
+
+    const cue = makeFakeCue(CueStyle.Primary, 'primary:Verse')
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(cue)
+    await handler.handleCue(CueType.Verse, gameplayCueData({ lightingCue: CueType.Verse }))
+    ;(sequencer.blackout as jest.Mock).mockClear()
+
+    await handler.handleCue(CueType.Verse, gameplayCueData({ lightingCue: CueType.Verse }))
+    await handler.handleCue(CueType.Verse, gameplayCueData({ lightingCue: CueType.Verse }))
+
+    expect(instantBlackouts(sequencer)).toHaveLength(0)
+  })
+
+  it('leaves a fade alone when a secondary overlay arrives', async () => {
+    const sequencer = fadingSequencer()
+    const handler = new CueHandler(makeLightManager(), sequencer)
+    handler.setMotionEnabled(false)
+
+    const primary = makeFakeCue(CueStyle.Primary, 'primary:Verse')
+    const implementation = jest.spyOn(registry, 'getCueImplementation').mockReturnValue(primary)
+    await handler.handleCue(CueType.Verse, gameplayCueData({ lightingCue: CueType.Verse }))
+    ;(sequencer.blackout as jest.Mock).mockClear()
+
+    implementation.mockReturnValue(makeFakeCue(CueStyle.Secondary, 'secondary:Frenzy'))
+    await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
+
+    expect(instantBlackouts(sequencer)).toHaveLength(0)
+  })
+})

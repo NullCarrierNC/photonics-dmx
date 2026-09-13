@@ -54,6 +54,7 @@ const accepting: ILightingController = {
   handleSongEvent: () => {},
   blackout: () => Promise.resolve(),
   cancelBlackout: () => {},
+  isBlackoutActive: () => false,
   enableDebug: () => {},
   debugLightLayers: () => {},
   shutdown: () => {},

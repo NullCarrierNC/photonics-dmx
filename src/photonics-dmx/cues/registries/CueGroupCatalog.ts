@@ -57,6 +57,13 @@ export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> 
   private defaultFlagged = false
   private motionDefaultFlagged = false
 
+  /**
+   * Enabled and active membership of each group at the moment it was unregistered, restored if the
+   * same id registers again. A cue file reload unregisters and re-registers every group, and without
+   * this the user's disabled groups would come back enabled.
+   */
+  private readonly unregisteredMembership = new Map<string, { enabled: boolean; active: boolean }>()
+
   /** Clear the catalog back to holding nothing at all. */
   public clear(): void {
     this.groups.clear()
@@ -73,16 +80,30 @@ export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> 
     this.stageKitGroup = null
     this.defaultFlagged = false
     this.motionDefaultFlagged = false
+    this.unregisteredMembership.clear()
   }
 
   /**
-   * Register a group, enabled and active by default. It fills either fallback that is empty and
-   * that it can serve.
+   * Register a group. A new id is enabled and active by default, an id registered before takes
+   * back the membership it had when it was unregistered, and a group already registered keeps its
+   * current membership. It fills either fallback that is empty and that it can serve.
    */
   public register(group: G): void {
+    const alreadyRegistered = this.groups.has(group.id)
     this.groups.set(group.id, group)
-    this.enabledGroups.add(group.id)
-    this.activeGroups.add(group.id)
+    if (!alreadyRegistered) {
+      const membership = this.unregisteredMembership.get(group.id) ?? {
+        enabled: true,
+        active: true,
+      }
+      this.unregisteredMembership.delete(group.id)
+      if (membership.enabled) {
+        this.enabledGroups.add(group.id)
+        if (membership.active) {
+          this.activeGroups.add(group.id)
+        }
+      }
+    }
     this.fillEmptyFallbacks()
   }
 
@@ -96,6 +117,10 @@ export class CueGroupCatalog<K extends string, V, G extends CatalogGroup<K, V>> 
       return false
     }
 
+    this.unregisteredMembership.set(groupId, {
+      enabled: this.enabledGroups.has(groupId),
+      active: this.activeGroups.has(groupId),
+    })
     this.groups.delete(groupId)
     this.enabledGroups.delete(groupId)
     this.activeGroups.delete(groupId)

@@ -1,5 +1,5 @@
 import { applyWaitUntil } from './waitUntil'
-import { Effect, EffectTransition, normalizeFixtureConfig, RGBIO, TrackedLight } from '../../types'
+import { Effect, EffectTransition, RGBIO, TrackedLight } from '../../types'
 import { IEffectTransformer, ILayerManager, LightEffectState } from './interfaces'
 import { LightTransitionController } from './LightTransitionController'
 import { PersistentEffectRun, PersistentRunRegistry } from './PersistentRunRegistry'
@@ -145,17 +145,11 @@ export class EffectScheduler {
       const firstTransition = lightTransitions[0]
 
       if (firstTransition.waitForCondition === 'none') {
-        // Prepare the color with pan/tilt defaults if needed
-        const color = { ...firstTransition.transform.color }
-        if (light.config) {
-          const cfg = normalizeFixtureConfig(light.config)
-          if (color.pan === undefined) {
-            color.pan = cfg.panHome
-          }
-          if (color.tilt === undefined) {
-            color.tilt = cfg.tiltHome
-          }
-        }
+        // A colour with no pan/tilt of its own is left as-is: the publisher already parks any
+        // undriven axis at the fixture's configured home, so a colour-only transition on a layer
+        // above a position or motion layer does not need to (and must not) carry a pan/tilt value
+        // that would win the blend and drag the head to home for the transition's duration.
+        const color = firstTransition.transform.color
 
         // Set transition directly on the controller
         this.lightTransitionController.setTransition(
