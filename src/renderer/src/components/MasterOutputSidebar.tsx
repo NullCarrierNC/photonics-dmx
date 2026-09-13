@@ -12,11 +12,11 @@ export const MASTER_OUTPUT_SIDEBAR_WIDTH_PX = 99
 // Fixed height because a label can wrap onto a different number of lines when it toggles, and a
 // fixed button keeps the other one where it is under the pointer.
 const TOGGLE_BASE =
-  'w-full min-h-[3rem] flex items-center justify-center text-center rounded px-1 py-2 text-[11px] font-semibold uppercase tracking-wide leading-tight text-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500'
+  'w-full min-h-[3rem] flex items-center justify-center text-center rounded border-2 px-1 py-2 text-[11px] font-bold leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500'
 
 /** Red marks the state needing the operator's attention: strobes live, or the rig blacked out. */
-const TOGGLE_ALERT = 'bg-red-600 hover:bg-red-700'
-const TOGGLE_SAFE = 'bg-green-600 hover:bg-green-700'
+const TOGGLE_ALERT = 'bg-red-600 border-transparent text-white hover:bg-red-700'
+const TOGGLE_SAFE = 'border-green-500 text-green-600 dark:text-green-400 hover:bg-green-500/10'
 
 /** Every 10%, with the long marks at 0, 50 and 100. */
 const FADER_TICKS = Array.from({ length: 11 }, (_, i) => i % 5 === 0)
