@@ -414,17 +414,74 @@ describe('CuePreviewYarg when the cue data stops', () => {
     jest.useRealTimers()
   })
 
-  it('goes back to waiting when nothing arrives for the idle window', async () => {
+  const yargError = async (payload: { type: string; autoDisabled?: boolean }): Promise<void> => {
+    await act(async () => {
+      listeners.get(RENDERER_RECEIVE.YARG_ERROR)?.({ message: '', ...payload })
+    })
+  }
+
+  it('holds the details through a long quiet stretch in a song', async () => {
     const send = renderPanelWithSender()
     await send(cueData({ postProcessing: 'Scanlines_Blue' }))
+
+    await act(async () => {
+      jest.advanceTimersByTime(5 * 60_000)
+    })
+
+    expect(screen.getByText('Scanlines Blue')).toBeInTheDocument()
+  })
+
+  it('holds the details while the song is paused', async () => {
+    const send = renderPanelWithSender()
+    await send(cueData({ pauseState: 'Paused', postProcessing: 'Scanlines_Blue' }))
+
+    await act(async () => {
+      jest.advanceTimersByTime(5 * 60_000)
+    })
+
+    expect(screen.getByText('Scanlines Blue')).toBeInTheDocument()
+  })
+
+  it('goes back to waiting a minute after the last frame outside a song', async () => {
+    const send = renderPanelWithSender()
+    await send(cueData({ currentScene: 'Score', postProcessing: 'Scanlines_Blue' }))
+
+    await act(async () => {
+      jest.advanceTimersByTime(59_000)
+    })
     expect(screen.getByText('Scanlines Blue')).toBeInTheDocument()
 
     await act(async () => {
-      jest.advanceTimersByTime(6000)
+      jest.advanceTimersByTime(2000)
     })
+    expect(screen.getByText('No active YARG cue')).toBeInTheDocument()
+  })
+
+  it('goes back to waiting as soon as YARG shuts down', async () => {
+    const send = renderPanelWithSender()
+    await send(cueData({ postProcessing: 'Scanlines_Blue' }))
+
+    await yargError({ type: 'yarg-shutdown' })
 
     expect(screen.getByText('No active YARG cue')).toBeInTheDocument()
-    expect(screen.queryByText('Scanlines Blue')).toBeNull()
+  })
+
+  it('goes back to waiting when the listener stops on an error', async () => {
+    const send = renderPanelWithSender()
+    await send(cueData({ postProcessing: 'Scanlines_Blue' }))
+
+    await yargError({ type: 'runtime-error', autoDisabled: true })
+
+    expect(screen.getByText('No active YARG cue')).toBeInTheDocument()
+  })
+
+  it('keeps the details through a warning', async () => {
+    const send = renderPanelWithSender()
+    await send(cueData({ postProcessing: 'Scanlines_Blue' }))
+
+    await yargError({ type: 'datagram-version-newer' })
+
+    expect(screen.getByText('Scanlines Blue')).toBeInTheDocument()
   })
 
   it('holds the details while frames keep arriving', async () => {
@@ -441,12 +498,13 @@ describe('CuePreviewYarg when the cue data stops', () => {
     expect(screen.getByText('Scanlines Blue')).toBeInTheDocument()
   })
 
-  it('shows a beat the next song opens on, after an idle spell', async () => {
+  it('shows a beat the next song opens on, after YARG restarts', async () => {
     const send = renderPanelWithSender()
     await send(cueData({ beat: 'Strong' }))
 
+    await yargError({ type: 'yarg-shutdown' })
     await act(async () => {
-      jest.advanceTimersByTime(6000)
+      jest.advanceTimersByTime(300)
     })
     await send(cueData({ beat: 'Strong' }))
 
