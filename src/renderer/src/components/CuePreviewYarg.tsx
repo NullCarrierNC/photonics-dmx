@@ -18,8 +18,11 @@ import {
 import { useAtom } from 'jotai'
 import { currentCueStateAtom, yargListenerEnabledAtom } from '../atoms'
 
-/** How long the panel keeps a song's details after the last cue frame. */
-const IDLE_CLEAR_MS = 5000
+/** How long the panel keeps the details after the last cue frame from outside a song. */
+const IDLE_CLEAR_MS = 60_000
+
+/** Scenes where YARG can go quiet for long stretches while the rig keeps running the cue. */
+const SONG_SCENES: ReadonlySet<CueData['currentScene']> = new Set(['Gameplay', 'Practice'])
 
 interface CuePreviewYargProps {
   className?: string
@@ -88,8 +91,8 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   const beatClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const measureClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const keyframeClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Cue data only arrives when a cue is dispatched, and a song that ends sends no closing
-  // frame, so the panel gives a song up this long after its last frame.
+  // Cue data only arrives when a cue is dispatched. Silence during a song leaves the details up,
+  // and silence after a frame from outside one gives them up once IDLE_CLEAR_MS has passed.
   const idleClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const guitarClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bassClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -283,7 +286,9 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
       // Simulation drives one event at a time by hand, so the panel holds what the user just fired.
       if (!simulationMode) {
         clearTimeout(idleClearTimerRef.current ?? undefined)
-        idleClearTimerRef.current = setTimeout(resetCueDetails, IDLE_CLEAR_MS)
+        idleClearTimerRef.current = SONG_SCENES.has(cueData.currentScene)
+          ? null
+          : setTimeout(resetCueDetails, IDLE_CLEAR_MS)
       }
 
       // Beat detection - check for beat values in the beat property
@@ -417,9 +422,21 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
     }
     addIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData)
 
+    // YARG quitting, or the listener stopping on an error, ends whatever the panel shows.
+    const handleYargError = (error: { type: string; autoDisabled?: boolean }) => {
+      if (error.type === 'yarg-shutdown' || error.autoDisabled === true) {
+        clearTimeout(idleClearTimerRef.current ?? undefined)
+        resetCueDetails()
+      }
+    }
+    if (!simulationMode) {
+      addIpcListener(RENDERER_RECEIVE.YARG_ERROR, handleYargError)
+    }
+
     return () => {
       setListenCueData(false)
       removeIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData)
+      removeIpcListener(RENDERER_RECEIVE.YARG_ERROR, handleYargError)
       clearTimeout(idleClearTimerRef.current ?? undefined)
       clearTimeout(beatClearTimerRef.current ?? undefined)
       clearTimeout(measureClearTimerRef.current ?? undefined)
