@@ -181,8 +181,111 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     stage('green', []) // empty positions clears just green
     expect(lastBanks()).toEqual({ red: 0b0101, green: 0, blue: 0, yellow: 0 })
 
-    stage('off', []) // global off clears everything
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      fog: false,
+      leftChannel: 0,
+      rightChannel: 0xff,
+      timestamp: Date.now(),
+    })
     expect(lastBanks()).toEqual({ red: 0, green: 0, blue: 0, yellow: 0 })
+  })
+
+  it('leaves the accumulated banks alone for fog and strobe packets', () => {
+    emitGameState(networkListener, 'InGame')
+    const handled: CueData[] = []
+    processor.on('cueHandled', (d: CueData) => handled.push(d))
+    const stage = (fields: Partial<Parameters<typeof networkListener.emit>[1]>): void => {
+      networkListener.emit('stagekit:data', {
+        positions: [],
+        color: 'off',
+        timestamp: Date.now(),
+        ...fields,
+      })
+    }
+    const lastBanks = (): CueData['ledBanks'] => handled[handled.length - 1].ledBanks
+
+    networkListener.emit('stagekit:data', {
+      positions: [0, 2],
+      color: 'red',
+      timestamp: Date.now(),
+    })
+    expect(lastBanks()).toEqual({ red: 0b0101, green: 0, blue: 0, yellow: 0 })
+
+    stage({ fog: true, leftChannel: 0, rightChannel: 1 })
+    stage({ fog: false, leftChannel: 0, rightChannel: 2 })
+    stage({ strobeEffect: 'fast' })
+    stage({ strobeEffect: 'off' })
+
+    expect(lastBanks()).toEqual({ red: 0b0101, green: 0, blue: 0, yellow: 0 })
+  })
+
+  it('DisableAll turns off every rig, resets strobe state, and reports processed and handled', () => {
+    emitGameState(networkListener, 'InGame')
+    emitStageKit(networkListener)
+    blackout.mockClear()
+
+    const handled: CueData[] = []
+    const processed: unknown[] = []
+    processor.on('cueHandled', (d: CueData) => handled.push(d))
+    processor.on('stagekit:processed', (e: unknown) => processed.push(e))
+
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      fog: false,
+      leftChannel: 0,
+      rightChannel: 0xff,
+      timestamp: Date.now(),
+    })
+
+    expect(blackout).toHaveBeenCalledWith(0)
+    expect(processed).toHaveLength(1)
+    expect(handled[handled.length - 1].ledBanks).toEqual({ red: 0, green: 0, blue: 0, yellow: 0 })
+  })
+
+  it('DisableAll during the menu look leaves the rig alone', async () => {
+    emitGameState(networkListener, 'InGame')
+    emitGameState(networkListener, 'Menus')
+    jest.advanceTimersByTime(1000)
+    await Promise.resolve()
+    await Promise.resolve()
+    blackout.mockClear()
+
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      fog: false,
+      leftChannel: 0,
+      rightChannel: 0xff,
+      timestamp: Date.now(),
+    })
+
+    expect(blackout).not.toHaveBeenCalled()
+  })
+
+  it('lights normally from a colour packet right after DisableAll', () => {
+    emitGameState(networkListener, 'InGame')
+    const handled: CueData[] = []
+    processor.on('cueHandled', (d: CueData) => handled.push(d))
+
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      fog: false,
+      leftChannel: 0,
+      rightChannel: 0xff,
+      timestamp: Date.now(),
+    })
+    networkListener.emit('stagekit:data', { positions: [3], color: 'blue', timestamp: Date.now() })
+
+    expect(handled[handled.length - 1].ledBanks).toEqual({
+      red: 0,
+      green: 0,
+      blue: 0b1000,
+      yellow: 0,
+    })
   })
 
   it('song_select_screen does not re-emit Default menu when cue is already running (e.g. after main_hub)', () => {
@@ -267,6 +370,52 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     for (let i = 0; i < 4; i++) {
       expect(removeEffect).toHaveBeenCalledWith(menuLight(i), 1 + i)
     }
+  })
+})
+
+describe('Rb3StageKitDirectProcessor DisableAll across multiple rigs', () => {
+  it('turns off every active rig', () => {
+    const networkListener = new EventEmitter()
+    const blackoutA = jest.fn<ILightingController['blackout']>(() => Promise.resolve())
+    const blackoutB = jest.fn<ILightingController['blackout']>(() => Promise.resolve())
+    const rigA = {
+      rigId: 'rig-a',
+      isPrimary: true,
+      dmxLightManager: new DmxLightManager(makeFourLightConfig()),
+      sequencer: fakeLightingController({ blackout: blackoutA }),
+      cueHandlers: { yarg: null, rb3: null },
+      audioCueHandler: null,
+      rb3MenuCueHandler: null,
+    } as unknown as RigChain
+    const rigB = {
+      rigId: 'rig-b',
+      isPrimary: false,
+      dmxLightManager: new DmxLightManager(makeFourLightConfig()),
+      sequencer: fakeLightingController({ blackout: blackoutB }),
+      cueHandlers: { yarg: null, rb3: null },
+      audioCueHandler: null,
+      rb3MenuCueHandler: null,
+    } as unknown as RigChain
+    const chainFanout = new ChainFanout()
+    chainFanout.setChains([rigA, rigB])
+    const processor = new Rb3StageKitDirectProcessor(chainFanout)
+    processor.startListening(networkListener)
+
+    emitGameState(networkListener, 'InGame')
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      color: 'off',
+      fog: false,
+      leftChannel: 0,
+      rightChannel: 0xff,
+      timestamp: Date.now(),
+    })
+
+    expect(blackoutA).toHaveBeenCalledWith(0)
+    expect(blackoutB).toHaveBeenCalledWith(0)
+
+    processor.stopListening(networkListener)
+    processor.destroy()
   })
 })
 
