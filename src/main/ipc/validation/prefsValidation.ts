@@ -13,6 +13,7 @@ import {
 import { CUE_DOMAINS } from '../../../services/configuration/cueDomainTypes'
 import { DEFAULT_AUDIO_GAME_MODE } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import { clampDmxOutputRefreshRateHz } from '../../../shared/dmxOutputRefresh'
+import { validateStoredUsbSenderConfigs } from './usbSenderConfigValidation'
 import { SACN_UNIVERSE_MAX, SACN_UNIVERSE_MIN } from '../../../shared/sacnUniverse'
 import { clampClockRateMs } from '../../../shared/clockRate'
 import {
@@ -544,28 +545,8 @@ export function validatePreferencesPayload(
     }
   }
 
-  if ('enttecProConfig' in cleaned) {
-    const c = cleaned.enttecProConfig
-    if (!isPlainObject(c)) {
-      return { ok: false, error: 'enttecProConfig must be an object' }
-    }
-    if ('port' in c && typeof c.port !== 'string') {
-      return { ok: false, error: 'enttecProConfig.port must be a string' }
-    }
-  }
-
-  if ('openDmxConfig' in cleaned) {
-    const c = cleaned.openDmxConfig
-    if (!isPlainObject(c)) {
-      return { ok: false, error: 'openDmxConfig must be an object' }
-    }
-    if ('port' in c && typeof c.port !== 'string') {
-      return { ok: false, error: 'openDmxConfig.port must be a string' }
-    }
-    if ('dmxSpeed' in c && (typeof c.dmxSpeed !== 'number' || !Number.isFinite(c.dmxSpeed))) {
-      return { ok: false, error: 'openDmxConfig.dmxSpeed must be a finite number' }
-    }
-  }
+  const usbSenders = validateStoredUsbSenderConfigs(cleaned)
+  if (!usbSenders.ok) return usbSenders
 
   if ('dmxOutputConfig' in cleaned) {
     const c = cleaned.dmxOutputConfig

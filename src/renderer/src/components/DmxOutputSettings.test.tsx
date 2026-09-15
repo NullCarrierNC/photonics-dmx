@@ -34,6 +34,7 @@ const enableSenderMock = jest.mocked(ipcApi.enableSender)
 const disableSenderMock = jest.mocked(ipcApi.disableSender)
 const updateSacnConfigMock = jest.mocked(ipcApi.updateSacnConfig)
 const updateArtNetConfigMock = jest.mocked(ipcApi.updateArtNetConfig)
+const updateEnttecConfigMock = jest.mocked(ipcApi.updateEnttecConfig)
 const getNetworkInterfacesMock = jest.mocked(ipcApi.getNetworkInterfaces)
 
 import DmxOutputSettings from './DmxOutputSettings'
@@ -247,13 +248,17 @@ describe('DmxOutputSettings sender startup payloads', () => {
   it('hands Enttec Pro the saved serial port', async () => {
     await renderPanel({
       dmxOutputConfig: outputConfig(),
-      enttecProConfig: { port: 'COM7' },
+      enttecProConfig: { port: 'COM7', dmxSpeed: 40 },
     })
 
     fireEvent.click(screen.getByLabelText('Enttec Pro USB'))
 
     await waitFor(() =>
-      expect(enableSenderMock).toHaveBeenCalledWith({ sender: 'enttecpro', devicePath: 'COM7' }),
+      expect(enableSenderMock).toHaveBeenCalledWith({
+        sender: 'enttecpro',
+        devicePath: 'COM7',
+        dmxSpeed: 40,
+      }),
     )
   })
 
@@ -419,6 +424,123 @@ describe('DmxOutputSettings OpenDMX refresh rate', () => {
     commit(screen.getByRole('spinbutton'), '25')
 
     await waitFor(() => expect(savedOpenDmx()).toEqual({ port: 'COM4', dmxSpeed: 25 }))
+  })
+
+  it('commits the port then the rate from one round-trip without either clobbering the other', async () => {
+    let releaseFirst: (() => void) | undefined
+    savePrefsMock
+      .mockImplementationOnce(async () => {
+        await new Promise<void>((resolve) => {
+          releaseFirst = resolve
+        })
+        return { success: true }
+      })
+      .mockImplementation(async () => ({ success: true }))
+
+    await renderPanel(openDmxOpen())
+
+    commit(screen.getByPlaceholderText('COM4'), 'COM9')
+    commit(screen.getByRole('spinbutton'), '20')
+
+    await waitFor(() => expect(releaseFirst).toBeDefined())
+    await act(async () => {
+      releaseFirst?.()
+    })
+
+    const openDmxCalls = () =>
+      savePrefsMock.mock.calls
+        .filter((c) => 'openDmxConfig' in c[0])
+        .map((c) => c[0].openDmxConfig as { port: string; dmxSpeed: number })
+    await waitFor(() => expect(openDmxCalls()).toHaveLength(2))
+    expect(openDmxCalls()[1]).toEqual({ port: 'COM9', dmxSpeed: 20 })
+  })
+})
+
+describe('DmxOutputSettings Enttec Pro refresh rate', () => {
+  const enttecOpen = (config: { port?: string; dmxSpeed?: number } = {}): LightingPreferences => ({
+    dmxOutputConfig: outputConfig({ enttecProEnabled: true }),
+    dmxSettingsPrefs: expansion({ enttecProExpanded: true }),
+    enttecProConfig: { port: 'COM7', dmxSpeed: 40, ...config },
+  })
+
+  const savedEnttecCalls = (): Array<{ port: string; dmxSpeed: number }> =>
+    savePrefsMock.mock.calls
+      .filter((c) => 'enttecProConfig' in c[0])
+      .map((c) => c[0].enttecProConfig as { port: string; dmxSpeed: number })
+
+  const lastSavedEnttec = (): { port: string; dmxSpeed: number } => {
+    const calls = savedEnttecCalls()
+    if (calls.length === 0) throw new Error('no enttecProConfig was saved')
+    return calls[calls.length - 1]
+  }
+
+  it('rounds and clamps to the floor of 10', async () => {
+    await renderPanel(enttecOpen())
+    commit(screen.getByLabelText('Refresh Rate'), '2')
+    await waitFor(() => expect(lastSavedEnttec().dmxSpeed).toBe(10))
+  })
+
+  it('rounds and clamps to the ceiling of 44', async () => {
+    await renderPanel(enttecOpen())
+    commit(screen.getByLabelText('Refresh Rate'), '200')
+    await waitFor(() => expect(lastSavedEnttec().dmxSpeed).toBe(44))
+  })
+
+  it('rounds a fractional rate to the nearest whole Hz', async () => {
+    await renderPanel(enttecOpen())
+    commit(screen.getByLabelText('Refresh Rate'), '20.6')
+    await waitFor(() => expect(lastSavedEnttec().dmxSpeed).toBe(21))
+  })
+
+  it('pushes the merged config to a running sender', async () => {
+    await renderPanel(enttecOpen({ port: 'COM7', dmxSpeed: 40 }), { enttecpro: true })
+
+    commit(screen.getByLabelText('Refresh Rate'), '20')
+
+    await waitFor(() =>
+      expect(updateEnttecConfigMock).toHaveBeenCalledWith({ devicePath: 'COM7', dmxSpeed: 20 }),
+    )
+  })
+
+  it('commits the port then the rate from one round-trip without either clobbering the other', async () => {
+    let releaseFirst: (() => void) | undefined
+    savePrefsMock
+      .mockImplementationOnce(async () => {
+        await new Promise<void>((resolve) => {
+          releaseFirst = resolve
+        })
+        return { success: true }
+      })
+      .mockImplementation(async () => ({ success: true }))
+
+    await renderPanel(enttecOpen({ port: 'COM7', dmxSpeed: 40 }))
+
+    commit(screen.getByPlaceholderText('COM3'), 'COM9')
+    commit(screen.getByLabelText('Refresh Rate'), '20')
+
+    await waitFor(() => expect(releaseFirst).toBeDefined())
+    await act(async () => {
+      releaseFirst?.()
+    })
+
+    await waitFor(() => expect(savedEnttecCalls()).toHaveLength(2))
+    // The port commit persists first, holding the original rate, then the rate commit persists
+    // the merged config, carrying the new port forward rather than the stale one it started with.
+    expect(savedEnttecCalls()[0]).toEqual({ port: 'COM9', dmxSpeed: 40 })
+    expect(savedEnttecCalls()[1]).toEqual({ port: 'COM9', dmxSpeed: 20 })
+  })
+
+  it('leaves the stored config and running sender untouched when the save is refused', async () => {
+    savePrefsMock.mockResolvedValueOnce({ success: false, error: 'disk full' })
+    const store = await renderPanel(enttecOpen({ port: 'COM7', dmxSpeed: 40 }), {
+      enttecpro: true,
+    })
+
+    commit(screen.getByLabelText('Refresh Rate'), '20')
+
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
+    expect(updateEnttecConfigMock).not.toHaveBeenCalled()
+    expect(store.get(lightingPrefsAtom).enttecProConfig).toEqual({ port: 'COM7', dmxSpeed: 40 })
   })
 })
 
@@ -652,13 +774,15 @@ describe('DmxOutputSettings serial ports', () => {
     await renderPanel({
       dmxOutputConfig: outputConfig({ enttecProEnabled: true }),
       dmxSettingsPrefs: expansion({ enttecProExpanded: true }),
-      enttecProConfig: { port: '' },
+      enttecProConfig: { port: '', dmxSpeed: 40 },
     })
 
     commit(screen.getByPlaceholderText('COM3'), 'COM9')
 
     await waitFor(() =>
-      expect(savePrefsMock).toHaveBeenCalledWith({ enttecProConfig: { port: 'COM9' } }),
+      expect(savePrefsMock).toHaveBeenCalledWith({
+        enttecProConfig: { port: 'COM9', dmxSpeed: 40 },
+      }),
     )
   })
 
@@ -676,7 +800,7 @@ describe('DmxOutputSettings serial ports', () => {
     await renderPanel({
       dmxOutputConfig: outputConfig({ enttecProEnabled: true }),
       dmxSettingsPrefs: expansion({ enttecProExpanded: true }),
-      enttecProConfig: { port: '' },
+      enttecProConfig: { port: '', dmxSpeed: 40 },
     })
 
     const field = screen.getByPlaceholderText('COM3') as HTMLInputElement

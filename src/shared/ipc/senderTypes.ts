@@ -32,6 +32,13 @@ export interface SenderInvokeMap {
     }
     response: IpcSuccessResult | IpcErrorResult
   }
+  [LIGHT.UPDATE_ENTTEC_CONFIG]: {
+    request: {
+      devicePath: string
+      dmxSpeed?: number
+    }
+    response: IpcSuccessResult | IpcErrorResult
+  }
   [LIGHT.SENDER_ENABLE]: {
     request: SenderConfig
     response: IpcSuccessResult | IpcErrorResult

@@ -10,9 +10,20 @@ export const DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT = 40
 /** Default OpenDMX USB send rate (Hz); used as `dmxSpeed` default for OpenDMX serial output. */
 export const OPEN_DMX_DEFAULT_REFRESH_RATE_HZ = 40
 
+/** Default Enttec Pro USB send rate (Hz). */
+export const ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ = 40
+
 export function clampDmxOutputRefreshRateHz(hz: number): number {
   const rounded = Math.round(hz)
   return Math.min(DMX_OUTPUT_REFRESH_RATE_HZ_MAX, Math.max(DMX_OUTPUT_REFRESH_RATE_HZ_MIN, rounded))
+}
+
+/** Normalizes Enttec Pro refresh rate from persisted prefs or IPC payloads (10-44 Hz, rounded). */
+export function normalizeEnttecProDmxSpeedHz(hz: unknown): number {
+  if (typeof hz !== 'number' || !Number.isFinite(hz)) {
+    return ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ
+  }
+  return clampDmxOutputRefreshRateHz(hz)
 }
 
 /**

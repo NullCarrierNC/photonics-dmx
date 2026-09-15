@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useRef } from 'react'
+import React, { useCallback, useState, useEffect } from 'react'
 import { useAtom } from 'jotai'
 import {
   senderArtNetEnabledAtom,
@@ -22,10 +22,13 @@ import {
   disableSender,
   updateSacnConfig,
   updateArtNetConfig,
+  updateEnttecConfig,
 } from '../ipcApi'
 import {
   DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
   DMX_OUTPUT_REFRESH_RATE_HZ_MIN,
+  ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ,
+  normalizeEnttecProDmxSpeedHz,
   OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
 } from '../../../shared/dmxOutputRefresh'
 import {
@@ -36,6 +39,7 @@ import {
   parseOpenDmxSpeed,
   type DmxOutputFlag,
 } from './DmxOutputSettings/outputConfig'
+import { useSerializedConfigCommit } from './DmxOutputSettings/useSerializedConfigCommit'
 import { applySenderRunState } from '../ipc/senderSwitch'
 import { persistPrefs } from '../ipc/persistPrefs'
 import { wasRefused } from '../ipc/ipcResult'
@@ -57,6 +61,7 @@ const DmxOutputSettings: React.FC = () => {
   const [comPort, setComPort] = useAtom(enttecProComPortAtom)
   const [openDmxComPort, setOpenDmxComPort] = useAtom(openDmxComPortAtom)
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
+  const enttecProSpeed = prefs.enttecProConfig?.dmxSpeed ?? ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ
   const openDmxSpeed = prefs.openDmxConfig?.dmxSpeed ?? OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
   const globalDmxPublishingRate = prefs.globalDmxPublishingRateHz ?? DMX_OUTPUT_REFRESH_RATE_HZ_MAX
   const advancedModeEnabled = prefs.advancedModeEnabled ?? false
@@ -69,14 +74,6 @@ const DmxOutputSettings: React.FC = () => {
     Array<{ name: string; value: string; family: string }>
   >([])
   const { toasts, showToast, hideToast } = useToast()
-
-  // Handlers rebuild a nested config object, so they read preferences from here rather than from
-  // the render that created them. Two fields of one config committed close together would
-  // otherwise write over each other, since the merge in main is one level deep.
-  const prefsRef = useRef(prefs)
-  useEffect(() => {
-    prefsRef.current = prefs
-  }, [prefs])
 
   /** Writes preferences, reporting a refusal on screen. */
   const persist = useCallback(
@@ -104,6 +101,29 @@ const DmxOutputSettings: React.FC = () => {
     },
     [showToast],
   )
+
+  /** Persists Enttec port/rate atomically and pushes the merged config to a running sender. */
+  const commitEnttecConfig = useSerializedConfigCommit({
+    stored: prefs.enttecProConfig,
+    defaultConfig: { port: '', dmxSpeed: ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ },
+    persist: (config, what) => persist({ enttecProConfig: config }, what),
+    setStored: (config) => setPrefs((prev) => ({ ...prev, enttecProConfig: config })),
+    applyToRunningSender: isEnttecProEnabled
+      ? (config, what) =>
+          applyToRunningSender(
+            () => updateEnttecConfig({ devicePath: config.port, dmxSpeed: config.dmxSpeed }),
+            what,
+          )
+      : undefined,
+  })
+
+  /** Persists OpenDMX port/rate atomically. OpenDMX has no live-update channel to push to. */
+  const commitOpenDmxConfig = useSerializedConfigCommit({
+    stored: prefs.openDmxConfig,
+    defaultConfig: { port: '', dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ },
+    persist: (config, what) => persist({ openDmxConfig: config }, what),
+    setStored: (config) => setPrefs((prev) => ({ ...prev, openDmxConfig: config })),
+  })
 
   // The port fields hold their own text while they are being edited and report on blur, so the
   // atoms can simply follow what is stored.
@@ -213,7 +233,8 @@ const DmxOutputSettings: React.FC = () => {
       flag: 'enttecProEnabled',
       isRunning: isEnttecProEnabled,
       setRunning: setIsEnttecProEnabled,
-      start: () => enableSender({ sender: 'enttecpro', devicePath: comPort }),
+      start: () =>
+        enableSender({ sender: 'enttecpro', devicePath: comPort, dmxSpeed: enttecProSpeed }),
       stop: () => disableSender({ sender: 'enttecpro' }),
     },
     opendmx: {
@@ -279,60 +300,23 @@ const DmxOutputSettings: React.FC = () => {
 
   const handleComPortChange = async (newPort: string) => {
     setComPort(newPort)
+    await commitEnttecConfig({ port: newPort }, 'the Enttec Pro port')
+  }
 
-    const newConfig = {
-      ...(prefsRef.current.enttecProConfig ?? { port: '' }),
-      port: newPort,
-    }
-
-    if (!(await persist({ enttecProConfig: newConfig }, 'the Enttec Pro port'))) {
-      return
-    }
-
-    setPrefs((prev) => ({
-      ...prev,
-      enttecProConfig: newConfig,
-    }))
+  const handleEnttecProSpeedChange = async (hz: number) => {
+    await commitEnttecConfig(
+      { dmxSpeed: normalizeEnttecProDmxSpeedHz(hz) },
+      'the Enttec Pro refresh rate',
+    )
   }
 
   const handleOpenDmxComPortChange = async (newPort: string) => {
     setOpenDmxComPort(newPort)
-
-    const newConfig = {
-      ...(prefsRef.current.openDmxConfig ?? {
-        port: '',
-        dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
-      }),
-      port: newPort,
-    }
-
-    if (!(await persist({ openDmxConfig: newConfig }, 'the OpenDMX port'))) {
-      return
-    }
-
-    setPrefs((prev) => ({
-      ...prev,
-      openDmxConfig: newConfig,
-    }))
+    await commitOpenDmxConfig({ port: newPort }, 'the OpenDMX port')
   }
 
   const handleOpenDmxSpeedChange = async (hz: number) => {
-    const newConfig = {
-      ...(prefsRef.current.openDmxConfig ?? {
-        port: '',
-        dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
-      }),
-      dmxSpeed: parseOpenDmxSpeed(String(hz)),
-    }
-
-    if (!(await persist({ openDmxConfig: newConfig }, 'the OpenDMX rate'))) {
-      return
-    }
-
-    setPrefs((prev) => ({
-      ...prev,
-      openDmxConfig: newConfig,
-    }))
+    await commitOpenDmxConfig({ dmxSpeed: parseOpenDmxSpeed(String(hz)) }, 'the OpenDMX rate')
   }
 
   const handleGlobalDmxRateChange = async (hz: number) => {
@@ -498,7 +482,9 @@ const DmxOutputSettings: React.FC = () => {
         <div>
           <EnttecProConfigCard
             comPort={comPort}
+            refreshRate={enttecProSpeed}
             onComPortChange={handleComPortChange}
+            onRefreshRateChange={handleEnttecProSpeedChange}
             expanded={enttecProExpanded}
             onToggle={() => {
               const newEnttecProExpanded = !enttecProExpanded

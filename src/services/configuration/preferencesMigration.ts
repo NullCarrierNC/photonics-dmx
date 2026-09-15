@@ -1,5 +1,6 @@
 import { DEFAULT_PREFERENCES, type AppPreferences } from './configurationDefaults'
 import { REQUIRED_PREFERENCE_KEYS } from './configDataValidators'
+import { normalizeEnttecProDmxSpeedHz } from '../../shared/dmxOutputRefresh'
 import { clampSacnUniverse } from '../../shared/sacnUniverse'
 import { clampClockRateMs } from '../../shared/clockRate'
 import {
@@ -54,6 +55,7 @@ export function applyLegacySenderFlatToNested(
 ): AppPreferences {
   const defaultEnttec: NonNullable<AppPreferences['enttecProConfig']> = {
     port: DEFAULT_PREFERENCES.enttecProConfig!.port,
+    dmxSpeed: DEFAULT_PREFERENCES.enttecProConfig!.dmxSpeed,
   }
   const defaultOpen: NonNullable<AppPreferences['openDmxConfig']> = {
     port: DEFAULT_PREFERENCES.openDmxConfig!.port,
@@ -355,15 +357,25 @@ export function healStoredClockRate(prefs: AppPreferences): AppPreferences {
 }
 
 export function healStoredSenderConfigs(prefs: AppPreferences): AppPreferences {
-  const sacn = prefs?.sacnConfig
-  if (!isPlainObject(sacn) || typeof sacn.universe !== 'number') {
-    return prefs
+  let next = prefs
+
+  const sacn = next?.sacnConfig
+  if (isPlainObject(sacn) && typeof sacn.universe === 'number') {
+    const universe = clampSacnUniverse(sacn.universe)
+    if (universe !== sacn.universe) {
+      next = { ...next, sacnConfig: { ...sacn, universe } }
+    }
   }
-  const universe = clampSacnUniverse(sacn.universe)
-  if (universe === sacn.universe) {
-    return prefs
+
+  const enttec = next?.enttecProConfig
+  if (isPlainObject(enttec)) {
+    const dmxSpeed = normalizeEnttecProDmxSpeedHz(enttec.dmxSpeed)
+    if (enttec.dmxSpeed !== dmxSpeed) {
+      next = { ...next, enttecProConfig: { ...enttec, dmxSpeed } }
+    }
   }
-  return { ...prefs, sacnConfig: { ...sacn, universe } }
+
+  return next
 }
 
 /**

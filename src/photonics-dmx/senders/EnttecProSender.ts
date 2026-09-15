@@ -1,4 +1,5 @@
 import { EnttecUSBDMXProDriver } from 'dmx-ts'
+import { ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ } from '../../shared/dmxOutputRefresh'
 import { SenderError } from './BaseSender'
 import { DmxTsSender } from './DmxTsSender'
 import { createLogger } from '../../shared/logger'
@@ -9,7 +10,7 @@ export class EnttecProSender extends DmxTsSender {
 
   constructor(
     private port: string,
-    private options = { dmxSpeed: 20 },
+    private options = { dmxSpeed: ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ },
     private universeName: string = 'uni1',
     universe: number = 0,
   ) {
@@ -31,6 +32,11 @@ export class EnttecProSender extends DmxTsSender {
   /** The serial driver is 1-based, so the blackout goes to the universe as it is. */
   protected writeBlackout(buffer: Record<number, number>): void {
     this.universe?.update(buffer)
+  }
+
+  /** At least two driver intervals, so a low configured rate still gets the blackout out. */
+  protected override blackoutSettleMs(): number {
+    return Math.max(100, Math.round(2000 / this.options.dmxSpeed))
   }
 
   public async send(universeBuffer: Record<number, number>): Promise<boolean> {

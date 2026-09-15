@@ -284,4 +284,48 @@ describe('setupSenderHandlers', () => {
       expect(restartSender).not.toHaveBeenCalled()
     })
   })
+
+  describe('UPDATE_ENTTEC_CONFIG', () => {
+    it('restarts Enttec Pro when sender is enabled', async () => {
+      setupSenderHandlers(mockIpcMain as any, mockControllerManager as any)
+      const validated = {
+        sender: 'enttecpro' as const,
+        devicePath: '/dev/ttyUSB0',
+        universe: 0,
+        dmxSpeed: 40,
+      }
+      validateEnable.mockReturnValue({ ok: true, value: validated })
+      getEnabledSenders.mockReturnValue(['enttecpro'])
+
+      const h = getHandler(LIGHT.UPDATE_ENTTEC_CONFIG)
+      const r = (await h(null, { devicePath: '/dev/ttyUSB0', dmxSpeed: 40 })) as {
+        success: boolean
+      }
+
+      expect(r).toEqual({ success: true })
+      expect(restartSender).toHaveBeenCalledWith('enttecpro', validated)
+    })
+
+    it('does not restart when Enttec Pro is not enabled', async () => {
+      setupSenderHandlers(mockIpcMain as any, mockControllerManager as any)
+      validateEnable.mockReturnValue({
+        ok: true,
+        value: {
+          sender: 'enttecpro' as const,
+          devicePath: '/dev/ttyUSB0',
+          universe: 0,
+          dmxSpeed: 40,
+        },
+      })
+      getEnabledSenders.mockReturnValue([])
+
+      const h = getHandler(LIGHT.UPDATE_ENTTEC_CONFIG)
+      const r = (await h(null, { devicePath: '/dev/ttyUSB0', dmxSpeed: 40 })) as {
+        success: boolean
+      }
+
+      expect(r).toEqual({ success: true })
+      expect(restartSender).not.toHaveBeenCalled()
+    })
+  })
 })

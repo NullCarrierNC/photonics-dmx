@@ -1,7 +1,10 @@
 // src/managers/SenderManager.ts
 import { EventEmitter } from 'node:events'
 import { createLogger } from '../../shared/logger'
-import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../shared/dmxOutputRefresh'
+import {
+  normalizeEnttecProDmxSpeedHz,
+  OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
+} from '../../shared/dmxOutputRefresh'
 import { BaseSender, SenderError } from '../senders/BaseSender'
 import { IpcSender } from '../senders/IpcSender'
 import { ArtNetSender } from '../senders/ArtNetSender'
@@ -142,7 +145,7 @@ export class SenderManager {
             const USB_UNIVERSE = 0
             sender = new EnttecProSender(
               devicePath,
-              { dmxSpeed: config.dmxSpeed ?? 20 },
+              { dmxSpeed: normalizeEnttecProDmxSpeedHz(config.dmxSpeed) },
               'uni1',
               USB_UNIVERSE,
             )

@@ -257,6 +257,19 @@ describe('healStoredSenderConfigs', () => {
     expect(healStoredSenderConfigs(prefs)).toBe(prefs)
   })
 
+  it('seeds missing Enttec Pro dmxSpeed to the default refresh rate', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      enttecProConfig: { port: 'COM3' },
+    } as AppPreferences
+
+    const out = healStoredSenderConfigs(prefs)
+
+    expect(out).not.toBe(prefs)
+    expect(out.enttecProConfig?.dmxSpeed).toBe(40)
+    expect(out.enttecProConfig?.port).toBe('COM3')
+  })
+
   it('brings a stored universe below the range up to the lowest sACN defines', () => {
     const prefs = {
       ...DEFAULT_PREFERENCES,

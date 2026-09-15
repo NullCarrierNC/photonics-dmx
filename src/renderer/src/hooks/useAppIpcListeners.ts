@@ -6,7 +6,10 @@ import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { getAppVersion, getCorruptRecoveryEvents, getPrefs, getValidationErrors } from '../ipcApi'
 import type { CueStateUpdatePayload, NodeCueRuntimeErrorPayload } from '../../../shared/ipcTypes'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
-import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../../shared/dmxOutputRefresh'
+import {
+  ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ,
+  OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
+} from '../../../shared/dmxOutputRefresh'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('useAppIpcListeners')
 
@@ -77,7 +80,7 @@ async function loadAndApplyPrefs(
     updatedPrefs.dmxOutputConfig = { ...defaultDmxOutputConfig, ...prefs.dmxOutputConfig }
   }
 
-  const defaultEnttecProConfig = { port: '' }
+  const defaultEnttecProConfig = { port: '', dmxSpeed: ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ }
   if (!prefs.enttecProConfig) {
     log.info('No saved Enttec Pro config, using defaults:', defaultEnttecProConfig)
     updatedPrefs.enttecProConfig = defaultEnttecProConfig
@@ -198,9 +201,6 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     const onAudioEnable = (config: AudioConfig) => p().handleAudioEnable(config)
     const onAudioDisable = () => p().handleAudioDisable(undefined)
     const onAudioConfigUpdate = (c: AudioConfig | undefined) => p().handleAudioConfigUpdate(c)
-    const onConfigCorrupt = (ev: { files: { fileName: string; message?: string }[] }) =>
-      p().handleConfigCorruptRecovered(ev)
-
     addIpcListener(RENDERER_RECEIVE.SENDER_ERROR, onSenderError)
     addIpcListener(RENDERER_RECEIVE.YARG_ERROR, onYargError)
     addIpcListener(RENDERER_RECEIVE.RB3_ERROR, onRb3Error)
@@ -211,7 +211,6 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, onAudioEnable)
     addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, onAudioDisable)
     addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onAudioConfigUpdate)
-    addIpcListener(RENDERER_RECEIVE.CONFIG_CORRUPT_RECOVERED, onConfigCorrupt)
 
     return () => {
       removeIpcListener(RENDERER_RECEIVE.SENDER_ERROR, onSenderError)
@@ -224,7 +223,6 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
       removeIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, onAudioEnable)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, onAudioDisable)
       removeIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, onAudioConfigUpdate)
-      removeIpcListener(RENDERER_RECEIVE.CONFIG_CORRUPT_RECOVERED, onConfigCorrupt)
     }
   }, [latest])
 }

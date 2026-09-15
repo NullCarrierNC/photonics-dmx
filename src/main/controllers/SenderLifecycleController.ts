@@ -16,6 +16,7 @@ import {
 import {
   artNetBaseRefreshIntervalMs,
   dmxOutputRefreshRateHzFromUnknownPayload,
+  normalizeEnttecProDmxSpeedHz,
 } from '../../shared/dmxOutputRefresh'
 import { validateStoredArtNetConfig, validateStoredSacnConfig } from '../ipc/inputValidation'
 
@@ -226,6 +227,7 @@ export class SenderLifecycleController {
           await sm.enableSender('enttecpro', 'enttecpro', {
             sender: 'enttecpro',
             devicePath: ec.port,
+            dmxSpeed: normalizeEnttecProDmxSpeedHz(ec.dmxSpeed),
           })
           log.info('Restored Enttec Pro sender from preferences')
         } catch (err) {
