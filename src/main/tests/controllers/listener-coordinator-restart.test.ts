@@ -88,7 +88,7 @@ describe('ListenerCoordinator listener shutdown ordering', () => {
     expect(co.cueHandler).toBeNull()
   })
 
-  it('disableRb3 keeps isRb3Enabled true until the RB3 listener shutdown Promise resolves', async () => {
+  it('disableRb3 marks RB3 disabled immediately while listener shutdown is still in flight', async () => {
     const lc = new ListenerCoordinator(makeDeps())
     let releaseShutdown: (() => void) | undefined
     const shutdownP = new Promise<void>((resolve) => {
@@ -106,10 +106,9 @@ describe('ListenerCoordinator listener shutdown ordering', () => {
 
     const disableP = lc.disableRb3()
     await Promise.resolve()
-    expect(co.isRb3Enabled).toBe(true)
+    expect(co.isRb3Enabled).toBe(false)
     releaseShutdown!()
     await disableP
-    expect(co.isRb3Enabled).toBe(false)
     expect(co.rb3eListener).toBeNull()
     expect(co.processorManager).toBeNull()
   })
