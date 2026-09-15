@@ -222,8 +222,15 @@ export class EffectScheduler {
               effectRunId,
             })
           } else {
-            this.removeEffectForLight(layer, lightId, false)
+            // Cancel and drop any queued successor before evicting the active effect: the
+            // incoming effect claims this slot outright, ahead of the queued same-name run that
+            // removeEffectForLight's successor pass starts when a slot empties.
+            const queued = this.layerManager.getQueuedEffect(layer, lightId)
+            if (queued?.effectRunId) {
+              this.persistentRuns.cancel(queued.effectRunId)
+            }
             this.layerManager.removeQueuedEffect(layer, lightId)
+            this.removeEffectForLight(layer, lightId, false)
             this.startEffect(
               name,
               effect,
@@ -252,7 +259,9 @@ export class EffectScheduler {
   /**
    * The 'replace' apply path: for each (layer, light) slot the effect targets, cancels the active
    * and queued effect on that slot and starts the new transitions immediately, easing from the
-   * light's current state.
+   * light's current state. A displaced active effect under a different name never reaches
+   * `onLightEffectComplete`, so its waiter is told here instead, once per name and only once the
+   * name is confirmed gone from every slot this call touches.
    */
   public replaceEffectTransitions(
     name: string,
@@ -261,6 +270,7 @@ export class EffectScheduler {
     isPersistent: boolean,
     effectRunId?: string,
   ): void {
+    const evicted = new Set<string>()
     transitionsByLayerAndLight.forEach((layerMap, layer) => {
       layerMap.forEach((transitionsForLight, lightId) => {
         const targetLight = transitionsForLight[0].lights.find((l) => l.id === lightId)
@@ -276,7 +286,14 @@ export class EffectScheduler {
           if (activeEffect.effectRunId) {
             this.persistentRuns.cancel(activeEffect.effectRunId)
           }
+          if (activeEffect.name !== name) {
+            evicted.add(activeEffect.name)
+          }
           this.layerManager.removeActiveEffect(layer, lightId)
+        }
+        const queued = this.layerManager.getQueuedEffect(layer, lightId)
+        if (queued?.effectRunId) {
+          this.persistentRuns.cancel(queued.effectRunId)
         }
         this.layerManager.removeQueuedEffect(layer, lightId)
 
@@ -291,6 +308,12 @@ export class EffectScheduler {
         )
       })
     })
+
+    for (const evictedName of evicted) {
+      if (!this.isEffectRunningAnywhere(evictedName)) {
+        this.deps.fireCompletionCallback(evictedName, true)
+      }
+    }
   }
 
   /**

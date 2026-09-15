@@ -111,4 +111,23 @@ describe('an effect evicted from its layer slot', () => {
 
     expect(completions).toEqual([])
   })
+
+  it('fires once when a different name displaces an active effect with a queued successor', () => {
+    const completions: boolean[] = []
+    harness.sequencer.addEffectUnblockedNameWithCallback(
+      'held',
+      look(RED, 1),
+      (cancelled) => completions.push(cancelled),
+      false,
+    )
+    harness.advanceBy(50)
+
+    harness.sequencer.addEffect('held', look(BLUE, 1))
+    harness.advanceBy(50)
+
+    harness.sequencer.addEffect('usurper', look(BLUE, 1))
+    harness.advanceBy(50)
+
+    expect(completions).toEqual([true])
+  })
 })

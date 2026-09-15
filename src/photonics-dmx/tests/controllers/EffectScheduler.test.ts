@@ -202,6 +202,36 @@ describe('EffectScheduler', () => {
       expect(layerManager.addQueuedEffect).not.toHaveBeenCalled()
       expect(layerManager.addActiveEffect).toHaveBeenCalledTimes(1)
     })
+
+    it('cancels a queued persistent run before displacing the active effect', () => {
+      const queuedRunId = persistentRuns.register(
+        'held',
+        effectWith([]),
+        groupByLayerAndLight([transition(1)]),
+      )
+      layerManager.getActiveEffect.mockReturnValue({
+        name: 'held',
+        lightId: light.id,
+      } as unknown as LightEffectState)
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'held',
+        effect: effectWith([transition(1)]),
+        isPersistent: true,
+        lightId: light.id,
+        effectRunId: queuedRunId,
+      })
+      const transitions = [transition(1)]
+
+      scheduler.applyEffectTransitions(
+        'usurper',
+        effectWith(transitions),
+        groupByLayerAndLight(transitions),
+        false,
+      )
+
+      expect(persistentRuns.has(queuedRunId!)).toBe(false)
+      expect(layerManager.removeQueuedEffect).toHaveBeenCalledWith(1, light.id)
+    })
   })
 
   describe('replaceEffectTransitions', () => {
@@ -229,6 +259,70 @@ describe('EffectScheduler', () => {
       expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(1, light.id)
       expect(layerManager.removeQueuedEffect).toHaveBeenCalledWith(1, light.id)
       expect(layerManager.addActiveEffect).toHaveBeenCalledTimes(1)
+    })
+
+    it('fires the displaced effect callback once when it differs from the incoming name', () => {
+      layerManager.getActiveEffect.mockReturnValue({
+        name: 'old',
+        lightId: light.id,
+      } as unknown as LightEffectState)
+      const transitions = [transition(1)]
+
+      scheduler.replaceEffectTransitions(
+        'pulse',
+        effectWith(transitions),
+        groupByLayerAndLight(transitions),
+        false,
+      )
+
+      expect(fireCompletionCallback).toHaveBeenCalledWith('old', true)
+      expect(fireCompletionCallback).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not fire a callback for the incoming name replacing its own prior run', () => {
+      layerManager.getActiveEffect.mockReturnValue({
+        name: 'pulse',
+        lightId: light.id,
+      } as unknown as LightEffectState)
+      const transitions = [transition(1)]
+
+      scheduler.replaceEffectTransitions(
+        'pulse',
+        effectWith(transitions),
+        groupByLayerAndLight(transitions),
+        false,
+      )
+
+      expect(fireCompletionCallback).not.toHaveBeenCalled()
+    })
+
+    it('cancels a queued successor run on the displaced slot', () => {
+      const queuedRunId = persistentRuns.register(
+        'old',
+        effectWith([]),
+        groupByLayerAndLight([transition(1)]),
+      )
+      layerManager.getActiveEffect.mockReturnValue({
+        name: 'old',
+        lightId: light.id,
+      } as unknown as LightEffectState)
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'old',
+        effect: effectWith([transition(1)]),
+        isPersistent: true,
+        lightId: light.id,
+        effectRunId: queuedRunId,
+      })
+      const transitions = [transition(1)]
+
+      scheduler.replaceEffectTransitions(
+        'pulse',
+        effectWith(transitions),
+        groupByLayerAndLight(transitions),
+        false,
+      )
+
+      expect(persistentRuns.has(queuedRunId!)).toBe(false)
     })
   })
 
