@@ -7,10 +7,9 @@ more lights. A builder returns an `Effect` object the sequencer can run.
 Cues are authored as node graphs, not here. See [../cues/node/README.md](../cues/node/README.md) for
 the system that compiles and runs them.
 
-`getEffectSingleColor` is the only builder still called, from
-[`cueHandlers/Rb3MenuCueHandler.ts`](../cueHandlers/Rb3MenuCueHandler.ts) and
-[`processors/AudioCueProcessor.ts`](../processors/AudioCueProcessor.ts). The other exports in
-`index.ts` reach no cue and are on their way out, so they are not documented here.
+`getEffectSingleColor`, from [`effectSingleColor.ts`](./effectSingleColor.ts), is the only builder
+left. It is called from [`cueHandlers/Rb3MenuCueHandler.ts`](../cueHandlers/Rb3MenuCueHandler.ts)
+and [`processors/AudioCueProcessor.ts`](../processors/AudioCueProcessor.ts).
 
 ## Base Interface
 

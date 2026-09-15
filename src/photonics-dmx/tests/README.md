@@ -18,7 +18,6 @@ whole source rather than only the files a test happens to import.
 | `controllers/` | Sequencer, EffectManager, LayerManager, LightTransitionController, TransitionEngine, Clock, DmxPublisher, ChainFanout, RigChain, blending and motion |
 | `cues/`        | Cue registries and selection, cue lifecycle, and the node system under `node/` (compiler, loader, runtime, utils)                                    |
 | `cueHandlers/` | CueHandler, CompositeCueRuntime, Rb3MenuCueHandler                                                                                                   |
-| `effects/`     | The programmatic effect builders in `effects/`                                                                                                       |
 | `audio/`       | Beat detection, chroma and mel band analysis, key detection, spectral features                                                                       |
 | `senders/`     | IpcSender, ArtNetSender, SacnSender, EnttecProSender, OpenDmxSender, usleep                                                                          |
 | `listeners/`   | YARG and RB3E network listeners, and both packet parsers                                                                                             |

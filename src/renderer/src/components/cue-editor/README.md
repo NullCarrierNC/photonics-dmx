@@ -81,9 +81,9 @@ filesystem paths from the renderer cannot escape those directories.
 - **EventListener** - Listens for events from Event Raiser nodes
 - **Action** - Light effects (colour, target groups, timing)
 - **Logic** - Around thirty types: variables, math, expressions, conditionals, loops, timing gates, and light and colour array operations. Defaults come from `lib/logicNodeFactories.ts`
-- **Event Raiser** - Emits events to other cues
-- **Effect Raiser** - Emits effect names for other cues to listen to
-- **Effect Listener** - Listens for effect names (effect mode only)
+- **Event Raiser** - Raises a named runtime event from the cue's `events[]` list, starting the matching **Event Listener** nodes in the same cue or effect graph
+- **Effect Raiser** - Invokes a registered reusable effect graph through `EffectExecutionEngine`, starting each **Effect Listener** it declares in its own execution context. Parameters map to the effect's `isParameter` variables
+- **Effect Listener** - An effect graph's entry point (effect mode only). An effect can declare more than one
 - **Notes** - Documentation node (no runtime behavior)
 
 ## Related

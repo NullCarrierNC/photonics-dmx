@@ -36,7 +36,7 @@ export function evaluateEventCondition(
 
 /**
  * Policy aspect: which event types start execution.
- * Cue: cue-started, cue-called; effect: effect-listener (single entry).
+ * Cue: cue-started, cue-called. Effect: effect-listener, one entry per declared listener.
  */
 export type EntryEventConfig = readonly string[]
 
