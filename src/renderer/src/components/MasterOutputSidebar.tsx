@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
 import { getMasterOutput, savePrefs, setMasterOutput } from '../ipcApi'
+import { registerIpcListener } from '../utils/ipcHelpers'
+import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('MasterOutputSidebar')
@@ -53,40 +55,68 @@ const MasterOutputSidebar: React.FC = () => {
   const [dimmerPercent, setDimmerPercent] = useState(100)
   const [blackout, setBlackout] = useState(false)
   const [strobeEnabled, setStrobeEnabled] = useState(true)
+  const syncGenerationRef = useRef(0)
 
-  // Read from main rather than from prefs: main has already applied the persisted level and strobe
-  // gate, and it also holds blackout, which never persists and so has no prefs value to read.
-  useEffect(() => {
-    let cancelled = false
+  const applyAuthoritativeState = useCallback(
+    (state: { dimmerPercent: number; blackout: boolean; strobeOutputEnabled: boolean }) => {
+      setDimmerPercent(state.dimmerPercent)
+      setBlackout(state.blackout)
+      setStrobeEnabled(state.strobeOutputEnabled)
+    },
+    [],
+  )
+
+  /** Reads master output from main. Stale responses are dropped via a monotonic generation. */
+  const refreshFromMain = useCallback(() => {
+    const generation = ++syncGenerationRef.current
     void getMasterOutput()
       .then((state) => {
-        if (cancelled) return
-        setDimmerPercent(state.dimmerPercent)
-        setBlackout(state.blackout)
-        setStrobeEnabled(state.strobeOutputEnabled)
+        if (generation !== syncGenerationRef.current) return
+        applyAuthoritativeState(state)
       })
       .catch((err) => log.error('Failed to read master output state', err))
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  }, [applyAuthoritativeState])
 
+  useEffect(() => {
+    refreshFromMain()
+    return () => {
+      syncGenerationRef.current += 1
+    }
+  }, [refreshFromMain])
+
+  useEffect(() => {
+    return registerIpcListener(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, () => {
+      refreshFromMain()
+    })
+  }, [refreshFromMain])
+
+  /**
+   * Applies a live change. Advances the sync generation before sending, so this interaction wins
+   * over any read or write already in flight, whichever settles last. A refused or failed change
+   * re-reads main to resync, since the fields already show a value main never held.
+   */
   const applyLive = useCallback(
     async (update: {
       dimmerPercent?: number
       blackout?: boolean
       strobeOutputEnabled?: boolean
     }): Promise<void> => {
+      const generation = ++syncGenerationRef.current
       try {
         const result = await setMasterOutput(update)
+        if (generation !== syncGenerationRef.current) return
         if (!result.success) {
           log.error('Failed to apply master output change', result.error)
+          refreshFromMain()
+          return
         }
+        applyAuthoritativeState(result.state)
       } catch (err) {
         log.error('Failed to apply master output change', err)
+        refreshFromMain()
       }
     },
-    [],
+    [applyAuthoritativeState, refreshFromMain],
   )
 
   const handleDimmerChange = useCallback(
