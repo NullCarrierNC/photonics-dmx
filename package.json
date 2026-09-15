@@ -34,8 +34,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "sim": "npx ts-node --project tsconfig.sim.json src/photonics-dmx/sim/runCueSim.ts",
-    "layout:graphs": "npx ts-node --project tsconfig.sim.json tools/node-graph-prettier.ts"
+    "sim": "ts-node --project tsconfig.sim.json src/photonics-dmx/sim/runCueSim.ts",
+    "layout:graphs": "ts-node --project tsconfig.sim.json tools/node-graph-prettier.ts"
   },
   "dependencies": {
     "@codemirror/lang-json": "^6.0.2",
@@ -102,6 +102,7 @@
     "tailwindcss": "3.4.14",
     "terser": "5.37.0",
     "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
     "typescript": "5.5.2",
     "vite": "^6.4.2"
   },
