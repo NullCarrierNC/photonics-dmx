@@ -69,23 +69,21 @@ export class Rb3eNetworkListener extends EventEmitter {
   private _currentFogState: boolean = false
   // Packet counter for debugging
   private packetCount = 0
+  private runtimeErrorEmitted = false
 
   constructor() {
     super()
     log.info('Rb3eNetworkListener initialized as event emitter.')
   }
 
-  /**
-   * Binds the UDP socket. Resolves once the socket is listening; rejects if the bind fails
-   * (e.g. EADDRINUSE), so callers can surface the failure instead of assuming the listener is up.
-   * Post-bind runtime errors are handled by the listener registered in `setupServerEvents`.
-   */
+  /** Binds the UDP socket. Rejects on bind failure. Post-bind errors use `setupServerEvents`. */
   public start(): Promise<void> {
     if (this.listening) {
       log.warn('RB3ENetworkListener is already running.')
       return Promise.resolve()
     }
     log.info(`RB3ENetworkListener: Starting UDP server on port ${PORT}...`)
+    this.runtimeErrorEmitted = false
     this.server = dgram.createSocket('udp4')
     this.setupServerEvents()
     return new Promise((resolve, reject) => {
@@ -108,10 +106,7 @@ export class Rb3eNetworkListener extends EventEmitter {
     })
   }
 
-  /**
-   * Closes the UDP socket and resolves when the OS has released the port
-   * (required before a new listener can bind the same port).
-   */
+  /** Closes the UDP socket once the OS has released the port. */
   public stop(): Promise<void> {
     if (!this.server) {
       this.listening = false
@@ -146,7 +141,16 @@ export class Rb3eNetworkListener extends EventEmitter {
     if (!this.server) return
 
     this.server.on('error', (err) => {
+      if (!this.listening) return // bind failures use start()'s one-shot handler
       log.error(`Server error:\n${err.stack}`)
+      const message = err instanceof Error ? err.message : String(err)
+      if (!this.runtimeErrorEmitted) {
+        this.runtimeErrorEmitted = true
+        this.emit('rb3-error', {
+          type: 'runtime-error',
+          message,
+        })
+      }
       const sock = this.server
       this.server = null
       this.listening = false

@@ -60,4 +60,56 @@ describe('Rb3eNetworkListener.start', () => {
     // Routed through the runtime handler; the promise is already settled, so no rejection surfaces.
     expect(() => sock.emit('error', new Error('runtime failure'))).not.toThrow()
   })
+
+  it('does not emit rb3-error on a bind failure', async () => {
+    const sock = new FakeSocket()
+    mockedCreateSocket.mockReturnValue(sock)
+    sock.bind.mockImplementation(() => sock.emit('error', new Error('bind failed')))
+
+    const listener = new Rb3eNetworkListener()
+    const errors: unknown[] = []
+    listener.on('rb3-error', (payload) => errors.push(payload))
+
+    await expect(listener.start()).rejects.toThrow('bind failed')
+    expect(errors).toEqual([])
+  })
+
+  it('can emit a runtime error again after stop and a successful restart', async () => {
+    const sock = new FakeSocket()
+    mockedCreateSocket.mockReturnValue(sock)
+    sock.bind.mockImplementation(() => sock.emit('listening'))
+
+    const listener = new Rb3eNetworkListener()
+    const errors: unknown[] = []
+    listener.on('rb3-error', (payload) => errors.push(payload))
+
+    await listener.start()
+    sock.emit('error', new Error('first runtime failure'))
+    await listener.stop()
+
+    sock.bind.mockImplementation(() => sock.emit('listening'))
+    await listener.start()
+    sock.emit('error', new Error('second runtime failure'))
+
+    expect(errors).toEqual([
+      { type: 'runtime-error', message: 'first runtime failure' },
+      { type: 'runtime-error', message: 'second runtime failure' },
+    ])
+  })
+
+  it('emits a runtime-error event exactly once after a post-bind socket failure', async () => {
+    const sock = new FakeSocket()
+    mockedCreateSocket.mockReturnValue(sock)
+    sock.bind.mockImplementation(() => sock.emit('listening'))
+
+    const listener = new Rb3eNetworkListener()
+    const errors: unknown[] = []
+    listener.on('rb3-error', (payload) => errors.push(payload))
+
+    await listener.start()
+    sock.emit('error', new Error('runtime failure'))
+    sock.emit('error', new Error('second failure'))
+
+    expect(errors).toEqual([{ type: 'runtime-error', message: 'runtime failure' }])
+  })
 })
