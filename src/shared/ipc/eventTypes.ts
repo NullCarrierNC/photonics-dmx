@@ -12,7 +12,6 @@ import { CUE, LIGHT, RENDERER_RECEIVE, RENDERER_SEND } from '../ipcChannels'
 import type { CueData, CueType } from '../../photonics-dmx/cues/types/cueTypes'
 import type { NodeCueListSummary } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type { EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader'
-import type { ConfigCorruptInfo } from '../../services/configuration/configCorruptTypes'
 import type {
   AudioConfig,
   AudioGameModeConfig,
@@ -116,7 +115,6 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.AUDIO_DATA_MIRROR]: AudioLightingData
   [RENDERER_RECEIVE.CUE_STATE_UPDATE]: CueStateUpdatePayload
   [RENDERER_RECEIVE.DMX_VALUES]: DmxValuesPayload
-  [RENDERER_RECEIVE.CONFIG_CORRUPT_RECOVERED]: { files: ConfigCorruptInfo[] }
   [RENDERER_RECEIVE.CUE_HANDLED]: CueData
   [RENDERER_RECEIVE.NODE_CUES_CHANGED]: NodeCueListSummary
   [RENDERER_RECEIVE.EFFECTS_CHANGED]: EffectListSummary
