@@ -286,9 +286,8 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       }
     } else if (color !== 'off') {
       void this.applyLightData(positions, color)
-    } else {
-      void this.clearLightsAtPositions(positions)
     }
+    // Fog, 0x00 and unrecognised commands carry no colour bank and leave the LEDs as they are.
 
     this.emit('stagekit:processed', {
       positions,
@@ -419,12 +418,6 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         log.error(`Rig ${rig.rigId}: clearStrobeEffectsAtPositions failed:`, error)
       }
     }
-  }
-
-  private async clearLightsAtPositions(positions: number[]): Promise<void> {
-    await Promise.allSettled(
-      Array.from(this.rigs.values()).map((r) => r.clearLightsAtPositions(positions)),
-    )
   }
 
   private async turnOffAllRigs(): Promise<void> {

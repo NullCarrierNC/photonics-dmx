@@ -44,8 +44,6 @@ export class Rb3StageKitRigProcessor {
   private readonly config: StageKitConfig
 
   private readonly lightMapper: StageKitLightMapper
-  /** DMX light indices for every LED position, cached at construction. */
-  private readonly dmxLightIndices: number[]
 
   // Per-light colour blending state. Keys are DMX light indices.
   private lightColorState = new Map<number, Set<string>>()
@@ -78,8 +76,6 @@ export class Rb3StageKitRigProcessor {
     log.info(`Rig ${rigId}: ${numLights} lights → StageKit mode ${dmxLightCount}`)
 
     this.lightMapper = new StageKitLightMapper(dmxLightCount)
-    const allPositions = Array.from({ length: dmxLightCount }, (_, i) => i)
-    this.dmxLightIndices = this.lightMapper.mapLedPositionsToDmxLights(allPositions)
 
     for (const c of ['red', 'green', 'blue', 'yellow']) {
       this.colorToLights.set(c, new Set())
@@ -206,7 +202,7 @@ export class Rb3StageKitRigProcessor {
         effectsToRemove.push(effectName)
       }
     } else {
-      const targetDmxIndices = positions.map((pos) => this.dmxLightIndices[pos])
+      const targetDmxIndices = this.lightMapper.mapLedPositionsToDmxLights(positions)
       for (const [effectName, effectData] of this.activeStrobeEffects.entries()) {
         const hasOverlap = effectData.positions.some((pos) => targetDmxIndices.includes(pos))
         if (hasOverlap) {
@@ -217,14 +213,6 @@ export class Rb3StageKitRigProcessor {
     }
     for (const effectName of effectsToRemove) {
       this.stopStrobeEffect(effectName)
-    }
-  }
-
-  public async clearLightsAtPositions(positions: number[]): Promise<void> {
-    if (positions.length === 0) return
-    const targetDmxIndices = positions.map((pos) => this.dmxLightIndices[pos])
-    for (const lightIndex of targetDmxIndices) {
-      await this.turnOffLight(lightIndex)
     }
   }
 

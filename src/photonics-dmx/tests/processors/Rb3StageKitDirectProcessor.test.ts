@@ -221,6 +221,44 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     expect(lastBanks()).toEqual({ red: 0b0101, green: 0, blue: 0, yellow: 0 })
   })
 
+  it.each([
+    ['0x00', { fog: false, rightChannel: 0x00 }],
+    ['fog on', { fog: true, rightChannel: 0x01 }],
+    ['an unrecognised command', { fog: false, rightChannel: 0x10 }],
+  ])('leaves lit positions alone on the rig and in the snapshot for %s', async (_label, fields) => {
+    emitGameState(networkListener, 'InGame')
+    const handled: CueData[] = []
+    processor.on('cueHandled', (d: CueData) => handled.push(d))
+
+    networkListener.emit('stagekit:data', {
+      positions: [0, 2],
+      color: 'red',
+      fog: false,
+      leftChannel: 0b0101,
+      rightChannel: 0x80,
+      timestamp: Date.now(),
+    })
+    await jest.advanceTimersByTimeAsync(50)
+    setState.mockClear()
+
+    networkListener.emit('stagekit:data', {
+      positions: [0, 2],
+      color: 'off',
+      leftChannel: 0b0101,
+      timestamp: Date.now(),
+      ...fields,
+    })
+    await jest.advanceTimersByTimeAsync(50)
+
+    expect(setState).not.toHaveBeenCalled()
+    expect(handled[handled.length - 1].ledBanks).toEqual({
+      red: 0b0101,
+      green: 0,
+      blue: 0,
+      yellow: 0,
+    })
+  })
+
   it('DisableAll turns off every rig, resets strobe state, and reports processed and handled', () => {
     emitGameState(networkListener, 'InGame')
     emitStageKit(networkListener)

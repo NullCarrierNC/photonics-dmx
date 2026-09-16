@@ -162,6 +162,21 @@ describe('Rb3StageKitRigProcessor strobe runs', () => {
     expect(setState).not.toHaveBeenCalled()
   })
 
+  it('stops a strobe cleared by an LED position the 4-light rig folds onto its lights', () => {
+    proc.applyStrobeEffect('medium')
+    // A 4-light rig shows LEDs 4 and 5 on lights 0 and 1, the two strobe targets here.
+    proc.clearStrobeEffectsAtPositions([4, 5])
+
+    expect(runningStrobes(proc)).toEqual([])
+  })
+
+  it('keeps a strobe running when the cleared positions miss its lights', () => {
+    proc.applyStrobeEffect('medium')
+    proc.clearStrobeEffectsAtPositions([2, 7])
+
+    expect(runningStrobes(proc)).toEqual(['stagekit-strobe-rig-1-medium'])
+  })
+
   it('leaves nothing running after dispose', async () => {
     proc.applyStrobeEffect('fastest')
     await proc.dispose()
