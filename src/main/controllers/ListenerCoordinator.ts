@@ -293,13 +293,17 @@ export class ListenerCoordinator {
         this.deps.sendToAllWindows(RENDERER_RECEIVE.RB3_GAME_MODE_DEADLINE, p),
     })
     this.processorManager.setCueHandler(this.deps.getChainFanout())
-    this.rb3eListener = new Rb3eNetworkListener()
-    this.rb3eListener.on('rb3-error', (errorData: { type: string; message: string }) => {
+    const listener = new Rb3eNetworkListener()
+    this.rb3eListener = listener
+    listener.on('rb3-error', (errorData: { type: string; message: string }) => {
       log.error('RB3 Listener Error:', errorData)
+      // A listener this session no longer owns has nothing left to tear down.
+      if (this.rb3eListener !== listener) return
       // A manual disable or an earlier error may already be tearing this session down. Only the
-      // call that starts the teardown tells the renderer to un-toggle, so a race between
-      // the two never sends two notices for the one failure.
-      const startsTeardown = this.isRb3Enabled && !this.rb3TeardownPromise
+      // call that starts the teardown tells the renderer to un-toggle, so a race between the two
+      // never sends two notices for the one failure. The session may still be starting, in which
+      // case the enable below sees the teardown and does not mark RB3 enabled.
+      const startsTeardown = !this.rb3TeardownPromise
       this.teardownRb3({ blackout: true }).catch((error) =>
         log.error('Error tearing down RB3 after a runtime error:', error),
       )
@@ -311,12 +315,18 @@ export class ListenerCoordinator {
         })
       }
     })
-    this.processorManager.setNetworkListener(this.rb3eListener)
-    // Enable only once the socket is actually listening. On a bind failure (e.g. port in use) the
-    // RB3 surface is torn back down and the renderer is told to un-toggle — otherwise the UI shows
-    // an enabled listener that receives nothing.
+    this.processorManager.setNetworkListener(listener)
+    // Enable only once the socket is listening. On a bind failure (e.g. port in use) the RB3
+    // surface is torn back down and the renderer is told to un-toggle, so the UI never shows an
+    // enabled listener that receives nothing.
     try {
-      await this.rb3eListener.start()
+      await listener.start()
+      // A socket error between the bind and this point has already started tearing the session
+      // down and told the renderer. Wait for that teardown so this enable ends with it.
+      if (this.rb3eListener !== listener || this.rb3TeardownPromise) {
+        await this.rb3TeardownPromise
+        return
+      }
       this.isRb3Enabled = true
       log.info(`RB3 listener enabled in ${mode} StageKit mode`)
     } catch (err) {

@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events'
-import { describe, expect, it, jest } from '@jest/globals'
+import * as dgram from 'dgram'
+import { afterEach, describe, expect, it, jest } from '@jest/globals'
 import {
   ListenerCoordinator,
   type ListenerCoordinatorDeps,
@@ -24,6 +25,15 @@ class FakeUdpSocket extends EventEmitter {
 jest.mock('dgram', () => ({
   createSocket: jest.fn(() => new FakeUdpSocket()),
 }))
+
+/** Fails at runtime in the same tick it starts listening, before the awaiting enable resumes. */
+class FailsOnceListeningSocket extends FakeUdpSocket {
+  override bind = jest.fn((_port: number, cb?: () => void) => {
+    cb?.()
+    this.emit('listening')
+    this.emit('error', new Error('socket failed while starting'))
+  })
+}
 
 function makeChain(sequencer: ReturnType<typeof fakeLightingController>, rigId = 'stub'): RigChain {
   return {
@@ -79,7 +89,23 @@ function makeDeps(
   }
 }
 
-/** A blackout promise the test controls the resolution of, so a teardown can be paused mid-flight. */
+const coordinators: ListenerCoordinator[] = []
+
+/** A coordinator whose listeners are disabled after the test, so no session outlives it. */
+function coordinator(deps: ListenerCoordinatorDeps): ListenerCoordinator {
+  const lc = new ListenerCoordinator(deps)
+  coordinators.push(lc)
+  return lc
+}
+
+afterEach(async () => {
+  for (const lc of coordinators.splice(0)) {
+    await lc.disableYarg()
+    await lc.disableRb3()
+  }
+})
+
+/** A blackout promise the test resolves by hand, so a teardown can be paused mid-flight. */
 function deferredBlackout(): { blackout: () => Promise<void>; resolve: () => void } {
   let resolve!: () => void
   const promise = new Promise<void>((r) => {
@@ -91,7 +117,7 @@ function deferredBlackout(): { blackout: () => Promise<void>; resolve: () => voi
 describe('ListenerCoordinator RB3 runtime socket failure', () => {
   it('blackouts rigs when auto-disabling after a post-bind runtime error', async () => {
     const deps = makeDeps()
-    const lc = new ListenerCoordinator(deps)
+    const lc = coordinator(deps)
     await lc.enableRb3Internal()
 
     const chain = deps.getRigChains()[0]
@@ -116,7 +142,7 @@ describe('ListenerCoordinator RB3 runtime socket failure', () => {
 
   it('auto-disables RB3 and notifies the renderer after a post-bind runtime error', async () => {
     const deps = makeDeps()
-    const lc = new ListenerCoordinator(deps)
+    const lc = coordinator(deps)
     await lc.enableRb3Internal()
 
     const co = lc as unknown as {
@@ -144,9 +170,64 @@ describe('ListenerCoordinator RB3 runtime socket failure', () => {
     })
   })
 
+  it('ends disabled with one notice when the socket fails before the enable resumes', async () => {
+    jest
+      .mocked(dgram.createSocket)
+      .mockImplementationOnce(() => new FailsOnceListeningSocket() as unknown as dgram.Socket)
+    const deps = makeDeps()
+    const lc = coordinator(deps)
+
+    await lc.enableRb3Internal()
+
+    const co = lc as unknown as {
+      rb3eListener: unknown
+      processorManager: unknown
+    }
+    expect(lc.getIsRb3Enabled()).toBe(false)
+    expect(co.rb3eListener).toBeNull()
+    expect(co.processorManager).toBeNull()
+    const notices = deps.sendToAllWindows.mock.calls.filter(
+      ([channel]) => channel === RENDERER_RECEIVE.RB3_ERROR,
+    )
+    expect(notices).toEqual([
+      [
+        RENDERER_RECEIVE.RB3_ERROR,
+        { type: 'runtime-error', message: 'socket failed while starting', autoDisabled: true },
+      ],
+    ])
+
+    await lc.enableRb3Internal()
+    expect(lc.getIsRb3Enabled()).toBe(true)
+  })
+
+  it('ignores an error from a listener the session has already replaced', async () => {
+    const deps = makeDeps()
+    const lc = coordinator(deps)
+    await lc.enableRb3Internal()
+
+    const co = lc as unknown as {
+      rb3eListener: { emit: (event: string, payload: unknown) => void } | null
+    }
+    const firstListener = co.rb3eListener!
+    await lc.disableRb3()
+    await lc.enableRb3Internal()
+    deps.sendToAllWindows.mockClear()
+
+    firstListener.emit('rb3-error', { type: 'runtime-error', message: 'late from the old socket' })
+    await new Promise((r) => setImmediate(r))
+
+    expect(lc.getIsRb3Enabled()).toBe(true)
+    expect(co.rb3eListener).not.toBeNull()
+    expect(co.rb3eListener).not.toBe(firstListener)
+    expect(deps.sendToAllWindows).not.toHaveBeenCalledWith(
+      RENDERER_RECEIVE.RB3_ERROR,
+      expect.anything(),
+    )
+  })
+
   it('serializes concurrent runtime teardown so processor destroy runs once', async () => {
     const deps = makeDeps()
-    const lc = new ListenerCoordinator(deps)
+    const lc = coordinator(deps)
     await lc.enableRb3Internal()
 
     const co = lc as unknown as {
@@ -176,7 +257,7 @@ describe('ListenerCoordinator RB3 runtime socket failure', () => {
 
   it('sends no notice for a runtime error that arrives during a manual disable', async () => {
     const deps = makeDeps()
-    const lc = new ListenerCoordinator(deps)
+    const lc = coordinator(deps)
     await lc.enableRb3Internal()
 
     const co = lc as unknown as {
@@ -199,7 +280,7 @@ describe('ListenerCoordinator RB3 runtime socket failure', () => {
     const chainA = makeChain(fakeLightingController(), 'a')
     const chainB = makeChain(fakeLightingController(), 'b')
     const deps = makeDeps({ chains: [chainA, chainB] })
-    const lc = new ListenerCoordinator(deps)
+    const lc = coordinator(deps)
     await lc.enableRb3Internal()
 
     chainA.rb3MenuCueHandler = { shutdown: jest.fn() } as unknown as RigChain['rb3MenuCueHandler']
@@ -222,7 +303,7 @@ describe('ListenerCoordinator RB3 runtime socket failure', () => {
     const paused = deferredBlackout()
     const chain = makeChain(fakeLightingController({ blackout: paused.blackout }))
     const deps = makeDeps({ chains: [chain] })
-    const lc = new ListenerCoordinator(deps)
+    const lc = coordinator(deps)
     await lc.enableRb3Internal()
 
     const co = lc as unknown as {
@@ -249,7 +330,7 @@ describe('ListenerCoordinator RB3 runtime socket failure', () => {
     const paused = deferredBlackout()
     const chain = makeChain(fakeLightingController({ blackout: paused.blackout }))
     const deps = makeDeps({ chains: [chain] })
-    const lc = new ListenerCoordinator(deps)
+    const lc = coordinator(deps)
     await lc.enableRb3Internal()
 
     const co = lc as unknown as {
@@ -279,7 +360,7 @@ describe('ListenerCoordinator RB3 runtime socket failure', () => {
     )
     const chain = makeChain(fakeLightingController())
     const deps = makeDeps({ chains: [chain], mode: 'cue', decorateCueRuntime })
-    const lc = new ListenerCoordinator(deps)
+    const lc = coordinator(deps)
     await lc.enableRb3Internal()
 
     expect(chain.cueHandlers.rb3).not.toBeNull()

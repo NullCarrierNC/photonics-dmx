@@ -49,7 +49,9 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
   log.info('Restarting controllers to apply configuration changes')
 
   // The lifecycle queue guarantees no listener toggle is mid-flight here, so the was-enabled
-  // snapshot is stable and rig chains can't be disposed under an in-flight enable.
+  // snapshot is stable and rig chains can't be disposed under an in-flight enable. An RB3 runtime
+  // error tears its session down outside the queue and reports RB3 disabled as soon as it starts,
+  // so the teardown below always calls disableRb3, which waits that teardown out.
   const wasYargEnabled = ctx.listenerLifecycle.yargRb3.getIsYargEnabled()
   const wasRb3Enabled = ctx.listenerLifecycle.yargRb3.getIsRb3Enabled()
   const wasAudioEnabled = ctx.listenerLifecycle.audio.getIsAudioEnabled()
@@ -61,9 +63,7 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
     if (wasYargEnabled) {
       await ctx.listenerLifecycle.yargRb3.disableYarg()
     }
-    if (wasRb3Enabled) {
-      await ctx.listenerLifecycle.yargRb3.disableRb3()
-    }
+    await ctx.listenerLifecycle.yargRb3.disableRb3()
     if (wasAudioEnabled) {
       await ctx.listenerLifecycle.audio.disableAudio()
     }

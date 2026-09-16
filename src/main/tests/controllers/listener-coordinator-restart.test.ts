@@ -1,6 +1,7 @@
 /**
- * Ensures disableYarg / disableRb3 await UDP listener shutdown so the port is
- * released before `isYargEnabled` / `isRb3Enabled` is cleared.
+ * Ensures disableYarg / disableRb3 await UDP listener shutdown so the port is released before they
+ * resolve. `isYargEnabled` clears once the YARG listener has shut down. `isRb3Enabled` clears as
+ * soon as the RB3 teardown starts, and a fresh RB3 enable waits on that teardown instead.
  */
 import { describe, expect, it, jest } from '@jest/globals'
 import {

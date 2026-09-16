@@ -297,6 +297,51 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect(graph.shutdownDomainCueHandlerRefs).toHaveBeenCalledTimes(1)
   })
 
+  it('waits out an RB3 teardown already reporting disabled before disposing rig chains', async () => {
+    let releaseTeardown!: () => void
+    const teardown = new Promise<void>((r) => {
+      releaseTeardown = r
+    })
+    const graph = restartGraph()
+    const listeners = listenerStub()
+    // A runtime error has started tearing RB3 down: the flag already reads false, but the teardown
+    // is still blacking out and closing the socket, and only disableRb3 waits for it.
+    ;(listeners.yargRb3.disableRb3 as jest.Mock).mockImplementation(() => teardown)
+    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
+      graph,
+      listenerLifecycle: listeners,
+      isInitialized: true,
+      lifecycle: lifecycleAt('running'),
+      init: jest.fn().mockImplementation(function (this: RestartFake) {
+        this.isInitialized = true
+        this.lifecycle.setPhase('running')
+        return Promise.resolve()
+      }),
+      senderLifecycle: {
+        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
+        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
+        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
+      },
+      consoleMode: {
+        onControllersReinitializedWhileConsoleOpen: jest.fn(),
+        getConsoleRestore: jest.fn().mockReturnValue(null),
+      },
+    })
+
+    const p = ControllerManager.prototype.restartControllers.call(
+      fake as unknown as ControllerManager,
+    )
+    await new Promise((r) => setImmediate(r))
+    expect(listeners.yargRb3.disableRb3).toHaveBeenCalledTimes(1)
+    expect(graph.disposeChainsForRestart).not.toHaveBeenCalled()
+
+    releaseTeardown()
+    await p
+
+    expect(graph.disposeChainsForRestart).toHaveBeenCalledTimes(1)
+    expect(listeners.yargRb3.enableRb3).not.toHaveBeenCalled()
+  })
+
   it('getLifecyclePhase returns the current phase on a prototype-based stub', () => {
     const stub = Object.assign(Object.create(ControllerManager.prototype), {
       graph: restartGraph(),
