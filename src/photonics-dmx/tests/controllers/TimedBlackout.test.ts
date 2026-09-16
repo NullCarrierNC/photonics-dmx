@@ -44,6 +44,43 @@ describe('timed blackout', () => {
   const anyLit = (): boolean =>
     harness.allLightIds.some((id) => (harness.getLightState(id)?.intensity ?? 0) > 0)
 
+  /** The run id the lit look is looping under, and whether the registry still holds it. */
+  const runState = (): { runId: string; isLive: () => boolean } => {
+    const runId = harness.sequencer
+      .getActiveEffectsForLight(harness.allLightIds[0])
+      .get(0)?.effectRunId
+    expect(runId).toBeDefined()
+    const persistentRuns = (
+      harness.sequencer as unknown as {
+        effectManager: { persistentRuns: { has(id: string): boolean } }
+      }
+    ).effectManager.persistentRuns
+    return { runId: runId!, isLive: () => persistentRuns.has(runId!) }
+  }
+
+  it('retires the run of a persistent look it wipes instantly', () => {
+    lightEverything('settled-look')
+    const { isLive } = runState()
+    expect(isLive()).toBe(true)
+
+    void harness.sequencer.blackout(0)
+    harness.advanceBy(10)
+
+    expect(isLive()).toBe(false)
+  })
+
+  it('retires the run of a persistent look when the fade completes', async () => {
+    lightEverything('settled-look')
+    const { isLive } = runState()
+
+    const done = harness.sequencer.blackout(50)
+    // Long enough for the fade's own completion timer to have fired.
+    harness.advanceBy(80)
+    await done
+
+    expect(isLive()).toBe(false)
+  })
+
   it('darkens a look whose transitions have all finished', () => {
     lightEverything('settled-look')
     expect(anyLit()).toBe(true)

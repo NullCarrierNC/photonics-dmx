@@ -100,7 +100,9 @@ export class EffectManager implements IEffectManager {
     this.systemEffects.setOnBlackoutCompleteCallback(() => {
       // Reset layer 0 effect tracking when a blackout completes
       this._lastCalled0LayerEffect = ''
-      // The wipe bypassed the scheduler, so the waiters it left behind are released here.
+      // The wipe bypassed the scheduler, so the waiters and runs it left behind are released here.
+      // A run counts lights the wipe has taken, so it goes with them.
+      this.persistentRuns.clear()
       this.effectCallbacks.cancelAll()
     })
   }
