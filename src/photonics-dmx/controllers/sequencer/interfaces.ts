@@ -417,7 +417,9 @@ export interface ILightingController {
 
   /**
    * Add an effect with a completion callback.
-   * Callback is fired when the effect fully completes (including waitUntilTime).
+   * Callback is fired when the effect fully completes (including waitUntilTime) and no light is
+   * running or queued under the name, so a submission queued behind a running effect of the same
+   * name is told when its own run ends.
    */
   addEffectWithCallback(
     name: string,

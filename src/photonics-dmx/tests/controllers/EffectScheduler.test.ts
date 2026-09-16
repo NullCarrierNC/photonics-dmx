@@ -62,6 +62,7 @@ describe('EffectScheduler', () => {
       removeQueuedEffect: jest.fn(),
       getQueuedEffect: jest.fn(),
       getActiveEffects: jest.fn().mockReturnValue(new Map()),
+      getEffectQueue: jest.fn().mockReturnValue(new Map()),
       getLightState: jest.fn(),
       resetLayerTracking: jest.fn(),
     } as unknown as jest.Mocked<ILayerManager>
@@ -232,6 +233,30 @@ describe('EffectScheduler', () => {
       expect(persistentRuns.has(queuedRunId!)).toBe(false)
       expect(layerManager.removeQueuedEffect).toHaveBeenCalledWith(1, light.id)
     })
+
+    it('tells the waiter of a queued entry it drops from behind a different active effect', () => {
+      layerManager.getActiveEffect.mockReturnValue({
+        name: 'other',
+        lightId: light.id,
+      } as unknown as LightEffectState)
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'waiting',
+        effect: effectWith([transition(1)]),
+        isPersistent: false,
+        lightId: light.id,
+      })
+      const transitions = [transition(1)]
+
+      scheduler.applyEffectTransitions(
+        'pulse',
+        effectWith(transitions),
+        groupByLayerAndLight(transitions),
+        false,
+      )
+
+      expect(fireCompletionCallback).toHaveBeenCalledWith('waiting', true)
+      expect(fireCompletionCallback).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('replaceEffectTransitions', () => {
@@ -324,6 +349,30 @@ describe('EffectScheduler', () => {
 
       expect(persistentRuns.has(queuedRunId!)).toBe(false)
     })
+
+    it('tells the waiter of a differently named queued entry it drops, once', () => {
+      layerManager.getActiveEffect.mockReturnValue({
+        name: 'old',
+        lightId: light.id,
+      } as unknown as LightEffectState)
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'waiting',
+        effect: effectWith([transition(1)]),
+        isPersistent: false,
+        lightId: light.id,
+      })
+      const transitions = [transition(1)]
+
+      scheduler.replaceEffectTransitions(
+        'pulse',
+        effectWith(transitions),
+        groupByLayerAndLight(transitions),
+        false,
+      )
+
+      expect(fireCompletionCallback).toHaveBeenCalledWith('waiting', true)
+      expect(fireCompletionCallback.mock.calls.filter(([n]) => n === 'waiting')).toHaveLength(1)
+    })
   })
 
   describe('startNextEffectInQueue', () => {
@@ -358,6 +407,8 @@ describe('EffectScheduler', () => {
       expect(scheduler.startNextEffectInQueue(1, light.id)).toBe(false)
       expect(layerManager.removeQueuedEffect).toHaveBeenCalledWith(1, light.id)
       expect(layerManager.addActiveEffect).not.toHaveBeenCalled()
+      expect(fireCompletionCallback).toHaveBeenCalledWith('queued', true)
+      expect(fireCompletionCallback).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -370,6 +421,16 @@ describe('EffectScheduler', () => {
     it('holds the callback while another light still runs the effect', () => {
       layerManager.getActiveEffects.mockReturnValue(
         new Map([[1, new Map([['light-2', { name: 'pulse', lightId: 'light-2' }]])]]) as never,
+      )
+
+      scheduler.onLightEffectComplete({ name: 'pulse', lightId: light.id } as LightEffectState)
+
+      expect(fireCompletionCallback).not.toHaveBeenCalled()
+    })
+
+    it('holds the callback while a run of the same name waits in a queue', () => {
+      layerManager.getEffectQueue.mockReturnValue(
+        new Map([[1, new Map([[light.id, { name: 'pulse', lightId: light.id }]])]]) as never,
       )
 
       scheduler.onLightEffectComplete({ name: 'pulse', lightId: light.id } as LightEffectState)

@@ -191,7 +191,8 @@ export class EffectScheduler {
   /**
    * Applies the supplied transitions to their respective layers/lights.
    * Handles replacement vs queue logic and passes through the effect-level
-   * run identifier when the effect is persistent.
+   * run identifier when the effect is persistent. A queued entry this call drops never runs, so
+   * its waiter is told once the name is neither running nor queued anywhere.
    */
   public applyEffectTransitions(
     name: string,
@@ -200,6 +201,7 @@ export class EffectScheduler {
     isPersistent: boolean,
     effectRunId?: string,
   ): void {
+    const droppedQueued = new Set<string>()
     transitionsByLayerAndLight.forEach((layerMap, layer) => {
       layerMap.forEach((transitionsForLight, lightId) => {
         const targetLight = transitionsForLight[0].lights.find((l) => l.id === lightId)
@@ -226,8 +228,11 @@ export class EffectScheduler {
             // incoming effect claims this slot outright, ahead of the queued same-name run that
             // removeEffectForLight's successor pass starts when a slot empties.
             const queued = this.layerManager.getQueuedEffect(layer, lightId)
-            if (queued?.effectRunId) {
-              this.persistentRuns.cancel(queued.effectRunId)
+            if (queued) {
+              droppedQueued.add(queued.name)
+              if (queued.effectRunId) {
+                this.persistentRuns.cancel(queued.effectRunId)
+              }
             }
             this.layerManager.removeQueuedEffect(layer, lightId)
             this.removeEffectForLight(layer, lightId, false)
@@ -254,14 +259,16 @@ export class EffectScheduler {
         }
       })
     })
+
+    this.fireForUnscheduled(droppedQueued)
   }
 
   /**
    * The 'replace' apply path: for each (layer, light) slot the effect targets, cancels the active
    * and queued effect on that slot and starts the new transitions immediately, easing from the
-   * light's current state. A displaced active effect under a different name never reaches
-   * `onLightEffectComplete`, so its waiter is told here instead, once per name and only once the
-   * name is confirmed gone from every slot this call touches.
+   * light's current state. A displaced active or queued effect under a different name never
+   * reaches `onLightEffectComplete`, so its waiter is told here instead, once per name and only
+   * once the name is neither running nor queued anywhere.
    */
   public replaceEffectTransitions(
     name: string,
@@ -292,8 +299,13 @@ export class EffectScheduler {
           this.layerManager.removeActiveEffect(layer, lightId)
         }
         const queued = this.layerManager.getQueuedEffect(layer, lightId)
-        if (queued?.effectRunId) {
-          this.persistentRuns.cancel(queued.effectRunId)
+        if (queued) {
+          if (queued.effectRunId) {
+            this.persistentRuns.cancel(queued.effectRunId)
+          }
+          if (queued.name !== name) {
+            evicted.add(queued.name)
+          }
         }
         this.layerManager.removeQueuedEffect(layer, lightId)
 
@@ -309,11 +321,7 @@ export class EffectScheduler {
       })
     })
 
-    for (const evictedName of evicted) {
-      if (!this.isEffectRunningAnywhere(evictedName)) {
-        this.deps.fireCompletionCallback(evictedName, true)
-      }
-    }
+    this.fireForUnscheduled(evicted)
   }
 
   /**
@@ -397,11 +405,7 @@ export class EffectScheduler {
 
     // An evicted effect never reaches onLightEffectComplete, so tell its waiter the run ended here.
     // A queued run of the same name taking the slot means the effect is still going, so skip those.
-    for (const name of evicted) {
-      if (!this.isEffectRunningAnywhere(name)) {
-        this.deps.fireCompletionCallback(name, true)
-      }
-    }
+    this.fireForUnscheduled(evicted)
   }
 
   /**
@@ -424,6 +428,7 @@ export class EffectScheduler {
       log.warn(
         `Discarding queued effect ${nextEffect.name} for light ${lightId} on layer ${layer}: no transitions target it`,
       )
+      this.fireForUnscheduled([nextEffect.name])
       return false
     }
 
@@ -456,10 +461,11 @@ export class EffectScheduler {
    * Also fires completion callbacks if all lights in an effect have completed.
    */
   public onLightEffectComplete(effectState: LightEffectState): void {
-    // Fire the completion callback once the name is running on no light at all. That covers this
-    // light too: an earlier callback in the same pass can have resubmitted the name onto it, and
-    // the fresh callback belongs to the fresh effect.
-    if (!this.isEffectRunningAnywhere(effectState.name)) {
+    // Fire the completion callback once no light is running or queued under the name. That covers
+    // this light too: an earlier callback in the same pass can have resubmitted the name onto it,
+    // and the fresh callback belongs to the fresh effect. A queued run of the same name starts
+    // after this call, so it still owes its own waiter a completion.
+    if (!this.isEffectScheduledAnywhere(effectState.name)) {
       this.deps.fireCompletionCallback(effectState.name)
     }
 
@@ -491,10 +497,24 @@ export class EffectScheduler {
     this.applyEffectTransitions(run.name, run.effect, run.transitionsByLayerAndLight, true, run.id)
   }
 
-  /** Whether an effect of this name is active for any light on any layer. */
-  private isEffectRunningAnywhere(name: string): boolean {
-    return Array.from(this.layerManager.getActiveEffects().values()).some((layerMap) =>
-      Array.from(layerMap.values()).some((activeEffect) => activeEffect.name === name),
+  /** Whether an effect of this name is active or queued for any light on any layer. */
+  private isEffectScheduledAnywhere(name: string): boolean {
+    const holdsName = (layers: Map<number, Map<string, { name: string }>>): boolean =>
+      Array.from(layers.values()).some((layerMap) =>
+        Array.from(layerMap.values()).some((entry) => entry.name === name),
+      )
+    return (
+      holdsName(this.layerManager.getActiveEffects()) ||
+      holdsName(this.layerManager.getEffectQueue())
     )
+  }
+
+  /** Tells the waiter of each name no longer running or queued that its run was cancelled. */
+  private fireForUnscheduled(names: Iterable<string>): void {
+    for (const name of names) {
+      if (!this.isEffectScheduledAnywhere(name)) {
+        this.deps.fireCompletionCallback(name, true)
+      }
+    }
   }
 }

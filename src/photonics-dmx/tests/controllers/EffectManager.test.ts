@@ -65,9 +65,7 @@ describe('EffectManager', () => {
       getQueuedEffect: jest.fn(),
       cleanupUnusedLayers: jest.fn(),
       getActiveEffects: jest.fn().mockReturnValue(new Map()),
-      getEffectQueue: jest.fn().mockReturnValue({
-        clear: jest.fn(),
-      }),
+      getEffectQueue: jest.fn().mockReturnValue(new Map()),
       getAllLayers: jest.fn().mockReturnValue([]),
       getLightTransitionController: jest.fn().mockReturnValue(lightTransitionController),
       setLayerLastUsed: jest.fn(),
@@ -456,7 +454,7 @@ describe('EffectManager', () => {
       )
 
       expect(applied).toBe(true)
-      expect(registryOf(effectManager).get('pos:0')).toBe(onComplete)
+      expect(registryOf(effectManager).get('pos:0')).toEqual([onComplete])
       expect(onComplete).not.toHaveBeenCalled()
     })
 
@@ -470,7 +468,7 @@ describe('EffectManager', () => {
       expect(first).toHaveBeenCalledTimes(1)
       expect(first).toHaveBeenCalledWith(true)
       expect(second).not.toHaveBeenCalled()
-      expect(registryOf(effectManager).get('pos:0')).toBe(second)
+      expect(registryOf(effectManager).get('pos:0')).toEqual([second])
     })
 
     it('does not fire a callback when no effect held the name', () => {
@@ -495,7 +493,7 @@ describe('EffectManager', () => {
       expect(applied).toBe(false)
       expect(held).not.toHaveBeenCalled()
       expect(rejected).not.toHaveBeenCalled()
-      expect(registryOf(effectManager).get('pos:0')).toBe(held)
+      expect(registryOf(effectManager).get('pos:0')).toEqual([held])
     })
   })
 
@@ -1184,7 +1182,7 @@ describe('EffectManager', () => {
       )
       const callbacks = (effectManagerWithCallbacks as any)
         .effectCallbacks as EffectCallbackRegistry
-      callbacks.set('orphan', () => {})
+      callbacks.add('orphan', () => {})
 
       effectManagerWithCallbacks.removeAllEffects()
 
@@ -1201,7 +1199,7 @@ describe('EffectManager', () => {
       const callbacks = (effectManagerWithCallbacks as any)
         .effectCallbacks as EffectCallbackRegistry
       const cb = jest.fn()
-      callbacks.set('pending', cb)
+      callbacks.add('pending', cb)
 
       effectManagerWithCallbacks.removeAllEffects()
 
@@ -1234,7 +1232,7 @@ describe('EffectManager', () => {
       const callbacks = (effectManager as any).effectCallbacks as EffectCallbackRegistry
       // setEffect clears callbacks internally, so registering before it (the old order) would have
       // left this empty; the callback must survive to fire on completion.
-      expect(callbacks.get('cb-effect')).toBe(onComplete)
+      expect(callbacks.get('cb-effect')).toEqual([onComplete])
     })
   })
 })

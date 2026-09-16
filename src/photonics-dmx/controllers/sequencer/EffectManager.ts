@@ -107,7 +107,9 @@ export class EffectManager implements IEffectManager {
 
   /**
    * Adds a new effect with a completion callback.
-   * The callback will be fired when all lights in the effect complete their transitions.
+   * The callback fires once no light is running or queued under the name, so a submission queued
+   * behind a running effect of the same name is told when its own run ends, together with any
+   * waiter the earlier submission registered.
    *
    * @param name The name of the effect
    * @param effect The effect configuration
@@ -121,7 +123,7 @@ export class EffectManager implements IEffectManager {
     isPersistent: boolean = false,
   ): void {
     // Register the callback
-    this.effectCallbacks.set(name, onComplete)
+    this.effectCallbacks.add(name, onComplete)
 
     // Add the effect normally
     this.addEffect(name, effect, isPersistent)
@@ -147,7 +149,7 @@ export class EffectManager implements IEffectManager {
     // setEffect clears all effects (and their callbacks) first, so register AFTER it — registering
     // before would immediately erase this callback and the completion would never fire.
     this.setEffect(name, effect, isPersistent)
-    this.effectCallbacks.set(name, onComplete)
+    this.effectCallbacks.add(name, onComplete)
   }
 
   /**
@@ -255,7 +257,7 @@ export class EffectManager implements IEffectManager {
     const applied = this.submitEffect(name, effect, isPersistent, REPLACE_EFFECT)
     if (applied) {
       this.effectCallbacks.fire(name, true)
-      this.effectCallbacks.set(name, onComplete)
+      this.effectCallbacks.add(name, onComplete)
     }
     return applied
   }
@@ -395,7 +397,7 @@ export class EffectManager implements IEffectManager {
   ): void {
     const added = this.addEffectUnblockedName(name, effect, isPersistent)
     if (added) {
-      this.effectCallbacks.set(name, onComplete)
+      this.effectCallbacks.add(name, onComplete)
     } else {
       onComplete(false)
     }
@@ -414,7 +416,7 @@ export class EffectManager implements IEffectManager {
   ): void {
     const set = this.setEffectUnblockedName(name, effect, isPersistent)
     if (set) {
-      this.effectCallbacks.set(name, onComplete)
+      this.effectCallbacks.add(name, onComplete)
     } else {
       onComplete(false)
     }

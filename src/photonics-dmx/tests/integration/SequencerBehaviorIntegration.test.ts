@@ -249,31 +249,48 @@ describe('Sequencer blending and queueing (real harness)', () => {
     harness.cleanup()
   })
 
-  it('fires callback after queued effect completes', () => {
+  it('fires a queued run callback on the frame that run ends, not when the run ahead of it ends', () => {
     const harness = createSequencerHarness({ frontCount: 1, backCount: 0 })
     const lights = harness.lightManager.getLights(['front'], ['all'])
+    const lightId = lights[0].id
     const colorA = { ...getColor('blue', 'high', 'replace'), opacity: 1 }
     const colorB = { ...getColor('green', 'high', 'replace'), opacity: 1 }
     const effectA = buildSingleLayerEffect(lights, 1, colorA, 20, 'linear')
     const effectB = buildSingleLayerEffect(lights, 1, colorB, 20, 'linear')
 
-    const onComplete = jest.fn()
-    harness.sequencer.addEffect('queue-callback', effectA)
-    harness.sequencer.addEffectWithCallback('queue-callback', effectB, onComplete)
-
-    harness.advanceBy(25)
-    expect(onComplete).not.toHaveBeenCalled()
-
-    let fired = false
-    for (let i = 0; i < 10; i += 1) {
-      harness.advanceBy(10)
-      if (onComplete.mock.calls.length > 0) {
-        fired = true
-        break
+    const layerManager = (
+      harness.sequencer as unknown as {
+        layerManager: { getEffectQueue: () => Map<number, Map<string, unknown>> }
       }
+    ).layerManager
+    const queued = (): number => layerManager.getEffectQueue().get(1)?.size ?? 0
+    const running = (): boolean => harness.sequencer.getActiveEffectsForLight(lightId).has(1)
+
+    const firstWaiter = jest.fn()
+    const queuedWaiter = jest.fn()
+    harness.sequencer.addEffectWithCallback('queue-callback', effectA, firstWaiter)
+    harness.sequencer.addEffectWithCallback('queue-callback', effectB, queuedWaiter)
+    expect(queued()).toBe(1)
+
+    // Step to the frame where A finishes and hands the slot to the queued B.
+    for (let i = 0; i < 40 && queued() > 0; i += 1) {
+      harness.advanceBy(5)
     }
-    expect(fired).toBe(true)
-    expect(onComplete).toHaveBeenCalledTimes(1)
+    expect(queued()).toBe(0)
+    expect(running()).toBe(true)
+    expect(firstWaiter).not.toHaveBeenCalled()
+    expect(queuedWaiter).not.toHaveBeenCalled()
+
+    // Step to the frame where B finishes. Neither waiter hears before it.
+    for (let i = 0; i < 40 && running(); i += 1) {
+      expect(queuedWaiter).not.toHaveBeenCalled()
+      harness.advanceBy(5)
+    }
+    expect(running()).toBe(false)
+    expect(firstWaiter).toHaveBeenCalledTimes(1)
+    expect(firstWaiter).toHaveBeenCalledWith(false)
+    expect(queuedWaiter).toHaveBeenCalledTimes(1)
+    expect(queuedWaiter).toHaveBeenCalledWith(false)
 
     harness.cleanup()
   })
