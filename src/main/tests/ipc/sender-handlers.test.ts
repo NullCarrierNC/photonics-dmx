@@ -286,46 +286,104 @@ describe('setupSenderHandlers', () => {
   })
 
   describe('UPDATE_ENTTEC_CONFIG', () => {
-    it('restarts Enttec Pro when sender is enabled', async () => {
+    const realValidate = jest.requireActual<typeof import('../../ipc/inputValidation')>(
+      '../../ipc/inputValidation',
+    ).validateSenderEnablePayload
+
+    type Result = { success: boolean; error?: string }
+    const update = async (payload: unknown): Promise<Result> => {
       setupSenderHandlers(mockIpcMain as any, mockControllerManager as any)
-      const validated = {
-        sender: 'enttecpro' as const,
-        devicePath: '/dev/ttyUSB0',
-        universe: 0,
-        dmxSpeed: 40,
-      }
-      validateEnable.mockReturnValue({ ok: true, value: validated })
-      getEnabledSenders.mockReturnValue(['enttecpro'])
+      return (await getHandler(LIGHT.UPDATE_ENTTEC_CONFIG)(null, payload)) as Result
+    }
 
-      const h = getHandler(LIGHT.UPDATE_ENTTEC_CONFIG)
-      const r = (await h(null, { devicePath: '/dev/ttyUSB0', dmxSpeed: 40 })) as {
-        success: boolean
-      }
-
-      expect(r).toEqual({ success: true })
-      expect(restartSender).toHaveBeenCalledWith('enttecpro', validated)
+    beforeEach(() => {
+      validateEnable.mockImplementation(realValidate)
     })
 
-    it('does not restart when Enttec Pro is not enabled', async () => {
-      setupSenderHandlers(mockIpcMain as any, mockControllerManager as any)
-      validateEnable.mockReturnValue({
-        ok: true,
-        value: {
-          sender: 'enttecpro' as const,
-          devicePath: '/dev/ttyUSB0',
-          universe: 0,
-          dmxSpeed: 40,
-        },
+    it('restarts Enttec Pro with the validated config when the sender is running', async () => {
+      isSenderEnabled.mockReturnValue(true)
+
+      const r = await update({ devicePath: '/dev/ttyUSB0', dmxSpeed: 20 })
+
+      expect(r).toEqual({ success: true })
+      expect(restartSender).toHaveBeenCalledWith('enttecpro', {
+        sender: 'enttecpro',
+        devicePath: '/dev/ttyUSB0',
+        universe: 0,
+        dmxSpeed: 20,
       })
+    })
+
+    it('restarts a sender that is still starting, which the manager counts as enabled', async () => {
+      // isSenderEnabled covers a sender still initializing, getEnabledSenders does not.
+      isSenderEnabled.mockReturnValue(true)
       getEnabledSenders.mockReturnValue([])
 
-      const h = getHandler(LIGHT.UPDATE_ENTTEC_CONFIG)
-      const r = (await h(null, { devicePath: '/dev/ttyUSB0', dmxSpeed: 40 })) as {
-        success: boolean
-      }
+      await update({ devicePath: '/dev/ttyUSB0', dmxSpeed: 20 })
+
+      expect(restartSender).toHaveBeenCalledTimes(1)
+    })
+
+    it('does nothing, and reports success, when Enttec Pro is not running', async () => {
+      isSenderEnabled.mockReturnValue(false)
+
+      const r = await update({ devicePath: '/dev/ttyUSB0', dmxSpeed: 40 })
 
       expect(r).toEqual({ success: true })
       expect(restartSender).not.toHaveBeenCalled()
+    })
+
+    it('takes a config with no port yet while the sender is off', async () => {
+      isSenderEnabled.mockReturnValue(false)
+
+      const r = await update({ devicePath: '', dmxSpeed: 25 })
+
+      expect(r).toEqual({ success: true })
+      expect(restartSender).not.toHaveBeenCalled()
+    })
+
+    it.each([null, 'COM3', 42])('refuses a payload that is not an object (%p)', async (payload) => {
+      isSenderEnabled.mockReturnValue(true)
+
+      const r = await update(payload)
+
+      expect(r.success).toBe(false)
+      expect(restartSender).not.toHaveBeenCalled()
+    })
+
+    it.each([Number.NaN, Number.POSITIVE_INFINITY, '30'])(
+      'refuses a non-finite or non-number rate for a running sender (%p)',
+      async (dmxSpeed) => {
+        isSenderEnabled.mockReturnValue(true)
+
+        const r = await update({ devicePath: '/dev/ttyUSB0', dmxSpeed })
+
+        expect(r).toEqual({ success: false, error: 'EnttecPro dmxSpeed must be a finite number' })
+        expect(restartSender).not.toHaveBeenCalled()
+      },
+    )
+
+    it('refuses a missing port for a running sender', async () => {
+      isSenderEnabled.mockReturnValue(true)
+
+      const r = await update({ dmxSpeed: 40 })
+
+      expect(r.success).toBe(false)
+      expect(restartSender).not.toHaveBeenCalled()
+    })
+
+    it('reports a failed restart and tells the renderer the sender did not start', async () => {
+      isSenderEnabled.mockReturnValue(true)
+      restartSender.mockRejectedValueOnce(new Error('port gone'))
+
+      const r = await update({ devicePath: '/dev/ttyUSB0', dmxSpeed: 40 })
+
+      expect(r.success).toBe(false)
+      expect(r.error).toContain('port gone')
+      expect(sendToAllWindows).toHaveBeenCalledWith(RENDERER_RECEIVE.SENDER_START_FAILED, {
+        sender: 'enttecpro',
+        error: r.error,
+      })
     })
   })
 })

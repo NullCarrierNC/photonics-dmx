@@ -146,6 +146,13 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       if (!isPlainObject(config)) {
         return { success: false, error: 'Invalid Enttec Pro config payload' }
       }
+      // The renderer sends every saved edit, running or not. With nothing running or starting
+      // there is nothing to apply it to, and a half-filled config (no port yet) is not an error.
+      const senderManager = controllerManager.getSenderManager()
+      if (!senderManager.isSenderEnabled('enttecpro')) {
+        log.info('Enttec Pro not currently enabled, nothing to restart')
+        return { success: true }
+      }
       const payloadValidation = validateSenderEnablePayload({
         sender: 'enttecpro',
         devicePath: config.devicePath,
@@ -158,13 +165,8 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       if (enttecConfig.sender !== 'enttecpro') {
         return { success: false as const, error: 'Internal validation mismatch' }
       }
-      const senderManager = controllerManager.getSenderManager()
-      if (senderManager.getEnabledSenders().includes('enttecpro')) {
-        await senderManager.restartSender('enttecpro', enttecConfig)
-        log.info('Enttec Pro configuration updated and sender restarted')
-      } else {
-        log.info('Enttec Pro not currently enabled, nothing to restart')
-      }
+      await senderManager.restartSender('enttecpro', enttecConfig)
+      log.info('Enttec Pro configuration updated and sender restarted')
       return { success: true }
     } catch (error) {
       log.error('Error updating Enttec Pro configuration:', error)

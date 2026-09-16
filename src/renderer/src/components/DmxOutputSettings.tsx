@@ -102,19 +102,22 @@ const DmxOutputSettings: React.FC = () => {
     [showToast],
   )
 
-  /** Persists Enttec port/rate atomically and pushes the merged config to a running sender. */
+  /**
+   * Persists Enttec port/rate atomically and pushes the merged config to main. The push goes out
+   * whether or not this render thinks the sender runs, because a sender enabled a moment ago may
+   * not show as running here yet. Main applies it to a running or starting sender and ignores it
+   * otherwise.
+   */
   const commitEnttecConfig = useSerializedConfigCommit({
     stored: prefs.enttecProConfig,
     defaultConfig: { port: '', dmxSpeed: ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ },
     persist: (config, what) => persist({ enttecProConfig: config }, what),
     setStored: (config) => setPrefs((prev) => ({ ...prev, enttecProConfig: config })),
-    applyToRunningSender: isEnttecProEnabled
-      ? (config, what) =>
-          applyToRunningSender(
-            () => updateEnttecConfig({ devicePath: config.port, dmxSpeed: config.dmxSpeed }),
-            what,
-          )
-      : undefined,
+    applyToRunningSender: (config, what) =>
+      applyToRunningSender(
+        () => updateEnttecConfig({ devicePath: config.port, dmxSpeed: config.dmxSpeed }),
+        what,
+      ),
   })
 
   /** Persists OpenDMX port/rate atomically. OpenDMX has no live-update channel to push to. */

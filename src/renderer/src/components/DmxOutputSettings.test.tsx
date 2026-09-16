@@ -502,6 +502,16 @@ describe('DmxOutputSettings Enttec Pro refresh rate', () => {
     )
   })
 
+  it('pushes an edit the panel does not yet show as running, leaving main to decide', async () => {
+    await renderPanel(enttecOpen({ port: 'COM7', dmxSpeed: 40 }), { enttecpro: false })
+
+    commit(screen.getByLabelText('Refresh Rate'), '25')
+
+    await waitFor(() =>
+      expect(updateEnttecConfigMock).toHaveBeenCalledWith({ devicePath: 'COM7', dmxSpeed: 25 }),
+    )
+  })
+
   it('commits the port then the rate from one round-trip without either clobbering the other', async () => {
     let releaseFirst: (() => void) | undefined
     savePrefsMock
