@@ -88,13 +88,14 @@ export class Sequencer implements ILightingController {
 
   /**
    * Adds a new effect without affecting effects on other layers.
-   * If an effect with the same name is already running, it will be queued.
+   * If an effect with the same name is already running on a light, this is queued behind it, and
+   * any earlier persistent run of the name stops looping once its current pass ends.
    * Otherwise, it will replace any effect running on the passed transition(s) layer(s).
    *
    * @param name The name of the effect
    * @param effect The effect configuration
-   * @param offset How long to wait before applying this effect (in ms)
-   * @param isPersistent If true, the effect re-queues itself after completing
+   * @param isPersistent If true, the effect re-queues itself after completing, until a later
+   *   submission of the same name is accepted
    */
   public addEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
     this.effectManager.addEffect(name, effect, isPersistent)
@@ -109,7 +110,8 @@ export class Sequencer implements ILightingController {
    *
    * @param name The name of the effect
    * @param effect The effect configuration
-   * @param isPersistent If true, the effect re-queues itself after completing
+   * @param isPersistent If true, the effect re-queues itself after completing, until a later
+   *   submission of the same name is accepted
    */
   public replaceEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
     this.effectManager.replaceEffect(name, effect, isPersistent)
@@ -117,12 +119,15 @@ export class Sequencer implements ILightingController {
 
   /**
    * Per-(layer, light) replace with a completion callback. The callback held for the displaced
-   * run is fired with `cancelled = true` so a blocking node waiting on it is released.
+   * run is fired with `cancelled = true` so a blocking node waiting on it is released. It hears
+   * once the replacement holds its slots, so an effect it submits from there supersedes the
+   * replacement, which then plays one pass rather than looping.
    *
    * @param name The name of the effect
    * @param effect The effect configuration
    * @param onComplete Callback fired when the effect completes or is displaced
-   * @param isPersistent If true, the effect re-queues itself after completing
+   * @param isPersistent If true, the effect re-queues itself after completing, until a later
+   *   submission of the same name is accepted
    * @returns True when the effect was applied, false when a gate refused it
    */
   public replaceEffectWithCallback(
@@ -141,7 +146,8 @@ export class Sequencer implements ILightingController {
    * @param name The name of the effect
    * @param effect The effect configuration
    * @param onComplete Callback to fire when effect completes
-   * @param isPersistent If true, the effect re-queues itself after completing
+   * @param isPersistent If true, the effect re-queues itself after completing, until a later
+   *   submission of the same name is accepted
    */
   public addEffectWithCallback(
     name: string,
@@ -171,13 +177,14 @@ export class Sequencer implements ILightingController {
   }
 
   /**
-   * Clears all running effects and starts a new effect.
-   * If an effect with the same name is already running, it will be queued.
+   * Clears all running effects and starts a new effect. A repeated set of the same name that
+   * targets layer 0 clears only layer 0, so a re-triggered scene is not torn down each time.
+   * A light still running the name queues this submission behind its current pass.
    *
    * @param name The name of the effect
    * @param effect The effect configuration
-   * @param offset How long to wait before applying this effect (in ms)
-   * @param isPersistent If true, the effect re-queues itself after completing
+   * @param isPersistent If true, the effect re-queues itself after completing, until a later
+   *   submission of the same name is accepted
    */
   public async setEffect(
     name: string,
@@ -194,7 +201,8 @@ export class Sequencer implements ILightingController {
    * @param name The name of the effect
    * @param effect The effect configuration
    * @param offset How long to wait before applying this effect (in ms)
-   * @param isPersistent If true, the effect re-queues itself after completing
+   * @param isPersistent If true, the effect re-queues itself after completing, until a later
+   *   submission of the same name is accepted
    * @returns True if the effect was added, false otherwise
    */
   public addEffectUnblockedName(
@@ -212,7 +220,8 @@ export class Sequencer implements ILightingController {
    * @param name The name of the effect
    * @param effect The effect configuration
    * @param offset How long to wait before applying this effect (in ms)
-   * @param isPersistent If true, the effect re-queues itself after completing
+   * @param isPersistent If true, the effect re-queues itself after completing, until a later
+   *   submission of the same name is accepted
    * @returns True if the effect was set, false otherwise
    */
   public setEffectUnblockedName(

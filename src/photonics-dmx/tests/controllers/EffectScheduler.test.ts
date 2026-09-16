@@ -6,6 +6,7 @@ import type {
   IEffectTransformer,
   ILayerManager,
   LightEffectState,
+  QueuedEffect,
 } from '../../controllers/sequencer/interfaces'
 import { Effect, EffectTransition } from '../../types'
 import { createMockTrackedLight } from '../helpers/testFixtures'
@@ -92,6 +93,36 @@ describe('EffectScheduler', () => {
     })
   })
 
+  /**
+   * Points the layer manager mock at live active and queue maps for one layer, so a change made
+   * during a call is visible to the rest of it.
+   */
+  const wireLiveMaps = (
+    layer: number,
+  ): { active: Map<string, LightEffectState>; queue: Map<string, QueuedEffect> } => {
+    const active = new Map<string, LightEffectState>()
+    const queue = new Map<string, QueuedEffect>()
+
+    layerManager.getActiveEffects.mockReturnValue(new Map([[layer, active]]) as never)
+    layerManager.getEffectQueue.mockReturnValue(new Map([[layer, queue]]) as never)
+    layerManager.getActiveEffect.mockImplementation((_layer, lightId) => active.get(lightId))
+    layerManager.addActiveEffect.mockImplementation((_layer, lightId, state) => {
+      active.set(lightId as string, state as LightEffectState)
+    })
+    layerManager.removeActiveEffect.mockImplementation((_layer, lightId) => {
+      active.delete(lightId as string)
+    })
+    layerManager.getQueuedEffect.mockImplementation((_layer, lightId) => queue.get(lightId))
+    layerManager.addQueuedEffect.mockImplementation((_layer, lightId, entry) => {
+      queue.set(lightId as string, entry as QueuedEffect)
+    })
+    layerManager.removeQueuedEffect.mockImplementation((_layer, lightId) => {
+      queue.delete(lightId as string)
+    })
+
+    return { active, queue }
+  }
+
   describe('applyEffectTransitions', () => {
     it('starts the effect on a free slot', () => {
       const transitions = [transition(1)]
@@ -143,6 +174,34 @@ describe('EffectScheduler', () => {
       expect([...active.keys()].sort()).toEqual(['light-1', 'light-2'])
       expect([...active.values()].every((e) => e.name === 'pulse')).toBe(true)
       expect(fireCompletionCallback).not.toHaveBeenCalledWith('pulse', true)
+    })
+
+    it('lets an effect a displaced waiter starts keep the freed slot', () => {
+      const { active } = wireLiveMaps(1)
+      active.set(light.id, { name: 'held', lightId: light.id } as LightEffectState)
+      const rescue = effectWith([transition(1)])
+      let rescued = false
+      fireCompletionCallback.mockImplementation((...args: unknown[]) => {
+        if (args[0] !== 'held' || rescued) return
+        rescued = true
+        scheduler.applyEffectTransitions(
+          'rescue',
+          rescue,
+          groupByLayerAndLight(rescue.transitions),
+          false,
+        )
+      })
+      const transitions = [transition(1)]
+
+      scheduler.applyEffectTransitions(
+        'usurper',
+        effectWith(transitions),
+        groupByLayerAndLight(transitions),
+        false,
+      )
+
+      expect(rescued).toBe(true)
+      expect(active.get(light.id)?.name).toBe('rescue')
     })
 
     it('advances past a first transition that needs neither time nor an event', () => {
@@ -256,6 +315,163 @@ describe('EffectScheduler', () => {
 
       expect(fireCompletionCallback).toHaveBeenCalledWith('waiting', true)
       expect(fireCompletionCallback).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('an entry waiting on an empty slot', () => {
+    const queueEntry = (queue: Map<string, QueuedEffect>, entry: Partial<QueuedEffect>): Effect => {
+      const effect = effectWith([transition(1)])
+      queue.set(light.id, {
+        name: 'pulse',
+        effect,
+        isPersistent: false,
+        lightId: light.id,
+        ...entry,
+      })
+      return effect
+    }
+
+    it('starts it before a submission of the same name queues behind it', () => {
+      const { active, queue } = wireLiveMaps(1)
+      const waiting = queueEntry(queue, { isPersistent: true, effectRunId: 'queued-run' })
+      const incoming = effectWith([transition(1)])
+
+      scheduler.applyEffectTransitions(
+        'pulse',
+        incoming,
+        groupByLayerAndLight(incoming.transitions),
+        false,
+      )
+
+      expect(active.get(light.id)?.effect).toBe(waiting)
+      expect(active.get(light.id)?.effectRunId).toBe('queued-run')
+      expect(queue.get(light.id)?.effect).toBe(incoming)
+    })
+
+    it('starts it, then evicts it for a submission under a different name', () => {
+      const { active, queue } = wireLiveMaps(1)
+      const queuedRunId = persistentRuns.register(
+        'pulse',
+        effectWith([]),
+        groupByLayerAndLight([transition(1)]),
+      )!
+      queueEntry(queue, { isPersistent: true, effectRunId: queuedRunId })
+      const transitions = [transition(1)]
+
+      scheduler.applyEffectTransitions(
+        'usurper',
+        effectWith(transitions),
+        groupByLayerAndLight(transitions),
+        false,
+      )
+
+      expect(active.get(light.id)?.name).toBe('usurper')
+      expect(persistentRuns.has(queuedRunId)).toBe(false)
+      expect(fireCompletionCallback.mock.calls.filter(([n]) => n === 'pulse')).toEqual([
+        ['pulse', true],
+      ])
+    })
+
+    it('leaves the slot to an effect the waiter of a discarded entry starts', () => {
+      // Discarding a malformed entry tells its waiter, which can claim the slot before the
+      // submission that triggered the discard gets there.
+      const { active, queue } = wireLiveMaps(1)
+      const elsewhere = createMockTrackedLight({ id: 'light-2' })
+      queueEntry(queue, { effect: effectWith([{ ...transition(1), lights: [elsewhere] }]) })
+      const rescue = effectWith([transition(1)])
+      const rescueRunId = persistentRuns.register(
+        'rescue',
+        rescue,
+        groupByLayerAndLight(rescue.transitions),
+      )!
+      let rescued = false
+      fireCompletionCallback.mockImplementation((...args: unknown[]) => {
+        if (args[0] !== 'pulse' || rescued) return
+        rescued = true
+        scheduler.applyEffectTransitions(
+          'rescue',
+          rescue,
+          groupByLayerAndLight(rescue.transitions),
+          true,
+          rescueRunId,
+        )
+      })
+      const transitions = [transition(1)]
+
+      scheduler.applyEffectTransitions(
+        'usurper',
+        effectWith(transitions),
+        groupByLayerAndLight(transitions),
+        false,
+      )
+
+      expect(rescued).toBe(true)
+      expect(active.get(light.id)?.name).toBe('usurper')
+      expect(persistentRuns.has(rescueRunId)).toBe(false)
+      expect(fireCompletionCallback).toHaveBeenCalledWith('rescue', true)
+    })
+
+    it('starts it when a persistent run restarts into the slot', () => {
+      const { active, queue } = wireLiveMaps(1)
+      const transitions = [transition(1)]
+      const runId = persistentRuns.register(
+        'sweep',
+        effectWith(transitions),
+        groupByLayerAndLight(transitions),
+      )!
+      queueEntry(queue, {})
+
+      scheduler.onLightEffectComplete({
+        name: 'sweep',
+        lightId: light.id,
+        effectRunId: runId,
+      } as LightEffectState)
+
+      expect(queue.has(light.id)).toBe(false)
+      expect(active.get(light.id)?.name).toBe('sweep')
+      expect(fireCompletionCallback).toHaveBeenCalledWith('pulse', true)
+    })
+  })
+
+  describe('dropQueuedByName', () => {
+    it('removes that name across layers and lights, cancelling its runs', () => {
+      const queues = new Map([
+        [1, new Map<string, QueuedEffect>()],
+        [2, new Map<string, QueuedEffect>()],
+      ])
+      layerManager.getEffectQueue.mockReturnValue(queues as never)
+      layerManager.getQueuedEffect.mockImplementation((layer, lightId) =>
+        queues.get(layer)?.get(lightId),
+      )
+      layerManager.removeQueuedEffect.mockImplementation((layer, lightId) => {
+        queues.get(layer)?.delete(lightId as string)
+      })
+
+      const runOn = (name: string): string =>
+        persistentRuns.register(name, effectWith([]), groupByLayerAndLight([transition(1)]))!
+      const entry = (name: string, runId: string): QueuedEffect => ({
+        name,
+        effect: effectWith([transition(1)]),
+        isPersistent: true,
+        lightId: light.id,
+        effectRunId: runId,
+      })
+      const firstRun = runOn('pulse')
+      const secondRun = runOn('pulse')
+      const otherRun = runOn('sweep')
+      queues.get(1)!.set(light.id, entry('pulse', firstRun))
+      queues.get(2)!.set('light-2', entry('pulse', secondRun))
+      queues.get(2)!.set(light.id, entry('sweep', otherRun))
+
+      scheduler.dropQueuedByName('pulse')
+
+      expect(queues.get(1)!.has(light.id)).toBe(false)
+      expect(queues.get(2)!.has('light-2')).toBe(false)
+      expect(queues.get(2)!.has(light.id)).toBe(true)
+      expect(persistentRuns.has(firstRun)).toBe(false)
+      expect(persistentRuns.has(secondRun)).toBe(false)
+      expect(persistentRuns.has(otherRun)).toBe(true)
+      expect(fireCompletionCallback).not.toHaveBeenCalled()
     })
   })
 
@@ -398,6 +614,9 @@ describe('EffectScheduler', () => {
         ]),
       )
       layerManager.getQueuedEffect.mockImplementation((_layer, lightId) => queue.get(lightId))
+      layerManager.removeQueuedEffect.mockImplementation((_layer, lightId) => {
+        queue.delete(lightId as string)
+      })
     }
 
     it('reports false when nothing is queued', () => {
@@ -467,6 +686,24 @@ describe('EffectScheduler', () => {
         [light.id, runId],
         [two.id, runId],
       ])
+    })
+
+    it('cancels the run of a queued entry it discards', () => {
+      const runId = persistentRuns.register(
+        'queued',
+        effectWith([staggered[1]]),
+        groupByLayerAndLight([staggered[1]]),
+      )!
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'queued',
+        effect: effectWith([staggered[1]]),
+        isPersistent: true,
+        lightId: light.id,
+        effectRunId: runId,
+      })
+
+      expect(scheduler.startNextEffectInQueue(1, light.id)).toBe(false)
+      expect(persistentRuns.has(runId)).toBe(false)
     })
 
     it('discards a queued entry whose transitions on the layer only target other lights', () => {

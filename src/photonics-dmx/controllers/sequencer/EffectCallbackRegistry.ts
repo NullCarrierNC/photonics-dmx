@@ -49,7 +49,8 @@ export class EffectCallbackRegistry {
    * Callbacks run inside the frame, so a waiter that throws is contained here. Letting it out
    * costs the rest of that frame: the effects finishing beside it never hear, their queued
    * successors never start, and the lights hold what they had. A callback registered for the same
-   * name while these run is held for that name's next completion.
+   * name while these run is held for that name's next completion, so a waiter that resubmits the
+   * name as it hears leaves two callbacks on it, both firing on the next completion.
    */
   public fire(name: string, cancelled = false): void {
     const held = this.callbacks.get(name)

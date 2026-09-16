@@ -191,8 +191,10 @@ export class EffectScheduler {
   /**
    * Applies the supplied transitions to their respective layers/lights.
    * Handles replacement vs queue logic and passes through the effect-level
-   * run identifier when the effect is persistent. A queued entry this call drops never runs, so
-   * its waiter is told once the name is neither running nor queued anywhere.
+   * run identifier when the effect is persistent. An entry already waiting on a slot starts first,
+   * so this call queues behind it or evicts it as it does a running effect. A queued entry this
+   * call drops never runs, so its waiter is told once the name is neither running nor queued
+   * anywhere.
    */
   public applyEffectTransitions(
     name: string,
@@ -201,7 +203,7 @@ export class EffectScheduler {
     isPersistent: boolean,
     effectRunId?: string,
   ): void {
-    const droppedQueued = new Set<string>()
+    const displaced = new Set<string>()
     transitionsByLayerAndLight.forEach((layerMap, layer) => {
       layerMap.forEach((transitionsForLight, lightId) => {
         const targetLight = transitionsForLight[0].lights.find((l) => l.id === lightId)
@@ -212,7 +214,14 @@ export class EffectScheduler {
           return
         }
 
-        const activeEffect = this.layerManager.getActiveEffect(layer, lightId)
+        // Slots sit empty with an entry still waiting only between finalizeCompletedEffects'
+        // removal and successor passes. The start can also tell a waiter as it discards a malformed
+        // entry, and that waiter can claim the slot, so read the slot after it either way.
+        let activeEffect = this.layerManager.getActiveEffect(layer, lightId)
+        if (!activeEffect) {
+          this.startNextEffectInQueue(layer, lightId)
+          activeEffect = this.layerManager.getActiveEffect(layer, lightId)
+        }
 
         if (activeEffect) {
           if (activeEffect.name === name) {
@@ -229,13 +238,13 @@ export class EffectScheduler {
             // removeEffectForLight's successor pass starts when a slot empties.
             const queued = this.layerManager.getQueuedEffect(layer, lightId)
             if (queued) {
-              droppedQueued.add(queued.name)
+              displaced.add(queued.name)
               if (queued.effectRunId) {
                 this.persistentRuns.cancel(queued.effectRunId)
               }
             }
             this.layerManager.removeQueuedEffect(layer, lightId)
-            this.removeEffectForLight(layer, lightId, false)
+            this.removeEffectForLight(layer, lightId, false, displaced)
             this.startEffect(
               name,
               effect,
@@ -260,7 +269,7 @@ export class EffectScheduler {
       })
     })
 
-    this.fireForUnscheduled(droppedQueued)
+    this.fireForUnscheduled(displaced)
   }
 
   /**
@@ -347,25 +356,32 @@ export class EffectScheduler {
    * What a submission needs when it takes a slot from a different effect: clearing the whole layer
    * there would evict lights the same submission had already started, and fire their completion
    * callbacks as cancelled while their transitions were still in flight.
+   *
+   * @param evictedInto Collects the evicted names for the caller to settle once it has installed
+   *   its own effect, instead of telling their waiters here. A waiter can submit an effect onto the
+   *   slot as it hears, so a caller midway through claiming that slot passes this and calls
+   *   {@link fireForUnscheduled} afterwards.
    */
   public removeEffectForLight(
     layer: number,
     lightId: string,
     shouldRemoveTransitions: boolean,
+    evictedInto?: Set<string>,
   ): void {
-    this.removeEffectsForLights(layer, [lightId], shouldRemoveTransitions)
+    this.removeEffectsForLights(layer, [lightId], shouldRemoveTransitions, evictedInto)
   }
 
   private removeEffectsForLights(
     layer: number,
     lightIds: string[],
     shouldRemoveTransitions: boolean,
+    evictedInto?: Set<string>,
   ): void {
     const activeEffects = this.layerManager.getActiveEffects().get(layer)
     if (!activeEffects) return
 
     const lightsToCleanup: string[] = []
-    const evicted = new Set<string>()
+    const evicted = evictedInto ?? new Set<string>()
 
     // Process each light's effect on this layer
     for (const lightId of lightIds) {
@@ -405,7 +421,35 @@ export class EffectScheduler {
 
     // An evicted effect never reaches onLightEffectComplete, so tell its waiter the run ended here.
     // A queued run of the same name taking the slot means the effect is still going, so skip those.
-    this.fireForUnscheduled(evicted)
+    if (!evictedInto) {
+      this.fireForUnscheduled(evicted)
+    }
+  }
+
+  /**
+   * Drops every queued entry held under this name and cancels the runs they belong to, so a name
+   * being submitted again has nothing left waiting from an earlier submission.
+   *
+   * Waiters are left alone: they are held per name, and the submission doing this is about to
+   * schedule that name again, so they resolve on its run.
+   */
+  public dropQueuedByName(name: string): void {
+    const slots: Array<[number, string]> = []
+    // Snapshotted, because removing the last entry on a layer drops the layer from this same map.
+    for (const [layer, layerMap] of this.layerManager.getEffectQueue()) {
+      for (const [lightId, entry] of layerMap) {
+        if (entry.name === name) {
+          slots.push([layer, lightId])
+        }
+      }
+    }
+
+    for (const [layer, lightId] of slots) {
+      const entry = this.layerManager.getQueuedEffect(layer, lightId)
+      if (entry?.name !== name) continue
+      this.persistentRuns.cancel(entry.effectRunId)
+      this.layerManager.removeQueuedEffect(layer, lightId)
+    }
   }
 
   /**
@@ -419,8 +463,8 @@ export class EffectScheduler {
 
     // Resolve everything the start depends on before consuming the entry, so a queue slot is never
     // emptied for a start that then doesn't happen. The transitions are this light's own on this
-    // layer, grouped the way a submission groups them for applyEffectTransitions: the effect's other
-    // transitions on the layer can target other lights, each of which owns its own queue slot.
+    // layer, grouped as a submission groups them, since the effect's other transitions on the layer
+    // can target other lights, each owning its own queue slot.
     const transitions =
       this.effectTransformer
         .groupTransitionsByLayerAndLight(nextEffect.effect.transitions)
@@ -430,6 +474,7 @@ export class EffectScheduler {
 
     if (!targetLight) {
       // Nothing startable in this entry. Drop it anyway so a malformed one can't wedge the slot.
+      this.persistentRuns.cancel(nextEffect.effectRunId)
       this.layerManager.removeQueuedEffect(layer, lightId)
       log.warn(
         `Discarding queued effect ${nextEffect.name} for light ${lightId} on layer ${layer}: no transitions target it`,

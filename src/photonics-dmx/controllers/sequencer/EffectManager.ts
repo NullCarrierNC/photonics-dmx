@@ -114,7 +114,8 @@ export class EffectManager implements IEffectManager {
    * @param name The name of the effect
    * @param effect The effect configuration
    * @param onComplete Callback to fire when effect completes
-   * @param isPersistent If true, the effect re-queues itself after completing
+   * @param isPersistent If true, the effect re-queues itself after completing, until a later
+   *   submission of the same name is accepted
    */
   public addEffectWithCallback(
     name: string,
@@ -138,7 +139,8 @@ export class EffectManager implements IEffectManager {
    * @param name The name of the effect
    * @param effect The effect configuration
    * @param onComplete Callback to fire when effect completes
-   * @param isPersistent If true, the effect re-queues itself after completing
+   * @param isPersistent If true, the effect re-queues itself after completing, until a later
+   *   submission of the same name is accepted
    */
   public setEffectWithCallback(
     name: string,
@@ -181,8 +183,8 @@ export class EffectManager implements IEffectManager {
 
   /**
    * Groups an effect's transitions by layer and light, records the name as owning layer 0 when it
-   * targets that layer, and opens a persistence run when the effect is persistent. Returns what the
-   * apply step needs.
+   * targets that layer, retires the name's earlier persistent runs, and opens a persistence run
+   * when the effect is persistent. Returns what the apply step needs.
    */
   private prepareSubmission(
     name: string,
@@ -200,6 +202,21 @@ export class EffectManager implements IEffectManager {
       this._lastCalled0LayerEffect = name
     }
 
+    // The latest accepted submission of a name owns the loop, whether or not it is itself
+    // persistent. Only accepted submissions reach here, and a callback raised by the 'set' clearing
+    // step runs before this line, so this submission supersedes any the callback made. An effect
+    // targeting no lights registers no run and retires none.
+    const targetsAnyLight = [...transitionsByLayerAndLight.values()].some(
+      (layerMap) => layerMap.size > 0,
+    )
+    if (targetsAnyLight) {
+      this.persistentRuns.cancelByName(name)
+      // Entries still queued under the runs just cancelled go with them, including on slots this
+      // submission does not cover. Sweeping before the apply leaves the entries this submission is
+      // about to queue alone.
+      this.scheduler.dropQueuedByName(name)
+    }
+
     const persistentRunId = isPersistent
       ? this.persistentRuns.register(name, effect, transitionsByLayerAndLight)
       : undefined
@@ -210,11 +227,13 @@ export class EffectManager implements IEffectManager {
   /**
    * Adds a new effect without impacting other effects running on different layers.
    * Will replace any effect running on the passed transition(s) layer(s) if a different
-   * effect was running. If the same effect is passed again, it will be queued.
+   * effect was running. If the same effect is passed again, it will be queued, and an earlier
+   * persistent run of that name stops looping once its current pass ends.
    *
    * @param name The name of the effect
    * @param effect The effect configuration
-   * @param isPersistent If true, the effect re-queues itself after completing
+   * @param isPersistent If true, the effect re-queues itself after completing, until a later
+   *   submission of the same name is accepted
    */
   public addEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
     this.submitEffect(name, effect, isPersistent, ADD_EFFECT)
@@ -245,6 +264,10 @@ export class EffectManager implements IEffectManager {
    * cancelled without firing their callbacks, so the callback held for `name` is fired here with
    * `cancelled = true` before the new one is registered, releasing the displaced waiter once.
    *
+   * The displaced waiter hears once the replacement holds its slots, so an effect it submits from
+   * inside that call is the latest submission of the name and supersedes the replacement: the
+   * replacement plays one pass and the waiter's submission is what loops.
+   *
    * @returns True when the effect was applied. A refusal leaves the running effect and its
    * callback untouched and registers nothing.
    */
@@ -268,7 +291,8 @@ export class EffectManager implements IEffectManager {
    *
    * @param name The name of the effect
    * @param effect The effect configuration
-   * @param isPersistent If true, the effect re-queues itself after completing
+   * @param isPersistent If true, the effect re-queues itself after completing, until a later
+   *   submission of the same name is accepted
    */
   public setEffect(name: string, effect: Effect, isPersistent: boolean = false): void {
     this.submitEffect(name, effect, isPersistent, SET_EFFECT)
@@ -373,7 +397,8 @@ export class EffectManager implements IEffectManager {
    *
    * @param name The name of the effect
    * @param effect The effect configuration
-   * @param isPersistent If true, the effect re-queues itself after completing
+   * @param isPersistent If true, the effect re-queues itself after completing, until a later
+   *   submission of the same name is accepted
    * @returns True if the effect was added, false otherwise
    */
   public addEffectUnblockedName(
@@ -429,7 +454,8 @@ export class EffectManager implements IEffectManager {
    *
    * @param name The name of the effect
    * @param effect The effect configuration
-   * @param isPersistent If true, the effect re-queues itself after completing
+   * @param isPersistent If true, the effect re-queues itself after completing, until a later
+   *   submission of the same name is accepted
    * @returns True if the effect was set, false otherwise
    */
   public setEffectUnblockedName(
