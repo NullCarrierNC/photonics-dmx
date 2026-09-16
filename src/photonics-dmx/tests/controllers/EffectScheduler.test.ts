@@ -376,6 +376,30 @@ describe('EffectScheduler', () => {
   })
 
   describe('startNextEffectInQueue', () => {
+    const two = createMockTrackedLight({ id: 'light-2' })
+    // Two transitions on the same layer, each targeting a different light.
+    const staggered: EffectTransition[] = [
+      { ...transition(1), lights: [light] },
+      { ...transition(1), lights: [two] },
+    ]
+
+    /** Queues an entry for each light of the staggered effect, all under the same run id. */
+    const queueStaggered = (effect: Effect, effectRunId?: string): void => {
+      const queue = new Map(
+        [light, two].map((l) => [
+          l.id,
+          {
+            name: 'staggered',
+            effect,
+            isPersistent: effectRunId !== undefined,
+            lightId: l.id,
+            effectRunId,
+          },
+        ]),
+      )
+      layerManager.getQueuedEffect.mockImplementation((_layer, lightId) => queue.get(lightId))
+    }
+
     it('reports false when nothing is queued', () => {
       layerManager.getQueuedEffect.mockReturnValue(undefined)
       expect(scheduler.startNextEffectInQueue(1, light.id)).toBe(false)
@@ -394,6 +418,70 @@ describe('EffectScheduler', () => {
       expect(layerManager.removeQueuedEffect).toHaveBeenCalledWith(1, light.id)
       const started = layerManager.addActiveEffect.mock.calls[0][2] as LightEffectState
       expect(started.effectRunId).toBe('run-1')
+    })
+
+    it('starts a staggered effect on each queued light with only the transitions targeting it', () => {
+      queueStaggered(effectWith(staggered), 'run-1')
+      const startEffect = jest.spyOn(scheduler, 'startEffect')
+
+      expect(scheduler.startNextEffectInQueue(1, light.id)).toBe(true)
+      expect(scheduler.startNextEffectInQueue(1, two.id)).toBe(true)
+
+      expect(
+        startEffect.mock.calls.map(([, , lights, , transitions]) => [lights, transitions]),
+      ).toEqual([
+        [[light], [staggered[0]]],
+        [[two], [staggered[1]]],
+      ])
+      const started = layerManager.addActiveEffect.mock.calls.map(([, lightId, state]) => [
+        lightId,
+        (state as LightEffectState).effectRunId,
+      ])
+      expect(started).toEqual([
+        [light.id, 'run-1'],
+        [two.id, 'run-1'],
+      ])
+      expect(fireCompletionCallback).not.toHaveBeenCalled()
+    })
+
+    it('restarts a persistent staggered run once every light it started from the queue finishes', () => {
+      const effect = effectWith(staggered)
+      const runId = persistentRuns.register('staggered', effect, groupByLayerAndLight(staggered))!
+      queueStaggered(effect, runId)
+
+      scheduler.startNextEffectInQueue(1, light.id)
+      scheduler.startNextEffectInQueue(1, two.id)
+      const queuedStarts = layerManager.addActiveEffect.mock.calls.map(
+        ([, , state]) => state as LightEffectState,
+      )
+      expect(queuedStarts).toHaveLength(2)
+
+      layerManager.addActiveEffect.mockClear()
+      queuedStarts.forEach((state) => scheduler.onLightEffectComplete(state))
+
+      const restarted = layerManager.addActiveEffect.mock.calls.map(([, lightId, state]) => [
+        lightId,
+        (state as LightEffectState).effectRunId,
+      ])
+      expect(restarted).toEqual([
+        [light.id, runId],
+        [two.id, runId],
+      ])
+    })
+
+    it('discards a queued entry whose transitions on the layer only target other lights', () => {
+      layerManager.getQueuedEffect.mockReturnValue({
+        name: 'queued',
+        effect: effectWith([staggered[1]]),
+        isPersistent: false,
+        lightId: light.id,
+      })
+
+      expect(scheduler.startNextEffectInQueue(1, light.id)).toBe(false)
+      expect(layerManager.removeQueuedEffect).toHaveBeenCalledWith(1, light.id)
+      expect(layerManager.addActiveEffect).not.toHaveBeenCalled()
+      expect(fireCompletionCallback).toHaveBeenCalledWith('queued', true)
+      expect(fireCompletionCallback).toHaveBeenCalledTimes(1)
     })
 
     it('discards a queued entry whose transitions do not target the light', () => {

@@ -418,11 +418,17 @@ export class EffectScheduler {
     if (!nextEffect) return false
 
     // Resolve everything the start depends on before consuming the entry, so a queue slot is never
-    // emptied for a start that then doesn't happen.
-    const transitions = nextEffect.effect.transitions.filter((t) => t.layer === layer)
+    // emptied for a start that then doesn't happen. The transitions are this light's own on this
+    // layer, grouped the way a submission groups them for applyEffectTransitions: the effect's other
+    // transitions on the layer can target other lights, each of which owns its own queue slot.
+    const transitions =
+      this.effectTransformer
+        .groupTransitionsByLayerAndLight(nextEffect.effect.transitions)
+        .get(layer)
+        ?.get(lightId) ?? []
     const targetLight = transitions[0]?.lights.find((l) => l.id === lightId)
 
-    if (transitions.length === 0 || !targetLight) {
+    if (!targetLight) {
       // Nothing startable in this entry. Drop it anyway so a malformed one can't wedge the slot.
       this.layerManager.removeQueuedEffect(layer, lightId)
       log.warn(
@@ -434,9 +440,8 @@ export class EffectScheduler {
 
     this.layerManager.removeQueuedEffect(layer, lightId)
 
-    // Scoped to the light this entry was queued for. The transition's `lights` array covers every
-    // light the effect targets, so starting across it would overwrite the other lights' state on
-    // this layer, each of which owns its own queue slot.
+    // Scoped to the light this entry was queued for, so the other lights' state on this layer is
+    // left to their own queue slots.
     // The entry's own run id, not a fresh one. This light is already counted in that run's light
     // total, so it needs to report its completion against the same run for the run to finish and
     // restart. Minting a new id here would split one logical run in two, and the original could

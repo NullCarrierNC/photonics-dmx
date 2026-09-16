@@ -1,6 +1,7 @@
 import { getColor } from '../../helpers/dmxHelpers'
 import { createSequencerHarness } from '../helpers/sequencerHarness'
 import type { Effect } from '../../types'
+import type { LightEffectState } from '../../controllers/sequencer/interfaces'
 
 const buildSingleLayerEffect = (
   lights: Effect['transitions'][number]['lights'],
@@ -24,6 +25,38 @@ const buildSingleLayerEffect = (
         duration,
         easing,
       },
+    },
+  ],
+})
+
+/**
+ * Two layer-1 transitions, each targeting one light: 20ms on the first light and 200ms on the
+ * second, so the first light finishes while the second is still running.
+ */
+const buildStaggeredEffect = (
+  lights: Effect['transitions'][number]['lights'],
+  color: Effect['transitions'][number]['transform']['color'],
+): Effect => ({
+  id: 'staggered',
+  description: 'staggered two-light effect',
+  transitions: [
+    {
+      lights: [lights[0]],
+      layer: 1,
+      waitForCondition: 'none',
+      waitForTime: 0,
+      waitUntilCondition: 'none',
+      waitUntilTime: 0,
+      transform: { color, duration: 20, easing: 'linear' },
+    },
+    {
+      lights: [lights[1]],
+      layer: 1,
+      waitForCondition: 'none',
+      waitForTime: 0,
+      waitUntilCondition: 'none',
+      waitUntilTime: 0,
+      transform: { color, duration: 200, easing: 'linear' },
     },
   ],
 })
@@ -174,33 +207,8 @@ describe('Sequencer blending and queueing (real harness)', () => {
     const colorA = { ...getColor('red', 'high', 'replace'), opacity: 1 }
     const colorB = { ...getColor('blue', 'high', 'replace'), opacity: 1 }
 
-    const staggered = (color: typeof colorA): Effect => ({
-      id: 'staggered',
-      description: 'staggered two-light effect',
-      transitions: [
-        {
-          lights: [lights[0]],
-          layer: 1,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          waitUntilCondition: 'none',
-          waitUntilTime: 0,
-          transform: { color, duration: 20, easing: 'linear' },
-        },
-        {
-          lights: [lights[1]],
-          layer: 1,
-          waitForCondition: 'none',
-          waitForTime: 0,
-          waitUntilCondition: 'none',
-          waitUntilTime: 0,
-          transform: { color, duration: 200, easing: 'linear' },
-        },
-      ],
-    })
-
-    harness.sequencer.addEffect('loop-test', staggered(colorA), true)
-    harness.sequencer.addEffect('loop-test', staggered(colorB), true)
+    harness.sequencer.addEffect('loop-test', buildStaggeredEffect(lights, colorA), true)
+    harness.sequencer.addEffect('loop-test', buildStaggeredEffect(lights, colorB), true)
 
     const layerManager = (
       harness.sequencer as unknown as {
@@ -220,6 +228,73 @@ describe('Sequencer blending and queueing (real harness)', () => {
     const state = harness.sequencer.getActiveEffectsForLight(shortLightId).get(1)
     expect(state?.isPersistent).toBe(true)
     expect(state?.effectRunId).toBeDefined()
+
+    harness.cleanup()
+  })
+
+  it('starts a queued staggered effect on both lights, each with only its own transitions', () => {
+    const harness = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const lights = harness.lightManager.getLights(['front'], ['all'])
+    const colorA = { ...getColor('red', 'high', 'replace'), opacity: 1 }
+    const colorB = { ...getColor('blue', 'high', 'replace'), opacity: 1 }
+    const queued = buildStaggeredEffect(lights, colorB)
+
+    harness.sequencer.addEffect('stagger-test', buildStaggeredEffect(lights, colorA))
+    harness.sequencer.addEffect('stagger-test', queued)
+
+    // For each light, the light ids its queued start holds transitions for, recorded as it starts.
+    const startedTargets = new Map<string, string[]>()
+    for (let i = 0; i < 40 && startedTargets.size < lights.length; i += 1) {
+      harness.advanceBy(10)
+      for (const light of lights) {
+        const state = harness.sequencer.getActiveEffectsForLight(light.id).get(1)
+        if (state?.effect === queued && !startedTargets.has(light.id)) {
+          startedTargets.set(
+            light.id,
+            state.transitions.flatMap((t) => t.lights.map((l) => l.id)),
+          )
+        }
+      }
+    }
+
+    expect(startedTargets.get(lights[0].id)).toEqual([lights[0].id])
+    expect(startedTargets.get(lights[1].id)).toEqual([lights[1].id])
+
+    harness.cleanup()
+  })
+
+  it('restarts a persistent staggered run after its queued lights finish', () => {
+    // The persistent run is queued behind a one-shot run of the same name, so only its queued
+    // entries can start the lights. It restarts once both have reported completion against its id.
+    const harness = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const lights = harness.lightManager.getLights(['front'], ['all'])
+    const [shortLightId, longLightId] = lights.map((l) => l.id)
+    const colorA = { ...getColor('red', 'high', 'replace'), opacity: 1 }
+    const colorB = { ...getColor('blue', 'high', 'replace'), opacity: 1 }
+    const layer1 = (lightId: string): LightEffectState | undefined =>
+      harness.sequencer.getActiveEffectsForLight(lightId).get(1)
+
+    harness.sequencer.addEffect('restart-test', buildStaggeredEffect(lights, colorA))
+    harness.sequencer.addEffect('restart-test', buildStaggeredEffect(lights, colorB), true)
+
+    // The short light starts its queued entry first.
+    for (let i = 0; i < 12 && layer1(shortLightId)?.effectRunId === undefined; i += 1) {
+      harness.advanceBy(10)
+    }
+    const runId = layer1(shortLightId)?.effectRunId
+    expect(runId).toBeDefined()
+
+    // It finishes and stays idle while the long light works through its own run and queued entry.
+    for (let i = 0; i < 12 && layer1(shortLightId) !== undefined; i += 1) {
+      harness.advanceBy(10)
+    }
+    expect(layer1(shortLightId)).toBeUndefined()
+
+    for (let i = 0; i < 60 && layer1(shortLightId) === undefined; i += 1) {
+      harness.advanceBy(10)
+    }
+    expect(layer1(shortLightId)?.effectRunId).toBe(runId)
+    expect(layer1(longLightId)?.effectRunId).toBe(runId)
 
     harness.cleanup()
   })
