@@ -1,5 +1,9 @@
 import React from 'react'
-import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../../../shared/dmxOutputRefresh'
+import {
+  DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
+  OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
+  OPEN_DMX_REFRESH_RATE_HZ_MIN,
+} from '../../../../shared/dmxOutputRefresh'
 import CollapsibleSenderCard from './CollapsibleSenderCard'
 import { DraftNumberField, DraftTextField } from '../controls/DraftField'
 
@@ -46,11 +50,13 @@ export const OpenDmxConfigCard: React.FC<OpenDmxConfigCardProps> = ({
           aria-label="Refresh Rate"
           value={refreshRate}
           onCommit={onRefreshRateChange}
-          min={1}
-          max={44}
+          min={OPEN_DMX_REFRESH_RATE_HZ_MIN}
+          max={DMX_OUTPUT_REFRESH_RATE_HZ_MAX}
           className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
         />
-        <span className="text-xs text-gray-500 dark:text-gray-400">Hz (1–44)</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          Hz ({OPEN_DMX_REFRESH_RATE_HZ_MIN}-{DMX_OUTPUT_REFRESH_RATE_HZ_MAX})
+        </span>
       </div>
       <p className="text-xs text-gray-600 dark:text-gray-400">
         Default is {OPEN_DMX_DEFAULT_REFRESH_RATE_HZ} Hz. If you see flickering, try seting your

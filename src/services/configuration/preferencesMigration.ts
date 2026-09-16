@@ -1,6 +1,9 @@
 import { DEFAULT_PREFERENCES, type AppPreferences } from './configurationDefaults'
 import { REQUIRED_PREFERENCE_KEYS } from './configDataValidators'
-import { normalizeEnttecProDmxSpeedHz } from '../../shared/dmxOutputRefresh'
+import {
+  normalizeEnttecProDmxSpeedHz,
+  normalizeOpenDmxSpeedHz,
+} from '../../shared/dmxOutputRefresh'
 import { clampSacnUniverse } from '../../shared/sacnUniverse'
 import { clampClockRateMs } from '../../shared/clockRate'
 import {
@@ -372,6 +375,14 @@ export function healStoredSenderConfigs(prefs: AppPreferences): AppPreferences {
     const dmxSpeed = normalizeEnttecProDmxSpeedHz(enttec.dmxSpeed)
     if (enttec.dmxSpeed !== dmxSpeed) {
       next = { ...next, enttecProConfig: { ...enttec, dmxSpeed } }
+    }
+  }
+
+  const openDmx = next?.openDmxConfig
+  if (isPlainObject(openDmx)) {
+    const dmxSpeed = normalizeOpenDmxSpeedHz(openDmx.dmxSpeed)
+    if (openDmx.dmxSpeed !== dmxSpeed) {
+      next = { ...next, openDmxConfig: { ...openDmx, dmxSpeed } }
     }
   }
 

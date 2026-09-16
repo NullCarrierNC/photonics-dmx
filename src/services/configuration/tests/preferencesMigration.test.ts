@@ -270,6 +270,35 @@ describe('healStoredSenderConfigs', () => {
     expect(out.enttecProConfig?.port).toBe('COM3')
   })
 
+  it('keeps a stored OpenDMX rate below the network floor', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      openDmxConfig: { port: 'COM4', dmxSpeed: 5 },
+    } as AppPreferences
+
+    expect(healStoredSenderConfigs(prefs)).toBe(prefs)
+  })
+
+  it('brings a stored OpenDMX rate past the ceiling back to 44 Hz', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      openDmxConfig: { port: 'COM4', dmxSpeed: 500 },
+    } as AppPreferences
+
+    const out = healStoredSenderConfigs(prefs)
+
+    expect(out.openDmxConfig).toEqual({ port: 'COM4', dmxSpeed: 44 })
+  })
+
+  it('seeds a missing OpenDMX rate to the default', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      openDmxConfig: { port: 'COM4' },
+    } as AppPreferences
+
+    expect(healStoredSenderConfigs(prefs).openDmxConfig?.dmxSpeed).toBe(40)
+  })
+
   it('brings a stored universe below the range up to the lowest sACN defines', () => {
     const prefs = {
       ...DEFAULT_PREFERENCES,

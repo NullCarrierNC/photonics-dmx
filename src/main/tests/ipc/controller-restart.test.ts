@@ -410,6 +410,33 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect(senderManager.enableSender).not.toHaveBeenCalled()
   })
 
+  it.each([
+    [5, 5],
+    [0, 1],
+    [900, 44],
+  ])(
+    'restoreSenderOutputsFromPrefs brings a stored OpenDMX rate of %p into range as %p',
+    async (stored, restored) => {
+      const { manager, senderManager } = makeManagerForRestore({
+        dmxOutputConfig: {
+          sacnEnabled: false,
+          artNetEnabled: false,
+          enttecProEnabled: false,
+          openDmxEnabled: true,
+        },
+        openDmxConfig: { port: 'COM4', dmxSpeed: stored },
+      })
+
+      await manager.restoreSenderOutputsFromPrefs()
+
+      expect(senderManager.enableSender).toHaveBeenCalledWith('opendmx', 'opendmx', {
+        sender: 'opendmx',
+        devicePath: 'COM4',
+        dmxSpeed: restored,
+      })
+    },
+  )
+
   it('restoreSenderOutputsFromPrefs leaves Art-Net off when the stored host is not an address', async () => {
     // The file is hand-editable, so the host is checked on the way out as well as on the way in.
     const { manager, senderManager } = makeManagerForRestore({

@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events'
 import { createLogger } from '../../shared/logger'
 import {
   normalizeEnttecProDmxSpeedHz,
-  OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
+  normalizeOpenDmxSpeedHz,
 } from '../../shared/dmxOutputRefresh'
 import { BaseSender, SenderError } from '../senders/BaseSender'
 import { IpcSender } from '../senders/IpcSender'
@@ -161,7 +161,7 @@ export class SenderManager {
             const USB_UNIVERSE = 0
             sender = new OpenDmxSender(
               openDevicePath,
-              { dmxSpeed: config.dmxSpeed ?? OPEN_DMX_DEFAULT_REFRESH_RATE_HZ },
+              { dmxSpeed: normalizeOpenDmxSpeedHz(config.dmxSpeed) },
               'uni1',
               USB_UNIVERSE,
             )

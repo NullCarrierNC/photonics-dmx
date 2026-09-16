@@ -458,6 +458,43 @@ describe('inputValidation', () => {
         expect(result.ok).toBe(false)
       },
     )
+
+    it('rounds and clamps a supplied opendmx dmxSpeed to its own 1-44 range', () => {
+      const speedFor = (dmxSpeed: number): number | undefined => {
+        const result = validateSenderEnablePayload({
+          sender: 'opendmx',
+          devicePath: 'COM3',
+          dmxSpeed,
+        })
+        return result.ok && result.value.sender === 'opendmx' ? result.value.dmxSpeed : undefined
+      }
+
+      expect(speedFor(5)).toBe(5)
+      expect(speedFor(0)).toBe(1)
+      expect(speedFor(-3)).toBe(1)
+      expect(speedFor(20.5)).toBe(21)
+      expect(speedFor(1000)).toBe(44)
+    })
+
+    it('leaves opendmx dmxSpeed undefined when the payload does not carry one', () => {
+      const result = validateSenderEnablePayload({ sender: 'opendmx', devicePath: 'COM3' })
+      expect(result.ok).toBe(true)
+      if (result.ok && result.value.sender === 'opendmx') {
+        expect(result.value.dmxSpeed).toBeUndefined()
+      }
+    })
+
+    it.each([NaN, Infinity, -Infinity, '40', null])(
+      'rejects a supplied opendmx dmxSpeed of %p rather than defaulting it',
+      (dmxSpeed) => {
+        const result = validateSenderEnablePayload({
+          sender: 'opendmx',
+          devicePath: 'COM3',
+          dmxSpeed,
+        })
+        expect(result.ok).toBe(false)
+      },
+    )
   })
 
   describe('validateLightingConfiguration', () => {
@@ -1216,6 +1253,18 @@ describe('inputValidation', () => {
         }
         // The caller's own object is untouched, only the validator's returned copy is normalized.
         expect(payload.enttecProConfig.dmxSpeed).toBe(2)
+      })
+
+      it('keeps a low openDmxConfig.dmxSpeed and clamps one past the ceiling', () => {
+        const stored = (dmxSpeed: number): number | undefined => {
+          const result = validatePreferencesPayload({ openDmxConfig: { port: 'COM3', dmxSpeed } })
+          if (!result.ok) return undefined
+          return (result.value as { openDmxConfig?: { dmxSpeed?: number } }).openDmxConfig?.dmxSpeed
+        }
+
+        expect(stored(5)).toBe(5)
+        expect(stored(0)).toBe(1)
+        expect(stored(200)).toBe(44)
       })
 
       it('rejects a malformed audioGameMode instead of storing it', () => {

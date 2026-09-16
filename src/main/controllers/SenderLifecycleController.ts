@@ -17,6 +17,7 @@ import {
   artNetBaseRefreshIntervalMs,
   dmxOutputRefreshRateHzFromUnknownPayload,
   normalizeEnttecProDmxSpeedHz,
+  normalizeOpenDmxSpeedHz,
 } from '../../shared/dmxOutputRefresh'
 import { validateStoredArtNetConfig, validateStoredSacnConfig } from '../ipc/inputValidation'
 
@@ -243,7 +244,7 @@ export class SenderLifecycleController {
           await sm.enableSender('opendmx', 'opendmx', {
             sender: 'opendmx',
             devicePath: oc.port,
-            dmxSpeed: oc.dmxSpeed,
+            dmxSpeed: normalizeOpenDmxSpeedHz(oc.dmxSpeed),
           })
           log.info('Restored OpenDMX sender from preferences')
         } catch (err) {

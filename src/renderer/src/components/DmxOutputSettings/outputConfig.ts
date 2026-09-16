@@ -10,6 +10,7 @@ import {
   clampDmxOutputRefreshRateHz,
   DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
   DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
+  normalizeOpenDmxSpeedHz,
   OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
 } from '../../../../shared/dmxOutputRefresh'
 import type { LightingPreferences } from '../../atoms'
@@ -64,9 +65,7 @@ export function parseGlobalPublishingRate(input: string): number {
 /** The OpenDMX send rate a field carries, which reaches below the floor the network senders keep. */
 export function parseOpenDmxSpeed(input: string): number {
   const parsed = parseInt(input, 10)
-  return Number.isFinite(parsed) && parsed > 0
-    ? Math.min(DMX_OUTPUT_REFRESH_RATE_HZ_MAX, Math.max(1, parsed))
-    : OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
+  return parsed > 0 ? normalizeOpenDmxSpeedHz(parsed) : OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
 }
 
 /** A sender's refresh rate, held inside the range the network senders accept. */
