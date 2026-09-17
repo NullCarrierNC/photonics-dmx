@@ -175,17 +175,11 @@ const MasterOutputSidebar: React.FC = () => {
       <div className="py-3 shrink-0 border-b border-gray-200 dark:border-gray-700">
         <button
           type="button"
-          onClick={toggleStrobe}
-          // Pressed means "output is being held back", matching the blackout button below, so the
-          // two read the same way to a screen reader despite their labels reading opposite ways.
-          aria-pressed={!strobeEnabled}
-          title={
-            strobeEnabled
-              ? 'Strobe cues are being sent to the rig'
-              : 'Strobe cues are held back from the rig'
-          }
-          className={`${TOGGLE_BASE} ${strobeEnabled ? TOGGLE_ALERT : TOGGLE_SAFE}`}>
-          {strobeEnabled ? 'Strobes Enabled' : 'Strobes Disabled'}
+          onClick={toggleBlackout}
+          aria-pressed={blackout}
+          title={blackout ? 'Output is blacked out' : 'Black out all DMX output'}
+          className={`${TOGGLE_BASE} ${blackout ? TOGGLE_ALERT : TOGGLE_SAFE}`}>
+          {blackout ? 'Blacked Out' : 'Blackout (Off)'}
         </button>
       </div>
 
@@ -224,11 +218,17 @@ const MasterOutputSidebar: React.FC = () => {
       <div className="pb-3 shrink-0">
         <button
           type="button"
-          onClick={toggleBlackout}
-          aria-pressed={blackout}
-          title={blackout ? 'Output is blacked out' : 'Black out all DMX output'}
-          className={`${TOGGLE_BASE} ${blackout ? TOGGLE_ALERT : TOGGLE_SAFE}`}>
-          {blackout ? 'Blacked Out' : 'Blackout (Off)'}
+          onClick={toggleStrobe}
+          // Pressed means "output is being held back", matching the blackout button above, so the
+          // two read the same way to a screen reader despite their labels reading opposite ways.
+          aria-pressed={!strobeEnabled}
+          title={
+            strobeEnabled
+              ? 'Strobe cues are being sent to the rig'
+              : 'Strobe cues are held back from the rig'
+          }
+          className={`${TOGGLE_BASE} ${strobeEnabled ? TOGGLE_ALERT : TOGGLE_SAFE}`}>
+          {strobeEnabled ? 'Strobes Enabled' : 'Strobes Disabled'}
         </button>
       </div>
     </div>
