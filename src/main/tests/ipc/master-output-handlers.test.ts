@@ -4,8 +4,8 @@
  * rig, and that a rejected payload changes nothing.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { LIGHT } from '../../../shared/ipcChannels'
-import { setupMasterOutputHandlers } from '../../ipc/master-output-handlers'
+import { LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { setupMasterOutputHandlers, toggleMasterBlackout } from '../../ipc/master-output-handlers'
 import { MasterOutputState } from '../../../photonics-dmx/controllers/MasterOutputState'
 
 const mockIpcMain = {
@@ -15,6 +15,11 @@ const mockIpcMain = {
 
 jest.mock('electron', () => ({
   ipcMain: mockIpcMain,
+}))
+
+const sendToAllWindows = jest.fn()
+jest.mock('../../utils/windowUtils', () => ({
+  sendToAllWindows: (channel: string, payload: unknown) => sendToAllWindows(channel, payload),
 }))
 
 function getHandler(channel: string): (e: unknown, d: unknown) => unknown {
@@ -121,5 +126,55 @@ describe('master output handlers', () => {
 
     expect(result).toMatchObject({ success: true })
     expect(master.isBlackoutActive()).toBe(true)
+  })
+
+  describe('announcing blackout to the other windows', () => {
+    it('tells every window when blackout changes', async () => {
+      setup()
+
+      await getHandler(LIGHT.SET_MASTER_OUTPUT)({}, { blackout: true })
+
+      expect(sendToAllWindows).toHaveBeenCalledWith(RENDERER_RECEIVE.MASTER_OUTPUT_CHANGED, {
+        dimmerPercent: 100,
+        blackout: true,
+        strobeOutputEnabled: true,
+      })
+    })
+
+    it('says nothing when the write leaves blackout where it was', async () => {
+      const { master } = setup()
+      master.setBlackout(true)
+
+      await getHandler(LIGHT.SET_MASTER_OUTPUT)({}, { blackout: true })
+
+      expect(sendToAllWindows).not.toHaveBeenCalled()
+    })
+
+    it('says nothing about a fader move', async () => {
+      setup()
+
+      // The fader writes on every change, so announcing these would be a message per frame of a
+      // drag to every window, and no window but the sidebar's own shows the level.
+      await getHandler(LIGHT.SET_MASTER_OUTPUT)({}, { dimmerPercent: 60 })
+      await getHandler(LIGHT.SET_MASTER_OUTPUT)({}, { strobeOutputEnabled: false })
+
+      expect(sendToAllWindows).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('toggleMasterBlackout', () => {
+    it('inverts what main holds and announces it', () => {
+      const master = new MasterOutputState()
+      const refreshOutput = jest.fn()
+      const controllerManager = {
+        getMasterOutput: () => master,
+        getDmxPublisher: () => ({ refreshOutput }),
+      }
+
+      expect(toggleMasterBlackout(controllerManager as never).blackout).toBe(true)
+      expect(refreshOutput).toHaveBeenCalledTimes(1)
+      expect(toggleMasterBlackout(controllerManager as never).blackout).toBe(false)
+      expect(sendToAllWindows).toHaveBeenCalledTimes(2)
+    })
   })
 })

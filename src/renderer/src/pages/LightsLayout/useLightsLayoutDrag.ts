@@ -5,7 +5,7 @@
  * one along. The drop animation aims at the rectangle the pointer was last over, so a light lands
  * where it was dropped instead of sliding back to its own slot first.
  */
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   defaultDropAnimationSideEffects,
   KeyboardSensor,
@@ -22,6 +22,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { DmxLight } from '../../../../photonics-dmx/types'
 import { reorderWithinGroup, swapAcrossGroups } from './lightLayoutDnd'
+import { claimEscape } from '../../utils/escClaims'
 
 export interface LightsLayoutDrag {
   sensors: ReturnType<typeof useSensors>
@@ -40,6 +41,17 @@ export function useLightsLayoutDrag(
 ): LightsLayoutDrag {
   const [activeDragLight, setActiveDragLight] = useState<DmxLight | null>(null)
   const overRectRef = useRef<ClientRect | null>(null)
+  // Held for the length of a drag, so Escape cancels it rather than blacking the rig out. Without
+  // this the global binding swallows the key and the drag commits on release instead.
+  const releaseEscapeRef = useRef<(() => void) | null>(null)
+
+  const releaseEscape = useCallback(() => {
+    releaseEscapeRef.current?.()
+    releaseEscapeRef.current = null
+  }, [])
+
+  // Covers an unmount mid-drag, which reaches neither the end nor the cancel handler.
+  useEffect(() => releaseEscape, [releaseEscape])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -49,6 +61,7 @@ export function useLightsLayoutDrag(
   const onDragStart = useCallback(
     (event: DragStartEvent) => {
       overRectRef.current = null
+      releaseEscapeRef.current = claimEscape()
       const id = String(event.active.id)
       setActiveDragLight(allPrimaryLights.find((l) => l.id === id) ?? null)
     },
@@ -62,6 +75,7 @@ export function useLightsLayoutDrag(
   const onDragEnd = useCallback(
     (event: DragEndEvent) => {
       setActiveDragLight(null)
+      releaseEscape()
       const { active, over } = event
       overRectRef.current = null
       if (!over || active.id === over.id) return
@@ -74,13 +88,14 @@ export function useLightsLayoutDrag(
           : swapAcrossGroups(prev, String(active.id), String(over.id)),
       )
     },
-    [setAllPrimaryLights],
+    [releaseEscape, setAllPrimaryLights],
   )
 
   const onDragCancel = useCallback(() => {
     setActiveDragLight(null)
+    releaseEscape()
     overRectRef.current = null
-  }, [])
+  }, [releaseEscape])
 
   const dropAnimation: DropAnimation = useMemo(
     () => ({

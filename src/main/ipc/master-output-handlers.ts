@@ -1,10 +1,63 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../controllers/ControllerManager'
-import { LIGHT } from '../../shared/ipcChannels'
+import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { handleInvoke } from './handleInvoke'
 import { validateMasterOutputPayload } from './inputValidation'
+import { sendToAllWindows } from '../utils/windowUtils'
+import type { MasterOutputSnapshot } from '../../photonics-dmx/controllers/MasterOutputState'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('master-output-handlers')
+
+/** The fields a caller may change in one go. Anything absent is left as it is. */
+export interface MasterOutputUpdate {
+  dimmerPercent?: number
+  blackout?: boolean
+  strobeOutputEnabled?: boolean
+}
+
+/**
+ * Applies a master output change and tells the publisher to re-emit, returning the state main
+ * holds after it. Shared by the IPC handler and the blackout shortcut, so both reach the rig the
+ * same way.
+ *
+ * A blackout change is broadcast to every window, because the writer is often not the sidebar that
+ * shows the state: the shortcut writes from any window, and from the main process while the app is
+ * in the background. Dimmer and strobe changes are not broadcast. Those come only from the sidebar's
+ * own controls, and the fader writes on every `onChange`, so announcing them would push a message
+ * per frame of a drag to every window for nobody's benefit.
+ */
+export function applyMasterOutput(
+  controllerManager: ControllerManager,
+  update: MasterOutputUpdate,
+): MasterOutputSnapshot {
+  const master = controllerManager.getMasterOutput()
+  const blackoutChanged =
+    update.blackout !== undefined && update.blackout !== master.isBlackoutActive()
+
+  if (update.dimmerPercent !== undefined) {
+    master.setDimmerPercent(update.dimmerPercent)
+  }
+  if (update.blackout !== undefined) {
+    master.setBlackout(update.blackout)
+  }
+  if (update.strobeOutputEnabled !== undefined) {
+    master.setStrobeOutputEnabled(update.strobeOutputEnabled)
+  }
+
+  controllerManager.getDmxPublisher()?.refreshOutput()
+
+  const snapshot = master.getSnapshot()
+  if (blackoutChanged) {
+    sendToAllWindows(RENDERER_RECEIVE.MASTER_OUTPUT_CHANGED, snapshot)
+  }
+  return snapshot
+}
+
+/** Latches or releases blackout from whatever main currently holds. Used by the OS-level hook. */
+export function toggleMasterBlackout(controllerManager: ControllerManager): MasterOutputSnapshot {
+  const blackout = !controllerManager.getMasterOutput().isBlackoutActive()
+  return applyMasterOutput(controllerManager, { blackout })
+}
 
 /**
  * The global output controls: master dimmer, blackout latch and strobe output gate.
@@ -31,19 +84,9 @@ export function setupMasterOutputHandlers(
       return { success: false as const, error: validation.error }
     }
 
-    const master = controllerManager.getMasterOutput()
-    if (validation.value.dimmerPercent !== undefined) {
-      master.setDimmerPercent(validation.value.dimmerPercent)
+    return {
+      success: true as const,
+      state: applyMasterOutput(controllerManager, validation.value),
     }
-    if (validation.value.blackout !== undefined) {
-      master.setBlackout(validation.value.blackout)
-    }
-    if (validation.value.strobeOutputEnabled !== undefined) {
-      master.setStrobeOutputEnabled(validation.value.strobeOutputEnabled)
-    }
-
-    controllerManager.getDmxPublisher()?.refreshOutput()
-
-    return { success: true as const, state: master.getSnapshot() }
   })
 }

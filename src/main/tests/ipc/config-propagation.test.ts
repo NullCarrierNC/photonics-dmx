@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { withCollaboratorGetters } from './managerFacades'
 import { ConfigStrobeType } from '../../../photonics-dmx/types'
 import { CONFIG } from '../../../shared/ipcChannels'
-import { LIGHT } from '../../../shared/ipcChannels'
+import { LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
 // --- Mocks set up before any imports that use them ---
 
@@ -67,6 +67,9 @@ jest.mock('electron', () => ({
 }))
 
 jest.mock('../../utils/windowUtils', () => ({ sendToAllWindows: mockSendToAllWindows }))
+
+const mockSetBlackoutShortcut = jest.fn()
+jest.mock('../../blackoutShortcut', () => ({ setBlackoutShortcut: mockSetBlackoutShortcut }))
 
 // These registries are imported inside config-handlers; mock them to avoid side effects
 jest.mock('../../../photonics-dmx/cues/registries/CueRegistry', () => ({
@@ -301,6 +304,61 @@ describe('SAVE_PREFS publisher hot-swap', () => {
     expect(result.success).toBe(false)
     expect(mockConfig.updatePreferences).not.toHaveBeenCalled()
     expect(mockVenueFrameProcessor.setVenuePostProcessingEnabled).not.toHaveBeenCalled()
+  })
+
+  it('rebinds the blackout shortcut in this process and in every window', async () => {
+    mockConfig.getAllPreferences.mockReturnValue({
+      blackoutShortcutKey: 'backquote',
+      blackoutShortcutScope: 'system-wide',
+    })
+
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!({}, { blackoutShortcutKey: 'backquote' })
+
+    expect(result).toEqual({ success: true })
+    const binding = { key: 'backquote', scope: 'system-wide' }
+    expect(mockSetBlackoutShortcut).toHaveBeenCalledWith(binding)
+    expect(mockSendToAllWindows).toHaveBeenCalledWith(
+      RENDERER_RECEIVE.BLACKOUT_SHORTCUT_CHANGED,
+      binding,
+    )
+  })
+
+  it('announces the whole binding when only one half was saved', async () => {
+    // SAVE_PREFS takes a partial, so a save carrying just the key has to report the stored scope
+    // too. A window that missed an earlier change would otherwise be left applying half of this one.
+    mockConfig.getAllPreferences.mockReturnValue({
+      blackoutShortcutKey: 'escape',
+      blackoutShortcutScope: 'system-wide',
+    })
+
+    await handlers.get(CONFIG.SAVE_PREFS)!({}, { blackoutShortcutKey: 'escape' })
+
+    expect(mockSendToAllWindows).toHaveBeenCalledWith(RENDERER_RECEIVE.BLACKOUT_SHORTCUT_CHANGED, {
+      key: 'escape',
+      scope: 'system-wide',
+    })
+  })
+
+  it('falls back to the defaults when the stored pair is unreadable', async () => {
+    mockConfig.getAllPreferences.mockReturnValue({})
+
+    await handlers.get(CONFIG.SAVE_PREFS)!({}, { blackoutShortcutScope: 'focused' })
+
+    expect(mockSetBlackoutShortcut).toHaveBeenCalledWith({ key: 'escape', scope: 'focused' })
+  })
+
+  it('leaves the blackout shortcut alone when the payload does not carry it', async () => {
+    await handlers.get(CONFIG.SAVE_PREFS)!({}, { effectDebounce: 5 })
+
+    expect(mockSetBlackoutShortcut).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unknown blackout shortcut value without applying it', async () => {
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!({}, { blackoutShortcutKey: 'backtick' })
+
+    expect(result.success).toBe(false)
+    expect(mockSetBlackoutShortcut).not.toHaveBeenCalled()
+    expect(mockConfig.updatePreferences).not.toHaveBeenCalled()
   })
 
   it('survives a publisher that has not been built yet', async () => {

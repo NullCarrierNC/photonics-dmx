@@ -16,6 +16,7 @@ import { clampDmxOutputRefreshRateHz } from '../../../shared/dmxOutputRefresh'
 import { validateStoredUsbSenderConfigs } from './usbSenderConfigValidation'
 import { SACN_UNIVERSE_MAX, SACN_UNIVERSE_MIN } from '../../../shared/sacnUniverse'
 import { clampClockRateMs } from '../../../shared/clockRate'
+import { BLACKOUT_SHORTCUT_KEYS, BLACKOUT_SHORTCUT_SCOPES } from '../../../shared/blackoutShortcut'
 import {
   isPlainObject,
   validateNumberInRange,
@@ -314,6 +315,8 @@ const APP_PREFERENCES_KEY_MAP: Record<keyof AppPreferences, true> = {
   venuePostProcessingEnabled: true,
   masterDimmerPercent: true,
   strobeOutputEnabled: true,
+  blackoutShortcutKey: true,
+  blackoutShortcutScope: true,
 }
 
 const APP_PREFERENCES_KEYS = new Set(
@@ -449,6 +452,28 @@ export function validatePreferencesPayload(
     )
     if (!mode.ok) {
       return { ok: false, error: mode.error }
+    }
+  }
+
+  if ('blackoutShortcutKey' in cleaned) {
+    const shortcutKey = validateStringUnion(
+      cleaned.blackoutShortcutKey,
+      BLACKOUT_SHORTCUT_KEYS,
+      'blackoutShortcutKey',
+    )
+    if (!shortcutKey.ok) {
+      return { ok: false, error: shortcutKey.error }
+    }
+  }
+
+  if ('blackoutShortcutScope' in cleaned) {
+    const scope = validateStringUnion(
+      cleaned.blackoutShortcutScope,
+      BLACKOUT_SHORTCUT_SCOPES,
+      'blackoutShortcutScope',
+    )
+    if (!scope.ok) {
+      return { ok: false, error: scope.error }
     }
   }
 

@@ -5,6 +5,7 @@ import App from './App'
 import { DarkModeProvider } from './DarkModeProvider'
 import CueEditorWindow from './windows/CueEditorWindow'
 import AudioPreviewWindow from './windows/AudioPreviewWindow'
+import WindowShell from './components/WindowShell'
 
 const getRootComponent = () => {
   const params = new URLSearchParams(window.location.search)
@@ -20,6 +21,8 @@ const getRootComponent = () => {
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <DarkModeProvider>{getRootComponent()}</DarkModeProvider>
+    <DarkModeProvider>
+      <WindowShell>{getRootComponent()}</WindowShell>
+    </DarkModeProvider>
   </React.StrictMode>,
 )

@@ -23,6 +23,14 @@ import {
   MASTER_DIMMER_MAX_PERCENT,
   MASTER_DIMMER_MIN_PERCENT,
 } from '../../photonics-dmx/controllers/MasterOutputState'
+import {
+  DEFAULT_BLACKOUT_SHORTCUT_KEY,
+  DEFAULT_BLACKOUT_SHORTCUT_SCOPE,
+  isBlackoutShortcutKey,
+  isBlackoutShortcutScope,
+  type BlackoutShortcutKey,
+  type BlackoutShortcutScope,
+} from '../../shared/blackoutShortcut'
 
 /**
  * Application preferences (persisted in prefs.json).
@@ -115,6 +123,10 @@ export interface AppPreferences {
   masterDimmerPercent?: number
   /** When false, strobe cues are held back from the rig: no flash, no hardware strobe channel. */
   strobeOutputEnabled?: boolean
+  /** Which key toggles the master blackout. */
+  blackoutShortcutKey?: BlackoutShortcutKey
+  /** How far that key reaches. */
+  blackoutShortcutScope?: BlackoutShortcutScope
   audioConfig?: AudioConfig
   activeAudioCueType?: AudioCueType
   audioGameMode?: AudioGameModeConfig
@@ -186,6 +198,23 @@ export function normalizeStrobeOutputEnabled(value: unknown): boolean {
   return typeof value === 'boolean' ? value : true
 }
 
+/**
+ * Normalizes the persisted blackout shortcut key. Both keys are optional, so a stored prefs file
+ * need not carry them, and anything unrecognised falls back to Escape rather than to a key people
+ * type, which would swallow a character somewhere without the user having asked for it.
+ */
+export function normalizeBlackoutShortcutKey(value: unknown): BlackoutShortcutKey {
+  return isBlackoutShortcutKey(value) ? value : DEFAULT_BLACKOUT_SHORTCUT_KEY
+}
+
+/**
+ * Normalizes the persisted blackout shortcut scope. Anything unrecognised falls back to the in-app
+ * binding rather than to the system-wide one, which would claim the key from every application.
+ */
+export function normalizeBlackoutShortcutScope(value: unknown): BlackoutShortcutScope {
+  return isBlackoutShortcutScope(value) ? value : DEFAULT_BLACKOUT_SHORTCUT_SCOPE
+}
+
 export const DEFAULT_PREFERENCES: AppPreferences = {
   effectDebounce: 0,
   complex: true,
@@ -252,6 +281,8 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   venuePostProcessingEnabled: true,
   masterDimmerPercent: DEFAULT_MASTER_DIMMER_PERCENT,
   strobeOutputEnabled: true,
+  blackoutShortcutKey: DEFAULT_BLACKOUT_SHORTCUT_KEY,
+  blackoutShortcutScope: DEFAULT_BLACKOUT_SHORTCUT_SCOPE,
   audioConfig: DEFAULT_AUDIO_CONFIG,
   cueEditorWindowState: {
     width: 1200,

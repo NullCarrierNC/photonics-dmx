@@ -2,7 +2,13 @@ import { app, IpcMain } from 'electron'
 import { ControllerManager } from '../../controllers/ControllerManager'
 import { setGlobalBrightnessConfig } from '../../../photonics-dmx/helpers/dmxHelpers'
 import { ipcError } from '../ipcResult'
-import { CONFIG } from '../../../shared/ipcChannels'
+import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { sendToAllWindows } from '../../utils/windowUtils'
+import { setBlackoutShortcut } from '../../blackoutShortcut'
+import {
+  normalizeBlackoutShortcutKey,
+  normalizeBlackoutShortcutScope,
+} from '../../../services/configuration/configurationDefaults'
 import { validatePreferencesPayload } from '../inputValidation'
 import { createLogger } from '../../../shared/logger'
 import { handleInvoke } from '../handleInvoke'
@@ -82,6 +88,23 @@ export function registerPreferencesDiagnosticsConfigHandlers(
       }
       if (masterChanged) {
         controllerManager.getDmxPublisher()?.refreshOutput()
+      }
+
+      // Both halves of the blackout shortcut rebind from here: the OS hook in this process, and the
+      // renderer listener in every window, including the one that just saved. The pair is read back
+      // from the merged preferences rather than taken from the payload, because this payload is a
+      // partial: a save carrying only the key would otherwise announce no scope at all.
+      if (
+        validation.value.blackoutShortcutKey !== undefined ||
+        validation.value.blackoutShortcutScope !== undefined
+      ) {
+        const saved = controllerManager.getConfig().getAllPreferences()
+        const binding = {
+          key: normalizeBlackoutShortcutKey(saved.blackoutShortcutKey),
+          scope: normalizeBlackoutShortcutScope(saved.blackoutShortcutScope),
+        }
+        setBlackoutShortcut(binding)
+        sendToAllWindows(RENDERER_RECEIVE.BLACKOUT_SHORTCUT_CHANGED, binding)
       }
 
       return { success: true }
