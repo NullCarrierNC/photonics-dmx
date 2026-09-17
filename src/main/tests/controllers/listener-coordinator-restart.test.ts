@@ -15,7 +15,10 @@ import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
 import { getCueRegistry } from '../../../photonics-dmx/cues/registries/cueRegistries'
 import { CueHandler } from '../../../photonics-dmx/cueHandlers/CueHandler'
 import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
-import { fakeLightingController } from '../../../photonics-dmx/tests/helpers/fakeLightingController'
+import {
+  fakeLightingController,
+  type FakeLightingController,
+} from '../../../photonics-dmx/tests/helpers/fakeLightingController'
 
 function makeDeps(): ListenerCoordinatorDeps {
   const effects = fakeLightingController()
@@ -205,5 +208,63 @@ describe('ListenerCoordinator ends the song span on disable so locks do not leak
     expect(rb3MotionEnd).toHaveBeenCalled()
     expect(yargEnd).not.toHaveBeenCalled()
     jest.restoreAllMocks()
+  })
+})
+
+describe('ListenerCoordinator disableYarg stops the cues before clearing the rig', () => {
+  it('shuts down every chain handler before any rig is cleared and blacked out', async () => {
+    const order: string[] = []
+    const deps = makeDeps()
+    const chains = deps.getRigChains()
+    const second = {
+      ...chains[0],
+      rigId: 'second',
+      isPrimary: false,
+      sequencer: fakeLightingController(),
+      cueHandlers: { yarg: null, rb3: null },
+    } as unknown as RigChain
+    chains.push(second)
+
+    for (const chain of chains) {
+      const sequencer = chain.sequencer as unknown as FakeLightingController
+      sequencer.removeAllEffects.mockImplementation(() => {
+        order.push(`removeAllEffects:${chain.rigId}`)
+      })
+      sequencer.blackout.mockImplementation(() => {
+        order.push(`blackout:${chain.rigId}`)
+        return Promise.resolve()
+      })
+      chain.cueHandlers.yarg = {
+        shutdown: () => order.push(`handlerShutdown:${chain.rigId}`),
+      } as unknown as CueHandler
+    }
+
+    const lc = new ListenerCoordinator(deps)
+    const co = lc as unknown as {
+      isYargEnabled: boolean
+      yargListener: { shutdown: () => Promise<void> } | null
+    }
+    co.isYargEnabled = true
+    co.yargListener = {
+      shutdown: () => {
+        order.push('listenerShutdown')
+        return Promise.resolve()
+      },
+    }
+
+    await lc.disableYarg()
+
+    expect(order).toEqual([
+      'listenerShutdown',
+      'handlerShutdown:stub',
+      'handlerShutdown:second',
+      'removeAllEffects:stub',
+      'blackout:stub',
+      'removeAllEffects:second',
+      'blackout:second',
+    ])
+    for (const chain of chains) {
+      expect(chain.cueHandlers.yarg).toBeNull()
+    }
   })
 })

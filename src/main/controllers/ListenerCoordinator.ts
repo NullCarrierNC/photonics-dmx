@@ -150,6 +150,13 @@ export class ListenerCoordinator {
 
   public async disableYarg(): Promise<void> {
     if (!this.isYargEnabled) return
+    // Input, then cues, then output: every cue engine is stopped before the rig is cleared, so the
+    // blackout is the last word on the lights. The socket closes synchronously, so no frame lands
+    // past this line, and awaiting it last keeps the blackout in the toggle's own tick.
+    const listenerClosing = this.yargListener?.shutdown()
+    this.deps.setVenuePostProcessing('Default')
+    this.notifyRuntimeDisabled('yarg')
+    this.clearChainHandlers('yarg')
     // Blackout via every chain's sequencer so a multi-rig setup doesn't leave secondary
     // rigs lit while the primary fades out.
     for (const chain of this.deps.getRigChains()) {
@@ -163,14 +170,11 @@ export class ListenerCoordinator {
     log.info(
       'ListenerCoordinator: Cleared running effects and blacked out every rig (disable YARG)',
     )
-    if (this.yargListener) {
-      await this.yargListener.shutdown()
+    if (listenerClosing) {
+      await listenerClosing
       this.yargListener = null
     }
     this.isYargEnabled = false
-    this.deps.setVenuePostProcessing('Default')
-    this.notifyRuntimeDisabled('yarg')
-    this.clearChainHandlers('yarg')
   }
 
   /** Apply the optional runtime decorator for a domain, or pass the base runtime through. */

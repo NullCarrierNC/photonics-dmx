@@ -141,6 +141,19 @@ export class AudioController {
       return
     }
     log.info('Disabling audio...')
+    // Input, then cues, then output: the processor is stopped before the rig is cleared, so the
+    // blackout is the last word on the lights.
+    if (this.audioDataHandler) {
+      ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
+      this.audioDataHandler = null
+    }
+    if (this.audioProcessor) {
+      this.audioProcessor.setOnStrobeStateChange(null)
+      this.audioProcessor.setOnGameModeCueChange(null)
+      this.audioProcessor.setOnGameModeScheduleChange(null)
+      this.audioProcessor.shutdown()
+      this.audioProcessor = null
+    }
     // Blackout via every chain's sequencer so multi-rig setups don't leave secondary rigs
     // lit when the audio listener is turned off.
     for (const chain of this.deps.getRigChains()) {
@@ -154,17 +167,6 @@ export class AudioController {
     log.info('AudioController: Cleared running effects and blacked out every rig (disable Audio)')
     this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_DISABLE, undefined)
     log.info('Sent audio:disable to renderer')
-    if (this.audioDataHandler) {
-      ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
-      this.audioDataHandler = null
-    }
-    if (this.audioProcessor) {
-      this.audioProcessor.setOnStrobeStateChange(null)
-      this.audioProcessor.setOnGameModeCueChange(null)
-      this.audioProcessor.setOnGameModeScheduleChange(null)
-      this.audioProcessor.shutdown()
-      this.audioProcessor = null
-    }
     this.isAudioEnabled = false
     log.info('Audio disabled successfully')
   }
