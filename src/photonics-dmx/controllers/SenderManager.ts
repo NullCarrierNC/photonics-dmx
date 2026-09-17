@@ -1,7 +1,10 @@
 // src/managers/SenderManager.ts
 import { EventEmitter } from 'node:events'
 import { createLogger } from '../../shared/logger'
-import { OPEN_DMX_DEFAULT_REFRESH_RATE_HZ } from '../../shared/dmxOutputRefresh'
+import {
+  normalizeEnttecProDmxSpeedHz,
+  normalizeOpenDmxSpeedHz,
+} from '../../shared/dmxOutputRefresh'
 import { BaseSender, SenderError } from '../senders/BaseSender'
 import { IpcSender } from '../senders/IpcSender'
 import { ArtNetSender } from '../senders/ArtNetSender'
@@ -32,6 +35,8 @@ export class SenderManager {
   private eventEmitter: EventEmitter
   private ipcSender: IpcSender | null = null
   private initializingSenders: Set<string> = new Set()
+  /** The start in flight for each sender still initializing, so a restart can wait it out. */
+  private readonly pendingEnables = new Map<string, Promise<void>>()
   private failedDuringInit: Set<string> = new Set()
   private initializingSenderPorts: Map<string, number | null> = new Map()
   private onSenderEnabledCallback: ((senderId: string) => void) | null = null
@@ -64,7 +69,7 @@ export class SenderManager {
    * @param senderType The type of sender to create ('artnet', 'sacn', 'enttecpro', 'ipc').
    * @param config Configuration for the sender.
    */
-  public async enableSender(
+  public enableSender(
     id: string,
     senderType: 'artnet' | 'sacn' | 'enttecpro' | 'opendmx' | 'ipc',
     config: SenderConfig,
@@ -72,9 +77,25 @@ export class SenderManager {
     // Check if sender is already enabled or currently initializing
     if (this.enabledSenders.has(id) || this.initializingSenders.has(id)) {
       log.warn(`Sender with ID "${id}" is already enabled or initializing.`)
-      return
+      return Promise.resolve()
     }
 
+    const enabling = this.startSender(id, senderType, config)
+    this.pendingEnables.set(id, enabling)
+    const settle = (): void => {
+      if (this.pendingEnables.get(id) === enabling) {
+        this.pendingEnables.delete(id)
+      }
+    }
+    enabling.then(settle, settle)
+    return enabling
+  }
+
+  private async startSender(
+    id: string,
+    senderType: 'artnet' | 'sacn' | 'enttecpro' | 'opendmx' | 'ipc',
+    config: SenderConfig,
+  ): Promise<void> {
     // Mark this sender as initializing
     this.initializingSenders.add(id)
 
@@ -142,7 +163,7 @@ export class SenderManager {
             const USB_UNIVERSE = 0
             sender = new EnttecProSender(
               devicePath,
-              { dmxSpeed: config.dmxSpeed ?? 20 },
+              { dmxSpeed: normalizeEnttecProDmxSpeedHz(config.dmxSpeed) },
               'uni1',
               USB_UNIVERSE,
             )
@@ -158,7 +179,7 @@ export class SenderManager {
             const USB_UNIVERSE = 0
             sender = new OpenDmxSender(
               openDevicePath,
-              { dmxSpeed: config.dmxSpeed ?? OPEN_DMX_DEFAULT_REFRESH_RATE_HZ },
+              { dmxSpeed: normalizeOpenDmxSpeedHz(config.dmxSpeed) },
               'uni1',
               USB_UNIVERSE,
             )
@@ -261,11 +282,17 @@ export class SenderManager {
   }
 
   /**
-   * Restarts a sender with new configuration.
+   * Restarts a sender with new configuration. A sender still starting up is restarted once its
+   * start settles, so a configuration sent while it comes up is not dropped. One whose start fails
+   * is left off.
    * @param id The unique string identifier for the sender.
    * @param config New configuration for the sender.
    */
   public async restartSender(id: string, config: SenderConfig): Promise<void> {
+    const enabling = this.pendingEnables.get(id)
+    if (enabling) {
+      await enabling.catch(() => undefined)
+    }
     if (this.enabledSenders.has(id)) {
       log.info(`Restarting sender with ID "${id}" with new configuration`)
 

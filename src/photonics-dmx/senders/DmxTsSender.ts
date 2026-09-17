@@ -25,6 +25,12 @@ export abstract class DmxTsSender extends BaseSender {
   /** Put the blackout frame on the wire the way this sender's driver takes it. */
   protected abstract writeBlackout(buffer: Record<number, number>): Promise<void> | void
 
+  /** How long to wait for the blackout frame to leave before closing the connection (ms). A
+   *  subclass whose driver sends slower than this overrides it to cover at least one interval. */
+  protected blackoutSettleMs(): number {
+    return 100
+  }
+
   /**
    * Stop the sender, leaving the universe dark.
    *
@@ -49,7 +55,7 @@ export abstract class DmxTsSender extends BaseSender {
       }
 
       // Give the blackout time to leave before the connection goes.
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      await new Promise((resolve) => setTimeout(resolve, this.blackoutSettleMs()))
 
       try {
         this.removeAllSendErrorListeners()

@@ -24,6 +24,15 @@ const BLUE: RGBIO = {
   blendMode: 'replace',
 }
 
+const GREEN: RGBIO = {
+  red: 0,
+  green: 255,
+  blue: 0,
+  intensity: 255,
+  opacity: 1,
+  blendMode: 'replace',
+}
+
 describe('an effect evicted from its layer slot', () => {
   let harness: SequencerHarness
 
@@ -110,5 +119,57 @@ describe('an effect evicted from its layer slot', () => {
     harness.advanceBy(50)
 
     expect(completions).toEqual([])
+  })
+
+  it('hands the slot to an effect the displaced waiter starts', () => {
+    const completions: boolean[] = []
+    harness.sequencer.addEffectUnblockedNameWithCallback(
+      'held',
+      look(RED, 1),
+      (cancelled) => {
+        completions.push(cancelled)
+        harness.sequencer.addEffect('rescue', look(GREEN, 1), true)
+      },
+      false,
+    )
+    harness.advanceBy(50)
+
+    harness.sequencer.addEffect('usurper', look(BLUE, 1))
+    harness.advanceBy(50)
+
+    expect(completions).toEqual([true])
+    const lightIds = harness.lightManager.getLights(['front'], 'all').map((l) => l.id)
+    const running = (): Array<string | undefined> =>
+      lightIds.map((id) => harness.sequencer.getActiveEffectsForLight(id).get(1)?.name)
+    expect(running()).toEqual(['rescue', 'rescue'])
+
+    // Its run survives the slot changing hands, so it keeps looping on every light.
+    let loops = 0
+    for (let i = 0; i < 12; i += 1) {
+      harness.advanceBy(500)
+      if (running().every((name) => name === 'rescue')) {
+        loops += 1
+      }
+    }
+    expect(loops).toBeGreaterThan(1)
+  })
+
+  it('fires once when a different name displaces an active effect with a queued successor', () => {
+    const completions: boolean[] = []
+    harness.sequencer.addEffectUnblockedNameWithCallback(
+      'held',
+      look(RED, 1),
+      (cancelled) => completions.push(cancelled),
+      false,
+    )
+    harness.advanceBy(50)
+
+    harness.sequencer.addEffect('held', look(BLUE, 1))
+    harness.advanceBy(50)
+
+    harness.sequencer.addEffect('usurper', look(BLUE, 1))
+    harness.advanceBy(50)
+
+    expect(completions).toEqual([true])
   })
 })

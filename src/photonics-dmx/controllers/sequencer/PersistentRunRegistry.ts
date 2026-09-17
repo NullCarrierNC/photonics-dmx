@@ -20,6 +20,9 @@ export type PersistentEffectRun = {
  * A run holds the transitions needed to re-apply the effect once every light it targets has
  * finished, and counts those lights down. Cancelling a run is how a restart is suppressed: the
  * caller drops the id and the countdown that reaches zero finds nothing to restart.
+ *
+ * `register` mints a fresh id on every call and retires nothing, so holding one live run per name
+ * is `EffectManager`'s job, done by cancelling the name's runs on each accepted submission.
  */
 export class PersistentRunRegistry {
   private runs: Map<string, PersistentEffectRun> = new Map()
@@ -73,6 +76,18 @@ export class PersistentRunRegistry {
   public cancel(runId?: string): void {
     if (!runId) return
     this.runs.delete(runId)
+  }
+
+  /**
+   * Cancels every run registered under this name. Lights still running one finish their current
+   * pass and find no run to restart.
+   */
+  public cancelByName(name: string): void {
+    for (const [runId, run] of this.runs) {
+      if (run.name === name) {
+        this.runs.delete(runId)
+      }
+    }
   }
 
   public clear(): void {

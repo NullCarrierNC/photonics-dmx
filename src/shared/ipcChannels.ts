@@ -134,6 +134,7 @@ export const LIGHT = {
   STOP_MOTION_CUE_SIMULATION: 'stop-motion-cue-simulation',
   UPDATE_SACN_CONFIG: 'update-sacn-config',
   UPDATE_ARTNET_CONFIG: 'update-artnet-config',
+  UPDATE_ENTTEC_CONFIG: 'update-enttec-config',
   GET_MASTER_OUTPUT: 'get-master-output',
   SET_MASTER_OUTPUT: 'set-master-output',
   CONSOLE_ENABLE: 'console-enable',
@@ -290,8 +291,6 @@ export const RENDERER_RECEIVE = {
   AUDIO_DATA_MIRROR: 'audio:data-mirror',
   CUE_STATE_UPDATE: 'cue-state-update',
   DMX_VALUES: 'dmx-values',
-  /** A persisted JSON file failed parse or schema; bad file was renamed, defaults were written. */
-  CONFIG_CORRUPT_RECOVERED: 'config:corrupt-recovered',
   CUE_HANDLED: 'cue-handled',
   NODE_CUES_CHANGED: 'node-cues:changed',
   EFFECTS_CHANGED: 'effects:changed',

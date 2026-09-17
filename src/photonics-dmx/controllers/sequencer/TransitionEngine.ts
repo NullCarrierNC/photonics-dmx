@@ -22,7 +22,12 @@ export class TransitionEngine implements ITransitionEngine {
    * state is deferred to the next frame so a cue-called / beat that runs later in the
    * same tick can start a new effect without a one-frame black gap.
    */
-  private _pendingLayerRemovals: Array<{ layer: number; lightId: string }> = []
+  private _pendingLayerRemovals: Array<{
+    layer: number
+    lightId: string
+    /** When true, wait one updateTransitions pass so LTC can composite a terminal snap. */
+    deferOneFrame?: boolean
+  }> = []
 
   /**
    * When true, next updateTransitions clears pan/tilt from layer state so fixtures return to
@@ -125,7 +130,12 @@ export class TransitionEngine implements ITransitionEngine {
   public updateTransitions(frame?: FrameContext): void {
     const currentTime = frame?.frameStartTime ?? this.getCurrentTime()
 
-    for (const { layer, lightId } of this._pendingLayerRemovals) {
+    const stillDeferred: typeof this._pendingLayerRemovals = []
+    for (const { layer, lightId, deferOneFrame } of this._pendingLayerRemovals) {
+      if (deferOneFrame) {
+        stillDeferred.push({ layer, lightId, deferOneFrame: false })
+        continue
+      }
       const hasNewEffect = this.layerManager.getActiveEffect(layer, lightId) !== undefined
       const hasQueuedEffect = this.layerManager.getQueuedEffect(layer, lightId) !== undefined
       if (!hasNewEffect && !hasQueuedEffect) {
@@ -135,7 +145,7 @@ export class TransitionEngine implements ITransitionEngine {
         this.layerManager.clearLightLayerState(layer, lightId)
       }
     }
-    this._pendingLayerRemovals = []
+    this._pendingLayerRemovals = stillDeferred
 
     if (this._pendingPanTiltClear) {
       this.lightTransitionController.clearPanTilt()
@@ -195,6 +205,7 @@ export class TransitionEngine implements ITransitionEngine {
    */
   private finalizeCompletedEffects(
     effectsToRemove: Array<{ layer: number; lightId: string }>,
+    options?: { deferLayerRemovalOneFrame?: boolean },
   ): void {
     const finished: Array<{ layer: number; lightId: string; effect: LightEffectState }> = []
     for (const { layer, lightId } of effectsToRemove) {
@@ -229,14 +240,35 @@ export class TransitionEngine implements ITransitionEngine {
 
       if (!startedQueuedEffect && !newEffectStarted) {
         if (layer > 0) {
-          this._pendingLayerRemovals.push({ layer, lightId })
+          this.queuePendingLayerRemoval(layer, lightId, options?.deferLayerRemovalOneFrame === true)
         }
       }
     }
   }
 
   /**
-   * Removes and completes every active effect that has advanced past its last transition.
+   * Queues a layer's state for removal next pass, merging with any pending entry for the same
+   * (layer, lightId) slot rather than adding a second one. A deferred entry wins the merge, so a
+   * slot already waiting one frame for a blend is never removed early by a plain entry landing
+   * afterward.
+   */
+  private queuePendingLayerRemoval(layer: number, lightId: string, deferOneFrame: boolean): void {
+    const existing = this._pendingLayerRemovals.find(
+      (entry) => entry.layer === layer && entry.lightId === lightId,
+    )
+    if (existing) {
+      existing.deferOneFrame = existing.deferOneFrame || deferOneFrame
+      return
+    }
+    this._pendingLayerRemovals.push({ layer, lightId, deferOneFrame })
+  }
+
+  /**
+   * Removes and completes every active effect that has advanced past its last transition,
+   * including one whose terminal colour already blended in an earlier frame's pass and is only
+   * being reaped now. Either way, a layer left empty on a non-base layer waits one more
+   * updateTransitions pass before its state is cleared, so the terminal colour still composites
+   * for one frame the way an effect finishing inside `updateTransitions` itself would.
    *
    * A song event releases an effect parked on `waitUntilCondition` by advancing it past its
    * last transition, and a cue reacting to that same event raises the effect again in the
@@ -256,7 +288,7 @@ export class TransitionEngine implements ITransitionEngine {
 
     if (effectsToRemove.length === 0) return
 
-    this.finalizeCompletedEffects(effectsToRemove)
+    this.finalizeCompletedEffects(effectsToRemove, { deferLayerRemovalOneFrame: true })
   }
 
   /**

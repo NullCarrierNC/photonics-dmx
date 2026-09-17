@@ -5,7 +5,7 @@ describe('EffectCallbackRegistry', () => {
   it('fires and drops a registered callback', () => {
     const registry = new EffectCallbackRegistry()
     const onComplete = jest.fn()
-    registry.set('pulse', onComplete)
+    registry.add('pulse', onComplete)
 
     registry.fire('pulse')
 
@@ -19,23 +19,52 @@ describe('EffectCallbackRegistry', () => {
     expect(() => registry.fire('missing')).not.toThrow()
   })
 
-  it('set replaces any callback already held for the name', () => {
+  it('holds every callback added for a name and fires them once each, in order', () => {
     const registry = new EffectCallbackRegistry()
-    const first = jest.fn()
-    const second = jest.fn()
-    registry.set('pulse', first)
-    registry.set('pulse', second)
+    const order: string[] = []
+    const first = jest.fn(() => order.push('first'))
+    const second = jest.fn(() => order.push('second'))
+    registry.add('pulse', first)
+    registry.add('pulse', second)
+
+    registry.fire('pulse')
+    registry.fire('pulse')
+
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(second).toHaveBeenCalledTimes(1)
+    expect(order).toEqual(['first', 'second'])
+  })
+
+  it('fires the rest of a name when one of its callbacks throws', () => {
+    const registry = new EffectCallbackRegistry()
+    const after = jest.fn()
+    registry.add('pulse', () => {
+      throw new Error('boom')
+    })
+    registry.add('pulse', after)
+
+    expect(() => registry.fire('pulse')).not.toThrow()
+
+    expect(after).toHaveBeenCalledWith(false)
+  })
+
+  it('holds a callback added for the name it is firing for the next completion', () => {
+    const registry = new EffectCallbackRegistry()
+    const next = jest.fn()
+    registry.add('pulse', () => {
+      registry.add('pulse', next)
+    })
 
     registry.fire('pulse')
 
-    expect(first).not.toHaveBeenCalled()
-    expect(second).toHaveBeenCalledTimes(1)
+    expect(next).not.toHaveBeenCalled()
+    expect(registry.get('pulse')).toEqual([next])
   })
 
   it('remove drops a callback without firing it', () => {
     const registry = new EffectCallbackRegistry()
     const onComplete = jest.fn()
-    registry.set('pulse', onComplete)
+    registry.add('pulse', onComplete)
 
     registry.remove('pulse')
     registry.fire('pulse')
@@ -47,13 +76,16 @@ describe('EffectCallbackRegistry', () => {
     const registry = new EffectCallbackRegistry()
     const a = jest.fn()
     const b = jest.fn()
-    registry.set('a', a)
-    registry.set('b', b)
+    const alsoA = jest.fn()
+    registry.add('a', a)
+    registry.add('b', b)
+    registry.add('a', alsoA)
 
     registry.cancelAll()
 
     expect(a).toHaveBeenCalledWith(true)
     expect(b).toHaveBeenCalledWith(true)
+    expect(alsoA).toHaveBeenCalledWith(true)
     expect(registry.size).toBe(0)
   })
 
@@ -63,8 +95,8 @@ describe('EffectCallbackRegistry', () => {
       throw new Error('boom')
     })
     const after = jest.fn()
-    registry.set('a', throwing)
-    registry.set('b', after)
+    registry.add('a', throwing)
+    registry.add('b', after)
 
     expect(() => registry.cancelAll()).not.toThrow()
 
@@ -76,8 +108,8 @@ describe('EffectCallbackRegistry', () => {
   it('a callback that registers a new callback during cancelAll leaves the new one held', () => {
     const registry = new EffectCallbackRegistry()
     const late = jest.fn()
-    registry.set('a', () => {
-      registry.set('b', late)
+    registry.add('a', () => {
+      registry.add('b', late)
     })
 
     registry.cancelAll()

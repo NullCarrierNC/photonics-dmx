@@ -1,5 +1,48 @@
 import { SenderManager } from '../../controllers/SenderManager'
 import type { BaseSender } from '../../senders/BaseSender'
+import { EnttecProSender } from '../../senders/EnttecProSender'
+
+jest.mock('../../senders/EnttecProSender', () => ({ EnttecProSender: jest.fn() }))
+
+/**
+ * Stands in for the Enttec Pro driver with a start() the test settles by hand, recording the rate
+ * each sender was built with.
+ */
+function controllableEnttec(): {
+  speeds: number[]
+  settleStart: (index: number, outcome?: Error) => void
+  startsBegun: () => number
+} {
+  const speeds: number[] = []
+  const settles: Array<(outcome?: Error) => void> = []
+  jest.mocked(EnttecProSender).mockImplementation(((
+    _port: string,
+    options: { dmxSpeed: number },
+  ) => {
+    speeds.push(options.dmxSpeed)
+    return {
+      start: jest.fn(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            settles.push((outcome) => (outcome ? reject(outcome) : resolve()))
+          }),
+      ),
+      stop: jest.fn(async () => {}),
+      send: jest.fn(),
+      removeSendError: jest.fn(),
+      onSendError: jest.fn(),
+      getConfiguredPort: jest.fn(() => null),
+      getUniverse: jest.fn(() => 0),
+    }
+  }) as never)
+  return {
+    speeds,
+    settleStart: (index, outcome) => settles[index](outcome),
+    startsBegun: () => settles.length,
+  }
+}
+
+const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve))
 
 function makeManager(): SenderManager {
   return new SenderManager({
@@ -111,5 +154,50 @@ describe('SenderManager.disableSender ordering', () => {
     expect(routedDuringStop).toBe(false)
     expect(sender.stop).toHaveBeenCalledTimes(1)
     expect(mgr.isSenderEnabled('artnet')).toBe(false)
+  })
+})
+
+describe('SenderManager.restartSender on a sender still starting', () => {
+  const config = (dmxSpeed: number) => ({
+    sender: 'enttecpro' as const,
+    devicePath: 'COM3',
+    dmxSpeed,
+  })
+
+  it('waits for the start to finish, then restarts with the new config', async () => {
+    const enttec = controllableEnttec()
+    const mgr = makeManager()
+
+    const enabling = mgr.enableSender('enttecpro', 'enttecpro', config(40))
+    const restarting = mgr.restartSender('enttecpro', config(20))
+    await flush()
+    expect(enttec.speeds).toEqual([40])
+
+    enttec.settleStart(0)
+    await enabling
+    for (let i = 0; i < 10 && enttec.startsBegun() < 2; i += 1) {
+      await flush()
+    }
+    enttec.settleStart(1)
+    await restarting
+
+    expect(enttec.speeds).toEqual([40, 20])
+    expect(mgr.getEnabledSenders()).toEqual(['enttecpro'])
+  })
+
+  it('leaves a sender whose start failed off', async () => {
+    const enttec = controllableEnttec()
+    const mgr = makeManager()
+
+    const enabling = mgr.enableSender('enttecpro', 'enttecpro', config(40))
+    const restarting = mgr.restartSender('enttecpro', config(20))
+    await flush()
+
+    enttec.settleStart(0, new Error('no device'))
+    await expect(enabling).rejects.toThrow('no device')
+    await restarting
+
+    expect(enttec.speeds).toEqual([40])
+    expect(mgr.isSenderEnabled('enttecpro')).toBe(false)
   })
 })

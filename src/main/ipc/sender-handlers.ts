@@ -93,7 +93,7 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
         await senderManager.restartSender('sacn', sacnConfig)
         log.info('sACN configuration updated and sender restarted')
       } else {
-        log.info('sACN not currently enabled, configuration saved for next enable')
+        log.info('sACN not currently enabled, nothing to restart')
       }
       return { success: true }
     } catch (error) {
@@ -127,7 +127,7 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
         await senderManager.restartSender('artnet', artnetConfig)
         log.info('Art-Net configuration updated and sender restarted')
       } else {
-        log.info('Art-Net not currently enabled, configuration saved for next enable')
+        log.info('Art-Net not currently enabled, nothing to restart')
       }
       return { success: true }
     } catch (error) {
@@ -135,6 +135,44 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       const failed = ipcError(error)
       sendToAllWindows(RENDERER_RECEIVE.SENDER_START_FAILED, {
         sender: 'artnet',
+        error: failed.error,
+      })
+      return failed
+    }
+  })
+
+  handleInvoke(ipcMain, LIGHT.UPDATE_ENTTEC_CONFIG, log, async (_, config: unknown) => {
+    try {
+      if (!isPlainObject(config)) {
+        return { success: false, error: 'Invalid Enttec Pro config payload' }
+      }
+      // The renderer sends every saved edit, running or not. With nothing running or starting
+      // there is nothing to apply it to, and a half-filled config (no port yet) is not an error.
+      const senderManager = controllerManager.getSenderManager()
+      if (!senderManager.isSenderEnabled('enttecpro')) {
+        log.info('Enttec Pro not currently enabled, nothing to restart')
+        return { success: true }
+      }
+      const payloadValidation = validateSenderEnablePayload({
+        sender: 'enttecpro',
+        devicePath: config.devicePath,
+        dmxSpeed: config.dmxSpeed,
+      })
+      if (!payloadValidation.ok) {
+        return { success: false as const, error: payloadValidation.error }
+      }
+      const enttecConfig = payloadValidation.value
+      if (enttecConfig.sender !== 'enttecpro') {
+        return { success: false as const, error: 'Internal validation mismatch' }
+      }
+      await senderManager.restartSender('enttecpro', enttecConfig)
+      log.info('Enttec Pro configuration updated and sender restarted')
+      return { success: true }
+    } catch (error) {
+      log.error('Error updating Enttec Pro configuration:', error)
+      const failed = ipcError(error)
+      sendToAllWindows(RENDERER_RECEIVE.SENDER_START_FAILED, {
+        sender: 'enttecpro',
         error: failed.error,
       })
       return failed

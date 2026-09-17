@@ -28,6 +28,9 @@ export const updateArtNetConfig = (config: {
   refreshRateHz?: number
 }) => window.api.invoke(LIGHT.UPDATE_ARTNET_CONFIG, config)
 
+export const updateEnttecConfig = (config: { devicePath: string; dmxSpeed?: number }) =>
+  window.api.invoke(LIGHT.UPDATE_ENTTEC_CONFIG, config)
+
 // ---------------------------------------------------------------------------
 // Sender management
 // ---------------------------------------------------------------------------

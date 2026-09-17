@@ -11,17 +11,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from 'events'
 import { StageKitConfig, DEFAULT_STAGEKIT_CONFIG } from '../listeners/RB3/StageKitTypes'
-import { CueData, defaultCueData } from '../cues/types/cueTypes'
+import { CueData } from '../cues/types/cueTypes'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import { Rb3StageKitRigProcessor } from './Rb3StageKitRigProcessor'
 import { ChainFanout } from '../controllers/ChainFanout'
-import { RB3_MAIN_HUB_SCREEN, RB3_SONG_SELECT_SCREEN } from '../listeners/RB3/rb3eTypes'
+import {
+  RB3_MAIN_HUB_SCREEN,
+  RB3_SONG_SELECT_SCREEN,
+  Rb3RightChannel,
+} from '../listeners/RB3/rb3eTypes'
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { Rb3MenuFramePump } from './rb3MenuAnimation'
 import { Rb3StrobeWatchdog } from './rb3StrobeWatchdog'
 import { createLogger } from '../../shared/logger'
-import { monotonicNowMs } from '../../shared/time'
-import { buildMenusCueData, buildStageKitCueData, LedBankAccumulator } from './rb3StageKitCueData'
+import {
+  buildInGameClearCueData,
+  buildMenusCueData,
+  buildStageKitCueData,
+  LedBankAccumulator,
+} from './rb3StageKitCueData'
 const log = createLogger('Rb3StageKitDirectProcessor')
 
 export class Rb3StageKitDirectProcessor extends EventEmitter {
@@ -253,6 +261,11 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
     this.strobeWatchdog.packetSeen()
 
+    if (event.rightChannel === Rb3RightChannel.DisableAll) {
+      this.handleDisableAll(event)
+      return
+    }
+
     if (!this._inSong) {
       log.info(
         'StageKitDirectProcessor: Received StageKit event while not in song, marking as in song',
@@ -273,9 +286,8 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       }
     } else if (color !== 'off') {
       void this.applyLightData(positions, color)
-    } else {
-      void this.clearLightsAtPositions(positions)
     }
+    // Fog, 0x00 and unrecognised commands carry no colour bank and leave the LEDs as they are.
 
     this.emit('stagekit:processed', {
       positions,
@@ -324,53 +336,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       this.ledBanks.reset()
       const clearCueData: CueData =
         gameState === 'InGame'
-          ? {
-              ...defaultCueData,
-              datagramVersion: realCueData?.datagramVersion || 1,
-              platform: realCueData?.platform || 'RB3E',
-              currentScene: 'Gameplay',
-              pauseState: realCueData?.pauseState || 'Unpaused',
-              venueSize: realCueData?.venueSize || 'Large',
-              beatsPerMinute: realCueData?.beatsPerMinute || 0,
-              songSection: realCueData?.songSection || 'Unknown',
-              guitarNotes: realCueData?.guitarNotes || [],
-              bassNotes: realCueData?.bassNotes || [],
-              drumNotes: realCueData?.drumNotes || [],
-              keysNotes: realCueData?.keysNotes || [],
-              vocalNote: realCueData?.vocalNote || 0,
-              harmony0Note: realCueData?.harmony0Note || 0,
-              harmony1Note: realCueData?.harmony1Note || 0,
-              harmony2Note: realCueData?.harmony2Note || 0,
-              lightingCue: 'StageKitDirect',
-              postProcessing: realCueData?.postProcessing || 'Default',
-              fogState: realCueData?.fogState || false,
-              strobeState: realCueData?.strobeState || 'Strobe_Off',
-              performer: realCueData?.performer || 0,
-              trackMode: realCueData?.trackMode || 'tracked',
-              beat: realCueData?.beat || 'Unknown',
-              keyframe: realCueData?.keyframe || 'Unknown',
-              bonusEffect: realCueData?.bonusEffect || false,
-              ledColor: '',
-              ledPositions: [],
-              rb3Platform: event.platform,
-              rb3BuildTag: realCueData?.rb3BuildTag || '',
-              rb3SongName: realCueData?.rb3SongName || '',
-              rb3SongArtist: realCueData?.rb3SongArtist || '',
-              rb3SongShortName: realCueData?.rb3SongShortName || '',
-              rb3VenueName: realCueData?.rb3VenueName || '',
-              rb3ScreenName: realCueData?.rb3ScreenName || '',
-              rb3BandInfo: realCueData?.rb3BandInfo || { members: [] },
-              rb3ModData: realCueData?.rb3ModData || { identifyValue: '', string: '' },
-              totalScore: realCueData?.totalScore || 0,
-              memberScores: realCueData?.memberScores || [],
-              stars: realCueData?.stars || 0,
-              sustainDurationMs: realCueData?.sustainDurationMs || 0,
-              measureOrBeat: realCueData?.measureOrBeat || 0,
-              cueHistory: [],
-              executionCount: 1,
-              cueStartTime: monotonicNowMs(),
-              timeSinceLastCue: 0,
-            }
+          ? buildInGameClearCueData(realCueData, event.platform)
           : this.menusCueData(realCueData, event.platform)
 
       this.emit('cueHandled', clearCueData)
@@ -454,12 +420,6 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     }
   }
 
-  private async clearLightsAtPositions(positions: number[]): Promise<void> {
-    await Promise.allSettled(
-      Array.from(this.rigs.values()).map((r) => r.clearLightsAtPositions(positions)),
-    )
-  }
-
   private async turnOffAllRigs(): Promise<void> {
     this._currentStrobeType = null
     await Promise.allSettled(Array.from(this.rigs.values()).map((r) => r.turnOffAllLights()))
@@ -540,8 +500,34 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   private emitCueDataForStageKit(event: StageKitData): void {
-    this.ledBanks.update(event.color, event.positions)
+    if (
+      event.color === 'red' ||
+      event.color === 'green' ||
+      event.color === 'blue' ||
+      event.color === 'yellow'
+    ) {
+      this.ledBanks.update(event.color, event.positions)
+    }
     this.emit('cueHandled', buildStageKitCueData(event, this.ledBanks.snapshot()))
+  }
+
+  private handleDisableAll(event: StageKitData): void {
+    this.strobeWatchdog.setStrobeRunning(false)
+    this._currentStrobeType = null
+    this.ledBanks.reset()
+    this.emit('stagekit:processed', {
+      positions: event.positions,
+      color: event.color,
+      strobeEffect: event.strobeEffect,
+      timestamp: Date.now(),
+    })
+    this.emit('cueHandled', buildStageKitCueData(event, this.ledBanks.snapshot()))
+    // RB3E repeats DisableAll as end-of-song teardown traffic even after the player has already
+    // backed out to Menus, where the menu pump owns the rig until its next frame repaints it.
+    if (this.isDefaultMenuCueRunning()) return
+    void this.turnOffAllRigs().catch((error) => {
+      log.error('StageKitDirectProcessor: Error handling DisableAll:', error)
+    })
   }
 
   /**

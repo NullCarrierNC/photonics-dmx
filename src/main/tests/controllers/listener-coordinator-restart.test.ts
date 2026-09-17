@@ -1,6 +1,7 @@
 /**
- * Ensures disableYarg / disableRb3 await UDP listener shutdown so the port is
- * released before `isYargEnabled` / `isRb3Enabled` is cleared.
+ * Ensures disableYarg / disableRb3 await UDP listener shutdown so the port is released before they
+ * resolve. `isYargEnabled` clears once the YARG listener has shut down. `isRb3Enabled` clears as
+ * soon as the RB3 teardown starts, and a fresh RB3 enable waits on that teardown instead.
  */
 import { describe, expect, it, jest } from '@jest/globals'
 import {
@@ -14,7 +15,10 @@ import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
 import { getCueRegistry } from '../../../photonics-dmx/cues/registries/cueRegistries'
 import { CueHandler } from '../../../photonics-dmx/cueHandlers/CueHandler'
 import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
-import { fakeLightingController } from '../../../photonics-dmx/tests/helpers/fakeLightingController'
+import {
+  fakeLightingController,
+  type FakeLightingController,
+} from '../../../photonics-dmx/tests/helpers/fakeLightingController'
 
 function makeDeps(): ListenerCoordinatorDeps {
   const effects = fakeLightingController()
@@ -88,7 +92,7 @@ describe('ListenerCoordinator listener shutdown ordering', () => {
     expect(co.cueHandler).toBeNull()
   })
 
-  it('disableRb3 keeps isRb3Enabled true until the RB3 listener shutdown Promise resolves', async () => {
+  it('disableRb3 marks RB3 disabled immediately while listener shutdown is still in flight', async () => {
     const lc = new ListenerCoordinator(makeDeps())
     let releaseShutdown: (() => void) | undefined
     const shutdownP = new Promise<void>((resolve) => {
@@ -106,10 +110,9 @@ describe('ListenerCoordinator listener shutdown ordering', () => {
 
     const disableP = lc.disableRb3()
     await Promise.resolve()
-    expect(co.isRb3Enabled).toBe(true)
+    expect(co.isRb3Enabled).toBe(false)
     releaseShutdown!()
     await disableP
-    expect(co.isRb3Enabled).toBe(false)
     expect(co.rb3eListener).toBeNull()
     expect(co.processorManager).toBeNull()
   })
@@ -205,5 +208,63 @@ describe('ListenerCoordinator ends the song span on disable so locks do not leak
     expect(rb3MotionEnd).toHaveBeenCalled()
     expect(yargEnd).not.toHaveBeenCalled()
     jest.restoreAllMocks()
+  })
+})
+
+describe('ListenerCoordinator disableYarg stops the cues before clearing the rig', () => {
+  it('shuts down every chain handler before any rig is cleared and blacked out', async () => {
+    const order: string[] = []
+    const deps = makeDeps()
+    const chains = deps.getRigChains()
+    const second = {
+      ...chains[0],
+      rigId: 'second',
+      isPrimary: false,
+      sequencer: fakeLightingController(),
+      cueHandlers: { yarg: null, rb3: null },
+    } as unknown as RigChain
+    chains.push(second)
+
+    for (const chain of chains) {
+      const sequencer = chain.sequencer as unknown as FakeLightingController
+      sequencer.removeAllEffects.mockImplementation(() => {
+        order.push(`removeAllEffects:${chain.rigId}`)
+      })
+      sequencer.blackout.mockImplementation(() => {
+        order.push(`blackout:${chain.rigId}`)
+        return Promise.resolve()
+      })
+      chain.cueHandlers.yarg = {
+        shutdown: () => order.push(`handlerShutdown:${chain.rigId}`),
+      } as unknown as CueHandler
+    }
+
+    const lc = new ListenerCoordinator(deps)
+    const co = lc as unknown as {
+      isYargEnabled: boolean
+      yargListener: { shutdown: () => Promise<void> } | null
+    }
+    co.isYargEnabled = true
+    co.yargListener = {
+      shutdown: () => {
+        order.push('listenerShutdown')
+        return Promise.resolve()
+      },
+    }
+
+    await lc.disableYarg()
+
+    expect(order).toEqual([
+      'listenerShutdown',
+      'handlerShutdown:stub',
+      'handlerShutdown:second',
+      'removeAllEffects:stub',
+      'blackout:stub',
+      'removeAllEffects:second',
+      'blackout:second',
+    ])
+    for (const chain of chains) {
+      expect(chain.cueHandlers.yarg).toBeNull()
+    }
   })
 })

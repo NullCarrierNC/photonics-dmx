@@ -1,6 +1,7 @@
 import {
   DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
   DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
+  ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ,
   OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
 } from '../../shared/dmxOutputRefresh'
 import {
@@ -32,6 +33,7 @@ export interface AppPreferences {
   complex: boolean
   enttecProConfig?: {
     port: string
+    dmxSpeed: number
   }
   openDmxConfig?: {
     port: string
@@ -211,6 +213,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   },
   enttecProConfig: {
     port: '',
+    dmxSpeed: ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ,
   },
   openDmxConfig: {
     port: '',

@@ -19,8 +19,9 @@ export interface LedBankMasks {
 const EMPTY_BANKS: LedBankMasks = { red: 0, green: 0, blue: 0, yellow: 0 }
 
 /**
- * Accumulates per-bank StageKit events into one snapshot: a colour sets that bank to its positions,
- * empty positions clear it, and `off` clears everything.
+ * Accumulates per-bank StageKit events into one snapshot: a colour sets that bank to its positions
+ * and empty positions clear only that bank. Strobe/fog packets carry `color: 'off'` and must not
+ * reset the accumulated banks, so callers use {@link reset} for DisableAll instead.
  */
 export class LedBankAccumulator {
   private masks: LedBankMasks = { ...EMPTY_BANKS }
@@ -30,10 +31,6 @@ export class LedBankAccumulator {
   }
 
   public update(color: string, positions: number[]): void {
-    if (color === 'off') {
-      this.reset()
-      return
-    }
     if (color === 'red' || color === 'green' || color === 'blue' || color === 'yellow') {
       this.masks[color] = positionsToMask(positions)
     }
@@ -108,6 +105,57 @@ export function buildStageKitCueData(event: StageKitData, ledBanks: LedBankMasks
     stars: 0,
     sustainDurationMs: 0,
     measureOrBeat: 0,
+    cueHistory: [],
+    executionCount: 1,
+    cueStartTime: monotonicNowMs(),
+    timeSinceLastCue: 0,
+  }
+}
+
+/** Gameplay transition frame after clearing accumulated LED banks. */
+export function buildInGameClearCueData(realCueData: CueData | null, platform: string): CueData {
+  return {
+    ...defaultCueData,
+    datagramVersion: realCueData?.datagramVersion || 1,
+    platform: realCueData?.platform || 'RB3E',
+    currentScene: 'Gameplay',
+    pauseState: realCueData?.pauseState || 'Unpaused',
+    venueSize: realCueData?.venueSize || 'Large',
+    beatsPerMinute: realCueData?.beatsPerMinute || 0,
+    songSection: realCueData?.songSection || 'Unknown',
+    guitarNotes: realCueData?.guitarNotes || [],
+    bassNotes: realCueData?.bassNotes || [],
+    drumNotes: realCueData?.drumNotes || [],
+    keysNotes: realCueData?.keysNotes || [],
+    vocalNote: realCueData?.vocalNote || 0,
+    harmony0Note: realCueData?.harmony0Note || 0,
+    harmony1Note: realCueData?.harmony1Note || 0,
+    harmony2Note: realCueData?.harmony2Note || 0,
+    lightingCue: 'StageKitDirect',
+    postProcessing: realCueData?.postProcessing || 'Default',
+    fogState: realCueData?.fogState || false,
+    strobeState: realCueData?.strobeState || 'Strobe_Off',
+    performer: realCueData?.performer || 0,
+    trackMode: realCueData?.trackMode || 'tracked',
+    beat: realCueData?.beat || 'Unknown',
+    keyframe: realCueData?.keyframe || 'Unknown',
+    bonusEffect: realCueData?.bonusEffect || false,
+    ledColor: '',
+    ledPositions: [],
+    rb3Platform: platform,
+    rb3BuildTag: realCueData?.rb3BuildTag || '',
+    rb3SongName: realCueData?.rb3SongName || '',
+    rb3SongArtist: realCueData?.rb3SongArtist || '',
+    rb3SongShortName: realCueData?.rb3SongShortName || '',
+    rb3VenueName: realCueData?.rb3VenueName || '',
+    rb3ScreenName: realCueData?.rb3ScreenName || '',
+    rb3BandInfo: realCueData?.rb3BandInfo || { members: [] },
+    rb3ModData: realCueData?.rb3ModData || { identifyValue: '', string: '' },
+    totalScore: realCueData?.totalScore || 0,
+    memberScores: realCueData?.memberScores || [],
+    stars: realCueData?.stars || 0,
+    sustainDurationMs: realCueData?.sustainDurationMs || 0,
+    measureOrBeat: realCueData?.measureOrBeat || 0,
     cueHistory: [],
     executionCount: 1,
     cueStartTime: monotonicNowMs(),

@@ -57,6 +57,7 @@ export class ListenerCoordinator {
   private rb3CueHandler: CueHandler | null = null
   private isYargEnabled = false
   private isRb3Enabled = false
+  private rb3TeardownPromise: Promise<void> | null = null
   private readonly domainRuntimes: Partial<Record<NetCueMode, CueRuntime>> = {}
 
   constructor(private readonly deps: ListenerCoordinatorDeps) {}
@@ -75,7 +76,7 @@ export class ListenerCoordinator {
       log.info('Cannot enable YARG: already enabled or no rig chains')
       return
     }
-    if (this.isRb3Enabled) {
+    if (this.isRb3Enabled || this.rb3TeardownPromise) {
       await this.disableRb3()
     }
     this.buildChainHandlers(chains, 'yarg')
@@ -149,6 +150,13 @@ export class ListenerCoordinator {
 
   public async disableYarg(): Promise<void> {
     if (!this.isYargEnabled) return
+    // Input, then cues, then output: every cue engine is stopped before the rig is cleared, so the
+    // blackout is the last word on the lights. The socket closes synchronously, so no frame lands
+    // past this line, and awaiting it last keeps the blackout in the toggle's own tick.
+    const listenerClosing = this.yargListener?.shutdown()
+    this.deps.setVenuePostProcessing('Default')
+    this.notifyRuntimeDisabled('yarg')
+    this.clearChainHandlers('yarg')
     // Blackout via every chain's sequencer so a multi-rig setup doesn't leave secondary
     // rigs lit while the primary fades out.
     for (const chain of this.deps.getRigChains()) {
@@ -162,14 +170,11 @@ export class ListenerCoordinator {
     log.info(
       'ListenerCoordinator: Cleared running effects and blacked out every rig (disable YARG)',
     )
-    if (this.yargListener) {
-      await this.yargListener.shutdown()
+    if (listenerClosing) {
+      await listenerClosing
       this.yargListener = null
     }
     this.isYargEnabled = false
-    this.deps.setVenuePostProcessing('Default')
-    this.notifyRuntimeDisabled('yarg')
-    this.clearChainHandlers('yarg')
   }
 
   /** Apply the optional runtime decorator for a domain, or pass the base runtime through. */
@@ -247,6 +252,9 @@ export class ListenerCoordinator {
   }
 
   public async enableRb3Internal(): Promise<void> {
+    // A runtime error or a manual disable may still be tearing down the previous session. Joining
+    // it here keeps that teardown from acting on the session this call is about to build.
+    await this.rb3TeardownPromise
     const chains = this.deps.getRigChains()
     if (this.isRb3Enabled || chains.length === 0) {
       log.info('Cannot enable RB3: already enabled or no rig chains')
@@ -289,13 +297,40 @@ export class ListenerCoordinator {
         this.deps.sendToAllWindows(RENDERER_RECEIVE.RB3_GAME_MODE_DEADLINE, p),
     })
     this.processorManager.setCueHandler(this.deps.getChainFanout())
-    this.rb3eListener = new Rb3eNetworkListener()
-    this.processorManager.setNetworkListener(this.rb3eListener)
-    // Enable only once the socket is actually listening. On a bind failure (e.g. port in use) the
-    // RB3 surface is torn back down and the renderer is told to un-toggle — otherwise the UI shows
-    // an enabled listener that receives nothing.
+    const listener = new Rb3eNetworkListener()
+    this.rb3eListener = listener
+    listener.on('rb3-error', (errorData: { type: string; message: string }) => {
+      log.error('RB3 Listener Error:', errorData)
+      // A listener this session no longer owns has nothing left to tear down.
+      if (this.rb3eListener !== listener) return
+      // A manual disable or an earlier error may already be tearing this session down. Only the
+      // call that starts the teardown tells the renderer to un-toggle, so a race between the two
+      // never sends two notices for the one failure. The session may still be starting, in which
+      // case the enable below sees the teardown and does not mark RB3 enabled.
+      const startsTeardown = !this.rb3TeardownPromise
+      this.teardownRb3({ blackout: true }).catch((error) =>
+        log.error('Error tearing down RB3 after a runtime error:', error),
+      )
+      if (startsTeardown) {
+        this.deps.sendToAllWindows(RENDERER_RECEIVE.RB3_ERROR, {
+          type: errorData.type,
+          message: errorData.message,
+          autoDisabled: true,
+        })
+      }
+    })
+    this.processorManager.setNetworkListener(listener)
+    // Enable only once the socket is listening. On a bind failure (e.g. port in use) the RB3
+    // surface is torn back down and the renderer is told to un-toggle, so the UI never shows an
+    // enabled listener that receives nothing.
     try {
-      await this.rb3eListener.start()
+      await listener.start()
+      // A socket error between the bind and this point has already started tearing the session
+      // down and told the renderer. Wait for that teardown so this enable ends with it.
+      if (this.rb3eListener !== listener || this.rb3TeardownPromise) {
+        await this.rb3TeardownPromise
+        return
+      }
       this.isRb3Enabled = true
       log.info(`RB3 listener enabled in ${mode} StageKit mode`)
     } catch (err) {
@@ -327,27 +362,43 @@ export class ListenerCoordinator {
     }
   }
 
-  public async disableRb3(): Promise<void> {
-    if (!this.isRb3Enabled) return
-    for (const chain of this.deps.getRigChains()) {
-      try {
-        chain.sequencer.removeAllEffects()
-        await chain.sequencer.blackout(0)
-      } catch (error) {
-        log.error(`Error clearing effects on rig ${chain.rigId} when disabling RB3:`, error)
-      }
+  /** Serialized, idempotent RB3 shutdown shared by manual disable and runtime auto-disable. */
+  private async teardownRb3(options: { blackout: boolean }): Promise<void> {
+    if (this.rb3TeardownPromise) {
+      return this.rb3TeardownPromise
     }
-    log.info('ListenerCoordinator: Cleared running effects and blacked out every rig (disable RB3)')
+    this.rb3TeardownPromise = this.doTeardownRb3(options).finally(() => {
+      this.rb3TeardownPromise = null
+    })
+    return this.rb3TeardownPromise
+  }
+
+  private async doTeardownRb3(options: { blackout: boolean }): Promise<void> {
+    if (!this.isRb3Enabled && !this.rb3eListener && !this.processorManager) {
+      return
+    }
+    this.isRb3Enabled = false
+    if (options.blackout) {
+      for (const chain of this.deps.getRigChains()) {
+        try {
+          chain.sequencer.removeAllEffects()
+          await chain.sequencer.blackout(0)
+        } catch (error) {
+          log.error(`Error clearing effects on rig ${chain.rigId} when disabling RB3:`, error)
+        }
+      }
+      log.info(
+        'ListenerCoordinator: Cleared running effects and blacked out every rig (disable RB3)',
+      )
+    }
     if (this.rb3eListener) {
       await this.rb3eListener.shutdown()
       this.rb3eListener = null
     }
-    this.isRb3Enabled = false
     if (this.processorManager) {
       this.processorManager.destroy()
       this.processorManager = null
     }
-    // Cue mode built per-chain RB3 cue handlers; direct mode leaves none. Safe either way.
     this.notifyRuntimeDisabled('rb3')
     this.clearChainHandlers('rb3')
     for (const chain of this.deps.getRigChains()) {
@@ -356,6 +407,15 @@ export class ListenerCoordinator {
         chain.rb3MenuCueHandler = null
       }
     }
+  }
+
+  public async disableRb3(): Promise<void> {
+    if (this.rb3TeardownPromise) {
+      await this.rb3TeardownPromise
+      return
+    }
+    if (!this.isRb3Enabled) return
+    await this.teardownRb3({ blackout: true })
   }
 
   public getRb3Mode(): ProcessingMode | 'none' {

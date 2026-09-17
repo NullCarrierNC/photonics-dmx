@@ -297,6 +297,51 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect(graph.shutdownDomainCueHandlerRefs).toHaveBeenCalledTimes(1)
   })
 
+  it('waits out an RB3 teardown already reporting disabled before disposing rig chains', async () => {
+    let releaseTeardown!: () => void
+    const teardown = new Promise<void>((r) => {
+      releaseTeardown = r
+    })
+    const graph = restartGraph()
+    const listeners = listenerStub()
+    // A runtime error has started tearing RB3 down: the flag already reads false, but the teardown
+    // is still blacking out and closing the socket, and only disableRb3 waits for it.
+    ;(listeners.yargRb3.disableRb3 as jest.Mock).mockImplementation(() => teardown)
+    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
+      graph,
+      listenerLifecycle: listeners,
+      isInitialized: true,
+      lifecycle: lifecycleAt('running'),
+      init: jest.fn().mockImplementation(function (this: RestartFake) {
+        this.isInitialized = true
+        this.lifecycle.setPhase('running')
+        return Promise.resolve()
+      }),
+      senderLifecycle: {
+        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
+        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
+        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
+      },
+      consoleMode: {
+        onControllersReinitializedWhileConsoleOpen: jest.fn(),
+        getConsoleRestore: jest.fn().mockReturnValue(null),
+      },
+    })
+
+    const p = ControllerManager.prototype.restartControllers.call(
+      fake as unknown as ControllerManager,
+    )
+    await new Promise((r) => setImmediate(r))
+    expect(listeners.yargRb3.disableRb3).toHaveBeenCalledTimes(1)
+    expect(graph.disposeChainsForRestart).not.toHaveBeenCalled()
+
+    releaseTeardown()
+    await p
+
+    expect(graph.disposeChainsForRestart).toHaveBeenCalledTimes(1)
+    expect(listeners.yargRb3.enableRb3).not.toHaveBeenCalled()
+  })
+
   it('getLifecyclePhase returns the current phase on a prototype-based stub', () => {
     const stub = Object.assign(Object.create(ControllerManager.prototype), {
       graph: restartGraph(),
@@ -364,6 +409,33 @@ describe('ControllerManager lifecycle and sender restore', () => {
 
     expect(senderManager.enableSender).not.toHaveBeenCalled()
   })
+
+  it.each([
+    [5, 5],
+    [0, 1],
+    [900, 44],
+  ])(
+    'restoreSenderOutputsFromPrefs brings a stored OpenDMX rate of %p into range as %p',
+    async (stored, restored) => {
+      const { manager, senderManager } = makeManagerForRestore({
+        dmxOutputConfig: {
+          sacnEnabled: false,
+          artNetEnabled: false,
+          enttecProEnabled: false,
+          openDmxEnabled: true,
+        },
+        openDmxConfig: { port: 'COM4', dmxSpeed: stored },
+      })
+
+      await manager.restoreSenderOutputsFromPrefs()
+
+      expect(senderManager.enableSender).toHaveBeenCalledWith('opendmx', 'opendmx', {
+        sender: 'opendmx',
+        devicePath: 'COM4',
+        dmxSpeed: restored,
+      })
+    },
+  )
 
   it('restoreSenderOutputsFromPrefs leaves Art-Net off when the stored host is not an address', async () => {
     // The file is hand-editable, so the host is checked on the way out as well as on the way in.

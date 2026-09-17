@@ -58,6 +58,51 @@ describe('EnttecProSender', () => {
       expect(payload[512]).toBe(0)
     })
 
+    it('waits at least two driver intervals before closing at a low configured rate', async () => {
+      jest.useFakeTimers()
+      const { DMX } = jest.requireMock('dmx-ts') as { DMX: jest.Mock }
+      const closeSpy = jest.fn().mockResolvedValue(undefined)
+      DMX.mockImplementationOnce(() => ({
+        addUniverse: jest.fn().mockResolvedValue({ update: mockUpdate, close: mockClose }),
+        removeAllListeners: jest.fn(),
+        close: closeSpy,
+      }))
+      const slow = new EnttecProSender('COM1', { dmxSpeed: 10 }, 'uni1', 0)
+      await slow.start()
+
+      const stopPromise = slow.stop()
+      await Promise.resolve()
+      await jest.advanceTimersByTimeAsync(199)
+      expect(closeSpy).not.toHaveBeenCalled()
+
+      await jest.advanceTimersByTimeAsync(1)
+      await stopPromise
+
+      expect(closeSpy).toHaveBeenCalledTimes(1)
+      jest.useRealTimers()
+    })
+
+    it('still floors at 100ms for a fast configured rate', async () => {
+      jest.useFakeTimers()
+      const { DMX } = jest.requireMock('dmx-ts') as { DMX: jest.Mock }
+      const closeSpy = jest.fn().mockResolvedValue(undefined)
+      DMX.mockImplementationOnce(() => ({
+        addUniverse: jest.fn().mockResolvedValue({ update: mockUpdate, close: mockClose }),
+        removeAllListeners: jest.fn(),
+        close: closeSpy,
+      }))
+      const fast = new EnttecProSender('COM1', { dmxSpeed: 44 }, 'uni1', 0)
+      await fast.start()
+
+      const stopPromise = fast.stop()
+      await Promise.resolve()
+      await jest.advanceTimersByTimeAsync(100)
+      await stopPromise
+
+      expect(closeSpy).toHaveBeenCalledTimes(1)
+      jest.useRealTimers()
+    })
+
     it('still lets go of the universe when the driver will not close', async () => {
       const { DMX } = jest.requireMock('dmx-ts') as { DMX: jest.Mock }
       DMX.mockImplementationOnce(() => ({

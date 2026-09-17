@@ -580,6 +580,60 @@ describe('TransitionEngine', () => {
     })
   })
 
+  describe('pending layer removal dedupe', () => {
+    it('merges a same-slot reap into an already-pending ordinary removal, so it still blends one frame', () => {
+      const layer = 2
+      const lightId = 'shared-slot'
+      const effectManager = {
+        onLightEffectComplete: jest.fn(),
+        startNextEffectInQueue: jest.fn().mockReturnValue(false),
+      } as unknown as IEffectManager
+      transitionEngine.setEffectManager(effectManager)
+      layerManager.getQueuedEffect.mockReturnValue(undefined)
+
+      // A backing map removeActiveEffect mutates, so getActiveEffect reports the slot as free
+      // once removed, the way the real layer manager does.
+      const slotMap = new Map<string, LightEffectState>()
+      const activeEffectsMap = new Map<number, Map<string, LightEffectState>>([[layer, slotMap]])
+      layerManager.getActiveEffects.mockReturnValue(activeEffectsMap)
+      layerManager.getActiveEffect.mockImplementation((l: number, id: string) =>
+        l === layer ? slotMap.get(id) : undefined,
+      )
+      layerManager.removeActiveEffect.mockImplementation((l: number, id: string) => {
+        if (l === layer) slotMap.delete(id)
+      })
+
+      // Frame 1: an ordinary completion queues a plain (non-deferred) removal for the slot.
+      const effectA = createMockActiveEffect({
+        name: 'effect-a',
+        lightId,
+        layer,
+        currentTransitionIndex: 1,
+      })
+      slotMap.set(lightId, effectA)
+      transitionEngine.updateTransitions()
+
+      // Before frame 2 runs, a song event reaps a different effect on the same slot, deferred.
+      const effectB = createMockActiveEffect({
+        name: 'effect-b',
+        lightId,
+        layer,
+        currentTransitionIndex: 1,
+      })
+      slotMap.set(lightId, effectB)
+      transitionEngine.reapCompletedEffects()
+
+      // Frame 2: the merged entry is deferred, so the slot is not removed yet.
+      transitionEngine.updateTransitions()
+      expect(lightTransitionController.removeLightLayer).not.toHaveBeenCalled()
+
+      // Frame 3: the deferred pass has now run, so the slot is finally removed once.
+      transitionEngine.updateTransitions()
+      expect(lightTransitionController.removeLightLayer).toHaveBeenCalledTimes(1)
+      expect(lightTransitionController.removeLightLayer).toHaveBeenCalledWith(lightId, layer)
+    })
+  })
+
   describe('getFinalState and clearFinalStates', () => {
     it('should get and clear final states for specific layers', () => {
       // Setup test data

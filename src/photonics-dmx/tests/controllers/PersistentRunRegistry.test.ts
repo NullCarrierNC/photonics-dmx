@@ -58,6 +58,28 @@ describe('PersistentRunRegistry', () => {
     expect(registry.get(runId!)).toBeUndefined()
   })
 
+  it('cancelByName drops every run of that name and leaves the others', () => {
+    const registry = new PersistentRunRegistry()
+    const firstPulse = registry.register('pulse', effect, transitionsFor({ 0: ['a'] }))
+    const secondPulse = registry.register('pulse', effect, transitionsFor({ 1: ['b'] }))
+    const sweep = registry.register('sweep', effect, transitionsFor({ 0: ['a'] }))
+
+    registry.cancelByName('pulse')
+
+    expect(registry.has(firstPulse!)).toBe(false)
+    expect(registry.has(secondPulse!)).toBe(false)
+    expect(registry.has(sweep!)).toBe(true)
+  })
+
+  it('cancelByName tolerates a name holding no runs', () => {
+    const registry = new PersistentRunRegistry()
+    const runId = registry.register('pulse', effect, transitionsFor({ 0: ['a'] }))
+
+    registry.cancelByName('unknown')
+
+    expect(registry.has(runId!)).toBe(true)
+  })
+
   it('clear drops every run', () => {
     const registry = new PersistentRunRegistry()
     const a = registry.register('a', effect, transitionsFor({ 0: ['a'] }))

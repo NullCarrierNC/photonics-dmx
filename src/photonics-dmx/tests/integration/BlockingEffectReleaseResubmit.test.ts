@@ -128,6 +128,43 @@ describe('blocking effect released by a song event', () => {
     harness.cleanup()
   })
 
+  it('shows green for at least one composited frame before the zero-duration release is removed', () => {
+    const harness = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const lights = harness.lightManager.getLights(['front'], ['all'])
+    const lightId = lights[0].id
+
+    harness.sequencer.addEffectUnblockedName('motion:pos', buildParkedThenInstantEffect(lights))
+    harness.advanceBy(150)
+
+    fireMeasureFrame(harness)
+    harness.advanceBy(10)
+
+    const state = harness.getLightState(lightId)
+    expect(state).not.toBeNull()
+    expect(state!.green).toBeGreaterThan(0)
+
+    harness.cleanup()
+  })
+
+  it('removes the zero-duration terminal colour on the following eligible frame', () => {
+    const harness = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const lights = harness.lightManager.getLights(['front'], ['all'])
+    const lightId = lights[0].id
+
+    harness.sequencer.addEffectUnblockedName('motion:pos', buildParkedThenInstantEffect(lights))
+    harness.advanceBy(150)
+
+    fireMeasureFrame(harness)
+    harness.advanceBy(10)
+    expect(harness.getLightState(lightId)!.green).toBeGreaterThan(0)
+
+    harness.advanceBy(20)
+    const afterRemoval = harness.getLightState(lightId)
+    expect(afterRemoval === null || afterRemoval.green === 0).toBe(true)
+
+    harness.cleanup()
+  })
+
   it('accepts a re-submission for an effect the measure frame releases on its beat', () => {
     const harness = createSequencerHarness({ frontCount: 2, backCount: 0 })
     const lights = harness.lightManager.getLights(['front'], ['all'])

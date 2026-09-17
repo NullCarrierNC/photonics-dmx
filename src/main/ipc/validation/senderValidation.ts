@@ -15,7 +15,9 @@ import type { ValidationResult } from './primitives'
 import { WIRE_SENDER_IDS } from '../../../photonics-dmx/types'
 import {
   artNetBaseRefreshIntervalMs,
+  clampDmxOutputRefreshRateHz,
   dmxOutputRefreshRateHzFromUnknownPayload,
+  normalizeOpenDmxSpeedHz,
 } from '../../../shared/dmxOutputRefresh'
 import { SACN_UNIVERSE_MAX, SACN_UNIVERSE_MIN } from '../../../shared/sacnUniverse'
 import { isPlainObject, isNonEmptyString, validateNumberInRange } from './primitives'
@@ -203,11 +205,21 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
       if (!isNonEmptyString(port)) {
         return { ok: false, error: 'Port (device path) is required for EnttecPro sender' }
       }
+      // Absence selects the default rate (applied where the config is consumed). A supplied value
+      // must be a finite number, or the payload is rejected.
+      let dmxSpeed: number | undefined
+      if (data.dmxSpeed !== undefined) {
+        if (typeof data.dmxSpeed !== 'number' || !Number.isFinite(data.dmxSpeed)) {
+          return { ok: false, error: 'EnttecPro dmxSpeed must be a finite number' }
+        }
+        dmxSpeed = clampDmxOutputRefreshRateHz(data.dmxSpeed)
+      }
       // We're treating USB adapters as single-universe; always use universe 0
       const config: SerialSenderConfig = {
         sender: 'enttecpro',
         devicePath: port,
         universe: 0,
+        dmxSpeed,
       }
       return { ok: true, value: config }
     }
@@ -217,8 +229,15 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
       if (!isNonEmptyString(port)) {
         return { ok: false, error: 'Port (device path) is required for OpenDMX sender' }
       }
-      const dmxSpeed =
-        typeof data.dmxSpeed === 'number' && data.dmxSpeed > 0 ? data.dmxSpeed : undefined
+      // Absence selects the default rate (applied where the config is consumed). A supplied value
+      // must be a finite number, or the payload is rejected.
+      let dmxSpeed: number | undefined
+      if (data.dmxSpeed !== undefined) {
+        if (typeof data.dmxSpeed !== 'number' || !Number.isFinite(data.dmxSpeed)) {
+          return { ok: false, error: 'OpenDMX dmxSpeed must be a finite number' }
+        }
+        dmxSpeed = normalizeOpenDmxSpeedHz(data.dmxSpeed)
+      }
       // We're treating USB adapters as single-universe; always use universe 0
       const config: SerialSenderConfig = {
         sender: 'opendmx',

@@ -409,6 +409,92 @@ describe('inputValidation', () => {
       const result = validateSenderEnablePayload({ sender: 'enttecpro' })
       expect(result.ok).toBe(false)
     })
+
+    it('leaves enttecpro dmxSpeed undefined when the payload does not carry one', () => {
+      const result = validateSenderEnablePayload({
+        sender: 'enttecpro',
+        devicePath: '/dev/ttyUSB0',
+      })
+      expect(result.ok).toBe(true)
+      if (result.ok && result.value.sender === 'enttecpro') {
+        expect(result.value.dmxSpeed).toBeUndefined()
+      }
+    })
+
+    it('rounds and clamps a supplied enttecpro dmxSpeed to 10-44', () => {
+      const low = validateSenderEnablePayload({
+        sender: 'enttecpro',
+        devicePath: '/dev/ttyUSB0',
+        dmxSpeed: 2.4,
+      })
+      expect(low.ok).toBe(true)
+      if (low.ok && low.value.sender === 'enttecpro') expect(low.value.dmxSpeed).toBe(10)
+
+      const high = validateSenderEnablePayload({
+        sender: 'enttecpro',
+        devicePath: '/dev/ttyUSB0',
+        dmxSpeed: 44.6,
+      })
+      expect(high.ok).toBe(true)
+      if (high.ok && high.value.sender === 'enttecpro') expect(high.value.dmxSpeed).toBe(44)
+
+      const mid = validateSenderEnablePayload({
+        sender: 'enttecpro',
+        devicePath: '/dev/ttyUSB0',
+        dmxSpeed: 20.5,
+      })
+      expect(mid.ok).toBe(true)
+      if (mid.ok && mid.value.sender === 'enttecpro') expect(mid.value.dmxSpeed).toBe(21)
+    })
+
+    it.each([NaN, Infinity, -Infinity, '40', null])(
+      'rejects a supplied enttecpro dmxSpeed of %p rather than defaulting it',
+      (dmxSpeed) => {
+        const result = validateSenderEnablePayload({
+          sender: 'enttecpro',
+          devicePath: '/dev/ttyUSB0',
+          dmxSpeed,
+        })
+        expect(result.ok).toBe(false)
+      },
+    )
+
+    it('rounds and clamps a supplied opendmx dmxSpeed to its own 1-44 range', () => {
+      const speedFor = (dmxSpeed: number): number | undefined => {
+        const result = validateSenderEnablePayload({
+          sender: 'opendmx',
+          devicePath: 'COM3',
+          dmxSpeed,
+        })
+        return result.ok && result.value.sender === 'opendmx' ? result.value.dmxSpeed : undefined
+      }
+
+      expect(speedFor(5)).toBe(5)
+      expect(speedFor(0)).toBe(1)
+      expect(speedFor(-3)).toBe(1)
+      expect(speedFor(20.5)).toBe(21)
+      expect(speedFor(1000)).toBe(44)
+    })
+
+    it('leaves opendmx dmxSpeed undefined when the payload does not carry one', () => {
+      const result = validateSenderEnablePayload({ sender: 'opendmx', devicePath: 'COM3' })
+      expect(result.ok).toBe(true)
+      if (result.ok && result.value.sender === 'opendmx') {
+        expect(result.value.dmxSpeed).toBeUndefined()
+      }
+    })
+
+    it.each([NaN, Infinity, -Infinity, '40', null])(
+      'rejects a supplied opendmx dmxSpeed of %p rather than defaulting it',
+      (dmxSpeed) => {
+        const result = validateSenderEnablePayload({
+          sender: 'opendmx',
+          devicePath: 'COM3',
+          dmxSpeed,
+        })
+        expect(result.ok).toBe(false)
+      },
+    )
   })
 
   describe('validateLightingConfiguration', () => {
@@ -1145,6 +1231,40 @@ describe('inputValidation', () => {
         ).toBe(false)
         expect(validatePreferencesPayload({ dmxOutputConfig: { sacnEnabled: true } }).ok).toBe(true)
         expect(validatePreferencesPayload({ dmxOutputConfig: { sacnEnabled: 1 } }).ok).toBe(false)
+      })
+
+      it('rejects a non-finite enttecProConfig.dmxSpeed rather than storing it', () => {
+        expect(
+          validatePreferencesPayload({ enttecProConfig: { port: 'COM3', dmxSpeed: NaN } }).ok,
+        ).toBe(false)
+        expect(
+          validatePreferencesPayload({ enttecProConfig: { port: 'COM3', dmxSpeed: 'fast' } }).ok,
+        ).toBe(false)
+      })
+
+      it('clamps a valid enttecProConfig.dmxSpeed to 10-44 without mutating the caller payload', () => {
+        const payload = { enttecProConfig: { port: 'COM3', dmxSpeed: 2 } }
+        const result = validatePreferencesPayload(payload)
+
+        expect(result.ok).toBe(true)
+        if (result.ok) {
+          const cleaned = result.value as { enttecProConfig?: { dmxSpeed?: number } }
+          expect(cleaned.enttecProConfig?.dmxSpeed).toBe(10)
+        }
+        // The caller's own object is untouched, only the validator's returned copy is normalized.
+        expect(payload.enttecProConfig.dmxSpeed).toBe(2)
+      })
+
+      it('keeps a low openDmxConfig.dmxSpeed and clamps one past the ceiling', () => {
+        const stored = (dmxSpeed: number): number | undefined => {
+          const result = validatePreferencesPayload({ openDmxConfig: { port: 'COM3', dmxSpeed } })
+          if (!result.ok) return undefined
+          return (result.value as { openDmxConfig?: { dmxSpeed?: number } }).openDmxConfig?.dmxSpeed
+        }
+
+        expect(stored(5)).toBe(5)
+        expect(stored(0)).toBe(1)
+        expect(stored(200)).toBe(44)
       })
 
       it('rejects a malformed audioGameMode instead of storing it', () => {

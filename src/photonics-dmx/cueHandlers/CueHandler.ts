@@ -90,6 +90,8 @@ class CueHandler extends EventEmitter {
    * previous cue's look until the new cue first draws, which can be a beat or a measure away.
    */
   private pendingSlowBlackoutEnd = false
+  /** Set while a chart blackout holds the rig dark. Strobe cues are swallowed until it clears. */
+  private chartBlackoutHeld = false
 
   public setManualMotionRef(ref: MotionCueRef | null): void {
     this.manualMotionRef = ref
@@ -156,6 +158,7 @@ class CueHandler extends EventEmitter {
   public notifySongEnd(): void {
     this.registry.onSongEnd()
     this.registry.onMotionSongEnd()
+    this.chartBlackoutHeld = false
   }
 
   public reset(): void {
@@ -177,6 +180,7 @@ class CueHandler extends EventEmitter {
     this.previousCueData = undefined
     this.wasVocalActive = false
     this.pendingSlowBlackoutEnd = false
+    this.chartBlackoutHeld = false
   }
 
   /** Stops the active strobe slot without disturbing per-frame edge baselines. */
@@ -335,21 +339,19 @@ class CueHandler extends EventEmitter {
     // Special cases that need to be handled differently
     switch (cueType) {
       case CueType.Blackout_Fast:
+      case CueType.Blackout_Spotlight:
+      case CueType.NoCue:
         this.pendingSlowBlackoutEnd = false
+        this.chartBlackoutHeld = true
         this.stopCurrentCue()
         this._sequencer.blackout(0)
         this.emit('cueHandled', historicCueData)
         return
       case CueType.Blackout_Slow:
         this.pendingSlowBlackoutEnd = true
+        this.chartBlackoutHeld = true
         this.stopCurrentCue()
         this._sequencer.blackout(500)
-        this.emit('cueHandled', historicCueData)
-        return
-      case CueType.Blackout_Spotlight:
-        this.pendingSlowBlackoutEnd = false
-        this.stopCurrentCue()
-        this._sequencer.blackout(0)
         this.emit('cueHandled', historicCueData)
         return
       case CueType.Strobe_Off:
@@ -362,12 +364,15 @@ class CueHandler extends EventEmitter {
         this.handleKeyframe()
         this.emit('cueHandled', historicCueData)
         return
-      case CueType.NoCue:
-        this.pendingSlowBlackoutEnd = false
-        this.stopCurrentCue()
-        this._sequencer.blackout(0)
-        this.emit('cueHandled', historicCueData)
-        return
+    }
+
+    if (incomingIsStrobe && this.chartBlackoutHeld) {
+      this.emit('cueHandled', historicCueData)
+      return
+    }
+    // A non-strobe cue past this point ends the hold, resolved or not: the chart moved on.
+    if (!incomingIsStrobe) {
+      this.chartBlackoutHeld = false
     }
 
     // Get implementation from registry
@@ -387,7 +392,6 @@ class CueHandler extends EventEmitter {
 
     if (cue) {
       const incomingIsSecondary = cue.style === CueStyle.Secondary
-
       // End a running fade before this cue executes (see the field comment). Beyond the chart's
       // Blackout_Slow, a new primary cue also ends a fade the previous cue's own blackout action
       // started, which would refuse the new cue's first submission the same way. Strobes run on top
@@ -550,7 +554,8 @@ class CueHandler extends EventEmitter {
 
   /**
    * Stop all tracked cues (primary, secondary, strobe) and call their onStop lifecycle methods.
-   * Used for blackout, NoCue, and by stopActiveCue(); primary-to-primary transitions stop only the previous primary inline, not via this method.
+   * Used by blackout, NoCue, stopActiveCue(), and shutdown(). Primary-to-primary transitions stop
+   * only the previous primary inline, not via this method.
    */
   private stopCurrentCue(): void {
     if (this.currentPrimaryCue) {
@@ -571,17 +576,11 @@ class CueHandler extends EventEmitter {
     }
   }
 
-  /**
-   * Stop the active cue (if any) and run its onStop lifecycle.
-   * Used by Cue Simulation / test harnesses so restarting the same cue works reliably.
-   */
+  /** Stop the active cue. Used by simulation so restarting the same cue works reliably. */
   public stopActiveCue(): void {
     this.stopCurrentCue()
   }
 
-  /**
-   * Handle keyframe navigation
-   */
   public handleKeyframe(): void {
     this._sequencer.onKeyframe()
   }
@@ -600,20 +599,7 @@ class CueHandler extends EventEmitter {
    * `cue-started` from a clean state.
    */
   public shutdown(): void {
-    if (this.currentPrimaryCue) {
-      this.currentPrimaryCue.onStop?.()
-      this.currentPrimaryCue = null
-    }
-    if (this.currentSecondaryCue) {
-      this.currentSecondaryCue.onStop?.()
-      this.currentSecondaryCue = null
-    }
-    this.stopActiveStrobe()
-    if (this.currentMotionCue) {
-      this.currentMotionCue.onStop?.()
-      this.currentMotionCue = null
-      this.currentMotionCueStartTime = null
-    }
+    this.stopCurrentCue()
     // End any open song on the registry so once-per-song and motion locks never survive a teardown.
     // This is the single owner of song-end on teardown, covering every path that disposes a handler
     // (coordinator clear, RigChain.dispose). Both calls are idempotent.

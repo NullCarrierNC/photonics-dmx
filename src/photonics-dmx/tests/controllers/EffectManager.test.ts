@@ -20,7 +20,7 @@ import { TransitionEngine } from '../../controllers/sequencer/TransitionEngine'
 import { EffectTransformer } from '../../controllers/sequencer/EffectTransformer'
 import { SystemEffectsController } from '../../controllers/sequencer/SystemEffectsController'
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
-import { Effect, EffectTransition } from '../../types'
+import { Effect, EffectTransition, TrackedLight } from '../../types'
 import { createMockTrackedLight, createMockRGBIP } from '../helpers/testFixtures'
 import {
   resetLogConfiguration,
@@ -65,9 +65,7 @@ describe('EffectManager', () => {
       getQueuedEffect: jest.fn(),
       cleanupUnusedLayers: jest.fn(),
       getActiveEffects: jest.fn().mockReturnValue(new Map()),
-      getEffectQueue: jest.fn().mockReturnValue({
-        clear: jest.fn(),
-      }),
+      getEffectQueue: jest.fn().mockReturnValue(new Map()),
       getAllLayers: jest.fn().mockReturnValue([]),
       getLightTransitionController: jest.fn().mockReturnValue(lightTransitionController),
       setLayerLastUsed: jest.fn(),
@@ -456,7 +454,7 @@ describe('EffectManager', () => {
       )
 
       expect(applied).toBe(true)
-      expect(registryOf(effectManager).get('pos:0')).toBe(onComplete)
+      expect(registryOf(effectManager).get('pos:0')).toEqual([onComplete])
       expect(onComplete).not.toHaveBeenCalled()
     })
 
@@ -470,7 +468,7 @@ describe('EffectManager', () => {
       expect(first).toHaveBeenCalledTimes(1)
       expect(first).toHaveBeenCalledWith(true)
       expect(second).not.toHaveBeenCalled()
-      expect(registryOf(effectManager).get('pos:0')).toBe(second)
+      expect(registryOf(effectManager).get('pos:0')).toEqual([second])
     })
 
     it('does not fire a callback when no effect held the name', () => {
@@ -495,7 +493,7 @@ describe('EffectManager', () => {
       expect(applied).toBe(false)
       expect(held).not.toHaveBeenCalled()
       expect(rejected).not.toHaveBeenCalled()
-      expect(registryOf(effectManager).get('pos:0')).toBe(held)
+      expect(registryOf(effectManager).get('pos:0')).toEqual([held])
     })
   })
 
@@ -934,6 +932,140 @@ describe('EffectManager', () => {
       effectManager.onLightEffectComplete(secondState)
       expect(layerManager.addActiveEffect).toHaveBeenCalledTimes(4)
     })
+
+    describe('superseding an earlier run of the same name', () => {
+      const light = createMockTrackedLight({ id: 'light-a', position: 1 })
+
+      const effectOn = (lights: TrackedLight[]): Effect => ({
+        id: 'persistent-effect',
+        description: 'Persistent test effect',
+        transitions: [
+          {
+            lights,
+            layer: 1,
+            waitForCondition: 'none',
+            waitForTime: 0,
+            transform: { color: createMockRGBIP(), easing: 'linear', duration: 100 },
+            waitUntilCondition: 'none',
+            waitUntilTime: 0,
+          },
+        ],
+      })
+
+      /** Submits a persistent run and returns the state of the light it started. */
+      const startRun = (name = 'persistent-effect'): LightEffectState => {
+        effectManager.addEffect(name, effectOn([light]), true)
+        return layerManager.addActiveEffect.mock.calls[0][2] as LightEffectState
+      }
+
+      /** Whether completing this light restarted its run. */
+      const restartsOn = (state: LightEffectState): boolean => {
+        const before = layerManager.addActiveEffect.mock.calls.length
+        effectManager.onLightEffectComplete(state)
+        return layerManager.addActiveEffect.mock.calls.length > before
+      }
+
+      it('ends the earlier run when the name is submitted again persistently', () => {
+        const firstState = startRun()
+
+        effectManager.addEffect('persistent-effect', effectOn([light]), true)
+
+        expect(restartsOn(firstState)).toBe(false)
+      })
+
+      it('ends the earlier run when the name is submitted again without persistence', () => {
+        const firstState = startRun()
+
+        effectManager.addEffect('persistent-effect', effectOn([light]))
+
+        expect(restartsOn(firstState)).toBe(false)
+      })
+
+      it('keeps the run when the resubmission is refused for a duplicate name', () => {
+        const firstState = startRun()
+        layerManager.getActiveEffects.mockReturnValue(
+          new Map([[1, new Map([['light-a', { name: 'persistent-effect' }]])]]) as never,
+        )
+
+        expect(effectManager.addEffectUnblockedName('persistent-effect', effectOn([light]))).toBe(
+          false,
+        )
+
+        expect(restartsOn(firstState)).toBe(true)
+      })
+
+      it('keeps the run when the resubmission carries no transitions', () => {
+        const firstState = startRun()
+
+        effectManager.addEffect('persistent-effect', {
+          id: 'persistent-effect',
+          description: 'Persistent test effect',
+          transitions: [],
+        })
+
+        expect(restartsOn(firstState)).toBe(true)
+      })
+
+      it('keeps the run when the resubmission targets no lights', () => {
+        const firstState = startRun()
+
+        effectManager.addEffect('persistent-effect', effectOn([]))
+
+        expect(restartsOn(firstState)).toBe(true)
+      })
+
+      /** Seeds one queued entry for this name and reports whether a submission dropped it. */
+      const queuedEntrySurvives = (submit: () => void): boolean => {
+        const queue = new Map([
+          [1, new Map([['light-a', { name: 'persistent-effect', lightId: 'light-a' }]])],
+        ])
+        layerManager.getEffectQueue.mockReturnValue(queue as never)
+        layerManager.getQueuedEffect.mockImplementation(
+          (layer, lightId) => queue.get(layer as number)?.get(lightId as string) as never,
+        )
+        layerManager.removeQueuedEffect.mockImplementation((layer, lightId) => {
+          queue.get(layer as number)?.delete(lightId as string)
+        })
+
+        submit()
+
+        return queue.get(1)!.has('light-a')
+      }
+
+      it('drops the queued entries of the name it supersedes', () => {
+        expect(
+          queuedEntrySurvives(() =>
+            effectManager.addEffect('persistent-effect', effectOn([light]), true),
+          ),
+        ).toBe(false)
+      })
+
+      it('keeps queued entries when the submission is refused', () => {
+        layerManager.getActiveEffects.mockReturnValue(
+          new Map([[1, new Map([['light-a', { name: 'persistent-effect' }]])]]) as never,
+        )
+
+        expect(
+          queuedEntrySurvives(() =>
+            effectManager.addEffectUnblockedName('persistent-effect', effectOn([light])),
+          ),
+        ).toBe(true)
+      })
+
+      it('keeps queued entries when the submission targets no lights', () => {
+        expect(
+          queuedEntrySurvives(() => effectManager.addEffect('persistent-effect', effectOn([]))),
+        ).toBe(true)
+      })
+
+      it('keeps runs registered under other names', () => {
+        const firstState = startRun()
+
+        effectManager.addEffect('other-effect', effectOn([light]), true)
+
+        expect(restartsOn(firstState)).toBe(true)
+      })
+    })
   })
 
   describe('startNextEffectInQueue', () => {
@@ -1184,7 +1316,7 @@ describe('EffectManager', () => {
       )
       const callbacks = (effectManagerWithCallbacks as any)
         .effectCallbacks as EffectCallbackRegistry
-      callbacks.set('orphan', () => {})
+      callbacks.add('orphan', () => {})
 
       effectManagerWithCallbacks.removeAllEffects()
 
@@ -1201,7 +1333,7 @@ describe('EffectManager', () => {
       const callbacks = (effectManagerWithCallbacks as any)
         .effectCallbacks as EffectCallbackRegistry
       const cb = jest.fn()
-      callbacks.set('pending', cb)
+      callbacks.add('pending', cb)
 
       effectManagerWithCallbacks.removeAllEffects()
 
@@ -1234,7 +1366,7 @@ describe('EffectManager', () => {
       const callbacks = (effectManager as any).effectCallbacks as EffectCallbackRegistry
       // setEffect clears callbacks internally, so registering before it (the old order) would have
       // left this empty; the callback must survive to fire on completion.
-      expect(callbacks.get('cb-effect')).toBe(onComplete)
+      expect(callbacks.get('cb-effect')).toEqual([onComplete])
     })
   })
 })
