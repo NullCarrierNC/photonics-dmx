@@ -1,9 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useAtom } from 'jotai'
+import React, { useCallback } from 'react'
+import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
-import { getMasterOutput, savePrefs, setMasterOutput } from '../ipcApi'
-import { registerIpcListener } from '../utils/ipcHelpers'
-import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { savePrefs } from '../ipcApi'
+import { applyMasterOutputAtom, masterOutputAtom, toggleBlackoutAtom } from '../state/masterOutput'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('MasterOutputSidebar')
@@ -45,87 +44,29 @@ const FaderScale: React.FC<{ side: 'left' | 'right' }> = ({ side }) => (
 /**
  * The global output controls, always visible down the right edge of the main window.
  *
- * Main holds the authoritative state ({@link MasterOutputState}), and this reads it on mount and
- * pushes changes back. The two paths are deliberately separate: every change goes to the live
- * channel immediately, while only the persisted half is written to prefs, and only when a gesture
- * ends, so a fader drag writes prefs.json once.
+ * The state and the write path live in {@link masterOutputAtom} and its siblings, shared with the
+ * blackout shortcut, which reaches these same controls from any window. This renders them and
+ * owns only what is specific to the sidebar: persisting the half of the controls that persists,
+ * once a gesture ends, so a fader drag writes prefs.json once.
  */
 const MasterOutputSidebar: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
-  const [dimmerPercent, setDimmerPercent] = useState(100)
-  const [blackout, setBlackout] = useState(false)
-  const [strobeEnabled, setStrobeEnabled] = useState(true)
-  const syncGenerationRef = useRef(0)
-
-  const applyAuthoritativeState = useCallback(
-    (state: { dimmerPercent: number; blackout: boolean; strobeOutputEnabled: boolean }) => {
-      setDimmerPercent(state.dimmerPercent)
-      setBlackout(state.blackout)
-      setStrobeEnabled(state.strobeOutputEnabled)
-    },
-    [],
-  )
-
-  /** Reads master output from main. Stale responses are dropped via a monotonic generation. */
-  const refreshFromMain = useCallback(() => {
-    const generation = ++syncGenerationRef.current
-    void getMasterOutput()
-      .then((state) => {
-        if (generation !== syncGenerationRef.current) return
-        applyAuthoritativeState(state)
-      })
-      .catch((err) => log.error('Failed to read master output state', err))
-  }, [applyAuthoritativeState])
-
-  useEffect(() => {
-    refreshFromMain()
-    return () => {
-      syncGenerationRef.current += 1
-    }
-  }, [refreshFromMain])
-
-  useEffect(() => {
-    return registerIpcListener(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, () => {
-      refreshFromMain()
-    })
-  }, [refreshFromMain])
-
-  /**
-   * Applies a live change. Advances the sync generation before sending, so this interaction wins
-   * over any read or write already in flight, whichever settles last. A refused or failed change
-   * re-reads main to resync, since the fields already show a value main never held.
-   */
-  const applyLive = useCallback(
-    async (update: {
-      dimmerPercent?: number
-      blackout?: boolean
-      strobeOutputEnabled?: boolean
-    }): Promise<void> => {
-      const generation = ++syncGenerationRef.current
-      try {
-        const result = await setMasterOutput(update)
-        if (generation !== syncGenerationRef.current) return
-        if (!result.success) {
-          log.error('Failed to apply master output change', result.error)
-          refreshFromMain()
-          return
-        }
-        applyAuthoritativeState(result.state)
-      } catch (err) {
-        log.error('Failed to apply master output change', err)
-        refreshFromMain()
-      }
-    },
-    [applyAuthoritativeState, refreshFromMain],
-  )
+  const {
+    dimmerPercent,
+    blackout,
+    strobeOutputEnabled: strobeEnabled,
+  } = useAtomValue(masterOutputAtom)
+  const setMaster = useSetAtom(masterOutputAtom)
+  const applyLive = useSetAtom(applyMasterOutputAtom)
+  const toggleBlackout = useSetAtom(toggleBlackoutAtom)
 
   const handleDimmerChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>): void => {
       const next = Number(event.target.value)
-      setDimmerPercent(next)
+      setMaster((prev) => ({ ...prev, dimmerPercent: next }))
       void applyLive({ dimmerPercent: next })
     },
-    [applyLive],
+    [applyLive, setMaster],
   )
 
   /** Persists on gesture end only. The value is already live by the time this runs. */
@@ -142,15 +83,9 @@ const MasterOutputSidebar: React.FC = () => {
       .catch((err) => log.error('Failed to save master dimmer level', err))
   }, [dimmerPercent, prefs.masterDimmerPercent, setPrefs])
 
-  const toggleBlackout = useCallback((): void => {
-    const next = !blackout
-    setBlackout(next)
-    void applyLive({ blackout: next })
-  }, [blackout, applyLive])
-
   const toggleStrobe = useCallback((): void => {
     const next = !strobeEnabled
-    setStrobeEnabled(next)
+    setMaster((prev) => ({ ...prev, strobeOutputEnabled: next }))
     void applyLive({ strobeOutputEnabled: next })
     void savePrefs({ strobeOutputEnabled: next })
       .then((result) => {
@@ -161,7 +96,7 @@ const MasterOutputSidebar: React.FC = () => {
         setPrefs((prev) => ({ ...prev, strobeOutputEnabled: next }))
       })
       .catch((err) => log.error('Failed to save strobe output preference', err))
-  }, [strobeEnabled, applyLive, setPrefs])
+  }, [strobeEnabled, applyLive, setMaster, setPrefs])
 
   return (
     <div

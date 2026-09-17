@@ -3,9 +3,19 @@ import { describe, expect, it, jest, beforeEach } from '@jest/globals'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Provider, createStore } from 'jotai'
 import MasterOutputSidebar from './MasterOutputSidebar'
+import { useMasterOutputSync } from '../hooks/useMasterOutputSync'
 import { lightingPrefsAtom } from '../atoms'
 import { LIGHT, CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import * as ipcHelpers from '../utils/ipcHelpers'
+
+/**
+ * The sidebar renders shared state that WindowShell keeps in step with main, so the two are
+ * exercised together here. On their own the buttons would have nothing seeding them.
+ */
+function Sidebar() {
+  useMasterOutputSync()
+  return <MasterOutputSidebar />
+}
 
 const invoke = jest.fn() as jest.MockedFunction<
   (channel: string, data: unknown) => Promise<unknown>
@@ -39,7 +49,7 @@ async function renderSidebar() {
   store.set(lightingPrefsAtom, { masterDimmerPercent: 100, strobeOutputEnabled: true })
   const utils = render(
     <Provider store={store}>
-      <MasterOutputSidebar />
+      <Sidebar />
     </Provider>,
   )
   await waitFor(() => expect(invoke).toHaveBeenCalledWith(LIGHT.GET_MASTER_OUTPUT, undefined))
@@ -124,7 +134,7 @@ describe('MasterOutputSidebar', () => {
     store.set(lightingPrefsAtom, { masterDimmerPercent: 100, strobeOutputEnabled: true })
     render(
       <Provider store={store}>
-        <MasterOutputSidebar />
+        <Sidebar />
       </Provider>,
     )
 
@@ -209,7 +219,7 @@ describe('MasterOutputSidebar', () => {
     store.set(lightingPrefsAtom, { masterDimmerPercent: 100, strobeOutputEnabled: true })
     render(
       <Provider store={store}>
-        <MasterOutputSidebar />
+        <Sidebar />
       </Provider>,
     )
     await waitFor(() => expect(resolvers).toHaveLength(1))
@@ -253,7 +263,7 @@ describe('MasterOutputSidebar', () => {
     store.set(lightingPrefsAtom, { masterDimmerPercent: 100, strobeOutputEnabled: true })
     render(
       <Provider store={store}>
-        <MasterOutputSidebar />
+        <Sidebar />
       </Provider>,
     )
 
@@ -287,7 +297,7 @@ describe('MasterOutputSidebar', () => {
     store.set(lightingPrefsAtom, { masterDimmerPercent: 100, strobeOutputEnabled: true })
     const { unmount } = render(
       <Provider store={store}>
-        <MasterOutputSidebar />
+        <Sidebar />
       </Provider>,
     )
     await waitFor(() => expect(resolvers).toHaveLength(1))
@@ -332,7 +342,7 @@ describe('MasterOutputSidebar', () => {
     store.set(lightingPrefsAtom, { masterDimmerPercent: 100, strobeOutputEnabled: true })
     render(
       <Provider store={store}>
-        <MasterOutputSidebar />
+        <Sidebar />
       </Provider>,
     )
     await waitFor(() => expect(invoke).toHaveBeenCalledWith(LIGHT.GET_MASTER_OUTPUT, undefined))

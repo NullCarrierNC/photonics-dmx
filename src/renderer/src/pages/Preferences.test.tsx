@@ -77,6 +77,10 @@ jest.mock('../components/ClockRateSettings', () => ({
   __esModule: true,
   default: () => <div data-testid="prefs-clock-rate" />,
 }))
+jest.mock('../components/BlackoutShortcutSettings', () => ({
+  __esModule: true,
+  default: () => <div data-testid="prefs-esc-blackout" />,
+}))
 jest.mock('../components/AdvancedModeSettings', () => ({
   __esModule: true,
   default: () => <div data-testid="prefs-advanced-mode" />,
@@ -104,6 +108,8 @@ describe('Preferences', () => {
     expect(screen.queryByTestId('prefs-motion-master')).toBeNull()
     expect(screen.queryByTestId('prefs-cue-consistency')).toBeNull()
     expect(screen.queryByTestId('prefs-clock-rate')).toBeNull()
+    // The blackout shortcut is not an advanced setting: it stays reachable either way.
+    expect(screen.getByTestId('prefs-esc-blackout')).toBeInTheDocument()
   })
 
   it('with Advanced Mode on shows Audio tab, Active Rigs, and full Advanced tab content', () => {
@@ -134,6 +140,7 @@ describe('Preferences', () => {
     expect(screen.getByTestId('prefs-motion-master')).toBeInTheDocument()
     expect(screen.getByTestId('prefs-cue-consistency')).toBeInTheDocument()
     expect(screen.getByTestId('prefs-clock-rate')).toBeInTheDocument()
+    expect(screen.getByTestId('prefs-esc-blackout')).toBeInTheDocument()
   })
 
   it('moves between tabs with the arrow keys, Home and End', () => {

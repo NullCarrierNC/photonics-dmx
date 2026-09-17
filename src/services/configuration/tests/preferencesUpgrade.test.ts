@@ -159,6 +159,25 @@ describe('PreferencesConfigFile upgrade path', () => {
     expect(prefs.venuePostProcessingEnabled).toBeUndefined()
   })
 
+  it('loads a same-version v6 file that predates the blackout shortcut without wiping it', () => {
+    const appData = freshAppData()
+    const {
+      blackoutShortcutKey: _omittedKey,
+      blackoutShortcutScope: _omittedScope,
+      ...withoutKeys
+    } = DEFAULT_PREFERENCES
+    seedPrefs(appData, 6, { ...withoutKeys, effectDebounce: 99 })
+
+    const onCorruptRecovery = jest.fn()
+    const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+    expect(onCorruptRecovery).not.toHaveBeenCalled()
+    expect(prefs.effectDebounce).toBe(99)
+    // Optional keys stay absent rather than being seeded, so every reader defaults for itself.
+    expect(prefs.blackoutShortcutKey).toBeUndefined()
+    expect(prefs.blackoutShortcutScope).toBeUndefined()
+  })
+
   it('migrates a stored v4 file end-to-end without throwing or recovering', () => {
     const appData = freshAppData()
     const all = createDefaultCueDomains()

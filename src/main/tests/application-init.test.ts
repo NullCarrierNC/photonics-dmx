@@ -25,11 +25,19 @@ jest.mock('../controllers/ControllerManager', () => ({
   ControllerManager: jest.fn(() => ({
     init: controllerInit,
     shutdown: controllerShutdown,
+    getConfig: () => ({ getPreference: jest.fn() }),
   })),
 }))
 
 jest.mock('../ipc/index', () => ({ setupIpcHandlers }))
 jest.mock('../menu', () => ({ setupMenu }))
+
+const initBlackoutShortcut = jest.fn()
+const disposeBlackoutShortcut = jest.fn()
+jest.mock('../blackoutShortcut', () => ({
+  initBlackoutShortcut,
+  disposeBlackoutShortcut,
+}))
 
 import { Application } from '../application'
 import { resetLogConfiguration, setLogSink } from '../../shared/logger'

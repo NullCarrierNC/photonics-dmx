@@ -3,6 +3,12 @@ import { WindowManager } from './WindowManager'
 import { setupIpcHandlers } from './ipc/index'
 import { ControllerManager } from './controllers/ControllerManager'
 import { setupMenu } from './menu'
+import { disposeBlackoutShortcut, initBlackoutShortcut } from './blackoutShortcut'
+import { toggleMasterBlackout } from './ipc/master-output-handlers'
+import {
+  normalizeBlackoutShortcutKey,
+  normalizeBlackoutShortcutScope,
+} from '../services/configuration/configurationDefaults'
 import { createLogger } from '../shared/logger'
 
 const log = createLogger('Application')
@@ -51,6 +57,24 @@ export class Application {
     // Set up application menu
     setupMenu()
 
+    // Arm the blackout shortcut. Only the system-wide scope needs main: the in-app half lives in
+    // the renderer, which reads the same preferences for itself. Caught here because the caller
+    // treats a rejection from init as fatal, and a key binding is not worth the app over.
+    try {
+      const config = this.controllerManager.getConfig()
+      initBlackoutShortcut(
+        () => {
+          toggleMasterBlackout(this.controllerManager)
+        },
+        {
+          key: normalizeBlackoutShortcutKey(config.getPreference('blackoutShortcutKey')),
+          scope: normalizeBlackoutShortcutScope(config.getPreference('blackoutShortcutScope')),
+        },
+      )
+    } catch (error) {
+      log.error('Failed to arm the blackout shortcut:', error)
+    }
+
     // Initialize controllers
     try {
       await this.controllerManager.init()
@@ -97,6 +121,14 @@ export class Application {
       }, 5000)
 
       try {
+        // Ahead of the controllers, but never at their expense: letting go of a key matters far
+        // less than closing senders, so a failure here must not abort the rest of the shutdown.
+        try {
+          disposeBlackoutShortcut()
+        } catch (error) {
+          log.error('Failed to release the blackout shortcut:', error)
+        }
+
         // Shutdown controller manager
         if (this.controllerManager) {
           await this.controllerManager.shutdown()

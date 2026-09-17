@@ -253,6 +253,18 @@ export const RENDERER_RECEIVE = {
   YARG_ERROR: 'yarg-error',
   RB3_ERROR: 'rb3-error',
   CONTROLLERS_RESTARTED: 'controllers-restarted',
+  /**
+   * Blackout was latched or released by a writer other than the sidebar, so every window can
+   * follow. Main holds the authoritative state but answers SET_MASTER_OUTPUT only to the caller,
+   * and the blackout shortcut writes from any window and from the main process itself.
+   */
+  MASTER_OUTPUT_CHANGED: 'master-output:changed',
+  /**
+   * Broadcast after SAVE_PREFS so all windows rebind the blackout shortcut (Preferences → all
+   * windows). Carries the resolved key and scope together, since SAVE_PREFS takes a partial and a
+   * window that missed an earlier change would otherwise apply half of this one.
+   */
+  BLACKOUT_SHORTCUT_CHANGED: 'blackout-shortcut:changed',
   AUDIO_ENABLE: 'audio:enable',
   AUDIO_DISABLE: 'audio:disable',
   /** Broadcast after SET_AUDIO_ENABLED so all windows sync Enable Audio UI. */

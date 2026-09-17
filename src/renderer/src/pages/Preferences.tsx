@@ -15,6 +15,7 @@ import StageKitRb3EnhancedSettings from '../components/StageKitRb3EnhancedSettin
 import BrightnessSettings from '../components/BrightnessSettings'
 import WhiteChannelMixModeSettings from '../components/WhiteChannelMixModeSettings'
 import ClockRateSettings from '../components/ClockRateSettings'
+import BlackoutShortcutSettings from '../components/BlackoutShortcutSettings'
 import ActiveRigsSettings from '../components/ActiveRigsSettings'
 import AudioPreferencesTabContent from '../components/AudioPreferencesTabContent'
 import AdvancedModeSettings from '../components/AdvancedModeSettings'
@@ -207,6 +208,7 @@ const Preferences: React.FC = () => {
         className="space-y-2">
         {effectiveTab === 'advanced' && (
           <>
+            <BlackoutShortcutSettings />
             <AdvancedModeSettings />
             {advancedModeEnabled && (
               <>

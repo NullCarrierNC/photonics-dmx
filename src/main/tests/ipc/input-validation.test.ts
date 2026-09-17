@@ -1122,6 +1122,33 @@ describe('inputValidation', () => {
         expect(validatePreferencesPayload({ whiteChannelMixMode: 3 }).ok).toBe(false)
       })
 
+      it('validates blackoutShortcutKey against the allowed set', () => {
+        expect(validatePreferencesPayload({ blackoutShortcutKey: 'escape' }).ok).toBe(true)
+        expect(validatePreferencesPayload({ blackoutShortcutKey: 'backquote' }).ok).toBe(true)
+        expect(validatePreferencesPayload({ blackoutShortcutKey: 'backtick' }).ok).toBe(false)
+        expect(validatePreferencesPayload({ blackoutShortcutKey: '`' }).ok).toBe(false)
+        expect(validatePreferencesPayload({ blackoutShortcutKey: true }).ok).toBe(false)
+      })
+
+      it('validates blackoutShortcutScope against the allowed set', () => {
+        expect(validatePreferencesPayload({ blackoutShortcutScope: 'disabled' }).ok).toBe(true)
+        expect(validatePreferencesPayload({ blackoutShortcutScope: 'focused' }).ok).toBe(true)
+        expect(validatePreferencesPayload({ blackoutShortcutScope: 'system-wide' }).ok).toBe(true)
+        expect(validatePreferencesPayload({ blackoutShortcutScope: 'systemwide' }).ok).toBe(false)
+        expect(validatePreferencesPayload({ blackoutShortcutScope: true }).ok).toBe(false)
+      })
+
+      it('keeps both blackout shortcut keys through the allowlist', () => {
+        // The key map is what decides whether a key survives to be saved at all, so a payload that
+        // validates but is silently stripped would leave the setting looking broken.
+        const result = validatePreferencesPayload({
+          blackoutShortcutKey: 'backquote',
+          blackoutShortcutScope: 'system-wide',
+        })
+        expect(result.ok && result.value.blackoutShortcutKey).toBe('backquote')
+        expect(result.ok && result.value.blackoutShortcutScope).toBe('system-wide')
+      })
+
       it('requires dmxSettingsPrefs expansion flags to be booleans', () => {
         expect(validatePreferencesPayload({ dmxSettingsPrefs: { artNetExpanded: true } }).ok).toBe(
           true,

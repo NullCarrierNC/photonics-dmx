@@ -9,6 +9,8 @@
  */
 
 import { CUE, LIGHT, RENDERER_RECEIVE, RENDERER_SEND } from '../ipcChannels'
+import type { MasterOutputSnapshot } from '../../photonics-dmx/controllers/MasterOutputState'
+import type { BlackoutShortcutBinding } from '../blackoutShortcut'
 import type { CueData, CueType } from '../../photonics-dmx/cues/types/cueTypes'
 import type { NodeCueListSummary } from '../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type { EffectListSummary } from '../../photonics-dmx/cues/node/loader/EffectLoader'
@@ -79,6 +81,8 @@ export interface IpcEventMap {
   }
   [RENDERER_RECEIVE.RB3_ERROR]: { type: string; message: string; autoDisabled?: boolean }
   [RENDERER_RECEIVE.CONTROLLERS_RESTARTED]: undefined
+  [RENDERER_RECEIVE.MASTER_OUTPUT_CHANGED]: MasterOutputSnapshot
+  [RENDERER_RECEIVE.BLACKOUT_SHORTCUT_CHANGED]: BlackoutShortcutBinding
   [RENDERER_RECEIVE.AUDIO_ENABLE]: AudioConfig
   [RENDERER_RECEIVE.AUDIO_DISABLE]: undefined
   [RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED]: { enabled: boolean }
