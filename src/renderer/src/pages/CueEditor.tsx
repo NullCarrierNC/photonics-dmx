@@ -16,6 +16,7 @@ import NewFileModal from '../components/cue-editor/components/NewFileModal'
 import ImportCueFileModal from '../components/cue-editor/components/ImportCueFileModal'
 import ToastContainer from '../components/Toast'
 import { useToast } from '../hooks/useToast'
+import { createLogger } from '../../../shared/logger'
 import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles'
 import { useCueFlow } from '../components/cue-editor/hooks/useCueFlow'
 import { useActiveNodes } from '../components/cue-editor/hooks/useActiveNodes'
@@ -38,6 +39,8 @@ import {
   DEFAULT_SIDEBAR_LAYOUT,
   getStoredSidebarLayout,
 } from '../components/cue-editor/lib/sidebarLayout'
+
+const log = createLogger('CueEditor')
 
 type EditorCueOrEffect =
   | NetNodeCueDefinition
@@ -315,7 +318,11 @@ const CueEditor: React.FC = () => {
           <button
             className="hover:text-blue-600 hover:underline text-left"
             onClick={() => {
-              if (editorDoc?.path) showItemInFolder(editorDoc.path)
+              if (editorDoc?.path) {
+                showItemInFolder(editorDoc.path).catch((error) =>
+                  log.error('Failed to reveal the file:', error),
+                )
+              }
             }}
             title="Click to reveal in file explorer">
             {editorDoc.path}

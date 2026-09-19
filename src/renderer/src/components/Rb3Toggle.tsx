@@ -62,7 +62,9 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
       // Disable Audio when RB3E is enabled (mutual exclusion)
       if (isAudioEnabled) {
         setIsAudioEnabled(false)
-        setAudioEnabled(false)
+        setAudioEnabled(false).catch((error) =>
+          log.error('Failed to disable audio alongside RB3:', error),
+        )
       }
     } else {
       disableRb3()

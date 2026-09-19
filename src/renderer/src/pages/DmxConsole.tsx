@@ -73,7 +73,7 @@ const DmxConsole: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+    void (async () => {
       try {
         const list = await getDmxRigs()
         if (cancelled) return

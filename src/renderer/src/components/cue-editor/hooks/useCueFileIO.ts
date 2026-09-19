@@ -232,7 +232,7 @@ export function useCueFileIO({
         rememberLastFilePath(response.path)
         setValidationErrors([])
         setIsDirty(false)
-        refreshEffectFiles()
+        await refreshEffectFiles()
         onSaveSuccess?.(`Effect saved: ${filename}`)
         return true
       } catch (error) {
@@ -261,7 +261,7 @@ export function useCueFileIO({
         rememberLastFilePath(response.path)
         setValidationErrors([])
         setIsDirty(false)
-        refreshFiles()
+        await refreshFiles()
         onSaveSuccess?.(`Cue saved: ${filename}`)
         return true
       } catch (error) {
@@ -319,9 +319,9 @@ export function useCueFileIO({
     setValidationErrors([])
     setIsDirty(false)
     if (editorDoc.mode === 'effect') {
-      refreshEffectFiles()
+      await refreshEffectFiles()
     } else {
-      refreshFiles()
+      await refreshFiles()
     }
   }, [
     clearLastFilePath,

@@ -17,6 +17,9 @@ import { Pages } from './../types'
 import { currentPageAtom, lightsLayoutHasUnsavedChangesAtom, lightingPrefsAtom } from './../atoms'
 import { useConfirm } from '../hooks/useConfirm'
 import { openCueEditorWindow, openAudioPreviewWindow } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('LeftMenu')
 
 interface LeftMenuProps {
   isDarkMode: boolean
@@ -51,11 +54,11 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
   }
 
   const handleCueEditorClick = () => {
-    openCueEditorWindow()
+    openCueEditorWindow().catch((error) => log.error('Failed to open the cue editor:', error))
   }
 
   const handleAudioPreviewClick = () => {
-    openAudioPreviewWindow()
+    openAudioPreviewWindow().catch((error) => log.error('Failed to open the audio preview:', error))
   }
 
   const buttonClasses = (menuName: Pages) =>

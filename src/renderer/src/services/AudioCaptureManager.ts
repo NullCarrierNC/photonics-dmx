@@ -300,7 +300,7 @@ export class AudioCaptureManager {
 
     // Close audio context
     if (this.audioContext) {
-      this.audioContext.close()
+      this.audioContext.close().catch((error) => log.error('Failed to close audio context:', error))
       this.audioContext = null
     }
 

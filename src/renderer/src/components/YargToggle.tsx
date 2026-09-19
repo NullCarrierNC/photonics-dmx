@@ -61,7 +61,9 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
       // Disable Audio when YARG is enabled (mutual exclusion)
       if (isAudioEnabled) {
         setIsAudioEnabled(false)
-        setAudioEnabled(false)
+        setAudioEnabled(false).catch((error) =>
+          log.error('Failed to disable audio alongside YARG:', error),
+        )
       }
     } else {
       disableYarg()

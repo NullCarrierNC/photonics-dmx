@@ -64,7 +64,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   resetIpcApiMock()
   analyser = new FakeAnalyser()
-  contextClose = jest.fn()
+  contextClose = jest.fn(() => Promise.resolve())
   audioContextCalls = 0
   jest.useFakeTimers()
   store.set(audioDataAtom, null)
@@ -282,6 +282,16 @@ describe('AudioCaptureManager stop', () => {
     expect(track.stop).toHaveBeenCalled()
     expect(source.disconnect).toHaveBeenCalled()
     expect(contextClose).toHaveBeenCalled()
+  })
+
+  it('finishes stopping when closing the context rejects', async () => {
+    const manager = await started()
+    contextClose.mockReturnValueOnce(Promise.reject(new Error('already closed')))
+
+    expect(() => manager.stop()).not.toThrow()
+    await Promise.resolve()
+
+    expect(manager.isActive()).toBe(false)
   })
 
   it('stops the analysis loop', async () => {
