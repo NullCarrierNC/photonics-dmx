@@ -88,7 +88,7 @@ describe('an effect evicted from its layer slot', () => {
     expect(completions).toEqual([])
   })
 
-  it('is told its run ended when a blackout wipes the rig', () => {
+  it('is told its run ended when a blackout wipes the rig', async () => {
     const completions: boolean[] = []
     harness.sequencer.addEffectUnblockedNameWithCallback(
       'held',
@@ -98,7 +98,7 @@ describe('an effect evicted from its layer slot', () => {
     )
     harness.advanceBy(50)
 
-    void harness.sequencer.blackout(0)
+    await harness.sequencer.blackout(0)
     harness.advanceBy(50)
 
     expect(completions).toEqual([true])

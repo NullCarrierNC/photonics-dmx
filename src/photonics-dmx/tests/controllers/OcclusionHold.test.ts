@@ -83,11 +83,11 @@ describe('occlusion hold', () => {
     expect(anyLit()).toBe(false)
   })
 
-  it('survives an immediate blackout and the cue that follows it', () => {
+  it('survives an immediate blackout and the cue that follows it', async () => {
     lightEverything('look')
     harness.sequencer.holdOcclusion(true)
 
-    void harness.sequencer.blackout(0)
+    await harness.sequencer.blackout(0)
     harness.advanceBy(50)
     expect(anyLit()).toBe(false)
 

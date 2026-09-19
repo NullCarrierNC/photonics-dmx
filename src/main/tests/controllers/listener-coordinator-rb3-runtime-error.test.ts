@@ -340,9 +340,14 @@ describe('ListenerCoordinator RB3 runtime socket failure', () => {
 
     const enableYargP = lc.enableYargInternal()
     let yargSettled = false
-    void enableYargP.then(() => {
-      yargSettled = true
-    })
+    enableYargP.then(
+      () => {
+        yargSettled = true
+      },
+      () => {
+        yargSettled = true
+      },
+    )
     await new Promise((r) => setImmediate(r))
     expect(yargSettled).toBe(false)
 
