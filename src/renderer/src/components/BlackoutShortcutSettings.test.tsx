@@ -80,9 +80,9 @@ describe('BlackoutShortcutSettings', () => {
       expect(savePrefs).toHaveBeenCalledWith({ blackoutShortcutKey: 'backquote' })
     })
 
-    it('says the backquote stands aside while typing', () => {
+    it('warns that the backquote is ignored while typing', () => {
       renderWith({ blackoutShortcutKey: 'backquote' })
-      expect(screen.getByText(/stands aside while you are typing/i)).toBeTruthy()
+      expect(screen.getByText(/won't toggle the lights if you're typing/i)).toBeTruthy()
     })
   })
 
@@ -138,12 +138,12 @@ describe('BlackoutShortcutSettings', () => {
 
     it('names Escape when Escape is bound', () => {
       renderWith({ blackoutShortcutKey: 'escape', blackoutShortcutScope: 'system-wide' })
-      expect(screen.getByText(/takes ESC away from every other application/i)).toBeTruthy()
+      expect(screen.getByText(/takes ESC key away from every other application/i)).toBeTruthy()
     })
 
-    it('spells out the sharper cost of losing a typed key', () => {
+    it('spells out what a claimed backquote costs elsewhere', () => {
       renderWith({ blackoutShortcutKey: 'backquote', blackoutShortcutScope: 'system-wide' })
-      expect(screen.getByText(/the character will simply never arrive/i)).toBeTruthy()
+      expect(screen.getByText(/no backticks in a terminal/i)).toBeTruthy()
     })
   })
 })

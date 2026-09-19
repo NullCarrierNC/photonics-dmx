@@ -1,3 +1,4 @@
+import { resolveLagCompensationMs } from './lagCompensation'
 import { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
 import {
   normalizeWhiteChannelMixMode,
@@ -30,6 +31,10 @@ const log = createLogger('ControllerGraph')
 /** What the graph needs from its owner to build and tear down its objects. */
 export interface ControllerGraphDeps {
   getConfig(): ConfigurationManager
+  /** Which input owns the rig, so the publisher can pick the matching output delay. */
+  isRb3Enabled(): boolean
+  isYargEnabled(): boolean
+  isAudioEnabled(): boolean
   getSenderManager(): SenderManager
   chainFanout: ChainFanout
   venueFrameProcessor: VenueFrameProcessor
@@ -197,6 +202,19 @@ export class ControllerGraph {
       ),
       frameProcessor: this.deps.venueFrameProcessor,
       masterOutput: this.deps.masterOutput,
+      // Read per frame, so both values and a change of input apply without a restart.
+      getLagCompensationMs: () =>
+        resolveLagCompensationMs(
+          {
+            isRb3Enabled: () => this.deps.isRb3Enabled(),
+            isYargEnabled: () => this.deps.isYargEnabled(),
+            isAudioEnabled: () => this.deps.isAudioEnabled(),
+          },
+          {
+            getVideoLagCompensationMs: () => config.getPreference('videoLagCompensationMs'),
+            getAudioLagCompensationMs: () => config.getPreference('audioLagCompensationMs'),
+          },
+        ),
     })
     this.deps.venueFrameProcessor.setVenuePostProcessingEnabled(
       normalizeVenuePostProcessingEnabled(config.getPreference('venuePostProcessingEnabled')),

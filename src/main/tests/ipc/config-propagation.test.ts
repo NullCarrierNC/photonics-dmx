@@ -306,6 +306,23 @@ describe('SAVE_PREFS publisher hot-swap', () => {
     expect(mockVenueFrameProcessor.setVenuePostProcessingEnabled).not.toHaveBeenCalled()
   })
 
+  it('persists a lag compensation change without restarting anything', async () => {
+    // The publisher reads this per frame, so storing it is the whole of applying it. A restart
+    // here would drop the running cues for a setting the user is expected to tune mid-song.
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!({}, { videoLagCompensationMs: 180 })
+
+    expect(result).toEqual({ success: true })
+    expect(mockConfig.updatePreferences).toHaveBeenCalledWith({ videoLagCompensationMs: 180 })
+    expect(mockControllerManager.restartControllers).not.toHaveBeenCalled()
+  })
+
+  it('refuses a lag compensation that is not a usable number', async () => {
+    const result = await handlers.get(CONFIG.SAVE_PREFS)!({}, { videoLagCompensationMs: 'slow' })
+
+    expect(result.success).toBe(false)
+    expect(mockConfig.updatePreferences).not.toHaveBeenCalled()
+  })
+
   it('rebinds the blackout shortcut in this process and in every window', async () => {
     mockConfig.getAllPreferences.mockReturnValue({
       blackoutShortcutKey: 'backquote',

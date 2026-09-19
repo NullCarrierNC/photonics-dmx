@@ -23,6 +23,7 @@ import type {
 } from './PublisherFrameProcessor'
 import { VenueFrameProcessor } from './VenueFrameProcessor'
 import { WireSlotGovernor } from './wireSlotGovernor'
+import { WireOutputDelay } from './WireOutputDelay'
 import { getStrobeStateManager, StrobeStateManager } from './StrobeStateManager'
 import { MASTER_DIMMER_MAX_PERCENT, MasterOutputState } from './MasterOutputState'
 import { createLogger } from '../../shared/logger'
@@ -72,6 +73,8 @@ export interface DmxPublisherOptions {
    * private instance at its defaults, which is full output with strobes enabled.
    */
   masterOutput?: MasterOutputState
+  /** Milliseconds to hold wire output, read per frame. See {@link WireOutputDelay}. */
+  getLagCompensationMs?: () => number
 }
 
 /**
@@ -175,6 +178,8 @@ export class DmxPublisher {
   private _timing: PublisherTiming = REAL_TIMING
   /** Per-wire-sender governor + working buffer state. */
   private readonly _governor: WireSlotGovernor
+  /** Holds wire frames for the output delay, leaving the IPC preview immediate. */
+  private readonly _wireDelay: WireOutputDelay
   /** Lightweight rate cap for the IPC preview path (separate from wire-slot governor). */
   private _ipc: IpcGovernor = { lastSendTimeMs: 0, pending: null, trailingTimer: null }
 
@@ -199,7 +204,14 @@ export class DmxPublisher {
     }
     this._frameProcessor = options.frameProcessor ?? new VenueFrameProcessor()
     this._masterOutput = options.masterOutput ?? new MasterOutputState()
-    this._governor = new WireSlotGovernor(senderManager, this._timing, this._minIntervalMs)
+    // The governor sends through the delay, so the hold sits below its rate gate and leaves its
+    // dirty-skip and trailing-timer bookkeeping on real time.
+    this._wireDelay = new WireOutputDelay(
+      { send: (wireId, buffer) => this._sender.send(wireId, buffer) },
+      this._timing,
+      options.getLagCompensationMs ?? ((): number => 0),
+    )
+    this._governor = new WireSlotGovernor(this._wireDelay, this._timing, this._minIntervalMs)
 
     this.publish = this.publish.bind(this)
     if (this._lightStateManager) {
@@ -294,8 +306,15 @@ export class DmxPublisher {
         ? this._immediateBlackoutData
         : normalised
 
-    for (const wireId of this._sender.getEnabledWireSenders()) {
-      void this._sender.send(wireId, out)
+    const writeWires = (): void => {
+      for (const wireId of this._sender.getEnabledWireSenders()) {
+        void this._wireDelay.send(wireId, out)
+      }
+    }
+    if (this._masterOutput.isBlackoutActive()) {
+      this._wireDelay.emitNow(writeWires)
+    } else {
+      writeWires()
     }
     if (this._sender.isIpcEnabled()) {
       this._dispatchIpc({ kind: 'manual', buffer: out })
@@ -347,13 +366,17 @@ export class DmxPublisher {
       return
     }
     this._resetGovernorAllSlots()
-    if (this._manualMode) {
-      if (this._lastManualBuffer !== null) {
-        this.setManualBuffer(this._lastManualBuffer)
+    // Blackout, master dimmer and the strobe gate all re-emit through here, and an operator
+    // reaching for any of them means now, not once the output delay has run down.
+    this._wireDelay.emitNow(() => {
+      if (this._manualMode) {
+        if (this._lastManualBuffer !== null) {
+          this.setManualBuffer(this._lastManualBuffer)
+        }
+        return
       }
-      return
-    }
-    this.publishNow(this._lastPublishedLights)
+      this.publishNow(this._lastPublishedLights)
+    })
   }
 
   /**
@@ -733,6 +756,9 @@ export class DmxPublisher {
       this._isShutDown = true
       this._rigManagers.clear()
 
+      // Drop anything still held by the output delay, then blacken straight at the sender: a
+      // final blackout is never something to hold back.
+      this._wireDelay.clear()
       // Send a final blackout to every enabled wire sender. Blackout must hit every sender
       // regardless of per-rig routing.
       for (const wireId of this._sender.getEnabledWireSenders()) {

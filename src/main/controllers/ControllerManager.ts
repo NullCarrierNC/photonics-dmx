@@ -145,6 +145,9 @@ export class ControllerManager {
       deps.graph ??
       new ControllerGraph({
         getConfig: () => this.config,
+        isRb3Enabled: () => this.getIsRb3Enabled(),
+        isYargEnabled: () => this.getIsYargEnabled(),
+        isAudioEnabled: () => this.getIsAudioEnabled(),
         getSenderManager: () => this.senderLifecycle.getSenderManager(),
         chainFanout: this.chainFanout,
         venueFrameProcessor: this.venueFrameProcessor,

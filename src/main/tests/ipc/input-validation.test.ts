@@ -1149,6 +1149,41 @@ describe('inputValidation', () => {
         expect(result.ok && result.value.blackoutShortcutScope).toBe('system-wide')
       })
 
+      it('holds each lag compensation inside its range', () => {
+        const at = (value: unknown): unknown => {
+          const result = validatePreferencesPayload({ videoLagCompensationMs: value })
+          return result.ok ? result.value.videoLagCompensationMs : 'rejected'
+        }
+        expect(at(0)).toBe(0)
+        expect(at(250)).toBe(250)
+        expect(at(500)).toBe(500)
+        expect(at(501)).toBe(500)
+        expect(at(-5)).toBe(0)
+        expect(at(120.6)).toBe(121)
+      })
+
+      it('holds the audio lag compensation the same way', () => {
+        const result = validatePreferencesPayload({ audioLagCompensationMs: 501 })
+        expect(result.ok && result.value.audioLagCompensationMs).toBe(500)
+      })
+
+      it('rejects a lag compensation that is not a usable number', () => {
+        expect(validatePreferencesPayload({ videoLagCompensationMs: 'slow' }).ok).toBe(false)
+        expect(validatePreferencesPayload({ videoLagCompensationMs: Number.NaN }).ok).toBe(false)
+        expect(validatePreferencesPayload({ audioLagCompensationMs: null }).ok).toBe(false)
+      })
+
+      it('keeps both lag compensation keys through the allowlist', () => {
+        // The key map is what decides whether a key survives to be saved at all, so a payload that
+        // validates but is silently stripped would leave the setting looking broken.
+        const result = validatePreferencesPayload({
+          videoLagCompensationMs: 180,
+          audioLagCompensationMs: 40,
+        })
+        expect(result.ok && result.value.videoLagCompensationMs).toBe(180)
+        expect(result.ok && result.value.audioLagCompensationMs).toBe(40)
+      })
+
       it('requires dmxSettingsPrefs expansion flags to be booleans', () => {
         expect(validatePreferencesPayload({ dmxSettingsPrefs: { artNetExpanded: true } }).ok).toBe(
           true,

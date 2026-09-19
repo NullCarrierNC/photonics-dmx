@@ -1,5 +1,12 @@
-import type { SenderManager } from './SenderManager'
 import type { WireSenderId } from '../types/rigs'
+
+/**
+ * Where resolved frames go. Narrower than `SenderManager` so the publisher can interpose its
+ * output delay without the governor knowing.
+ */
+export interface WireSink {
+  send(wireId: WireSenderId, universeBuffer: Record<number, number>): Promise<boolean>
+}
 
 export type TimerHandle = ReturnType<typeof setTimeout>
 
@@ -85,7 +92,7 @@ export class WireSlotGovernor {
   private readonly slots: Map<WireSenderId, SenderSlotState> = new Map()
 
   constructor(
-    private readonly sender: SenderManager,
+    private readonly sender: WireSink,
     private readonly timing: GovernorTiming,
     private minIntervalMs: number,
   ) {}
