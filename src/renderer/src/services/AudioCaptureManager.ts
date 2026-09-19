@@ -247,7 +247,9 @@ export class AudioCaptureManager {
     try {
       this.source?.disconnect()
       this.stream?.getTracks().forEach((track) => track.stop())
-      void this.audioContext?.close()
+      this.audioContext
+        ?.close()
+        .catch((error) => log.error('Failed to close audio context:', error))
       if (this.analysisTimer !== null) {
         clearInterval(this.analysisTimer)
       }

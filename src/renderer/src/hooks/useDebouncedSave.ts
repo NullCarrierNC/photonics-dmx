@@ -10,6 +10,9 @@
  * to do with a refusal, a revert or a value the main process answered with, it does in there.
  */
 import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('useDebouncedSave')
 
 /** How long a burst has to go quiet before the write goes out. */
 export const DEFAULT_QUIET_MS = 300
@@ -73,7 +76,7 @@ export function useDebouncedSave<T>(
       return
     }
     written.current = pending
-    void writeRef.current(pending.value)
+    writeRef.current(pending.value).catch((error) => log.error('A debounced save failed', error))
   }, [clearTimer])
 
   const cancel = useCallback((): void => {

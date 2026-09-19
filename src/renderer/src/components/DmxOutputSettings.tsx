@@ -186,16 +186,23 @@ const DmxOutputSettings: React.FC = () => {
     })
     log.info('No DMX output config in preferences, initializing from sender states:', initialConfig)
 
-    void persist({ dmxOutputConfig: initialConfig }, 'the DMX output configuration').then(
-      (saved) => {
-        if (saved) {
-          setPrefs((prev) => ({
-            ...prev,
-            dmxOutputConfig: initialConfig,
-          }))
-        }
-      },
-    )
+    let cancelled = false
+    void (async () => {
+      const saved = await persist(
+        { dmxOutputConfig: initialConfig },
+        'the DMX output configuration',
+      )
+      if (!saved || cancelled) {
+        return
+      }
+      setPrefs((prev) => ({
+        ...prev,
+        dmxOutputConfig: initialConfig,
+      }))
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [
     prefs.dmxOutputConfig,
     isSacnEnabled,
