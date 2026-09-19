@@ -26,6 +26,9 @@ import OpenDmxToggle from './OpenDmxToggle'
 import LightsDmxPreview3D from './LightsDmxPreview3D'
 import { MotorEdgeHomeWarnings } from './MotorEdgeHomeWarnings'
 import { useIpcPreviewSender } from '@renderer/hooks/useIpcPreviewSender'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('MovingHeadCalibrationWizard')
 
 const STEP_TITLES = [
   'Pan range',
@@ -101,18 +104,24 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
   useEffect(() => {
     let cancelled = false
     const snapshot = light
-    ;(async () => {
+    void (async () => {
       setInitError(null)
-      const result = await enableConsole(rigId)
-      if (cancelled) return
-      if (!result.success) {
-        setInitError(result.error)
-        return
+      try {
+        const result = await enableConsole(rigId)
+        if (cancelled) return
+        if (!result.success) {
+          setInitError(result.error)
+          return
+        }
+        const initial = buildInitialConsoleBuffer(snapshot)
+        setConsoleBuffer(initial)
+        sendConsoleDmx(initial)
+        setConsoleReady(true)
+      } catch (error) {
+        log.error('Failed to enable DMX console mode:', error)
+        if (cancelled) return
+        setInitError(error instanceof Error ? error.message : String(error))
       }
-      const initial = buildInitialConsoleBuffer(snapshot)
-      setConsoleBuffer(initial)
-      sendConsoleDmx(initial)
-      setConsoleReady(true)
     })()
     return () => {
       cancelled = true
