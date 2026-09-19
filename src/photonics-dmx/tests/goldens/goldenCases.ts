@@ -13,12 +13,17 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { CueSimulator } from '../../sim/CueSimulator'
-import type { SimTimeline } from '../../sim/types'
+import type { ScenarioEntry, SimTimeline } from '../../sim/types'
 
 export interface GoldenCase {
   library: string
   cue: string
   durationMs: number
+  /**
+   * Events to inject during the run. A cue whose look only advances on a song event renders one
+   * frozen state without them, which pins nothing; Stomp needs keyframes to show its toggle.
+   */
+  scenario?: ScenarioEntry[]
 }
 
 /**
@@ -35,7 +40,17 @@ export const GOLDEN_CASES: GoldenCase[] = [
   { library: 'yarg-stagekit', cue: 'Warm_Automatic', durationMs: 1500 },
   { library: 'yarg-stagekit', cue: 'Frenzy', durationMs: 1500 },
   { library: 'yarg-stagekit', cue: 'Dischord', durationMs: 1500 },
-  { library: 'yarg-stagekit', cue: 'Stomp', durationMs: 1500 },
+  {
+    library: 'yarg-stagekit',
+    cue: 'Stomp',
+    durationMs: 1500,
+    // Stomp holds black until the first keyframe, then alternates lit and black on each one.
+    scenario: [
+      { at: 300, event: 'keyframe-next' },
+      { at: 700, event: 'keyframe-next' },
+      { at: 1100, event: 'keyframe-next' },
+    ],
+  },
   { library: 'yarg-stagekit', cue: 'Blackout_Fast', durationMs: 1500 },
 ]
 
@@ -106,6 +121,9 @@ export async function runGoldenCase(c: GoldenCase): Promise<TimelineSnapshot> {
   })
   try {
     sim.setCue(c.cue)
+    if (c.scenario) {
+      sim.loadScenario(c.scenario)
+    }
     const timeline = await sim.run(c.durationMs)
     return buildSnapshot(timeline)
   } finally {

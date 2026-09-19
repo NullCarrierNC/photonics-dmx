@@ -31,6 +31,426 @@
       "events": [],
       "lights": {
         "front-1": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-2": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-3": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-4": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-5": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-6": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-7": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-8": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        }
+      }
+    },
+    {
+      "timeMs": 300,
+      "events": ["keyframe-next"],
+      "lights": {
+        "front-1": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-2": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-3": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-4": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-5": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-6": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-7": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-8": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        }
+      }
+    },
+    {
+      "timeMs": 350,
+      "events": [],
+      "lights": {
+        "front-1": {
+          "red": 255,
+          "green": 255,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-2": {
+          "red": 0,
+          "green": 255,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-3": {
+          "red": 0,
+          "green": 255,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-4": {
+          "red": 255,
+          "green": 0,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-5": {
+          "red": 255,
+          "green": 0,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-6": {
+          "red": 0,
+          "green": 255,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-7": {
+          "red": 0,
+          "green": 255,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-8": {
+          "red": 255,
+          "green": 255,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        }
+      }
+    },
+    {
+      "timeMs": 700,
+      "events": ["keyframe-next"],
+      "lights": {
+        "front-1": {
+          "red": 255,
+          "green": 255,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-2": {
+          "red": 0,
+          "green": 255,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-3": {
+          "red": 0,
+          "green": 255,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-4": {
+          "red": 255,
+          "green": 0,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-5": {
+          "red": 255,
+          "green": 0,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-6": {
+          "red": 0,
+          "green": 255,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-7": {
+          "red": 0,
+          "green": 255,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-8": {
+          "red": 255,
+          "green": 255,
+          "blue": 0,
+          "intensity": 180,
+          "opacity": 1,
+          "blendMode": "replace"
+        }
+      }
+    },
+    {
+      "timeMs": 750,
+      "events": [],
+      "lights": {
+        "front-1": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-2": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-3": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-4": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-5": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-6": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-7": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-8": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        }
+      }
+    },
+    {
+      "timeMs": 1100,
+      "events": ["keyframe-next"],
+      "lights": {
+        "front-1": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-2": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-3": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "front-4": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-5": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-6": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-7": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        },
+        "back-8": {
+          "red": 0,
+          "green": 0,
+          "blue": 0,
+          "intensity": 0,
+          "opacity": 1,
+          "blendMode": "replace"
+        }
+      }
+    },
+    {
+      "timeMs": 1150,
+      "events": [],
+      "lights": {
+        "front-1": {
           "red": 255,
           "green": 255,
           "blue": 0,
