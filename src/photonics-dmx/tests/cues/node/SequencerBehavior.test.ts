@@ -34,7 +34,6 @@ function createRecordingSequencer(): { sequencer: ILightingController; recorded:
     },
     setEffect: (name: string) => {
       recorded.push({ method: 'setEffect', name })
-      return Promise.resolve()
     },
     removeEffect: (name: string, layer?: number) => {
       recorded.push({ method: 'removeEffect', name, layer })

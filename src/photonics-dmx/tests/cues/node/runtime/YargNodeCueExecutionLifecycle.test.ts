@@ -24,7 +24,6 @@ function createRecordingSequencer(): { sequencer: ILightingController; recorded:
     },
     setEffect: (name: string) => {
       recorded.push({ method: 'setEffect', name })
-      return Promise.resolve()
     },
     addEffectUnblockedName: (name: string) => {
       recorded.push({ method: 'addEffect', name })

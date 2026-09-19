@@ -95,7 +95,7 @@ describe('Node cue chaining', () => {
       addEffect: (name: string, _effect: Effect) => {
         callOrder.push(name)
       },
-      setEffect: () => Promise.resolve(),
+      setEffect: () => {},
       addEffectWithCallback: (
         name: string,
         _effect: Effect,

@@ -446,7 +446,7 @@ describe('Sequencer blending and queueing (real harness)', () => {
       harness.cleanup()
     })
 
-    it('drains a higher layer when a repeated set finds layer 0 already finished', async () => {
+    it('drains a higher layer when a repeated set finds layer 0 already finished', () => {
       const harness = createSequencerHarness({ frontCount: 1, backCount: 0 })
       const lights = harness.lightManager.getLights(['front'], ['all'])
       const lightId = lights[0].id
@@ -464,10 +464,10 @@ describe('Sequencer blending and queueing (real harness)', () => {
       })
       const queued = multiLayer(colorB)
 
-      await harness.sequencer.setEffect('multi-test', multiLayer(colorA), true)
+      harness.sequencer.setEffect('multi-test', multiLayer(colorA), true)
       // Layer 0 finishes well before layer 1, so the repeated set finds nothing to retire there.
       advanceUntil(harness, () => false, 5)
-      await harness.sequencer.setEffect('multi-test', queued, true)
+      harness.sequencer.setEffect('multi-test', queued, true)
       expect(queuedCount(harness)).toBe(1)
 
       advanceUntil(harness, () => queuedCount(harness) === 0, 60)
@@ -479,7 +479,7 @@ describe('Sequencer blending and queueing (real harness)', () => {
       harness.cleanup()
     })
 
-    it('outlasts a submission made by a waiter its own clearing step cancelled', async () => {
+    it('outlasts a submission made by a waiter its own clearing step cancelled', () => {
       // setEffect clears first, which fires held waiters, and a waiter can submit the name back.
       // The submission that did the clearing is the later one, so it keeps looping.
       const harness = createSequencerHarness({ frontCount: 1, backCount: 0 })
@@ -501,7 +501,7 @@ describe('Sequencer blending and queueing (real harness)', () => {
       )
       harness.advanceBy(10)
 
-      await harness.sequencer.setEffect('loop-test', clearing, true)
+      harness.sequencer.setEffect('loop-test', clearing, true)
       expect(resubmitted).toBe(true)
 
       advanceUntil(harness, () => queuedCount(harness) === 0, 40)

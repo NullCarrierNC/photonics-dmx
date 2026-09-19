@@ -186,7 +186,7 @@ describe('timed blackout', () => {
 
   it("fades from the light's actual blended colour, not layer 0, when nothing is on layer 0", () => {
     // The look lives on a layer above 0, so layer 0 itself holds no state at all.
-    void harness.sequencer.setEffect(
+    harness.sequencer.setEffect(
       'raised-look',
       getEffectSingleColor({
         color: WHITE,
@@ -210,7 +210,7 @@ describe('timed blackout', () => {
 
   /** A persistent look above layer 0, the way a primary cue leaves its effects up when it stops. */
   const lightRaisedLook = (): void => {
-    void harness.sequencer.setEffect(
+    harness.sequencer.setEffect(
       'raised-look',
       getEffectSingleColor({
         color: WHITE,
