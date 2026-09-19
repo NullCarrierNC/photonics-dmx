@@ -271,7 +271,7 @@ const DmxOutputSettings: React.FC = () => {
     }))
 
     if (enabled !== toggle.isRunning) {
-      void applySenderRunState(name, enabled, toggle.setRunning, () =>
+      await applySenderRunState(name, enabled, toggle.setRunning, () =>
         enabled ? toggle.start() : toggle.stop(),
       )
     }

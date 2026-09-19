@@ -63,13 +63,13 @@ export const applyMasterOutputAtom = atom(
       if (generation !== get(syncGenerationAtom)) return
       if (!result.success) {
         log.error('Failed to apply master output change', result.error)
-        void set(refreshMasterOutputAtom)
+        await set(refreshMasterOutputAtom)
         return
       }
       set(masterOutputAtom, result.state)
     } catch (err) {
       log.error('Failed to apply master output change', err)
-      void set(refreshMasterOutputAtom)
+      await set(refreshMasterOutputAtom)
     } finally {
       set(pendingWritesAtom, Math.max(0, get(pendingWritesAtom) - 1))
     }
