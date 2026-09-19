@@ -26,6 +26,20 @@ import { useIpcPreviewSender } from '@renderer/hooks/useIpcPreviewSender'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('DmxConsole')
 
+const messageFor = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error)
+
+/** Hands DMX output back. The cleanup that calls this cannot wait, so failure is reported here. */
+const leaveConsole = (): void => {
+  disableConsole()
+    .then((result) => {
+      if (!result.success) {
+        log.error('Main refused to leave DMX console mode:', result.error)
+      }
+    })
+    .catch((error) => log.error('Failed to leave DMX console mode:', error))
+}
+
 import {
   buildConsoleFixedSeed,
   channelLabel,
@@ -134,11 +148,12 @@ const DmxConsole: React.FC = () => {
     return () => {
       const pending = enableInFlightRef.current
       if (pending) {
-        void pending.then(() => disableConsole())
+        // Either way it settles: an enable that rejects can still have left console mode open.
+        pending.then(leaveConsole, leaveConsole)
         return
       }
       if (consoleEnabledRef.current) {
-        void disableConsole()
+        leaveConsole()
       }
     }
   }, [])
@@ -155,13 +170,18 @@ const DmxConsole: React.FC = () => {
       return
     }
     if (consoleEnabled) {
-      const result = await disableConsole()
-      if (result.success) {
-        setConsoleEnabled(false)
-        setConsoleBuffer({})
-        setChannelOverrides({})
-      } else {
-        setActionError(result.error)
+      try {
+        const result = await disableConsole()
+        if (result.success) {
+          setConsoleEnabled(false)
+          setConsoleBuffer({})
+          setChannelOverrides({})
+        } else {
+          setActionError(result.error)
+        }
+      } catch (error) {
+        log.error('Failed to leave DMX console mode', error)
+        setActionError(messageFor(error))
       }
       return
     }
@@ -176,6 +196,10 @@ const DmxConsole: React.FC = () => {
     let result: Awaited<typeof pending>
     try {
       result = await pending
+    } catch (error) {
+      log.error('Failed to enter DMX console mode', error)
+      setActionError(messageFor(error))
+      return
     } finally {
       enableInFlightRef.current = null
     }
@@ -197,7 +221,17 @@ const DmxConsole: React.FC = () => {
     }
     setActionError(null)
     if (consoleEnabled) {
-      await disableConsole()
+      try {
+        const result = await disableConsole()
+        if (!result.success) {
+          setActionError(result.error)
+          return
+        }
+      } catch (error) {
+        log.error('Failed to leave DMX console mode', error)
+        setActionError(messageFor(error))
+        return
+      }
       setConsoleEnabled(false)
       setConsoleBuffer({})
     }

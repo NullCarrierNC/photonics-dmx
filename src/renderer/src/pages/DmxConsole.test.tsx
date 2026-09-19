@@ -101,4 +101,26 @@ describe('DmxConsole', () => {
 
     await waitFor(() => expect(jest.mocked(ipcApi.disableConsole)).toHaveBeenCalled())
   })
+
+  it('hands DMX output back when the enable rejects after the page closes', async () => {
+    let failConsole!: (error: Error) => void
+    jest.mocked(ipcApi.enableConsole).mockImplementation(
+      (() =>
+        new Promise((_resolve, reject) => {
+          failConsole = reject
+        })) as never,
+    )
+
+    const view = renderConsole()
+    const toggle = await screen.findByRole('button', { name: 'Enable console' })
+    await waitFor(() => expect(toggle).toBeEnabled())
+    fireEvent.click(toggle)
+
+    view.unmount()
+    // Main can have stored the restore state before whatever went wrong, so console mode is open
+    // even though the enable reports a failure.
+    failConsole(new Error('channel gone'))
+
+    await waitFor(() => expect(jest.mocked(ipcApi.disableConsole)).toHaveBeenCalled())
+  })
 })
