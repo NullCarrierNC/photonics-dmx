@@ -352,7 +352,7 @@ const CueEditor: React.FC = () => {
           existingGroupIds={existingGroupIdsForNewFileModal}
           onCancel={() => setShowNewFileModal(false)}
           onSave={(metadata) => {
-            handleCreateNewFile(metadata)
+            void handleCreateNewFile(metadata)
             setShowNewFileModal(false)
           }}
         />

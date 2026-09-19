@@ -108,14 +108,14 @@ export function useCueCrud({
 
         const filename = `${metadata.groupId}.json`
 
-        const validation = await validateEffect({ content: file })
-        if (!validation.valid) {
-          setValidationErrors(validation.errors)
-          onError?.('Failed to create effect file: ' + validation.errors.join(', '))
-          return
-        }
-
         try {
+          const validation = await validateEffect({ content: file })
+          if (!validation.valid) {
+            setValidationErrors(validation.errors)
+            onError?.('Failed to create effect file: ' + validation.errors.join(', '))
+            return
+          }
+
           const response = await saveEffectFile({ mode: file.mode, filename, content: file })
           if (!response.success) {
             onError?.('Failed to save: ' + response.error)
@@ -127,10 +127,10 @@ export function useCueCrud({
           loadCueIntoFlow(file.effects[0] ?? null)
           setValidationErrors([])
           setIsDirty(false)
-          refreshEffectFiles()
+          await refreshEffectFiles()
         } catch (error) {
-          log.error('Failed to save effect file', error)
-          onError?.('Failed to save effect file: ' + error)
+          log.error('Failed to create effect file', error)
+          onError?.('Failed to create effect file: ' + error)
         }
       } else {
         const file = createDefaultFile(mode, cueKind)
@@ -142,14 +142,14 @@ export function useCueCrud({
 
         const filename = `${metadata.groupId}.json`
 
-        const validation = await validateNodeCue({ content: file })
-        if (!validation.valid) {
-          setValidationErrors(validation.errors)
-          onError?.('Failed to create cue file: ' + validation.errors.join(', '))
-          return
-        }
-
         try {
+          const validation = await validateNodeCue({ content: file })
+          if (!validation.valid) {
+            setValidationErrors(validation.errors)
+            onError?.('Failed to create cue file: ' + validation.errors.join(', '))
+            return
+          }
+
           const response = await saveNodeCueFile({ mode: file.mode, filename, content: file })
           if (!response.success) {
             onError?.('Failed to save: ' + response.error)
@@ -161,10 +161,10 @@ export function useCueCrud({
           loadCueIntoFlow(file.cues[0] ?? null)
           setValidationErrors([])
           setIsDirty(false)
-          refreshFiles()
+          await refreshFiles()
         } catch (error) {
-          log.error('Failed to save cue file', error)
-          onError?.('Failed to save cue file: ' + error)
+          log.error('Failed to create cue file', error)
+          onError?.('Failed to create cue file: ' + error)
         }
       }
     },
