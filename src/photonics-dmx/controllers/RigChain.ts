@@ -88,7 +88,7 @@ export class RigChain {
    * lifecycle belongs to the caller so multiple chains can share one tick source without
    * one chain's teardown stopping ticks for the others.
    */
-  public async dispose(): Promise<void> {
+  public dispose(): void {
     for (const domain of Object.keys(this.cueHandlers) as NetCueMode[]) {
       const handler = this.cueHandlers[domain]
       if (!handler) continue

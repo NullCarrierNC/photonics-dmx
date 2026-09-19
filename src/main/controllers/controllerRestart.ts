@@ -68,7 +68,7 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
       await ctx.listenerLifecycle.audio.disableAudio()
     }
 
-    await ctx.graph.disposeChainsForRestart()
+    ctx.graph.disposeChainsForRestart()
 
     await ctx.graph.shutdownPublisher()
     await ctx.senderLifecycle.resetSenderForControllerRestart()

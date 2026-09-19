@@ -132,7 +132,7 @@ describe('RigChain', () => {
       const [rigA] = makeTwoRigs({ frontPerRig: 4 })
       const clock = new ManualTestClock() as unknown as Clock
       const chain = new RigChain({ rigId: rigA.id, config: rigA.config, clock })
-      await chain.dispose()
+      chain.dispose()
       expect(yargSpy).toHaveBeenCalledWith(chain.sequencer)
       expect(audioSpy).toHaveBeenCalledWith(chain.sequencer)
     } finally {

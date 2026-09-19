@@ -80,11 +80,11 @@ function listenerStub() {
 /** A graph whose build/teardown steps are observable no-op mocks. */
 function restartGraph(): ControllerGraph {
   return {
-    disposeChainsForRestart: jest.fn().mockImplementation(() => Promise.resolve()),
-    disposeChainsForShutdown: jest.fn().mockImplementation(() => Promise.resolve()),
+    disposeChainsForRestart: jest.fn(),
+    disposeChainsForShutdown: jest.fn(),
     disposeLoaders: jest.fn().mockImplementation(() => Promise.resolve()),
-    shutdownPublisher: jest.fn().mockImplementation(() => Promise.resolve()),
-    shutdownPublisherSafe: jest.fn().mockImplementation(() => Promise.resolve()),
+    shutdownPublisher: jest.fn(),
+    shutdownPublisherSafe: jest.fn(),
     shutdownDomainCueHandlerRefs: jest.fn(),
     destroyClock: jest.fn(),
     clearBuildRefs: jest.fn(),

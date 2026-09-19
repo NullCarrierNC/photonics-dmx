@@ -64,7 +64,7 @@ export async function runControllerShutdown(ctx: ControllerShutdownContext): Pro
   // Deliberately unguarded, so a failure here leaves the shutdown incomplete and retryable.
   await ctx.graph.disposeLoaders()
   ctx.graph.shutdownDomainCueHandlerRefs()
-  await ctx.graph.disposeChainsForShutdown()
+  ctx.graph.disposeChainsForShutdown()
   ctx.graph.destroyClock()
 
   try {
