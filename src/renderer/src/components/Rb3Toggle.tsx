@@ -37,7 +37,7 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
     // Handle controllers restarted event
     const handleControllersRestarted = () => {
       log.info('Controllers restarted, refreshing RB3E toggle state')
-      initializeState()
+      void initializeState()
     }
 
     const cleanup = registerIpcListener(
@@ -46,7 +46,7 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
     )
 
     // Initialize on mount
-    initializeState()
+    void initializeState()
 
     // Return the cleanup function
     return cleanup

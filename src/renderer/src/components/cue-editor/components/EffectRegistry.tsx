@@ -38,14 +38,14 @@ const EffectRegistry: React.FC<Props> = ({ editorDoc, selectedCueId, onEffectsCh
   // Load available effect files when dialog opens
   useEffect(() => {
     if (showDialog && !editingEffect) {
-      loadEffectFiles()
+      void loadEffectFiles()
     }
   }, [showDialog, editingEffect])
 
   // Load effects from selected file
   useEffect(() => {
     if (selectedFile) {
-      loadEffectsFromFile(selectedFile)
+      void loadEffectsFromFile(selectedFile)
     } else {
       setAvailableEffects([])
     }

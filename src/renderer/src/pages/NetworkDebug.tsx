@@ -97,7 +97,7 @@ const NetworkDebug = () => {
     }
 
     // Check initial state
-    checkEnabledState()
+    void checkEnabledState()
 
     // Set up interval to check for changes
     const interval = setInterval(checkEnabledState, 1000)

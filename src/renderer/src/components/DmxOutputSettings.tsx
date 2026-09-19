@@ -170,7 +170,7 @@ const DmxOutputSettings: React.FC = () => {
       }
     }
 
-    loadNetworkInterfaces()
+    void loadNetworkInterfaces()
   }, [])
 
   // Seed the saved output config on first run from whatever the backend already has running.

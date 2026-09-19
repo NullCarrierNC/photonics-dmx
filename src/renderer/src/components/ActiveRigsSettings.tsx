@@ -101,7 +101,7 @@ const ActiveRigsSettings: React.FC = () => {
       }
     }
 
-    loadRigs()
+    void loadRigs()
   }, [setRigs])
 
   const handleActiveToggle = async (rigId: string, newActive: boolean) => {

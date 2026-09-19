@@ -178,7 +178,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
   }, [])
 
   useEffect(() => {
-    loadCueState()
+    void loadCueState()
 
     const handleAudioEvent = () => loadCueState(true)
     addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent)
@@ -393,11 +393,11 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     }
   }
 
-  const handleGroupChange = (groupId: string) => {
+  const handleGroupChange = async (groupId: string) => {
     setSelectedGroupId(groupId)
     const firstCueInGroup = availableCues.find((cue) => cue.groupId === groupId)
     if (firstCueInGroup) {
-      handleCueChange(firstCueInGroup.id)
+      await handleCueChange(firstCueInGroup.id)
     } else {
       setSelectedCueId('')
     }
@@ -519,7 +519,7 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
             <AudioCuePickers
               groupOptions={groupOptions}
               selectedGroupId={selectedGroupId}
-              onGroupChange={handleGroupChange}
+              onGroupChange={(groupId) => void handleGroupChange(groupId)}
               cuesForSelectedGroup={cuesForSelectedGroup}
               selectedCueId={selectedCueId}
               activeCue={activeCue}

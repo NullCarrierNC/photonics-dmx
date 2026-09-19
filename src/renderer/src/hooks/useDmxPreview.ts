@@ -66,7 +66,7 @@ export function useDmxPreview(): {
       }
     }
 
-    loadRigConfig()
+    void loadRigConfig()
     return () => {
       cancelled = true
     }

@@ -31,7 +31,7 @@ const YargFallbackSettings: React.FC = () => {
         setIsLoading(false)
       }
     }
-    load()
+    void load()
   }, [])
 
   const handleChange = useCallback(

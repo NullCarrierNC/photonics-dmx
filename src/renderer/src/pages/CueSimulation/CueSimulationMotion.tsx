@@ -56,7 +56,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({
         log.error('Failed to load motion cue groups:', e)
       }
     }
-    load()
+    void load()
     return () => {
       cancelled = true
     }
@@ -86,7 +86,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({
         log.error('Failed to load motion cues:', e)
       }
     }
-    load()
+    void load()
     return () => {
       cancelled = true
     }

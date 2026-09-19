@@ -82,7 +82,7 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
     )
 
     // Initialize on mount
-    initializeState()
+    void initializeState()
 
     return () => {
       cleanupRestarted()

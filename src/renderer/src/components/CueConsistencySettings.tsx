@@ -177,7 +177,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
       }
     }
 
-    load()
+    void load()
   }, [seedYargProbability, seedAudioProbability, seedRb3Probability])
 
   const handleConsistencyWindowChange = useCallback(
@@ -242,9 +242,9 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
     setConsistencyWindow(Math.max(0, Math.min(300000, value)))
   }
 
-  const handleInputBlur = () => {
-    // Save when the user finishes editing (loses focus)
-    handleConsistencyWindowChange(consistencyWindow)
+  /** Saves when the user finishes editing, rather than on every keystroke. */
+  const handleInputBlur = async (): Promise<void> => {
+    await handleConsistencyWindowChange(consistencyWindow)
   }
 
   const handleMotionMinHoldChange = useCallback(

@@ -237,7 +237,7 @@ const CueSimulation: React.FC = () => {
       }
     }
 
-    loadSettings()
+    void loadSettings()
   }, [])
 
   // The page remembers what was last simulated. A selection changes as fast as the user clicks, so
@@ -276,7 +276,7 @@ const CueSimulation: React.FC = () => {
 
   // Load saved effect after group is loaded and effects are available
   useEffect(() => {
-    const loadSavedEffect = async () => {
+    const loadSavedEffect = (): void => {
       const saved = savedEffectRef.current
       if (!saved || saved.groupId !== selectedGroupId) {
         return
@@ -310,7 +310,8 @@ const CueSimulation: React.FC = () => {
         }
       }
 
-      checkForEffects()
+      // The retry chain continues through a timer, so this promise settles after the first attempt.
+      void checkForEffects()
     }
 
     loadSavedEffect()
@@ -511,7 +512,7 @@ const CueSimulation: React.FC = () => {
     }
 
     if (selectedGroup) {
-      fetchGroupInfo()
+      void fetchGroupInfo()
     }
   }, [selectedGroup, selectedGroupId, selectedRegistryType])
 

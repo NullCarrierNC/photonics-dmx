@@ -117,12 +117,12 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetchGroups sets state in async callback
-    fetchGroups()
+    void fetchGroups()
   }, [fetchGroups])
 
   useEffect(() => {
     const handleNodeCuesChanged = () => {
-      fetchGroups()
+      void fetchGroups()
     }
     addIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged)
     return () => {

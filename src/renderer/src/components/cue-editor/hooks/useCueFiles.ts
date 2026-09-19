@@ -465,8 +465,8 @@ const useCueFiles = ({
   )
 
   useEffect(() => {
-    fileIO.refreshFiles()
-    fileIO.refreshEffectFiles()
+    void fileIO.refreshFiles()
+    void fileIO.refreshEffectFiles()
     const handler = (payload: {
       yarg: NodeCueFileSummary[]
       audio: NodeCueFileSummary[]
@@ -527,12 +527,12 @@ const useCueFiles = ({
       if (effectFiles.length === 0) return
       const summary = effectFiles.find((f) => f.path === storedPath && f.mode === expectedFileMode)
       restoredLastFileRef.current = true
-      if (summary) fileIO.selectEffectFile(summary, preferredItemId)
+      if (summary) void fileIO.selectEffectFile(summary, preferredItemId)
     } else {
       if (files.length === 0) return
       const summary = files.find((f) => f.path === storedPath && f.mode === expectedFileMode)
       restoredLastFileRef.current = true
-      if (summary) fileIO.selectFile(summary, preferredItemId)
+      if (summary) void fileIO.selectFile(summary, preferredItemId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: one-shot restore
   }, [files, effectFiles, fileIO.selectFile, fileIO.selectEffectFile])

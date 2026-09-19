@@ -37,7 +37,7 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
     // Handle controllers restarted event
     const handleControllersRestarted = () => {
       log.info('Controllers restarted, refreshing YARG toggle state')
-      initializeState()
+      void initializeState()
     }
 
     const cleanup = registerIpcListener(
@@ -46,7 +46,7 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
     )
 
     // Initialize on mount
-    initializeState()
+    void initializeState()
 
     return cleanup
   }, [setIsYargEnabled])

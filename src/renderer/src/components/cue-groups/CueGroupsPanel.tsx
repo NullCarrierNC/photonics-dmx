@@ -109,7 +109,7 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
   }, [domain, log])
 
   useEffect(() => {
-    fetchGroups()
+    void fetchGroups()
   }, [fetchGroups])
 
   const clearPersistError = useCallback((groupId: string) => {

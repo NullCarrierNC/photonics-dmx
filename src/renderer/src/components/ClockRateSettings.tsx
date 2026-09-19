@@ -29,7 +29,7 @@ const ClockRateSettings: React.FC = () => {
       }
     }
 
-    loadClockRate()
+    void loadClockRate()
   }, [])
 
   const handleClockRateChange = useCallback(
