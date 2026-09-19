@@ -20,7 +20,7 @@ jest.mock('enttec-open-dmx-usb', () => {
         port: { isOpen: true, close: closeMock, drain: drainMock },
       })
       // Use Promise microtask (not setImmediate) so this fires even with jest.useFakeTimers()
-      Promise.resolve().then(() => dev.emit('ready'))
+      void Promise.resolve().then(() => dev.emit('ready'))
       return dev
     }),
   }

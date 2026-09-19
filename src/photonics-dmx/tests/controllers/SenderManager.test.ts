@@ -66,8 +66,8 @@ describe('SenderManager.disableAllSenders ordering', () => {
         stop: jest.fn(async () => {
           // From the moment the bulk disable starts, a concurrently published frame must be
           // dropped for EVERY sender — including ones whose stop() has not begun yet.
-          mgr.send('artnet', { 1: 255 })
-          mgr.send('sacn', { 1: 255 })
+          await mgr.send('artnet', { 1: 255 })
+          await mgr.send('sacn', { 1: 255 })
           for (const [otherId, other] of Object.entries(fakes)) {
             if ((other.send as jest.Mock).mock.calls.length > 0) routedDuringStop.push(otherId)
           }
@@ -137,7 +137,7 @@ describe('SenderManager.disableSender ordering', () => {
         // stop() blacks out then waits before closing; during this window the publisher must no
         // longer be able to reach this sender.
         enabledDuringStop = mgr.isSenderEnabled('artnet')
-        mgr.send('artnet', { 1: 255 }) // a live frame published mid-stop must be dropped
+        await mgr.send('artnet', { 1: 255 }) // a live frame published mid-stop must be dropped
         if ((sender.send as jest.Mock).mock.calls.length > 0) routedDuringStop = true
       }),
       send: jest.fn(),

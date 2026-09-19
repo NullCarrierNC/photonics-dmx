@@ -158,7 +158,7 @@ describe('Sequencer', () => {
       const duration = 1000
 
       // Call the method
-      sequencer.blackout(duration)
+      await sequencer.blackout(duration)
 
       // Verify the delegation
       expect(blackoutSpy).toHaveBeenCalledWith(duration)
