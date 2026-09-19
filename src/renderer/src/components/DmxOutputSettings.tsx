@@ -357,19 +357,23 @@ const DmxOutputSettings: React.FC = () => {
     }
   }
 
-  // Save expanded state changes
-  const saveExpandedStates = async (
-    artNet: boolean,
-    sacn: boolean,
-    enttecPro: boolean,
-    openDmx: boolean,
-  ) => {
+  const panelSetters = {
+    artNetExpanded: setArtNetExpanded,
+    sacnExpanded: setSacnExpanded,
+    enttecProExpanded: setEnttecProExpanded,
+    openDmxExpanded: setOpenDmxExpanded,
+  }
+
+  /** Opens or closes one sender's panel and saves the layout all four share. */
+  const toggleExpanded = async (panel: keyof typeof panelSetters): Promise<void> => {
     const newDmxSettingsPrefs = {
-      artNetExpanded: artNet,
-      sacnExpanded: sacn,
-      enttecProExpanded: enttecPro,
-      openDmxExpanded: openDmx,
+      artNetExpanded,
+      sacnExpanded,
+      enttecProExpanded,
+      openDmxExpanded,
     }
+    newDmxSettingsPrefs[panel] = !newDmxSettingsPrefs[panel]
+    panelSetters[panel](newDmxSettingsPrefs[panel])
 
     if (!(await persist({ dmxSettingsPrefs: newDmxSettingsPrefs }, 'the panel layout'))) {
       return
@@ -446,16 +450,7 @@ const DmxOutputSettings: React.FC = () => {
             config={sacnConfig}
             networkInterfaces={networkInterfaces}
             expanded={sacnExpanded}
-            onToggle={() => {
-              const newSacnExpanded = !sacnExpanded
-              setSacnExpanded(newSacnExpanded)
-              saveExpandedStates(
-                artNetExpanded,
-                newSacnExpanded,
-                enttecProExpanded,
-                openDmxExpanded,
-              )
-            }}
+            onToggle={() => void toggleExpanded('sacnExpanded')}
             onConfigChange={handleSacnConfigChange}
           />
         </div>
@@ -466,16 +461,7 @@ const DmxOutputSettings: React.FC = () => {
           <ArtNetConfigCard
             config={artNetConfig}
             expanded={artNetExpanded}
-            onToggle={() => {
-              const newArtNetExpanded = !artNetExpanded
-              setArtNetExpanded(newArtNetExpanded)
-              saveExpandedStates(
-                newArtNetExpanded,
-                sacnExpanded,
-                enttecProExpanded,
-                openDmxExpanded,
-              )
-            }}
+            onToggle={() => void toggleExpanded('artNetExpanded')}
             onConfigChange={handleArtNetConfigChange}
           />
         </div>
@@ -489,16 +475,7 @@ const DmxOutputSettings: React.FC = () => {
             onComPortChange={handleComPortChange}
             onRefreshRateChange={handleEnttecProSpeedChange}
             expanded={enttecProExpanded}
-            onToggle={() => {
-              const newEnttecProExpanded = !enttecProExpanded
-              setEnttecProExpanded(newEnttecProExpanded)
-              saveExpandedStates(
-                artNetExpanded,
-                sacnExpanded,
-                newEnttecProExpanded,
-                openDmxExpanded,
-              )
-            }}
+            onToggle={() => void toggleExpanded('enttecProExpanded')}
           />
         </div>
       )}
@@ -511,16 +488,7 @@ const DmxOutputSettings: React.FC = () => {
             onComPortChange={handleOpenDmxComPortChange}
             onRefreshRateChange={handleOpenDmxSpeedChange}
             expanded={openDmxExpanded}
-            onToggle={() => {
-              const newOpenDmxExpanded = !openDmxExpanded
-              setOpenDmxExpanded(newOpenDmxExpanded)
-              saveExpandedStates(
-                artNetExpanded,
-                sacnExpanded,
-                enttecProExpanded,
-                newOpenDmxExpanded,
-              )
-            }}
+            onToggle={() => void toggleExpanded('openDmxExpanded')}
           />
         </div>
       )}
