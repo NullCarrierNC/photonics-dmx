@@ -386,10 +386,10 @@ export class ControllerGraph {
   }
 
   /** Shut down the publisher, tolerating failure. Used by the shutdown path. */
-  public async shutdownPublisherSafe(): Promise<void> {
+  public shutdownPublisherSafe(): void {
     if (this.dmxPublisher) {
       try {
-        await this.dmxPublisher.shutdown()
+        this.dmxPublisher.shutdown()
         log.info('ControllerManager shutdown: DMX publisher stopped')
       } catch (err) {
         log.error('Error shutting down DMX publisher:', err)
@@ -398,9 +398,9 @@ export class ControllerGraph {
   }
 
   /** Shut down the publisher, propagating failure. Used by the restart path. */
-  public async shutdownPublisher(): Promise<void> {
+  public shutdownPublisher(): void {
     if (this.dmxPublisher) {
-      await this.dmxPublisher.shutdown()
+      this.dmxPublisher.shutdown()
     }
   }
 

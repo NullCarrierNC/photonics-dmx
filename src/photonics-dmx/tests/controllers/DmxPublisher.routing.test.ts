@@ -370,7 +370,7 @@ describe('DmxPublisher per-sender governor isolation', () => {
     }
   })
 
-  it('shutdown sends a `kind: manual` blackout payload to IPC', async () => {
+  it('shutdown sends a `kind: manual` blackout payload to IPC', () => {
     const sender = makeMockSender({ wireSenders: ['sacn'], ipcEnabled: true })
     const publisher = new DmxPublisher(
       sender as unknown as SenderManager,
@@ -378,7 +378,7 @@ describe('DmxPublisher per-sender governor isolation', () => {
       new StrobeStateManager(),
     )
 
-    await publisher.shutdown()
+    publisher.shutdown()
 
     // The publisher emits a manual blackout to every enabled wire sender AND to IPC.
     const lastIpcCall = sender.sendIpc.mock.calls[sender.sendIpc.mock.calls.length - 1]!

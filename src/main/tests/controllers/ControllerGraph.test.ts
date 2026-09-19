@@ -119,16 +119,18 @@ describe('ControllerGraph teardown steps', () => {
     expect(graph.getEffectLoader()).toBeNull()
   })
 
-  it('shutdownPublisherSafe swallows a failing publisher, shutdownPublisher propagates it', async () => {
+  it('shutdownPublisherSafe swallows a failing publisher, shutdownPublisher propagates it', () => {
     const graph = makeGraph()
     seed(graph, {
       dmxPublisher: {
-        shutdown: jest.fn().mockImplementation(() => Promise.reject(new Error('boom'))),
+        shutdown: jest.fn(() => {
+          throw new Error('boom')
+        }),
       },
     })
 
-    await expect(graph.shutdownPublisherSafe()).resolves.toBeUndefined()
-    await expect(graph.shutdownPublisher()).rejects.toThrow('boom')
+    expect(() => graph.shutdownPublisherSafe()).not.toThrow()
+    expect(() => graph.shutdownPublisher()).toThrow('boom')
   })
 
   it('destroyClock tolerates a throwing clock and clears it either way', () => {

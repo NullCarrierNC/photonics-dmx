@@ -38,7 +38,7 @@ export async function runControllerShutdown(ctx: ControllerShutdownContext): Pro
   ctx.lifecycle.setPhase('shuttingDown')
   log.info('ControllerManager shutdown: starting')
 
-  await ctx.graph.shutdownPublisherSafe()
+  ctx.graph.shutdownPublisherSafe()
 
   try {
     await ctx.listenerLifecycle.yargRb3.disableYarg()

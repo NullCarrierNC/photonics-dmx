@@ -217,7 +217,7 @@ describe('DmxPublisher mid-flight rig add/remove', () => {
     publisher.updateActiveRigs([makeRig('A', 'la', 1)])
     publisher.setRigChains([{ rigId: 'A', lightStateManager: lsmA }])
 
-    await publisher.shutdown()
+    publisher.shutdown()
 
     sender.send.mockClear()
     lsmA.setLightState('la', rgbio({ red: 99, intensity: 99 }))

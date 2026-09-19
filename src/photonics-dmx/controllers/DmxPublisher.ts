@@ -737,7 +737,7 @@ export class DmxPublisher {
     this._ipc.lastSendTimeMs = 0
   }
 
-  public async shutdown(): Promise<void> {
+  public shutdown(): void {
     try {
       this.clearManualBuffer()
       // Remove all event listeners (single-source path uses removeAllListeners; per-chain

@@ -70,7 +70,7 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
 
     ctx.graph.disposeChainsForRestart()
 
-    await ctx.graph.shutdownPublisher()
+    ctx.graph.shutdownPublisher()
     await ctx.senderLifecycle.resetSenderForControllerRestart()
 
     ctx.graph.shutdownDomainCueHandlerRefs()
