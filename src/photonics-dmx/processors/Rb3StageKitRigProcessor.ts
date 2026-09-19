@@ -191,7 +191,9 @@ export class Rb3StageKitRigProcessor {
     if (effectData.targetLights) {
       // restoreColorsAfterStrobe keys strobedLights and the reblend by DMX light index, so
       // pass the stored DMX indices (effectData.positions).
-      void this.restoreColorsAfterStrobe(effectData.targetLights, effectData.positions)
+      this.restoreColorsAfterStrobe(effectData.targetLights, effectData.positions).catch((err) =>
+        log.error(`Rig ${this.rigId}: failed to reblend after a strobe:`, err),
+      )
     }
   }
 
@@ -263,7 +265,7 @@ export class Rb3StageKitRigProcessor {
 
   /** Cancel timers and intervals owned by this rig. Use when a rig is removed from the
    *  active set so we don't keep ticking against a torn-down sequencer. */
-  public async dispose(): Promise<void> {
+  public dispose(): void {
     for (const pendingUpdate of this.pendingUpdates.values()) {
       if (pendingUpdate.timeout) clearTimeout(pendingUpdate.timeout)
     }
@@ -335,7 +337,10 @@ export class Rb3StageKitRigProcessor {
     }
     const strobeInterval = setInterval(() => {
       if (isOn) {
-        void this.restoreColorsAfterStrobe(targetLights, dmxLightIndices)
+        // Awaiting here would skew the strobe period, so the reblend reports its own failure.
+        this.restoreColorsAfterStrobe(targetLights, dmxLightIndices).catch((err) =>
+          log.error(`Rig ${this.rigId}: failed to reblend after a strobe:`, err),
+        )
         isOn = false
       } else {
         this.sequencer.setState(targetLights, color, 0)

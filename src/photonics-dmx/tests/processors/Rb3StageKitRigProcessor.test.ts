@@ -177,9 +177,9 @@ describe('Rb3StageKitRigProcessor strobe runs', () => {
     expect(runningStrobes(proc)).toEqual(['stagekit-strobe-rig-1-medium'])
   })
 
-  it('leaves nothing running after dispose', async () => {
+  it('leaves nothing running after dispose', () => {
     proc.applyStrobeEffect('fastest')
-    await proc.dispose()
+    proc.dispose()
 
     expect(runningStrobes(proc)).toEqual([])
     setState.mockClear()

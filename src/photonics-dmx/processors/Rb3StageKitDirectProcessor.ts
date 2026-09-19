@@ -106,7 +106,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     // Dispose rigs that left the active set.
     for (const [rigId, rig] of this.rigs) {
       if (!currentRigIds.has(rigId)) {
-        void rig.dispose().catch((err) => log.error(`Rig ${rigId}: error disposing:`, err))
+        rig.dispose()
         this.rigs.delete(rigId)
       }
     }
@@ -565,9 +565,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     this.clearMenuAnimationTimer()
     this.strobeWatchdog.stop()
     for (const rig of this.rigs.values()) {
-      void rig.dispose().catch((error) => {
-        log.error(`Rig ${rig.rigId}: error disposing during destroy:`, error)
-      })
+      rig.dispose()
     }
     this.rigs.clear()
     this.removeAllListeners()

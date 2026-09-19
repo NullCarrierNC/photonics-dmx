@@ -86,7 +86,7 @@ async function runStrobe(clockMs: number, type: 'fastest' | 'fast' | 'medium'): 
   await step(500, false)
   const whiteAfterStop = isWhite()
 
-  await rig.dispose()
+  rig.dispose()
   sequencer.shutdown()
   clockNow.mockRestore()
 
