@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Modal from './Modal'
 import {
   DmxLight,
@@ -29,6 +29,20 @@ import { useIpcPreviewSender } from '@renderer/hooks/useIpcPreviewSender'
 import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('MovingHeadCalibrationWizard')
+
+/**
+ * Hands console mode back. Nothing in the wizard can wait on this, so a refusal or a rejection is
+ * reported here rather than at the call site.
+ */
+const leaveConsole = (): void => {
+  disableConsole()
+    .then((result) => {
+      if (!result.success) {
+        log.error('Main refused to leave DMX console mode:', result.error)
+      }
+    })
+    .catch((error) => log.error('Failed to leave DMX console mode:', error))
+}
 
 const STEP_TITLES = [
   'Pan range',
@@ -71,6 +85,9 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [stepsConfirmed, setStepsConfirmed] = useState<Set<number>>(() => new Set())
+  // Console mode belongs to the latest effect run, so a run that a later one has replaced leaves
+  // the hand-back to its successor.
+  const consoleOwnerRef = useRef(0)
 
   const ch = light.channels as RgbMovingHeadDmxChannels
 
@@ -104,10 +121,14 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
   useEffect(() => {
     let cancelled = false
     const snapshot = light
+    const token = ++consoleOwnerRef.current
+    // Sent before the first await, because main answers a disable that arrives ahead of the
+    // enable with success and no work, leaving the rig in manual output for the session.
+    const pending = enableConsole(rigId)
     void (async () => {
       setInitError(null)
       try {
-        const result = await enableConsole(rigId)
+        const result = await pending
         if (cancelled) return
         if (!result.success) {
           setInitError(result.error)
@@ -124,8 +145,15 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
       }
     })()
     return () => {
+      // The flag stops the renderer writing into a wizard that is gone. The hand-back waits for
+      // this run's own enable, and only runs while this run still owns console mode.
       cancelled = true
-      void disableConsole()
+      const release = (): void => {
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- reading the ref late is the point: a value copied at cleanup time cannot say whether a later run has taken console mode over.
+        if (consoleOwnerRef.current !== token) return
+        leaveConsole()
+      }
+      pending.then(release, release)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-init console when rig or light instance id changes; full `light` would reset on every parent re-render.
   }, [rigId, light.id])
@@ -173,14 +201,22 @@ const MovingHeadCalibrationWizard: React.FC<MovingHeadCalibrationWizardProps> = 
       await disableConsole()
       onComplete(config)
       onClose()
+    } catch (error) {
+      log.error('Failed to save the calibration:', error)
+      setSaveError(error instanceof Error ? error.message : String(error))
     } finally {
       setSaving(false)
     }
   }
 
-  const handleCancel = async () => {
-    await disableConsole()
-    onClose()
+  const handleCancel = async (): Promise<void> => {
+    try {
+      await disableConsole()
+    } catch (error) {
+      log.error('Failed to leave DMX console mode:', error)
+    } finally {
+      onClose()
+    }
   }
 
   const progress = (
