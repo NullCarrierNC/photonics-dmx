@@ -105,7 +105,7 @@ describe('Node cue logic runtime', () => {
     jest.restoreAllMocks()
   })
 
-  it('branches through conditional logic and clamps divide-by-zero', async () => {
+  it('branches through conditional logic and clamps divide-by-zero', () => {
     const definition: NetNodeCueDefinition = {
       id: 'logic-cue',
       name: 'Logic Cue',
@@ -244,7 +244,7 @@ describe('Node cue logic runtime', () => {
         }) as any,
     )
 
-    await cue.execute({ beat: 'Strong' } as any, sequencer, lightManager)
+    cue.execute({ beat: 'Strong' } as any, sequencer, lightManager)
 
     // Verify the conditional logic evaluated correctly (10/0 = 0, 0 == 0 is true)
     expect(buildEffectSpy).toHaveBeenCalledWith(
@@ -256,7 +256,7 @@ describe('Node cue logic runtime', () => {
     expect(addEffect).toHaveBeenCalledTimes(1)
   })
 
-  it('computes wrap, clamp, and select-from-list in a chain and branches on the result', async () => {
+  it('computes wrap, clamp, and select-from-list in a chain and branches on the result', () => {
     const definition: NetNodeCueDefinition = {
       id: 'p6-cue',
       name: 'P6 Cue',
@@ -321,7 +321,7 @@ describe('Node cue logic runtime', () => {
     const cue = new LightingNodeCue('group-1', compiled)
     const { sequencer, lightManager, buildEffectSpy } = setupEffectMocks()
 
-    await cue.execute({ beat: 'Strong' } as any, sequencer, lightManager)
+    cue.execute({ beat: 'Strong' } as any, sequencer, lightManager)
 
     // 4 -> clamped to 2 -> [100,200,300][2] = 300, so 300 == 300 is true.
     expect(buildEffectSpy).toHaveBeenCalledWith(

@@ -124,7 +124,7 @@ const baseCueData: CueData = {
 } as CueData
 
 describe('LightingNodeCue execution lifecycle', () => {
-  it('runs cue-started once and cue-called on every execute', async () => {
+  it('runs cue-started once and cue-called on every execute', () => {
     const { sequencer, recorded } = createRecordingSequencer()
     const def = createCueDefinition(
       [
@@ -141,14 +141,14 @@ describe('LightingNodeCue execution lifecycle', () => {
     )
     const lightManager = new DmxLightManager(createMockLightingConfig())
 
-    await nodeCue.execute(baseCueData, sequencer, lightManager)
-    await nodeCue.execute(baseCueData, sequencer, lightManager)
+    nodeCue.execute(baseCueData, sequencer, lightManager)
+    nodeCue.execute(baseCueData, sequencer, lightManager)
 
     expect(recorded.filter((call) => call.method === 'setEffect')).toHaveLength(1)
     expect(recorded.filter((call) => call.method === 'addEffect')).toHaveLength(2)
   })
 
-  it('re-enters cue-called-only cues on every execute', async () => {
+  it('re-enters cue-called-only cues on every execute', () => {
     const { sequencer, recorded } = createRecordingSequencer()
     const def = createCueDefinition(
       [{ id: 'ev-called', type: 'event', eventType: 'cue-called' }],
@@ -162,8 +162,8 @@ describe('LightingNodeCue execution lifecycle', () => {
     )
     const lightManager = new DmxLightManager(createMockLightingConfig())
 
-    await nodeCue.execute(baseCueData, sequencer, lightManager)
-    await nodeCue.execute(baseCueData, sequencer, lightManager)
+    nodeCue.execute(baseCueData, sequencer, lightManager)
+    nodeCue.execute(baseCueData, sequencer, lightManager)
 
     expect(recorded.filter((call) => call.method === 'setEffect')).toHaveLength(1)
     expect(recorded.filter((call) => call.method === 'addEffect')).toHaveLength(1)

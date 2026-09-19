@@ -2796,7 +2796,7 @@ describe('NodeExecutionEngine', () => {
   })
 
   describe('two cues sharing one groupId, one stops', () => {
-    it('second cue can still run after first cue is stopped', async () => {
+    it('second cue can still run after first cue is stopped', () => {
       const groupId = 'shared-group'
       const eventNode: NetEventNode = {
         id: 'event1',
@@ -2853,12 +2853,12 @@ describe('NodeExecutionEngine', () => {
       const cue2 = new LightingNodeCue(groupId, compiled2, registry)
       const params = createCueData('Strong')
 
-      await cue1.execute(params, mockSequencer, mockLightManager)
+      cue1.execute(params, mockSequencer, mockLightManager)
       cue1.onStop()
       const totalCallsBefore =
         (mockSequencer.setEffectUnblockedName as jest.Mock).mock.calls.length +
         (mockSequencer.addEffect as jest.Mock).mock.calls.length
-      await cue2.execute(params, mockSequencer, mockLightManager)
+      cue2.execute(params, mockSequencer, mockLightManager)
       const totalCallsAfter =
         (mockSequencer.setEffectUnblockedName as jest.Mock).mock.calls.length +
         (mockSequencer.addEffect as jest.Mock).mock.calls.length

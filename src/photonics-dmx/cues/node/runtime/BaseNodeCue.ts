@@ -120,11 +120,15 @@ export abstract class BaseNodeCue implements INetCue {
     return state
   }
 
+  /**
+   * Starts a cue run. {@link INetCue.execute} keeps the wider `void | Promise<void>`, which is what
+   * `BaseAudioNodeCue` returns.
+   */
   execute(
     parameters: CueData,
     sequencer: ILightingController,
     lightManager: DmxLightManager,
-  ): void | Promise<void> {
+  ): void {
     const state = this.getOrCreateState(sequencer, lightManager)
     state.engine!.startCueRun(parameters, {
       hasCueStartedFired: state.session.hasCueStartedFired(),
