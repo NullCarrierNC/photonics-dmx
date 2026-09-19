@@ -20,6 +20,9 @@ function makeGraph(prefs: Record<string, unknown> = {}): ControllerGraph {
   } as unknown as ConfigurationManager
   const deps: ControllerGraphDeps = {
     getConfig: () => config,
+    isRb3Enabled: () => false,
+    isYargEnabled: () => false,
+    isAudioEnabled: () => false,
     getSenderManager: jest.fn() as unknown as ControllerGraphDeps['getSenderManager'],
     chainFanout: new ChainFanout(),
     venueFrameProcessor: new VenueFrameProcessor(),

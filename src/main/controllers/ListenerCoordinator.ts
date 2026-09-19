@@ -378,6 +378,23 @@ export class ListenerCoordinator {
       return
     }
     this.isRb3Enabled = false
+    // Input, then cues, then output, as disableYarg does. The socket closes synchronously and
+    // destroying the processors stops the keepalive and the menu pump generating frames of their
+    // own, so the blackout below is the last word on the lights rather than something a late
+    // packet or a local tick can undo.
+    const listenerClosing = this.rb3eListener?.shutdown()
+    if (this.processorManager) {
+      this.processorManager.destroy()
+      this.processorManager = null
+    }
+    this.notifyRuntimeDisabled('rb3')
+    this.clearChainHandlers('rb3')
+    for (const chain of this.deps.getRigChains()) {
+      if (chain.rb3MenuCueHandler) {
+        chain.rb3MenuCueHandler.shutdown()
+        chain.rb3MenuCueHandler = null
+      }
+    }
     if (options.blackout) {
       for (const chain of this.deps.getRigChains()) {
         try {
@@ -391,21 +408,10 @@ export class ListenerCoordinator {
         'ListenerCoordinator: Cleared running effects and blacked out every rig (disable RB3)',
       )
     }
-    if (this.rb3eListener) {
-      await this.rb3eListener.shutdown()
+    // Awaited last, so the blackout stays in the toggle's own tick.
+    if (listenerClosing) {
+      await listenerClosing
       this.rb3eListener = null
-    }
-    if (this.processorManager) {
-      this.processorManager.destroy()
-      this.processorManager = null
-    }
-    this.notifyRuntimeDisabled('rb3')
-    this.clearChainHandlers('rb3')
-    for (const chain of this.deps.getRigChains()) {
-      if (chain.rb3MenuCueHandler) {
-        chain.rb3MenuCueHandler.shutdown()
-        chain.rb3MenuCueHandler = null
-      }
     }
   }
 

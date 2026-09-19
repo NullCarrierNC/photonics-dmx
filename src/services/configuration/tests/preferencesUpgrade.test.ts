@@ -10,6 +10,7 @@ jest.mock('electron', () => ({
 import { PreferencesConfigFile } from '../PreferencesConfigFile'
 import { DEFAULT_PREFERENCES } from '../configurationDefaults'
 import { createDefaultCueDomains } from '../cueDomainTypes'
+import { normalizeLagCompensationMs } from '../../../shared/lagCompensation'
 
 const createdDirs: string[] = []
 
@@ -176,6 +177,43 @@ describe('PreferencesConfigFile upgrade path', () => {
     // Optional keys stay absent rather than being seeded, so every reader defaults for itself.
     expect(prefs.blackoutShortcutKey).toBeUndefined()
     expect(prefs.blackoutShortcutScope).toBeUndefined()
+  })
+
+  it('loads a same-version v6 file that predates lag compensation without wiping it', () => {
+    const appData = freshAppData()
+    const {
+      videoLagCompensationMs: _omittedVideo,
+      audioLagCompensationMs: _omittedAudio,
+      ...withoutKey
+    } = DEFAULT_PREFERENCES
+    seedPrefs(appData, 6, { ...withoutKey, effectDebounce: 97 })
+
+    const onCorruptRecovery = jest.fn()
+    const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+    expect(onCorruptRecovery).not.toHaveBeenCalled()
+    expect(prefs.effectDebounce).toBe(97)
+    // Optional keys stay absent rather than being seeded, so every reader defaults for itself.
+    expect(prefs.videoLagCompensationMs).toBeUndefined()
+    expect(prefs.audioLagCompensationMs).toBeUndefined()
+  })
+
+  it('keeps the rest of a file whose stored lag compensation is unusable', () => {
+    // The key is deliberately not declared to the schema, so a hand-edited value cannot send the
+    // whole file to corrupt-recovery. Readers normalize it instead.
+    const appData = freshAppData()
+    seedPrefs(appData, 6, {
+      ...DEFAULT_PREFERENCES,
+      effectDebounce: 96,
+      videoLagCompensationMs: 'fast' as unknown as number,
+    })
+
+    const onCorruptRecovery = jest.fn()
+    const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+    expect(onCorruptRecovery).not.toHaveBeenCalled()
+    expect(prefs.effectDebounce).toBe(96)
+    expect(normalizeLagCompensationMs(prefs.videoLagCompensationMs)).toBe(0)
   })
 
   it('migrates a stored v4 file end-to-end without throwing or recovering', () => {

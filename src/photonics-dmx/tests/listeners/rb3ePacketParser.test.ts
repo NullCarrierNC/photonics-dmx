@@ -7,27 +7,15 @@ import {
   MAX_PACKET_TYPE,
   parseRb3ePacketHeader,
   parseStageKitData,
-  PROTOCOL_MAGIC,
   readNullTerminatedString,
   type StageKitPersistentState,
 } from '../../listeners/RB3/rb3ePacketParser'
 import { Rb3ePacketType, Rb3PlatformID, Rb3RightChannel } from '../../listeners/RB3/rb3eTypes'
+import { buildRb3ePacket } from '../helpers/rb3ePacket'
 
 const NOW = 1_700_000_000_000
 
-/** Builds a well-formed RB3E datagram around the given payload. */
-function packet(
-  type: number,
-  payload: Buffer = Buffer.alloc(0),
-  opts: { platform?: number; protocolVersion?: number; declaredSize?: number } = {},
-): Buffer {
-  const header = Buffer.alloc(4)
-  header.writeUInt8(opts.protocolVersion ?? 1, 0)
-  header.writeUInt8(type, 1)
-  header.writeUInt8(opts.declaredSize ?? payload.length, 2)
-  header.writeUInt8(opts.platform ?? Rb3PlatformID.RB3E_PLATFORM_XBOX, 3)
-  return Buffer.concat([PROTOCOL_MAGIC, header, payload])
-}
+const packet = buildRb3ePacket
 
 const idleState: StageKitPersistentState = {
   strobeState: 'Strobe_Off',

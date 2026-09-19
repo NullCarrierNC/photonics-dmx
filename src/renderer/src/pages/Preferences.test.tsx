@@ -85,6 +85,10 @@ jest.mock('../components/AdvancedModeSettings', () => ({
   __esModule: true,
   default: () => <div data-testid="prefs-advanced-mode" />,
 }))
+jest.mock('../components/LagCompensationSettings', () => ({
+  __esModule: true,
+  default: () => <div data-testid="prefs-lag-compensation" />,
+}))
 
 describe('Preferences', () => {
   beforeEach(() => {
@@ -110,6 +114,8 @@ describe('Preferences', () => {
     expect(screen.queryByTestId('prefs-clock-rate')).toBeNull()
     // The blackout shortcut is not an advanced setting: it stays reachable either way.
     expect(screen.getByTestId('prefs-esc-blackout')).toBeInTheDocument()
+    // Lag compensation is the same: a rig out of step with the screen is not an advanced problem.
+    expect(screen.getByTestId('prefs-lag-compensation')).toBeInTheDocument()
   })
 
   it('with Advanced Mode on shows Audio tab, Active Rigs, and full Advanced tab content', () => {
@@ -141,6 +147,17 @@ describe('Preferences', () => {
     expect(screen.getByTestId('prefs-cue-consistency')).toBeInTheDocument()
     expect(screen.getByTestId('prefs-clock-rate')).toBeInTheDocument()
     expect(screen.getByTestId('prefs-esc-blackout')).toBeInTheDocument()
+    expect(screen.getByTestId('prefs-lag-compensation')).toBeInTheDocument()
+  })
+
+  it('puts lag compensation above the Advanced Mode toggle', () => {
+    renderWithProviders(<Preferences />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Advanced' }))
+
+    const lag = screen.getByTestId('prefs-lag-compensation')
+    const advancedMode = screen.getByTestId('prefs-advanced-mode')
+
+    expect(lag.compareDocumentPosition(advancedMode)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
   it('moves between tabs with the arrow keys, Home and End', () => {

@@ -31,9 +31,9 @@ function keyLabel(key: BlackoutShortcutKey): string {
 function keyDescription(key: BlackoutShortcutKey): string {
   switch (key) {
     case 'escape':
-      return 'Works even while you are typing, since nothing in Photonics uses Escape in a field. An open dialog keeps it, so a first press closes the dialog rather than blacking out.'
+      return 'If you have a modal open it will close on esc, so second press will toggle the lights.'
     case 'backquote':
-      return 'Stands aside while you are typing in a text box or the JSON editor, so a backtick stays a backtick. Follows the physical key below Escape whatever your layout prints on it.'
+      return "CAUTION: Won't toggle the lights if you're typing in a text box."
   }
 }
 
@@ -82,8 +82,7 @@ const BlackoutShortcutSettings: React.FC = () => {
         Blackout Shortcut Key
       </h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Binds a key to the master blackout, so output can be killed without reaching for the sidebar
-        button.
+        Binds a key to the master blackout, so output can be toggled by a keypress.
       </p>
 
       <label
@@ -147,8 +146,8 @@ const BlackoutShortcutSettings: React.FC = () => {
       {scope === 'system-wide' && (
         <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">
           {key === 'backquote'
-            ? 'NOTE: this takes the ` key away from every other application while Photonics is running and not in focus. No backticks in a terminal, a chat window or an editor, and the character will simply never arrive.'
-            : 'NOTE: this takes ESC away from every other application on this machine for as long as Photonics is running and not in focus.'}
+            ? 'NOTE: this takes the ` key away from every other application while Photonics is running - even when not in focus. No backticks in a terminal, a chat window editor, etc.'
+            : 'NOTE: this takes ESC key away from every other application while Photonics is running - even when not in focus.'}
         </p>
       )}
 

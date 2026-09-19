@@ -16,6 +16,7 @@ import { clampDmxOutputRefreshRateHz } from '../../../shared/dmxOutputRefresh'
 import { validateStoredUsbSenderConfigs } from './usbSenderConfigValidation'
 import { SACN_UNIVERSE_MAX, SACN_UNIVERSE_MIN } from '../../../shared/sacnUniverse'
 import { clampClockRateMs } from '../../../shared/clockRate'
+import { clampLagCompensationMs } from '../../../shared/lagCompensation'
 import { BLACKOUT_SHORTCUT_KEYS, BLACKOUT_SHORTCUT_SCOPES } from '../../../shared/blackoutShortcut'
 import {
   isPlainObject,
@@ -317,6 +318,8 @@ const APP_PREFERENCES_KEY_MAP: Record<keyof AppPreferences, true> = {
   strobeOutputEnabled: true,
   blackoutShortcutKey: true,
   blackoutShortcutScope: true,
+  videoLagCompensationMs: true,
+  audioLagCompensationMs: true,
 }
 
 const APP_PREFERENCES_KEYS = new Set(
@@ -539,6 +542,19 @@ export function validatePreferencesPayload(
     )
     if (!v.ok) return v
     cleaned.yargFallbackCueTimeMs = Math.round(v.value)
+  }
+
+  // Clamped rather than refused, as the clock rate is. Both keys are deliberately absent from the
+  // prefs schema, so a value already on disk is brought into range where it is read, and an
+  // unusable one cannot send the whole file to corrupt-recovery.
+  for (const key of ['videoLagCompensationMs', 'audioLagCompensationMs'] as const) {
+    if (key in cleaned) {
+      const delay = cleaned[key]
+      if (typeof delay !== 'number' || !Number.isFinite(delay)) {
+        return { ok: false, error: `${key} must be a finite number` }
+      }
+      cleaned[key] = clampLagCompensationMs(delay)
+    }
   }
 
   if ('clockRate' in cleaned) {

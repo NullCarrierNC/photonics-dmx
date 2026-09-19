@@ -31,6 +31,7 @@ import {
   type BlackoutShortcutKey,
   type BlackoutShortcutScope,
 } from '../../shared/blackoutShortcut'
+import { LAG_COMPENSATION_MS_DEFAULT } from '../../shared/lagCompensation'
 
 /**
  * Application preferences (persisted in prefs.json).
@@ -127,6 +128,16 @@ export interface AppPreferences {
   blackoutShortcutKey?: BlackoutShortcutKey
   /** How far that key reaches. */
   blackoutShortcutScope?: BlackoutShortcutScope
+  /**
+   * How long DMX output is held so the rig lands with the game's picture on a display that
+   * processes it. Covers YARG, RB3E, the Cue Simulator and the Console. 0 is off.
+   */
+  videoLagCompensationMs?: number
+  /**
+   * The same, for audio-reactive lighting. Separate because an AV chain delays sound and picture by
+   * different amounts, and a loopback capture is early where a microphone is late. 0 is off.
+   */
+  audioLagCompensationMs?: number
   audioConfig?: AudioConfig
   activeAudioCueType?: AudioCueType
   audioGameMode?: AudioGameModeConfig
@@ -283,6 +294,8 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   strobeOutputEnabled: true,
   blackoutShortcutKey: DEFAULT_BLACKOUT_SHORTCUT_KEY,
   blackoutShortcutScope: DEFAULT_BLACKOUT_SHORTCUT_SCOPE,
+  videoLagCompensationMs: LAG_COMPENSATION_MS_DEFAULT,
+  audioLagCompensationMs: LAG_COMPENSATION_MS_DEFAULT,
   audioConfig: DEFAULT_AUDIO_CONFIG,
   cueEditorWindowState: {
     width: 1200,

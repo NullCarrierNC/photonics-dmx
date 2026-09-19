@@ -44,6 +44,33 @@ Node types include: event listeners (YARG cues, effect triggers), logic (variabl
 (light effects with timing), event raisers, effect raisers/listeners. The visual cue editor (in the renderer) provides a
 ReactFlow-based UI for authoring these JSON files. See [cues/node/README.md](cues/node/README.md) for details.
 
+### Lag Compensation
+
+A TV or an AV receiver spends time processing picture and sound before either reaches the operator,
+so the rig runs ahead of both. `DmxPublisher` holds wire output for the number of milliseconds the
+`videoLagCompensationMs` or `audioLagCompensationMs` preference asks for (0, the default, sends in
+the publishing frame and arms no timer).
+
+The hold sits at the wire fork rather than upstream. The rig visualiser in the renderer is fed from
+`SenderManager.sendIpc`, which the publisher dispatches from the same computed frame as the wire
+senders, so a delay anywhere further up would move the preview and the fixtures together and
+correct nothing between them. Held at the fork, the fixtures move and the preview does not, which is
+what puts the two in step: the preview is already late by the display's own latency.
+
+The delay applies below the output-rate governor, so its dirty-skip and trailing-timer bookkeeping
+stay on real time, and the frame is copied on the way in because the governor reuses one buffer per
+slot. The sender's promise is passed back, so a failed send still drops the governor's cache.
+
+Which of the two values applies is resolved per frame by `resolveLagCompensationMs`, following the
+same `RB3E > YARG > AUDIO` precedence the renderer uses to decide which source owns the screen.
+Audio is calibrated separately because an AV chain rarely delays sound and picture by the same
+amount. With nothing listening, the Cue Simulator or the Console is driving and the video value
+applies, since both are watched on a display.
+
+Nothing that an operator expects to act at once is held: the master blackout, the master dimmer and
+the strobe gate all re-emit through `refreshOutput`, which drops held frames and sends immediately,
+and the shutdown blackout goes straight at the sender.
+
 ## Processing Architecture
 
 Photonics uses different processing approaches for YARG and RB3E:
