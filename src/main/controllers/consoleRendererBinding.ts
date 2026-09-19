@@ -34,7 +34,7 @@ export function bindConsoleModeToRenderer(
     released = true
     webContents.off('did-start-navigation', onNavigate)
     log.info(`Leaving console mode: the page ${reason}`)
-    void disableConsoleMode().catch((err) => {
+    disableConsoleMode().catch((err) => {
       log.error('Error leaving console mode:', err)
     })
   }

@@ -211,7 +211,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     this._currentGameState = 'Menus'
     this._inSong = false
     this.emit('cueHandled', this.menusCueData(null, 'RB3E', screenName))
-    void this.turnOffAllRigs().catch((error) => {
+    this.turnOffAllRigs().catch((error) => {
       log.error(
         'StageKitDirectProcessor: Error clearing lights during screen-based Default menu cue:',
         error,
@@ -349,14 +349,14 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         this._inSong = true
         this.clearMenuAnimationTimer()
 
-        void this.turnOffAllRigs().catch((error) => {
+        this.turnOffAllRigs().catch((error) => {
           log.error(
             'StageKitDirectProcessor: Error clearing lights during InGame transition:',
             error,
           )
         })
 
-        void this.blackoutAllRigs().catch((error) => {
+        this.blackoutAllRigs().catch((error) => {
           log.error(
             'StageKitDirectProcessor: Error calling sequencer blackout during InGame transition:',
             error,
@@ -369,7 +369,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
         this._inSong = false
 
-        void this.turnOffAllRigs().catch((error) => {
+        this.turnOffAllRigs().catch((error) => {
           log.error(
             'StageKitDirectProcessor: Error clearing lights during Menus transition:',
             error,
@@ -525,7 +525,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     // RB3E repeats DisableAll as end-of-song teardown traffic even after the player has already
     // backed out to Menus, where the menu pump owns the rig until its next frame repaints it.
     if (this.isDefaultMenuCueRunning()) return
-    void this.turnOffAllRigs().catch((error) => {
+    this.turnOffAllRigs().catch((error) => {
       log.error('StageKitDirectProcessor: Error handling DisableAll:', error)
     })
   }
@@ -559,7 +559,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Clean up resources
    */
   public destroy(): void {
-    void this.turnOffAllRigs().catch((error) => {
+    this.turnOffAllRigs().catch((error) => {
       log.error('StageKitDirectProcessor: Error clearing lights during destroy:', error)
     })
     this.clearMenuAnimationTimer()

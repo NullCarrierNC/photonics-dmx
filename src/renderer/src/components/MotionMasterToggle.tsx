@@ -16,14 +16,16 @@ const MotionMasterToggle: React.FC<MotionMasterToggleProps> = ({ onMotionEnabled
 
   useEffect(() => {
     let cancelled = false
-    void getMotionEnabled()
+    getMotionEnabled()
       .then((v) => {
         if (!cancelled && typeof v === 'boolean') {
           setEnabled(v)
           onMotionEnabledChange?.(v)
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        log.error('Failed to read the motion master state', err)
+      })
     return () => {
       cancelled = true
     }

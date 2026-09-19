@@ -23,6 +23,9 @@ import AdvancedModeSettings from '../components/AdvancedModeSettings'
 import { getMotionEnabled } from '../ipcApi'
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('Preferences')
 
 type PreferencesTabId = 'dmxOut' | 'yarg' | 'rb3' | 'audio' | 'advanced'
 
@@ -58,13 +61,15 @@ const Preferences: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false
-    void getMotionEnabled()
+    getMotionEnabled()
       .then((v) => {
         if (!cancelled && typeof v === 'boolean') {
           setMotionMasterEnabled(v)
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        log.error('Failed to read the motion master state', err)
+      })
     return () => {
       cancelled = true
     }

@@ -33,7 +33,7 @@ function acquire(): void {
   }
   if (!streamOn) {
     streamOn = true
-    void Promise.resolve(enableSender({ sender: 'ipc' } as IpcSenderConfig)).catch((err) =>
+    enableSender({ sender: 'ipc' } as IpcSenderConfig).catch((err) =>
       log.error('Failed to enable the IPC preview sender', err),
     )
   }
@@ -50,7 +50,7 @@ function release(): void {
       return
     }
     streamOn = false
-    void Promise.resolve(disableSender({ sender: 'ipc' })).catch((err) =>
+    disableSender({ sender: 'ipc' }).catch((err) =>
       log.error('Failed to disable the IPC preview sender', err),
     )
   }, RELEASE_GRACE_MS)

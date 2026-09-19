@@ -188,7 +188,7 @@ export class AudioController {
     if (this.audioProcessor) {
       this.audioProcessor.refreshCueSelection()
       if (!this.deps.config.getAudioGameModeConfig().enabled) {
-        void this.deps.config
+        this.deps.config
           .setPreference('activeAudioCueType', this.audioProcessor.getManualPrimaryCueType())
           .catch((err) => {
             log.error('Failed to persist active audio cue type:', err)
@@ -260,7 +260,7 @@ export class AudioController {
         error: `Cue ${cueType} is not available in enabled groups`,
       }
     }
-    void this.deps.config.setPreference('activeAudioCueType', cueType).catch((err) => {
+    this.deps.config.setPreference('activeAudioCueType', cueType).catch((err) => {
       log.error('Failed to persist active audio cue type:', err)
     })
     if (this.audioProcessor) {

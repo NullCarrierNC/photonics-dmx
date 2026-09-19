@@ -259,7 +259,7 @@ export class AudioCueProcessor {
     }
     this.lightingSuppressed = false
 
-    void this.chainFanout
+    this.chainFanout
       .audioHandleData(
         processedData,
         this.config,
