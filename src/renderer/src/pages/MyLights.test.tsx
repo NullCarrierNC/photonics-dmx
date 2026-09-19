@@ -90,6 +90,19 @@ describe('MyLights editor modal', () => {
     expect(saveMyLights).toHaveBeenCalledTimes(1)
   })
 
+  it('puts the library back when the save rejects', async () => {
+    saveMyLights.mockRejectedValueOnce(new Error('channel gone'))
+    renderPage()
+    fireEvent.click(screen.getByText('Front PAR'))
+    fireEvent.change(nameInput(), { target: { value: 'Renamed PAR' } })
+    fireEvent.click(screen.getByText('Save'))
+
+    // The optimistic rename is rolled back and the editor stays open, the same as a refusal.
+    await screen.findByText('Failed to save the light library.')
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(nameInput().value).toBe('Renamed PAR')
+  })
+
   it('closes without prompting when nothing was edited', async () => {
     renderPage()
     fireEvent.click(screen.getByText('Front PAR'))
