@@ -8,6 +8,13 @@ import { denyWebContentsWillNavigate } from './rendererSessionSecurity'
 import { createLogger } from '../shared/logger'
 const log = createLogger('WindowManager')
 
+/** The window factories return synchronously and `ready-to-show` drives display, so nothing awaits a load. */
+const onLoadFailure =
+  (window: string) =>
+  (err: unknown): void => {
+    log.error(`Failed to load the ${window} renderer:`, err)
+  }
+
 export class WindowManager {
   private mainWindow: BrowserWindow | null = null
   private cueEditorWindow: BrowserWindow | null = null
@@ -44,7 +51,7 @@ export class WindowManager {
       log.warn(`Blocked window.open to non-http(s) URL: ${url}`)
       return
     }
-    shell.openExternal(url)
+    shell.openExternal(url).catch((err) => log.error(`Failed to open ${url} externally:`, err))
   }
 
   /**
@@ -82,7 +89,7 @@ export class WindowManager {
     }
     this.resizeTimeout = setTimeout(() => {
       if (this.mainWindow) {
-        this.saveWindowState(this.mainWindow, 'windowState')
+        void this.saveWindowState(this.mainWindow, 'windowState')
       }
     }, 500)
   }
@@ -96,7 +103,7 @@ export class WindowManager {
     }
     this.moveTimeout = setTimeout(() => {
       if (this.mainWindow) {
-        this.saveWindowState(this.mainWindow, 'windowState')
+        void this.saveWindowState(this.mainWindow, 'windowState')
       }
     }, 500)
   }
@@ -110,7 +117,7 @@ export class WindowManager {
     }
     this.cueEditorResizeTimeout = setTimeout(() => {
       if (this.cueEditorWindow) {
-        this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
+        void this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
       }
     }, 500)
   }
@@ -124,7 +131,7 @@ export class WindowManager {
     }
     this.cueEditorMoveTimeout = setTimeout(() => {
       if (this.cueEditorWindow) {
-        this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
+        void this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
       }
     }, 500)
   }
@@ -135,7 +142,7 @@ export class WindowManager {
     }
     this.audioPreviewResizeTimeout = setTimeout(() => {
       if (this.audioPreviewWindow) {
-        this.saveWindowState(this.audioPreviewWindow, 'audioPreviewWindowState')
+        void this.saveWindowState(this.audioPreviewWindow, 'audioPreviewWindowState')
       }
     }, 500)
   }
@@ -146,7 +153,7 @@ export class WindowManager {
     }
     this.audioPreviewMoveTimeout = setTimeout(() => {
       if (this.audioPreviewWindow) {
-        this.saveWindowState(this.audioPreviewWindow, 'audioPreviewWindowState')
+        void this.saveWindowState(this.audioPreviewWindow, 'audioPreviewWindowState')
       }
     }, 500)
   }
@@ -265,9 +272,11 @@ export class WindowManager {
 
     // Load the renderer
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      this.mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+      this.mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']).catch(onLoadFailure('main'))
     } else {
-      this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+      this.mainWindow
+        .loadFile(join(__dirname, '../renderer/index.html'))
+        .catch(onLoadFailure('main'))
     }
 
     return this.mainWindow
@@ -342,11 +351,15 @@ export class WindowManager {
     denyWebContentsWillNavigate(this.cueEditorWindow.webContents)
 
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      this.cueEditorWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}?window=cue-editor`)
+      this.cueEditorWindow
+        .loadURL(`${process.env['ELECTRON_RENDERER_URL']}?window=cue-editor`)
+        .catch(onLoadFailure('cue editor'))
     } else {
-      this.cueEditorWindow.loadFile(join(__dirname, '../renderer/index.html'), {
-        query: { window: 'cue-editor' },
-      })
+      this.cueEditorWindow
+        .loadFile(join(__dirname, '../renderer/index.html'), {
+          query: { window: 'cue-editor' },
+        })
+        .catch(onLoadFailure('cue editor'))
     }
 
     return this.cueEditorWindow
@@ -442,13 +455,15 @@ export class WindowManager {
     denyWebContentsWillNavigate(this.audioPreviewWindow.webContents)
 
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      this.audioPreviewWindow.loadURL(
-        `${process.env['ELECTRON_RENDERER_URL']}?window=audio-preview`,
-      )
+      this.audioPreviewWindow
+        .loadURL(`${process.env['ELECTRON_RENDERER_URL']}?window=audio-preview`)
+        .catch(onLoadFailure('audio preview'))
     } else {
-      this.audioPreviewWindow.loadFile(join(__dirname, '../renderer/index.html'), {
-        query: { window: 'audio-preview' },
-      })
+      this.audioPreviewWindow
+        .loadFile(join(__dirname, '../renderer/index.html'), {
+          query: { window: 'audio-preview' },
+        })
+        .catch(onLoadFailure('audio preview'))
     }
 
     return this.audioPreviewWindow
