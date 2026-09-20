@@ -213,12 +213,12 @@ export function useCueFileIO({
 
     if (editorDoc.mode === 'effect') {
       const effectContent = updatedFile as EffectFile
-      const validation = await validateEffect({ content: effectContent })
-      if (!validation.valid) {
-        setValidationErrors(validation.errors)
-        return false
-      }
       try {
+        const validation = await validateEffect({ content: effectContent })
+        if (!validation.valid) {
+          setValidationErrors(validation.errors)
+          return false
+        }
         const response = await saveEffectFile({
           mode: effectContent.mode,
           filename,
@@ -242,12 +242,12 @@ export function useCueFileIO({
       }
     } else {
       const cueContent = updatedFile as NodeCueFile
-      const validation = await validateNodeCue({ content: cueContent })
-      if (!validation.valid) {
-        setValidationErrors(validation.errors)
-        return false
-      }
       try {
+        const validation = await validateNodeCue({ content: cueContent })
+        if (!validation.valid) {
+          setValidationErrors(validation.errors)
+          return false
+        }
         const response = await saveNodeCueFile({
           mode: cueContent.mode,
           filename,

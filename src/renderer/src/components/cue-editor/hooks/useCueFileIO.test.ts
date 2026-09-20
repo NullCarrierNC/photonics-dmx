@@ -235,6 +235,40 @@ describe('useCueFileIO handleReload', () => {
   })
 })
 
+describe('useCueFileIO handleSave', () => {
+  beforeEach(() => {
+    resetIpcApiMock()
+  })
+
+  const openCueDoc = (): Partial<UseCueFileIOParams> =>
+    ({
+      editorDoc: {
+        mode: 'cue',
+        path: '/cues/motion-cues.json',
+        file: mixedFile(),
+      },
+      filename: 'motion-cues.json',
+      selectedCueId: 'cue-light',
+      cueKind: 'lighting',
+      getUpdatedDocument: jest.fn(() => mixedFile()),
+      lastStoredFilePathRef: { current: '/cues/motion-cues.json' as string | null },
+    }) as unknown as Partial<UseCueFileIOParams>
+
+  it('reports a validation call that rejects', async () => {
+    jest.mocked(ipcApi.validateNodeCue).mockRejectedValue(new Error('channel gone') as never)
+    const { rendered, onSaveError } = setup(openCueDoc())
+
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await rendered.result.current.handleSave()
+    })
+
+    expect(saved).toBe(false)
+    expect(onSaveError).toHaveBeenCalledWith(expect.stringContaining('channel gone'))
+    expect(ipcApi.saveNodeCueFile).not.toHaveBeenCalled()
+  })
+})
+
 describe('useCueFileIO revertCurrentFileToDisk', () => {
   beforeEach(() => {
     resetIpcApiMock()
