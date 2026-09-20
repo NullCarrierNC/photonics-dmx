@@ -341,12 +341,17 @@ export function useCueFileIO({
 
   const handleExport = useCallback(async () => {
     if (!editorDoc?.path) return
-    if (editorDoc.mode === 'effect') {
-      await exportEffectFile(editorDoc.path)
-    } else {
-      await exportNodeCueFile(editorDoc.path)
+    try {
+      if (editorDoc.mode === 'effect') {
+        await exportEffectFile(editorDoc.path)
+      } else {
+        await exportNodeCueFile(editorDoc.path)
+      }
+    } catch (error) {
+      log.error('Failed to export current file', error)
+      onSaveError?.(`Failed to export: ${formatSaveError(error)}`)
     }
-  }, [editorDoc])
+  }, [editorDoc, onSaveError])
 
   const handleReload = useCallback(async () => {
     const currentPath = editorDoc?.path

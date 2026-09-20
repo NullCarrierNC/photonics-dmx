@@ -390,19 +390,31 @@ const CueSimulation: React.FC = () => {
     simulationContext(selectedVenueSize, selectedBpm, selectedGroupId, selectedEffect)
 
   const handleSimulateBeat = async () => {
-    await simulateBeat(simulationContextNow())
-    // Simply turn on the indicator, the useTimeoutEffect will reset it
-    setShowBeatIndicator(true)
+    try {
+      await simulateBeat(simulationContextNow())
+      // Simply turn on the indicator, the useTimeoutEffect will reset it
+      setShowBeatIndicator(true)
+    } catch (error) {
+      log.error('Error simulating a beat:', error)
+    }
   }
 
   const handleSimulateKeyframe = async () => {
-    await simulateKeyframe(simulationContextNow())
-    setShowKeyframeIndicator(true)
+    try {
+      await simulateKeyframe(simulationContextNow())
+      setShowKeyframeIndicator(true)
+    } catch (error) {
+      log.error('Error simulating a keyframe:', error)
+    }
   }
 
   const handleSimulateMeasure = async () => {
-    await simulateMeasure(simulationContextNow())
-    setShowMeasureIndicator(true)
+    try {
+      await simulateMeasure(simulationContextNow())
+      setShowMeasureIndicator(true)
+    } catch (error) {
+      log.error('Error simulating a measure:', error)
+    }
   }
 
   const handleSimulateInstrumentNote = async (noteType: string) => {

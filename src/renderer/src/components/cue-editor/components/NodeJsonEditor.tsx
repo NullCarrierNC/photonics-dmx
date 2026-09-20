@@ -167,7 +167,15 @@ function NodeJsonEditor<K extends string, D extends { id: string }, F extends Re
     }
 
     const fileWithDefinition = buildFile(parsed)
-    const result = await validate(fileWithDefinition)
+    let result: JsonValidationResult
+    try {
+      result = await validate(fileWithDefinition)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      setValidationErrors([`Validation failed: ${message}`])
+      setValidationPassed(false)
+      return
+    }
 
     if (!result.valid) {
       setValidationErrors(result.errors ?? ['Validation failed'])
