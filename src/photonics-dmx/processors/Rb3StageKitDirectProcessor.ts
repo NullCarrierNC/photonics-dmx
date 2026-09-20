@@ -285,7 +285,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         this.applyStrobeEffect(strobeEffect)
       }
     } else if (color !== 'off') {
-      void this.applyLightData(positions, color)
+      this.applyLightData(positions, color)
     }
     // Fog, 0x00 and unrecognised commands carry no colour bank and leave the LEDs as they are.
 
@@ -391,12 +391,16 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
   // ── Per-rig fanout wrappers ──────────────────────────────────────────────────────────
   // Each wrapper iterates every active rig processor so the coordinator's event handlers
-  // stay rig-agnostic. Errors on one rig don't block the others (Promise.allSettled).
+  // stay rig-agnostic. Errors on one rig don't block the others.
 
-  private async applyLightData(positions: number[], color: string): Promise<void> {
-    await Promise.allSettled(
-      Array.from(this.rigs.values()).map((r) => r.applyLightData(positions, color)),
-    )
+  private applyLightData(positions: number[], color: string): void {
+    for (const rig of this.rigs.values()) {
+      try {
+        rig.applyLightData(positions, color)
+      } catch (error) {
+        log.error(`Rig ${rig.rigId}: applyLightData failed:`, error)
+      }
+    }
   }
 
   private applyStrobeEffect(strobeType: 'slow' | 'medium' | 'fast' | 'fastest'): void {
