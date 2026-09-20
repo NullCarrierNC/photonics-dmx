@@ -122,7 +122,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ className }) => {
           <button
             type="button"
             className="text-xs text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-            onClick={copyOutput}>
+            onClick={() => void copyOutput()}>
             Copy
           </button>
           <button

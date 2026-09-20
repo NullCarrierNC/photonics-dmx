@@ -476,14 +476,14 @@ const LightsLayout = () => {
             <>
               <button
                 type="button"
-                onClick={handleImport}
+                onClick={() => void handleImport()}
                 title="Import a rig from a file"
                 className={rigToolbarButton}>
                 Import Layout
               </button>
               <button
                 type="button"
-                onClick={handleExport}
+                onClick={() => void handleExport()}
                 disabled={!activeRigId}
                 title="Export the selected rig to a file"
                 className={rigToolbarButton}>
@@ -516,8 +516,8 @@ const LightsLayout = () => {
               setRigName={setRigName}
               onRigsChange={setRigs}
               onBeforeDiscardingUnsaved={tryConfirmUnsaved}
-              onDuplicate={handleDuplicate}
-              onDelete={handleDelete}
+              onDuplicate={() => void handleDuplicate()}
+              onDelete={() => void handleDelete()}
             />
           )}
 
@@ -570,7 +570,7 @@ const LightsLayout = () => {
 
           {/* Save Button */}
           <button
-            onClick={handleSaveChanges}
+            onClick={() => void handleSaveChanges()}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mt-4 mb-10">
             Save Changes
           </button>

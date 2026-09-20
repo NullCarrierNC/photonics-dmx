@@ -300,7 +300,7 @@ const CueSimulation: React.FC = () => {
             savedEffectRef.current = null
           } else if (retries > 0) {
             // Effects not loaded yet, retry after a short delay
-            setTimeout(() => checkForEffects(retries - 1), 200)
+            setTimeout(() => void checkForEffects(retries - 1), 200)
           } else {
             savedEffectRef.current = null
           }
@@ -574,7 +574,7 @@ const CueSimulation: React.FC = () => {
               <div>
                 <CueRegistrySelector
                   onRegistryChange={handleRegistryChange}
-                  onGroupChange={handleGroupChange}
+                  onGroupChange={(groupIds) => void handleGroupChange(groupIds)}
                   selectedVenueSize={selectedVenueSize}
                   onVenueSizeChange={setSelectedVenueSize}
                   selectedBpm={selectedBpm}
@@ -585,7 +585,7 @@ const CueSimulation: React.FC = () => {
               </div>
               <div className="lg:w-64">
                 <EffectsDropdown
-                  onSelect={handleEffectSelect}
+                  onSelect={(effect) => void handleEffectSelect(effect)}
                   groupId={selectedGroupId}
                   value={selectedEffect?.id}
                   disabled={!selectedGroupId}
@@ -625,11 +625,11 @@ const CueSimulation: React.FC = () => {
           )}
           <CueSimulationActions
             disabled={!selectedEffect || !selectedGroupId || isRb3Enabled}
-            onTestEffect={handleTestEffect}
-            onStopTestEffect={handleStopTestEffect}
-            onSimulateBeat={handleSimulateBeat}
-            onSimulateMeasure={handleSimulateMeasure}
-            onSimulateKeyframe={handleSimulateKeyframe}
+            onTestEffect={() => void handleTestEffect()}
+            onStopTestEffect={() => void handleStopTestEffect()}
+            onSimulateBeat={() => void handleSimulateBeat()}
+            onSimulateMeasure={() => void handleSimulateMeasure()}
+            onSimulateKeyframe={() => void handleSimulateKeyframe()}
             showSongSimulation={selectedRegistryType !== 'RB3E'}
           />
           {selectedRegistryType === 'RB3E' && !isRb3Enabled && <StageKitLedPanel />}
@@ -638,7 +638,7 @@ const CueSimulation: React.FC = () => {
             <CueSimulationInstrument
               selectedInstrument={selectedInstrument}
               onInstrumentChange={setSelectedInstrument}
-              onSimulateNote={handleSimulateInstrumentNote}
+              onSimulateNote={(noteType) => void handleSimulateInstrumentNote(noteType)}
               disabled={!selectedGroupId || isRb3Enabled}
             />
           )}

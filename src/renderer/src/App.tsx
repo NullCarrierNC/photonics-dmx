@@ -460,7 +460,7 @@ export const App = (): JSX.Element => {
             isDarkMode={isDarkMode}
             toggleDarkMode={toggleDarkMode}
             isCollapsed={isLeftMenuCollapsed}
-            onToggleCollapse={handleToggleLeftMenu}
+            onToggleCollapse={() => void handleToggleLeftMenu()}
           />
         </div>
       </div>

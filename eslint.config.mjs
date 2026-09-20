@@ -40,8 +40,14 @@ export default defineConfig([
     rules: {
       // Every promise gets an answer at its call site. Await it, or catch it where it can reject.
       // void is for the sites that have no better answer: the caller is a frame, a timer or an
-      // effect body that cannot await, and the callee already reports its own failure.
+      // effect body that cannot await, and the callee already reports its own failure. A promise
+      // returned into a callback typed void is the same unanswered promise, so those sites void it
+      // explicitly too.
       '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: true, checksConditionals: true },
+      ],
     },
   },
   {

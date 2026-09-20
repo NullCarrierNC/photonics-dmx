@@ -897,6 +897,9 @@ describe('DmxOutputSettings refused senders', () => {
 
     fireEvent.click(screen.getByLabelText('sACN'))
 
+    // setRunning(wanted) has already run by the time the call goes out, so waiting on the call is
+    // what makes the assertion below read the revert.
+    await waitFor(() => expect(enableSenderMock).toHaveBeenCalled())
     await waitFor(() => expect(store.get(senderSacnEnabledAtom)).toBe(false))
     // The checkbox says which senders are available, not which are running.
     await waitFor(() => expect(savedOutputConfig().sacnEnabled).toBe(true))
@@ -911,6 +914,7 @@ describe('DmxOutputSettings refused senders', () => {
 
     fireEvent.click(screen.getByLabelText('sACN'))
 
+    await waitFor(() => expect(disableSenderMock).toHaveBeenCalled())
     await waitFor(() => expect(store.get(senderSacnEnabledAtom)).toBe(true))
   })
 
@@ -922,6 +926,17 @@ describe('DmxOutputSettings refused senders', () => {
 
     fireEvent.click(screen.getByLabelText('sACN'))
 
+    await waitFor(() => expect(store.get(senderSacnEnabledAtom)).toBe(false))
+  })
+
+  // The real bridge rejects rather than throwing on the spot.
+  it('marks the sender not running when the start rejects', async () => {
+    enableSenderMock.mockRejectedValue(new Error('bridge gone'))
+    const store = await renderPanel({ dmxOutputConfig: outputConfig() })
+
+    fireEvent.click(screen.getByLabelText('sACN'))
+
+    await waitFor(() => expect(enableSenderMock).toHaveBeenCalled())
     await waitFor(() => expect(store.get(senderSacnEnabledAtom)).toBe(false))
   })
 })

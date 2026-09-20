@@ -49,7 +49,7 @@ const LifecycleFailedBanner: React.FC = () => {
       </span>
       <button
         type="button"
-        onClick={handleRetry}
+        onClick={() => void handleRetry()}
         disabled={retrying}
         className="shrink-0 px-3 py-1 rounded bg-white text-red-700 font-semibold disabled:opacity-60">
         {retrying ? 'Retrying...' : 'Retry'}

@@ -184,7 +184,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={handleStart}
+              onClick={() => void handleStart()}
               className={`px-4 py-2 rounded text-sm ${
                 disabled || !groupId || !cueId || isStarting
                   ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
@@ -195,7 +195,7 @@ export const CueSimulationMotion: React.FC<CueSimulationMotionProps> = ({
             </button>
             <button
               type="button"
-              onClick={handleStop}
+              onClick={() => void handleStop()}
               className={`px-4 py-2 rounded text-sm ${
                 disabled
                   ? 'bg-gray-400 text-gray-600 cursor-not-allowed'

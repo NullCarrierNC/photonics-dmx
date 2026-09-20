@@ -9,6 +9,9 @@ import About from '../pages/About'
 import Preferences from '../pages/Preferences'
 import DmxConsole from '../pages/DmxConsole'
 import { openCueEditorWindow } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('AppPageRouter')
 
 interface AppPageRouterProps {
   currentPage: Pages
@@ -44,7 +47,11 @@ export function AppPageRouter({ currentPage }: AppPageRouterProps): JSX.Element 
           </p>
           <button
             className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-500"
-            onClick={() => openCueEditorWindow()}>
+            onClick={() => {
+              openCueEditorWindow().catch((error) =>
+                log.error('Failed to open the cue editor:', error),
+              )
+            }}>
             Open Cue Editor
           </button>
         </div>

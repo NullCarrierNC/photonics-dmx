@@ -278,7 +278,7 @@ function NodeJsonEditor<K extends string, D extends { id: string }, F extends Re
         ) : (
           <button
             type="button"
-            onClick={handleValidate}
+            onClick={() => void handleValidate()}
             className="px-3 py-1.5 text-sm font-medium rounded text-white bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400">
             Validate
           </button>

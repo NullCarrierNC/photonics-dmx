@@ -260,9 +260,9 @@ const CueEditor: React.FC = () => {
         onCueKindChange={(k) => guardJsonEditorNavigation(() => handleCueKindChange(k))}
         onEffectToggle={(e) => guardJsonEditorNavigation(() => handleEffectToggle(e))}
         onNewFile={() => setShowNewFileModal(true)}
-        onSave={handleSave}
-        onImport={handleImport}
-        onExport={handleExport}
+        onSave={() => void handleSave()}
+        onImport={() => void handleImport()}
+        onExport={() => void handleExport()}
         onDelete={() => setShowDeleteConfirm(true)}
         hasEditorDoc={!!editorDoc}
         hasFile={hasFile}
@@ -290,9 +290,9 @@ const CueEditor: React.FC = () => {
           currentCueDefinition,
           currentEffectDefinition,
           hasFile,
-          selectFile,
-          selectEffectFile,
-          handleReload,
+          selectFile: (file) => void selectFile(file),
+          selectEffectFile: (file) => void selectEffectFile(file),
+          handleReload: () => void handleReload(),
           handleAddCue,
           handleAddEffect,
           removeCue,
@@ -388,7 +388,7 @@ const CueEditor: React.FC = () => {
         message="You have unsaved changes. Discard them?"
         confirmLabel="Discard"
         danger
-        onConfirm={handleDiscardNavigation}
+        onConfirm={() => void handleDiscardNavigation()}
         onCancel={cancelPendingNavigation}
       />
 
