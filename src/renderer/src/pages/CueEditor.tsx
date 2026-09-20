@@ -16,6 +16,7 @@ import NewFileModal from '../components/cue-editor/components/NewFileModal'
 import ImportCueFileModal from '../components/cue-editor/components/ImportCueFileModal'
 import ToastContainer from '../components/Toast'
 import { useToast } from '../hooks/useToast'
+import { createLogger } from '../../../shared/logger'
 import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles'
 import { useCueFlow } from '../components/cue-editor/hooks/useCueFlow'
 import { useActiveNodes } from '../components/cue-editor/hooks/useActiveNodes'
@@ -38,6 +39,8 @@ import {
   DEFAULT_SIDEBAR_LAYOUT,
   getStoredSidebarLayout,
 } from '../components/cue-editor/lib/sidebarLayout'
+
+const log = createLogger('CueEditor')
 
 type EditorCueOrEffect =
   | NetNodeCueDefinition
@@ -257,9 +260,9 @@ const CueEditor: React.FC = () => {
         onCueKindChange={(k) => guardJsonEditorNavigation(() => handleCueKindChange(k))}
         onEffectToggle={(e) => guardJsonEditorNavigation(() => handleEffectToggle(e))}
         onNewFile={() => setShowNewFileModal(true)}
-        onSave={handleSave}
-        onImport={handleImport}
-        onExport={handleExport}
+        onSave={() => void handleSave()}
+        onImport={() => void handleImport()}
+        onExport={() => void handleExport()}
         onDelete={() => setShowDeleteConfirm(true)}
         hasEditorDoc={!!editorDoc}
         hasFile={hasFile}
@@ -287,9 +290,9 @@ const CueEditor: React.FC = () => {
           currentCueDefinition,
           currentEffectDefinition,
           hasFile,
-          selectFile,
-          selectEffectFile,
-          handleReload,
+          selectFile: (file) => void selectFile(file),
+          selectEffectFile: (file) => void selectEffectFile(file),
+          handleReload: () => void handleReload(),
           handleAddCue,
           handleAddEffect,
           removeCue,
@@ -315,7 +318,11 @@ const CueEditor: React.FC = () => {
           <button
             className="hover:text-blue-600 hover:underline text-left"
             onClick={() => {
-              if (editorDoc?.path) showItemInFolder(editorDoc.path)
+              if (editorDoc?.path) {
+                showItemInFolder(editorDoc.path).catch((error) =>
+                  log.error('Failed to reveal the file:', error),
+                )
+              }
             }}
             title="Click to reveal in file explorer">
             {editorDoc.path}
@@ -352,7 +359,7 @@ const CueEditor: React.FC = () => {
           existingGroupIds={existingGroupIdsForNewFileModal}
           onCancel={() => setShowNewFileModal(false)}
           onSave={(metadata) => {
-            handleCreateNewFile(metadata)
+            void handleCreateNewFile(metadata)
             setShowNewFileModal(false)
           }}
         />
@@ -381,7 +388,7 @@ const CueEditor: React.FC = () => {
         message="You have unsaved changes. Discard them?"
         confirmLabel="Discard"
         danger
-        onConfirm={handleDiscardNavigation}
+        onConfirm={() => void handleDiscardNavigation()}
         onCancel={cancelPendingNavigation}
       />
 

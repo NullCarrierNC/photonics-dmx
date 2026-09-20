@@ -224,47 +224,52 @@ const useCueFiles = ({
   }, [pendingImport, effectFiles, files])
 
   const handleImport = useCallback(async () => {
-    if (editorDoc?.mode === 'effect') {
-      const effectMode: EffectMode = mode === 'audio' ? 'audio' : 'yarg'
-      const result = await pickEffectImportFile(effectMode)
-      if (!result.success) {
-        if (result.error !== 'User cancelled import.') {
-          onError?.(result.error)
+    try {
+      if (editorDoc?.mode === 'effect') {
+        const effectMode: EffectMode = mode === 'audio' ? 'audio' : 'yarg'
+        const result = await pickEffectImportFile(effectMode)
+        if (!result.success) {
+          if (result.error !== 'User cancelled import.') {
+            onError?.(result.error)
+          }
+          return
         }
-        return
-      }
-      const taken = new Set(
-        effectFiles
-          .filter((f) => f.mode === result.mode)
-          .map((f) => f.groupId.trim().toLowerCase()),
-      )
-      const suggestedGroupId = suggestNonConflictingGroupId(result.content.group.id, taken)
-      setPendingImport({
-        kind: 'effect',
-        sourceBasename: result.sourceBasename,
-        saveMode: result.mode,
-        suggestedGroupId,
-        content: result.content,
-      })
-    } else {
-      const result = await pickNodeCueImportFile(mode)
-      if (!result.success) {
-        if (result.error !== 'User cancelled import.') {
-          onError?.(result.error)
+        const taken = new Set(
+          effectFiles
+            .filter((f) => f.mode === result.mode)
+            .map((f) => f.groupId.trim().toLowerCase()),
+        )
+        const suggestedGroupId = suggestNonConflictingGroupId(result.content.group.id, taken)
+        setPendingImport({
+          kind: 'effect',
+          sourceBasename: result.sourceBasename,
+          saveMode: result.mode,
+          suggestedGroupId,
+          content: result.content,
+        })
+      } else {
+        const result = await pickNodeCueImportFile(mode)
+        if (!result.success) {
+          if (result.error !== 'User cancelled import.') {
+            onError?.(result.error)
+          }
+          return
         }
-        return
+        const taken = new Set(
+          files.filter((f) => f.mode === result.mode).map((f) => f.groupId.trim().toLowerCase()),
+        )
+        const suggestedGroupId = suggestNonConflictingGroupId(result.content.group.id, taken)
+        setPendingImport({
+          kind: 'cue',
+          sourceBasename: result.sourceBasename,
+          saveMode: result.mode,
+          suggestedGroupId,
+          content: result.content,
+        })
       }
-      const taken = new Set(
-        files.filter((f) => f.mode === result.mode).map((f) => f.groupId.trim().toLowerCase()),
-      )
-      const suggestedGroupId = suggestNonConflictingGroupId(result.content.group.id, taken)
-      setPendingImport({
-        kind: 'cue',
-        sourceBasename: result.sourceBasename,
-        saveMode: result.mode,
-        suggestedGroupId,
-        content: result.content,
-      })
+    } catch (error) {
+      log.error('Failed to import a cue file', error)
+      onError?.(`Failed to import: ${error instanceof Error ? error.message : String(error)}`)
     }
   }, [editorDoc?.mode, mode, effectFiles, files, onError])
 
@@ -465,8 +470,8 @@ const useCueFiles = ({
   )
 
   useEffect(() => {
-    fileIO.refreshFiles()
-    fileIO.refreshEffectFiles()
+    void fileIO.refreshFiles()
+    void fileIO.refreshEffectFiles()
     const handler = (payload: {
       yarg: NodeCueFileSummary[]
       audio: NodeCueFileSummary[]
@@ -527,12 +532,12 @@ const useCueFiles = ({
       if (effectFiles.length === 0) return
       const summary = effectFiles.find((f) => f.path === storedPath && f.mode === expectedFileMode)
       restoredLastFileRef.current = true
-      if (summary) fileIO.selectEffectFile(summary, preferredItemId)
+      if (summary) void fileIO.selectEffectFile(summary, preferredItemId)
     } else {
       if (files.length === 0) return
       const summary = files.find((f) => f.path === storedPath && f.mode === expectedFileMode)
       restoredLastFileRef.current = true
-      if (summary) fileIO.selectFile(summary, preferredItemId)
+      if (summary) void fileIO.selectFile(summary, preferredItemId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: one-shot restore
   }, [files, effectFiles, fileIO.selectFile, fileIO.selectEffectFile])

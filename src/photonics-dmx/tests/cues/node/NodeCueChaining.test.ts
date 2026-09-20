@@ -11,7 +11,7 @@ describe('Node cue chaining', () => {
     jest.restoreAllMocks()
   })
 
-  it('executes actions sequentially with execution engine', async () => {
+  it('executes actions sequentially with execution engine', () => {
     const definition: NetNodeCueDefinition = {
       id: 'test-cue',
       name: 'Chained Beat',
@@ -95,7 +95,7 @@ describe('Node cue chaining', () => {
       addEffect: (name: string, _effect: Effect) => {
         callOrder.push(name)
       },
-      setEffect: () => Promise.resolve(),
+      setEffect: () => {},
       addEffectWithCallback: (
         name: string,
         _effect: Effect,
@@ -159,7 +159,7 @@ describe('Node cue chaining', () => {
       shutdown: () => {},
     }
 
-    await cue.execute({ beat: 'Strong' } as any, sequencerMock as ILightingController, null as any)
+    cue.execute({ beat: 'Strong' } as any, sequencerMock as ILightingController, null as any)
 
     // a1 and a2 target different lights so the chain is not composed; each action submitted individually
     expect(callOrder.length).toBe(2)

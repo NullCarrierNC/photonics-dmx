@@ -72,7 +72,7 @@ const MasterOutputSidebar: React.FC = () => {
   /** Persists on gesture end only. The value is already live by the time this runs. */
   const commitDimmer = useCallback((): void => {
     if (prefs.masterDimmerPercent === dimmerPercent) return
-    void savePrefs({ masterDimmerPercent: dimmerPercent })
+    savePrefs({ masterDimmerPercent: dimmerPercent })
       .then((result) => {
         if (!result.success) {
           log.error('Failed to save master dimmer level', result.error)
@@ -87,7 +87,7 @@ const MasterOutputSidebar: React.FC = () => {
     const next = !strobeEnabled
     setMaster((prev) => ({ ...prev, strobeOutputEnabled: next }))
     void applyLive({ strobeOutputEnabled: next })
-    void savePrefs({ strobeOutputEnabled: next })
+    savePrefs({ strobeOutputEnabled: next })
       .then((result) => {
         if (!result.success) {
           log.error('Failed to save strobe output preference', result.error)

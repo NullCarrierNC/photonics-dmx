@@ -170,7 +170,7 @@ const DmxOutputSettings: React.FC = () => {
       }
     }
 
-    loadNetworkInterfaces()
+    void loadNetworkInterfaces()
   }, [])
 
   // Seed the saved output config on first run from whatever the backend already has running.
@@ -186,16 +186,23 @@ const DmxOutputSettings: React.FC = () => {
     })
     log.info('No DMX output config in preferences, initializing from sender states:', initialConfig)
 
-    void persist({ dmxOutputConfig: initialConfig }, 'the DMX output configuration').then(
-      (saved) => {
-        if (saved) {
-          setPrefs((prev) => ({
-            ...prev,
-            dmxOutputConfig: initialConfig,
-          }))
-        }
-      },
-    )
+    let cancelled = false
+    void (async () => {
+      const saved = await persist(
+        { dmxOutputConfig: initialConfig },
+        'the DMX output configuration',
+      )
+      if (!saved || cancelled) {
+        return
+      }
+      setPrefs((prev) => ({
+        ...prev,
+        dmxOutputConfig: initialConfig,
+      }))
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [
     prefs.dmxOutputConfig,
     isSacnEnabled,
@@ -211,8 +218,8 @@ const DmxOutputSettings: React.FC = () => {
     flag: DmxOutputFlag
     isRunning: boolean
     setRunning: (value: boolean) => void
-    start: () => void
-    stop: () => void
+    start: () => Promise<unknown>
+    stop: () => Promise<unknown>
   }
 
   type SenderName = 'sacn' | 'artnet' | 'enttecpro' | 'opendmx'
@@ -245,7 +252,11 @@ const DmxOutputSettings: React.FC = () => {
       isRunning: isOpenDmxEnabled,
       setRunning: setIsOpenDmxEnabled,
       start: () =>
-        enableSender({ sender: 'opendmx', devicePath: openDmxComPort, dmxSpeed: openDmxSpeed }),
+        enableSender({
+          sender: 'opendmx',
+          devicePath: openDmxComPort,
+          dmxSpeed: openDmxSpeed,
+        }),
       stop: () => disableSender({ sender: 'opendmx' }),
     },
   }
@@ -271,7 +282,7 @@ const DmxOutputSettings: React.FC = () => {
     }))
 
     if (enabled !== toggle.isRunning) {
-      void applySenderRunState(name, enabled, toggle.setRunning, () =>
+      await applySenderRunState(name, enabled, toggle.setRunning, () =>
         enabled ? toggle.start() : toggle.stop(),
       )
     }
@@ -357,19 +368,23 @@ const DmxOutputSettings: React.FC = () => {
     }
   }
 
-  // Save expanded state changes
-  const saveExpandedStates = async (
-    artNet: boolean,
-    sacn: boolean,
-    enttecPro: boolean,
-    openDmx: boolean,
-  ) => {
+  const panelSetters = {
+    artNetExpanded: setArtNetExpanded,
+    sacnExpanded: setSacnExpanded,
+    enttecProExpanded: setEnttecProExpanded,
+    openDmxExpanded: setOpenDmxExpanded,
+  }
+
+  /** Opens or closes one sender's panel and saves the layout all four share. */
+  const toggleExpanded = async (panel: keyof typeof panelSetters): Promise<void> => {
     const newDmxSettingsPrefs = {
-      artNetExpanded: artNet,
-      sacnExpanded: sacn,
-      enttecProExpanded: enttecPro,
-      openDmxExpanded: openDmx,
+      artNetExpanded,
+      sacnExpanded,
+      enttecProExpanded,
+      openDmxExpanded,
     }
+    newDmxSettingsPrefs[panel] = !newDmxSettingsPrefs[panel]
+    panelSetters[panel](newDmxSettingsPrefs[panel])
 
     if (!(await persist({ dmxSettingsPrefs: newDmxSettingsPrefs }, 'the panel layout'))) {
       return
@@ -396,7 +411,7 @@ const DmxOutputSettings: React.FC = () => {
             <DraftNumberField
               aria-label="Global DMX Publishing Rate"
               value={globalDmxPublishingRate}
-              onCommit={handleGlobalDmxRateChange}
+              onCommit={(hz) => void handleGlobalDmxRateChange(hz)}
               className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               min={DMX_OUTPUT_REFRESH_RATE_HZ_MIN}
               max={DMX_OUTPUT_REFRESH_RATE_HZ_MAX}
@@ -431,13 +446,13 @@ const DmxOutputSettings: React.FC = () => {
 
       <DmxOutputEnabledModes
         sacnEnabled={prefs.dmxOutputConfig?.sacnEnabled || false}
-        onSacnToggle={() => handleSenderToggle('sacn')}
+        onSacnToggle={() => void handleSenderToggle('sacn')}
         artNetEnabled={prefs.dmxOutputConfig?.artNetEnabled || false}
-        onArtNetToggle={() => handleSenderToggle('artnet')}
+        onArtNetToggle={() => void handleSenderToggle('artnet')}
         enttecProEnabled={prefs.dmxOutputConfig?.enttecProEnabled || false}
-        onEnttecProToggle={() => handleSenderToggle('enttecpro')}
+        onEnttecProToggle={() => void handleSenderToggle('enttecpro')}
         openDmxEnabled={prefs.dmxOutputConfig?.openDmxEnabled || false}
-        onOpenDmxToggle={() => handleSenderToggle('opendmx')}
+        onOpenDmxToggle={() => void handleSenderToggle('opendmx')}
       />
 
       {prefs.dmxOutputConfig?.sacnEnabled && (
@@ -446,17 +461,8 @@ const DmxOutputSettings: React.FC = () => {
             config={sacnConfig}
             networkInterfaces={networkInterfaces}
             expanded={sacnExpanded}
-            onToggle={() => {
-              const newSacnExpanded = !sacnExpanded
-              setSacnExpanded(newSacnExpanded)
-              saveExpandedStates(
-                artNetExpanded,
-                newSacnExpanded,
-                enttecProExpanded,
-                openDmxExpanded,
-              )
-            }}
-            onConfigChange={handleSacnConfigChange}
+            onToggle={() => void toggleExpanded('sacnExpanded')}
+            onConfigChange={(field, value) => void handleSacnConfigChange(field, value)}
           />
         </div>
       )}
@@ -466,17 +472,8 @@ const DmxOutputSettings: React.FC = () => {
           <ArtNetConfigCard
             config={artNetConfig}
             expanded={artNetExpanded}
-            onToggle={() => {
-              const newArtNetExpanded = !artNetExpanded
-              setArtNetExpanded(newArtNetExpanded)
-              saveExpandedStates(
-                newArtNetExpanded,
-                sacnExpanded,
-                enttecProExpanded,
-                openDmxExpanded,
-              )
-            }}
-            onConfigChange={handleArtNetConfigChange}
+            onToggle={() => void toggleExpanded('artNetExpanded')}
+            onConfigChange={(field, value) => void handleArtNetConfigChange(field, value)}
           />
         </div>
       )}
@@ -486,19 +483,10 @@ const DmxOutputSettings: React.FC = () => {
           <EnttecProConfigCard
             comPort={comPort}
             refreshRate={enttecProSpeed}
-            onComPortChange={handleComPortChange}
-            onRefreshRateChange={handleEnttecProSpeedChange}
+            onComPortChange={(port) => void handleComPortChange(port)}
+            onRefreshRateChange={(hz) => void handleEnttecProSpeedChange(hz)}
             expanded={enttecProExpanded}
-            onToggle={() => {
-              const newEnttecProExpanded = !enttecProExpanded
-              setEnttecProExpanded(newEnttecProExpanded)
-              saveExpandedStates(
-                artNetExpanded,
-                sacnExpanded,
-                newEnttecProExpanded,
-                openDmxExpanded,
-              )
-            }}
+            onToggle={() => void toggleExpanded('enttecProExpanded')}
           />
         </div>
       )}
@@ -508,19 +496,10 @@ const DmxOutputSettings: React.FC = () => {
           <OpenDmxConfigCard
             comPort={openDmxComPort}
             refreshRate={openDmxSpeed}
-            onComPortChange={handleOpenDmxComPortChange}
-            onRefreshRateChange={handleOpenDmxSpeedChange}
+            onComPortChange={(port) => void handleOpenDmxComPortChange(port)}
+            onRefreshRateChange={(hz) => void handleOpenDmxSpeedChange(hz)}
             expanded={openDmxExpanded}
-            onToggle={() => {
-              const newOpenDmxExpanded = !openDmxExpanded
-              setOpenDmxExpanded(newOpenDmxExpanded)
-              saveExpandedStates(
-                artNetExpanded,
-                sacnExpanded,
-                enttecProExpanded,
-                newOpenDmxExpanded,
-              )
-            }}
+            onToggle={() => void toggleExpanded('openDmxExpanded')}
           />
         </div>
       )}

@@ -131,7 +131,7 @@ const bindings: CueDomainRegistryBinding[] = [
         const allGroups = registry.getAllGroups()
         registry.setEnabledGroups(allGroups)
         if (allGroups.length > 0) {
-          void config
+          config
             .updateCueDomain('audio', { enabledGroups: allGroups })
             .catch((err) => log.error('Failed to persist default audio enabled groups:', err))
         }

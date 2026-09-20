@@ -414,13 +414,13 @@ export class YargNetworkListener extends EventEmitter {
         if (continuingBlackoutRun) {
           // Non-driving run: don't reset the window; suppress while Fallback owns the look.
           if (!this.fallbackActive) {
-            this.cueHandler.handleCue(cueType, YargCueData)
+            void this.cueHandler.handleCue(cueType, YargCueData)
           }
         } else {
           // Driving cue (or first blackout of a run): reset the window and clear active Fallback.
           this.lastCueReceivedAt = monotonicNowMs()
           this.fallbackActive = false
-          this.cueHandler.handleCue(cueType, YargCueData)
+          void this.cueHandler.handleCue(cueType, YargCueData)
         }
         this.inNonDrivingRun = nonDriving
       }
@@ -461,9 +461,9 @@ export class YargNetworkListener extends EventEmitter {
         default:
           strobeCueType = CueType.Strobe_Slow
       }
-      this.cueHandler.handleCue(strobeCueType, YargCueData)
+      void this.cueHandler.handleCue(strobeCueType, YargCueData)
     } else if (previousHadActiveStrobe) {
-      this.cueHandler.handleCue(CueType.Strobe_Off, YargCueData)
+      void this.cueHandler.handleCue(CueType.Strobe_Off, YargCueData)
     }
 
     const noteEdges = computeInstrumentRisingEdges(this.lastData, YargCueData)
@@ -514,7 +514,7 @@ export class YargNetworkListener extends EventEmitter {
         this.inNonDrivingRun = false
         this.cueHandler.notifySongStart()
         // Trigger a fast blackout to clear any menu lighting
-        this.cueHandler.handleCue(CueType.Blackout_Fast, {
+        void this.cueHandler.handleCue(CueType.Blackout_Fast, {
           datagramVersion: 0,
           platform: 'Unknown',
           currentScene: currentScene,

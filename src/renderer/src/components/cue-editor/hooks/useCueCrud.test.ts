@@ -284,6 +284,17 @@ describe('useCueCrud new files', () => {
     expect(ipcApi.saveNodeCueFile).not.toHaveBeenCalled()
   })
 
+  it('reports a validation call that rejects', async () => {
+    jest.mocked(ipcApi.validateNodeCue).mockRejectedValue(new Error('channel gone'))
+    const crud = renderCrud()
+    await act(async () => {
+      await crud.result.current.handleCreateNewFile(NEW_FILE)
+    })
+
+    expect(crud.onError).toHaveBeenCalledWith('Failed to create cue file: Error: channel gone')
+    expect(ipcApi.saveNodeCueFile).not.toHaveBeenCalled()
+  })
+
   it('reports a refused save and opens nothing', async () => {
     jest.mocked(ipcApi.saveNodeCueFile).mockResolvedValue({ success: false, error: 'disk full' })
     const crud = renderCrud()

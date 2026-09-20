@@ -17,7 +17,6 @@
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web && npm run typecheck:test",
     "any:budget": "node tools/any-budget.mjs",
-    "floating:budget": "node tools/floating-promises-budget.mjs",
     "size:budget": "node tools/size-budget.mjs",
     "paths:check": "node tools/referenced-paths-check.mjs",
     "prestart": "install-electron",

@@ -4,8 +4,6 @@ import { getEffectSingleColor } from '../effects/effectSingleColor'
 import { getColor } from '../helpers/dmxHelpers'
 import { randomBetween } from '../helpers/utils'
 import { Effect, RGBIO } from '../types'
-import { createLogger } from '../../shared/logger'
-const log = createLogger('Rb3MenuCueHandler')
 
 /**
  * Minimal dispatch surface for RB3 menu lighting. Implemented directly by
@@ -60,9 +58,7 @@ export class Rb3MenuCueHandler {
       color: getColor('red', 'low'),
       duration: 10,
     })
-    this.sequencer.setEffect(BASE_EFFECT_NAME, base, true).catch((error) => {
-      log.error('Rb3MenuCueHandler: setEffect base failed:', error)
-    })
+    this.sequencer.setEffect(BASE_EFFECT_NAME, base, true)
 
     for (let i = 0; i < lights.length; i++) {
       const color = palette[randomBetween(0, palette.length - 1)]

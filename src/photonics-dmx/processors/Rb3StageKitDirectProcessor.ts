@@ -106,7 +106,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     // Dispose rigs that left the active set.
     for (const [rigId, rig] of this.rigs) {
       if (!currentRigIds.has(rigId)) {
-        void rig.dispose().catch((err) => log.error(`Rig ${rigId}: error disposing:`, err))
+        rig.dispose()
         this.rigs.delete(rigId)
       }
     }
@@ -211,7 +211,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     this._currentGameState = 'Menus'
     this._inSong = false
     this.emit('cueHandled', this.menusCueData(null, 'RB3E', screenName))
-    void this.turnOffAllRigs().catch((error) => {
+    this.turnOffAllRigs().catch((error) => {
       log.error(
         'StageKitDirectProcessor: Error clearing lights during screen-based Default menu cue:',
         error,
@@ -285,7 +285,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         this.applyStrobeEffect(strobeEffect)
       }
     } else if (color !== 'off') {
-      void this.applyLightData(positions, color)
+      this.applyLightData(positions, color)
     }
     // Fog, 0x00 and unrecognised commands carry no colour bank and leave the LEDs as they are.
 
@@ -349,14 +349,14 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         this._inSong = true
         this.clearMenuAnimationTimer()
 
-        void this.turnOffAllRigs().catch((error) => {
+        this.turnOffAllRigs().catch((error) => {
           log.error(
             'StageKitDirectProcessor: Error clearing lights during InGame transition:',
             error,
           )
         })
 
-        void this.blackoutAllRigs().catch((error) => {
+        this.blackoutAllRigs().catch((error) => {
           log.error(
             'StageKitDirectProcessor: Error calling sequencer blackout during InGame transition:',
             error,
@@ -369,7 +369,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
         this._inSong = false
 
-        void this.turnOffAllRigs().catch((error) => {
+        this.turnOffAllRigs().catch((error) => {
           log.error(
             'StageKitDirectProcessor: Error clearing lights during Menus transition:',
             error,
@@ -391,12 +391,16 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
   // ── Per-rig fanout wrappers ──────────────────────────────────────────────────────────
   // Each wrapper iterates every active rig processor so the coordinator's event handlers
-  // stay rig-agnostic. Errors on one rig don't block the others (Promise.allSettled).
+  // stay rig-agnostic. Errors on one rig don't block the others.
 
-  private async applyLightData(positions: number[], color: string): Promise<void> {
-    await Promise.allSettled(
-      Array.from(this.rigs.values()).map((r) => r.applyLightData(positions, color)),
-    )
+  private applyLightData(positions: number[], color: string): void {
+    for (const rig of this.rigs.values()) {
+      try {
+        rig.applyLightData(positions, color)
+      } catch (error) {
+        log.error(`Rig ${rig.rigId}: applyLightData failed:`, error)
+      }
+    }
   }
 
   private applyStrobeEffect(strobeType: 'slow' | 'medium' | 'fast' | 'fastest'): void {
@@ -525,7 +529,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
     // RB3E repeats DisableAll as end-of-song teardown traffic even after the player has already
     // backed out to Menus, where the menu pump owns the rig until its next frame repaints it.
     if (this.isDefaultMenuCueRunning()) return
-    void this.turnOffAllRigs().catch((error) => {
+    this.turnOffAllRigs().catch((error) => {
       log.error('StageKitDirectProcessor: Error handling DisableAll:', error)
     })
   }
@@ -559,15 +563,13 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
    * Clean up resources
    */
   public destroy(): void {
-    void this.turnOffAllRigs().catch((error) => {
+    this.turnOffAllRigs().catch((error) => {
       log.error('StageKitDirectProcessor: Error clearing lights during destroy:', error)
     })
     this.clearMenuAnimationTimer()
     this.strobeWatchdog.stop()
     for (const rig of this.rigs.values()) {
-      void rig.dispose().catch((error) => {
-        log.error(`Rig ${rig.rigId}: error disposing during destroy:`, error)
-      })
+      rig.dispose()
     }
     this.rigs.clear()
     this.removeAllListeners()

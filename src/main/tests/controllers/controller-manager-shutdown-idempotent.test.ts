@@ -46,8 +46,8 @@ function makeManager(overrides: Partial<ShutdownMocks> = {}): {
     disableYarg: overrides.disableYarg ?? resolved(),
     disableRb3: overrides.disableRb3 ?? resolved(),
     disableAudio: overrides.disableAudio ?? resolved(),
-    disposeChains: overrides.disposeChains ?? resolved(),
-    publisherShutdown: overrides.publisherShutdown ?? resolved(),
+    disposeChains: overrides.disposeChains ?? jest.fn(),
+    publisherShutdown: overrides.publisherShutdown ?? jest.fn(),
     senderShutdown: overrides.senderShutdown ?? resolved(),
   }
   const graph = {
@@ -145,8 +145,10 @@ describe('ControllerManager.shutdown idempotency', () => {
   it('a rejected teardown stays retryable, and a retry that succeeds completes the shutdown', async () => {
     const disposeChains = jest
       .fn()
-      .mockImplementationOnce(() => Promise.reject(new Error('teardown failed')))
-      .mockImplementation(() => Promise.resolve())
+      .mockImplementationOnce(() => {
+        throw new Error('teardown failed')
+      })
+      .mockImplementation(() => {})
     const { manager, mocks } = makeManager({ disposeChains })
 
     await expect(manager.shutdown()).rejects.toThrow(/teardown failed/)

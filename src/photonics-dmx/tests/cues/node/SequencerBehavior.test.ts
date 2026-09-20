@@ -34,7 +34,6 @@ function createRecordingSequencer(): { sequencer: ILightingController; recorded:
     },
     setEffect: (name: string) => {
       recorded.push({ method: 'setEffect', name })
-      return Promise.resolve()
     },
     removeEffect: (name: string, layer?: number) => {
       recorded.push({ method: 'removeEffect', name, layer })
@@ -137,7 +136,7 @@ describe('Sequencer behavior', () => {
     compiledCue = NodeCueCompiler.compileCue(cueDefinition, 'yarg')
   })
 
-  it('cue produces expected sequencer call sequence', async () => {
+  it('cue produces expected sequencer call sequence', () => {
     const { sequencer, recorded } = createRecordingSequencer()
     const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
     const cue = new LightingNodeCue('group1', compiledCue, new EffectRegistry(), noopCallbacks)
@@ -145,20 +144,20 @@ describe('Sequencer behavior', () => {
       beat: 'Strong',
       strobeState: 'Strobe_Off',
     } as CueData
-    await cue.execute(params, sequencer, lightManager)
+    cue.execute(params, sequencer, lightManager)
     expect(recorded.length).toBeGreaterThan(0)
     const methods = recorded.map((c) => c.method)
     expect(methods.some((m) => m === 'setEffect' || m === 'addEffect')).toBe(true)
   })
 
-  it('cue-called-only cue produces expected sequencer call sequence', async () => {
+  it('cue-called-only cue produces expected sequencer call sequence', () => {
     const def = cueCalledOnlyDefinition()
     const compiled = NodeCueCompiler.compileCue(def, 'yarg')
     const { sequencer, recorded } = createRecordingSequencer()
     const noopCallbacks: NodeRuntimeCallbacks = { emit: () => {} }
     const cue = new LightingNodeCue('group1', compiled, new EffectRegistry(), noopCallbacks)
     const params: CueData = { beat: 'Strong', strobeState: 'Strobe_Off' } as CueData
-    await cue.execute(params, sequencer, lightManager)
+    cue.execute(params, sequencer, lightManager)
     expect(recorded.length).toBeGreaterThan(0)
     const methods = recorded.map((c) => c.method)
     expect(methods.some((m) => m === 'setEffect' || m === 'addEffect')).toBe(true)

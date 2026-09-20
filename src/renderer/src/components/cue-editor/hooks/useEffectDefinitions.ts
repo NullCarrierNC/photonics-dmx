@@ -111,7 +111,7 @@ export function useEffectDefinitions(
       setLoaded({ requestKey, definitions: newDefinitions })
     }
 
-    loadEffects()
+    void loadEffects()
     return () => {
       cancelled = true
     }

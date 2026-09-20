@@ -82,7 +82,7 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
     )
 
     // Initialize on mount
-    initializeState()
+    void initializeState()
 
     return () => {
       cleanupRestarted()
@@ -170,7 +170,7 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
           role="switch"
           aria-checked={isAudioEnabled}
           aria-labelledby={labelId}
-          onClick={handleToggle}
+          onClick={() => void handleToggle()}
           disabled={isYargEnabled || isRb3Enabled || disabled || isSaving}
           className={`w-12 h-6 rounded-full ${
             isAudioEnabled ? 'bg-green-500' : 'bg-gray-400'
@@ -194,7 +194,7 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
             role="switch"
             aria-checked={gameModeEnabled}
             aria-label="Game mode"
-            onClick={handleGameModeSwitch}
+            onClick={() => void handleGameModeSwitch()}
             disabled={disabled || gameModeSaving}
             title={gameModeEnabled ? 'Game: cues cycle automatically' : 'Manual: pick a cue'}
             className={`w-9 h-5 rounded-full shrink-0 ${

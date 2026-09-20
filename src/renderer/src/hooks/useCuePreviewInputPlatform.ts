@@ -27,10 +27,10 @@ export function useCuePreviewInputPlatform(): 'RB3E' | 'YARG' | 'AUDIO' | null {
       }
     }
 
-    checkAudioState()
+    void checkAudioState()
 
     // Poll for audio state changes every 500ms
-    const interval = setInterval(checkAudioState, 500)
+    const interval = setInterval(() => void checkAudioState(), 500)
     return () => clearInterval(interval)
   }, [])
 

@@ -17,6 +17,9 @@ import { Pages } from './../types'
 import { currentPageAtom, lightsLayoutHasUnsavedChangesAtom, lightingPrefsAtom } from './../atoms'
 import { useConfirm } from '../hooks/useConfirm'
 import { openCueEditorWindow, openAudioPreviewWindow } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('LeftMenu')
 
 interface LeftMenuProps {
   isDarkMode: boolean
@@ -51,11 +54,11 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
   }
 
   const handleCueEditorClick = () => {
-    openCueEditorWindow()
+    openCueEditorWindow().catch((error) => log.error('Failed to open the cue editor:', error))
   }
 
   const handleAudioPreviewClick = () => {
-    openAudioPreviewWindow()
+    openAudioPreviewWindow().catch((error) => log.error('Failed to open the audio preview:', error))
   }
 
   const buttonClasses = (menuName: Pages) =>
@@ -70,7 +73,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
       <div className="flex flex-col space-y-2 flex-grow w-full">
         {/* Status Button */}
         <button
-          onClick={() => handleMenuClick(Pages.Status)}
+          onClick={() => void handleMenuClick(Pages.Status)}
           className={buttonClasses(Pages.Status)}
           title={isCollapsed ? 'Status' : undefined}>
           <FiActivity className="text-xl" />
@@ -79,7 +82,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
 
         {/* My Lights Button */}
         <button
-          onClick={() => handleMenuClick(Pages.MyLights)}
+          onClick={() => void handleMenuClick(Pages.MyLights)}
           className={buttonClasses(Pages.MyLights)}
           title={isCollapsed ? 'My Lights' : undefined}>
           <FaLightbulb className="text-xl" />
@@ -88,7 +91,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
 
         {/* Light Layout Button */}
         <button
-          onClick={() => handleMenuClick(Pages.LightLayout)}
+          onClick={() => void handleMenuClick(Pages.LightLayout)}
           className={buttonClasses(Pages.LightLayout)}
           title={isCollapsed ? 'Light Layout' : undefined}>
           <FiLayout className="text-xl" />
@@ -97,7 +100,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
 
         {/* DMX Console */}
         <button
-          onClick={() => handleMenuClick(Pages.DmxConsole)}
+          onClick={() => void handleMenuClick(Pages.DmxConsole)}
           className={buttonClasses(Pages.DmxConsole)}
           title={isCollapsed ? 'DMX Console' : undefined}>
           <MdTune className="text-xl" />
@@ -106,7 +109,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
 
         {/* Cue Preview Button */}
         <button
-          onClick={() => handleMenuClick(Pages.CuePreview)}
+          onClick={() => void handleMenuClick(Pages.CuePreview)}
           className={buttonClasses(Pages.CuePreview)}
           title={isCollapsed ? 'DMX Preview' : undefined}>
           <FaPlay className="text-xl" />
@@ -115,7 +118,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
 
         {/* Cue Simulation Button */}
         <button
-          onClick={() => handleMenuClick(Pages.CueSimulation)}
+          onClick={() => void handleMenuClick(Pages.CueSimulation)}
           className={buttonClasses(Pages.CueSimulation)}
           title={isCollapsed ? 'Cue Simulation' : undefined}>
           <FaInfinity className="text-xl" />
@@ -124,7 +127,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
 
         {/* Preferences */}
         <button
-          onClick={() => handleMenuClick(Pages.Preferences)}
+          onClick={() => void handleMenuClick(Pages.Preferences)}
           className={buttonClasses(Pages.Preferences)}
           title={isCollapsed ? 'Preferences' : undefined}>
           <FiSliders className="text-xl" />
@@ -165,7 +168,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
 
         {/* Network Debug Button */}
         <button
-          onClick={() => handleMenuClick(Pages.NetworkDebug)}
+          onClick={() => void handleMenuClick(Pages.NetworkDebug)}
           className={buttonClasses(Pages.NetworkDebug)}
           title={isCollapsed ? 'Network Debug' : undefined}>
           <FiCpu className="text-xl" />
@@ -174,7 +177,7 @@ const LeftMenu: React.FC<LeftMenuProps> = ({
 
         {/* About */}
         <button
-          onClick={() => handleMenuClick(Pages.About)}
+          onClick={() => void handleMenuClick(Pages.About)}
           className={buttonClasses(Pages.About)}
           title={isCollapsed ? 'About' : undefined}>
           <FiInfo className="text-xl" />

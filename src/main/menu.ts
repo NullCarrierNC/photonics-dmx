@@ -1,4 +1,7 @@
 import { app, Menu, dialog, MenuItemConstructorOptions } from 'electron'
+import { createLogger } from '../shared/logger'
+
+const log = createLogger('menu')
 
 /**
  * Create the About menu
@@ -16,12 +19,14 @@ function createAboutMenu(): MenuItemConstructorOptions[] {
               {
                 label: 'About',
                 click: () => {
-                  dialog.showMessageBox({
-                    type: 'info',
-                    title: `About ${app.name}`,
-                    message: `${app.name} PREVIEW v${app.getVersion()}`,
-                    buttons: ['OK'],
-                  })
+                  dialog
+                    .showMessageBox({
+                      type: 'info',
+                      title: `About ${app.name}`,
+                      message: `${app.name} PREVIEW v${app.getVersion()}`,
+                      buttons: ['OK'],
+                    })
+                    .catch((err) => log.error('Failed to show the About dialog:', err))
                 },
               },
               { type: 'separator' as const },

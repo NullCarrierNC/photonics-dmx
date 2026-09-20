@@ -50,7 +50,7 @@ function useBlackoutShortcutBinding(): BlackoutShortcutBinding {
 
   useEffect(() => {
     let current = true
-    void getPrefs()
+    getPrefs()
       .then((prefs) => {
         if (!current) return
         setBinding({

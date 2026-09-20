@@ -191,8 +191,8 @@ export abstract class BaseNodeFileLoader<
       },
     )
 
-    this.watcher.on('add', (file) => this.handleFileChange(file))
-    this.watcher.on('change', (file) => this.handleFileChange(file))
+    this.watcher.on('add', (file) => void this.handleFileChange(file))
+    this.watcher.on('change', (file) => void this.handleFileChange(file))
     this.watcher.on('unlink', (file) => this.handleFileRemoved(file))
   }
 

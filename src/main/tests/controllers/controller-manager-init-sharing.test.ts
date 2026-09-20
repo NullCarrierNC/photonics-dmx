@@ -65,10 +65,10 @@ function makeManager(): Steps {
     }),
     disposeLoaders: jest.fn(async () => {}),
     shutdownDomainCueHandlerRefs: jest.fn(),
-    disposeChainsForShutdown: jest.fn(async () => {
+    disposeChainsForShutdown: jest.fn(() => {
       order.push('teardown')
     }),
-    shutdownPublisherSafe: jest.fn(async () => {}),
+    shutdownPublisherSafe: jest.fn(),
     destroyClock: jest.fn(),
   } as unknown as ControllerGraph
 

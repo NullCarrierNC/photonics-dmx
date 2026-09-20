@@ -213,12 +213,12 @@ export function useCueFileIO({
 
     if (editorDoc.mode === 'effect') {
       const effectContent = updatedFile as EffectFile
-      const validation = await validateEffect({ content: effectContent })
-      if (!validation.valid) {
-        setValidationErrors(validation.errors)
-        return false
-      }
       try {
+        const validation = await validateEffect({ content: effectContent })
+        if (!validation.valid) {
+          setValidationErrors(validation.errors)
+          return false
+        }
         const response = await saveEffectFile({
           mode: effectContent.mode,
           filename,
@@ -232,7 +232,7 @@ export function useCueFileIO({
         rememberLastFilePath(response.path)
         setValidationErrors([])
         setIsDirty(false)
-        refreshEffectFiles()
+        await refreshEffectFiles()
         onSaveSuccess?.(`Effect saved: ${filename}`)
         return true
       } catch (error) {
@@ -242,12 +242,12 @@ export function useCueFileIO({
       }
     } else {
       const cueContent = updatedFile as NodeCueFile
-      const validation = await validateNodeCue({ content: cueContent })
-      if (!validation.valid) {
-        setValidationErrors(validation.errors)
-        return false
-      }
       try {
+        const validation = await validateNodeCue({ content: cueContent })
+        if (!validation.valid) {
+          setValidationErrors(validation.errors)
+          return false
+        }
         const response = await saveNodeCueFile({
           mode: cueContent.mode,
           filename,
@@ -261,7 +261,7 @@ export function useCueFileIO({
         rememberLastFilePath(response.path)
         setValidationErrors([])
         setIsDirty(false)
-        refreshFiles()
+        await refreshFiles()
         onSaveSuccess?.(`Cue saved: ${filename}`)
         return true
       } catch (error) {
@@ -319,9 +319,9 @@ export function useCueFileIO({
     setValidationErrors([])
     setIsDirty(false)
     if (editorDoc.mode === 'effect') {
-      refreshEffectFiles()
+      await refreshEffectFiles()
     } else {
-      refreshFiles()
+      await refreshFiles()
     }
   }, [
     clearLastFilePath,
@@ -341,12 +341,17 @@ export function useCueFileIO({
 
   const handleExport = useCallback(async () => {
     if (!editorDoc?.path) return
-    if (editorDoc.mode === 'effect') {
-      await exportEffectFile(editorDoc.path)
-    } else {
-      await exportNodeCueFile(editorDoc.path)
+    try {
+      if (editorDoc.mode === 'effect') {
+        await exportEffectFile(editorDoc.path)
+      } else {
+        await exportNodeCueFile(editorDoc.path)
+      }
+    } catch (error) {
+      log.error('Failed to export current file', error)
+      onSaveError?.(`Failed to export: ${formatSaveError(error)}`)
     }
-  }, [editorDoc])
+  }, [editorDoc, onSaveError])
 
   const handleReload = useCallback(async () => {
     const currentPath = editorDoc?.path

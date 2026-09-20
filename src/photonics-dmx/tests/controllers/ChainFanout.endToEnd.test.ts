@@ -18,9 +18,9 @@ import type { Clock } from '../../controllers/sequencer/Clock'
 describe('ChainFanout end-to-end (listener → fanout → per-chain handlers → per-chain sequencers)', () => {
   let chains: RigChain[] = []
 
-  afterEach(async () => {
+  afterEach(() => {
     for (const c of chains) {
-      await c.dispose()
+      c.dispose()
     }
     chains = []
   })

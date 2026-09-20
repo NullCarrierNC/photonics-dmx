@@ -402,7 +402,7 @@ export class ConfigurationManager {
       // callers detect the same repair, and a turn both orders them behind any user edit in flight
       // and re-derives the repair from the freshest data. A repair that is already applied by the
       // time its turn runs returns the input unchanged and writes nothing.
-      void this.dmxRigs
+      this.dmxRigs
         .mutate((latest) => {
           const healed = syncRigsConfigWithUserLights(
             migrateDmxRigsConfig(latest).config,

@@ -109,9 +109,14 @@ describe('YargNetworkListener', () => {
     await listener.start()
     const stopP = listener.stop()
     let resolved = false
-    void stopP.then(() => {
-      resolved = true
-    })
+    stopP.then(
+      () => {
+        resolved = true
+      },
+      () => {
+        resolved = true
+      },
+    )
     await Promise.resolve()
     expect(resolved).toBe(false)
     expect(pending).toHaveLength(1)
@@ -346,7 +351,7 @@ describe('YargNetworkListener', () => {
       expect(cueHandler.handleCue).not.toHaveBeenCalled()
     })
 
-    it('emits datagram-version-mismatch for non-zero versions below minimum supported', () => {
+    it('emits datagram-version-mismatch for non-zero versions below minimum supported', async () => {
       const strictListener = new YargNetworkListenerMinV2(cueHandler)
       const onError = jest.fn()
       strictListener.on('yarg-error', onError)
@@ -363,7 +368,7 @@ describe('YargNetworkListener', () => {
       )
       expect(cueHandler.handleCue).not.toHaveBeenCalled()
 
-      void strictListener.shutdown()
+      await strictListener.shutdown()
     })
   })
 

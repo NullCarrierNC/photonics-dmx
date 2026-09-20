@@ -9,10 +9,12 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { Rb3StageKitDirectProcessor } from '../../processors/Rb3StageKitDirectProcessor'
+import type { Rb3StageKitRigProcessor } from '../../processors/Rb3StageKitRigProcessor'
 import { ChainFanout } from '../../controllers/ChainFanout'
 import type { RigChain } from '../../controllers/RigChain'
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
 import { fakeLightingController } from '../helpers/fakeLightingController'
+import { resetLogConfiguration, setLogSink, type LogEntry } from '../../../shared/logger'
 
 function makeFourLightConfig() {
   return createMockLightingConfig({
@@ -102,15 +104,13 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     jest.restoreAllMocks()
   })
 
-  async function flushBlendingTimers(): Promise<void> {
-    // The blending pipeline schedules `setTimeout(applyAccumulatedColors, 5ms)` per light;
-    // the callback awaits applyColorToLight → sequencer.setState. Drain timers + a healthy
-    // number of microtasks so every per-rig per-light chain completes.
+  function flushBlendingTimers(): void {
+    // The blending pipeline schedules `setTimeout(applyAccumulatedColors, 5ms)` per light, and
+    // the callback runs straight through to sequencer.setState.
     jest.advanceTimersByTime(10)
-    for (let i = 0; i < 16; i++) await Promise.resolve()
   }
 
-  it('symmetric two-rig: gameplay event drives setState on every chain sequencer', async () => {
+  it('symmetric two-rig: gameplay event drives setState on every chain sequencer', () => {
     const a = makeChain('a', true, makeFourLightConfig())
     const b = makeChain(
       'b',
@@ -136,11 +136,7 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
       color: 'red',
       timestamp: Date.now(),
     })
-    // Drain microtasks (Promise.allSettled) before the blending timer fires.
-    await Promise.resolve()
-    await Promise.resolve()
-    await flushBlendingTimers()
-    await Promise.resolve()
+    flushBlendingTimers()
 
     // Each rig's sequencer.setState gets called against its own light references.
     expect(a.setState).toHaveBeenCalled()
@@ -156,7 +152,38 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     expect(bLightIds.every((id) => id.startsWith('b-'))).toBe(true)
   })
 
-  it('asymmetric two-rig (4 + 8 lights): each chain runs its own StageKit mode', async () => {
+  it('reports a rig that throws in applyLightData and still renders its siblings', () => {
+    const a = makeChain('a', true, makeFourLightConfig())
+    const b = makeChain('b', false, makeEightLightConfig())
+    fanout.setChains([a.chain, b.chain])
+    processor = new Rb3StageKitDirectProcessor(fanout)
+    processor.startListening(networkListener)
+
+    const rigs = (processor as unknown as { rigs: Map<string, Rb3StageKitRigProcessor> }).rigs
+    const failing = jest.fn(() => {
+      throw new Error('rig down')
+    })
+    rigs.get('a')!.applyLightData = failing
+
+    const entries: LogEntry[] = []
+    setLogSink((entry) => entries.push(entry))
+    try {
+      networkListener.emit('stagekit:data', {
+        positions: [0, 1],
+        color: 'red',
+        timestamp: Date.now(),
+      })
+    } finally {
+      resetLogConfiguration()
+    }
+    flushBlendingTimers()
+
+    expect(failing).toHaveBeenCalled()
+    expect(entries.some((e) => e.message.includes('Rig a: applyLightData failed'))).toBe(true)
+    expect(b.setState).toHaveBeenCalled()
+  })
+
+  it('asymmetric two-rig (4 + 8 lights): each chain runs its own StageKit mode', () => {
     const small = makeChain('small', true, makeFourLightConfig())
     const large = makeChain('large', false, makeEightLightConfig('b'))
     fanout.setChains([small.chain, large.chain])
@@ -168,10 +195,7 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
       color: 'blue',
       timestamp: Date.now(),
     })
-    await Promise.resolve()
-    await Promise.resolve()
-    await flushBlendingTimers()
-    await Promise.resolve()
+    flushBlendingTimers()
 
     expect(small.setState).toHaveBeenCalled()
     expect(large.setState).toHaveBeenCalled()
@@ -188,7 +212,7 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     expect(largeLightIds.size).toBeLessThanOrEqual(8)
   })
 
-  it('rig with fewer than 4 lights is skipped without breaking siblings', async () => {
+  it('rig with fewer than 4 lights is skipped without breaking siblings', () => {
     const tiny = makeChain(
       'tiny',
       true,
@@ -212,10 +236,7 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
       color: 'red',
       timestamp: Date.now(),
     })
-    await Promise.resolve()
-    await Promise.resolve()
-    await flushBlendingTimers()
-    await Promise.resolve()
+    flushBlendingTimers()
 
     // tiny rig was skipped — never gets a setState call.
     expect(tiny.setState).not.toHaveBeenCalled()
@@ -371,10 +392,7 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
       color: 'red',
       timestamp: Date.now(),
     })
-    await Promise.resolve()
-    await Promise.resolve()
-    await flushBlendingTimers()
-    await Promise.resolve()
+    flushBlendingTimers()
 
     networkListener.emit('stagekit:data', {
       positions: [0],
@@ -423,7 +441,7 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     expect(blend.blendedColor).not.toBeNull()
   })
 
-  it('refreshRigs adds processors for new chains and disposes processors for removed ones', async () => {
+  it('refreshRigs adds processors for new chains and disposes processors for removed ones', () => {
     const a = makeChain('a', true, makeFourLightConfig())
     const b = makeChain(
       'b',
@@ -452,10 +470,7 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
       color: 'red',
       timestamp: Date.now(),
     })
-    await Promise.resolve()
-    await Promise.resolve()
-    await flushBlendingTimers()
-    await Promise.resolve()
+    flushBlendingTimers()
     expect(a.setState).toHaveBeenCalled()
     expect(b.setState).not.toHaveBeenCalled()
     a.setState.mockClear()
@@ -469,9 +484,7 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
       color: 'green',
       timestamp: Date.now(),
     })
-    // Drain the synchronous fanout Promise.allSettled before the blending timer fires.
-    for (let i = 0; i < 4; i++) await Promise.resolve()
-    await flushBlendingTimers()
+    flushBlendingTimers()
 
     // Both rigs now drive setState.
     expect(a.setState).toHaveBeenCalled()
@@ -488,10 +501,7 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
       color: 'blue',
       timestamp: Date.now(),
     })
-    await Promise.resolve()
-    await Promise.resolve()
-    await flushBlendingTimers()
-    await Promise.resolve()
+    flushBlendingTimers()
 
     // Only rig B receives the new event.
     expect(a.setState).not.toHaveBeenCalled()

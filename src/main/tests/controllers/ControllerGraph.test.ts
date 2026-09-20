@@ -54,10 +54,12 @@ describe('ControllerGraph teardown steps', () => {
     expect(graph.getRb3CueHandler()).toBeNull()
   })
 
-  it('disposeChainsForShutdown tolerates a failing chain and clears the chain refs', async () => {
+  it('disposeChainsForShutdown tolerates a failing chain and clears the chain refs', () => {
     const graph = makeGraph()
-    const disposeOk = jest.fn().mockImplementation(() => Promise.resolve())
-    const disposeBad = jest.fn().mockImplementation(() => Promise.reject(new Error('boom')))
+    const disposeOk = jest.fn()
+    const disposeBad = jest.fn(() => {
+      throw new Error('boom')
+    })
     seed(graph, {
       rigChains: [
         { rigId: 'a', dispose: disposeBad },
@@ -67,7 +69,7 @@ describe('ControllerGraph teardown steps', () => {
       effectsController: {},
     })
 
-    await graph.disposeChainsForShutdown()
+    graph.disposeChainsForShutdown()
 
     expect(disposeBad).toHaveBeenCalledTimes(1)
     expect(disposeOk).toHaveBeenCalledTimes(1)
@@ -76,20 +78,22 @@ describe('ControllerGraph teardown steps', () => {
     expect(graph.getEffectsController()).toBeNull()
   })
 
-  it('disposeChainsForRestart propagates the first failing chain', async () => {
+  it('disposeChainsForRestart propagates the first failing chain', () => {
     const graph = makeGraph()
-    const disposeAfter = jest.fn().mockImplementation(() => Promise.resolve())
+    const disposeAfter = jest.fn()
     seed(graph, {
       rigChains: [
         {
           rigId: 'a',
-          dispose: jest.fn().mockImplementation(() => Promise.reject(new Error('boom'))),
+          dispose: jest.fn(() => {
+            throw new Error('boom')
+          }),
         },
         { rigId: 'b', dispose: disposeAfter },
       ],
     })
 
-    await expect(graph.disposeChainsForRestart()).rejects.toThrow('boom')
+    expect(() => graph.disposeChainsForRestart()).toThrow('boom')
     expect(disposeAfter).not.toHaveBeenCalled()
   })
 
@@ -115,16 +119,18 @@ describe('ControllerGraph teardown steps', () => {
     expect(graph.getEffectLoader()).toBeNull()
   })
 
-  it('shutdownPublisherSafe swallows a failing publisher, shutdownPublisher propagates it', async () => {
+  it('shutdownPublisherSafe swallows a failing publisher, shutdownPublisher propagates it', () => {
     const graph = makeGraph()
     seed(graph, {
       dmxPublisher: {
-        shutdown: jest.fn().mockImplementation(() => Promise.reject(new Error('boom'))),
+        shutdown: jest.fn(() => {
+          throw new Error('boom')
+        }),
       },
     })
 
-    await expect(graph.shutdownPublisherSafe()).resolves.toBeUndefined()
-    await expect(graph.shutdownPublisher()).rejects.toThrow('boom')
+    expect(() => graph.shutdownPublisherSafe()).not.toThrow()
+    expect(() => graph.shutdownPublisher()).toThrow('boom')
   })
 
   it('destroyClock tolerates a throwing clock and clears it either way', () => {

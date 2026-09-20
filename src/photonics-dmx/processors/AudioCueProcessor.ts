@@ -259,7 +259,7 @@ export class AudioCueProcessor {
     }
     this.lightingSuppressed = false
 
-    void this.chainFanout
+    this.chainFanout
       .audioHandleData(
         processedData,
         this.config,
@@ -568,7 +568,7 @@ export class AudioCueProcessor {
         lights,
         layer: AUDIO_IDLE_LAYER,
       })
-      void chain.sequencer.setEffect(AUDIO_IDLE_EFFECT_NAME, effect, true)
+      chain.sequencer.setEffect(AUDIO_IDLE_EFFECT_NAME, effect, true)
     }
     this.idleLookActive = true
   }

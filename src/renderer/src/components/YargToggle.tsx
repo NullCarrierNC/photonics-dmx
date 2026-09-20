@@ -37,7 +37,7 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
     // Handle controllers restarted event
     const handleControllersRestarted = () => {
       log.info('Controllers restarted, refreshing YARG toggle state')
-      initializeState()
+      void initializeState()
     }
 
     const cleanup = registerIpcListener(
@@ -46,7 +46,7 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
     )
 
     // Initialize on mount
-    initializeState()
+    void initializeState()
 
     return cleanup
   }, [setIsYargEnabled])
@@ -61,7 +61,9 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
       // Disable Audio when YARG is enabled (mutual exclusion)
       if (isAudioEnabled) {
         setIsAudioEnabled(false)
-        setAudioEnabled(false)
+        setAudioEnabled(false).catch((error) =>
+          log.error('Failed to disable audio alongside YARG:', error),
+        )
       }
     } else {
       disableYarg()

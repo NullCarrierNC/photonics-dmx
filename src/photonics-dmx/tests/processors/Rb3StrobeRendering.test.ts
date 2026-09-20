@@ -49,7 +49,7 @@ async function runStrobe(clockMs: number, type: 'fastest' | 'fast' | 'medium'): 
   const rig = new Rb3StageKitRigProcessor('rig-a', lightManager, sequencer, { enabled: true })
 
   // A lit rig first, so a flash is something other than the colour underneath it.
-  await rig.applyLightData([0, 1, 2, 3, 4, 5, 6, 7], 'blue')
+  rig.applyLightData([0, 1, 2, 3, 4, 5, 6, 7], 'blue')
 
   const isWhite = (): boolean => {
     const state = lightStateManager.getLightState('f1')
@@ -86,7 +86,7 @@ async function runStrobe(clockMs: number, type: 'fastest' | 'fast' | 'medium'): 
   await step(500, false)
   const whiteAfterStop = isWhite()
 
-  await rig.dispose()
+  rig.dispose()
   sequencer.shutdown()
   clockNow.mockRestore()
 

@@ -178,15 +178,19 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
   }, [])
 
   useEffect(() => {
-    loadCueState()
+    void loadCueState()
 
-    const handleAudioEvent = () => loadCueState(true)
+    const handleAudioEvent = (): void => {
+      void loadCueState(true)
+    }
     addIpcListener(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, handleAudioEvent)
     addIpcListener(RENDERER_RECEIVE.AUDIO_ENABLE, handleAudioEvent)
     addIpcListener(RENDERER_RECEIVE.AUDIO_DISABLE, handleAudioEvent)
     addIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, handleAudioEvent)
     addIpcListener(RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED, handleAudioEvent)
-    const onMotionEnabled = () => loadCueState(true)
+    const onMotionEnabled = (): void => {
+      void loadCueState(true)
+    }
     addIpcListener(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, onMotionEnabled)
 
     return () => {
@@ -268,9 +272,9 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
   }, [])
 
   useEffect(() => {
-    const onMotionCueChange = async (payload: {
+    const applyMotionCueChange = async (payload: {
       ref: { groupId: string; cueId: string } | null
-    }) => {
+    }): Promise<void> => {
       if (!payload.ref) {
         setMotionPlayingLabel(null)
         setMotionPlayingGroupLabel(null)
@@ -287,6 +291,11 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         setMotionPlayingGroupLabel(payload.ref.groupId)
         setMotionPlayingLabel(payload.ref.cueId)
       }
+    }
+    const onMotionCueChange = (payload: {
+      ref: { groupId: string; cueId: string } | null
+    }): void => {
+      void applyMotionCueChange(payload)
     }
     addIpcListener(RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE, onMotionCueChange)
     return () => {
@@ -393,11 +402,11 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     }
   }
 
-  const handleGroupChange = (groupId: string) => {
+  const handleGroupChange = async (groupId: string) => {
     setSelectedGroupId(groupId)
     const firstCueInGroup = availableCues.find((cue) => cue.groupId === groupId)
     if (firstCueInGroup) {
-      handleCueChange(firstCueInGroup.id)
+      await handleCueChange(firstCueInGroup.id)
     } else {
       setSelectedCueId('')
     }
@@ -519,11 +528,11 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
             <AudioCuePickers
               groupOptions={groupOptions}
               selectedGroupId={selectedGroupId}
-              onGroupChange={handleGroupChange}
+              onGroupChange={(groupId) => void handleGroupChange(groupId)}
               cuesForSelectedGroup={cuesForSelectedGroup}
               selectedCueId={selectedCueId}
               activeCue={activeCue}
-              onCueChange={handleCueChange}
+              onCueChange={(cueId) => void handleCueChange(cueId)}
               saving={saving}
               selectedCue={selectedCue}
               selectedGroupInfo={selectedGroupInfo}
@@ -533,10 +542,10 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
             <AudioMotionPicker
               motionGroups={motionGroups}
               motionGroupId={motionGroupId}
-              onGroupChange={handleMotionGroupChange}
+              onGroupChange={(groupId) => void handleMotionGroupChange(groupId)}
               motionCuesOptions={motionCuesOptions}
               motionCueId={motionCueId}
-              onCueChange={handleMotionCueChange}
+              onCueChange={(cueId) => void handleMotionCueChange(cueId)}
               savingMotion={savingMotion}
             />
           )}

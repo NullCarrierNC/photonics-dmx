@@ -45,9 +45,6 @@ jobs:
       - name: Explicit any budget
         run: npm run any:budget
 
-      - name: Floating promise budget
-        run: npm run floating:budget
-
       - name: File size budget
         run: npm run size:budget
 

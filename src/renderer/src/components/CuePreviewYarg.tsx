@@ -148,9 +148,9 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   }, [loadMotionLabels])
 
   useEffect(() => {
-    const onMotionCueChange = async (payload: {
+    const applyMotionCueChange = async (payload: {
       ref: { groupId: string; cueId: string } | null
-    }) => {
+    }): Promise<void> => {
       if (!payload.ref) {
         setMotionPlayingLabel(null)
         setMotionPlayingGroupLabel(null)
@@ -167,6 +167,11 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
         setMotionPlayingGroupLabel(payload.ref.groupId)
         setMotionPlayingLabel(payload.ref.cueId)
       }
+    }
+    const onMotionCueChange = (payload: {
+      ref: { groupId: string; cueId: string } | null
+    }): void => {
+      void applyMotionCueChange(payload)
     }
     addIpcListener(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, onMotionCueChange)
     return () => {

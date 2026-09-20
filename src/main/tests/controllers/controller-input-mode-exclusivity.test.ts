@@ -53,8 +53,8 @@ function makeManager(): { manager: ControllerManager; mocks: InputMocks } {
   const graph = {
     disposeLoaders: resolved(),
     shutdownDomainCueHandlerRefs: jest.fn(),
-    disposeChainsForShutdown: resolved(),
-    shutdownPublisherSafe: resolved(),
+    disposeChainsForShutdown: jest.fn(),
+    shutdownPublisherSafe: jest.fn(),
     destroyClock: jest.fn(),
   } as unknown as ControllerGraph
   const listenerLifecycle = {

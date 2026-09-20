@@ -10,6 +10,9 @@ import { myDmxLightsAtom, sortedMyDmxLightsAtom } from '@renderer/atoms'
 import { saveMyLights } from '../ipcApi'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from '../hooks/useConfirm'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('MyLights')
 
 const MyLights = () => {
   const { toasts, showToast, hideToast } = useToast()
@@ -48,6 +51,23 @@ const MyLights = () => {
     })
   }
 
+  /**
+   * Writes the library, putting `previous` back and saying so if the write is refused or throws.
+   * The caller has already applied the new library optimistically.
+   */
+  const persistLibrary = async (next: DmxFixture[], previous: DmxFixture[]): Promise<boolean> => {
+    try {
+      const result = await saveMyLights(next)
+      if (result.success) return true
+      showToast(result.error, 'error', 5000)
+    } catch (error) {
+      log.error('Failed to save the light library', error)
+      showToast('Failed to save the light library.', 'error', 5000)
+    }
+    setMyLights(previous)
+    return false
+  }
+
   const handleSave = async () => {
     if (!currentLight) return
     const lightToSave: DmxFixture = {
@@ -69,12 +89,7 @@ const MyLights = () => {
     // doesn't keep showing an unsaved state that isn't on disk.
     const previousLibrary = myLights
     setMyLights(nextLibrary)
-    const result = await saveMyLights(nextLibrary)
-    if (!result.success) {
-      setMyLights(previousLibrary)
-      showToast(result.error, 'error', 5000)
-      return
-    }
+    if (!(await persistLibrary(nextLibrary, previousLibrary))) return
     closeEditor()
   }
 
@@ -91,12 +106,7 @@ const MyLights = () => {
     const previousLibrary = myLights
     const updatedMyLights = myLights.filter((light) => light.id !== currentLight.id)
     setMyLights(updatedMyLights)
-    const result = await saveMyLights(updatedMyLights)
-    if (!result.success) {
-      setMyLights(previousLibrary)
-      showToast(result.error, 'error', 5000)
-      return
-    }
+    if (!(await persistLibrary(updatedMyLights, previousLibrary))) return
     closeEditor()
   }
 

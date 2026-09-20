@@ -69,7 +69,7 @@ process.on('unhandledRejection', (reason, _promise) => {
 })
 
 // Handle clean shutdown on process signals
-process.on('SIGINT', async () => {
+async function shutdownOnSigint(): Promise<void> {
   log.info('Received SIGINT signal, shutting down gracefully...')
 
   // Set a hard timeout to force exit after 2 seconds
@@ -93,9 +93,13 @@ process.on('SIGINT', async () => {
     clearTimeout(forceExitTimeout)
     process.exit(1)
   }
+}
+
+process.on('SIGINT', () => {
+  void shutdownOnSigint()
 })
 
-process.on('SIGTERM', async () => {
+async function shutdownOnSigterm(): Promise<void> {
   log.info('Received SIGTERM signal, shutting down gracefully...')
 
   // Set a hard timeout to force exit after 2 seconds
@@ -118,6 +122,10 @@ process.on('SIGTERM', async () => {
     clearTimeout(forceExitTimeout)
     process.exit(1)
   }
+}
+
+process.on('SIGTERM', () => {
+  void shutdownOnSigterm()
 })
 
 /**
@@ -217,11 +225,7 @@ app.on('activate', () => {
 })
 
 // Handle before-quit event
-app.on('before-quit', async (event) => {
-  // Prevent the default quit behavior
-  event.preventDefault()
-
-  // Perform our graceful shutdown
+async function shutdownBeforeQuit(): Promise<void> {
   log.info('Application is shutting down, cleaning up resources...')
   try {
     await applicationInstance?.shutdown()
@@ -236,4 +240,10 @@ app.on('before-quit', async (event) => {
     await closeFileLogWithTimeout()
     app.exit(1)
   }
+}
+
+app.on('before-quit', (event) => {
+  // Prevent the default quit behavior
+  event.preventDefault()
+  void shutdownBeforeQuit()
 })

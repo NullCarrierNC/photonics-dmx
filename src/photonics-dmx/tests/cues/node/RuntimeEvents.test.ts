@@ -747,7 +747,7 @@ describe('Runtime Event System', () => {
       expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
     })
 
-    it('LightingNodeCue (Primary): first execute uses setEffect, second uses addEffect, after onStop first again uses setEffect', async () => {
+    it('LightingNodeCue (Primary): first execute uses setEffect, second uses addEffect, after onStop first again uses setEffect', () => {
       const cueStartedEvent: NetEventNode = {
         id: 'e-start',
         type: 'event',
@@ -799,24 +799,24 @@ describe('Runtime Event System', () => {
       const cue = new LightingNodeCue('group1', compiled)
       const cueData = createCueData()
 
-      await cue.execute(cueData, mockSequencer, mockLightManager)
+      cue.execute(cueData, mockSequencer, mockLightManager)
       expect(mockSequencer.setEffectUnblockedName).toHaveBeenCalledTimes(1)
       expect(mockSequencer.removeAllEffects).not.toHaveBeenCalled()
       const addEffectAfterFirst = (mockSequencer.addEffect as jest.Mock).mock.calls.length
       expect(addEffectAfterFirst).toBeGreaterThanOrEqual(0)
 
-      await cue.execute(cueData, mockSequencer, mockLightManager)
+      cue.execute(cueData, mockSequencer, mockLightManager)
       expect(mockSequencer.setEffectUnblockedName).toHaveBeenCalledTimes(1)
       expect((mockSequencer.addEffect as jest.Mock).mock.calls.length).toBeGreaterThan(
         addEffectAfterFirst,
       )
 
       cue.onStop()
-      await cue.execute(cueData, mockSequencer, mockLightManager)
+      cue.execute(cueData, mockSequencer, mockLightManager)
       expect(mockSequencer.setEffectUnblockedName).toHaveBeenCalledTimes(2)
     })
 
-    it('LightingNodeCue onStop does not remove effects from sequencer so lights stay lit during cue transition', async () => {
+    it('LightingNodeCue onStop does not remove effects from sequencer so lights stay lit during cue transition', () => {
       const cueStartedEvent: NetEventNode = {
         id: 'e-start',
         type: 'event',
@@ -860,7 +860,7 @@ describe('Runtime Event System', () => {
       const cue = new LightingNodeCue('group1', compiled)
       const cueData = createCueData()
 
-      await cue.execute(cueData, mockSequencer, mockLightManager)
+      cue.execute(cueData, mockSequencer, mockLightManager)
       expect(mockSequencer.setEffectUnblockedName).toHaveBeenCalled()
 
       const removeEffectCallsBefore = (mockSequencer.removeEffect as jest.Mock).mock.calls.length
@@ -869,7 +869,7 @@ describe('Runtime Event System', () => {
       expect(mockSequencer.removeEffect).toHaveBeenCalledTimes(removeEffectCallsBefore)
     })
 
-    it('LightingNodeCue (Secondary): execute submits effect via addEffect', async () => {
+    it('LightingNodeCue (Secondary): execute submits effect via addEffect', () => {
       const cueStartedEvent: NetEventNode = {
         id: 'e-start',
         type: 'event',
@@ -913,13 +913,13 @@ describe('Runtime Event System', () => {
       const cue = new LightingNodeCue('group1', compiled)
       const cueData = createCueData()
 
-      await cue.execute(cueData, mockSequencer, mockLightManager)
+      cue.execute(cueData, mockSequencer, mockLightManager)
       const setCalls = (mockSequencer.setEffectUnblockedName as jest.Mock).mock.calls.length
       const addCalls = (mockSequencer.addEffect as jest.Mock).mock.calls.length
       expect(setCalls + addCalls).toBeGreaterThanOrEqual(1)
     })
 
-    it('LightingNodeCue (Primary, no cue-started node): first execute uses setEffect', async () => {
+    it('LightingNodeCue (Primary, no cue-started node): first execute uses setEffect', () => {
       const cueCalledEvent: NetEventNode = {
         id: 'e-called',
         type: 'event',
@@ -963,7 +963,7 @@ describe('Runtime Event System', () => {
       const cue = new LightingNodeCue('group1', compiled)
       const cueData = createCueData()
 
-      await cue.execute(cueData, mockSequencer, mockLightManager)
+      cue.execute(cueData, mockSequencer, mockLightManager)
       expect(mockSequencer.setEffectUnblockedName).toHaveBeenCalledTimes(1)
       expect(mockSequencer.removeAllEffects).not.toHaveBeenCalled()
     })

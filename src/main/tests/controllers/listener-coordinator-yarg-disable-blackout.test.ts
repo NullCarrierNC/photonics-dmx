@@ -177,7 +177,7 @@ afterEach(async () => {
   // Every listener and chain is torn down here, so no timer outlives the test.
   await current.coordinator.disableYarg()
   await current.coordinator.disableRb3()
-  await current.chain.dispose()
+  current.chain.dispose()
   for (const domain of ['yarg', 'rb3'] as const) {
     const registry = getCueRegistry(domain)
     for (const id of current.loadedGroupIds[domain]) {

@@ -332,7 +332,7 @@ export interface IDebugMonitor {
  */
 export interface ILightingController {
   addEffect(name: string, effect: Effect, isPersistent?: boolean): void
-  setEffect(name: string, effect: Effect, isPersistent?: boolean): Promise<void>
+  setEffect(name: string, effect: Effect, isPersistent?: boolean): void
   /**
    * Cancels any active or queued effect on each (layer, light) targeted by the new
    * effect and starts the new transitions immediately. See {@link IEffectManager.replaceEffect}.

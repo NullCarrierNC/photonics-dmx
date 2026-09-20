@@ -58,12 +58,12 @@ describe('timed blackout', () => {
     return { runId: runId!, isLive: () => persistentRuns.has(runId!) }
   }
 
-  it('retires the run of a persistent look it wipes instantly', () => {
+  it('retires the run of a persistent look it wipes instantly', async () => {
     lightEverything('settled-look')
     const { isLive } = runState()
     expect(isLive()).toBe(true)
 
-    void harness.sequencer.blackout(0)
+    await harness.sequencer.blackout(0)
     harness.advanceBy(10)
 
     expect(isLive()).toBe(false)
@@ -131,25 +131,25 @@ describe('timed blackout', () => {
     await expect(done).resolves.toBeUndefined()
   })
 
-  it('goes dark at once when an instant blackout lands during a fade', () => {
+  it('goes dark at once when an instant blackout lands during a fade', async () => {
     lightEverything('settled-look')
 
     void harness.sequencer.blackout(500)
     harness.advanceBy(100)
     expect(anyLit()).toBe(true)
 
-    void harness.sequencer.blackout(0)
+    await harness.sequencer.blackout(0)
     harness.advanceBy(10)
 
     expect(anyLit()).toBe(false)
   })
 
-  it('leaves a look that starts after an instant blackout alone', () => {
+  it('leaves a look that starts after an instant blackout alone', async () => {
     lightEverything('settled-look')
 
     void harness.sequencer.blackout(500)
     harness.advanceBy(100)
-    void harness.sequencer.blackout(0)
+    await harness.sequencer.blackout(0)
     harness.advanceBy(10)
 
     lightEverything('look-after')
@@ -186,7 +186,7 @@ describe('timed blackout', () => {
 
   it("fades from the light's actual blended colour, not layer 0, when nothing is on layer 0", () => {
     // The look lives on a layer above 0, so layer 0 itself holds no state at all.
-    void harness.sequencer.setEffect(
+    harness.sequencer.setEffect(
       'raised-look',
       getEffectSingleColor({
         color: WHITE,
@@ -210,7 +210,7 @@ describe('timed blackout', () => {
 
   /** A persistent look above layer 0, the way a primary cue leaves its effects up when it stops. */
   const lightRaisedLook = (): void => {
-    void harness.sequencer.setEffect(
+    harness.sequencer.setEffect(
       'raised-look',
       getEffectSingleColor({
         color: WHITE,

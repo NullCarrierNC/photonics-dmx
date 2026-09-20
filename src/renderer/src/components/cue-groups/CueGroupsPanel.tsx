@@ -109,7 +109,7 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
   }, [domain, log])
 
   useEffect(() => {
-    fetchGroups()
+    void fetchGroups()
   }, [fetchGroups])
 
   const clearPersistError = useCallback((groupId: string) => {
@@ -364,7 +364,7 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
                           type="checkbox"
                           className="form-checkbox mt-0.5 h-4 w-4 text-blue-600 rounded shrink-0"
                           checked={isOn}
-                          onChange={(e) => handleCueToggle(group.id, cue.id, e.target.checked)}
+                          onChange={(e) => void handleCueToggle(group.id, cue.id, e.target.checked)}
                           aria-labelledby={rowLabelId}
                         />
                         <p id={rowLabelId} className="text-xs text-gray-600 dark:text-gray-400">

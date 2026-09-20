@@ -103,7 +103,7 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     lightManager = new DmxLightManager(makeFourLightConfig())
 
     addEffect = jest.fn()
-    setEffect = jest.fn<ILightingController['setEffect']>(() => Promise.resolve())
+    setEffect = jest.fn<ILightingController['setEffect']>()
     removeEffect = jest.fn()
     setState = jest.fn()
     blackout = jest.fn<ILightingController['blackout']>(() => Promise.resolve())

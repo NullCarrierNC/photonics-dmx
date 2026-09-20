@@ -101,7 +101,7 @@ const ActiveRigsSettings: React.FC = () => {
       }
     }
 
-    loadRigs()
+    void loadRigs()
   }, [setRigs])
 
   const handleActiveToggle = async (rigId: string, newActive: boolean) => {
@@ -284,7 +284,7 @@ const ActiveRigsSettings: React.FC = () => {
             type="checkbox"
             id="allowMultipleActiveRigs"
             checked={allowMultipleActiveRigs}
-            onChange={(e) => handleAllowMultipleActiveRigsChange(e.target.checked)}
+            onChange={(e) => void handleAllowMultipleActiveRigsChange(e.target.checked)}
             className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
           />
           <label
@@ -355,7 +355,7 @@ const ActiveRigsSettings: React.FC = () => {
                       <input
                         type="checkbox"
                         checked={rig.active}
-                        onChange={(e) => handleActiveToggle(rig.id, e.target.checked)}
+                        onChange={(e) => void handleActiveToggle(rig.id, e.target.checked)}
                         className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                       />
                     ) : (
@@ -363,7 +363,7 @@ const ActiveRigsSettings: React.FC = () => {
                         type="radio"
                         name="activeRig"
                         checked={rig.active}
-                        onChange={() => handleActiveToggle(rig.id, true)}
+                        onChange={() => void handleActiveToggle(rig.id, true)}
                         className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                       />
                     )}
@@ -378,7 +378,9 @@ const ActiveRigsSettings: React.FC = () => {
                           type="checkbox"
                           id={`rig-${rig.id}-mirror-horiz`}
                           checked={rig.mirrorHoriz === true}
-                          onChange={(e) => handleMirrorToggle(rig.id, 'horiz', e.target.checked)}
+                          onChange={(e) =>
+                            void handleMirrorToggle(rig.id, 'horiz', e.target.checked)
+                          }
                           className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                         />
                         Horiz
@@ -391,7 +393,9 @@ const ActiveRigsSettings: React.FC = () => {
                           type="checkbox"
                           id={`rig-${rig.id}-mirror-vert`}
                           checked={rig.mirrorVert === true}
-                          onChange={(e) => handleMirrorToggle(rig.id, 'vert', e.target.checked)}
+                          onChange={(e) =>
+                            void handleMirrorToggle(rig.id, 'vert', e.target.checked)
+                          }
                           className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                         />
                         Vert
@@ -414,7 +418,7 @@ const ActiveRigsSettings: React.FC = () => {
                                 id={inputId}
                                 checked={checked}
                                 onChange={(e) =>
-                                  handleOutputToggle(rig.id, senderId, e.target.checked)
+                                  void handleOutputToggle(rig.id, senderId, e.target.checked)
                                 }
                                 className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                               />
@@ -435,7 +439,7 @@ const ActiveRigsSettings: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-600 dark:text-gray-400">Confirm?</span>
                         <button
-                          onClick={() => handleDelete(rig.id)}
+                          onClick={() => void handleDelete(rig.id)}
                           className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs">
                           Yes
                         </button>

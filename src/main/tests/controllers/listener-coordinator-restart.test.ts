@@ -140,9 +140,14 @@ describe('ListenerCoordinator enableRb3 initialization ordering', () => {
 
     const enableP = lc.enableRb3(false, initAsync)
     let resolved = false
-    void enableP.then(() => {
-      resolved = true
-    })
+    enableP.then(
+      () => {
+        resolved = true
+      },
+      () => {
+        resolved = true
+      },
+    )
 
     await Promise.resolve()
     // enableRb3 must not resolve while initialization is still in flight.

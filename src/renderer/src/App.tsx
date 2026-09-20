@@ -358,7 +358,7 @@ export const App = (): JSX.Element => {
       }
     }
 
-    loadLightLibrary()
+    void loadLightLibrary()
   }, [setLightLibrary])
 
   // Load my lights effect
@@ -372,7 +372,7 @@ export const App = (): JSX.Element => {
       }
     }
 
-    loadMyLights()
+    void loadMyLights()
   }, [setMyLights])
 
   // Load light layout effect
@@ -386,7 +386,7 @@ export const App = (): JSX.Element => {
       }
     }
 
-    loadLightLayout()
+    void loadLightLayout()
   }, [setActiveLightsConfig])
 
   // Load DMX rigs at app start so any page that surfaces rig-aware UI (e.g. RoutedRigsHint
@@ -402,7 +402,7 @@ export const App = (): JSX.Element => {
       }
     }
 
-    loadDmxRigs()
+    void loadDmxRigs()
   }, [setDmxRigs])
 
   useAppIpcListeners({
@@ -460,7 +460,7 @@ export const App = (): JSX.Element => {
             isDarkMode={isDarkMode}
             toggleDarkMode={toggleDarkMode}
             isCollapsed={isLeftMenuCollapsed}
-            onToggleCollapse={handleToggleLeftMenu}
+            onToggleCollapse={() => void handleToggleLeftMenu()}
           />
         </div>
       </div>

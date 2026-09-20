@@ -67,24 +67,18 @@ function makeSequencerStub(setState: jest.Mock): ILightingController {
 }
 
 describe('Rb3StageKitRigProcessor accumulated-colour flush', () => {
-  const unhandled: unknown[] = []
-  const onUnhandled = (reason: unknown): void => {
-    unhandled.push(reason)
-  }
-
   beforeEach(() => {
     jest.useFakeTimers()
-    unhandled.length = 0
-    process.on('unhandledRejection', onUnhandled)
   })
 
   afterEach(() => {
-    process.off('unhandledRejection', onUnhandled)
     jest.useRealTimers()
   })
 
-  it('swallows a rejecting setState and clears the pending update', async () => {
-    const setState = jest.fn<() => Promise<void>>().mockRejectedValue(new Error('sequencer down'))
+  it('swallows a throwing setState and clears the pending update', () => {
+    const setState = jest.fn(() => {
+      throw new Error('sequencer down')
+    })
     const proc = new Rb3StageKitRigProcessor(
       'rig-1',
       makeFourLightManager(),
@@ -92,13 +86,11 @@ describe('Rb3StageKitRigProcessor accumulated-colour flush', () => {
       DEFAULT_STAGEKIT_CONFIG,
     )
 
-    await proc.applyLightData([0, 1], 'red')
-    // The flush is scheduled on a short accumulation timer; drain it and its microtasks.
-    await jest.advanceTimersByTimeAsync(50)
+    proc.applyLightData([0, 1], 'red')
+    // The flush is scheduled on a short accumulation timer.
+    jest.advanceTimersByTime(50)
 
     expect(setState).toHaveBeenCalled()
-    // The rejection was caught, not left dangling on the event loop.
-    expect(unhandled).toHaveLength(0)
     // The finally block cleared the pending entry so the light isn't wedged.
     const pending = (proc as unknown as { pendingUpdates: Map<number, unknown> }).pendingUpdates
     expect(pending.size).toBe(0)
@@ -111,7 +103,7 @@ describe('Rb3StageKitRigProcessor strobe runs', () => {
 
   beforeEach(() => {
     jest.useFakeTimers()
-    setState = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+    setState = jest.fn()
     proc = new Rb3StageKitRigProcessor(
       'rig-1',
       makeStrobeLightManager(),
@@ -177,9 +169,9 @@ describe('Rb3StageKitRigProcessor strobe runs', () => {
     expect(runningStrobes(proc)).toEqual(['stagekit-strobe-rig-1-medium'])
   })
 
-  it('leaves nothing running after dispose', async () => {
+  it('leaves nothing running after dispose', () => {
     proc.applyStrobeEffect('fastest')
-    await proc.dispose()
+    proc.dispose()
 
     expect(runningStrobes(proc)).toEqual([])
     setState.mockClear()

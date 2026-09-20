@@ -198,7 +198,9 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
     const onCueStateUpdate = (state: CueStateUpdatePayload) => p().handleCueStateUpdate(state)
     const onSenderStartFailed = (data: { sender: string; error: string }) =>
       p().handleSenderStartFailure(data)
-    const onAudioEnable = (config: AudioConfig) => p().handleAudioEnable(config)
+    const onAudioEnable = (config: AudioConfig): void => {
+      void p().handleAudioEnable(config)
+    }
     const onAudioDisable = () => p().handleAudioDisable(undefined)
     const onAudioConfigUpdate = (c: AudioConfig | undefined) => p().handleAudioConfigUpdate(c)
     addIpcListener(RENDERER_RECEIVE.SENDER_ERROR, onSenderError)

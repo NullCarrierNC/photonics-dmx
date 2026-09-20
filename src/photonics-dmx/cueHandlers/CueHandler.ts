@@ -344,14 +344,14 @@ class CueHandler extends EventEmitter {
         this.pendingSlowBlackoutEnd = false
         this.chartBlackoutHeld = true
         this.stopCurrentCue()
-        this._sequencer.blackout(0)
+        void this._sequencer.blackout(0)
         this.emit('cueHandled', historicCueData)
         return
       case CueType.Blackout_Slow:
         this.pendingSlowBlackoutEnd = true
         this.chartBlackoutHeld = true
         this.stopCurrentCue()
-        this._sequencer.blackout(500)
+        void this._sequencer.blackout(500)
         this.emit('cueHandled', historicCueData)
         return
       case CueType.Strobe_Off:
@@ -430,7 +430,11 @@ class CueHandler extends EventEmitter {
         this.currentPrimaryCue = cue
       }
 
-      await cue.execute(historicCueData, this._sequencer, this._lightManager)
+      try {
+        await cue.execute(historicCueData, this._sequencer, this._lightManager)
+      } catch (error) {
+        log.error(`Cue ${cueType} execution failed:`, error)
+      }
     }
     // No `else` log here: the registry already logs (and dedups) a missing cue implementation.
 

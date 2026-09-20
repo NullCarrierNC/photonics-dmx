@@ -237,7 +237,7 @@ const CueSimulation: React.FC = () => {
       }
     }
 
-    loadSettings()
+    void loadSettings()
   }, [])
 
   // The page remembers what was last simulated. A selection changes as fast as the user clicks, so
@@ -276,7 +276,7 @@ const CueSimulation: React.FC = () => {
 
   // Load saved effect after group is loaded and effects are available
   useEffect(() => {
-    const loadSavedEffect = async () => {
+    const loadSavedEffect = (): void => {
       const saved = savedEffectRef.current
       if (!saved || saved.groupId !== selectedGroupId) {
         return
@@ -300,7 +300,7 @@ const CueSimulation: React.FC = () => {
             savedEffectRef.current = null
           } else if (retries > 0) {
             // Effects not loaded yet, retry after a short delay
-            setTimeout(() => checkForEffects(retries - 1), 200)
+            setTimeout(() => void checkForEffects(retries - 1), 200)
           } else {
             savedEffectRef.current = null
           }
@@ -309,8 +309,8 @@ const CueSimulation: React.FC = () => {
           savedEffectRef.current = null
         }
       }
-
-      checkForEffects()
+      // Settles after the first attempt: the retry chain carries on through a timer.
+      void checkForEffects()
     }
 
     loadSavedEffect()
@@ -390,19 +390,31 @@ const CueSimulation: React.FC = () => {
     simulationContext(selectedVenueSize, selectedBpm, selectedGroupId, selectedEffect)
 
   const handleSimulateBeat = async () => {
-    await simulateBeat(simulationContextNow())
-    // Simply turn on the indicator, the useTimeoutEffect will reset it
-    setShowBeatIndicator(true)
+    try {
+      await simulateBeat(simulationContextNow())
+      // Simply turn on the indicator, the useTimeoutEffect will reset it
+      setShowBeatIndicator(true)
+    } catch (error) {
+      log.error('Error simulating a beat:', error)
+    }
   }
 
   const handleSimulateKeyframe = async () => {
-    await simulateKeyframe(simulationContextNow())
-    setShowKeyframeIndicator(true)
+    try {
+      await simulateKeyframe(simulationContextNow())
+      setShowKeyframeIndicator(true)
+    } catch (error) {
+      log.error('Error simulating a keyframe:', error)
+    }
   }
 
   const handleSimulateMeasure = async () => {
-    await simulateMeasure(simulationContextNow())
-    setShowMeasureIndicator(true)
+    try {
+      await simulateMeasure(simulationContextNow())
+      setShowMeasureIndicator(true)
+    } catch (error) {
+      log.error('Error simulating a measure:', error)
+    }
   }
 
   const handleSimulateInstrumentNote = async (noteType: string) => {
@@ -511,7 +523,7 @@ const CueSimulation: React.FC = () => {
     }
 
     if (selectedGroup) {
-      fetchGroupInfo()
+      void fetchGroupInfo()
     }
   }, [selectedGroup, selectedGroupId, selectedRegistryType])
 
@@ -574,7 +586,7 @@ const CueSimulation: React.FC = () => {
               <div>
                 <CueRegistrySelector
                   onRegistryChange={handleRegistryChange}
-                  onGroupChange={handleGroupChange}
+                  onGroupChange={(groupIds) => void handleGroupChange(groupIds)}
                   selectedVenueSize={selectedVenueSize}
                   onVenueSizeChange={setSelectedVenueSize}
                   selectedBpm={selectedBpm}
@@ -585,7 +597,7 @@ const CueSimulation: React.FC = () => {
               </div>
               <div className="lg:w-64">
                 <EffectsDropdown
-                  onSelect={handleEffectSelect}
+                  onSelect={(effect) => void handleEffectSelect(effect)}
                   groupId={selectedGroupId}
                   value={selectedEffect?.id}
                   disabled={!selectedGroupId}
@@ -625,11 +637,11 @@ const CueSimulation: React.FC = () => {
           )}
           <CueSimulationActions
             disabled={!selectedEffect || !selectedGroupId || isRb3Enabled}
-            onTestEffect={handleTestEffect}
-            onStopTestEffect={handleStopTestEffect}
-            onSimulateBeat={handleSimulateBeat}
-            onSimulateMeasure={handleSimulateMeasure}
-            onSimulateKeyframe={handleSimulateKeyframe}
+            onTestEffect={() => void handleTestEffect()}
+            onStopTestEffect={() => void handleStopTestEffect()}
+            onSimulateBeat={() => void handleSimulateBeat()}
+            onSimulateMeasure={() => void handleSimulateMeasure()}
+            onSimulateKeyframe={() => void handleSimulateKeyframe()}
             showSongSimulation={selectedRegistryType !== 'RB3E'}
           />
           {selectedRegistryType === 'RB3E' && !isRb3Enabled && <StageKitLedPanel />}
@@ -638,7 +650,7 @@ const CueSimulation: React.FC = () => {
             <CueSimulationInstrument
               selectedInstrument={selectedInstrument}
               onInstrumentChange={setSelectedInstrument}
-              onSimulateNote={handleSimulateInstrumentNote}
+              onSimulateNote={(noteType) => void handleSimulateInstrumentNote(noteType)}
               disabled={!selectedGroupId || isRb3Enabled}
             />
           )}

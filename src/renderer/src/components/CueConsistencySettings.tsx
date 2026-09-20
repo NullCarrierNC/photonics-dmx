@@ -177,7 +177,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
       }
     }
 
-    load()
+    void load()
   }, [seedYargProbability, seedAudioProbability, seedRb3Probability])
 
   const handleConsistencyWindowChange = useCallback(
@@ -242,9 +242,9 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
     setConsistencyWindow(Math.max(0, Math.min(300000, value)))
   }
 
-  const handleInputBlur = () => {
-    // Save when the user finishes editing (loses focus)
-    handleConsistencyWindowChange(consistencyWindow)
+  /** Saves when the user finishes editing, rather than on every keystroke. */
+  const handleInputBlur = async (): Promise<void> => {
+    await handleConsistencyWindowChange(consistencyWindow)
   }
 
   const handleMotionMinHoldChange = useCallback(
@@ -266,9 +266,13 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
         }
       } catch (error) {
         log.error('Failed to save motion min hold:', error)
-        const reload = await getMotionCueMinHoldMs()
-        if (reload.success && typeof reload.minHoldMs === 'number') {
-          setMotionMinHoldMsState(reload.minHoldMs)
+        try {
+          const reload = await getMotionCueMinHoldMs()
+          if (reload.success && typeof reload.minHoldMs === 'number') {
+            setMotionMinHoldMsState(reload.minHoldMs)
+          }
+        } catch (reloadError) {
+          log.error('Failed to re-read motion min hold:', reloadError)
         }
       } finally {
         setIsSaving(false)
@@ -353,7 +357,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           help="Within a Song: the cue group can change among enabled groups during the song (subject to the consistency window). Once Per Song: the group is chosen when the song starts and remains fixed for that song."
           disabled={isLoading || isSaving}
           onChange={(mode) =>
-            saveMode(
+            void saveMode(
               mode as CueGroupSelectionMode,
               selectionMode,
               setSelectionMode,
@@ -377,7 +381,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
               step="100"
               value={consistencyWindow}
               onChange={handleInputChange}
-              onBlur={handleInputBlur}
+              onBlur={() => void handleInputBlur()}
               className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading || isSaving}
               placeholder="10000"
@@ -402,7 +406,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           help="Controls when a new motion cue is triggered in YARG mode."
           disabled={isLoading || isSaving || !motionGloballyEnabled}
           onChange={(mode) =>
-            saveMode(
+            void saveMode(
               mode as MotionGroupSelectionMode,
               yargMotionSelectionMode,
               setYargMotionSelectionModeState,
@@ -423,7 +427,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           help="Controls when a new motion cue is triggered in audio mode."
           disabled={isLoading || isSaving || !motionGloballyEnabled}
           onChange={(mode) =>
-            saveMode(
+            void saveMode(
               mode as MotionGroupSelectionMode,
               audioMotionSelectionMode,
               setAudioMotionSelectionModeState,
@@ -474,7 +478,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           help="RB3 has no cue-change signal, so the lighting group rotates on a switch timer instead. Within a Song: the group rotates among the enabled RB3 groups as the timer fires. Once Per Song: one group is picked when the song starts and held for the whole song. Applies to RB3 cue mode only."
           disabled={isLoading || isSaving}
           onChange={(mode) =>
-            saveMode(
+            void saveMode(
               mode as CueGroupSelectionMode,
               rb3SelectionMode,
               setRb3SelectionMode,
@@ -495,7 +499,7 @@ const CueConsistencySettings: React.FC<CueConsistencySettingsProps> = ({
           help="RB3 has no beat, so a new motion cue is chosen on a Light-1 state change once the switch timer below has elapsed."
           disabled={isLoading || isSaving || !motionGloballyEnabled}
           onChange={(mode) =>
-            saveMode(
+            void saveMode(
               mode as MotionGroupSelectionMode,
               rb3MotionSelectionMode,
               setRb3MotionSelectionModeState,

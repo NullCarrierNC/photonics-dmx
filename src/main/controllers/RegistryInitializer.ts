@@ -59,7 +59,7 @@ export class RegistryInitializer {
     }
     await effectLoader.startWatching()
 
-    effectLoader.on('changed', async (payload: EffectListSummary) => {
+    const onEffectsChanged = async (payload: EffectListSummary): Promise<void> => {
       this.ctx.sendToAllWindows(RENDERER_RECEIVE.EFFECTS_CHANGED, payload)
       const nodeCueLoader = this.ctx.getNodeCueLoader()
       if (nodeCueLoader) {
@@ -69,6 +69,9 @@ export class RegistryInitializer {
           log.error('Failed to reload node cues after effect change:', error)
         }
       }
+    }
+    effectLoader.on('changed', (payload: EffectListSummary) => {
+      void onEffectsChanged(payload)
     })
   }
 

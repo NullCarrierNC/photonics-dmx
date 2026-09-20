@@ -21,6 +21,7 @@ import {
   __resetStrobeStateManagerForTests,
 } from '../../controllers/StrobeStateManager'
 import { fakeLightingController } from '../helpers/fakeLightingController'
+import { resetLogConfiguration, setLogSink, type LogEntry } from '../../../shared/logger'
 
 type CueLifecycleMocks = {
   execute: jest.Mock
@@ -932,5 +933,39 @@ describe('CueHandler cue change during a cue-driven fade', () => {
     await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
 
     expect(instantBlackouts(sequencer)).toHaveLength(0)
+  })
+})
+
+describe('CueHandler cue execution failure', () => {
+  let registry: CueRegistry
+
+  beforeEach(() => {
+    registry = CueRegistry.getInstance()
+    jest.restoreAllMocks()
+  })
+
+  it('reports a cue whose execute throws and still finishes the dispatch', async () => {
+    const cue = makeFakeCue(CueStyle.Primary, 'primary:Frenzy')
+    cue.execute.mockImplementation(() => {
+      throw new Error('boom')
+    })
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(cue)
+    jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
+
+    const handler = new CueHandler(makeLightManager(), makeSequencer())
+    handler.setMotionEnabled(false)
+    const handled = jest.fn()
+    handler.on('cueHandled', handled)
+
+    const entries: LogEntry[] = []
+    setLogSink((entry) => entries.push(entry))
+    try {
+      await handler.handleCue(CueType.Frenzy, gameplayCueData({ lightingCue: CueType.Frenzy }))
+    } finally {
+      resetLogConfiguration()
+    }
+
+    expect(entries.some((e) => e.message.includes('Cue Frenzy execution failed'))).toBe(true)
+    expect(handled).toHaveBeenCalledTimes(1)
   })
 })

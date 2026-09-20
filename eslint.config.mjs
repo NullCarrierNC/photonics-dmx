@@ -38,10 +38,16 @@ export default defineConfig([
       },
     },
     rules: {
-      // A warning, held at its current count by tools/floating-promises-budget.mjs, because the
-      // backlog is larger than one pass and each site needs its own answer: await it, catch it, or
-      // say with void that its failure is ignorable.
-      '@typescript-eslint/no-floating-promises': 'warn',
+      // Every promise gets an answer at its call site. Await it, or catch it where it can reject.
+      // void is for the sites that have no better answer: the caller is a frame, a timer or an
+      // effect body that cannot await, and the callee already reports its own failure. A promise
+      // returned into a callback typed void is the same unanswered promise, so those sites void it
+      // explicitly too.
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: true, checksConditionals: true },
+      ],
     },
   },
   {

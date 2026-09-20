@@ -70,12 +70,12 @@ export const EffectsDropdown: React.FC<EffectsDropdownProps> = ({
 
   // Fetch effects when group changes
   useEffect(() => {
-    fetchEffects()
+    void fetchEffects()
   }, [fetchEffects])
 
   useEffect(() => {
     const handleNodeCuesChanged = () => {
-      fetchEffects()
+      void fetchEffects()
     }
     addIpcListener(RENDERER_RECEIVE.NODE_CUES_CHANGED, handleNodeCuesChanged)
     addIpcListener(RENDERER_RECEIVE.EFFECTS_CHANGED, handleNodeCuesChanged)

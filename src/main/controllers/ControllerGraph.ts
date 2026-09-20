@@ -360,10 +360,10 @@ export class ControllerGraph {
    * Dispose every rig chain, tolerating per-chain failures. The shared clock is destroyed
    * separately so a chain tearing down can't take ticks away from any sibling chain.
    */
-  public async disposeChainsForShutdown(): Promise<void> {
+  public disposeChainsForShutdown(): void {
     for (const chain of this.rigChains) {
       try {
-        await chain.dispose()
+        chain.dispose()
       } catch (err) {
         log.error(`Error disposing rig chain ${chain.rigId}:`, err)
       }
@@ -378,18 +378,18 @@ export class ControllerGraph {
    * Dispose every rig chain for a restart. Unlike the shutdown flavour this propagates the first
    * failure, so the restart can refuse to rebuild on top of a partially torn-down graph.
    */
-  public async disposeChainsForRestart(): Promise<void> {
+  public disposeChainsForRestart(): void {
     for (const chain of this.rigChains) {
-      await chain.dispose()
+      chain.dispose()
     }
     this.rigChains = []
   }
 
   /** Shut down the publisher, tolerating failure. Used by the shutdown path. */
-  public async shutdownPublisherSafe(): Promise<void> {
+  public shutdownPublisherSafe(): void {
     if (this.dmxPublisher) {
       try {
-        await this.dmxPublisher.shutdown()
+        this.dmxPublisher.shutdown()
         log.info('ControllerManager shutdown: DMX publisher stopped')
       } catch (err) {
         log.error('Error shutting down DMX publisher:', err)
@@ -398,9 +398,9 @@ export class ControllerGraph {
   }
 
   /** Shut down the publisher, propagating failure. Used by the restart path. */
-  public async shutdownPublisher(): Promise<void> {
+  public shutdownPublisher(): void {
     if (this.dmxPublisher) {
-      await this.dmxPublisher.shutdown()
+      this.dmxPublisher.shutdown()
     }
   }
 

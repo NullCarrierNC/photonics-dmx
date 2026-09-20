@@ -254,7 +254,7 @@ describe('SystemEffectsController', () => {
 
       const running = systemEffectsController.blackout(1000)
       for (let request = 0; request < 6; request += 1) {
-        void systemEffectsController.blackout(500)
+        await systemEffectsController.blackout(500)
       }
       await jest.advanceTimersByTimeAsync(1500)
       await running
@@ -268,8 +268,8 @@ describe('SystemEffectsController', () => {
 
       for (let run = 0; run < 2; run += 1) {
         const running = systemEffectsController.blackout(1000)
-        void systemEffectsController.blackout(500)
-        void systemEffectsController.blackout(500)
+        await systemEffectsController.blackout(500)
+        await systemEffectsController.blackout(500)
         await jest.advanceTimersByTimeAsync(1500)
         await running
       }

@@ -90,7 +90,7 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
       log.warn(`Ignoring invalid cue style payload: ${String(style)}`)
       return
     }
-    void controllerManager
+    controllerManager
       .getConfig()
       .setPreference('complex', style === 'complex')
       .catch((err) => log.error('Failed to save cue style preference:', err))

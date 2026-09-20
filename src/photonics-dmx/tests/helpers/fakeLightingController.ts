@@ -16,7 +16,7 @@ export type FakeLightingController = {
  */
 const accepting: ILightingController = {
   addEffect: () => {},
-  setEffect: () => Promise.resolve(),
+  setEffect: () => {},
   replaceEffect: () => {},
   replaceEffectWithCallback: () => true,
   addEffectUnblockedName: () => true,

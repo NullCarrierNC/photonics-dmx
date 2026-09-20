@@ -86,7 +86,7 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
       setColorBanks((prev) => nextColorBanks(prev, cueData))
       setCurrentCueData(cueData)
     }
-    const handlePrimaryChange = async (payload: { groupId: string | null }) => {
+    const applyPrimaryChange = async (payload: { groupId: string | null }): Promise<void> => {
       if (!payload.groupId) {
         setPrimaryGroupLabel(null)
         return
@@ -106,6 +106,9 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
           ? null
           : Math.max(0, Math.ceil((payload.deadlineMs - Date.now()) / 1000)),
       )
+    }
+    const handlePrimaryChange = (payload: { groupId: string | null }): void => {
+      void applyPrimaryChange(payload)
     }
     addIpcListener(RENDERER_RECEIVE.CUE_HANDLED, handleCueData)
     addIpcListener(RENDERER_RECEIVE.RB3_GAME_MODE_CUE_CHANGE, handlePrimaryChange)
@@ -159,9 +162,9 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
   }, [loadMotionLabels])
 
   useEffect(() => {
-    const onMotionCueChange = async (payload: {
+    const applyMotionCueChange = async (payload: {
       ref: { groupId: string; cueId: string } | null
-    }) => {
+    }): Promise<void> => {
       if (!payload.ref) {
         setMotionGroupLabel(null)
         setMotionCueLabel(null)
@@ -178,6 +181,11 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
         setMotionGroupLabel(payload.ref.groupId)
         setMotionCueLabel(payload.ref.cueId)
       }
+    }
+    const onMotionCueChange = (payload: {
+      ref: { groupId: string; cueId: string } | null
+    }): void => {
+      void applyMotionCueChange(payload)
     }
     addIpcListener(RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE, onMotionCueChange)
     return () => {

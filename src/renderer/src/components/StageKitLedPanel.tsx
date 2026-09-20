@@ -1,5 +1,8 @@
 import React, { useCallback, useState } from 'react'
 import { setRb3SimLedState } from '../ipcApi'
+import { createLogger } from '../../../shared/logger'
+
+const log = createLogger('StageKitLedPanel')
 
 /**
  * Drives the simulated RB3 StageKit LED state for cue simulation: one toggle row per colour bank
@@ -44,7 +47,9 @@ const StageKitLedPanel: React.FC = () => {
   const [fog, setFog] = useState(false)
 
   const push = useCallback((next: Record<Bank, number>, nextFog: boolean) => {
-    void setRb3SimLedState({ ...next, fog: nextFog })
+    setRb3SimLedState({ ...next, fog: nextFog }).catch((error) =>
+      log.error('Failed to push the simulated LED state', error),
+    )
   }, [])
 
   const toggleLed = useCallback(
