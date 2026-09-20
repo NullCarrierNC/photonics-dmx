@@ -309,8 +309,7 @@ const CueSimulation: React.FC = () => {
           savedEffectRef.current = null
         }
       }
-
-      // The retry chain continues through a timer, so this promise settles after the first attempt.
+      // Settles after the first attempt: the retry chain carries on through a timer.
       void checkForEffects()
     }
 

@@ -239,17 +239,19 @@ export class AudioCaptureManager {
     }
   }
 
-  /**
-   * Stop audio capture and clean up resources
-   */
+  /** Closes the audio context and drops it. Nothing here waits, so a failed close reports itself. */
+  private closeAudioContext(): void {
+    if (!this.audioContext) return
+    this.audioContext.close().catch((error) => log.error('Failed to close audio context:', error))
+    this.audioContext = null
+  }
+
   /** Give back whatever a failed start had already taken. */
   private releasePartialStart(): void {
     try {
       this.source?.disconnect()
       this.stream?.getTracks().forEach((track) => track.stop())
-      this.audioContext
-        ?.close()
-        .catch((error) => log.error('Failed to close audio context:', error))
+      this.closeAudioContext()
       if (this.analysisTimer !== null) {
         clearInterval(this.analysisTimer)
       }
@@ -258,7 +260,6 @@ export class AudioCaptureManager {
     }
     this.source = null
     this.stream = null
-    this.audioContext = null
     this.analyser = null
     this.melBandAnalyser = null
     this.analysisTimer = null
@@ -300,11 +301,7 @@ export class AudioCaptureManager {
       this.stream = null
     }
 
-    // Close audio context
-    if (this.audioContext) {
-      this.audioContext.close().catch((error) => log.error('Failed to close audio context:', error))
-      this.audioContext = null
-    }
+    this.closeAudioContext()
 
     this.analyser = null
     this.melBandAnalyser = null
