@@ -28,7 +28,7 @@ function makeChainStub(rigId: string, isPrimary: boolean): RigChain {
     rigId,
     isPrimary,
     dmxLightManager: {} as DmxLightManager,
-    sequencer: {} as Sequencer,
+    sequencer: { onMotionPatternsCleared: () => () => {} } as unknown as Sequencer,
     cueHandlers: {
       yarg: null,
       rb3: null,
@@ -141,8 +141,7 @@ describe.each<NetCueMode>(['yarg', 'rb3'])(
 
       cm.ensureChainsHaveHandlersForSimulation(domain)
 
-      const handler = a.cueHandlers[domain] as unknown as { motionEnabled: boolean }
-      expect(handler.motionEnabled).toBe(false)
+      expect(a.cueHandlers[domain]!.getMotionCoordinator().isMotionEnabled()).toBe(false)
     })
 
     it('no-ops on an empty rigChains list', () => {

@@ -40,6 +40,7 @@ export class Sequencer implements ILightingController {
   private systemEffectsController: SystemEffectsController
   private debugMonitor: DebugMonitor
   private motionPatternEngine: MotionPatternEngine
+  private readonly motionPatternsClearedListeners = new Set<() => void>()
   private clock: Clock
   private frameIndex: number = 0
   private readonly handleClockTick: (deltaTime: number) => void
@@ -264,11 +265,21 @@ export class Sequencer implements ILightingController {
   }
 
   /**
-   * Removes all active effects
+   * Removes all active effects and motion patterns, then tells the pattern subscribers.
    */
   public removeAllEffects(): void {
     this.motionPatternEngine.removeAllPatterns()
     this.effectManager.removeAllEffects()
+    for (const listener of Array.from(this.motionPatternsClearedListeners)) {
+      listener()
+    }
+  }
+
+  public onMotionPatternsCleared(listener: () => void): () => void {
+    this.motionPatternsClearedListeners.add(listener)
+    return () => {
+      this.motionPatternsClearedListeners.delete(listener)
+    }
   }
 
   public addMotionPattern(

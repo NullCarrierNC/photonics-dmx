@@ -37,6 +37,7 @@ const accepting: ILightingController = {
   removeMotionPattern: () => {},
   getMotionPattern: () => undefined,
   updateMotionPatternConfig: () => {},
+  onMotionPatternsCleared: () => () => {},
   addEffectWithCallback: () => {},
   setEffectWithCallback: () => {},
   removeEffectCallback: () => {},

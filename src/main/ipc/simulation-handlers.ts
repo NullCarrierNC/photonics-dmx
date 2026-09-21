@@ -14,6 +14,7 @@ import { isPostProcessingState } from '../../photonics-dmx/helpers/venuePostProc
 import { sendToAllWindows } from '../utils/windowUtils'
 import { ipcError } from './ipcResult'
 import { createMockAudioCueData, createMockCueData, type MockCueDataOptions } from './mockCueData'
+import { sendMotionSimCleared, sendMotionSimStarted } from './motionSimulationEvents'
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { isNonEmptyString, isPlainObject } from './inputValidation'
@@ -35,15 +36,7 @@ export function setupSimulationHandlers(
   const sim = controllerManager.getMotionCueSimulator()
 
   const stopMotionSimAndNotify = (): void => {
-    const hadYargSim = sim.hasNetCueActive('yarg')
-    sim.stop()
-    if (hadYargSim) {
-      sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
-        ref: null,
-        source: 'cleared',
-        manualFallback: false,
-      })
-    }
+    sendMotionSimCleared(sim.stop())
   }
 
   controllerManager.getConsoleModeController().setOnConsoleEnter(stopMotionSimAndNotify)
@@ -520,7 +513,7 @@ export function setupSimulationHandlers(
       if (!cue) {
         return ipcError(new Error(`YARG motion cue not found: ${groupId}/${cueId}`))
       }
-      sim.clearActive()
+      sendMotionSimCleared(sim.clearActive())
       // Cancel pending pan/tilt clears on every chain — without this, secondary rigs
       // would clear pan/tilt mid-motion after the previous simulation stopped.
       fanout.cancelPanTiltClear()
@@ -538,11 +531,7 @@ export function setupSimulationHandlers(
         }
       }
       sim.setNetCue('yarg', cue)
-      sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
-        ref: { groupId, cueId },
-        source: 'auto',
-        manualFallback: false,
-      })
+      sendMotionSimStarted('yarg', { groupId, cueId })
       return { success: true as const }
     } catch (error) {
       log.error('Error starting YARG motion cue simulation:', error)
@@ -577,7 +566,7 @@ export function setupSimulationHandlers(
     if (!cue) {
       return ipcError(new Error(`RB3 motion cue not found: ${groupId}/${cueId}`))
     }
-    sim.clearActive()
+    sendMotionSimCleared(sim.clearActive())
     fanout.cancelPanTiltClear()
     const mockCueData = simCueData({
       venueSize: 'Small',
@@ -592,11 +581,7 @@ export function setupSimulationHandlers(
       }
     }
     sim.setNetCue('rb3', cue)
-    sendToAllWindows(RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE, {
-      ref: { groupId, cueId },
-      source: 'auto',
-      manualFallback: false,
-    })
+    sendMotionSimStarted('rb3', { groupId, cueId })
     return { success: true as const }
   })
 
@@ -627,7 +612,7 @@ export function setupSimulationHandlers(
     if (!cue) {
       return ipcError(new Error(`Audio motion cue not found: ${groupId}/${cueId}`))
     }
-    sim.clearActive()
+    sendMotionSimCleared(sim.clearActive())
     fanout.cancelPanTiltClear()
     const mockAudio = createMockAudioCueData(1)
     for (const chain of fanout.getChains()) {
@@ -637,19 +622,12 @@ export function setupSimulationHandlers(
       }
     }
     sim.setAudioCue(cue)
+    sendMotionSimStarted('audio', { groupId, cueId })
     return { success: true as const }
   })
 
   handleInvoke(ipcMain, LIGHT.STOP_MOTION_CUE_SIMULATION, log, async () => {
-    const hadYargSim = sim.hasNetCueActive('yarg')
-    sim.stop()
-    if (hadYargSim) {
-      sendToAllWindows(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
-        ref: null,
-        source: 'cleared',
-        manualFallback: false,
-      })
-    }
+    sendMotionSimCleared(sim.stop())
     return { success: true as const }
   })
 

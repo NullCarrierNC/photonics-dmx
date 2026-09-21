@@ -17,6 +17,20 @@ export interface IpcErrorResult {
 
 export type IpcSuccessResult = { success: true }
 
+/** The three inputs that run a motion cue of their own. */
+export type MotionRuntimeDomain = 'yarg' | 'rb3' | 'audio'
+
+/**
+ * What a domain's motion layer is doing: the motion cue being run, how it was chosen, and whether a
+ * pinned cue was unavailable so a random one plays instead. `ref` is null when no motion cue runs.
+ * Pushed on the domain's motion-change channel and answered by the running-motion-cue query.
+ */
+export type MotionCueChangePayload = {
+  ref: { groupId: string; cueId: string } | null
+  source: 'manual' | 'auto' | 'cleared'
+  manualFallback: boolean
+}
+
 /**
  * Runtime lifecycle phases for the main-process controller graph.
  * Owned by `ControllerManager`, mirrored here so the renderer can disable actions outside `running`.

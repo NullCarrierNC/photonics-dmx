@@ -7,6 +7,12 @@ import type { SongEventCondition } from './sequencer/interfaces'
 import { RigChain } from './RigChain'
 import { ChainCueRuntime } from './ChainCueRuntime'
 import type { NetCueMode } from '../cues/types/nodeCueTypes'
+import type { MotionCueChangePayload } from '../../shared/ipc/common'
+
+/** What a domain reports while no motion cue runs on it. */
+function noMotionCue(): MotionCueChangePayload {
+  return { ref: null, source: 'cleared', manualFallback: false }
+}
 
 /**
  * Listener / processor surface that dispatches the same incoming event to every active rig
@@ -31,6 +37,21 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
 
   public getChains(): RigChain[] {
     return this.chains
+  }
+
+  /** The chain whose handlers speak for a domain: the one marked primary, else the first. */
+  public getPrimaryChain(): RigChain | null {
+    return this.chains.find((c) => c.isPrimary) ?? this.chains[0] ?? null
+  }
+
+  /** The motion cue a net domain runs, as its handler on the primary chain reports it. */
+  public runningMotionCue(domain: NetCueMode): MotionCueChangePayload {
+    return this.getPrimaryChain()?.cueHandlers[domain]?.getRunningMotionCue() ?? noMotionCue()
+  }
+
+  /** The motion cue the audio input runs, as its handler on the primary chain reports it. */
+  public audioRunningMotionCue(): MotionCueChangePayload {
+    return this.getPrimaryChain()?.audioCueHandler?.getRunningMotionCue() ?? noMotionCue()
   }
 
   // ── Game domains (CueRuntime) ────────────────────────────────────────────────────────

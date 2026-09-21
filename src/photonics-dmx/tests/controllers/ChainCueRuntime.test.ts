@@ -8,8 +8,8 @@ import type { CueData } from '../../cues/types/cueTypes'
 
 describe('ChainCueRuntime', () => {
   const setup = () => {
-    const rb3HandleCue = jest.fn<(c: CueType, d: CueData) => Promise<void>>()
-    const yargHandleCue = jest.fn<(c: CueType, d: CueData) => Promise<void>>()
+    const rb3HandleCue = jest.fn<(c: CueType, d: CueData, token?: object) => Promise<void>>()
+    const yargHandleCue = jest.fn<(c: CueType, d: CueData, token?: object) => Promise<void>>()
     const rb3NotifyStart = jest.fn()
     const rb3StopActiveCue = jest.fn()
     const stopActiveCue = jest.fn()
@@ -44,7 +44,7 @@ describe('ChainCueRuntime', () => {
   it('fans handleCue to the RB3 handler slot, not the YARG slot', async () => {
     const { fanout, rb3HandleCue, yargHandleCue } = setup()
     await new ChainCueRuntime(fanout, 'rb3').handleCue(CueType.RB3, defaultCueData)
-    expect(rb3HandleCue).toHaveBeenCalledWith(CueType.RB3, defaultCueData)
+    expect(rb3HandleCue).toHaveBeenCalledWith(CueType.RB3, defaultCueData, expect.any(Object))
     expect(yargHandleCue).not.toHaveBeenCalled()
   })
 

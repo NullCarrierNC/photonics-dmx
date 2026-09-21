@@ -9,7 +9,7 @@ import {
   getRb3CueGroups,
   getRb3MotionCueGroups,
   getAvailableRb3MotionCues,
-  getActiveRb3MotionCue,
+  getRunningMotionCue,
 } from '../ipcApi'
 import { useAtom } from 'jotai'
 import { rb3eListenerEnabledAtom } from '../atoms'
@@ -122,32 +122,44 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
     }
   }, [rb3eListenerEnabled])
 
-  // Resolve the active motion cue's group + cue labels (mirrors the YARG preview).
+  /** Show the motion cue main reports as running, with its group and cue names resolved. */
+  const applyMotionPayload = useCallback(
+    async (payload: { ref: { groupId: string; cueId: string } | null } | null): Promise<void> => {
+      const ref = payload?.ref
+      if (!ref) {
+        setMotionGroupLabel(null)
+        setMotionCueLabel(null)
+        return
+      }
+      try {
+        const groups = await getRb3MotionCueGroups()
+        setMotionGroupLabel(groups?.find((g) => g.id === ref.groupId)?.name ?? ref.groupId)
+        const cues = await getAvailableRb3MotionCues(ref.groupId)
+        setMotionCueLabel(cues.find((c) => c.id === ref.cueId)?.name ?? ref.cueId)
+      } catch {
+        setMotionGroupLabel(ref.groupId)
+        setMotionCueLabel(ref.cueId)
+      }
+    },
+    [],
+  )
+
+  // Seeded from the motion cue main is running.
   const loadMotionLabels = useCallback(async () => {
     try {
       const enabled = await getMotionEnabled()
       setMotionEnabled(enabled === true)
       if (!enabled) {
-        setMotionGroupLabel(null)
-        setMotionCueLabel(null)
+        await applyMotionPayload(null)
         return
       }
-      const ref = await getActiveRb3MotionCue()
-      if (ref && typeof ref === 'object' && 'groupId' in ref) {
-        const r = ref as { groupId: string; cueId: string }
-        const groups = await getRb3MotionCueGroups()
-        setMotionGroupLabel(groups?.find((g) => g.id === r.groupId)?.name ?? r.groupId)
-        const cues = await getAvailableRb3MotionCues(r.groupId)
-        setMotionCueLabel(cues.find((c) => c.id === r.cueId)?.name ?? r.cueId)
-      } else {
-        setMotionGroupLabel(null)
-        setMotionCueLabel(null)
-      }
+      const running = await getRunningMotionCue('rb3')
+      await applyMotionPayload(running && 'ref' in running ? running : null)
     } catch {
       setMotionGroupLabel(null)
       setMotionCueLabel(null)
     }
-  }, [])
+  }, [applyMotionPayload])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async; setState only after awaited IPC
@@ -162,36 +174,16 @@ const CuePreviewRb3e: React.FC<CuePreviewRb3eProps> = ({ className = '' }) => {
   }, [loadMotionLabels])
 
   useEffect(() => {
-    const applyMotionCueChange = async (payload: {
-      ref: { groupId: string; cueId: string } | null
-    }): Promise<void> => {
-      if (!payload.ref) {
-        setMotionGroupLabel(null)
-        setMotionCueLabel(null)
-        return
-      }
-      try {
-        const groups = await getRb3MotionCueGroups()
-        setMotionGroupLabel(
-          groups?.find((g) => g.id === payload.ref!.groupId)?.name ?? payload.ref.groupId,
-        )
-        const cues = await getAvailableRb3MotionCues(payload.ref.groupId)
-        setMotionCueLabel(cues.find((c) => c.id === payload.ref!.cueId)?.name ?? payload.ref.cueId)
-      } catch {
-        setMotionGroupLabel(payload.ref.groupId)
-        setMotionCueLabel(payload.ref.cueId)
-      }
-    }
     const onMotionCueChange = (payload: {
       ref: { groupId: string; cueId: string } | null
     }): void => {
-      void applyMotionCueChange(payload)
+      void applyMotionPayload(payload)
     }
     addIpcListener(RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE, onMotionCueChange)
     return () => {
       removeIpcListener(RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE, onMotionCueChange)
     }
-  }, [])
+  }, [applyMotionPayload])
 
   // Tick the countdown once a second while a live deadline is armed. Date.now stays out of render
   // (an impure call there is disallowed); the seconds remaining are derived here and on each push.

@@ -7,6 +7,7 @@ import { setupSimulationHandlers } from './simulation-handlers'
 import { setupCueGroupHandlers } from './cue-group-handlers'
 import { setupCueSelectionPrefsHandlers } from './cue-selection-prefs-handlers'
 import { setupMotionGroupHandlers } from './motion-group-handlers'
+import { setupMotionRuntimeHandlers } from './motion-runtime-handlers'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 
 /**
@@ -38,4 +39,5 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
   setupCueGroupHandlers(ipcMain)
   setupCueSelectionPrefsHandlers(ipcMain, controllerManager)
   setupMotionGroupHandlers(ipcMain, controllerManager)
+  setupMotionRuntimeHandlers(ipcMain, controllerManager)
 }

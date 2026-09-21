@@ -7,6 +7,7 @@ import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { getStrobeStateManager } from '../controllers/StrobeStateManager'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import type { MotionCueChangePayload } from '../../shared/ipc/common'
 import type { RuntimeBroadcaster } from '../runtime/broadcaster'
 import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
 import { createLogger } from '../../shared/logger'
@@ -49,7 +50,8 @@ export class AudioCueHandler extends EventEmitter {
   private lastPrimaryForMotion: IAudioCue | null = null
   private lastManualMotionRef: AudioMotionCueRef | null | undefined = undefined
   private manualMotionRef: AudioMotionCueRef | null = null
-  private lastEmittedMotionKey: string | null = null
+  /** How the running motion cue was chosen, or null while none runs. */
+  private currentMotionPick: { source: 'manual' | 'auto'; manualFallback: boolean } | null = null
   private motionEnabled = true
   private executionCount = 0
   private readonly getMotionCueMinimumHoldMs: () => number
@@ -88,6 +90,7 @@ export class AudioCueHandler extends EventEmitter {
       this.currentMotionCue?.onStop?.()
       this.currentMotionCue = null
       this.currentMotionCueStartTime = null
+      this.currentMotionPick = null
       this.lastPrimaryForMotion = null
       this.lastManualMotionRef = undefined
       this.emitAudioMotionCueChange(null, 'cleared')
@@ -151,16 +154,23 @@ export class AudioCueHandler extends EventEmitter {
     source: 'manual' | 'auto' | 'cleared',
     manualFallback?: boolean,
   ): void {
-    const key = ref ? `${ref.groupId}:${ref.cueId}` : 'null'
-    if (key === this.lastEmittedMotionKey && source !== 'cleared' && manualFallback !== true) {
-      return
-    }
-    this.lastEmittedMotionKey = key
-    this.runtimeBroadcaster.emit(RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE, {
+    const payload: MotionCueChangePayload = {
       ref,
       source,
       manualFallback: manualFallback === true,
-    })
+    }
+    this.runtimeBroadcaster.emit(RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE, payload)
+  }
+
+  /** The motion cue this handler runs, as the renderer should show it. */
+  public getRunningMotionCue(): MotionCueChangePayload {
+    const cue = this.currentMotionCue
+    const pick = this.currentMotionPick
+    const ref = cue && pick ? this.registry.findMotionCueRef(cue) : null
+    if (!ref || !pick) {
+      return { ref: null, source: 'cleared', manualFallback: false }
+    }
+    return { ref, source: pick.source, manualFallback: pick.manualFallback }
   }
 
   private assignPrimarySlot(cueType: AudioCueType): void {
@@ -209,6 +219,7 @@ export class AudioCueHandler extends EventEmitter {
         this.currentMotionCue.onStop?.()
         this.currentMotionCue = null
         this.currentMotionCueStartTime = null
+        this.currentMotionPick = null
         this.emitAudioMotionCueChange(null, 'cleared')
       }
       return
@@ -239,6 +250,7 @@ export class AudioCueHandler extends EventEmitter {
         this.currentMotionCue.onStop?.()
         this.currentMotionCue = null
         this.currentMotionCueStartTime = null
+        this.currentMotionPick = null
         this.emitAudioMotionCueChange(null, 'cleared')
       }
       return
@@ -256,6 +268,7 @@ export class AudioCueHandler extends EventEmitter {
           this.currentMotionCue.onStop?.()
           this.currentMotionCue = null
           this.currentMotionCueStartTime = null
+          this.currentMotionPick = null
           this.sequencer.schedulePanTiltClear()
           this.emitAudioMotionCueChange(null, 'cleared')
         }
@@ -291,6 +304,7 @@ export class AudioCueHandler extends EventEmitter {
       if (prev !== motionCue) {
         this.currentMotionCueStartTime = nowMs
       }
+      this.currentMotionPick = { source, manualFallback }
       const ref = this.registry.findMotionCueRef(motionCue)
       if (ref) {
         this.emitAudioMotionCueChange(ref, source, manualFallback)
@@ -300,6 +314,7 @@ export class AudioCueHandler extends EventEmitter {
         this.currentMotionCue.onStop?.()
         this.currentMotionCue = null
         this.currentMotionCueStartTime = null
+        this.currentMotionPick = null
         this.emitAudioMotionCueChange(null, 'cleared')
       }
     }
@@ -389,13 +404,17 @@ export class AudioCueHandler extends EventEmitter {
     // Unconditional: an interrupted audio strobe (processing stops with no explicit clear) must
     // not leave the process-wide StrobeStateManager stuck on a slot.
     getStrobeStateManager().setActive(null, 'audio')
+    const hadMotion = this.currentMotionCue !== null
     stopAndClear(this.currentMotionCue)
     this.currentMotionCue = null
     this.currentMotionCueStartTime = null
+    this.currentMotionPick = null
     this.lastPrimaryForMotion = null
     this.lastManualMotionRef = undefined
     this.executionCount = 0
-    this.lastEmittedMotionKey = null
+    if (hadMotion) {
+      this.emitAudioMotionCueChange(null, 'cleared')
+    }
   }
 
   /**

@@ -14,11 +14,11 @@ import { DmxLightManager } from '../controllers/DmxLightManager'
 import { getStrobeStateManager } from '../controllers/StrobeStateManager'
 import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
 import { CueRegistry } from '../cues/registries/CueRegistry'
-import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { RuntimeBroadcaster } from '../runtime/broadcaster'
-import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
+import type { MotionCueChangePayload } from '../../shared/ipc/common'
 import { createLogger } from '../../shared/logger'
 import { monotonicNowMs } from '../../shared/time'
+import { MotionSelectionCoordinator, type MotionChangeChannel } from './MotionSelectionCoordinator'
 const log = createLogger('CueHandler')
 
 /**
@@ -30,10 +30,11 @@ const log = createLogger('CueHandler')
  * active/enabled groups, consistency tracking, stage-kit preference when applicable,
  * and default-group fallback when no active group implements the cue.
  *
- * Motion cues run in parallel via CueRegistry.getRandomMotionCue() when the lighting cue type
- * changes (not on re-queues of the same cue). Simulated cues (trackMode === 'simulated') skip
- * random motion selection; use motion simulation IPC instead. Optional once-per-song lock from
- * configuration applies to random selection.
+ * Motion cues run in parallel with the lighting cue. Which one runs is decided by the domain's
+ * {@link MotionSelectionCoordinator}, shared by every chain's handler so all rigs run the same
+ * motion cue and the renderer hears one change per decision. This handler applies the decision to
+ * its own sequencer. Simulated cues (trackMode === 'simulated') skip motion selection, and motion
+ * simulation IPC drives their motion.
  *
  * Reminder: setEffect clears all running effects, regardless of layer.
  * Layer 0 will maintain its state though.
@@ -49,31 +50,26 @@ export type CueHandlerOptions = {
   registry?: CueRegistry
   /** Which motion-cue-change channel to broadcast on. Defaults to YARG; RB3 cue mode passes its own
    *  so its motion selections don't surface as YARG changes. */
-  motionChangeChannel?:
-    | typeof RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE
-    | typeof RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE
+  motionChangeChannel?: MotionChangeChannel
+  /**
+   * The domain's shared motion selection. Handlers on different rig chains pass the same one so
+   * every rig runs the motion cue it picks. A handler built without one decides on its own, from
+   * the motion options above.
+   */
+  motionCoordinator?: MotionSelectionCoordinator
 }
 
 class CueHandler extends EventEmitter {
   private readonly _lightManager: DmxLightManager
   private readonly _sequencer: ILightingController
   private readonly registry: CueRegistry
+  private readonly motionCoordinator: MotionSelectionCoordinator
+  private readonly unsubscribeMotionWipe: () => void
   private currentPrimaryCue: INetCue | null = null
   private currentSecondaryCue: INetCue | null = null
   private currentStrobeCue: INetCue | null = null
-  private currentMotionCue: INetCue | null = null
-  private currentMotionCueStartTime: number | null = null
-  private motionEnabled = true
-  private manualMotionRef: MotionCueRef | null = null
-  /** Tracks which manual ref was used for the last motion pick (undefined = not yet synced). */
-  private lastManualMotionRefForMotion: MotionCueRef | null | undefined = undefined
-  private lastEmittedMotionKey: string | null = null
-  private readonly getMotionCueMinimumHoldMs: () => number
-  private readonly getMotionCueProbabilityPercent: () => number
-  private readonly runtimeBroadcaster: RuntimeBroadcaster
-  private readonly motionChangeChannel:
-    | typeof RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE
-    | typeof RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE
+  /** The motion cue this chain last pointed its sequencer at, or null while its heads are home. */
+  private appliedMotionCue: INetCue | null = null
   private cueHistory: CueType[] = []
   private currentCue?: CueType
   private executionCount = 0
@@ -94,43 +90,13 @@ class CueHandler extends EventEmitter {
   private chartBlackoutHeld = false
 
   public setManualMotionRef(ref: MotionCueRef | null): void {
-    this.manualMotionRef = ref
-    this.lastManualMotionRefForMotion = undefined
-  }
-
-  private emitMotionCueChange(
-    ref: MotionCueRef | null,
-    source: 'manual' | 'auto' | 'cleared',
-    manualFallback?: boolean,
-  ): void {
-    const key = ref ? `${ref.groupId}:${ref.cueId}` : 'null'
-    if (key === this.lastEmittedMotionKey && source !== 'cleared' && manualFallback !== true) {
-      return
-    }
-    this.lastEmittedMotionKey = key
-    this.runtimeBroadcaster.emit(this.motionChangeChannel, {
-      ref,
-      source,
-      manualFallback: manualFallback === true,
-    })
+    this.motionCoordinator.setManualMotionRef(ref)
   }
 
   public setMotionEnabled(enabled: boolean): void {
-    if (this.motionEnabled === enabled) {
-      return
-    }
-    this.motionEnabled = enabled
+    this.motionCoordinator.setMotionEnabled(enabled)
     if (!enabled) {
-      if (this.currentMotionCue) {
-        this.currentMotionCue.onStop?.()
-        this.currentMotionCue = null
-        this.currentMotionCueStartTime = null
-        this._sequencer.schedulePanTiltClear()
-        this.emitMotionCueChange(null, 'cleared')
-      }
-      this.lastManualMotionRefForMotion = undefined
-    } else {
-      this.lastManualMotionRefForMotion = undefined
+      this.applyMotionCue(null)
     }
   }
 
@@ -143,11 +109,28 @@ class CueHandler extends EventEmitter {
     this._lightManager = lightManager
     this._sequencer = photonicsSequencer
     this.registry = options?.registry ?? CueRegistry.getInstance()
-    this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
-    this.getMotionCueProbabilityPercent = options?.getMotionCueProbabilityPercent ?? (() => 100)
-    this.runtimeBroadcaster = options?.runtimeBroadcaster ?? noopRuntimeBroadcaster()
-    this.motionChangeChannel =
-      options?.motionChangeChannel ?? RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE
+    this.motionCoordinator =
+      options?.motionCoordinator ??
+      new MotionSelectionCoordinator({
+        registry: this.registry,
+        getMotionCueMinimumHoldMs: options?.getMotionCueMinimumHoldMs,
+        getMotionCueProbabilityPercent: options?.getMotionCueProbabilityPercent,
+        runtimeBroadcaster: options?.runtimeBroadcaster,
+        motionChangeChannel: options?.motionChangeChannel,
+      })
+    this.unsubscribeMotionWipe = this._sequencer.onMotionPatternsCleared(() => {
+      this.onMotionPatternsWiped()
+    })
+  }
+
+  /** The domain's shared motion selection this handler applies. */
+  public getMotionCoordinator(): MotionSelectionCoordinator {
+    return this.motionCoordinator
+  }
+
+  /** The motion cue this handler's domain is running, as the renderer should show it. */
+  public getRunningMotionCue(): MotionCueChangePayload {
+    return this.motionCoordinator.getRunningMotionRef()
   }
 
   public notifySongStart(): void {
@@ -330,7 +313,16 @@ class CueHandler extends EventEmitter {
     }
   }
 
-  public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
+  /**
+   * Run one dispatch. `dispatchToken` identifies the dispatch to the motion coordinator. The
+   * fan-out passes one object to every chain's handler so they all apply the same motion decision,
+   * and a direct caller leaves it out and gets a decision of its own.
+   */
+  public async handleCue(
+    cueType: CueType,
+    parameters: CueData,
+    dispatchToken: object = {},
+  ): Promise<void> {
     const incomingIsStrobe = isStrobeCueType(cueType)
     // Update CueData with history and context information. addHistoryToCueData no-ops the
     // primary-cue accounting for strobe cues so a held strobe does not thrash it.
@@ -444,116 +436,70 @@ class CueHandler extends EventEmitter {
       // The Fallback is a self-contained idle look; never layer an automatic motion cue on top of
       // it. Treat it like motion-disabled so any motion left over from the previous cue is stopped
       // (and the heads homed) and no new pick is made.
-      if (!this.motionEnabled || cueType === CueType.Fallback) {
-        if (this.currentMotionCue) {
-          this.currentMotionCue.onStop?.()
-          this.currentMotionCue = null
-          this.currentMotionCueStartTime = null
-          this._sequencer.schedulePanTiltClear()
-          this.emitMotionCueChange(null, 'cleared')
-        }
+      if (!this.motionCoordinator.isMotionEnabled() || cueType === CueType.Fallback) {
+        this.motionCoordinator.clear(dispatchToken)
+        this.applyMotionCue(null)
       } else {
-        const motionCue = this.selectMotionCue(historicCueData.executionCount === 1, false)
-        try {
-          if (motionCue) {
-            await motionCue.execute(historicCueData, this._sequencer, this._lightManager)
-          }
-        } catch (error) {
-          log.error('Motion cue execution failed:', error)
-          if (motionCue && this.currentMotionCue === motionCue) {
-            this.currentMotionCue.onStop?.()
-            this.currentMotionCue = null
-            this.currentMotionCueStartTime = null
-            this._sequencer.schedulePanTiltClear()
-            this.emitMotionCueChange(null, 'cleared')
-          }
-        }
+        this.motionCoordinator.select(dispatchToken, historicCueData.executionCount === 1, false)
+        await this.runMotionCue(this.motionCoordinator.getCurrent(), historicCueData)
       }
     }
 
     this.emit('cueHandled', historicCueData)
   }
 
+  /** Point this chain at the coordinator's motion cue and run it against this chain's sequencer. */
+  private async runMotionCue(motionCue: INetCue | null, data: CueData): Promise<void> {
+    this.applyMotionCue(motionCue)
+    if (!motionCue) {
+      return
+    }
+    try {
+      await motionCue.execute(data, this._sequencer, this._lightManager)
+    } catch (error) {
+      log.error('Motion cue execution failed:', error)
+      this.motionCoordinator.stopIfCurrent(motionCue)
+      this.applyMotionCue(null)
+    }
+  }
+
   /**
-   * Re-pick the motion cue and return the one that should run this frame. A fresh pick happens on a
-   * new primary cue (`isNewCue`), a manual-ref change, or an external `force` trigger — each subject
-   * to the min-hold floor; otherwise the current motion cue is retained. This swaps
-   * `currentMotionCue` and emits the change but does NOT execute the cue: the caller runs it on its
-   * own frame cadence.
+   * Record which motion cue this chain runs. A change to a cue cancels a pending pan/tilt clear so
+   * the new motion is not homed on its first frame. A change to nothing homes this chain's heads.
    */
-  private selectMotionCue(isNewCue: boolean, force: boolean): INetCue | null {
-    const registry = this.registry
-    const isManualChange = this.manualMotionRef !== this.lastManualMotionRefForMotion
-    const now = monotonicNowMs()
-    const minHold = this.getMotionCueMinimumHoldMs()
-    const heldLongEnough =
-      this.currentMotionCueStartTime == null || now - this.currentMotionCueStartTime >= minHold
-    const needNewMotionPick = isManualChange || ((isNewCue || force) && heldLongEnough)
-
-    if (!needNewMotionPick) {
-      return this.currentMotionCue
+  private applyMotionCue(motionCue: INetCue | null): void {
+    if (motionCue === this.appliedMotionCue) {
+      return
     }
-
-    this.lastManualMotionRefForMotion = this.manualMotionRef
-    let motionCue: INetCue | null = null
-    let pickSource: 'manual' | 'auto' = 'auto'
-    let pickManualFallback = false
-    if (this.manualMotionRef) {
-      motionCue = registry.getMotionCueImplementation(this.manualMotionRef)
-      if (motionCue) {
-        pickSource = 'manual'
-      } else {
-        pickManualFallback = true
-        motionCue = registry.getRandomMotionCue()
-        pickSource = 'auto'
-        this.runtimeBroadcaster.emit(RENDERER_RECEIVE.DEBUG_LOG, {
-          message:
-            'Selected YARG motion cue is unavailable (disabled or unknown); using a random motion program.',
-          variables: [],
-          timestamp: Date.now(),
-        })
-      }
-    } else {
-      const probability = this.getMotionCueProbabilityPercent()
-      if (probability >= 100 || Math.random() * 100 < probability) {
-        motionCue = registry.getRandomMotionCue()
-      }
-    }
-
     if (motionCue) {
-      const prevMotion = this.currentMotionCue
-      if (this.currentMotionCue && this.currentMotionCue !== motionCue) {
-        this.currentMotionCue.onStop?.()
-      }
-      this.currentMotionCue = motionCue
-      if (prevMotion !== motionCue) {
-        this.currentMotionCueStartTime = now
-      }
       this._sequencer.cancelPanTiltClear()
-      const ref = registry.findMotionCueRef(motionCue)
-      if (ref) {
-        this.emitMotionCueChange(ref, pickSource, pickManualFallback)
-      }
-    } else if (this.currentMotionCue) {
-      this.currentMotionCue.onStop?.()
-      this.currentMotionCue = null
-      this.currentMotionCueStartTime = null
+    } else {
       this._sequencer.schedulePanTiltClear()
-      this.emitMotionCueChange(null, 'cleared')
     }
-    return this.currentMotionCue
+    this.appliedMotionCue = motionCue
+  }
+
+  /** This chain's sequencer dropped its motion patterns without a pick asking it to. */
+  private onMotionPatternsWiped(): void {
+    if (!this.appliedMotionCue) {
+      return
+    }
+    this.appliedMotionCue = null
+    this.motionCoordinator.notifyExternalWipe()
   }
 
   /**
    * External trigger (RB3 switch-timer + Light-1 edge): force a probability-gated motion re-pick.
-   * The swapped cue runs on the next frame dispatch (the RB3 keepalive), so this does not execute it.
-   * No-op while motion is disabled.
+   * The swapped cue runs on the next frame dispatch (the RB3 keepalive), so this does not execute
+   * it. The fan-out passes one `token` to every chain so they share the pick. No-op while motion is
+   * disabled.
    */
-  public requestMotionRepick(): void {
-    if (!this.motionEnabled) {
+  public requestMotionRepick(token: object = {}): void {
+    if (!this.motionCoordinator.isMotionEnabled()) {
       return
     }
-    this.selectMotionCue(false, true)
+    this.motionCoordinator.select(token, false, true)
+    this.applyMotionCue(this.motionCoordinator.getCurrent())
   }
 
   /**
@@ -571,13 +517,8 @@ class CueHandler extends EventEmitter {
       this.currentSecondaryCue = null
     }
     this.stopActiveStrobe()
-    if (this.currentMotionCue) {
-      this.currentMotionCue.onStop?.()
-      this.currentMotionCue = null
-      this.currentMotionCueStartTime = null
-      this._sequencer.schedulePanTiltClear()
-      this.emitMotionCueChange(null, 'cleared')
-    }
+    this.motionCoordinator.stop()
+    this.applyMotionCue(null)
   }
 
   /** Stop the active cue. Used by simulation so restarting the same cue works reliably. */
@@ -604,6 +545,7 @@ class CueHandler extends EventEmitter {
    */
   public shutdown(): void {
     this.stopCurrentCue()
+    this.unsubscribeMotionWipe()
     // End any open song on the registry so once-per-song and motion locks never survive a teardown.
     // This is the single owner of song-end on teardown, covering every path that disposes a handler
     // (coordinator clear, RigChain.dispose). Both calls are idempotent.

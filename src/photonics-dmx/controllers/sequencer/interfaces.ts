@@ -416,6 +416,12 @@ export interface ILightingController {
   updateMotionPatternConfig(name: string, config: ResolvedMotionPatternSetting): void
 
   /**
+   * Called after {@link removeAllEffects} has dropped every motion pattern, so a cue handler that
+   * still reports a motion cue learns its pattern is gone. Returns the unsubscribe.
+   */
+  onMotionPatternsCleared(listener: () => void): () => void
+
+  /**
    * Add an effect with a completion callback.
    * Callback is fired when the effect fully completes (including waitUntilTime) and no light is
    * running or queued under the name, so a submission queued behind a running effect of the same

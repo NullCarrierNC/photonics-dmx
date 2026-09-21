@@ -3,6 +3,15 @@
  */
 import type { FixtureConfig } from '../../../photonics-dmx/types'
 import { CONFIG, LIGHT } from '../../../shared/ipcChannels'
+import type { MotionRuntimeDomain } from '../../../shared/ipc/common'
+
+// ---------------------------------------------------------------------------
+// Motion runtime
+// ---------------------------------------------------------------------------
+
+/** The motion cue a domain is running now (a simulation first, else the live handler's pick). */
+export const getRunningMotionCue = (domain: MotionRuntimeDomain) =>
+  window.api.invoke(LIGHT.GET_RUNNING_MOTION_CUE, { domain })
 
 // ---------------------------------------------------------------------------
 // Stage kit

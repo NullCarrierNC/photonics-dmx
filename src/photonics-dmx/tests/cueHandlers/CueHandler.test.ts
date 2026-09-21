@@ -42,6 +42,27 @@ function makeSequencer(): ILightingController {
   return fakeLightingController()
 }
 
+type MotionInternals = {
+  currentMotionCue: INetCue | null
+  currentMotionCueStartTime: number | null
+  currentPick: { source: 'manual' | 'auto'; manualFallback: boolean } | null
+  lastManualMotionRefForMotion: unknown
+}
+
+/** The coordinator's motion state, for cases that seed a running cue directly. */
+function motionInternals(handler: CueHandler): MotionInternals {
+  return handler.getMotionCoordinator() as unknown as MotionInternals
+}
+
+/** Put `cue` in place as the running motion cue, applied to this handler's chain. */
+function seedRunningMotion(handler: CueHandler, cue: INetCue): void {
+  const internals = motionInternals(handler)
+  internals.currentMotionCue = cue
+  internals.currentMotionCueStartTime = monotonicNowMs()
+  internals.currentPick = { source: 'auto', manualFallback: false }
+  ;(handler as unknown as { appliedMotionCue: INetCue | null }).appliedMotionCue = cue
+}
+
 function makeLightManager(): DmxLightManager {
   return {} as unknown as DmxLightManager
 }
@@ -91,14 +112,11 @@ describe('CueHandler shutdown lifecycle', () => {
       currentPrimaryCue: INetCue | null
       currentSecondaryCue: INetCue | null
       currentStrobeCue: INetCue | null
-      currentMotionCue: INetCue | null
-      currentMotionCueStartTime: number | null
     }
     internals.currentPrimaryCue = primary
     internals.currentSecondaryCue = secondary
     internals.currentStrobeCue = strobe
-    internals.currentMotionCue = motion
-    internals.currentMotionCueStartTime = monotonicNowMs()
+    seedRunningMotion(handler, motion)
 
     handler.shutdown()
 
@@ -110,8 +128,8 @@ describe('CueHandler shutdown lifecycle', () => {
     expect(internals.currentPrimaryCue).toBeNull()
     expect(internals.currentSecondaryCue).toBeNull()
     expect(internals.currentStrobeCue).toBeNull()
-    expect(internals.currentMotionCue).toBeNull()
-    expect(internals.currentMotionCueStartTime).toBeNull()
+    expect(handler.getMotionCoordinator().getCurrent()).toBeNull()
+    expect(motionInternals(handler).currentMotionCueStartTime).toBeNull()
   })
 
   it('shutdown with an active motion cue schedules a pan/tilt clear and broadcasts it cleared once', () => {
@@ -121,12 +139,7 @@ describe('CueHandler shutdown lifecycle', () => {
       runtimeBroadcaster: { emit } as never,
     })
     const motion = makeFakeCue(CueStyle.Primary, 'motion')
-    const internals = handler as unknown as {
-      currentMotionCue: INetCue | null
-      currentMotionCueStartTime: number | null
-    }
-    internals.currentMotionCue = motion
-    internals.currentMotionCueStartTime = monotonicNowMs()
+    seedRunningMotion(handler, motion)
 
     handler.shutdown()
 
@@ -447,13 +460,8 @@ describe('CueHandler Fallback motion suppression', () => {
     const handler = new CueHandler(makeLightManager(), sequencer)
 
     // Seed a freshly-started motion cue from a previous (real) cue. startTime = now keeps it inside
-    // the min-hold so the unpatched handler would re-execute it rather than clear it.
-    const internals = handler as unknown as {
-      currentMotionCue: INetCue | null
-      currentMotionCueStartTime: number | null
-    }
-    internals.currentMotionCue = motion
-    internals.currentMotionCueStartTime = monotonicNowMs()
+    // the min-hold, where an ordinary cue change keeps it running.
+    seedRunningMotion(handler, motion)
 
     await handler.handleCue(CueType.Fallback, gameplayCueData({ lightingCue: CueType.Fallback }))
 
@@ -462,7 +470,7 @@ describe('CueHandler Fallback motion suppression', () => {
     expect(sequencer.schedulePanTiltClear).toHaveBeenCalled()
     expect(getRandomMotionCue).not.toHaveBeenCalled()
     expect(motion.execute).not.toHaveBeenCalled()
-    expect(internals.currentMotionCue).toBeNull()
+    expect(handler.getMotionCoordinator().getCurrent()).toBeNull()
   })
 })
 
@@ -473,14 +481,6 @@ describe('CueHandler requestMotionRepick (RB3 external trigger)', () => {
     registry = CueRegistry.getInstance()
     jest.restoreAllMocks()
   })
-
-  function motionInternals(handler: CueHandler) {
-    return handler as unknown as {
-      currentMotionCue: INetCue | null
-      currentMotionCueStartTime: number | null
-      lastManualMotionRefForMotion: unknown
-    }
-  }
 
   it('swaps in a random motion cue without executing it (the frame dispatch runs it)', () => {
     const motion = makeFakeCue(CueStyle.Primary, 'motion')

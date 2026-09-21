@@ -21,7 +21,7 @@ import type {
   AudioLightingData,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import type { Rb3GameModeSchedulePayload } from '../../photonics-dmx/processors/Rb3GameModeManager'
-import type { DmxValuesPayload, LifecyclePhase } from './common'
+import type { DmxValuesPayload, LifecyclePhase, MotionCueChangePayload } from './common'
 
 export interface IpcSendMap {
   [CUE.YARG_LISTENER_ENABLED]: void
@@ -93,21 +93,9 @@ export interface IpcEventMap {
   [RENDERER_RECEIVE.RB3_MOTION_CUE_GROUPS_CHANGED]: undefined
   [RENDERER_RECEIVE.AUDIO_MOTION_CUE_GROUPS_CHANGED]: undefined
   [RENDERER_RECEIVE.MOTION_ENABLED_CHANGED]: boolean
-  [RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE]: {
-    ref: { groupId: string; cueId: string } | null
-    source: 'manual' | 'auto' | 'cleared'
-    manualFallback: boolean
-  }
-  [RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE]: {
-    ref: { groupId: string; cueId: string } | null
-    source: 'manual' | 'auto' | 'cleared'
-    manualFallback: boolean
-  }
-  [RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE]: {
-    ref: { groupId: string; cueId: string } | null
-    source: 'manual' | 'auto' | 'cleared'
-    manualFallback: boolean
-  }
+  [RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE]: MotionCueChangePayload
+  [RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE]: MotionCueChangePayload
+  [RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE]: MotionCueChangePayload
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_CUE_CHANGE]: { activeCueType: string }
   [RENDERER_RECEIVE.AUDIO_GAME_MODE_DEADLINE]: AudioGameModeSchedulePayload
   [RENDERER_RECEIVE.RB3_GAME_MODE_CUE_CHANGE]: { groupId: string | null }

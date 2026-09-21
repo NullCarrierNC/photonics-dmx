@@ -58,9 +58,13 @@ export class ChainCueRuntime implements CueRuntime {
   }
 
   public async handleCue(cueType: CueType, parameters: CueData): Promise<void> {
+    // One token per dispatch, so every chain's handler applies the same motion decision for it.
     // Fire all chain handlers concurrently; each chain awaits its own cue's effect chain.
     // Errors on any chain are isolated so a rig with an unloadable cue doesn't block siblings.
-    await Promise.allSettled(this.handlers().map((h) => h.handleCue(cueType, parameters)))
+    const dispatchToken = {}
+    await Promise.allSettled(
+      this.handlers().map((h) => h.handleCue(cueType, parameters, dispatchToken)),
+    )
   }
 
   public stopActiveCue(): void {
@@ -100,6 +104,7 @@ export class ChainCueRuntime implements CueRuntime {
   }
 
   public requestMotionRepick(): void {
-    for (const h of this.handlers()) h.requestMotionRepick()
+    const token = {}
+    for (const h of this.handlers()) h.requestMotionRepick(token)
   }
 }

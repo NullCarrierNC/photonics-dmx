@@ -2,13 +2,19 @@ import type { INetCue } from '../../photonics-dmx/cues/interfaces/INetCue'
 import type { IAudioCue } from '../../photonics-dmx/cues/interfaces/IAudioCue'
 import type { ChainFanout } from './ChainFanout'
 import type { RigChain } from './RigChain'
-import type { CueData } from '../../photonics-dmx/cues/types/cueTypes'
+import type { CueData, MotionCueRef } from '../../photonics-dmx/cues/types/cueTypes'
 import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
+import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
+import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
+import type { MotionRuntimeDomain } from '../../shared/ipc/common'
 import { createMockAudioCueData } from '../ipc/mockCueData'
 
 interface MotionCueSimulatorDeps {
   getChainFanout: () => ChainFanout
 }
+
+/** Which domains have a simulated motion cue running. */
+export type ActiveMotionSimDomains = Record<MotionRuntimeDomain, boolean>
 
 /**
  * Owns the Cue-Simulation motion-cue state: one active cue per net domain, the active audio motion
@@ -35,8 +41,31 @@ export class MotionCueSimulator {
     this.audioCue = cue
   }
 
-  /** Stop and clear every active cue without touching pan/tilt (used by start-paths and restart). */
-  clearActive(): void {
+  activeDomains(): ActiveMotionSimDomains {
+    return {
+      yarg: this.netCues.yarg !== null,
+      rb3: this.netCues.rb3 !== null,
+      audio: this.audioCue !== null,
+    }
+  }
+
+  /** The registry ref of a net domain's simulated motion cue, or null while none runs. */
+  activeNetCueRef(domain: NetCueMode): MotionCueRef | null {
+    const cue = this.netCues[domain]
+    return cue ? getCueRegistry(domain).findMotionCueRef(cue) : null
+  }
+
+  /** The registry ref of the simulated audio motion cue, or null while none runs. */
+  activeAudioCueRef(): MotionCueRef | null {
+    return this.audioCue ? AudioCueRegistry.getInstance().findMotionCueRef(this.audioCue) : null
+  }
+
+  /**
+   * Stop and clear every active cue without touching pan/tilt (used by start-paths and restart).
+   * Returns which domains were running, so the caller can tell the renderer what cleared.
+   */
+  clearActive(): ActiveMotionSimDomains {
+    const active = this.activeDomains()
     for (const domain of Object.keys(this.netCues) as NetCueMode[]) {
       this.netCues[domain]?.onStop?.()
       this.netCues[domain] = null
@@ -44,15 +73,17 @@ export class MotionCueSimulator {
     this.audioCue?.onStop?.()
     this.audioCue = null
     this.audioExecutionCount = 0
+    return active
   }
 
   /**
    * Stop simulation and schedule a pan/tilt clear on every chain so secondary rigs don't leave their
-   * moving heads pointed at the last motion target.
+   * moving heads pointed at the last motion target. Returns which domains were running.
    */
-  stop(): void {
-    this.clearActive()
+  stop(): ActiveMotionSimDomains {
+    const active = this.clearActive()
     this.deps.getChainFanout().schedulePanTiltClear()
+    return active
   }
 
   /**

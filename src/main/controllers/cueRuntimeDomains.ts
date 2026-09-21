@@ -1,12 +1,10 @@
 import { CueHandler } from '../../photonics-dmx/cueHandlers/CueHandler'
+import { MotionSelectionCoordinator } from '../../photonics-dmx/cueHandlers/MotionSelectionCoordinator'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import type { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
 import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import type { MotionCueRef } from '../../photonics-dmx/cues/types/cueTypes'
-import {
-  noopRuntimeBroadcaster,
-  type RuntimeBroadcaster,
-} from '../../photonics-dmx/runtime/broadcaster'
+import type { RuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 import {
   createDefaultCueDomainPrefs,
   type CueDomain,
@@ -97,9 +95,10 @@ export interface DomainChainHandlerOptions {
 
 /**
  * Attach one {@link CueHandler} per rig chain in a domain's slot, each bound to that chain's own
- * lights and sequencer so a cue renders against every rig's layout. Only the primary chain's
- * handler gets the real broadcaster, so the UI sees one event per logical cue rather than one per
- * rig. Returns that primary handler.
+ * lights and sequencer so a cue renders against every rig's layout. Every handler shares the
+ * domain's {@link MotionSelectionCoordinator}, so all rigs run the same motion cue and the UI sees
+ * one motion event per decision. A top-up joins the coordinator the running handlers already use,
+ * and a rebuild starts a fresh one. Returns the primary chain's handler.
  */
 export function buildDomainChainHandlers(
   domain: NetCueMode,
@@ -107,6 +106,18 @@ export function buildDomainChainHandlers(
   options: DomainChainHandlerOptions,
 ): CueHandler | null {
   const row = cueRuntimeDomain(domain)
+  const running = options.replaceExisting
+    ? undefined
+    : chains.find((c) => c.cueHandlers[domain])?.cueHandlers[domain]?.getMotionCoordinator?.()
+  const motionCoordinator =
+    running ??
+    new MotionSelectionCoordinator({
+      registry: row.registry(),
+      getMotionCueMinimumHoldMs: options.getMotionCueMinimumHoldMs,
+      getMotionCueProbabilityPercent: options.getMotionCueProbabilityPercent,
+      runtimeBroadcaster: options.runtimeBroadcaster,
+      motionChangeChannel: row.motionChangeChannel,
+    })
   for (const chain of chains) {
     const existing = chain.cueHandlers[domain]
     if (existing) {
@@ -115,10 +126,7 @@ export function buildDomainChainHandlers(
     }
     const handler = new CueHandler(chain.dmxLightManager, chain.sequencer, {
       registry: row.registry(),
-      getMotionCueMinimumHoldMs: options.getMotionCueMinimumHoldMs,
-      getMotionCueProbabilityPercent: options.getMotionCueProbabilityPercent,
-      runtimeBroadcaster: chain.isPrimary ? options.runtimeBroadcaster : noopRuntimeBroadcaster(),
-      motionChangeChannel: row.motionChangeChannel,
+      motionCoordinator,
     })
     handler.setMotionEnabled(options.getMotionEnabled())
     handler.setManualMotionRef(options.getActiveMotionCueRef())

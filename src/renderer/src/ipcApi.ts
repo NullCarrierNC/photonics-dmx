@@ -155,6 +155,7 @@ export {
   enableConsole,
   getClockRate,
   getMasterOutput,
+  getRunningMotionCue,
   getStageKitPriority,
   sendConsoleDmx,
   setClockRate,

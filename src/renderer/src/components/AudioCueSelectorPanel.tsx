@@ -9,6 +9,7 @@ import {
   getAudioReactiveCues,
   getAvailableAudioMotionCues,
   getMotionEnabled,
+  getRunningMotionCue,
   setActiveAudioCue,
   setActiveAudioMotionCue,
 } from '../ipcApi'
@@ -112,9 +113,11 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
       }
 
       try {
-        const [groups, activeRef] = await Promise.all([
+        // The picker shows the pinned preference, and the playing labels show what main is running.
+        const [groups, activeRef, running] = await Promise.all([
           getAudioMotionCueGroups(),
           getActiveAudioMotionCue(),
+          getRunningMotionCue('audio'),
         ])
         const groupsList = groups ?? []
         setMotionGroups(groupsList)
@@ -124,14 +127,19 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
           setMotionCueId(ref.cueId)
           const cues = await getAvailableAudioMotionCues(ref.groupId)
           setMotionCuesOptions(cues.map((c) => ({ id: c.id, name: c.name })))
-          const groupRow = groupsList.find((g) => g.id === ref.groupId)
-          setMotionPlayingGroupLabel(groupRow?.name ?? ref.groupId)
-          const cueRow = cues.find((c) => c.id === ref.cueId)
-          setMotionPlayingLabel(cueRow?.name ?? ref.cueId)
         } else {
           setMotionGroupId('')
           setMotionCueId('')
           setMotionCuesOptions([])
+        }
+        const playing = running && 'ref' in running ? running.ref : null
+        if (playing) {
+          const groupRow = groupsList.find((g) => g.id === playing.groupId)
+          setMotionPlayingGroupLabel(groupRow?.name ?? playing.groupId)
+          const playingCues = await getAvailableAudioMotionCues(playing.groupId)
+          const cueRow = playingCues.find((c) => c.id === playing.cueId)
+          setMotionPlayingLabel(cueRow?.name ?? playing.cueId)
+        } else {
           setMotionPlayingGroupLabel(null)
           setMotionPlayingLabel(null)
         }
