@@ -28,6 +28,12 @@ import {
   normalizeBearingDegrees,
   parseBearingFromResolvedValue,
 } from '../../../helpers/stageDirections'
+import { createLogger } from '../../../../shared/logger'
+
+const log = createLogger('actionResolver')
+
+/** Whether a linear sweep without an axis has been reported, which happens once per process. */
+let reportedMissingSweepAxis = false
 
 export function resolveActionTiming(
   timing: ActionTimingConfig,
@@ -221,6 +227,10 @@ export function resolveMotionPattern(
     tiltAmplitudeDeg = sizeDeg
     tiltFreqMultiplier = 2
   } else if (pattern === 'linear-sweep') {
+    if (!setting.linearSweepAxis && !reportedMissingSweepAxis) {
+      reportedMissingSweepAxis = true
+      log.warn('linear-sweep motion pattern has no linearSweepAxis; sweeping horizontally (pan)')
+    }
     linearSweepAxis = setting.linearSweepAxis
       ? parseLinearSweepAxis(String(resolveValue('string', setting.linearSweepAxis, context)))
       : 'horizontal'
