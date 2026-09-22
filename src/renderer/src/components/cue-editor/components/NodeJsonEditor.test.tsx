@@ -33,22 +33,31 @@ function open({ validate, reconcile }: OpenOptions = {}) {
   const validateFile = jest.fn(
     validate ?? ((): Promise<JsonValidationResult> => Promise.resolve({ valid: true })),
   )
-  const { container } = renderWithProviders(
+  const render = (definition: Item, selectedId: string) => (
     <NodeJsonEditor
-      definition={alpha}
+      definition={definition}
       collectionKey="items"
-      selectedId="a"
+      selectedId={selectedId}
       buildFile={(item: Item): ItemFile => ({ items: [bravo, item] })}
       validate={validateFile}
       reconcile={reconcile}
       onSave={onSave}
       onCancel={onCancel}
       onDirtyChange={onDirtyChange}
-    />,
+    />
   )
-  const editor = EditorView.findFromDOM(container.querySelector('.cm-editor') as HTMLElement)
-  if (!editor) throw new Error('CodeMirror did not mount')
-  return { onSave, onCancel, onDirtyChange, validate: validateFile, editor }
+  const { container, rerender } = renderWithProviders(render(alpha, 'a'))
+  /** The view on screen now. */
+  const current = (): EditorView => {
+    const view = EditorView.findFromDOM(container.querySelector('.cm-editor') as HTMLElement)
+    if (!view) throw new Error('CodeMirror did not mount')
+    return view
+  }
+  const editor = current()
+  const show = (definition: Item, selectedId = 'a'): void => {
+    rerender(render(definition, selectedId))
+  }
+  return { onSave, onCancel, onDirtyChange, validate: validateFile, editor, current, show }
 }
 
 function setText(editor: EditorView, text: string): void {
@@ -158,5 +167,61 @@ describe('NodeJsonEditor', () => {
     const { onCancel } = open()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onCancel).toHaveBeenCalledTimes(1)
+  })
+
+  describe('when the definition changes underneath it', () => {
+    const renamed: Item = { id: 'a', name: 'Alpha Renamed' }
+    const lastDirty = (onDirtyChange: jest.Mock): unknown => onDirtyChange.mock.calls.at(-1)?.[0]
+
+    it('keeps unsaved text and says the definition changed', () => {
+      const { editor, current, show, onDirtyChange } = open()
+      setText(editor, '{ "id": "a", "name": "Typed" }')
+
+      show(renamed)
+
+      expect(current().state.doc.toString()).toBe('{ "id": "a", "name": "Typed" }')
+      expect(screen.getByText(/changed outside the JSON editor/)).toBeInTheDocument()
+      expect(lastDirty(onDirtyChange)).toBe(true)
+    })
+
+    it('takes the new definition while nothing is unsaved', () => {
+      const { current, show, onDirtyChange } = open()
+
+      show(renamed)
+
+      expect(current().state.doc.toString()).toBe(JSON.stringify(renamed, null, 2))
+      expect(lastDirty(onDirtyChange)).toBe(false)
+    })
+
+    it('leaves the text alone for the same definition in a new object', () => {
+      const { editor, current, show } = open()
+      setText(editor, '{ "id": "a", "name": "Typed" }')
+
+      show({ ...alpha })
+
+      expect(current().state.doc.toString()).toBe('{ "id": "a", "name": "Typed" }')
+      expect(screen.queryByText(/changed outside the JSON editor/)).not.toBeInTheDocument()
+    })
+
+    it('reloads the current definition on request and drops the edits', () => {
+      const { editor, current, show, onDirtyChange } = open()
+      setText(editor, '{ "id": "a", "name": "Typed" }')
+      show(renamed)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Reload' }))
+
+      expect(current().state.doc.toString()).toBe(JSON.stringify(renamed, null, 2))
+      expect(lastDirty(onDirtyChange)).toBe(false)
+    })
+
+    it('opens a different definition fresh', () => {
+      const { editor, current, show, onDirtyChange } = open()
+      setText(editor, '{ "id": "a", "name": "Typed" }')
+
+      show(bravo, 'b')
+
+      expect(current().state.doc.toString()).toBe(JSON.stringify(bravo, null, 2))
+      expect(lastDirty(onDirtyChange)).toBe(false)
+    })
   })
 })
