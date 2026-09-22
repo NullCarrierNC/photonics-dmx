@@ -6,10 +6,16 @@
  * compares its top level to the list below, which names what ships and nothing else, then looks
  * inside out/ for the three files that make the difference between an app and a blank window.
  *
+ * It also reads the Electron fuses from the binary each archive belongs to, and checks they are
+ * set the way electron-builder.yml's electronFuses block sets them.
+ *
  * Run it after `npm run build:unpack` or any of the per-platform builds.
  */
 import { openSync, readSync, closeSync, existsSync, readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import fuses from '@electron/fuses'
+
+const { getCurrentFuseWire, FuseV1Options } = fuses
 
 /** What a packaged build holds at the top level of its archive. */
 const SHIPPED = ['LICENSE', 'THIRD-PARTY-LICENSES.md', 'node_modules', 'out', 'package.json']
@@ -26,6 +32,59 @@ const REQUIRED_IN_OUT = ['main/index.js', 'preload/index.js', 'renderer/index.ht
 const ALLOWED_IN_OUT = ['main', 'preload', 'renderer']
 
 const DIST = 'dist'
+
+/**
+ * The fuses a packaged build carries, as electron-builder.yml sets them. Off: running the binary
+ * as plain Node, NODE_OPTIONS and --inspect. On: the archive integrity check and loading the app
+ * from the archive alone.
+ */
+const EXPECTED_FUSES = {
+  RunAsNode: false,
+  EnableNodeOptionsEnvironmentVariable: false,
+  EnableNodeCliInspectArguments: false,
+  EnableEmbeddedAsarIntegrityValidation: true,
+  OnlyLoadAppFromAsar: true,
+}
+
+/** How the fuse wire records a fuse: the characters '1' and '0'. */
+const FUSE_ON = '1'.charCodeAt(0)
+const FUSE_OFF = '0'.charCodeAt(0)
+
+/**
+ * The Electron binary an archive belongs to: the .app bundle on macOS, and the executable in the
+ * folder above resources/ elsewhere.
+ */
+function binaryFor(archive) {
+  const macApp = archive.match(/^(.*\.app)[\\/]Contents[\\/]Resources[\\/]app\.asar$/)
+  if (macApp) {
+    return macApp[1]
+  }
+  const buildDir = dirname(dirname(archive))
+  for (const name of ['Photonics.exe', 'photonics-dmx', 'photonics', 'Photonics']) {
+    const candidate = join(buildDir, name)
+    if (existsSync(candidate) && statSync(candidate).isFile()) {
+      return candidate
+    }
+  }
+  return null
+}
+
+/** What is wrong with a build's fuses, or nothing when they are set as expected. */
+async function fuseProblems(archive) {
+  const binary = binaryFor(archive)
+  if (!binary) {
+    return [`no Electron binary found beside the archive`]
+  }
+  const wire = await getCurrentFuseWire(binary)
+  const problems = []
+  for (const [name, wanted] of Object.entries(EXPECTED_FUSES)) {
+    const state = wire[FuseV1Options[name]]
+    if (state !== (wanted ? FUSE_ON : FUSE_OFF)) {
+      problems.push(`${name} should be ${wanted ? 'on' : 'off'}`)
+    }
+  }
+  return problems
+}
 
 /**
  * electron-builder writes each unpacked build into a dist/ directory named for its platform and
@@ -127,6 +186,15 @@ const expected = [...SHIPPED].sort()
 let failed = false
 
 for (const archive of archives) {
+  const fuseIssues = await fuseProblems(archive)
+  if (fuseIssues.length > 0) {
+    failed = true
+    console.error(`${archive}: Electron fuses are not set as electron-builder.yml sets them`)
+    for (const issue of fuseIssues) {
+      console.error(`  ${issue}`)
+    }
+  }
+
   const index = readIndex(archive)
   const actual = topLevelNames(index).sort()
   const missing = expected.filter((name) => !actual.includes(name))
@@ -141,6 +209,9 @@ for (const archive of archives) {
     extraInOut.length === 0
   ) {
     console.log(`${archive}: carries the ${expected.length} entries it should, out/ included`)
+    if (fuseIssues.length === 0) {
+      console.log(`${archive}: fuses set as electron-builder.yml sets them`)
+    }
     continue
   }
 
@@ -164,7 +235,7 @@ for (const archive of archives) {
 
 if (failed) {
   console.error(
-    'Update the files list in electron-builder.yml, or SHIPPED here, whichever is wrong.',
+    'Update electron-builder.yml, or SHIPPED or EXPECTED_FUSES here, whichever is wrong.',
   )
   process.exit(1)
 }

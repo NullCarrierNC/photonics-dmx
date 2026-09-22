@@ -1,6 +1,16 @@
 appId: rocks.photonics
 productName: Photonics
 asar: true
+# Fuses baked into the Electron binary. Off: running it as plain Node, NODE_OPTIONS and --inspect,
+# each a way to run other code with the app's own permissions. On: the archive integrity check and
+# loading the app from app.asar alone. tools/packaged-files-check.mjs reads them back.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  resetAdHocDarwinSignature: true
 directories:
   buildResources: build
 # Everything the app loads at runtime resolves under out/, which the build writes. package.json is
