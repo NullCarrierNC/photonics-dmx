@@ -48,10 +48,7 @@ import {
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
 import { useDebouncedSave } from '@renderer/hooks/useDebouncedSave'
 import { persistPrefs } from '../ipc/persistPrefs'
-import type { AppPreferences } from '../../../shared/ipcTypes'
 import { createLogger } from '../../../shared/logger'
-
-type SimulationSettings = NonNullable<AppPreferences['simulationSettings']>
 
 /** How long the selections have to stop changing before they are stored. */
 const SETTINGS_QUIET_MS = 500
@@ -60,6 +57,7 @@ import {
   simulationContext,
   type SimulationContext,
 } from './CueSimulation/simulationPayload'
+import { sameSimulationSettings, type SimulationSettings } from './CueSimulation/simulationSettings'
 
 const log = createLogger('CueSimulation')
 
@@ -119,10 +117,9 @@ const CueSimulation: React.FC = () => {
   useTimeoutEffect(resetMeasureIndicator, showMeasureIndicator ? 200 : null)
   useTimeoutEffect(resetKeyframeIndicator, showKeyframeIndicator ? 200 : null)
 
-  // Track initialization phases
-  const isInitialMount = useRef(true)
-  const isFullyInitialized = useRef(false)
-  const isLoadingFromPrefs = useRef(false)
+  // False until the saved selections are back in place. Nothing is stored before then, and the
+  // group selector leaves an empty selection alone.
+  const [settingsRestored, setSettingsRestored] = useState(false)
   const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null)
   // The effect to restore and the group it belongs to. Carrying the group is what makes the
   // restore independent of when the load flag clears: the group arrives as a state update, so by
@@ -187,15 +184,29 @@ const CueSimulation: React.FC = () => {
     }
   }, [])
 
+  // The page remembers what was last simulated. A selection changes as fast as the user clicks, so
+  // the write waits for the clicking to stop and still goes out if the page is left first.
+  const writeSimulationSettings = useCallback(
+    (settings: SimulationSettings) =>
+      persistPrefs({ simulationSettings: settings }, 'the simulation settings', (message) =>
+        setSettingsSaveError(message),
+      ),
+    [],
+  )
+  const settingsSaver = useDebouncedSave(writeSimulationSettings, {
+    quietMs: SETTINGS_QUIET_MS,
+    isEqual: sameSimulationSettings,
+  })
+
   // Load saved simulation settings on mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        isLoadingFromPrefs.current = true
         const prefs = await getPrefs()
         const savedSettings = prefs.simulationSettings
 
         if (savedSettings) {
+          settingsSaver.seed(savedSettings)
           // Load all saved settings
           if (savedSettings.registryType) {
             setSelectedRegistryType(savedSettings.registryType)
@@ -233,38 +244,29 @@ const CueSimulation: React.FC = () => {
       } catch (error) {
         log.error('Error loading simulation settings:', error)
       } finally {
-        isLoadingFromPrefs.current = false
+        setSettingsRestored(true)
       }
     }
 
     void loadSettings()
-  }, [])
-
-  // The page remembers what was last simulated. A selection changes as fast as the user clicks, so
-  // the write waits for the clicking to stop and still goes out if the page is left first.
-  const writeSimulationSettings = useCallback(
-    (settings: SimulationSettings) =>
-      persistPrefs({ simulationSettings: settings }, 'the simulation settings', (message) =>
-        setSettingsSaveError(message),
-      ),
-    [],
-  )
-  const settingsSaver = useDebouncedSave(writeSimulationSettings, { quietMs: SETTINGS_QUIET_MS })
+  }, [settingsSaver])
 
   useEffect(() => {
-    if (isLoadingFromPrefs.current) {
+    if (!settingsRestored) {
       return
     }
     setSettingsSaveError(null)
     settingsSaver.saveSoon({
       registryType: selectedRegistryType,
       groupId: selectedGroupId,
-      effectId: selectedEffect?.id || null,
+      // A saved effect still being restored is kept, so a slow cue list never stores it as cleared.
+      effectId: selectedEffect?.id ?? savedEffectRef.current?.effectId ?? null,
       venueSize: selectedVenueSize,
       bpm: selectedBpm,
       instrument: selectedInstrument,
     })
   }, [
+    settingsRestored,
     settingsSaver,
     selectedRegistryType,
     selectedGroupId,
@@ -276,6 +278,7 @@ const CueSimulation: React.FC = () => {
 
   // Load saved effect after group is loaded and effects are available
   useEffect(() => {
+    let cancelled = false
     const loadSavedEffect = (): void => {
       const saved = savedEffectRef.current
       if (!saved || saved.groupId !== selectedGroupId) {
@@ -289,6 +292,7 @@ const CueSimulation: React.FC = () => {
             selectedRegistryType === 'RB3E'
               ? await getAvailableRb3Cues(selectedGroupId)
               : await getAvailableCues(selectedGroupId)
+          if (cancelled || savedEffectRef.current !== saved) return
           if (availableEffects && availableEffects.length > 0) {
             const savedEffect = availableEffects.find(
               (e: EffectSelector) => e.id === saved.effectId,
@@ -314,6 +318,9 @@ const CueSimulation: React.FC = () => {
     }
 
     loadSavedEffect()
+    return () => {
+      cancelled = true
+    }
   }, [selectedGroupId, selectedRegistryType])
 
   // Moving to a different group than the saved effect belongs to abandons the restore.
@@ -321,16 +328,6 @@ const CueSimulation: React.FC = () => {
     const saved = savedEffectRef.current
     if (saved && saved.groupId !== selectedGroupId) {
       savedEffectRef.current = null
-    }
-  }, [selectedGroupId])
-
-  // Simulation uses cueGroup in the simulate payload; we do not set global active groups here.
-  useEffect(() => {
-    if (selectedGroupId) {
-      if (isInitialMount.current) {
-        isInitialMount.current = false
-      }
-      isFullyInitialized.current = true
     }
   }, [selectedGroupId])
 
@@ -593,6 +590,7 @@ const CueSimulation: React.FC = () => {
                   onBpmChange={setSelectedBpm}
                   selectedGroupId={selectedGroupId}
                   selectedRegistryType={selectedRegistryType}
+                  ready={settingsRestored}
                 />
               </div>
               <div className="lg:w-64">

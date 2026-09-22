@@ -97,6 +97,46 @@ describe('CueRegistrySelector', () => {
     await waitFor(() => expect(onGroupChange).toHaveBeenCalledWith(['rb3-stagekit']))
   })
 
+  it('keeps a saved group that is not first in the list', async () => {
+    const onGroupChange = jest.fn()
+    renderWithProviders(
+      <CueRegistrySelector
+        {...baseProps}
+        onGroupChange={onGroupChange}
+        selectedGroupId="yarg-stagekit"
+        selectedRegistryType="YARG"
+      />,
+    )
+
+    await screen.findByRole('option', { name: 'YARG Fade' })
+    expect(screen.getByLabelText('Cue Group')).toHaveValue('yarg-stagekit')
+    expect(onGroupChange).not.toHaveBeenCalled()
+  })
+
+  it('leaves an empty selection alone until the parent has restored its own', async () => {
+    const onGroupChange = jest.fn()
+    const { rerender } = renderWithProviders(
+      <CueRegistrySelector
+        {...baseProps}
+        onGroupChange={onGroupChange}
+        selectedRegistryType="YARG"
+        ready={false}
+      />,
+    )
+    await screen.findByRole('option', { name: 'YARG Fade' })
+    expect(onGroupChange).not.toHaveBeenCalled()
+
+    rerender(
+      <CueRegistrySelector
+        {...baseProps}
+        onGroupChange={onGroupChange}
+        selectedRegistryType="YARG"
+        ready
+      />,
+    )
+    await waitFor(() => expect(onGroupChange).toHaveBeenCalledWith(['yarg-fade']))
+  })
+
   it('reports a BPM when the user leaves the field, not per keystroke', async () => {
     const onBpmChange = jest.fn()
     renderWithProviders(

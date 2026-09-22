@@ -16,10 +16,19 @@ import {
 import { LIGHT, CONFIG } from '../../../shared/ipcChannels'
 
 let savePrefsAnswer: unknown = undefined
+let prefsAnswer: unknown = {}
+let cueGroupsAnswer: unknown[] = []
+let availableCuesAnswer: unknown[] = []
 
 const invoke = jest.fn<(channel: string, payload?: unknown) => Promise<unknown>>(
   async (channel: string) => {
     if (channel === CONFIG.SAVE_PREFS) return savePrefsAnswer
+    if (channel === CONFIG.GET_PREFS) return prefsAnswer
+    if (channel === LIGHT.GET_CUE_GROUPS) return cueGroupsAnswer
+    if (channel === CONFIG.GET_ENABLED_CUE_GROUPS) {
+      return (cueGroupsAnswer as Array<{ id: string }>).map((g) => g.id)
+    }
+    if (channel === LIGHT.GET_AVAILABLE_CUES) return availableCuesAnswer
     if (channel.startsWith('get-')) return []
     if (channel === LIGHT.SIMULATE_POST_PROCESSING) return true
     if (channel === CONFIG.GET_PREFS) return {}
@@ -74,6 +83,9 @@ describe('CueSimulation settings', () => {
   beforeEach(() => {
     invoke.mockClear()
     savePrefsAnswer = undefined
+    prefsAnswer = {}
+    cueGroupsAnswer = []
+    availableCuesAnswer = []
   })
 
   afterEach(() => {
@@ -87,6 +99,32 @@ describe('CueSimulation settings', () => {
     view.unmount()
 
     await waitFor(() => expect(savedSettings().some((s) => s.bpm === 140)).toBe(true))
+  })
+
+  it('reopens on the saved group and writes nothing when nothing changed', async () => {
+    prefsAnswer = {
+      simulationSettings: {
+        registryType: 'YARG',
+        groupId: 'zeta',
+        effectId: 'Verse',
+        venueSize: 'Large',
+        bpm: 120,
+        instrument: 'guitar',
+      },
+    }
+    cueGroupsAnswer = [
+      { id: 'alpha', name: 'Alpha', description: '', cueTypes: ['Verse'] },
+      { id: 'zeta', name: 'Zeta', description: '', cueTypes: ['Verse'] },
+    ]
+    availableCuesAnswer = [{ id: 'Verse', yargDescription: 'Verse', rb3Description: '' }]
+    const view = renderPage()
+
+    await screen.findByRole('option', { name: 'Zeta' })
+    await waitFor(() => expect(screen.getByLabelText('Cue Group')).toHaveValue('zeta'))
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    view.unmount()
+
+    expect(savedSettings()).toEqual([])
   })
 
   it('says so when the settings cannot be stored', async () => {

@@ -20,6 +20,8 @@ type CueGroup = {
   cueTypes: string[]
 }
 
+const NO_GROUPS: CueGroup[] = []
+
 interface CueRegistrySelectorProps {
   onRegistryChange: (registryType: CueRegistryType) => void
   onGroupChange: (groupIds: string[]) => void
@@ -27,9 +29,16 @@ interface CueRegistrySelectorProps {
   onVenueSizeChange: (venueSize: 'NoVenue' | 'Small' | 'Large') => void
   selectedBpm: number
   onBpmChange: (bpm: number) => void
+  /** The selected group. The selector shows it and reports changes, the parent owns it. */
   selectedGroupId: string
   /** Which registry's cue groups to list (YARG lighting vs RB3 cue-mode groups). */
   selectedRegistryType: CueRegistryType
+  /**
+   * Whether the parent has settled the selection it restores. Until then an empty or unknown
+   * selection is left alone. After that it is replaced with the first group, which is also how a
+   * registry with one group gets its only choice picked.
+   */
+  ready?: boolean
 
   /**
    * When true, the component will initialize with the currently active group selected.
@@ -46,10 +55,15 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   onBpmChange,
   selectedGroupId,
   selectedRegistryType,
+  ready = true,
 }) => {
-  const [groups, setGroups] = useState<CueGroup[]>([])
-  const [selectedGroup, setSelectedGroup] = useState<string>('')
-  const isInitialMount = useRef(true)
+  // Tagged with the registry they were fetched for, so a list from the previous registry is never
+  // used to pick a group in the new one.
+  const [fetched, setFetched] = useState<{ registry: CueRegistryType; groups: CueGroup[] }>({
+    registry: selectedRegistryType,
+    groups: [],
+  })
+  const groups = fetched.registry === selectedRegistryType ? fetched.groups : NO_GROUPS
   // Always holds the latest selected registry so an in-flight fetch can detect that the registry
   // changed (YARG <-> RB3E) before its awaits resolved and discard its now-stale results. Updated
   // in an effect (not during render) so it commits before any fetch's awaits resolve.
@@ -91,29 +105,11 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
       )
 
       log.info(`Enabled groups:`, sortedGroups)
-      setGroups(sortedGroups)
-
-      const selectionValid =
-        selectedGroup !== '' && sortedGroups.some((g) => g.id === selectedGroup)
-      if (!selectionValid) {
-        // No valid current selection — initial load, a registry switch (YARG <-> RB3E), or the
-        // selected group was removed. Auto-select the first group and notify the parent so the
-        // downstream venue/bpm/effect controls enable even when there is only one group (which
-        // can't be picked via the dropdown's onChange).
-        if (sortedGroups.length > 0) {
-          const firstGroup = sortedGroups[0]
-          setSelectedGroup(firstGroup.id)
-          handleGroupChangeCallback(firstGroup.id)
-        }
-      } else if (isInitialMount.current) {
-        // Valid restored selection on first load: re-notify the parent to sync.
-        handleGroupChangeCallback(selectedGroup)
-      }
-      isInitialMount.current = false
+      setFetched({ registry: selectedRegistryType, groups: sortedGroups })
     } catch (error) {
       log.error('Error fetching cue groups:', error)
     }
-  }, [handleGroupChangeCallback, selectedGroup, selectedRegistryType])
+  }, [selectedRegistryType])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetchGroups sets state in async callback
@@ -130,21 +126,17 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
     }
   }, [fetchGroups])
 
-  // Separate effect to handle fallback when selected group becomes invalid
+  // An empty selection, one from another registry or one whose group went away falls back to the
+  // first group, and the parent hears it so the venue, BPM and effect controls enable.
   useEffect(() => {
-    if (groups.length > 0 && selectedGroup && !groups.some((g) => g.id === selectedGroup)) {
-      // If the currently selected group is no longer available, fallback to first group
-      const firstGroup = groups[0]
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- fallback when selected group removed
-      setSelectedGroup(firstGroup.id)
-      handleGroupChangeCallback(firstGroup.id)
+    if (!ready || groups.length === 0 || groups.some((g) => g.id === selectedGroupId)) {
+      return
     }
-  }, [groups, selectedGroup, handleGroupChangeCallback])
+    handleGroupChangeCallback(groups[0].id)
+  }, [ready, groups, selectedGroupId, handleGroupChangeCallback])
 
   const handleGroupChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const groupId = event.target.value
-    setSelectedGroup(groupId)
-    handleGroupChangeCallback(groupId)
+    handleGroupChangeCallback(event.target.value)
   }
 
   return (
@@ -185,7 +177,8 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
           Cue Group
         </label>
         <select
-          value={selectedGroup}
+          aria-label="Cue Group"
+          value={groups.some((g) => g.id === selectedGroupId) ? selectedGroupId : ''}
           onChange={handleGroupChange}
           className="p-2 border rounded dark:bg-gray-700 dark:text-gray-200"
           style={{ width: '200px' }}>
