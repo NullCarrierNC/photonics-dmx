@@ -596,6 +596,45 @@ describe('EffectManager', () => {
     })
   })
 
+  describe('unblocked submissions with a completion callback', () => {
+    const flash = (): Effect => ({
+      id: 'flash',
+      description: 'Flash',
+      transitions: [
+        {
+          lights: [createMockTrackedLight()],
+          layer: 1,
+          waitForCondition: 'none',
+          waitForTime: 0,
+          transform: { color: createMockRGBIP(), easing: 'linear', duration: 100 },
+          waitUntilCondition: 'none',
+          waitUntilTime: 0,
+        },
+      ],
+    })
+
+    it('holds the callback for the run already using the name', () => {
+      const lightMap = new Map([['test-light-1', { name: 'flash', layer: 1 }]])
+      layerManager.getActiveEffects.mockReturnValue(new Map([[1, lightMap]]) as never)
+      const onComplete = jest.fn()
+
+      expect(effectManager.addEffectUnblockedNameWithCallback('flash', flash(), onComplete)).toBe(
+        true,
+      )
+      expect(onComplete).not.toHaveBeenCalled()
+    })
+
+    it('reports a blackout refusal and never calls back', () => {
+      systemEffects.isBlackoutActive.mockReturnValue(true)
+      const onComplete = jest.fn()
+
+      expect(effectManager.setEffectUnblockedNameWithCallback('flash', flash(), onComplete)).toBe(
+        false,
+      )
+      expect(onComplete).not.toHaveBeenCalled()
+    })
+  })
+
   describe('addEffectUnblockedName', () => {
     it('names the rig in the refusal it logs when the manager drives one', () => {
       const effectName = 'test-effect'

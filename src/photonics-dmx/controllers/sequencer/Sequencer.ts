@@ -231,28 +231,38 @@ export class Sequencer implements ILightingController {
 
   /**
    * Add an effect only if not already running, with completion callback.
-   * If discarded, callback is fired immediately.
+   * @returns True when `onComplete` will be called, false when the submission was refused
    */
   public addEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
-  ): void {
-    this.effectManager.addEffectUnblockedNameWithCallback(name, effect, onComplete, isPersistent)
+  ): boolean {
+    return this.effectManager.addEffectUnblockedNameWithCallback(
+      name,
+      effect,
+      onComplete,
+      isPersistent,
+    )
   }
 
   /**
    * Set an effect only if not already running, with completion callback.
-   * If discarded, callback is fired immediately.
+   * @returns True when `onComplete` will be called, false when the submission was refused
    */
   public setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
-  ): void {
-    this.effectManager.setEffectUnblockedNameWithCallback(name, effect, onComplete, isPersistent)
+  ): boolean {
+    return this.effectManager.setEffectUnblockedNameWithCallback(
+      name,
+      effect,
+      onComplete,
+      isPersistent,
+    )
   }
 
   /**

@@ -195,13 +195,13 @@ export interface IEffectManager {
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
-  ): void
+  ): boolean
   setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
-  ): void
+  ): boolean
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void
   startNextEffectInQueue(layer: number, lightId: string): boolean
   /**
@@ -351,18 +351,24 @@ export interface ILightingController {
   ): boolean
   addEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
   setEffectUnblockedName(name: string, effect: Effect, isPersistent?: boolean): boolean
+  /**
+   * Submits unless the name is already running. Returns true when `onComplete` will be called
+   * later, on this effect or, for a name already running, when that run ends. Returns false when
+   * the submission was refused, and then `onComplete` is never called. It is never called during
+   * the submission itself.
+   */
   addEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
-  ): void
+  ): boolean
   setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent?: boolean,
-  ): void
+  ): boolean
   removeEffectByLayer(layer: number, shouldRemoveTransitions?: boolean): void
   removeEffect(name: string, layer: number): void
   removeAllEffects(): void

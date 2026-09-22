@@ -34,7 +34,7 @@ import type { Connection } from '../../types/nodeCueTypes'
 import type { CueData } from '../../types/cueTypes'
 import { runFanOut as runFanOutLoop, computeLedChanges } from './fanOut'
 import type { AudioCueData } from '../../types/audioCueTypes'
-import type { TrackedLight } from '../../../types'
+import type { Effect, TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
 import { NodeRuntimeCallbacks, VariableValue } from './executionTypes'
 import {
@@ -884,19 +884,16 @@ export abstract class BaseNodeExecutionEngine {
 
         if (shouldBlock) {
           context.registerActiveAction(actionNode.id, actionNode)
-          this.markPendingCallbackEffect(effectName)
-          const callback = (cancelled = false): void => {
-            this.clearPendingCallbackEffect(effectName)
-            this.submittedEffects.delete(effectName)
-            this.emitNodeExecution('deactivated', actionNode.id)
-            this.onBlockingActionComplete(actionNode.id, context, cancelled)
-          }
-          this.submittedEffects.set(effectName, resolvedLayer)
-          if (useSetEffect) {
-            this.sequencer.setEffectUnblockedNameWithCallback(effectName, effect, callback)
-          } else {
-            this.sequencer.addEffectUnblockedNameWithCallback(effectName, effect, callback)
-          }
+          this.submitBlockingEffect(
+            effectName,
+            resolvedLayer,
+            effect,
+            useSetEffect,
+            (cancelled) => {
+              this.emitNodeExecution('deactivated', actionNode.id)
+              this.onBlockingActionComplete(actionNode.id, context, cancelled)
+            },
+          )
         } else {
           this.submittedEffects.set(effectName, resolvedLayer)
           if (useSetEffect) {
@@ -971,29 +968,18 @@ export abstract class BaseNodeExecutionEngine {
       const useSetEffectChain = this.getAndConsumeInitialClearPolicy()
       if (chainHasBlockingStep) {
         context.registerActiveAction(lastChainNode.id, lastChainNode)
-        this.markPendingCallbackEffect(chainEffectName)
-        const callback = (cancelled = false): void => {
-          this.clearPendingCallbackEffect(chainEffectName)
-          this.submittedEffects.delete(chainEffectName)
-          for (const a of actionChain) {
-            this.emitNodeExecution('deactivated', a.id)
-          }
-          this.onBlockingActionComplete(lastChainNode.id, context, cancelled)
-        }
-        this.submittedEffects.set(chainEffectName, chainData.baseLayer)
-        if (useSetEffectChain) {
-          this.sequencer.setEffectUnblockedNameWithCallback(
-            chainEffectName,
-            composedEffect,
-            callback,
-          )
-        } else {
-          this.sequencer.addEffectUnblockedNameWithCallback(
-            chainEffectName,
-            composedEffect,
-            callback,
-          )
-        }
+        this.submitBlockingEffect(
+          chainEffectName,
+          chainData.baseLayer,
+          composedEffect,
+          useSetEffectChain,
+          (cancelled) => {
+            for (const a of actionChain) {
+              this.emitNodeExecution('deactivated', a.id)
+            }
+            this.onBlockingActionComplete(lastChainNode.id, context, cancelled)
+          },
+        )
       } else {
         this.submittedEffects.set(chainEffectName, chainData.baseLayer)
         if (useSetEffectChain) {
@@ -1095,9 +1081,7 @@ export abstract class BaseNodeExecutionEngine {
     const useSetEffect = this.getAndConsumeInitialClearPolicy()
 
     if (shouldBlock) {
-      const callback = (cancelled = false): void => {
-        this.clearPendingCallbackEffect(effectName)
-        this.submittedEffects.delete(effectName)
+      const settle = (cancelled: boolean): void => {
         // A displaced or cancelled move never reached its target, so it must not record one. The
         // fingerprint means "the position this light was last moved to and settled at".
         if (!cancelled) {
@@ -1106,11 +1090,14 @@ export abstract class BaseNodeExecutionEngine {
         this.emitNodeExecution('deactivated', actionNode.id)
         this.onBlockingActionComplete(actionNode.id, context, cancelled)
       }
+      const callback = (cancelled = false): void => {
+        this.clearPendingCallbackEffect(effectName)
+        this.submittedEffects.delete(effectName)
+        settle(cancelled)
+      }
       if (useSetEffect) {
         context.registerActiveAction(actionNode.id, actionNode)
-        this.markPendingCallbackEffect(effectName)
-        this.submittedEffects.set(effectName, resolvedLayer)
-        this.sequencer.setEffectUnblockedNameWithCallback(effectName, effect, callback)
+        this.submitBlockingEffect(effectName, resolvedLayer, effect, true, settle)
       } else {
         // The submission replaces any in-flight move of this name, and the sequencer cancel-fires
         // the displaced callback during the call. The records below are therefore written after it
@@ -1143,6 +1130,35 @@ export abstract class BaseNodeExecutionEngine {
       this.emitNodeExecution('deactivated', actionNode.id)
       this.continueToNextNodes(actionNode.id, context)
     }
+  }
+
+  /**
+   * Submit an effect whose completion gates the nodes after it, and call `settle` when it ends. The
+   * records cancelAll removes it by, and the pending mark isBusy reads, are written once the
+   * sequencer accepts it, so a refusal leaves a run already holding the name alone and settles at
+   * once.
+   */
+  private submitBlockingEffect(
+    name: string,
+    layer: number,
+    effect: Effect,
+    useSetEffect: boolean,
+    settle: (cancelled: boolean) => void,
+  ): void {
+    const onComplete = (cancelled = false): void => {
+      this.clearPendingCallbackEffect(name)
+      this.submittedEffects.delete(name)
+      settle(cancelled)
+    }
+    const accepted = useSetEffect
+      ? this.sequencer.setEffectUnblockedNameWithCallback(name, effect, onComplete)
+      : this.sequencer.addEffectUnblockedNameWithCallback(name, effect, onComplete)
+    if (!accepted) {
+      settle(false)
+      return
+    }
+    this.markPendingCallbackEffect(name)
+    this.submittedEffects.set(name, layer)
   }
 
   protected abstract startListenerExecution(

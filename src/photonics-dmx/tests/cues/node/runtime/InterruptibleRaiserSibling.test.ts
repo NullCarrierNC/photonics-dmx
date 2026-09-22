@@ -121,7 +121,7 @@ describe('an interruptible effect raiser beside a sibling on the same layer', ()
     const addWithCallback = h.sequencer.addEffectUnblockedNameWithCallback.bind(h.sequencer)
     h.sequencer.addEffectUnblockedNameWithCallback = (name, effect, onComplete, persistent) => {
       submittedNames.push(name)
-      addWithCallback(
+      return addWithCallback(
         name,
         effect,
         (cancelled) => {

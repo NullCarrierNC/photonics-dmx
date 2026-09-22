@@ -15,6 +15,7 @@ import {
   REPLACE_EFFECT,
   SET_EFFECT,
   SET_EFFECT_UNBLOCKED_NAME,
+  type SubmissionOutcome,
   type SubmissionPolicy,
 } from './effectSubmission'
 import { PersistentRunRegistry } from './PersistentRunRegistry'
@@ -279,7 +280,7 @@ export class EffectManager implements IEffectManager {
     onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
   ): boolean {
-    const applied = this.submitEffect(name, effect, isPersistent, REPLACE_EFFECT)
+    const applied = this.submitEffect(name, effect, isPersistent, REPLACE_EFFECT) === 'applied'
     if (applied) {
       this.effectCallbacks.fire(name, true)
       this.effectCallbacks.add(name, onComplete)
@@ -304,22 +305,21 @@ export class EffectManager implements IEffectManager {
    * The single submission pipeline behind every public add/set/replace variant: blackout gate and
    * transition validation in the policy's order, the duplicate-name gate, the 'set' clearing step,
    * then grouping and the policy's apply path.
-   * @returns True when the effect was applied, false when a gate refused it
    */
   private submitEffect(
     name: string,
     effect: Effect,
     isPersistent: boolean,
     policy: SubmissionPolicy,
-  ): boolean {
+  ): SubmissionOutcome {
     if (policy.blackoutFirst && !this.passBlackoutGate(name, effect, policy)) {
-      return false
+      return 'refused'
     }
     if (this.hasNoTransitions(name, effect)) {
-      return false
+      return 'refused'
     }
     if (!policy.blackoutFirst && !this.passBlackoutGate(name, effect, policy)) {
-      return false
+      return 'refused'
     }
 
     if (policy.blockDuplicateName && this.isEffectRunning(name)) {
@@ -329,7 +329,7 @@ export class EffectManager implements IEffectManager {
       log.debug(
         `Not ${policy.verb.progressive} effect "${name}" because an effect with the same name is already running. Preventing timing issues.${rigSuffix}`,
       )
-      return false
+      return 'duplicate-name'
     }
 
     if (policy.mode === 'set') {
@@ -366,7 +366,7 @@ export class EffectManager implements IEffectManager {
         persistentRunId,
       )
     }
-    return true
+    return 'applied'
   }
 
   /**
@@ -408,45 +408,44 @@ export class EffectManager implements IEffectManager {
     effect: Effect,
     isPersistent: boolean = false,
   ): boolean {
-    return this.submitEffect(name, effect, isPersistent, ADD_EFFECT_UNBLOCKED_NAME)
+    return this.submitEffect(name, effect, isPersistent, ADD_EFFECT_UNBLOCKED_NAME) === 'applied'
   }
 
-  /**
-   * Like addEffectUnblockedName but with a completion callback.
-   * If the effect was added, the callback is fired when the effect completes.
-   * If the effect was discarded (same name already running), the callback is fired immediately.
-   */
+  /** addEffectUnblockedName with a completion callback, as {@link submitWithWaiter} describes. */
   public addEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
-  ): void {
-    const added = this.addEffectUnblockedName(name, effect, isPersistent)
-    if (added) {
-      this.effectCallbacks.add(name, onComplete)
-    } else {
-      onComplete(false)
-    }
+  ): boolean {
+    return this.submitWithWaiter(name, effect, onComplete, isPersistent, ADD_EFFECT_UNBLOCKED_NAME)
   }
 
-  /**
-   * Like setEffectUnblockedName but with a completion callback.
-   * If the effect was set, the callback is fired when the effect completes.
-   * If the effect was discarded (same name already running), the callback is fired immediately.
-   */
+  /** setEffectUnblockedName with a completion callback, as {@link submitWithWaiter} describes. */
   public setEffectUnblockedNameWithCallback(
     name: string,
     effect: Effect,
     onComplete: (cancelled: boolean) => void,
     isPersistent: boolean = false,
-  ): void {
-    const set = this.setEffectUnblockedName(name, effect, isPersistent)
-    if (set) {
-      this.effectCallbacks.add(name, onComplete)
-    } else {
-      onComplete(false)
-    }
+  ): boolean {
+    return this.submitWithWaiter(name, effect, onComplete, isPersistent, SET_EFFECT_UNBLOCKED_NAME)
+  }
+
+  /**
+   * Submits and registers `onComplete` for when the name finishes. A submission refused because the
+   * name is already running parks the callback on that run. Any other refusal registers nothing.
+   * @returns True when `onComplete` will be called later, false when the submission was refused
+   */
+  private submitWithWaiter(
+    name: string,
+    effect: Effect,
+    onComplete: (cancelled: boolean) => void,
+    isPersistent: boolean,
+    policy: SubmissionPolicy,
+  ): boolean {
+    if (this.submitEffect(name, effect, isPersistent, policy) === 'refused') return false
+    this.effectCallbacks.add(name, onComplete)
+    return true
   }
 
   /**
@@ -465,7 +464,7 @@ export class EffectManager implements IEffectManager {
     effect: Effect,
     isPersistent: boolean = false,
   ): boolean {
-    return this.submitEffect(name, effect, isPersistent, SET_EFFECT_UNBLOCKED_NAME)
+    return this.submitEffect(name, effect, isPersistent, SET_EFFECT_UNBLOCKED_NAME) === 'applied'
   }
 
   /**
