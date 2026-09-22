@@ -5,9 +5,8 @@ import {
 } from './fakeBrowserWindow'
 
 jest.mock('electron', () => ({
-  BrowserWindow: Object.assign(
-    jest.fn((options: Record<string, unknown>) => mockCreateFakeBrowserWindow(options)),
-    { getAllWindows: jest.fn(() => []) },
+  BrowserWindow: jest.fn((options: Record<string, unknown>) =>
+    mockCreateFakeBrowserWindow(options),
   ),
   shell: { openExternal: jest.fn() },
   screen: {
@@ -112,7 +111,7 @@ describe('WindowManager.closeAllWindows', () => {
     const wm = new WindowManager()
 
     await expect(wm.closeAllWindows()).resolves.toBeUndefined()
-    expect(wm.hasWindows()).toBe(false)
+    expect(builtWindows()).toEqual([])
   })
 })
 

@@ -12,6 +12,7 @@ import type { LogEntry } from '../../shared/logger'
 const applicationInit = jest.fn<() => Promise<void>>()
 const applicationShutdown = jest.fn<() => Promise<void>>()
 const handleSecondInstance = jest.fn()
+const handleActivate = jest.fn()
 const applicationCtor = jest.fn()
 let mockIsPackaged = false
 let mockHasInstanceLock = true
@@ -45,7 +46,7 @@ jest.mock('electron', () => ({
     commandLine: { appendSwitch: jest.fn() },
     name: '',
   },
-  BrowserWindow: { getAllWindows: jest.fn(() => []) },
+  BrowserWindow: { getAllWindows: jest.fn(() => [{}]) },
   dialog: { showErrorBox },
 }))
 
@@ -73,7 +74,7 @@ jest.mock('../application', () => ({
     flushLogs: (() => Promise<void>) | null = null
     handleSecondInstance = handleSecondInstance
     handleAllWindowsClosed = jest.fn()
-    handleActivate = jest.fn()
+    handleActivate = handleActivate
     getControllerManager = jest.fn(() => null)
   },
 }))
@@ -106,6 +107,7 @@ describe('main startup', () => {
     applicationShutdown.mockReset()
     applicationShutdown.mockResolvedValue(undefined)
     handleSecondInstance.mockReset()
+    handleActivate.mockReset()
     mockIsPackaged = false
     applicationCtor.mockReset()
     createFileLogSink.mockReset()
@@ -166,6 +168,15 @@ describe('main startup', () => {
     ;(secondInstance as () => void)()
 
     expect(handleSecondInstance).toHaveBeenCalledTimes(1)
+  })
+
+  it('hands every Dock activation to the application, with windows open or not', async () => {
+    await startUp()
+
+    const activate = appOn.mock.calls.find((c) => c[0] === 'activate')?.[1]
+    ;(activate as () => void)()
+
+    expect(handleActivate).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the configuration account recording when a packaged build raises the floor', async () => {

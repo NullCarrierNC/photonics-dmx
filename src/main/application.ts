@@ -89,8 +89,9 @@ export class Application {
     }
   }
 
+  /** A Dock click brings the main window back when it was closed, even with another window open. */
   public handleActivate(): void {
-    if (!this.windowManager.hasWindows()) {
+    if (!this.windowManager.getMainWindow()) {
       this.windowManager.createMainWindow()
     }
   }

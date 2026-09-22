@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 const createMainWindow = jest.fn()
+const getMainWindow = jest.fn<() => unknown>(() => null)
 const setControllerManager = jest.fn()
 const setupIpcHandlers = jest.fn()
 const setupMenu = jest.fn()
@@ -16,7 +17,7 @@ jest.mock('../WindowManager', () => ({
   WindowManager: jest.fn(() => ({
     setControllerManager,
     createMainWindow,
-    hasWindows: () => true,
+    getMainWindow,
     closeAllWindows: jest.fn(async () => {}),
   })),
 }))
@@ -123,5 +124,28 @@ describe('Application shutdown watchdog', () => {
       exit.mockRestore()
       resetLogConfiguration()
     }
+  })
+})
+
+describe('Application activate', () => {
+  beforeEach(() => {
+    createMainWindow.mockReset()
+    getMainWindow.mockReset()
+  })
+
+  it('reopens the main window when only another window is open', () => {
+    getMainWindow.mockReturnValue(null)
+
+    new Application().handleActivate()
+
+    expect(createMainWindow).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves an open main window where it is', () => {
+    getMainWindow.mockReturnValue({})
+
+    new Application().handleActivate()
+
+    expect(createMainWindow).not.toHaveBeenCalled()
   })
 })

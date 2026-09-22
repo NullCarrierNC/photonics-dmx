@@ -8,9 +8,8 @@ const PRIMARY = { x: 0, y: 25, width: 1920, height: 1055 }
 const SECOND = { x: 1920, y: 0, width: 2560, height: 1440 }
 
 jest.mock('electron', () => ({
-  BrowserWindow: Object.assign(
-    jest.fn((options: Record<string, unknown>) => mockCreateFakeBrowserWindow(options)),
-    { getAllWindows: jest.fn(() => []) },
+  BrowserWindow: jest.fn((options: Record<string, unknown>) =>
+    mockCreateFakeBrowserWindow(options),
   ),
   shell: { openExternal: jest.fn() },
   screen: {

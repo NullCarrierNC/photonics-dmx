@@ -1,5 +1,5 @@
 import * as path from 'path'
-import { app, BrowserWindow, dialog } from 'electron'
+import { app, dialog } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import {
   installDefaultSessionContentSecurityPolicy,
@@ -219,9 +219,7 @@ app.on('window-all-closed', () => {
 
 // Handle activate event (macOS)
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    applicationInstance?.handleActivate()
-  }
+  applicationInstance?.handleActivate()
 })
 
 // Handle before-quit event

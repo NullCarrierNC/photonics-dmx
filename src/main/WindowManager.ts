@@ -165,13 +165,11 @@ export class WindowManager {
     window.on('resized', () => this.scheduleSave(role))
     window.on('moved', () => this.scheduleSave(role))
     window.on('ready-to-show', () => window.show())
-    if (role !== 'main') {
-      window.on('closed', () => {
-        if (this.windows.get(role) === window) {
-          this.windows.delete(role)
-        }
-      })
-    }
+    window.on('closed', () => {
+      if (this.windows.get(role) === window) {
+        this.windows.delete(role)
+      }
+    })
 
     window.webContents.setWindowOpenHandler((details) => {
       this.openExternalSafely(details.url)
@@ -230,13 +228,6 @@ export class WindowManager {
    */
   public broadcastAudioMirror(data: AudioLightingData): void {
     this.openWindow('audioPreview')?.webContents.send(RENDERER_RECEIVE.AUDIO_DATA_MIRROR, data)
-  }
-
-  /**
-   * Checks if there are any open windows
-   */
-  public hasWindows(): boolean {
-    return BrowserWindow.getAllWindows().length > 0
   }
 
   /**
