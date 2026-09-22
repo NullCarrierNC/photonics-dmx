@@ -39,7 +39,19 @@ export class AudioController {
   private invalidAudioFrameCount = 0
   private invalidAudioFrameLastLogMs = 0
 
+  /** Enable and disable run one at a time, so a disable that arrives mid-enable tears it down. */
+  private opChain: Promise<unknown> = Promise.resolve()
+
   constructor(private readonly deps: AudioControllerDeps) {}
+
+  private serialize<T>(op: () => Promise<T>): Promise<T> {
+    const run = this.opChain.then(op, op)
+    this.opChain = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
+  }
 
   public setBroadcastAudioMirror(fn: ((data: AudioLightingData) => void) | null): void {
     this.broadcastAudioMirror = fn
@@ -53,7 +65,11 @@ export class AudioController {
     await this.enableAudioInternal()
   }
 
-  public async enableAudioInternal(): Promise<void> {
+  public enableAudioInternal(): Promise<void> {
+    return this.serialize(() => this.startAudio())
+  }
+
+  private async startAudio(): Promise<void> {
     const chains = this.deps.getRigChains()
     if (this.isAudioEnabled || chains.length === 0) {
       log.info('Cannot enable Audio: already enabled or no rig chains')
@@ -96,10 +112,10 @@ export class AudioController {
       if (gameMode.enabled) {
         this.audioProcessor.enableGameMode(gameMode)
       } else {
-        await this.deps.config.setPreference(
-          'activeAudioCueType',
-          this.audioProcessor.getManualPrimaryCueType(),
-        )
+        // Remembered for the next start only, so failing to store it leaves audio running.
+        await this.deps.config
+          .setPreference('activeAudioCueType', this.audioProcessor.getManualPrimaryCueType())
+          .catch((error: unknown) => log.error('Could not store the active audio cue type:', error))
       }
       if (this.audioDataHandler) {
         ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
@@ -132,17 +148,18 @@ export class AudioController {
       log.info('Audio enabled successfully')
     } catch (error) {
       log.error('Failed to enable audio:', error)
+      this.releaseProcessor()
+      this.isAudioEnabled = false
       throw error
     }
   }
 
-  public async disableAudio(): Promise<void> {
-    if (!this.isAudioEnabled) {
-      return
-    }
-    log.info('Disabling audio...')
-    // Input, then cues, then output: the processor is stopped before the rig is cleared, so the
-    // blackout is the last word on the lights.
+  public disableAudio(): Promise<void> {
+    return this.serialize(() => this.stopAudio())
+  }
+
+  /** Detach the frame listener and shut the processor down. */
+  private releaseProcessor(): void {
     if (this.audioDataHandler) {
       ipcMain.removeListener(RENDERER_SEND.AUDIO_DATA, this.audioDataHandler)
       this.audioDataHandler = null
@@ -154,6 +171,16 @@ export class AudioController {
       this.audioProcessor.shutdown()
       this.audioProcessor = null
     }
+  }
+
+  private async stopAudio(): Promise<void> {
+    if (!this.isAudioEnabled) {
+      return
+    }
+    log.info('Disabling audio...')
+    // Input, then cues, then output: the processor is stopped before the rig is cleared, so the
+    // blackout is the last word on the lights.
+    this.releaseProcessor()
     // Blackout via every chain's sequencer so multi-rig setups don't leave secondary rigs
     // lit when the audio listener is turned off.
     for (const chain of this.deps.getRigChains()) {

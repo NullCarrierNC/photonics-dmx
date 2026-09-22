@@ -56,9 +56,8 @@ import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoade
  * - `failed`: reinitialization after teardown did not complete; call `restartControllers()` or `init()` to recover.
  *
  * Concurrency:
- * - YARG/RB3 toggles and `restartControllers()` serialize on one lifecycle queue (`runLifecycleOp`),
- *   so no two of them ever interleave. Queued ops additionally await any in-flight shutdown.
- * - Audio toggles run off the queue and await any in-flight restart/shutdown (one-directional).
+ * - Listener toggles, audio included, and `restartControllers()` serialize on one lifecycle queue
+ *   (`runQueuedOp`), so no two of them ever interleave. Queued ops await any in-flight shutdown.
  * - `shutdown()` runs off the queue and must NEVER drain it: queued ops await the in-flight
  *   shutdown via `awaitShutdownWork`, so a shutdown that waited on the queue would deadlock
  *   against them.
@@ -265,8 +264,7 @@ export class ControllerManager {
    * additionally yields to any in-flight shutdown.
    */
   public async enableYarg(): Promise<void> {
-    await this.lifecycle.runOp(async () => {
-      await this.lifecycle.awaitShutdownWork()
+    await this.lifecycle.runQueuedOp(async () => {
       await this.listenerLifecycle.audio.disableAudio()
       await this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
     })
@@ -276,8 +274,7 @@ export class ControllerManager {
    * Disable YARG listener
    */
   public async disableYarg(): Promise<void> {
-    await this.lifecycle.runOp(async () => {
-      await this.lifecycle.awaitShutdownWork()
+    await this.lifecycle.runQueuedOp(async () => {
       await this.listenerLifecycle.yargRb3.disableYarg()
     })
   }
@@ -287,8 +284,7 @@ export class ControllerManager {
    * chains from here and simulation IPC is refused while RB3E is enabled.
    */
   public async enableRb3(): Promise<void> {
-    await this.lifecycle.runOp(async () => {
-      await this.lifecycle.awaitShutdownWork()
+    await this.lifecycle.runQueuedOp(async () => {
       await this.stopTestEffect()
       this.onSimulationPreempt?.()
       await this.listenerLifecycle.audio.disableAudio()
@@ -300,8 +296,7 @@ export class ControllerManager {
    * Disable Rb3 listener
    */
   public async disableRb3(): Promise<void> {
-    await this.lifecycle.runOp(async () => {
-      await this.lifecycle.awaitShutdownWork()
+    await this.lifecycle.runQueuedOp(async () => {
       await this.listenerLifecycle.yargRb3.disableRb3()
     })
   }
@@ -522,18 +517,18 @@ export class ControllerManager {
    * Enable audio listener and processor
    */
   public async enableAudio(): Promise<void> {
-    await this.lifecycle.awaitInFlightWork()
-    await this.listenerLifecycle.yargRb3.disableYarg()
-    await this.listenerLifecycle.yargRb3.disableRb3()
-    await this.listenerLifecycle.audio.enableAudio(this.isInitialized, () => this.init())
+    await this.lifecycle.runQueuedOp(async () => {
+      await this.listenerLifecycle.yargRb3.disableYarg()
+      await this.listenerLifecycle.yargRb3.disableRb3()
+      await this.listenerLifecycle.audio.enableAudio(this.isInitialized, () => this.init())
+    })
   }
 
   /**
    * Disable audio processing
    */
   public async disableAudio(): Promise<void> {
-    await this.lifecycle.awaitInFlightWork()
-    await this.listenerLifecycle.audio.disableAudio()
+    await this.lifecycle.runQueuedOp(() => this.listenerLifecycle.audio.disableAudio())
   }
 
   /**

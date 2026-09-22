@@ -38,12 +38,10 @@ const PHASE_TRANSITIONS: Record<LifecyclePhase, readonly LifecyclePhase[]> = {
  * *does*; this owns when a transition is legal and what may run next.
  *
  * Concurrency rules the memos encode:
- * - Queued ops exclude each other, and additionally await any in-flight shutdown.
+ * - Queued ops exclude each other, and additionally await any in-flight shutdown. Every listener
+ *   toggle, audio included, and every restart is a queued op.
  * - `runExclusiveShutdown` runs off the queue and must never drain it, since queued ops await the
  *   shutdown memo and a shutdown waiting on the queue would deadlock against them.
- * - Off-queue callers (audio toggles) await restart and shutdown through `awaitInFlightWork`.
- *   A queued op must never call that: the restart is itself queued, so a queued op waiting behind
- *   it on the same queue would deadlock. Queued ops use `awaitShutdownWork`.
  * - A restart request joins the one in flight until that restart starts rebuilding. After that the
  *   rebuild has read its configuration, so the request gets one follow-up restart instead.
  */
@@ -247,24 +245,6 @@ export class ControllerLifecycle {
   }
 
   /**
-   * Wait for any in-flight restart, shutdown or initialisation to settle before mutating audio
-   * lifecycle.
-   * Errors from the in-flight operation are swallowed here so that the caller can still attempt
-   * its own work; the operation that owns the promise is responsible for surfacing its error.
-   *
-   * Off-queue callers only. See the class comment for why a queued op must not call this.
-   */
-  public async awaitInFlightWork(): Promise<void> {
-    const pending = this.restartInFlight ?? this.shutdownPromise ?? this.initInFlight
-    if (!pending) return
-    try {
-      await pending
-    } catch {
-      // The owner already logged / rethrew; we just needed to wait.
-    }
-  }
-
-  /**
    * Wait for an in-flight shutdown to settle. Used by queued lifecycle ops, which already exclude
    * each other and any restart via the queue, but must still yield to the exclusive shutdown
    * (which runs off the queue). Deliberately does NOT await the restart memo.
@@ -276,6 +256,14 @@ export class ControllerLifecycle {
     } catch {
       // The owner already logged / rethrew; we just needed to wait.
     }
+  }
+
+  /** Run `op` on the queue once any in-flight shutdown has settled, like every listener toggle. */
+  public runQueuedOp<T>(op: () => Promise<T>): Promise<T> {
+    return this.runOp(async () => {
+      await this.awaitShutdownWork()
+      return op()
+    })
   }
 
   /**

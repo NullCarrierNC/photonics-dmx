@@ -309,25 +309,26 @@ describe('ControllerLifecycle', () => {
   })
 
   describe('await helpers', () => {
-    it('awaitInFlightWork waits on a restart and swallows its failure', async () => {
+    it('runQueuedOp runs its op once a shutdown in flight has settled', async () => {
       const lifecycle = new ControllerLifecycle(() => {})
-      let rejectWork!: (err: Error) => void
-      const barrier = new Promise<void>((_, reject) => {
-        rejectWork = reject
+      lifecycle.setPhase('running')
+      let releaseShutdown!: () => void
+      const shutdownBarrier = new Promise<void>((r) => {
+        releaseShutdown = r
       })
-      const restart = lifecycle.runSharedRestart(() => barrier)
-      restart.catch(() => {})
+      const shutdown = lifecycle.runExclusiveShutdown(() => shutdownBarrier)
 
-      let waited = false
-      const waiter = lifecycle.awaitInFlightWork().then(() => {
-        waited = true
+      let ran = false
+      const queued = lifecycle.runQueuedOp(async () => {
+        ran = true
       })
       await Promise.resolve()
-      expect(waited).toBe(false)
+      await Promise.resolve()
+      expect(ran).toBe(false)
 
-      rejectWork(new Error('boom'))
-      await waiter
-      expect(waited).toBe(true)
+      releaseShutdown()
+      await Promise.all([shutdown, queued])
+      expect(ran).toBe(true)
     })
 
     it('awaitShutdownWork waits only on a shutdown, not a restart', async () => {
