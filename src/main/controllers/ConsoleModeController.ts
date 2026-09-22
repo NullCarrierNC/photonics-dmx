@@ -138,12 +138,8 @@ export class ConsoleModeController {
     if (light.fixtureId !== fixtureId) {
       return { success: false, error: 'Fixture id does not match this light' }
     }
-    const baseConfig = normalizeFixtureConfig(light.config)
-    const newConfig = clampMergeMovingHeadFixtureConfig(baseConfig, patch)
-    const updatedLight: DmxLight = { ...light, config: newConfig }
-    const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
-    await this.deps.getConfig().saveDmxRig({ ...rig, config: newRigConfig })
-
+    // Both the rig and its fixture template are checked before either is written, so a refusal
+    // leaves neither half changed.
     const userLights = this.deps.getConfig().getUserLights()
     const fi = userLights.findIndex((f) => f.id === fixtureId)
     if (fi < 0) {
@@ -153,6 +149,13 @@ export class ConsoleModeController {
     if (fixture.fixture !== FixtureTypes.RGBMH) {
       return { success: false, error: 'Fixture template is not a moving head' }
     }
+
+    const baseConfig = normalizeFixtureConfig(light.config)
+    const newConfig = clampMergeMovingHeadFixtureConfig(baseConfig, patch)
+    const updatedLight: DmxLight = { ...light, config: newConfig }
+    const newRigConfig = this.replaceLightInRigConfig(rig.config, lightId, updatedLight)
+    await this.deps.getConfig().saveDmxRig({ ...rig, config: newRigConfig })
+
     const fBase = normalizeFixtureConfig(fixture.config)
     const newUserLights = [...userLights]
     newUserLights[fi] = {

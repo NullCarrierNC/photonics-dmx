@@ -180,4 +180,38 @@ describe('ConsoleModeController', () => {
 
     expect(setManualBuffer).toHaveBeenCalledWith({ 1: 255 })
   })
+
+  it('saves nothing when the fixture template is missing', async () => {
+    const saveDmxRig = jest.fn()
+    const light = {
+      id: 'mh-1',
+      fixtureId: 'fixture-1',
+      fixture: 'rgb/mh',
+      config: {},
+    }
+    const c = new ConsoleModeController(
+      baseDeps({
+        getConfig: () =>
+          ({
+            getDmxRig: () => ({
+              id: 'rig-1',
+              config: { frontLights: [light], backLights: [], strobeLights: [] },
+            }),
+            getUserLights: () => [],
+            saveDmxRig,
+            updateUserLights: jest.fn(),
+          }) as never,
+      }),
+    )
+
+    const result = await c.setConsoleFixtureConfig({
+      rigId: 'rig-1',
+      lightId: 'mh-1',
+      fixtureId: 'fixture-1',
+      config: { panHome: 50 },
+    })
+
+    expect(result).toEqual({ success: false, error: 'Fixture template not found in My Lights' })
+    expect(saveDmxRig).not.toHaveBeenCalled()
+  })
 })
