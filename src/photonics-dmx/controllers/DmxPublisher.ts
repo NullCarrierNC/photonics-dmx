@@ -299,7 +299,6 @@ export class DmxPublisher {
     this._lastManualBuffer = buffer
     this._resetGovernorAllSlots()
 
-    // Normalise the input buffer once; broadcast to every enabled wire slot.
     const normalised = normaliseUniverseBuffer(buffer)
     const out =
       this._masterOutput.isBlackoutActive() || Object.keys(normalised).length === 0
@@ -308,6 +307,7 @@ export class DmxPublisher {
 
     const writeWires = (): void => {
       for (const wireId of this._sender.getEnabledWireSenders()) {
+        this._governor.markWritten(wireId, out)
         void this._wireDelay.send(wireId, out)
       }
     }

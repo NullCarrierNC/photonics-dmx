@@ -125,6 +125,17 @@ export class WireSlotGovernor {
   }
 
   /**
+   * Records channels written to the wire outside the cue frame, so the next cue frame releases the
+   * ones it does not address.
+   */
+  markWritten(wireId: WireSenderId, buffer: Record<number, number>): void {
+    const written = this.slotFor(wireId).lastWrittenChannels
+    for (const key of Object.keys(buffer)) {
+      written.add(Number(key))
+    }
+  }
+
+  /**
    * Writes an explicit 0 for every channel this slot addressed last frame but not this one, then
    * records what it is writing now, so a fixture that drops out of the frame goes dark.
    */
