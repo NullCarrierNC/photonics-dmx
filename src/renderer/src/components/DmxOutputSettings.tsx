@@ -11,7 +11,7 @@ import {
   openDmxComPortAtom,
   lightingPrefsAtom,
 } from '../atoms'
-import DmxOutputEnabledModes from './DmxOutputSettings/DmxOutputEnabledModes'
+import DmxOutputEnabledModes, { type SenderName } from './DmxOutputSettings/DmxOutputEnabledModes'
 import SacnConfigCard from './DmxOutputSettings/SacnConfigCard'
 import ArtNetConfigCard from './DmxOutputSettings/ArtNetConfigCard'
 import EnttecProConfigCard from './DmxOutputSettings/EnttecProConfigCard'
@@ -70,6 +70,7 @@ const DmxOutputSettings: React.FC = () => {
   const [sacnExpanded, setSacnExpanded] = useState(false)
   const [enttecProExpanded, setEnttecProExpanded] = useState(false)
   const [openDmxExpanded, setOpenDmxExpanded] = useState(false)
+  const [savingSenders, setSavingSenders] = useState<ReadonlySet<SenderName>>(() => new Set())
   const [networkInterfaces, setNetworkInterfaces] = useState<
     Array<{ name: string; value: string; family: string }>
   >([])
@@ -222,8 +223,6 @@ const DmxOutputSettings: React.FC = () => {
     stop: () => Promise<unknown>
   }
 
-  type SenderName = 'sacn' | 'artnet' | 'enttecpro' | 'opendmx'
-
   const senderToggles: Record<SenderName, SenderToggle> = {
     sacn: {
       flag: 'sacnEnabled',
@@ -266,7 +265,7 @@ const DmxOutputSettings: React.FC = () => {
    * follows the saved config while starting and stopping follows what the backend reports, so a
    * sender already in the state being asked for is left running, or stopped, as it is.
    */
-  const handleSenderToggle = async (name: SenderName) => {
+  const saveSenderFlag = async (name: SenderName) => {
     const toggle = senderToggles[name]
     const enabled = !(prefs.dmxOutputConfig?.[toggle.flag] ?? false)
     const newConfig = nextOutputConfig(prefs.dmxOutputConfig, toggle.flag, enabled)
@@ -286,6 +285,20 @@ const DmxOutputSettings: React.FC = () => {
         enabled ? toggle.start() : toggle.stop(),
       )
     }
+  }
+
+  /** Holds the sender's box while its flag saves, so a second click cannot ask again. */
+  const handleSenderToggle = async (name: SenderName) => {
+    if (savingSenders.has(name)) return
+    const markSaving = (saving: boolean) =>
+      setSavingSenders((current) => {
+        const next = new Set(current)
+        if (saving) next.add(name)
+        else next.delete(name)
+        return next
+      })
+    markSaving(true)
+    await saveSenderFlag(name).finally(() => markSaving(false))
   }
 
   const handleArtNetConfigChange = async (
@@ -445,6 +458,7 @@ const DmxOutputSettings: React.FC = () => {
       )}
 
       <DmxOutputEnabledModes
+        saving={savingSenders}
         sacnEnabled={prefs.dmxOutputConfig?.sacnEnabled || false}
         onSacnToggle={() => void handleSenderToggle('sacn')}
         artNetEnabled={prefs.dmxOutputConfig?.artNetEnabled || false}

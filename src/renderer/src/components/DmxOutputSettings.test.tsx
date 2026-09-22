@@ -103,6 +103,27 @@ describe('DmxOutputSettings sender checkboxes', () => {
     expect((screen.getByLabelText('ArtNet') as HTMLInputElement).checked).toBe(false)
   })
 
+  it('holds a box while its flag saves, so a second click saves and starts nothing more', async () => {
+    let finishSave!: (result: { success: true }) => void
+    savePrefsMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishSave = resolve
+        }),
+    )
+    await renderPanel({ dmxOutputConfig: outputConfig() })
+
+    fireEvent.click(screen.getByLabelText('sACN'))
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalledTimes(1))
+    expect(screen.getByLabelText('sACN')).toBeDisabled()
+    fireEvent.click(screen.getByLabelText('sACN'))
+    await act(async () => finishSave({ success: true }))
+
+    await waitFor(() => expect(screen.getByLabelText('sACN')).not.toBeDisabled())
+    expect(savePrefsMock).toHaveBeenCalledTimes(1)
+    expect(enableSenderMock).toHaveBeenCalledTimes(1)
+  })
+
   it('offers every sender the panel can drive', async () => {
     await renderPanel({ dmxOutputConfig: outputConfig() })
 
