@@ -184,3 +184,10 @@ export const AUDIO_CUE_DATA_PROPERTIES = [
   'detected-key',
   'detected-key-strength',
 ] as const
+
+// ============================================================================
+// Layers
+// ============================================================================
+
+/** The highest layer an action may draw on. The blackout draws on it too. */
+export const MAX_NODE_LAYER = 255

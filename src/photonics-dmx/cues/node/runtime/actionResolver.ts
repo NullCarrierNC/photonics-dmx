@@ -28,6 +28,7 @@ import {
   normalizeBearingDegrees,
   parseBearingFromResolvedValue,
 } from '../../../helpers/stageDirections'
+import { MAX_NODE_LAYER } from '../../../constants/nodeConstants'
 import { createLogger } from '../../../../shared/logger'
 
 const log = createLogger('actionResolver')
@@ -86,11 +87,14 @@ export function resolveActionColor(
   }
 }
 
+/** The action's layer, kept on the layers that exist whatever a variable holds. */
 export function resolveActionLayer(
   layer: ValueSource | undefined,
   context: ExecutionContext,
 ): number {
-  return layer ? Number(resolveValue('number', layer, context)) : 0
+  if (!layer) return 0
+  const n = Number(resolveValue('number', layer, context))
+  return Number.isFinite(n) ? Math.min(MAX_NODE_LAYER, Math.max(0, n)) : 0
 }
 
 function resolveBearingValue(source: ValueSource, context: ExecutionContext): number {

@@ -1,5 +1,6 @@
 import type { ActionNode, ValueSource } from '../../types/nodeCueTypes'
 import { WAIT_CONDITIONS, type LightTarget } from '../../../types'
+import { MAX_NODE_LAYER } from '../../../constants/nodeConstants'
 
 /**
  * Structural validation shared by node cue and effect compilers for physically
@@ -28,6 +29,21 @@ export function validateSharedActionNodePayload(
   }
 
   validateTiming(action, label, createError)
+  validateLayer(action, label, createError)
+}
+
+function validateLayer(
+  action: ActionNode,
+  label: string,
+  createError: (message: string) => Error,
+): void {
+  if (action.layer?.source !== 'literal') return
+  const n = Number(action.layer.value)
+  if (!Number.isFinite(n) || n < 0 || n > MAX_NODE_LAYER) {
+    throw createError(
+      `Action '${label}' layer literal must be a number from 0 to ${MAX_NODE_LAYER}.`,
+    )
+  }
 }
 
 function validateTargetGroups(
