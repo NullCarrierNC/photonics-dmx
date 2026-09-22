@@ -22,9 +22,13 @@ export function useLightsLayoutRig(
   const [rigName, setRigName] = useState('')
 
   useEffect(() => {
+    // A cleared effect stops before it writes, so a remount (StrictMode runs this twice) cannot
+    // save a second default rig.
+    let cancelled = false
     const loadRigs = async () => {
       try {
         const loadedRigs = await getDmxRigs()
+        if (cancelled) return
         setRigs(loadedRigs || [])
 
         if (!activeRigId && loadedRigs.length > 0) {
@@ -32,6 +36,7 @@ export function useLightsLayoutRig(
         } else if (loadedRigs.length === 0) {
           const defaultRig = createDefaultDmxRig()
           await saveDmxRig(defaultRig)
+          if (cancelled) return
           setRigs([defaultRig])
           setActiveRigId(defaultRig.id)
         }
@@ -41,16 +46,20 @@ export function useLightsLayoutRig(
     }
 
     void loadRigs()
+    return () => {
+      cancelled = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: load rigs once
   }, [setActiveRigId, setRigs])
 
   useEffect(() => {
+    let cancelled = false
     const loadRigConfig = async () => {
       if (!activeRigId) return
 
       try {
         const rig = await getDmxRig(activeRigId)
-        if (rig) {
+        if (rig && !cancelled) {
           setRigName(rig.name)
           setActiveLightsConfig(rig.config)
         }
@@ -61,6 +70,9 @@ export function useLightsLayoutRig(
 
     if (activeRigId) {
       void loadRigConfig()
+    }
+    return () => {
+      cancelled = true
     }
   }, [activeRigId, setActiveLightsConfig])
 
