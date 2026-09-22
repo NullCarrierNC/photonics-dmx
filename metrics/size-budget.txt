@@ -11,6 +11,5 @@ Entries may only shrink. Regenerate after a split with: node tools/size-budget.m
 639 src/main/ipc/validation/prefsValidation.ts
 623 src/renderer/src/services/AudioCaptureManager.ts
 622 src/photonics-dmx/controllers/sequencer/EffectManager.ts
-613 src/renderer/src/components/CuePreviewYarg.tsx
 609 src/main/controllers/ControllerManager.ts
 602 src/services/configuration/preferencesMigration.ts

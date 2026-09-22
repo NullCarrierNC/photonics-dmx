@@ -119,4 +119,40 @@ describe('CuePreviewYarg motion labels', () => {
     expect(screen.queryByText('Nod (Slow)')).toBeNull()
     expect(screen.getByText('No active YARG cue')).toBeInTheDocument()
   })
+
+  it('shows the group and cue of one change together when two changes race', async () => {
+    const OTHER = { id: 'yarg-motion-other', name: 'Other motion' }
+    const SPIN = { id: 'motion-spin', name: 'Spin' }
+    await renderEnabled()
+    await screen.findByText('Nod (Slow)')
+    let releaseFirst!: () => void
+    jest
+      .mocked(ipcApi.getYargMotionCueGroups)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseFirst = () => resolve([GROUP, OTHER] as never)
+          }),
+      )
+      .mockResolvedValue([GROUP, OTHER] as never)
+    jest
+      .mocked(ipcApi.getAvailableYargMotionCues)
+      .mockImplementation(async (groupId) => (groupId === OTHER.id ? [SPIN] : [NOD, WAVE]) as never)
+
+    await fire(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
+      ref: { groupId: GROUP.id, cueId: WAVE.id },
+      source: 'auto',
+      manualFallback: false,
+    })
+    await fire(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, {
+      ref: { groupId: OTHER.id, cueId: SPIN.id },
+      source: 'auto',
+      manualFallback: false,
+    })
+    await act(async () => releaseFirst())
+
+    expect(screen.getByText('Other motion')).toBeInTheDocument()
+    expect(screen.getByText('Spin')).toBeInTheDocument()
+    expect(screen.queryByText('Wave (Slow)')).toBeNull()
+  })
 })

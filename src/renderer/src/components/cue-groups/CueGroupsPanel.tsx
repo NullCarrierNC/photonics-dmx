@@ -10,7 +10,7 @@ import { createLogger } from '../../../../shared/logger'
 import { CueGroupEnableList } from './CueGroupEnableList'
 import { CueGroupRow } from './CueGroupRow'
 import { useCueGroupRovingTabIndex } from './useCueGroupRovingTabIndex'
-import { useLatestGenerationGate } from './useLatestGenerationGate'
+import { useLatestGenerationGate } from '../../hooks/useLatestGenerationGate'
 
 /** The least a group row needs. Each domain's own group type carries more. */
 export interface CueGroupRowData {

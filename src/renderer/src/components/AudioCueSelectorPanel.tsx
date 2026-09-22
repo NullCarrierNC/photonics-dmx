@@ -8,8 +8,6 @@ import {
   getAudioMotionCueGroups,
   getAudioReactiveCues,
   getAvailableAudioMotionCues,
-  getMotionEnabled,
-  getRunningMotionCue,
   setActiveAudioCue,
   setActiveAudioMotionCue,
 } from '../ipcApi'
@@ -18,6 +16,7 @@ import type { AudioGameModeSchedulePayload } from '../../../shared/ipcTypes'
 import AudioCuePickers from './AudioCueSelectorPanel/AudioCuePickers'
 import AudioMotionPicker from './AudioCueSelectorPanel/AudioMotionPicker'
 import CurrentCueSummary from './AudioCueSelectorPanel/CurrentCueSummary'
+import { useRunningMotionLabels } from '../hooks/useRunningMotionLabels'
 import type { AudioCueOption } from './AudioCueSelectorPanel/types'
 
 const log = createLogger('AudioCueSelectorPanel')
@@ -51,9 +50,11 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
   const [strobeFiringDisplay, setStrobeFiringDisplay] = useState(false)
   const [strobeCueType, setStrobeCueType] = useState<string | null>(null)
   const strobeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [motionGlobalEnabled, setMotionGlobalEnabled] = useState(true)
-  const [motionPlayingLabel, setMotionPlayingLabel] = useState<string | null>(null)
-  const [motionPlayingGroupLabel, setMotionPlayingGroupLabel] = useState<string | null>(null)
+  const {
+    motionEnabled: motionGlobalEnabled,
+    groupLabel: motionPlayingGroupLabel,
+    cueLabel: motionPlayingLabel,
+  } = useRunningMotionLabels('audio')
   const [motionGroups, setMotionGroups] = useState<
     Array<{ id: string; name: string; description?: string; cueCount: number }>
   >([])
@@ -75,13 +76,6 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
       }
       const enabled = await getAudioEnabled()
       setAudioEnabled(enabled)
-
-      try {
-        const me = await getMotionEnabled()
-        setMotionGlobalEnabled(me === true)
-      } catch {
-        setMotionGlobalEnabled(true)
-      }
 
       try {
         const gm = await getAudioGameMode()
@@ -106,18 +100,16 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
         setMotionGroupId('')
         setMotionCueId('')
         setMotionCuesOptions([])
-        setMotionPlayingLabel(null)
-        setMotionPlayingGroupLabel(null)
         setGameModeSchedule(null)
         return
       }
 
       try {
-        // The picker shows the pinned preference, and the playing labels show what main is running.
-        const [groups, activeRef, running] = await Promise.all([
+        // The picker shows the pinned preference. The playing labels come from
+        // useRunningMotionLabels.
+        const [groups, activeRef] = await Promise.all([
           getAudioMotionCueGroups(),
           getActiveAudioMotionCue(),
-          getRunningMotionCue('audio'),
         ])
         const groupsList = groups ?? []
         setMotionGroups(groupsList)
@@ -132,21 +124,8 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
           setMotionCueId('')
           setMotionCuesOptions([])
         }
-        const playing = running && 'ref' in running ? running.ref : null
-        if (playing) {
-          const groupRow = groupsList.find((g) => g.id === playing.groupId)
-          setMotionPlayingGroupLabel(groupRow?.name ?? playing.groupId)
-          const playingCues = await getAvailableAudioMotionCues(playing.groupId)
-          const cueRow = playingCues.find((c) => c.id === playing.cueId)
-          setMotionPlayingLabel(cueRow?.name ?? playing.cueId)
-        } else {
-          setMotionPlayingGroupLabel(null)
-          setMotionPlayingLabel(null)
-        }
       } catch (e) {
         log.error('Failed to load audio motion picker state', e)
-        setMotionPlayingGroupLabel(null)
-        setMotionPlayingLabel(null)
       }
 
       const response: CueStateResponse = await getAudioReactiveCues()
@@ -276,38 +255,6 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     return () => {
       removeIpcListener(RENDERER_RECEIVE.AUDIO_STROBE_STATE, handleStrobeState)
       clearHideTimer()
-    }
-  }, [])
-
-  useEffect(() => {
-    const applyMotionCueChange = async (payload: {
-      ref: { groupId: string; cueId: string } | null
-    }): Promise<void> => {
-      if (!payload.ref) {
-        setMotionPlayingLabel(null)
-        setMotionPlayingGroupLabel(null)
-        return
-      }
-      try {
-        const groups = await getAudioMotionCueGroups()
-        const groupRow = groups?.find((g) => g.id === payload.ref!.groupId)
-        setMotionPlayingGroupLabel(groupRow?.name ?? payload.ref.groupId)
-        const cues = await getAvailableAudioMotionCues(payload.ref.groupId)
-        const row = cues.find((c) => c.id === payload.ref!.cueId)
-        setMotionPlayingLabel(row?.name ?? payload.ref.cueId)
-      } catch {
-        setMotionPlayingGroupLabel(payload.ref.groupId)
-        setMotionPlayingLabel(payload.ref.cueId)
-      }
-    }
-    const onMotionCueChange = (payload: {
-      ref: { groupId: string; cueId: string } | null
-    }): void => {
-      void applyMotionCueChange(payload)
-    }
-    addIpcListener(RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE, onMotionCueChange)
-    return () => {
-      removeIpcListener(RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE, onMotionCueChange)
     }
   }, [])
 

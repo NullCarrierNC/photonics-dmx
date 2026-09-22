@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   CueData,
   InstrumentNoteType,
@@ -8,13 +8,8 @@ import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import PostProcessingStatus from './PostProcessingStatus'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import YargNoteGrid from './CuePreviewYarg/YargNoteGrid'
-import {
-  getAvailableYargMotionCues,
-  getMotionEnabled,
-  getRunningMotionCue,
-  getYargMotionCueGroups,
-  setListenCueData,
-} from '../ipcApi'
+import { setListenCueData } from '../ipcApi'
+import { useRunningMotionLabels } from '../hooks/useRunningMotionLabels'
 import { useAtom } from 'jotai'
 import { currentCueStateAtom, yargListenerEnabledAtom } from '../atoms'
 
@@ -62,9 +57,11 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   const [keyframeReceived, setKeyframeReceived] = useState(false)
   const [lastKeyframeType, setLastKeyframeType] = useState<string | null>(null)
 
-  const [motionGlobalEnabled, setMotionGlobalEnabled] = useState(true)
-  const [motionPlayingLabel, setMotionPlayingLabel] = useState<string | null>(null)
-  const [motionPlayingGroupLabel, setMotionPlayingGroupLabel] = useState<string | null>(null)
+  const {
+    motionEnabled: motionGlobalEnabled,
+    groupLabel: motionPlayingGroupLabel,
+    cueLabel: motionPlayingLabel,
+  } = useRunningMotionLabels('yarg')
 
   // State for instrument note indicators
   const [activeInstrumentNotes, setActiveInstrumentNotes] = useState<{
@@ -106,69 +103,6 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   const primaryCueNameRef = useRef<string>('')
   const primaryClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const secondaryClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  /** Show the motion cue main reports as running, with its group and cue names resolved. */
-  const applyMotionPayload = useCallback(
-    async (payload: { ref: { groupId: string; cueId: string } | null } | null): Promise<void> => {
-      const ref = payload?.ref
-      if (!ref) {
-        setMotionPlayingGroupLabel(null)
-        setMotionPlayingLabel(null)
-        return
-      }
-      try {
-        const groups = await getYargMotionCueGroups()
-        setMotionPlayingGroupLabel(groups?.find((g) => g.id === ref.groupId)?.name ?? ref.groupId)
-        const cues = await getAvailableYargMotionCues(ref.groupId)
-        setMotionPlayingLabel(cues.find((c) => c.id === ref.cueId)?.name ?? ref.cueId)
-      } catch {
-        setMotionPlayingGroupLabel(ref.groupId)
-        setMotionPlayingLabel(ref.cueId)
-      }
-    },
-    [],
-  )
-
-  // Seeded from the motion cue main is running.
-  const loadMotionLabels = useCallback(async () => {
-    try {
-      const me = await getMotionEnabled()
-      setMotionGlobalEnabled(me === true)
-      if (!me) {
-        await applyMotionPayload(null)
-        return
-      }
-      const running = await getRunningMotionCue('yarg')
-      await applyMotionPayload(running && 'ref' in running ? running : null)
-    } catch {
-      setMotionPlayingGroupLabel(null)
-      setMotionPlayingLabel(null)
-    }
-  }, [applyMotionPayload])
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async; setState only after awaited IPC, no synchronous render cascade
-    void loadMotionLabels()
-    const onRefresh = () => void loadMotionLabels()
-    addIpcListener(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, onRefresh)
-    addIpcListener(RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED, onRefresh)
-    return () => {
-      removeIpcListener(RENDERER_RECEIVE.MOTION_ENABLED_CHANGED, onRefresh)
-      removeIpcListener(RENDERER_RECEIVE.YARG_MOTION_CUE_GROUPS_CHANGED, onRefresh)
-    }
-  }, [loadMotionLabels])
-
-  useEffect(() => {
-    const onMotionCueChange = (payload: {
-      ref: { groupId: string; cueId: string } | null
-    }): void => {
-      void applyMotionPayload(payload)
-    }
-    addIpcListener(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, onMotionCueChange)
-    return () => {
-      removeIpcListener(RENDERER_RECEIVE.YARG_MOTION_CUE_CHANGE, onMotionCueChange)
-    }
-  }, [applyMotionPayload])
 
   // Update primary/secondary cue display based on cue state changes; clear after 100ms when no cue firing (same delay as notes)
   useEffect(() => {
