@@ -18,7 +18,20 @@ import { sendMotionSimCleared, sendMotionSimStarted } from './motionSimulationEv
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { isNonEmptyString, isPlainObject } from './inputValidation'
+import type { MotionRuntimeDomain } from '../../shared/ipc/common'
+import type { ChainFanout } from '../controllers/ChainFanout'
+import type { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
+import type { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 const log = createLogger('simulation-handlers')
+
+/** A motion cue the simulator can start on a rig chain, whichever platform it belongs to. */
+interface SimulatedMotionCue<TData> {
+  execute(
+    data: TData,
+    sequencer: ILightingController,
+    lights: DmxLightManager,
+  ): void | Promise<void>
+}
 
 /**
  * The motion-cue simulation state now lives in a ControllerManager-owned {@link MotionCueSimulator}
@@ -248,160 +261,79 @@ export function setupSimulationHandlers(
     },
   )
 
-  handleInvoke(
-    ipcMain,
-    LIGHT.SIMULATE_BEAT,
-    log,
-    async (
-      _,
-      data?: {
-        venueSize?: 'NoVenue' | 'Small' | 'Large'
-        bpm?: number
-        cueGroup?: string
-        effectId?: string | null
-      },
-    ) => {
-      if (rb3Blocked() || !controllerManager.getIsInitialized()) return false
-      // Make sure every chain has a YARG handler so the fanout `handleCue` actually
-      // reaches secondary rigs even when no real network listener has run.
-      controllerManager.ensureChainsHaveHandlersForSimulation('yarg')
-      const fanout = controllerManager.getChainFanout()
+  /** The timing events the simulate buttons fire, and what each tells the chains. */
+  const SIMULATED_TIMING = [
+    {
+      channel: LIGHT.SIMULATE_BEAT,
+      beat: 'Strong',
+      keyframe: 'Unknown',
+      what: 'beat',
+      fire: (fanout) => fanout.onBeat(),
+    },
+    {
+      channel: LIGHT.SIMULATE_KEYFRAME,
+      beat: 'Unknown',
+      keyframe: 'Next',
+      what: 'keyframe',
+      fire: (fanout) => fanout.onKeyframe(),
+    },
+    {
+      channel: LIGHT.SIMULATE_MEASURE,
+      beat: 'Measure',
+      keyframe: 'Unknown',
+      what: 'measure',
+      fire: (fanout) => fanout.onMeasure(),
+    },
+  ] as const satisfies ReadonlyArray<
+    MockCueDataOptions & { channel: string; what: string; fire: (fanout: ChainFanout) => void }
+  >
 
-      const mockCueData = data
-        ? simCueData({
+  for (const timing of SIMULATED_TIMING) {
+    handleInvoke(
+      ipcMain,
+      timing.channel,
+      log,
+      async (
+        _,
+        data?: {
+          venueSize?: 'NoVenue' | 'Small' | 'Large'
+          bpm?: number
+          cueGroup?: string
+          effectId?: string | null
+        },
+      ) => {
+        if (rb3Blocked() || !controllerManager.getIsInitialized()) return false
+        // Make sure every chain has a YARG handler so the fanout `handleCue` actually
+        // reaches secondary rigs even when no real network listener has run.
+        controllerManager.ensureChainsHaveHandlersForSimulation('yarg')
+        const fanout = controllerManager.getChainFanout()
+
+        const mockCueData = simCueData({
+          ...(data && {
             venueSize: data.venueSize ?? 'Small',
             bpm: data.bpm ?? 120,
             effectId: data.effectId ?? undefined,
-            beat: 'Strong',
-            keyframe: 'Unknown',
             simulationCueGroup: data.cueGroup,
-          })
-        : simCueData({
-            beat: 'Strong',
-            keyframe: 'Unknown',
-          })
+          }),
+          beat: timing.beat,
+          keyframe: timing.keyframe,
+        })
 
-      if (data) {
-        const { effectId } = data
-        if (effectId) {
-          const cueType = getCueTypeFromId(effectId)
-          if (cueType) {
-            try {
-              await fanout.handleCue(cueType, mockCueData)
-            } catch (error) {
-              log.error('Error handling cue in simulate beat:', error)
-            }
+        const cueType = data?.effectId ? getCueTypeFromId(data.effectId) : undefined
+        if (cueType) {
+          try {
+            await fanout.handleCue(cueType, mockCueData)
+          } catch (error) {
+            log.error(`Error handling cue in simulate ${timing.what}:`, error)
           }
         }
-      }
-      sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
-      await sim.runAll(mockCueData)
-      fanout.onBeat()
-      return true
-    },
-  )
-
-  handleInvoke(
-    ipcMain,
-    LIGHT.SIMULATE_KEYFRAME,
-    log,
-    async (
-      _,
-      data?: {
-        venueSize?: 'NoVenue' | 'Small' | 'Large'
-        bpm?: number
-        cueGroup?: string
-        effectId?: string | null
+        sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
+        await sim.runAll(mockCueData)
+        timing.fire(fanout)
+        return true
       },
-    ) => {
-      if (rb3Blocked() || !controllerManager.getIsInitialized()) return false
-      controllerManager.ensureChainsHaveHandlersForSimulation('yarg')
-      const fanout = controllerManager.getChainFanout()
-
-      const mockCueData = data
-        ? simCueData({
-            venueSize: data.venueSize ?? 'Small',
-            bpm: data.bpm ?? 120,
-            effectId: data.effectId ?? undefined,
-            beat: 'Unknown',
-            keyframe: 'Next',
-            simulationCueGroup: data.cueGroup,
-          })
-        : simCueData({
-            beat: 'Unknown',
-            keyframe: 'Next',
-          })
-
-      if (data) {
-        const { effectId } = data
-        if (effectId) {
-          const cueType = getCueTypeFromId(effectId)
-          if (cueType) {
-            try {
-              await fanout.handleCue(cueType, mockCueData)
-            } catch (error) {
-              log.error('Error handling cue in simulate keyframe:', error)
-            }
-          }
-        }
-      }
-      sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
-      await sim.runAll(mockCueData)
-      fanout.onKeyframe()
-      return true
-    },
-  )
-
-  handleInvoke(
-    ipcMain,
-    LIGHT.SIMULATE_MEASURE,
-    log,
-    async (
-      _,
-      data?: {
-        venueSize?: 'NoVenue' | 'Small' | 'Large'
-        bpm?: number
-        cueGroup?: string
-        effectId?: string | null
-      },
-    ) => {
-      if (rb3Blocked() || !controllerManager.getIsInitialized()) return false
-      controllerManager.ensureChainsHaveHandlersForSimulation('yarg')
-      const fanout = controllerManager.getChainFanout()
-
-      const mockCueData = data
-        ? simCueData({
-            venueSize: data.venueSize ?? 'Small',
-            bpm: data.bpm ?? 120,
-            effectId: data.effectId ?? undefined,
-            beat: 'Measure',
-            keyframe: 'Unknown',
-            simulationCueGroup: data.cueGroup,
-          })
-        : simCueData({
-            beat: 'Measure',
-            keyframe: 'Unknown',
-          })
-
-      if (data) {
-        const { effectId } = data
-        if (effectId) {
-          const cueType = getCueTypeFromId(effectId)
-          if (cueType) {
-            try {
-              await fanout.handleCue(cueType, mockCueData)
-            } catch (error) {
-              log.error('Error handling cue in simulate measure:', error)
-            }
-          }
-        }
-      }
-      sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
-      await sim.runAll(mockCueData)
-      fanout.onMeasure()
-      return true
-    },
-  )
+    )
+  }
 
   handleInvoke(
     ipcMain,
@@ -485,61 +417,18 @@ export function setupSimulationHandlers(
     },
   )
 
-  handleInvoke(ipcMain, LIGHT.START_YARG_MOTION_CUE_SIMULATION, log, async (_, data: unknown) => {
-    try {
-      if (rb3Blocked()) {
-        return ipcError(new Error(RB3_BLOCKED_ERROR))
-      }
-      if (!isPlainObject(data)) {
-        return ipcError(new Error('Invalid motion simulation payload'))
-      }
-      const groupId = data.groupId
-      const cueId = data.cueId
-      if (!isNonEmptyString(groupId) || !isNonEmptyString(cueId)) {
-        return ipcError(new Error('groupId and cueId are required'))
-      }
-      if (!controllerManager.getIsInitialized()) {
-        await controllerManager.init()
-      }
-      const fanout = controllerManager.getChainFanout()
-      if (fanout.getChains().length === 0) {
-        return ipcError(new Error('Lighting system not available'))
-      }
-      const group = CueRegistry.getInstance().getGroup(groupId)
-      if (!group) {
-        return ipcError(new Error(`YARG motion group not found: ${groupId}`))
-      }
-      const cue = group.motionCues?.get(cueId)
-      if (!cue) {
-        return ipcError(new Error(`YARG motion cue not found: ${groupId}/${cueId}`))
-      }
-      sendMotionSimCleared(sim.clearActive())
-      // Cancel pending pan/tilt clears on every chain — without this, secondary rigs
-      // would clear pan/tilt mid-motion after the previous simulation stopped.
-      fanout.cancelPanTiltClear()
-      const mockCueData = simCueData({
-        venueSize: 'Small',
-        bpm: 120,
-        simulationCueGroup: groupId,
-      })
-      // Execute the motion cue once per active rig chain. The cue instance is shared
-      // (registry singleton) but each chain's call binds a per-sequencer engine internally.
-      for (const chain of fanout.getChains()) {
-        const maybePromise = cue.execute(mockCueData, chain.sequencer, chain.dmxLightManager)
-        if (maybePromise instanceof Promise) {
-          await maybePromise
-        }
-      }
-      sim.setNetCue('yarg', cue)
-      sendMotionSimStarted('yarg', { groupId, cueId })
-      return { success: true as const }
-    } catch (error) {
-      log.error('Error starting YARG motion cue simulation:', error)
-      return ipcError(error)
-    }
-  })
-
-  handleInvoke(ipcMain, LIGHT.START_RB3_MOTION_CUE_SIMULATION, log, async (_, data: unknown) => {
+  /**
+   * Starts one motion cue on every rig chain, for any platform: checks the payload, finds the cue
+   * in the platform's registry, clears the running simulation and runs the cue once per chain.
+   */
+  async function startMotionSimulation<TData, TCue extends SimulatedMotionCue<TData>>(
+    data: unknown,
+    domain: MotionRuntimeDomain,
+    label: string,
+    findGroup: (groupId: string) => { motionCues?: Map<string, TCue> } | undefined,
+    cueDataFor: (groupId: string) => TData,
+    remember: (cue: TCue) => void,
+  ) {
     if (rb3Blocked()) {
       return ipcError(new Error(RB3_BLOCKED_ERROR))
     }
@@ -558,73 +447,64 @@ export function setupSimulationHandlers(
     if (fanout.getChains().length === 0) {
       return ipcError(new Error('Lighting system not available'))
     }
-    const group = getCueRegistry('rb3').getGroup(groupId)
+    const group = findGroup(groupId)
     if (!group) {
-      return ipcError(new Error(`RB3 motion group not found: ${groupId}`))
+      return ipcError(new Error(`${label} motion group not found: ${groupId}`))
     }
     const cue = group.motionCues?.get(cueId)
     if (!cue) {
-      return ipcError(new Error(`RB3 motion cue not found: ${groupId}/${cueId}`))
+      return ipcError(new Error(`${label} motion cue not found: ${groupId}/${cueId}`))
     }
     sendMotionSimCleared(sim.clearActive())
+    // Cancel pending pan/tilt clears on every chain, so a secondary rig does not clear pan/tilt
+    // mid-motion after the previous simulation stopped.
     fanout.cancelPanTiltClear()
-    const mockCueData = simCueData({
-      venueSize: 'Small',
-      bpm: 120,
-      simulationCueGroup: groupId,
-    })
-    // Execute once to start the (time-driven) motion; RB3 motion has no beat to re-run on.
+    const cueData = cueDataFor(groupId)
+    // The cue instance is shared, and each chain's call binds a per-sequencer engine internally.
     for (const chain of fanout.getChains()) {
-      const maybePromise = cue.execute(mockCueData, chain.sequencer, chain.dmxLightManager)
-      if (maybePromise instanceof Promise) {
-        await maybePromise
-      }
+      await cue.execute(cueData, chain.sequencer, chain.dmxLightManager)
     }
-    sim.setNetCue('rb3', cue)
-    sendMotionSimStarted('rb3', { groupId, cueId })
+    remember(cue)
+    sendMotionSimStarted(domain, { groupId, cueId })
     return { success: true as const }
-  })
+  }
 
-  handleInvoke(ipcMain, LIGHT.START_AUDIO_MOTION_CUE_SIMULATION, log, async (_, data: unknown) => {
-    if (rb3Blocked()) {
-      return ipcError(new Error(RB3_BLOCKED_ERROR))
-    }
-    if (!isPlainObject(data)) {
-      return ipcError(new Error('Invalid motion simulation payload'))
-    }
-    const groupId = data.groupId
-    const cueId = data.cueId
-    if (!isNonEmptyString(groupId) || !isNonEmptyString(cueId)) {
-      return ipcError(new Error('groupId and cueId are required'))
-    }
-    if (!controllerManager.getIsInitialized()) {
-      await controllerManager.init()
-    }
-    const fanout = controllerManager.getChainFanout()
-    if (fanout.getChains().length === 0) {
-      return ipcError(new Error('Lighting system not available'))
-    }
-    const group = AudioCueRegistry.getInstance().getGroup(groupId)
-    if (!group) {
-      return ipcError(new Error(`Audio motion group not found: ${groupId}`))
-    }
-    const cue = group.motionCues?.get(cueId)
-    if (!cue) {
-      return ipcError(new Error(`Audio motion cue not found: ${groupId}/${cueId}`))
-    }
-    sendMotionSimCleared(sim.clearActive())
-    fanout.cancelPanTiltClear()
-    const mockAudio = createMockAudioCueData(1)
-    for (const chain of fanout.getChains()) {
-      const maybePromise = cue.execute(mockAudio, chain.sequencer, chain.dmxLightManager)
-      if (maybePromise instanceof Promise) {
-        await maybePromise
-      }
-    }
-    sim.setAudioCue(cue)
-    sendMotionSimStarted('audio', { groupId, cueId })
-    return { success: true as const }
-  })
+  const netMotionCueData = (groupId: string): CueData =>
+    simCueData({ venueSize: 'Small', bpm: 120, simulationCueGroup: groupId })
+
+  handleInvoke(ipcMain, LIGHT.START_YARG_MOTION_CUE_SIMULATION, log, (_, data: unknown) =>
+    startMotionSimulation(
+      data,
+      'yarg',
+      'YARG',
+      (groupId) => CueRegistry.getInstance().getGroup(groupId),
+      netMotionCueData,
+      (cue) => sim.setNetCue('yarg', cue),
+    ),
+  )
+
+  // RB3 motion has no beat to re-run on, so the one start drives its time-based motion.
+  handleInvoke(ipcMain, LIGHT.START_RB3_MOTION_CUE_SIMULATION, log, (_, data: unknown) =>
+    startMotionSimulation(
+      data,
+      'rb3',
+      'RB3',
+      (groupId) => getCueRegistry('rb3').getGroup(groupId),
+      netMotionCueData,
+      (cue) => sim.setNetCue('rb3', cue),
+    ),
+  )
+
+  handleInvoke(ipcMain, LIGHT.START_AUDIO_MOTION_CUE_SIMULATION, log, (_, data: unknown) =>
+    startMotionSimulation(
+      data,
+      'audio',
+      'Audio',
+      (groupId) => AudioCueRegistry.getInstance().getGroup(groupId),
+      () => createMockAudioCueData(1),
+      (cue) => sim.setAudioCue(cue),
+    ),
+  )
 
   handleInvoke(ipcMain, LIGHT.STOP_MOTION_CUE_SIMULATION, log, async () => {
     sendMotionSimCleared(sim.stop())
