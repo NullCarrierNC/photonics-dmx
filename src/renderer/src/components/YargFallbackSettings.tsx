@@ -38,6 +38,7 @@ const YargFallbackSettings: React.FC = () => {
     async (value: number) => {
       if (isSaving) return
       const clampedSeconds = Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, Math.round(value)))
+      const previous = seconds
       setSeconds(clampedSeconds)
       try {
         setIsSaving(true)
@@ -46,14 +47,16 @@ const YargFallbackSettings: React.FC = () => {
           setSeconds(Math.round(result.fallbackMs / 1000))
         } else if (!result.success) {
           log.error('Failed to save YARG fallback time:', result.error)
+          setSeconds(previous)
         }
       } catch (error) {
         log.error('Failed to save YARG fallback time:', error)
+        setSeconds(previous)
       } finally {
         setIsSaving(false)
       }
     },
-    [isSaving],
+    [isSaving, seconds],
   )
 
   return (

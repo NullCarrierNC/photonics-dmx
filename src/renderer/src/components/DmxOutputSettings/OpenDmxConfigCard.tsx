@@ -5,13 +5,13 @@ import {
   OPEN_DMX_REFRESH_RATE_HZ_MIN,
 } from '../../../../shared/dmxOutputRefresh'
 import CollapsibleSenderCard from './CollapsibleSenderCard'
-import { DraftNumberField, DraftTextField } from '../controls/DraftField'
+import { DraftNumberField, DraftTextField, type CommitOutcome } from '../controls/DraftField'
 
 interface OpenDmxConfigCardProps {
   comPort: string
   refreshRate: number
-  onComPortChange: (port: string) => void
-  onRefreshRateChange: (hz: number) => void
+  onComPortChange: (port: string) => CommitOutcome
+  onRefreshRateChange: (hz: number) => CommitOutcome
   expanded: boolean
   onToggle: () => void
 }

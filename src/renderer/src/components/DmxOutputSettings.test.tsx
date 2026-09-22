@@ -373,6 +373,17 @@ describe('DmxOutputSettings global publishing rate', () => {
     )
   })
 
+  it('shows the stored rate again when the save is refused', async () => {
+    savePrefsMock.mockResolvedValue({ success: false, error: 'read only' } as never)
+    await renderPanel(advanced({ globalDmxPublishingRateHz: 30 }))
+    const field = screen.getByRole('spinbutton') as HTMLInputElement
+
+    commit(field, '20')
+
+    await waitFor(() => expect(savePrefsMock).toHaveBeenCalled())
+    await waitFor(() => expect(field.value).toBe('30'))
+  })
+
   it('says nothing when the committed rate is the one already stored', async () => {
     await renderPanel(advanced({ globalDmxPublishingRateHz: 30 }))
 

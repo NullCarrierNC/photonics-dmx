@@ -37,6 +37,7 @@ const ClockRateSettings: React.FC = () => {
       if (isSaving) return
 
       const newValue = clampClockRateMs(value)
+      const previous = clockRateValue
       setClockRateValue(newValue)
 
       try {
@@ -46,18 +47,16 @@ const ClockRateSettings: React.FC = () => {
           setClockRateValue(newValue)
         } else {
           log.error('Failed to save clock rate:', result.error)
-          // Revert to previous value on failure (it will be re-fetched from backend)
-          window.location.reload() // Simple approach - could be more sophisticated
+          setClockRateValue(previous)
         }
       } catch (error) {
         log.error('Failed to save clock rate:', error)
-        // Revert to previous value on failure
-        window.location.reload() // Simple approach - could be more sophisticated
+        setClockRateValue(previous)
       } finally {
         setIsSaving(false)
       }
     },
-    [isSaving],
+    [isSaving, clockRateValue],
   )
 
   return (

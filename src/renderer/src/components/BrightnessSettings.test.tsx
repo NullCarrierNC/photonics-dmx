@@ -69,4 +69,16 @@ describe('BrightnessSettings', () => {
 
     await screen.findByRole('alert')
   })
+
+  it('shows the saved level again when the save is refused', async () => {
+    savePrefs.mockImplementation((() => Promise.resolve(refused('read only'))) as never)
+    renderPanel()
+    const box = screen.getByLabelText('Low level')
+
+    fireEvent.change(box, { target: { value: '77' } })
+    fireEvent.blur(box)
+
+    await screen.findByRole('alert')
+    expect(box).toHaveValue(40)
+  })
 })

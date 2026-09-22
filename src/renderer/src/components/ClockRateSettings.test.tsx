@@ -75,4 +75,15 @@ describe('ClockRateSettings', () => {
 
     await waitFor(() => expect(setClockRateMock).toHaveBeenCalledWith(25))
   })
+
+  it('shows the saved rate again when the save is refused', async () => {
+    setClockRateMock.mockResolvedValue({ success: false, error: 'read only' } as never)
+    const field = await renderPanel()
+
+    fireEvent.change(field, { target: { value: '25' } })
+    fireEvent.blur(field)
+
+    await waitFor(() => expect(setClockRateMock).toHaveBeenCalledWith(25))
+    await waitFor(() => expect(field).toHaveValue(10))
+  })
 })

@@ -304,7 +304,7 @@ const DmxOutputSettings: React.FC = () => {
   const handleArtNetConfigChange = async (
     field: keyof typeof artNetConfig,
     value: string | number,
-  ) => {
+  ): Promise<boolean> => {
     const parsed = field === 'refreshRateHz' ? clampRefreshRateValue(value) : value
     const newConfig = {
       ...artNetConfig,
@@ -312,7 +312,7 @@ const DmxOutputSettings: React.FC = () => {
     }
 
     if (!(await persist({ artNetConfig: newConfig }, 'the ArtNet configuration'))) {
-      return
+      return false
     }
 
     setPrefs((prev) => ({
@@ -323,43 +323,47 @@ const DmxOutputSettings: React.FC = () => {
     if (isArtNetEnabled) {
       await applyToRunningSender(() => updateArtNetConfig(newConfig), 'the ArtNet configuration')
     }
+    return true
   }
 
-  const handleComPortChange = async (newPort: string) => {
+  const handleComPortChange = async (newPort: string): Promise<boolean> => {
     setComPort(newPort)
-    await commitEnttecConfig({ port: newPort }, 'the Enttec Pro port')
+    const saved = await commitEnttecConfig({ port: newPort }, 'the Enttec Pro port')
+    if (!saved) setComPort(storedEnttecPort)
+    return saved
   }
 
-  const handleEnttecProSpeedChange = async (hz: number) => {
-    await commitEnttecConfig(
+  const handleEnttecProSpeedChange = (hz: number): Promise<boolean> =>
+    commitEnttecConfig(
       { dmxSpeed: normalizeEnttecProDmxSpeedHz(hz) },
       'the Enttec Pro refresh rate',
     )
-  }
 
-  const handleOpenDmxComPortChange = async (newPort: string) => {
+  const handleOpenDmxComPortChange = async (newPort: string): Promise<boolean> => {
     setOpenDmxComPort(newPort)
-    await commitOpenDmxConfig({ port: newPort }, 'the OpenDMX port')
+    const saved = await commitOpenDmxConfig({ port: newPort }, 'the OpenDMX port')
+    if (!saved) setOpenDmxComPort(storedOpenDmxPort)
+    return saved
   }
 
-  const handleOpenDmxSpeedChange = async (hz: number) => {
-    await commitOpenDmxConfig({ dmxSpeed: parseOpenDmxSpeed(String(hz)) }, 'the OpenDMX rate')
-  }
+  const handleOpenDmxSpeedChange = (hz: number): Promise<boolean> =>
+    commitOpenDmxConfig({ dmxSpeed: parseOpenDmxSpeed(String(hz)) }, 'the OpenDMX rate')
 
-  const handleGlobalDmxRateChange = async (hz: number) => {
+  const handleGlobalDmxRateChange = async (hz: number): Promise<boolean> => {
     const sanitized = parseGlobalPublishingRate(String(hz))
 
     if (!(await persist({ globalDmxPublishingRateHz: sanitized }, 'the DMX publishing rate'))) {
-      return
+      return false
     }
 
     setPrefs((prev) => ({ ...prev, globalDmxPublishingRateHz: sanitized }))
+    return true
   }
 
   const handleSacnConfigChange = async (
     field: keyof typeof sacnConfig,
     value: string | number | boolean,
-  ) => {
+  ): Promise<boolean> => {
     const parsed = field === 'refreshRateHz' ? clampRefreshRateValue(value) : value
     const newConfig = {
       ...sacnConfig,
@@ -367,7 +371,7 @@ const DmxOutputSettings: React.FC = () => {
     }
 
     if (!(await persist({ sacnConfig: newConfig }, 'the sACN configuration'))) {
-      return
+      return false
     }
 
     setPrefs((prev) => ({
@@ -379,6 +383,7 @@ const DmxOutputSettings: React.FC = () => {
     if (isSacnEnabled) {
       await applyToRunningSender(() => updateSacnConfig(newConfig), 'the sACN configuration')
     }
+    return true
   }
 
   const panelSetters = {
@@ -424,7 +429,7 @@ const DmxOutputSettings: React.FC = () => {
             <DraftNumberField
               aria-label="Global DMX Publishing Rate"
               value={globalDmxPublishingRate}
-              onCommit={(hz) => void handleGlobalDmxRateChange(hz)}
+              onCommit={handleGlobalDmxRateChange}
               className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               min={DMX_OUTPUT_REFRESH_RATE_HZ_MIN}
               max={DMX_OUTPUT_REFRESH_RATE_HZ_MAX}
@@ -476,7 +481,7 @@ const DmxOutputSettings: React.FC = () => {
             networkInterfaces={networkInterfaces}
             expanded={sacnExpanded}
             onToggle={() => void toggleExpanded('sacnExpanded')}
-            onConfigChange={(field, value) => void handleSacnConfigChange(field, value)}
+            onConfigChange={handleSacnConfigChange}
           />
         </div>
       )}
@@ -487,7 +492,7 @@ const DmxOutputSettings: React.FC = () => {
             config={artNetConfig}
             expanded={artNetExpanded}
             onToggle={() => void toggleExpanded('artNetExpanded')}
-            onConfigChange={(field, value) => void handleArtNetConfigChange(field, value)}
+            onConfigChange={handleArtNetConfigChange}
           />
         </div>
       )}
@@ -497,8 +502,8 @@ const DmxOutputSettings: React.FC = () => {
           <EnttecProConfigCard
             comPort={comPort}
             refreshRate={enttecProSpeed}
-            onComPortChange={(port) => void handleComPortChange(port)}
-            onRefreshRateChange={(hz) => void handleEnttecProSpeedChange(hz)}
+            onComPortChange={handleComPortChange}
+            onRefreshRateChange={handleEnttecProSpeedChange}
             expanded={enttecProExpanded}
             onToggle={() => void toggleExpanded('enttecProExpanded')}
           />
@@ -510,8 +515,8 @@ const DmxOutputSettings: React.FC = () => {
           <OpenDmxConfigCard
             comPort={openDmxComPort}
             refreshRate={openDmxSpeed}
-            onComPortChange={(port) => void handleOpenDmxComPortChange(port)}
-            onRefreshRateChange={(hz) => void handleOpenDmxSpeedChange(hz)}
+            onComPortChange={handleOpenDmxComPortChange}
+            onRefreshRateChange={handleOpenDmxSpeedChange}
             expanded={openDmxExpanded}
             onToggle={() => void toggleExpanded('openDmxExpanded')}
           />

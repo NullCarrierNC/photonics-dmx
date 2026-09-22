@@ -34,6 +34,7 @@ const BrightnessSettings: React.FC = () => {
   }
 
   const handleBrightnessChange = async (level: keyof typeof localBrightness, value: number) => {
+    const previous = localBrightness
     const newBrightness = { ...localBrightness, [level]: value }
     setLocalBrightness(newBrightness)
     setSaveError(null)
@@ -43,6 +44,8 @@ const BrightnessSettings: React.FC = () => {
         ...prev,
         brightness: newBrightness,
       }))
+    } else {
+      setLocalBrightness(previous)
     }
   }
 

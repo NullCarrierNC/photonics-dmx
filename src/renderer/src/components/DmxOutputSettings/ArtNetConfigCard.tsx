@@ -1,6 +1,6 @@
 import React from 'react'
 import CollapsibleSenderCard from './CollapsibleSenderCard'
-import { DraftNumberField, DraftTextField } from '../controls/DraftField'
+import { DraftNumberField, DraftTextField, type CommitOutcome } from '../controls/DraftField'
 
 export interface ArtNetConfig {
   host: string
@@ -20,7 +20,7 @@ interface ArtNetConfigCardProps {
   config: ArtNetConfig
   expanded: boolean
   onToggle: () => void
-  onConfigChange: (field: keyof ArtNetConfig, value: string | number) => void
+  onConfigChange: (field: keyof ArtNetConfig, value: string | number) => CommitOutcome
 }
 
 export const ArtNetConfigCard: React.FC<ArtNetConfigCardProps> = ({
