@@ -9,7 +9,7 @@ import type { ValidationResult } from './primitives'
 import { isNonEmptyString } from './primitives'
 
 /**
- * Resolves `targetPath` and confirms it sits under one of `allowedRoots` after normalization,
+ * Resolves `targetPath`, following links, and confirms it sits under one of `allowedRoots`,
  * rejecting empty input, null bytes, and paths that escape the roots. The default roots include the
  * user's home directory by design: users import/export cue and effect libraries to arbitrary
  * locations they choose, so shell open/show operations are scoped to the home tree rather than a
@@ -38,6 +38,27 @@ function defaultAllowedRoots(): string[] {
   return [...(isPackagedBuild() ? [] : [process.cwd()]), os.homedir(), os.tmpdir()]
 }
 
+/**
+ * The path with every link in it followed, or null when the filesystem will not say. A path that
+ * does not exist yet follows its nearest existing ancestor and keeps the rest, so a file about to
+ * be written is judged by where it will land.
+ */
+function realPathOf(target: string): string | null {
+  const missing: string[] = []
+  let existing = target
+  while (!fs.existsSync(existing)) {
+    const parent = path.dirname(existing)
+    if (parent === existing) return target
+    missing.unshift(path.basename(existing))
+    existing = parent
+  }
+  try {
+    return path.join(fs.realpathSync(existing), ...missing)
+  } catch {
+    return null
+  }
+}
+
 export function validatePathUnderAllowedRoots(
   targetPath: unknown,
   allowedRoots: string[] = defaultAllowedRoots(),
@@ -50,8 +71,15 @@ export function validatePathUnderAllowedRoots(
     return { ok: false, error: 'Path must not contain null bytes' }
   }
 
-  const resolvedTarget = path.resolve(path.normalize(targetPath))
-  const resolvedRoots = allowedRoots.map((root) => path.resolve(root))
+  // Links are followed on both sides, so a link under a root cannot lead out of it, and a root
+  // that is itself a link (macOS tmpdir is one) still contains what it contains.
+  const resolvedTarget = realPathOf(path.resolve(path.normalize(targetPath)))
+  if (resolvedTarget === null) {
+    return { ok: false, error: 'Path could not be resolved' }
+  }
+  const resolvedRoots = allowedRoots
+    .map((root) => realPathOf(path.resolve(root)))
+    .filter((root): root is string => root !== null)
 
   const isWithinAllowedRoot = resolvedRoots.some((root) => {
     const relative = path.relative(root, resolvedTarget)

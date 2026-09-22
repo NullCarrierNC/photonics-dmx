@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
@@ -681,6 +681,45 @@ describe('inputValidation', () => {
       const result = validatePathUnderAllowedRoots('/tmp/foo', [])
       expect(result.ok).toBe(false)
     })
+
+    describe('links', () => {
+      let root: string
+
+      beforeEach(() => {
+        root = fs.mkdtempSync(path.join(os.tmpdir(), 'photonics-links-'))
+      })
+
+      afterEach(() => {
+        fs.rmSync(root, { recursive: true, force: true })
+      })
+
+      it('refuses a link under a root that points outside it', () => {
+        const link = path.join(root, 'escape')
+        fs.symlinkSync('/etc', link)
+
+        expect(validatePathUnderAllowedRoots(link, [root]).ok).toBe(false)
+        expect(validatePathUnderAllowedRoots(path.join(link, 'hosts'), [root]).ok).toBe(false)
+      })
+
+      it('accepts a file inside a root that is reached through a link', () => {
+        const real = fs.mkdtempSync(path.join(os.tmpdir(), 'photonics-real-'))
+        const linkedRoot = path.join(root, 'libraries')
+        fs.symlinkSync(real, linkedRoot)
+        try {
+          expect(validatePathUnderAllowedRoots(path.join(real, 'cues.json'), [linkedRoot]).ok).toBe(
+            true,
+          )
+        } finally {
+          fs.rmSync(real, { recursive: true, force: true })
+        }
+      })
+
+      it('accepts a file that does not exist yet under a root', () => {
+        expect(validatePathUnderAllowedRoots(path.join(root, 'new', 'cues.json'), [root]).ok).toBe(
+          true,
+        )
+      })
+    })
   })
 
   describe('validateOpenablePath', () => {
@@ -721,6 +760,19 @@ describe('inputValidation', () => {
 
     it('still refuses a path outside the allowed roots', () => {
       expect(validateOpenablePath('/etc/hosts.json', allowedRoots).ok).toBe(false)
+    })
+
+    it('refuses a link with no extension that leads to an application bundle', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'photonics-openable-'))
+      const bundle = path.join(dir, 'Something.app')
+      fs.mkdirSync(bundle)
+      const link = path.join(dir, 'harmless')
+      fs.symlinkSync(bundle, link)
+      try {
+        expect(validateOpenablePath(link, allowedRoots).ok).toBe(false)
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true })
+      }
     })
 
     describe('channel bounds', () => {
