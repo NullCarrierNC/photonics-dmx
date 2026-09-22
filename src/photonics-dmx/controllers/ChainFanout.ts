@@ -165,8 +165,16 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
     strobeCueType: AudioCueType | null = null,
     gameModeActive = false,
   ): void {
+    // One token per call, so every chain applies the same motion decision.
+    const dispatchToken = {}
     for (const c of this.chains) {
-      c.audioCueHandler?.syncSlots(primaryCueType, secondaryCueType, strobeCueType, gameModeActive)
+      c.audioCueHandler?.syncSlots(
+        primaryCueType,
+        secondaryCueType,
+        strobeCueType,
+        gameModeActive,
+        dispatchToken,
+      )
     }
   }
 
@@ -179,6 +187,7 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
     enabledBandCount: number,
     gameModeActive: boolean,
   ): Promise<void> {
+    const dispatchToken = {}
     await Promise.allSettled(
       this.chains.map((c) =>
         c.audioCueHandler?.handleAudioData(
@@ -189,6 +198,7 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
           strobeCueType,
           enabledBandCount,
           gameModeActive,
+          dispatchToken,
         ),
       ),
     )

@@ -6,12 +6,10 @@ import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
 import { getStrobeStateManager } from '../controllers/StrobeStateManager'
-import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import type { MotionCueChangePayload } from '../../shared/ipc/common'
-import type { RuntimeBroadcaster } from '../runtime/broadcaster'
-import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
+import type { MotionSelectionCoordinator } from './MotionSelectionCoordinator'
+import { createAudioMotionCoordinator } from './audioMotionCoordinator'
 import { createLogger } from '../../shared/logger'
-import { monotonicNowMs } from '../../shared/time'
 const log = createLogger('AudioCueHandler')
 
 /**
@@ -28,10 +26,11 @@ function stopAndClear(cue: IAudioCue | null): void {
 }
 
 export type AudioCueHandlerOptions = {
-  getMotionCueMinimumHoldMs?: () => number
-  /** Probability (0-100) that an automatic motion cue pick will play on a primary cue change. Defaults to 100 (always). */
-  getMotionCueProbabilityPercent?: () => number
-  runtimeBroadcaster?: RuntimeBroadcaster
+  /**
+   * The audio input's motion decision, shared by every chain's handler so all rigs run the same
+   * motion cue. A handler built without one decides for itself.
+   */
+  motionCoordinator?: MotionSelectionCoordinator<IAudioCue>
 }
 
 /**
@@ -44,19 +43,10 @@ export class AudioCueHandler extends EventEmitter {
   private currentPrimaryCue: IAudioCue | null = null
   private currentSecondaryCue: IAudioCue | null = null
   private currentStrobeCue: IAudioCue | null = null
-  /** Parallel motion layer; refreshed when the primary lighting cue changes. */
-  private currentMotionCue: IAudioCue | null = null
-  private currentMotionCueStartTime: number | null = null
-  private lastPrimaryForMotion: IAudioCue | null = null
-  private lastManualMotionRef: AudioMotionCueRef | null | undefined = undefined
-  private manualMotionRef: AudioMotionCueRef | null = null
-  /** How the running motion cue was chosen, or null while none runs. */
-  private currentMotionPick: { source: 'manual' | 'auto'; manualFallback: boolean } | null = null
-  private motionEnabled = true
+  private readonly motionCoordinator: MotionSelectionCoordinator<IAudioCue>
+  /** The motion cue this chain last applied, so a change to nothing homes its heads once. */
+  private appliedMotionCue: IAudioCue | null = null
   private executionCount = 0
-  private readonly getMotionCueMinimumHoldMs: () => number
-  private readonly getMotionCueProbabilityPercent: () => number
-  private readonly runtimeBroadcaster: RuntimeBroadcaster
 
   constructor(
     private lightManager: DmxLightManager,
@@ -65,45 +55,24 @@ export class AudioCueHandler extends EventEmitter {
   ) {
     super()
     this.registry = AudioCueRegistry.getInstance()
-    this.getMotionCueMinimumHoldMs = options?.getMotionCueMinimumHoldMs ?? (() => 5000)
-    this.getMotionCueProbabilityPercent = options?.getMotionCueProbabilityPercent ?? (() => 100)
-    this.runtimeBroadcaster = options?.runtimeBroadcaster ?? noopRuntimeBroadcaster()
+    this.motionCoordinator = options?.motionCoordinator ?? createAudioMotionCoordinator()
   }
 
   public isMotionLayerEnabled(): boolean {
-    return this.motionEnabled
+    return this.motionCoordinator.isMotionEnabled()
   }
 
   /** Clears motion min-hold timing so the next primary change can re-pick motion immediately. */
   public resetMotionTracking(): void {
-    this.currentMotionCueStartTime = null
-    this.lastPrimaryForMotion = null
-    this.lastManualMotionRef = undefined
+    this.motionCoordinator.resetTracking()
   }
 
   public setMotionEnabled(enabled: boolean): void {
-    if (this.motionEnabled === enabled) {
-      return
-    }
-    this.motionEnabled = enabled
-    if (!enabled) {
-      this.currentMotionCue?.onStop?.()
-      this.currentMotionCue = null
-      this.currentMotionCueStartTime = null
-      this.currentMotionPick = null
-      this.lastPrimaryForMotion = null
-      this.lastManualMotionRef = undefined
-      this.emitAudioMotionCueChange(null, 'cleared')
-    } else {
-      this.lastPrimaryForMotion = null
-      this.lastManualMotionRef = undefined
-      this.currentMotionCueStartTime = null
-    }
+    this.motionCoordinator.setMotionEnabled(enabled)
   }
 
   public setManualMotionRef(ref: AudioMotionCueRef | null): void {
-    this.manualMotionRef = ref
-    this.lastManualMotionRef = undefined
+    this.motionCoordinator.setManualMotionRef(ref)
   }
 
   /**
@@ -111,6 +80,8 @@ export class AudioCueHandler extends EventEmitter {
    * @param primaryCueType Main cue (wash / rotation); empty string clears primary slot
    * @param secondaryCueType Optional overlay; null clears secondary slot
    * @param strobeCueType Optional strobe overlay; null clears strobe slot
+   * @param dispatchToken One object per fan-out call, shared by every chain so they apply the same
+   *   motion decision. A direct caller leaves it out and gets a decision of its own.
    */
   public async handleAudioData(
     audioData: AudioLightingData,
@@ -120,12 +91,13 @@ export class AudioCueHandler extends EventEmitter {
     strobeCueType: AudioCueType | null,
     enabledBandCount: number,
     gameModeActive: boolean,
+    dispatchToken: object = {},
   ): Promise<void> {
     this.assignPrimarySlot(primaryCueType)
     this.assignSecondarySlot(secondaryCueType)
     this.assignStrobeSlot(strobeCueType)
 
-    this.syncMotionWithPrimary(gameModeActive)
+    this.syncMotionWithPrimary(primaryCueType, gameModeActive, dispatchToken)
 
     this.executionCount++
 
@@ -146,31 +118,12 @@ export class AudioCueHandler extends EventEmitter {
     await run(this.currentPrimaryCue)
     await run(this.currentSecondaryCue)
     await run(this.currentStrobeCue)
-    await run(this.currentMotionCue)
+    await run(this.appliedMotionCue)
   }
 
-  private emitAudioMotionCueChange(
-    ref: AudioMotionCueRef | null,
-    source: 'manual' | 'auto' | 'cleared',
-    manualFallback?: boolean,
-  ): void {
-    const payload: MotionCueChangePayload = {
-      ref,
-      source,
-      manualFallback: manualFallback === true,
-    }
-    this.runtimeBroadcaster.emit(RENDERER_RECEIVE.AUDIO_MOTION_CUE_CHANGE, payload)
-  }
-
-  /** The motion cue this handler runs, as the renderer should show it. */
+  /** The motion cue the audio input runs, as the renderer should show it. */
   public getRunningMotionCue(): MotionCueChangePayload {
-    const cue = this.currentMotionCue
-    const pick = this.currentMotionPick
-    const ref = cue && pick ? this.registry.findMotionCueRef(cue) : null
-    if (!ref || !pick) {
-      return { ref: null, source: 'cleared', manualFallback: false }
-    }
-    return { ref, source: pick.source, manualFallback: pick.manualFallback }
+    return this.motionCoordinator.getRunningMotionRef()
   }
 
   private assignPrimarySlot(cueType: AudioCueType): void {
@@ -206,118 +159,52 @@ export class AudioCueHandler extends EventEmitter {
     secondaryCueType: AudioCueType | null,
     strobeCueType: AudioCueType | null = null,
     gameModeActive = false,
+    dispatchToken: object = {},
   ): void {
     this.assignPrimarySlot(primaryCueType)
     this.assignSecondarySlot(secondaryCueType)
     this.assignStrobeSlot(strobeCueType)
-    this.syncMotionWithPrimary(gameModeActive)
+    this.syncMotionWithPrimary(primaryCueType, gameModeActive, dispatchToken)
   }
 
-  private syncMotionWithPrimary(gameModeActive: boolean): void {
-    if (!this.motionEnabled) {
-      if (this.currentMotionCue) {
-        this.currentMotionCue.onStop?.()
-        this.currentMotionCue = null
-        this.currentMotionCueStartTime = null
-        this.currentMotionPick = null
-        this.emitAudioMotionCueChange(null, 'cleared')
-      }
-      return
-    }
-
-    const primaryChanged = this.currentPrimaryCue !== this.lastPrimaryForMotion
-    const manualChanged = this.manualMotionRef !== this.lastManualMotionRef
-    if (!primaryChanged && !manualChanged) {
-      return
-    }
-
-    const bypassMinHold = manualChanged || gameModeActive
-    if (primaryChanged && !bypassMinHold) {
-      const minHold = this.getMotionCueMinimumHoldMs()
-      const now = monotonicNowMs()
-      const heldLongEnough =
-        this.currentMotionCueStartTime == null || now - this.currentMotionCueStartTime >= minHold
-      if (!heldLongEnough) {
-        return
-      }
-    }
-
-    this.lastPrimaryForMotion = this.currentPrimaryCue
-    this.lastManualMotionRef = this.manualMotionRef
-
-    if (!this.currentPrimaryCue) {
-      if (this.currentMotionCue) {
-        this.currentMotionCue.onStop?.()
-        this.currentMotionCue = null
-        this.currentMotionCueStartTime = null
-        this.currentMotionPick = null
-        this.emitAudioMotionCueChange(null, 'cleared')
-      }
-      return
-    }
-
-    let motionCue: IAudioCue | null = null
-    let source: 'manual' | 'auto' = 'auto'
-    let manualFallback = false
-
-    const usingManualRef = this.manualMotionRef != null && !gameModeActive
-    if (!usingManualRef) {
-      const probability = this.getMotionCueProbabilityPercent()
-      if (probability < 100 && Math.random() * 100 >= probability) {
-        if (this.currentMotionCue) {
-          this.currentMotionCue.onStop?.()
-          this.currentMotionCue = null
-          this.currentMotionCueStartTime = null
-          this.currentMotionPick = null
-          this.sequencer.schedulePanTiltClear()
-          this.emitAudioMotionCueChange(null, 'cleared')
-        }
-        return
-      }
-    }
-
-    if (usingManualRef) {
-      motionCue = this.registry.getMotionCueImplementation(this.manualMotionRef!)
-      if (motionCue) {
-        source = 'manual'
-      } else {
-        manualFallback = true
-        motionCue = this.registry.getRandomMotionCue()
-        source = 'auto'
-        this.runtimeBroadcaster.emit(RENDERER_RECEIVE.DEBUG_LOG, {
-          message:
-            'Selected audio motion cue is unavailable (disabled or unknown); using a random motion program.',
-          variables: [],
-          timestamp: Date.now(),
-        })
-      }
+  /**
+   * Bring this chain's motion cue in line with the shared decision. A change of primary cue picks
+   * again once the current motion has held for the minimum time, and in game mode picks at once and
+   * ignores the manual ref. With no primary cue, or motion off, the motion cue stops.
+   */
+  private syncMotionWithPrimary(
+    primaryCueType: AudioCueType,
+    gameModeActive: boolean,
+    dispatchToken: object,
+  ): void {
+    const cueKey = this.currentPrimaryCue ? primaryCueType : ''
+    if (!this.motionCoordinator.isMotionEnabled() || !this.currentPrimaryCue) {
+      this.motionCoordinator.clear(dispatchToken, cueKey)
     } else {
-      motionCue = this.registry.getRandomMotionCue()
-      source = 'auto'
+      this.motionCoordinator.select(dispatchToken, {
+        cueKey,
+        bypassMinHold: gameModeActive,
+        ignoreManualRef: gameModeActive,
+        pickAfterHold: true,
+      })
     }
+    this.applyMotionCue(this.motionCoordinator.getCurrent())
+  }
 
-    const nowMs = monotonicNowMs()
-    if (motionCue && this.currentMotionCue !== motionCue) {
-      const prev = this.currentMotionCue
-      this.currentMotionCue?.onStop?.()
-      this.currentMotionCue = motionCue
-      if (prev !== motionCue) {
-        this.currentMotionCueStartTime = nowMs
-      }
-      this.currentMotionPick = { source, manualFallback }
-      const ref = this.registry.findMotionCueRef(motionCue)
-      if (ref) {
-        this.emitAudioMotionCueChange(ref, source, manualFallback)
-      }
-    } else if (!motionCue) {
-      if (this.currentMotionCue) {
-        this.currentMotionCue.onStop?.()
-        this.currentMotionCue = null
-        this.currentMotionCueStartTime = null
-        this.currentMotionPick = null
-        this.emitAudioMotionCueChange(null, 'cleared')
-      }
+  /**
+   * Record which motion cue this chain runs. A change to a cue cancels a pending pan/tilt clear so
+   * the new motion is not homed on its first frame. A change to nothing homes this chain's heads.
+   */
+  private applyMotionCue(motionCue: IAudioCue | null): void {
+    if (motionCue === this.appliedMotionCue) {
+      return
     }
+    if (motionCue) {
+      this.sequencer.cancelPanTiltClear()
+    } else {
+      this.sequencer.schedulePanTiltClear()
+    }
+    this.appliedMotionCue = motionCue
   }
 
   private assignSecondarySlot(cueType: AudioCueType | null): void {
@@ -404,17 +291,11 @@ export class AudioCueHandler extends EventEmitter {
     // Unconditional: an interrupted audio strobe (processing stops with no explicit clear) must
     // not leave the process-wide StrobeStateManager stuck on a slot.
     getStrobeStateManager().setActive(null, 'audio')
-    const hadMotion = this.currentMotionCue !== null
-    stopAndClear(this.currentMotionCue)
-    this.currentMotionCue = null
-    this.currentMotionCueStartTime = null
-    this.currentMotionPick = null
-    this.lastPrimaryForMotion = null
-    this.lastManualMotionRef = undefined
+    // The motion cue is shared by every chain, and clearing it takes its effects off each one.
+    this.motionCoordinator.stop(stopAndClear)
+    this.motionCoordinator.resetTracking()
+    this.appliedMotionCue = null
     this.executionCount = 0
-    if (hadMotion) {
-      this.emitAudioMotionCueChange(null, 'cleared')
-    }
   }
 
   /**

@@ -7,6 +7,7 @@ import {
 import { DEFAULT_AUDIO_CONFIG, DEFAULT_AUDIO_IDLE_DETECTION } from '../listeners/Audio'
 
 import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
+import { createAudioMotionCoordinator } from '../cueHandlers/audioMotionCoordinator'
 import type { AudioSecondaryRuntime } from './AudioSecondaryRuntime'
 import type { ChainFanout } from '../controllers/ChainFanout'
 import { pickStrobeCueType } from './audioStrobeHelpers'
@@ -87,18 +88,17 @@ export class AudioCueProcessor {
     this.registry = AudioCueRegistry.getInstance()
     this.currentPrimaryCueType = this.selectActiveCueType(preferredCueType)
     this.currentSecondaryCueType = preferredSecondaryCueType ?? null
-    // Create one AudioCueHandler per chain, bound to that chain's sequencer and light
-    // manager. Only the primary chain emits renderer broadcasts to keep the UI from
-    // receiving duplicate motion-cue change events.
-    const chains = this.chainFanout.getChains()
-    for (const chain of chains) {
-      if (chain.audioCueHandler) {
-        chain.audioCueHandler.destroy()
-      }
+    // One AudioCueHandler per chain, bound to that chain's sequencer and light manager, all
+    // sharing one motion decision so every rig runs the same motion cue.
+    const motionCoordinator = createAudioMotionCoordinator({
+      getMotionCueMinimumHoldMs,
+      getMotionCueProbabilityPercent,
+      runtimeBroadcaster,
+    })
+    for (const chain of this.chainFanout.getChains()) {
+      chain.audioCueHandler?.destroy()
       chain.audioCueHandler = new AudioCueHandler(chain.dmxLightManager, chain.sequencer, {
-        getMotionCueMinimumHoldMs,
-        getMotionCueProbabilityPercent,
-        runtimeBroadcaster: chain.isPrimary ? runtimeBroadcaster : undefined,
+        motionCoordinator,
       })
     }
     this.chainFanout.audioSyncSlots(

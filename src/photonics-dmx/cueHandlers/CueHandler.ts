@@ -187,8 +187,8 @@ class CueHandler extends EventEmitter {
     // Strobe cues (including Strobe_Off) run in their own slot on top of the primary/secondary
     // look. They must not disturb the primary-cue history/executionCount accounting: a held
     // strobe is re-dispatched ~30x/s alongside the lighting cue, and mutating currentCue here
-    // would thrash cueHistory/executionCount and defeat the executionCount-gated motion pick.
-    // Report the current (unchanged) primary state instead of advancing it.
+    // would thrash cueHistory/executionCount. Report the current (unchanged) primary state
+    // instead of advancing it.
     if (isStrobeCueType(cueType)) {
       return {
         ...parameters,
@@ -430,17 +430,17 @@ class CueHandler extends EventEmitter {
     }
     // No `else` log here: the registry already logs (and dedups) a missing cue implementation.
 
-    // Strobe cues run in their own slot and must not drive motion selection (which is gated on
-    // the primary cue's executionCount); only non-strobe cues touch the motion pick.
+    // Strobe cues run in their own slot and must not drive motion selection. The coordinator reads
+    // a new cue from the cue type each dispatch carries, so only non-strobe cues reach it.
     if (trackMode !== 'simulated' && !incomingIsStrobe) {
       // The Fallback is a self-contained idle look; never layer an automatic motion cue on top of
       // it. Treat it like motion-disabled so any motion left over from the previous cue is stopped
       // (and the heads homed) and no new pick is made.
       if (!this.motionCoordinator.isMotionEnabled() || cueType === CueType.Fallback) {
-        this.motionCoordinator.clear(dispatchToken)
+        this.motionCoordinator.clear(dispatchToken, cueType)
         this.applyMotionCue(null)
       } else {
-        this.motionCoordinator.select(dispatchToken, historicCueData.executionCount === 1, false)
+        this.motionCoordinator.select(dispatchToken, { cueKey: cueType })
         await this.runMotionCue(this.motionCoordinator.getCurrent(), historicCueData)
       }
     }
@@ -498,7 +498,7 @@ class CueHandler extends EventEmitter {
     if (!this.motionCoordinator.isMotionEnabled()) {
       return
     }
-    this.motionCoordinator.select(token, false, true)
+    this.motionCoordinator.select(token, { force: true })
     this.applyMotionCue(this.motionCoordinator.getCurrent())
   }
 

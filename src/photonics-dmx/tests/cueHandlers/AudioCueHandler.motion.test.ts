@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { AudioCueHandler } from '../../cueHandlers/AudioCueHandler'
+import { createAudioMotionCoordinator } from '../../cueHandlers/audioMotionCoordinator'
 import { AudioCueRegistry } from '../../cues/registries/AudioCueRegistry'
 import type { IAudioCue } from '../../cues/interfaces/IAudioCue'
 import type { DmxLightManager } from '../../controllers/DmxLightManager'
@@ -24,8 +25,10 @@ describe('AudioCueHandler motion reporting', () => {
     registry = AudioCueRegistry.getInstance()
     emit = jest.fn()
     handler = new AudioCueHandler({} as DmxLightManager, fakeLightingController(), {
-      runtimeBroadcaster: { emit } as never,
-      getMotionCueMinimumHoldMs: () => 0,
+      motionCoordinator: createAudioMotionCoordinator({
+        runtimeBroadcaster: { emit } as never,
+        getMotionCueMinimumHoldMs: () => 0,
+      }),
     })
     jest.spyOn(registry, 'findMotionCueRef').mockReturnValue(REF)
   })

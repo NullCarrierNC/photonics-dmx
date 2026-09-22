@@ -69,7 +69,7 @@ export class AudioController {
         audioConfig,
         preferredCueType,
         null,
-        () => this.deps.config.getPreference('cueDomains').yargMotion.minimumHoldMs ?? 5000,
+        () => this.deps.config.getPreference('cueDomains').audioMotion.minimumHoldMs ?? 5000,
         () => this.deps.config.getPreference('cueDomains').audioMotion.probabilityPercent ?? 100,
       )
       this.audioProcessor.setOnStrobeStateChange((active) => {

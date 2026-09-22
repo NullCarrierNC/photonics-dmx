@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { MotionSelectionCoordinator } from '../../cueHandlers/MotionSelectionCoordinator'
+import {
+  MotionSelectionCoordinator,
+  type MotionSelectionCoordinatorOptions,
+} from '../../cueHandlers/MotionSelectionCoordinator'
 import { CueRegistry } from '../../cues/registries/CueRegistry'
 import { CueStyle, type INetCue } from '../../cues/interfaces/INetCue'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
@@ -30,9 +33,9 @@ describe('MotionSelectionCoordinator', () => {
   })
 
   function build(
-    options: Partial<ConstructorParameters<typeof MotionSelectionCoordinator>[0]> = {},
+    options: Partial<MotionSelectionCoordinatorOptions<INetCue>> = {},
   ): MotionSelectionCoordinator {
-    return new MotionSelectionCoordinator({
+    return new MotionSelectionCoordinator<INetCue>({
       registry,
       runtimeBroadcaster: { emit } as never,
       getMotionCueMinimumHoldMs: () => 0,
@@ -50,8 +53,8 @@ describe('MotionSelectionCoordinator', () => {
     const coordinator = build()
     const token = {}
 
-    expect(coordinator.select(token, true, false)).toBe(a)
-    expect(coordinator.select(token, true, false)).toBe(a)
+    expect(coordinator.select(token, { cueKey: 'Verse' })).toBe(a)
+    expect(coordinator.select(token, { cueKey: 'Verse' })).toBe(a)
 
     expect(getRandom).toHaveBeenCalledTimes(1)
     expect(emit).toHaveBeenCalledTimes(1)
@@ -67,21 +70,22 @@ describe('MotionSelectionCoordinator', () => {
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValueOnce(a).mockReturnValueOnce(b)
     const coordinator = build()
 
-    coordinator.select({}, true, false)
-    expect(coordinator.select({}, true, false)).toBe(b)
+    coordinator.select({}, { cueKey: 'Verse' })
+    expect(coordinator.select({}, { cueKey: 'Chorus' })).toBe(b)
 
     expect(a.onStop).toHaveBeenCalledTimes(1)
     expect(b.onStop).not.toHaveBeenCalled()
     expect(emit).toHaveBeenCalledTimes(2)
   })
 
-  it('keeps the current cue while a dispatch is not a new cue and no repick is forced', () => {
+  it('keeps the current cue while dispatches carry the same cue and no repick is forced', () => {
     const a = makeFakeCue('motion-a')
     const getRandom = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(a)
     const coordinator = build()
 
-    coordinator.select({}, true, false)
-    expect(coordinator.select({}, false, false)).toBe(a)
+    coordinator.select({}, { cueKey: 'Verse' })
+    expect(coordinator.select({}, { cueKey: 'Verse' })).toBe(a)
+    expect(coordinator.select({})).toBe(a)
 
     expect(getRandom).toHaveBeenCalledTimes(1)
     expect(emit).toHaveBeenCalledTimes(1)
@@ -93,8 +97,8 @@ describe('MotionSelectionCoordinator', () => {
     const coordinator = build({ getMotionCueProbabilityPercent: () => 50 })
     const token = {}
 
-    expect(coordinator.select(token, true, false)).toBeNull()
-    expect(coordinator.select(token, true, false)).toBeNull()
+    expect(coordinator.select(token, { cueKey: 'Verse' })).toBeNull()
+    expect(coordinator.select(token, { cueKey: 'Verse' })).toBeNull()
 
     expect(random).toHaveBeenCalledTimes(1)
     expect(getRandom).not.toHaveBeenCalled()
@@ -106,8 +110,8 @@ describe('MotionSelectionCoordinator', () => {
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(a)
     const coordinator = build()
 
-    coordinator.select({}, true, false)
-    coordinator.select({}, true, false)
+    coordinator.select({}, { cueKey: 'Verse' })
+    coordinator.select({}, { cueKey: 'Chorus' })
 
     expect(a.onStop).not.toHaveBeenCalled()
     expect(emit).toHaveBeenCalledTimes(2)
@@ -117,7 +121,7 @@ describe('MotionSelectionCoordinator', () => {
     const a = makeFakeCue('motion-a')
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(a)
     const coordinator = build()
-    coordinator.select({}, true, false)
+    coordinator.select({}, { cueKey: 'Verse' })
 
     const token = {}
     coordinator.clear(token)
@@ -140,7 +144,7 @@ describe('MotionSelectionCoordinator', () => {
       .mockReturnValueOnce(a)
       .mockReturnValueOnce(b)
     const coordinator = build({ getMotionCueMinimumHoldMs: () => 60_000 })
-    coordinator.select({}, true, false)
+    coordinator.select({}, { cueKey: 'Verse' })
 
     coordinator.notifyExternalWipe()
 
@@ -150,8 +154,8 @@ describe('MotionSelectionCoordinator', () => {
       source: 'cleared',
       manualFallback: false,
     })
-    // Inside the hold and not a new cue, which would keep the current pick on an ordinary dispatch.
-    expect(coordinator.select({}, false, false)).toBe(b)
+    // Inside the hold and the same cue, where an ordinary dispatch keeps the current pick.
+    expect(coordinator.select({}, { cueKey: 'Verse' })).toBe(b)
     expect(getRandom).toHaveBeenCalledTimes(2)
   })
 
@@ -167,7 +171,7 @@ describe('MotionSelectionCoordinator', () => {
     const a = makeFakeCue('motion-a')
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(a)
     const coordinator = build()
-    coordinator.select({}, true, false)
+    coordinator.select({}, { cueKey: 'Verse' })
 
     coordinator.setMotionEnabled(false)
     coordinator.setMotionEnabled(false)
@@ -182,7 +186,7 @@ describe('MotionSelectionCoordinator', () => {
     const b = makeFakeCue('motion-b')
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(a)
     const coordinator = build()
-    coordinator.select({}, true, false)
+    coordinator.select({}, { cueKey: 'Verse' })
 
     coordinator.stopIfCurrent(b)
     expect(coordinator.getCurrent()).toBe(a)
@@ -203,7 +207,7 @@ describe('MotionSelectionCoordinator', () => {
     const coordinator = build()
 
     coordinator.setManualMotionRef({ groupId: 'motion-group', cueId: 'pinned' })
-    coordinator.select({}, false, false)
+    coordinator.select({})
     expect(coordinator.getRunningMotionRef()).toEqual({
       ref: REF,
       source: 'manual',
@@ -211,7 +215,7 @@ describe('MotionSelectionCoordinator', () => {
     })
 
     coordinator.setManualMotionRef({ groupId: 'motion-group', cueId: 'missing' })
-    coordinator.select({}, false, false)
+    coordinator.select({})
     expect(getImplementation).toHaveBeenCalledTimes(2)
     expect(coordinator.getRunningMotionRef()).toEqual({
       ref: REF,
@@ -219,6 +223,77 @@ describe('MotionSelectionCoordinator', () => {
       manualFallback: true,
     })
     expect(emit).toHaveBeenCalledWith(RENDERER_RECEIVE.DEBUG_LOG, expect.anything())
+  })
+
+  it('treats the same manual ref again as no change, so the hold holds', () => {
+    const pinned = makeFakeCue('pinned')
+    const getImplementation = jest
+      .spyOn(registry, 'getMotionCueImplementation')
+      .mockReturnValue(pinned)
+    const coordinator = build({ getMotionCueMinimumHoldMs: () => 60_000 })
+
+    coordinator.setManualMotionRef({ groupId: 'motion-group', cueId: 'pinned' })
+    coordinator.select({}, { cueKey: 'Verse' })
+    coordinator.setManualMotionRef({ groupId: 'motion-group', cueId: 'pinned' })
+    coordinator.select({}, { cueKey: 'Verse' })
+
+    expect(getImplementation).toHaveBeenCalledTimes(1)
+    expect(emit).toHaveBeenCalledTimes(1)
+  })
+
+  it('picks again on the same cue after a stop', () => {
+    const a = makeFakeCue('motion-a')
+    const getRandom = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(a)
+    const coordinator = build()
+    coordinator.select({}, { cueKey: 'Verse' })
+
+    coordinator.stop()
+
+    expect(coordinator.select({}, { cueKey: 'Verse' })).toBe(a)
+    expect(getRandom).toHaveBeenCalledTimes(2)
+  })
+
+  it('drops a new cue that arrives inside the hold', () => {
+    const a = makeFakeCue('motion-a')
+    const getRandom = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(a)
+    let holdMs = 60_000
+    const coordinator = build({ getMotionCueMinimumHoldMs: () => holdMs })
+    coordinator.select({}, { cueKey: 'Verse' })
+
+    coordinator.select({}, { cueKey: 'Chorus' })
+    holdMs = 0
+    coordinator.select({}, { cueKey: 'Chorus' })
+
+    expect(getRandom).toHaveBeenCalledTimes(1)
+  })
+
+  it('picks for a new cue once the hold has run when asked to wait for it', () => {
+    const a = makeFakeCue('motion-a')
+    const getRandom = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(a)
+    let holdMs = 60_000
+    const coordinator = build({ getMotionCueMinimumHoldMs: () => holdMs })
+    coordinator.select({}, { cueKey: 'wash', pickAfterHold: true })
+
+    coordinator.select({}, { cueKey: 'pulse', pickAfterHold: true })
+    expect(getRandom).toHaveBeenCalledTimes(1)
+    holdMs = 0
+    coordinator.select({}, { cueKey: 'pulse', pickAfterHold: true })
+
+    expect(getRandom).toHaveBeenCalledTimes(2)
+  })
+
+  it('picks inside the hold and past a manual ref when told to', () => {
+    const random = makeFakeCue('random')
+    const getImplementation = jest.spyOn(registry, 'getMotionCueImplementation')
+    const getRandom = jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(random)
+    const coordinator = build({ getMotionCueMinimumHoldMs: () => 60_000 })
+    coordinator.select({}, { cueKey: 'wash', ignoreManualRef: true })
+    coordinator.setManualMotionRef({ groupId: 'motion-group', cueId: 'pinned' })
+
+    coordinator.select({}, { cueKey: 'pulse', bypassMinHold: true, ignoreManualRef: true })
+
+    expect(getImplementation).not.toHaveBeenCalled()
+    expect(getRandom).toHaveBeenCalledTimes(2)
   })
 
   it('reports cleared while no motion cue runs', () => {
@@ -234,7 +309,7 @@ describe('MotionSelectionCoordinator', () => {
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(a)
     const coordinator = build({ motionChangeChannel: RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE })
 
-    coordinator.select({}, true, false)
+    coordinator.select({}, { cueKey: 'Verse' })
 
     expect(emit).toHaveBeenCalledWith(RENDERER_RECEIVE.RB3_MOTION_CUE_CHANGE, expect.anything())
     expect(emit).not.toHaveBeenCalledWith(

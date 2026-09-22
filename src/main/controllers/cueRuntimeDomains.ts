@@ -117,6 +117,7 @@ export function buildDomainChainHandlers(
       getMotionCueProbabilityPercent: options.getMotionCueProbabilityPercent,
       runtimeBroadcaster: options.runtimeBroadcaster,
       motionChangeChannel: row.motionChangeChannel,
+      domainLabel: row.domain.toUpperCase(),
     })
   for (const chain of chains) {
     const existing = chain.cueHandlers[domain]
