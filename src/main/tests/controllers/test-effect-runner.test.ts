@@ -228,3 +228,59 @@ describe('TestEffectRunner RB3 LED state', () => {
     }
   })
 })
+
+describe('TestEffectRunner starts', () => {
+  function pendingInit(): { ctx: TestEffectRunnerContext; resolve: () => void } {
+    let resolve: () => void = () => {}
+    const ready = new Promise<void>((r) => {
+      resolve = r
+    })
+    return {
+      ctx: { getChainFanout: () => fanout, ensureInitialized: () => ready },
+      resolve: () => resolve(),
+    }
+  }
+  let fanout: ChainFanout
+
+  it('leaves nothing dispatching after stop when two starts wait on one init', async () => {
+    jest.useFakeTimers()
+    try {
+      fanout = makeFanout([makeChainStub('a')])
+      const { ctx, resolve } = pendingInit()
+      const runner = new TestEffectRunner(ctx, makeDispatcher(fanout, jest.fn()))
+
+      runner.startTestEffect('Chorus')
+      runner.startTestEffect('Chorus')
+      resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+      await runner.stopTestEffect()
+      ;(fanout.handleCue as jest.Mock).mockClear()
+
+      jest.advanceTimersByTime(1000)
+      expect(fanout.handleCue).not.toHaveBeenCalled()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('does not start ticking for an effect id that names no cue', async () => {
+    jest.useFakeTimers()
+    try {
+      fanout = makeFanout([makeChainStub('a')])
+      const { ctx, resolve } = pendingInit()
+      const runner = new TestEffectRunner(ctx, makeDispatcher(fanout, jest.fn()))
+
+      runner.startTestEffect('not-a-cue')
+      resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+
+      jest.advanceTimersByTime(1000)
+      expect(fanout.handleCue).not.toHaveBeenCalled()
+      expect(jest.getTimerCount()).toBe(0)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+})
