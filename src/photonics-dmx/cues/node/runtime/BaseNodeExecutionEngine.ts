@@ -430,9 +430,7 @@ export abstract class BaseNodeExecutionEngine {
     const nodeId = delayNode.id
     try {
       const delayMs = Number(resolveValue('number', delayNode.delayTime, context))
-      const actualDelay = Math.max(0, delayMs) // Ensure non-negative
-
-      this.debugLog(`exec delay nodeId=${nodeId} ctx=${context.id}`, { delayMs: actualDelay })
+      this.debugLog(`exec delay nodeId=${nodeId} ctx=${context.id}`, { delayMs })
 
       // Register as active to block execution. A dummy action node satisfies ExecutionContext.
       const dummyAction: ActionNode = {
@@ -457,8 +455,7 @@ export abstract class BaseNodeExecutionEngine {
       }
       context.registerActiveAction(nodeId, dummyAction)
 
-      const timerId = setTimeout(() => {
-        context.removeTimer(timerId)
+      context.startTimer(() => {
         // Guard on isActionActive: other blocking nodes (e.g. from a for-each-light body)
         // can advance the execution phase while the delay waits.
         if (context.isActionActive(nodeId)) {
@@ -466,8 +463,7 @@ export abstract class BaseNodeExecutionEngine {
           this.emitNodeExecution('deactivated', nodeId)
           this.onBlockingActionComplete(nodeId, context)
         }
-      }, actualDelay)
-      context.addTimer(timerId)
+      }, delayMs)
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.emitRuntimeError(nodeId, msg)

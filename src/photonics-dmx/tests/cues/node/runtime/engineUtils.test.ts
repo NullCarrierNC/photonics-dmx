@@ -1,8 +1,12 @@
 /**
- * Tests for graph traversal utilities used by NodeExecutionEngine and EffectExecutionEngine.
+ * Tests for the utilities NodeExecutionEngine and EffectExecutionEngine share.
  */
 
-import { collectReachableNodes } from '../../../../cues/node/runtime/engineUtils'
+import {
+  collectReachableNodes,
+  clampTimerDelayMs,
+  MAX_TIMER_DELAY_MS,
+} from '../../../../cues/node/runtime/engineUtils'
 import type { Connection } from '../../../../cues/types/nodeCueTypes'
 
 function conn(from: string, to: string): Connection {
@@ -61,5 +65,17 @@ describe('engineUtils', () => {
       const result = collectReachableNodes(adjacency, ['A'], 'A')
       expect(result).toEqual(new Set())
     })
+  })
+})
+
+describe('clampTimerDelayMs', () => {
+  it.each([
+    [250, 250],
+    [-5, 0],
+    [Number.NaN, 0],
+    [2 ** 40, MAX_TIMER_DELAY_MS],
+    [Number.POSITIVE_INFINITY, MAX_TIMER_DELAY_MS],
+  ])('turns %p into %p', (input, expected) => {
+    expect(clampTimerDelayMs(input)).toBe(expected)
   })
 })

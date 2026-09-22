@@ -821,6 +821,75 @@ describe('Node runtime with real Sequencer', () => {
     })
   })
 
+  it('holds a delay longer than a timer can count', () => {
+    jest.useFakeTimers()
+    try {
+      const eventNode: NetEventNode = { id: 'event-1', type: 'event', eventType: 'beat' }
+      const delayNode = {
+        id: 'delay-1',
+        type: 'logic',
+        logicType: 'delay',
+        delayTime: { source: 'literal', value: 2 ** 40 },
+      } as LogicNode
+      const actionNode = {
+        id: 'action-1',
+        type: 'action',
+        effectType: 'set-color',
+        target: {
+          groups: { source: 'literal', value: 'front' },
+          filter: { source: 'literal', value: 'all' },
+        },
+        color: {
+          name: { source: 'literal', value: 'blue' },
+          brightness: { source: 'literal', value: 'high' },
+        },
+        timing: {
+          waitForCondition: { source: 'literal', value: 'none' },
+          waitForTime: { source: 'literal', value: 0 },
+          duration: { source: 'literal', value: 0 },
+          waitUntilCondition: { source: 'literal', value: 'none' },
+          waitUntilTime: { source: 'literal', value: 0 },
+        },
+      } as ActionNode
+      const engine = new NodeExecutionEngine(
+        compileCue({
+          id: 'long-delay',
+          name: 'Long Delay',
+          kind: 'lighting',
+          cueType: CueType.Default,
+          style: 'primary',
+          nodes: {
+            events: [eventNode],
+            actions: [actionNode],
+            logic: [delayNode],
+            eventRaisers: [],
+            eventListeners: [],
+            effectRaisers: [],
+          },
+          connections: [
+            { from: 'event-1', to: 'delay-1' },
+            { from: 'delay-1', to: 'action-1' },
+          ],
+        }),
+        'test-group:long-delay',
+        harness.sequencer,
+        harness.lightManager,
+        noopRuntimeBroadcaster(),
+        cueLevelVarStore,
+        groupLevelVarStore,
+        new EffectRegistry(),
+      )
+
+      engine.startExecution(eventNode, createCueData())
+      jest.advanceTimersByTime(1000)
+      harness.advanceBy(10)
+
+      expect(harness.getLightState(harness.frontLightIds[0])?.intensity ?? 0).toBe(0)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it('blocks execution through delay nodes', async () => {
     jest.useFakeTimers()
     try {

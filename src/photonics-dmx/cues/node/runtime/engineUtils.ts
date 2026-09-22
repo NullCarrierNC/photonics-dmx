@@ -27,3 +27,15 @@ export function collectReachableNodes(
   }
   return result
 }
+
+/** The longest delay setTimeout honours. It fires a longer one after 1 ms. */
+export const MAX_TIMER_DELAY_MS = 2 ** 31 - 1
+
+/**
+ * A delay setTimeout honours: 0 for a negative or non-numeric delay, and the longest it can wait
+ * for anything longer, so an authored "wait a very long time" still waits.
+ */
+export function clampTimerDelayMs(delayMs: number): number {
+  if (Number.isNaN(delayMs)) return 0
+  return Math.min(MAX_TIMER_DELAY_MS, Math.max(0, delayMs))
+}
