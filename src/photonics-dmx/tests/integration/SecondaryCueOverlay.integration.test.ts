@@ -50,7 +50,13 @@ function allBundledYargEffects(): EffectRegistry {
   return registry
 }
 
-function setColorAction(id: string, color: string, layer: number, filter = 'all'): ActionNode {
+function setColorAction(
+  id: string,
+  color: string,
+  layer: number,
+  filter = 'all',
+  durationMs = 0,
+): ActionNode {
   return {
     id,
     type: 'action',
@@ -67,7 +73,7 @@ function setColorAction(id: string, color: string, layer: number, filter = 'all'
     timing: {
       waitForCondition: { source: 'literal', value: 'none' },
       waitForTime: { source: 'literal', value: 0 },
-      duration: { source: 'literal', value: 0 },
+      duration: { source: 'literal', value: durationMs },
       waitUntilCondition: { source: 'literal', value: 'none' },
       waitUntilTime: { source: 'literal', value: 0 },
     },
@@ -125,6 +131,35 @@ describe('secondary cue over a primary look', () => {
     secondary.onStop()
     h.advanceBy(50)
     expect(colours()).toEqual(['blue', 'blue'])
+    h.cleanup()
+  })
+
+  it('leaves the primary running on a shared layer when the secondary stops', () => {
+    const h = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const primary = new LightingNodeCue(
+      'g',
+      NodeCueCompiler.compileCue(
+        singleActionCue('p', 'primary', setColorAction('pa', 'blue', 3, 'even', 1000)),
+        'yarg',
+      ),
+    )
+    const secondary = new LightingNodeCue(
+      'g',
+      NodeCueCompiler.compileCue(
+        singleActionCue('s', 'secondary', setColorAction('sa', 'red', 3, 'odd', 1000)),
+        'yarg',
+      ),
+    )
+    const data = createMockCueData({ venueSize: 'Small', bpm: 120 })
+    primary.execute(data, h.sequencer, h.lightManager)
+    secondary.execute(data, h.sequencer, h.lightManager)
+    h.advanceBy(100)
+
+    secondary.onStop()
+    h.advanceBy(1000)
+    const primaryLight = h.getLightState(h.frontLightIds[1])
+    expect(primaryLight?.blue ?? 0).toBeGreaterThan(0)
+    expect(primaryLight?.intensity ?? 0).toBeGreaterThan(0)
     h.cleanup()
   })
 })

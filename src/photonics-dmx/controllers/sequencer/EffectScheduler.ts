@@ -334,13 +334,8 @@ export class EffectScheduler {
   }
 
   /**
-   * Removes an effect from a specific layer.
-   *
-   * Intentionally layer-wide: it clears the effect for every light on the layer, treating a
-   * non-base layer as a single shared effect "slot" rather than per-light state. This matches the
-   * current shared-layer effect model, even though `interfaces.ts` types effects per-light;
-   * scoping removal to individual lights would require reworking how persistent runs are tracked.
-   * @param layer The layer from which to remove the effect
+   * Removes every effect on a layer, whatever its name, for callers that own the whole layer.
+   * @param layer The layer to clear
    * @param shouldRemoveTransitions Whether to remove transition (colour) data too
    */
   public removeEffectByLayer(layer: number, shouldRemoveTransitions: boolean): void {
@@ -348,6 +343,33 @@ export class EffectScheduler {
     if (!activeEffects) return
     // Snapshotted, because the removal below starts queued successors back into this same map.
     this.removeEffectsForLights(layer, Array.from(activeEffects.keys()), shouldRemoveTransitions)
+  }
+
+  /**
+   * Removes one named effect from a layer, on every light it runs on, and leaves the layer's other
+   * effects running. Queued entries under the name on the layer go first, so the removal cannot
+   * start one of them in a slot it has just freed.
+   * @param name The name of the effect to remove
+   * @param layer The layer from which to remove it
+   * @param shouldRemoveTransitions Whether to remove transition (colour) data too
+   */
+  public removeEffectByName(name: string, layer: number, shouldRemoveTransitions: boolean): void {
+    const queued = this.layerManager.getEffectQueue().get(layer)
+    for (const [lightId, entry] of Array.from(queued ?? [])) {
+      if (entry.name !== name) continue
+      this.persistentRuns.cancel(entry.effectRunId)
+      this.layerManager.removeQueuedEffect(layer, lightId)
+    }
+
+    const activeEffects = this.layerManager.getActiveEffects().get(layer)
+    if (!activeEffects) return
+    // Snapshotted, because the removal below starts queued successors back into this same map.
+    const lightIds = Array.from(activeEffects)
+      .filter(([, effectState]) => effectState.name === name)
+      .map(([lightId]) => lightId)
+    if (lightIds.length > 0) {
+      this.removeEffectsForLights(layer, lightIds, shouldRemoveTransitions)
+    }
   }
 
   /**

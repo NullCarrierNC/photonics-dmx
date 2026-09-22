@@ -800,6 +800,52 @@ describe('EffectScheduler', () => {
     })
   })
 
+  describe('removeEffectByName', () => {
+    it('removes the named effect from each light running it and leaves other names on the layer', () => {
+      layerManager.getActiveEffects.mockReturnValue(
+        new Map([
+          [
+            1,
+            new Map([
+              ['light-1', { name: 'sweep' }],
+              ['light-2', { name: 'sweep' }],
+              ['light-3', { name: 'pulse' }],
+            ]),
+          ],
+        ]) as never,
+      )
+      layerManager.getQueuedEffect.mockReturnValue(undefined)
+
+      scheduler.removeEffectByName('sweep', 1, true)
+
+      expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(1, 'light-1')
+      expect(layerManager.removeActiveEffect).toHaveBeenCalledWith(1, 'light-2')
+      expect(layerManager.removeActiveEffect).not.toHaveBeenCalledWith(1, 'light-3')
+    })
+
+    it('drops queued entries of the name on the layer so none starts in a freed slot', () => {
+      const queue = new Map<string, QueuedEffect>([
+        ['light-1', { name: 'sweep', effect: effectWith([transition(1)]) } as QueuedEffect],
+        ['light-2', { name: 'pulse', effect: effectWith([transition(1)]) } as QueuedEffect],
+      ])
+      layerManager.getActiveEffects.mockReturnValue(
+        new Map([[1, new Map([['light-1', { name: 'sweep' }]])]]) as never,
+      )
+      layerManager.getEffectQueue.mockReturnValue(new Map([[1, queue]]))
+      layerManager.getQueuedEffect.mockImplementation((_layer, lightId) => queue.get(lightId))
+      layerManager.removeQueuedEffect.mockImplementation((_layer, lightId) => {
+        queue.delete(lightId)
+      })
+
+      scheduler.removeEffectByName('sweep', 1, true)
+
+      expect(layerManager.removeQueuedEffect).toHaveBeenCalledTimes(1)
+      expect(layerManager.removeQueuedEffect).toHaveBeenCalledWith(1, 'light-1')
+      expect(layerManager.addActiveEffect).not.toHaveBeenCalled()
+      expect(queue.has('light-2')).toBe(true)
+    })
+  })
+
   describe('removeEffectByLayer', () => {
     it('cancels the run, clears the slot and resets tracking when nothing is queued', () => {
       const runId = persistentRuns.register(

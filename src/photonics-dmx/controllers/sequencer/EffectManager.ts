@@ -507,19 +507,13 @@ export class EffectManager implements IEffectManager {
   }
 
   /**
-   * Removes a specific effect by name and layer
+   * Removes a named effect from a layer, on every light it runs on. Other effects on the layer keep
+   * running, and queued entries under the name are dropped so none starts in the freed slot.
    * @param name The name of the effect to remove
    * @param layer The layer on which the effect is running
    */
   public removeEffect(name: string, layer: number): void {
-    const activeEffects = this.layerManager.getActiveEffects().get(layer)
-    if (!activeEffects) return
-
-    // One call covers the layer, and it starts each light's queued successor. Calling it per match
-    // re-entered the map being iterated, so a successor sharing the name drained the queue too.
-    if ([...activeEffects.values()].some((e) => e.name === name)) {
-      this.removeEffectByLayer(layer, true)
-    }
+    this.scheduler.removeEffectByName(name, layer, true)
   }
 
   /**
