@@ -13,7 +13,7 @@ const SenderErrorIndicator: React.FC = () => {
   return (
     <div className=" ">
       <span className="px-3 py-1 text-xs font-semibold bg-red-500 text-white rounded-full shadow-md">
-        {JSON.stringify(error)}
+        {error}
       </span>
     </div>
   )

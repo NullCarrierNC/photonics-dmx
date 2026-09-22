@@ -169,8 +169,7 @@ export const audioListenerEnabledAtom = atom<boolean>(false)
 export const audioDataAtom = atom<AudioLightingData | null>(null)
 
 export const isSenderErrorAtom = atom<boolean>(false)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- error message or serialized error
-export const senderErrorAtom = atom<any>('')
+export const senderErrorAtom = atom<string>('')
 
 export const senderEnttecProEnabledAtom = atom<boolean>(false)
 export const enttecProComPortAtom = atom<string>('')
