@@ -17,8 +17,6 @@ export function withCollaboratorGetters<T extends Record<string, unknown>>(mock:
     m.getConsoleModeController = () => ({
       setOnConsoleEnter: flat('setOnConsoleEnter'),
       sendConsoleDmx: flat('sendConsoleDmx'),
-      updateConsoleChannel: flat('updateConsoleChannel'),
-      setConsoleHome: flat('setConsoleHome'),
       setConsoleFixtureConfig: flat('setConsoleFixtureConfig'),
     })
   }

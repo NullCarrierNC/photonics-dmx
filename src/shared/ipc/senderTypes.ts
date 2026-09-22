@@ -72,26 +72,6 @@ export interface SenderInvokeMap {
     request: void
     response: IpcSuccessResult | IpcErrorResult
   }
-  [LIGHT.CONSOLE_UPDATE_CHANNEL]: {
-    request: {
-      rigId: string
-      lightId: string
-      fixtureId: string
-      channelName: string
-      channelNumber: number
-    }
-    response: IpcSuccessResult | IpcErrorResult
-  }
-  [LIGHT.CONSOLE_SET_HOME]: {
-    request: {
-      rigId: string
-      lightId: string
-      fixtureId: string
-      panHome: number
-      tiltHome: number
-    }
-    response: IpcSuccessResult | IpcErrorResult
-  }
   [LIGHT.CONSOLE_SET_FIXTURE_CONFIG]: {
     request: {
       rigId: string

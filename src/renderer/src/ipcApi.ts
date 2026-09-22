@@ -162,7 +162,6 @@ export {
   setConsoleFixtureConfig,
   setMasterOutput,
   setStageKitPriority,
-  updateConsoleChannel,
 } from './ipc/lighting'
 
 export {

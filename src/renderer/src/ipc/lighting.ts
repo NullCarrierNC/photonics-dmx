@@ -55,14 +55,6 @@ export const disableConsole = () => window.api.invoke(LIGHT.CONSOLE_DISABLE, und
 export const sendConsoleDmx = (buffer: Record<number, number>) =>
   window.api.send(LIGHT.CONSOLE_SEND_DMX, buffer)
 
-export const updateConsoleChannel = (payload: {
-  rigId: string
-  lightId: string
-  fixtureId: string
-  channelName: string
-  channelNumber: number
-}) => window.api.invoke(LIGHT.CONSOLE_UPDATE_CHANNEL, payload)
-
 export const setConsoleFixtureConfig = (payload: {
   rigId: string
   lightId: string
