@@ -278,6 +278,7 @@ export type NodeGraphPayloads = {
   notes: NotesNode[]
 }
 
+/** Reads the canvas back into the nodes, connections and positions a definition stores. */
 function flowToNodesAndConnections(
   nodes: EditorNode[],
   edges: Edge[],
@@ -407,7 +408,7 @@ const updateDocumentFromFlow = (
   return replaceCueInFile(editorDoc.file as NodeCueFile, updatedCue.id, updatedCue as CueDefinition)
 }
 
-export { cueToFlow, updateDocumentFromFlow }
+export { cueToFlow, flowToNodesAndConnections, updateDocumentFromFlow }
 
 // ============================================================================
 // Effect Transform Functions

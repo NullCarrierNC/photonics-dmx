@@ -10,7 +10,11 @@ import type {
   AudioEffectDefinition,
 } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import type { EditorDocument } from '../lib/types'
-import { updateDocumentFromFlow, updateEffectDocumentFromFlow } from '../lib/cueTransforms'
+import {
+  flowToNodesAndConnections,
+  updateDocumentFromFlow,
+  updateEffectDocumentFromFlow,
+} from '../lib/cueTransforms'
 import { layoutGraph } from '../lib/graphLayout'
 import { replaceCueInFile, replaceEffectInFile } from '../lib/cueUtils'
 
@@ -125,15 +129,18 @@ export function useCueJsonEditor({
     ],
   )
 
+  /** Lays out the graph on the canvas, so nodes added or moved since the last save are included. */
   const handleGraphPrettify = useCallback(() => {
-    const definition = editorDoc?.mode === 'effect' ? currentEffectDefinition : currentCueDefinition
+    const mode = editorDoc?.mode === 'effect' ? 'effect' : 'cue'
+    const definition = mode === 'effect' ? currentEffectDefinition : currentCueDefinition
     if (!definition) return
 
+    const canvas = flowToNodesAndConnections(nodes, edges, mode)
     const result = layoutGraph(
       definition.id,
-      definition.nodes,
-      definition.connections,
-      definition.layout?.nodePositions ?? {},
+      canvas.nodes,
+      canvas.connections,
+      canvas.layoutPositions,
     )
     if (!('nodePositions' in result) || !result.nodePositions) return
 
@@ -153,6 +160,8 @@ export function useCueJsonEditor({
     editorDoc?.mode,
     currentCueDefinition,
     currentEffectDefinition,
+    nodes,
+    edges,
     setNodes,
     reactFlowInstance,
     setIsDirty,
