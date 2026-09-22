@@ -44,6 +44,8 @@ const PHASE_TRANSITIONS: Record<LifecyclePhase, readonly LifecyclePhase[]> = {
  * - Off-queue callers (audio toggles) await restart and shutdown through `awaitInFlightWork`.
  *   A queued op must never call that: the restart is itself queued, so a queued op waiting behind
  *   it on the same queue would deadlock. Queued ops use `awaitShutdownWork`.
+ * - A restart request joins the one in flight until that restart starts rebuilding. After that the
+ *   rebuild has read its configuration, so the request gets one follow-up restart instead.
  */
 export class ControllerLifecycle {
   private phaseValue: LifecyclePhase = 'initializing'
@@ -55,6 +57,10 @@ export class ControllerLifecycle {
   private shutdownCompleted = false
   /** Set while a restart is in flight so overlapping callers share the one attempt. */
   private restartInFlight: Promise<void> | null = null
+  /** Set once the in-flight restart has started rebuilding from the configuration. */
+  private restartRebuildStarted = false
+  /** The restart queued behind the in-flight one, until it starts. */
+  private followUpRestart: Promise<void> | null = null
   /** Set while an initialisation is in flight so overlapping callers share the one attempt. */
   private initInFlight: Promise<void> | null = null
 
@@ -179,16 +185,47 @@ export class ControllerLifecycle {
   /**
    * Run a restart as a queued lifecycle op, memoized so overlapping callers share the one attempt
    * and the off-queue audio toggles can wait on it. The memo is assigned synchronously so a
-   * same-tick second call shares it, and cleared when the attempt settles either way.
+   * same-tick second call shares it, and cleared when the attempt settles either way. A caller
+   * that arrives once the in-flight restart has started rebuilding gets the follow-up restart.
    */
   public runSharedRestart(work: () => Promise<void>): Promise<void> {
     if (this.restartInFlight) {
-      return this.restartInFlight
+      return this.restartRebuildStarted ? this.queueFollowUpRestart(work) : this.restartInFlight
     }
+    this.restartRebuildStarted = false
     this.restartInFlight = this.runOp(work).finally(() => {
       this.restartInFlight = null
+      this.restartRebuildStarted = false
     })
     return this.restartInFlight
+  }
+
+  /** The in-flight restart is rebuilding, so it has read the configuration it will run with. */
+  public markRestartRebuildStarted(): void {
+    if (this.restartInFlight) {
+      this.restartRebuildStarted = true
+    }
+  }
+
+  /**
+   * One restart behind the in-flight one, shared by every caller until it starts. It clears its
+   * slot as it starts, so a caller arriving during its own rebuild opens the next follow-up.
+   */
+  private queueFollowUpRestart(work: () => Promise<void>): Promise<void> {
+    if (this.followUpRestart) {
+      return this.followUpRestart
+    }
+    const current = this.restartInFlight
+    this.followUpRestart = (async () => {
+      try {
+        await current
+      } catch {
+        // The in-flight restart's owner reports its failure. This one still runs.
+      }
+      this.followUpRestart = null
+      await this.runSharedRestart(work)
+    })()
+    return this.followUpRestart
   }
 
   /**

@@ -195,6 +195,61 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect(initCount).toBe(1)
   })
 
+  it('a restart requested once the rebuild began runs again with what was saved', async () => {
+    let release!: () => void
+    const barrier = new Promise<void>((r) => {
+      release = r
+    })
+    let initCount = 0
+    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
+      graph: restartGraph(),
+      listenerLifecycle: listenerStub(),
+      effectsController: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
+      dmxPublisher: { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) },
+      cueHandler: { shutdown: jest.fn() },
+      rigChains: [],
+      clock: { destroy: jest.fn() },
+      dmxLightManager: {},
+      lightStateManager: {},
+      lightTransitionController: {},
+      sequencer: {},
+      isInitialized: true,
+      lifecycle: lifecycleAt('running'),
+      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+      init: jest.fn().mockImplementation(async function (this: RestartFake) {
+        initCount += 1
+        if (initCount === 1) await barrier
+        this.isInitialized = true
+        this.lifecycle.setPhase('running')
+      }),
+      senderLifecycle: {
+        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
+        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
+        restoreSenderOutputsFromPrefs: jest.fn().mockImplementation(() => Promise.resolve()),
+      },
+      consoleMode: {
+        onControllersReinitializedWhileConsoleOpen: jest.fn(),
+        getConsoleRestore: jest.fn().mockReturnValue(null),
+      },
+    })
+
+    const p1 = ControllerManager.prototype.restartControllers.call(
+      fake as unknown as ControllerManager,
+    )
+    for (let i = 0; i < 20 && initCount === 0; i++) await Promise.resolve()
+    expect(initCount).toBe(1)
+    const p2 = ControllerManager.prototype.restartControllers.call(
+      fake as unknown as ControllerManager,
+    )
+    release()
+    await Promise.all([p1, p2])
+
+    expect(initCount).toBe(2)
+  })
+
   it('restart is enqueued behind an in-flight listener op before snapshotting enabled state', async () => {
     let releaseOp!: () => void
     const opBarrier = new Promise<void>((r) => {

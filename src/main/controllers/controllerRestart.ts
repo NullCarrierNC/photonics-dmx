@@ -139,6 +139,8 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
     throw new Error('Controller teardown failed during restart; reinitialization aborted')
   }
 
+  // From here the rebuild reads the configuration, so a later request needs a restart of its own.
+  ctx.lifecycle.markRestartRebuildStarted()
   try {
     await ctx.init()
     ctx.lifecycle.setPhase(wasConsoleMode ? 'consoleMode' : 'running')

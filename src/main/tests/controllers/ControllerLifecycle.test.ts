@@ -193,6 +193,68 @@ describe('ControllerLifecycle', () => {
       expect(lifecycle.isRestartInFlight()).toBe(false)
     })
 
+    it('gives a caller that arrives after the rebuild started one follow-up restart', async () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      let releaseFirst!: () => void
+      const firstBarrier = new Promise<void>((r) => {
+        releaseFirst = r
+      })
+      let rebuildStarted!: () => void
+      const started = new Promise<void>((r) => {
+        rebuildStarted = r
+      })
+      const runs: string[] = []
+      const first = lifecycle.runSharedRestart(async () => {
+        runs.push('first')
+        lifecycle.markRestartRebuildStarted()
+        rebuildStarted()
+        await firstBarrier
+      })
+      await started
+
+      const work = async (): Promise<void> => {
+        runs.push('follow-up')
+      }
+      const second = lifecycle.runSharedRestart(work)
+      const third = lifecycle.runSharedRestart(work)
+      expect(second).not.toBe(first)
+      expect(third).toBe(second)
+
+      releaseFirst()
+      await Promise.all([first, second, third])
+      expect(runs).toEqual(['first', 'follow-up'])
+      expect(lifecycle.isRestartInFlight()).toBe(false)
+    })
+
+    it('opens a further follow-up for a caller arriving during the follow-up rebuild', async () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      const releases: Array<() => void> = []
+      const runs: number[] = []
+      const work = async (): Promise<void> => {
+        runs.push(runs.length + 1)
+        lifecycle.markRestartRebuildStarted()
+        await new Promise<void>((r) => releases.push(r))
+      }
+      const flush = async (): Promise<void> => {
+        for (let i = 0; i < 10; i++) await Promise.resolve()
+      }
+
+      const first = lifecycle.runSharedRestart(work)
+      await flush()
+      const second = lifecycle.runSharedRestart(work)
+      releases[0]()
+      await flush()
+      expect(runs).toEqual([1, 2])
+
+      const third = lifecycle.runSharedRestart(work)
+      expect(third).not.toBe(second)
+      releases[1]()
+      await flush()
+      releases[2]()
+      await Promise.all([first, second, third])
+      expect(runs).toEqual([1, 2, 3])
+    })
+
     it('clears the memo on rejection so a later restart runs fresh', async () => {
       const lifecycle = new ControllerLifecycle(() => {})
 
