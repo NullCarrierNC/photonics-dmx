@@ -57,6 +57,7 @@ export {
   validateStoredArtNetConfig,
   validateStoredSacnConfig,
 } from './validation/prefsValidation'
+export { validatePreferencesSave } from './validation/prefsSaveValidation'
 
 export {
   validateAudioConfigPayload,

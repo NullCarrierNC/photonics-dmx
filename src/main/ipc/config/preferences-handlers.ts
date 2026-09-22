@@ -9,7 +9,7 @@ import {
   normalizeBlackoutShortcutKey,
   normalizeBlackoutShortcutScope,
 } from '../../../services/configuration/configurationDefaults'
-import { validatePreferencesPayload } from '../inputValidation'
+import { validatePreferencesSave } from '../inputValidation'
 import { createLogger } from '../../../shared/logger'
 import { handleInvoke } from '../handleInvoke'
 const log = createLogger('preferences-handlers')
@@ -36,7 +36,7 @@ export function registerPreferencesDiagnosticsConfigHandlers(
 
   handleInvoke(ipcMain, CONFIG.SAVE_PREFS, log, async (_, updates: unknown) => {
     try {
-      const validation = validatePreferencesPayload(updates)
+      const validation = validatePreferencesSave(updates)
       if (!validation.ok) {
         return { success: false, error: validation.error }
       }
