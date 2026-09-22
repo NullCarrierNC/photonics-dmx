@@ -244,6 +244,20 @@ export const ALL_INVOKE_CHANNELS: readonly string[] = INVOKE_CHANNEL_GROUPS.flat
   Object.values(group),
 )
 
+/**
+ * Every renderer-to-main fire-and-forget channel, the keys of IpcSendMap. The preload forwards
+ * `send` on these alone, so an invoke-only channel cannot be sent to.
+ */
+export const ALL_SEND_CHANNELS = [
+  CUE.YARG_LISTENER_ENABLED,
+  CUE.YARG_LISTENER_DISABLED,
+  CUE.RB3E_LISTENER_ENABLED,
+  CUE.RB3E_LISTENER_DISABLED,
+  CUE.SET_LISTEN_CUE_DATA,
+  CUE.CUE_STYLE,
+  LIGHT.CONSOLE_SEND_DMX,
+] as const
+
 /** Main process -> renderer (one-way send). Use when main calls webContents.send(). */
 export const RENDERER_RECEIVE = {
   SENDER_START_FAILED: 'sender-start-failed',

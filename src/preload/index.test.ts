@@ -9,8 +9,10 @@ const ipcRenderer = {
 }
 jest.mock('electron', () => ({ contextBridge: { exposeInMainWorld }, ipcRenderer }))
 
+import type { IpcSendChannel } from '../shared/ipcTypes'
 import {
   ALL_INVOKE_CHANNELS,
+  ALL_SEND_CHANNELS,
   CHANNELS,
   CONFIG,
   CUE,
@@ -67,6 +69,31 @@ describe('preload IPC channel allowlist (M-11)', () => {
     ipcRenderer.invoke.mockClear()
     await expect(api.invoke('evil:channel', {})).rejects.toThrow('Unknown IPC channel')
     expect(ipcRenderer.invoke).not.toHaveBeenCalled()
+  })
+
+  it('drops send on an invoke-only channel', () => {
+    ipcRenderer.send.mockClear()
+    api.send(CHANNELS.GET_PREFS, undefined)
+    expect(ipcRenderer.send).not.toHaveBeenCalled()
+  })
+
+  it('forwards send on every fire-and-forget channel', () => {
+    for (const channel of ALL_SEND_CHANNELS) {
+      ipcRenderer.send.mockClear()
+      api.send(channel, undefined)
+      expect(ipcRenderer.send).toHaveBeenCalledWith(channel, undefined)
+    }
+  })
+
+  it('lists every channel the send map types, and nothing else', () => {
+    type Listed = (typeof ALL_SEND_CHANNELS)[number]
+    type Complete = [IpcSendChannel] extends [Listed]
+      ? [Listed] extends [IpcSendChannel]
+        ? true
+        : false
+      : false
+    const complete: Complete = true
+    expect(complete).toBe(true)
   })
 
   it('drops send / sendToMain on unknown channels', () => {
