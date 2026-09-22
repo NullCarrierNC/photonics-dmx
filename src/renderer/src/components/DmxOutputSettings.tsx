@@ -44,7 +44,6 @@ import { applySenderRunState } from '../ipc/senderSwitch'
 import { persistPrefs } from '../ipc/persistPrefs'
 import { wasRefused } from '../ipc/ipcResult'
 import { useToast } from '../hooks/useToast'
-import ToastContainer from './Toast'
 import type { AppPreferences } from '../../../shared/ipcTypes'
 import { DraftNumberField } from './controls/DraftField'
 import { createLogger } from '../../../shared/logger'
@@ -74,7 +73,7 @@ const DmxOutputSettings: React.FC = () => {
   const [networkInterfaces, setNetworkInterfaces] = useState<
     Array<{ name: string; value: string; family: string }>
   >([])
-  const { toasts, showToast, hideToast } = useToast()
+  const { showToast } = useToast()
 
   /** Writes preferences, reporting a refusal on screen. */
   const persist = useCallback(
@@ -522,8 +521,6 @@ const DmxOutputSettings: React.FC = () => {
           />
         </div>
       )}
-
-      <ToastContainer toasts={toasts} onDismiss={hideToast} />
     </div>
   )
 }

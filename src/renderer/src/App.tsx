@@ -37,7 +37,6 @@ import { AudioCaptureManager } from './services/AudioCaptureManager'
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { useToast } from './hooks/useToast'
 import { useYargErrorHandler } from './hooks/useYargErrorHandler'
-import ToastContainer from './components/Toast'
 import { ConfirmModalHost } from './components/ConfirmModalHost'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useDarkMode } from './DarkModeProvider'
@@ -86,7 +85,7 @@ export const App = (): JSX.Element => {
   const setYargEnabled = useSetAtom(yargListenerEnabledAtom)
   const setRb3Enabled = useSetAtom(rb3eListenerEnabledAtom)
   const [appVer, setAppVer] = useState('')
-  const { toasts, showToast, hideToast } = useToast()
+  const { showToast } = useToast()
 
   // Audio capture manager ref (created once, persists for app lifetime)
   const audioCaptureManagerRef = useRef<AudioCaptureManager | null>(null)
@@ -495,7 +494,6 @@ export const App = (): JSX.Element => {
         </div>
       </div>
       <MasterOutputSidebar />
-      <ToastContainer toasts={toasts} onDismiss={hideToast} />
       <ConfirmModalHost />
     </div>
   )

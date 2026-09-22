@@ -38,6 +38,7 @@ const updateEnttecConfigMock = jest.mocked(ipcApi.updateEnttecConfig)
 const getNetworkInterfacesMock = jest.mocked(ipcApi.getNetworkInterfaces)
 
 import DmxOutputSettings from './DmxOutputSettings'
+import { ToastStack } from './Toast'
 
 type OutputConfig = NonNullable<LightingPreferences['dmxOutputConfig']>
 type SettingsPrefs = NonNullable<LightingPreferences['dmxSettingsPrefs']>
@@ -67,15 +68,22 @@ function expansion(overrides: Partial<SettingsPrefs> = {}): SettingsPrefs {
 type RunningSenders = { sacn?: boolean; artnet?: boolean; enttecpro?: boolean; opendmx?: boolean }
 
 async function renderPanel(prefs: LightingPreferences = {}, running: RunningSenders = {}) {
-  const { store } = renderWithProviders(<DmxOutputSettings />, {
-    seed: (set) => {
-      set(lightingPrefsAtom, prefs)
-      set(senderSacnEnabledAtom, running.sacn ?? false)
-      set(senderArtNetEnabledAtom, running.artnet ?? false)
-      set(senderEnttecProEnabledAtom, running.enttecpro ?? false)
-      set(senderOpenDmxEnabledAtom, running.opendmx ?? false)
+  // The window's toast stack renders beside the panel, as WindowShell renders it in the app.
+  const { store } = renderWithProviders(
+    <>
+      <DmxOutputSettings />
+      <ToastStack />
+    </>,
+    {
+      seed: (set) => {
+        set(lightingPrefsAtom, prefs)
+        set(senderSacnEnabledAtom, running.sacn ?? false)
+        set(senderArtNetEnabledAtom, running.artnet ?? false)
+        set(senderEnttecProEnabledAtom, running.enttecpro ?? false)
+        set(senderOpenDmxEnabledAtom, running.opendmx ?? false)
+      },
     },
-  })
+  )
   // The network interface list is fetched on mount, so waiting on it settles the first render.
   await waitFor(() => expect(getNetworkInterfacesMock).toHaveBeenCalled())
   return store

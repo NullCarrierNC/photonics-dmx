@@ -14,7 +14,6 @@ import EffectListenerNodeComponent from '../components/cue-editor/components/flo
 import NotesNodeComponent from '../components/cue-editor/components/flow/NotesNode'
 import NewFileModal from '../components/cue-editor/components/NewFileModal'
 import ImportCueFileModal from '../components/cue-editor/components/ImportCueFileModal'
-import ToastContainer from '../components/Toast'
 import { useToast } from '../hooks/useToast'
 import { createLogger } from '../../../shared/logger'
 import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles'
@@ -55,7 +54,7 @@ const CueEditor: React.FC = () => {
   )
   const [showNewFileModal, setShowNewFileModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const { toasts, showToast, hideToast } = useToast()
+  const { showToast } = useToast()
   const loadCueIntoFlowRef = useRef<(cue: EditorCueOrEffect) => void>(() => {})
   const getUpdatedDocumentRef = useRef<() => NodeCueFile | EffectFile | null>(() => null)
   const flowWrapperRef = useRef<HTMLDivElement | null>(null)
@@ -391,8 +390,6 @@ const CueEditor: React.FC = () => {
         onConfirm={() => void handleDiscardNavigation()}
         onCancel={cancelPendingNavigation}
       />
-
-      <ToastContainer toasts={toasts} onDismiss={hideToast} />
     </div>
   )
 }

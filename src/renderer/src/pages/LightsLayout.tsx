@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useCallback, useLayoutEffect, useRef } fr
 import LightLayoutPreview from '../components/LightLayoutPreview'
 import { findSharedChannelNumbers } from '../components/lightChannelDisplay'
 import { useAtom, useSetAtom } from 'jotai'
-import ToastContainer from '../components/Toast'
 
 import {
   ConfigStrobeType,
@@ -56,7 +55,7 @@ const rigToolbarButton =
  * @returns React component
  */
 const LightsLayout = () => {
-  const { toasts, showToast, hideToast } = useToast()
+  const { showToast } = useToast()
   const confirm = useConfirm()
   const [activeConfig, setActiveLightsConfig] = useAtom(activeDmxLightsConfigAtom)
   const [myFixtures] = useAtom(myValidDmxLightsAtom)
@@ -457,7 +456,6 @@ const LightsLayout = () => {
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
-      <ToastContainer toasts={toasts} onDismiss={hideToast} />
       {pendingImport !== null && (
         <ImportRigModal
           key={pendingImport.sourceBasename}

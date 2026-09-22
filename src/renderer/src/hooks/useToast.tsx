@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useCallback } from 'react'
+import { atom, useSetAtom } from 'jotai'
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning'
 
@@ -9,35 +10,27 @@ export interface Toast {
   duration?: number
 }
 
+/** Every toast a window is showing, in arrival order. The window's one ToastStack renders them. */
+export const toastsAtom = atom<Toast[]>([])
+
+/** Shows and hides toasts in the window's one stack. */
 export const useToast = () => {
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const timeoutIdsRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const setToasts = useSetAtom(toastsAtom)
 
-  useEffect(() => {
-    return () => {
-      timeoutIdsRef.current.forEach(clearTimeout)
-      timeoutIdsRef.current = []
-    }
-  }, [])
+  const showToast = useCallback(
+    (message: string, type: ToastType = 'info', duration = 3000) => {
+      const id = `toast-${Date.now()}-${Math.random()}`
+      setToasts((prev) => [...prev, { id, message, type, duration }])
+    },
+    [setToasts],
+  )
 
-  const showToast = useCallback((message: string, type: ToastType = 'info', duration = 3000) => {
-    const id = `toast-${Date.now()}-${Math.random()}`
-    const newToast: Toast = { id, message, type, duration }
+  const hideToast = useCallback(
+    (id: string) => {
+      setToasts((prev) => prev.filter((t) => t.id !== id))
+    },
+    [setToasts],
+  )
 
-    setToasts((prev) => [...prev, newToast])
-
-    if (duration > 0) {
-      const timeoutId = setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id))
-        timeoutIdsRef.current = timeoutIdsRef.current.filter((tid) => tid !== timeoutId)
-      }, duration)
-      timeoutIdsRef.current.push(timeoutId)
-    }
-  }, [])
-
-  const hideToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
-  }, [])
-
-  return { toasts, showToast, hideToast }
+  return { showToast, hideToast }
 }

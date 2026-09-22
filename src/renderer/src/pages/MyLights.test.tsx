@@ -30,6 +30,7 @@ jest.mock('../hooks/useConfirm', () => ({
 
 // Imported after the mocks are set up.
 import MyLights from './MyLights'
+import { ToastStack } from '../components/Toast'
 
 function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
   return {
@@ -45,7 +46,14 @@ function fixture(overrides: Partial<DmxFixture> = {}): DmxFixture {
 }
 
 function renderPage(lights: DmxFixture[] = [fixture()]) {
-  return renderWithProviders(<MyLights />, { seed: (set) => set(myDmxLightsAtom, lights) })
+  // The window's toast stack renders beside the page, as WindowShell renders it in the app.
+  return renderWithProviders(
+    <>
+      <MyLights />
+      <ToastStack />
+    </>,
+    { seed: (set) => set(myDmxLightsAtom, lights) },
+  )
 }
 
 /** The light name input inside the modal, which is where edits are made in these tests. */

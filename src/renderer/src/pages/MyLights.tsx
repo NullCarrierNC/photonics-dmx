@@ -4,7 +4,6 @@ import equal from 'fast-deep-equal'
 
 import LightSettingsModal from '../components/LightSettingsModal'
 import LightChannelsPreview from '../components/LightChannelsPreview'
-import ToastContainer from '../components/Toast'
 import { DmxFixture, FixtureTypes } from '../../../photonics-dmx/types'
 import { myDmxLightsAtom, sortedMyDmxLightsAtom } from '@renderer/atoms'
 import { saveMyLights } from '../ipcApi'
@@ -15,7 +14,7 @@ import { createLogger } from '../../../shared/logger'
 const log = createLogger('MyLights')
 
 const MyLights = () => {
-  const { toasts, showToast, hideToast } = useToast()
+  const { showToast } = useToast()
   const confirm = useConfirm()
   const [myLights, setMyLights] = useAtom(myDmxLightsAtom)
   const [myLightsSorted] = useAtom(sortedMyDmxLightsAtom)
@@ -128,7 +127,6 @@ const MyLights = () => {
 
   return (
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
-      <ToastContainer toasts={toasts} onDismiss={hideToast} />
       <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">My Lights</h1>
 
       {/* prettier-ignore */}
