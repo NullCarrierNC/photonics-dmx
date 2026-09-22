@@ -24,7 +24,6 @@ type StrobeType = 'slow' | 'medium' | 'fast' | 'fastest'
 interface ActiveStrobeEffect {
   type: StrobeType
   positions: number[]
-  timestamp: number
   interval?: NodeJS.Timeout
   targetLights: TrackedLight[]
 }
@@ -51,7 +50,7 @@ export class Rb3StageKitRigProcessor {
   private colorToLights = new Map<string, Set<number>>()
   private pendingUpdates = new Map<number, PendingUpdate>()
 
-  // Active strobe effects keyed by effect name (`stagekit-strobe-{rigId}-{type}-{ts}`).
+  // Active strobe effects keyed by effect name (`stagekit-strobe-{rigId}-{type}`).
   private activeStrobeEffects = new Map<string, ActiveStrobeEffect>()
   private strobedLights = new Set<number>()
 
@@ -169,7 +168,6 @@ export class Rb3StageKitRigProcessor {
     this.activeStrobeEffects.set(effectName, {
       type: strobeType,
       positions: dmxLightIndices,
-      timestamp: Date.now(),
       targetLights,
     })
     this.startStrobeEffect(effectName, targetLights, white, strobeInterval, dmxLightIndices)
