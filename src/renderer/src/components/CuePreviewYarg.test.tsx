@@ -176,6 +176,15 @@ const litUnder = (instrument: string): string[] =>
     .map((pip) => pip.textContent ?? '')
 
 describe('CuePreviewYarg instrument notes', () => {
+  // The pips clear 100 ms after the last note, so a real clock lets a slow run clear them first.
+  beforeEach(() => {
+    jest.useFakeTimers()
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
   it.each([
     ['Guitar', 'guitarNotes'],
     ['Bass', 'bassNotes'],
@@ -211,6 +220,15 @@ describe('CuePreviewYarg instrument notes', () => {
 })
 
 describe('CuePreviewYarg drum notes', () => {
+  // The pips clear 100 ms after the last note, so a real clock lets a slow run clear them first.
+  beforeEach(() => {
+    jest.useFakeTimers()
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
   it('shows the pads and the cymbals with the kick', async () => {
     await renderWithCueData(cueData())
 
