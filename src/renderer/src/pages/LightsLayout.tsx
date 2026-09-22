@@ -42,6 +42,7 @@ import { useLightsLayoutDrag } from './LightsLayout/useLightsLayoutDrag'
 import LightsLayoutCanvas from './LightsLayout/LightsLayoutCanvas'
 import { useLightsLayoutActiveConfigSync } from './LightsLayout/useLightsLayoutActiveConfigSync'
 import { useToast } from '../hooks/useToast'
+import { useTimeout } from '../utils/useTimeout'
 import { useConfirm } from '../hooks/useConfirm'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('LightsLayout')
@@ -91,6 +92,7 @@ const LightsLayout = () => {
 
   const [highlightedLight, setHighlightedLight] = useState<number | null>(null)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
+  const hideSuccessMessage = useTimeout(() => setShowSuccessMessage(false), 3000)
 
   const [allPrimaryLights, setAllPrimaryLights] = useState<DmxLight[]>(() => {
     const front = activeConfig?.frontLights || []
@@ -436,7 +438,7 @@ const LightsLayout = () => {
       }
 
       setShowSuccessMessage(true)
-      setTimeout(() => setShowSuccessMessage(false), 3000)
+      hideSuccessMessage.set()
     } catch (error) {
       log.error('Failed to save rig:', error)
       showToast('Failed to save rig.', 'error', 5000)

@@ -195,6 +195,41 @@ describe('LightsLayout — unsaved-changes flag', () => {
   })
 })
 
+describe('LightsLayout save confirmation', () => {
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it('hides the confirmation after three seconds and leaves no timer once the page closes', async () => {
+    jest.useFakeTimers()
+    const view = renderWithProviders(<LightsLayout />, {
+      seed: (set) => {
+        set(activeRigIdAtom, 'r1')
+        set(dmxRigsAtom, [initialRig])
+        set(activeDmxLightsConfigAtom, initialRig.config)
+        set(myDmxLightsAtom, [fixture])
+        set(lightingPrefsAtom, {})
+      },
+    })
+    await waitFor(() => expect(screen.getByText('Save Changes')).toBeInTheDocument())
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save Changes'))
+    })
+    await screen.findByText('Changes saved successfully!')
+    act(() => jest.advanceTimersByTime(3000))
+    expect(screen.queryByText('Changes saved successfully!')).toBeNull()
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save Changes'))
+    })
+    await screen.findByText('Changes saved successfully!')
+    view.unmount()
+
+    expect(jest.getTimerCount()).toBe(0)
+  })
+})
+
 describe('LightsLayout import dialog', () => {
   it('does not build the import dialog until there is an import to name', async () => {
     // The dialog seeds its name field when it mounts. Kept mounted behind an isOpen prop it
