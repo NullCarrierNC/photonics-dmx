@@ -6,7 +6,13 @@ import type { AudioCueType } from '../../../photonics-dmx/cues/types/audioCueTyp
 import type { ValidationResult } from './primitives'
 import { CueType } from '../../../photonics-dmx/cues/types/cueTypes'
 import { AudioCueRegistry } from '../../../photonics-dmx/cues/registries/AudioCueRegistry'
-import { isPlainObject, isNonEmptyString, validateStringUnion } from './primitives'
+import {
+  isPlainObject,
+  isNonEmptyString,
+  validateNumberInRange,
+  validateStringUnion,
+} from './primitives'
+import { MAX_BPM, MIN_BPM } from '../../../photonics-dmx/listeners/YARG/yargFieldBounds'
 
 const YARG_AUDIO_MOTION_SELECTION_MODES = ['oncePerSong', 'perCueChange', 'none'] as const
 const CUE_GROUP_SELECTION_MODES = ['oncePerSong', 'withinSong'] as const
@@ -46,6 +52,48 @@ export function validateCueType(value: unknown): ValidationResult<CueType> {
     return { ok: false, error: `cueType '${value}' is not a known CueType` }
   }
   return { ok: true, value: value as CueType }
+}
+
+const VENUE_SIZES = ['NoVenue', 'Small', 'Large'] as const
+
+/**
+ * What a test-effect start runs: a known cue type, with the venue, BPM and cue group it asks for.
+ */
+export interface TestEffectRequest {
+  effectId: CueType
+  venueSize?: (typeof VENUE_SIZES)[number]
+  bpm?: number
+  cueGroup?: string
+}
+
+/**
+ * Validates a test-effect start. The BPM is held to the range the YARG listener accepts from the
+ * game, so a simulated song can do nothing a real one cannot.
+ */
+export function validateTestEffectPayload(data: unknown): ValidationResult<TestEffectRequest> {
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'Invalid test effect payload' }
+  }
+  const effectId = validateCueType(data.effectId)
+  if (!effectId.ok) return effectId
+  const request: TestEffectRequest = { effectId: effectId.value }
+  if (data.venueSize !== undefined) {
+    const venueSize = validateStringUnion(data.venueSize, VENUE_SIZES, 'venueSize')
+    if (!venueSize.ok) return venueSize
+    request.venueSize = venueSize.value
+  }
+  if (data.bpm !== undefined) {
+    const bpm = validateNumberInRange(data.bpm, MIN_BPM, MAX_BPM, 'bpm')
+    if (!bpm.ok) return bpm
+    request.bpm = bpm.value
+  }
+  if (data.cueGroup !== undefined) {
+    if (typeof data.cueGroup !== 'string') {
+      return { ok: false, error: 'cueGroup must be a string' }
+    }
+    request.cueGroup = data.cueGroup
+  }
+  return { ok: true, value: request }
 }
 
 /**

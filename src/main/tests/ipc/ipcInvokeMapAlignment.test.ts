@@ -27,6 +27,7 @@ import {
   validatePreferencesPayload,
   validateSenderEnablePayload,
   validateStageKitPriority,
+  validateTestEffectPayload,
 } from '../../ipc/inputValidation'
 import type { IpcInvokeMap } from '../../../shared/ipcTypes'
 import { CONFIG, LIGHT, SHELL } from '../../../shared/ipcChannels'
@@ -193,6 +194,18 @@ type ValidatorMapAlignment = [
       IpcInvokeMap[typeof SHELL.OPEN_PATH]['request']
     >
   >,
+  AssertTrue<
+    Assignable<
+      ValidatorOk<typeof validateTestEffectPayload>,
+      IpcInvokeMap[typeof LIGHT.START_TEST_EFFECT]['request']
+    >
+  >,
+  AssertTrue<
+    Assignable<
+      ValidatorOk<typeof validateTestEffectPayload>,
+      IpcInvokeMap[typeof LIGHT.START_RB3_TEST_EFFECT]['request']
+    >
+  >,
 ]
 
 describe('IpcInvokeMap ↔ inputValidation contract', () => {
@@ -225,7 +238,9 @@ describe('IpcInvokeMap ↔ inputValidation contract', () => {
       true,
       true,
       true,
+      true,
+      true,
     ]
-    expect(_alignmentProof).toHaveLength(25)
+    expect(_alignmentProof).toHaveLength(27)
   })
 })

@@ -27,6 +27,7 @@ export {
   validateCueGroupSelectionMode,
   validateStageKitPriority,
   validateCueType,
+  validateTestEffectPayload,
   validateAudioCueType,
   validateCueRefPayload,
   validateDisabledCuesMap,

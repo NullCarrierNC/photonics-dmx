@@ -17,7 +17,7 @@ import { createMockAudioCueData, createMockCueData, type MockCueDataOptions } fr
 import { sendMotionSimCleared, sendMotionSimStarted } from './motionSimulationEvents'
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
-import { isNonEmptyString, isPlainObject } from './inputValidation'
+import { isNonEmptyString, isPlainObject, validateTestEffectPayload } from './inputValidation'
 import type { MotionRuntimeDomain } from '../../shared/ipc/common'
 import type { ChainFanout } from '../controllers/ChainFanout'
 import type { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
@@ -130,76 +130,55 @@ export function setupSimulationHandlers(
     }
   })
 
-  handleInvoke(
-    ipcMain,
-    LIGHT.START_TEST_EFFECT,
-    log,
-    async (
-      _,
-      data: {
-        effectId: string
-        venueSize?: 'NoVenue' | 'Small' | 'Large'
-        bpm?: number
-        cueGroup?: string
-      },
-    ) => {
-      const { effectId, venueSize, bpm, cueGroup } = data ?? {}
+  handleInvoke(ipcMain, LIGHT.START_TEST_EFFECT, log, async (_, data: unknown) => {
+    try {
+      if (rb3Blocked()) {
+        return { success: false, error: RB3_BLOCKED_ERROR }
+      }
+      const request = validateTestEffectPayload(data)
+      if (!request.ok) {
+        return { success: false, error: request.error }
+      }
+      const { effectId, venueSize, bpm, cueGroup } = request.value
       log.info(
         `IPC start-test-effect called with effectId: ${effectId}, venueSize: ${venueSize}, BPM: ${bpm}, cueGroup: ${cueGroup ?? 'none'}`,
       )
-      try {
-        if (rb3Blocked()) {
-          return { success: false, error: RB3_BLOCKED_ERROR }
-        }
-        if (!controllerManager.getIsInitialized()) {
-          log.info('System not initialized, initializing now before testing effect')
-          await controllerManager.init()
-        }
-        const runner = controllerManager.getTestEffectRunner('yarg')
-        runner.startTestEffect(effectId, venueSize, bpm, cueGroup)
-        return { success: true }
-      } catch (error) {
-        log.error('Error starting test effect:', error)
-        return ipcError(error)
+      if (!controllerManager.getIsInitialized()) {
+        log.info('System not initialized, initializing now before testing effect')
+        await controllerManager.init()
       }
-    },
-  )
+      const runner = controllerManager.getTestEffectRunner('yarg')
+      runner.startTestEffect(effectId, venueSize, bpm, cueGroup)
+      return { success: true }
+    } catch (error) {
+      log.error('Error starting test effect:', error)
+      return ipcError(error)
+    }
+  })
 
   // RB3 twin of START_TEST_EFFECT: dispatches the selected RB3 cue through the RB3 chain runtime
   // (own registry / rb3CueHandler slots) rather than the YARG test-effect runner. The runner
   // re-dispatches on an interval so a held strobe re-fires `cue-called` continuously (a single
   // dispatch would flash once). Firing is refused while the live RB3E listener owns the rig chains
   // (same guard as every simulate handler).
-  handleInvoke(
-    ipcMain,
-    LIGHT.START_RB3_TEST_EFFECT,
-    log,
-    async (
-      _,
-      data: {
-        effectId: string
-        venueSize?: 'NoVenue' | 'Small' | 'Large'
-        bpm?: number
-        cueGroup?: string
-      },
-    ) => {
-      const { effectId, venueSize, bpm, cueGroup } = data ?? {}
-      try {
-        if (rb3Blocked()) {
-          return { success: false, error: RB3_BLOCKED_ERROR }
-        }
-        if (!getCueTypeFromId(effectId)) {
-          return { success: false, error: `Unknown RB3 cue: ${effectId}` }
-        }
-        const runner = controllerManager.getTestEffectRunner('rb3')
-        runner.startTestEffect(effectId, venueSize, bpm, cueGroup)
-        return { success: true }
-      } catch (error) {
-        log.error('Error starting RB3 test effect:', error)
-        return ipcError(error)
+  handleInvoke(ipcMain, LIGHT.START_RB3_TEST_EFFECT, log, async (_, data: unknown) => {
+    try {
+      if (rb3Blocked()) {
+        return { success: false, error: RB3_BLOCKED_ERROR }
       }
-    },
-  )
+      const request = validateTestEffectPayload(data)
+      if (!request.ok) {
+        return { success: false, error: request.error }
+      }
+      const { effectId, venueSize, bpm, cueGroup } = request.value
+      const runner = controllerManager.getTestEffectRunner('rb3')
+      runner.startTestEffect(effectId, venueSize, bpm, cueGroup)
+      return { success: true }
+    } catch (error) {
+      log.error('Error starting RB3 test effect:', error)
+      return ipcError(error)
+    }
+  })
 
   handleInvoke(
     ipcMain,
