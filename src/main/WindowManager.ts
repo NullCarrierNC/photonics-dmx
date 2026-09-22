@@ -160,6 +160,8 @@ export class WindowManager {
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
+        // DevTools open only while developing, so a packaged build offers no console.
+        devTools: is.dev,
         // Audio capture and analysis run in the main window and drive the show. Chromium throttles
         // timers and frames in a hidden window, which is exactly the case where a game is running
         // full-screen in front of it.

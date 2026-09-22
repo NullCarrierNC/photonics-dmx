@@ -58,14 +58,18 @@ function createAboutMenu(): MenuItemConstructorOptions[] {
         { role: 'paste' },
       ] as MenuItemConstructorOptions[],
     },
-    // View menu
+    // View menu. Reload and DevTools are for development, and a packaged build leaves them out.
     {
       label: 'View',
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' as const },
+        ...(app.isPackaged
+          ? []
+          : ([
+              { role: 'reload' },
+              { role: 'forceReload' },
+              { role: 'toggleDevTools' },
+              { type: 'separator' as const },
+            ] as MenuItemConstructorOptions[])),
         { role: 'resetZoom' },
         { role: 'zoomIn' },
         { role: 'zoomOut' },

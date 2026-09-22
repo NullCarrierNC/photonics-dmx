@@ -75,3 +75,25 @@ describe('WindowManager restored bounds', () => {
     expect(lastWindowBounds()).toEqual({ x: 40, y: 60, width: 700, height: 480 })
   })
 })
+
+describe('WindowManager DevTools', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('keeps DevTools shut on every window of a packaged build', () => {
+    const wm = managerWithSaved({})
+    wm.createMainWindow()
+    wm.openCueEditorWindow()
+    wm.openAudioPreviewWindow()
+
+    const results = (BrowserWindow as unknown as jest.Mock).mock.results
+    for (const { value } of results) {
+      const { webPreferences } = (value as FakeBrowserWindow).options as {
+        webPreferences: { devTools?: boolean }
+      }
+      expect(webPreferences.devTools).toBe(false)
+    }
+    expect(results).toHaveLength(3)
+  })
+})
