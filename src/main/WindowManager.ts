@@ -15,17 +15,50 @@ const onLoadFailure =
     log.error(`Failed to load the ${window} renderer:`, err)
   }
 
+/** The windows the app opens, at most one of each. */
+type WindowRole = 'main' | 'cueEditor' | 'audioPreview'
+
+interface WindowSpec {
+  /** The preference the window's geometry is saved under. */
+  stateKey: 'windowState' | 'cueEditorWindowState' | 'audioPreviewWindowState'
+  width: number
+  height: number
+  /** Names the window in a failed-load log line. */
+  label: string
+  title?: string
+  /** The renderer entry's `window` query. The main window loads the entry without one. */
+  query?: string
+}
+
+const WINDOW_SPECS: Record<WindowRole, WindowSpec> = {
+  main: { stateKey: 'windowState', width: 1280, height: 1000, label: 'main' },
+  cueEditor: {
+    stateKey: 'cueEditorWindowState',
+    width: 1200,
+    height: 900,
+    label: 'cue editor',
+    title: 'Cue Editor - Photonics',
+    query: 'cue-editor',
+  },
+  audioPreview: {
+    stateKey: 'audioPreviewWindowState',
+    width: 560,
+    height: 584,
+    label: 'audio preview',
+    title: 'Audio Preview - Photonics',
+    query: 'audio-preview',
+  },
+}
+
+const WINDOW_ROLES = Object.keys(WINDOW_SPECS) as WindowRole[]
+
+/** How long a window's geometry has to settle after a move or resize before it is saved. */
+const SAVE_DELAY_MS = 500
+
 export class WindowManager {
-  private mainWindow: BrowserWindow | null = null
-  private cueEditorWindow: BrowserWindow | null = null
-  private audioPreviewWindow: BrowserWindow | null = null
+  private readonly windows = new Map<WindowRole, BrowserWindow>()
+  private readonly saveTimers = new Map<WindowRole, NodeJS.Timeout>()
   private controllerManager: ControllerManager | null = null
-  private resizeTimeout: NodeJS.Timeout | null = null
-  private moveTimeout: NodeJS.Timeout | null = null
-  private cueEditorResizeTimeout: NodeJS.Timeout | null = null
-  private cueEditorMoveTimeout: NodeJS.Timeout | null = null
-  private audioPreviewResizeTimeout: NodeJS.Timeout | null = null
-  private audioPreviewMoveTimeout: NodeJS.Timeout | null = null
 
   /**
    * Sets the controller manager for accessing preferences
@@ -54,108 +87,42 @@ export class WindowManager {
     shell.openExternal(url).catch((err) => log.error(`Failed to open ${url} externally:`, err))
   }
 
-  /**
-   * Saves window state to preferences with debouncing
-   */
-  private async saveWindowState(
-    window: BrowserWindow,
-    preferenceKey: 'windowState' | 'cueEditorWindowState' | 'audioPreviewWindowState',
-  ): Promise<void> {
-    if (window.isDestroyed() || !this.controllerManager) {
+  /** The window open in a role, or null when there is none or it has been destroyed. */
+  private openWindow(role: WindowRole): BrowserWindow | null {
+    const window = this.windows.get(role)
+    return window && !window.isDestroyed() ? window : null
+  }
+
+  /** Saves an open window's geometry to preferences. */
+  private async saveWindowState(role: WindowRole): Promise<void> {
+    const window = this.openWindow(role)
+    if (!window || !this.controllerManager) {
       return
     }
 
-    const bounds = window.getBounds()
-    const windowState = {
-      width: bounds.width,
-      height: bounds.height,
-      x: bounds.x,
-      y: bounds.y,
-    }
-
+    const { width, height, x, y } = window.getBounds()
     try {
-      await this.controllerManager.getConfig().updatePreferences({ [preferenceKey]: windowState })
+      await this.controllerManager
+        .getConfig()
+        .updatePreferences({ [WINDOW_SPECS[role].stateKey]: { width, height, x, y } })
     } catch (error) {
       log.error('Failed to save window state:', error)
     }
   }
 
-  /**
-   * Debounced save for resize events
-   */
-  private debouncedSaveMainResize(): void {
-    if (this.resizeTimeout) {
-      clearTimeout(this.resizeTimeout)
+  /** Saves a window's geometry once it has stopped moving and resizing. */
+  private scheduleSave(role: WindowRole): void {
+    const pending = this.saveTimers.get(role)
+    if (pending) {
+      clearTimeout(pending)
     }
-    this.resizeTimeout = setTimeout(() => {
-      if (this.mainWindow) {
-        void this.saveWindowState(this.mainWindow, 'windowState')
-      }
-    }, 500)
-  }
-
-  /**
-   * Debounced save for move events
-   */
-  private debouncedSaveMainMove(): void {
-    if (this.moveTimeout) {
-      clearTimeout(this.moveTimeout)
-    }
-    this.moveTimeout = setTimeout(() => {
-      if (this.mainWindow) {
-        void this.saveWindowState(this.mainWindow, 'windowState')
-      }
-    }, 500)
-  }
-
-  /**
-   * Debounced save for cue editor resize events
-   */
-  private debouncedSaveCueEditorResize(): void {
-    if (this.cueEditorResizeTimeout) {
-      clearTimeout(this.cueEditorResizeTimeout)
-    }
-    this.cueEditorResizeTimeout = setTimeout(() => {
-      if (this.cueEditorWindow) {
-        void this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
-      }
-    }, 500)
-  }
-
-  /**
-   * Debounced save for cue editor move events
-   */
-  private debouncedSaveCueEditorMove(): void {
-    if (this.cueEditorMoveTimeout) {
-      clearTimeout(this.cueEditorMoveTimeout)
-    }
-    this.cueEditorMoveTimeout = setTimeout(() => {
-      if (this.cueEditorWindow) {
-        void this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
-      }
-    }, 500)
-  }
-
-  private debouncedSaveAudioPreviewResize(): void {
-    if (this.audioPreviewResizeTimeout) {
-      clearTimeout(this.audioPreviewResizeTimeout)
-    }
-    this.audioPreviewResizeTimeout = setTimeout(() => {
-      if (this.audioPreviewWindow) {
-        void this.saveWindowState(this.audioPreviewWindow, 'audioPreviewWindowState')
-      }
-    }, 500)
-  }
-
-  private debouncedSaveAudioPreviewMove(): void {
-    if (this.audioPreviewMoveTimeout) {
-      clearTimeout(this.audioPreviewMoveTimeout)
-    }
-    this.audioPreviewMoveTimeout = setTimeout(() => {
-      if (this.audioPreviewWindow) {
-        void this.saveWindowState(this.audioPreviewWindow, 'audioPreviewWindowState')
-      }
-    }, 500)
+    this.saveTimers.set(
+      role,
+      setTimeout(() => {
+        this.saveTimers.delete(role)
+        void this.saveWindowState(role)
+      }, SAVE_DELAY_MS),
+    )
   }
 
   /**
@@ -199,286 +166,106 @@ export class WindowManager {
     return bounds
   }
 
+  /** The saved geometry for a role, or its default size, kept on screen. */
+  private initialBounds(role: WindowRole): { width: number; height: number; x: number; y: number } {
+    const spec = WINDOW_SPECS[role]
+    const saved = this.controllerManager?.getConfig().getPreference(spec.stateKey)
+    return this.validateWindowBounds({
+      width: saved?.width || spec.width,
+      height: saved?.height || spec.height,
+      x: saved?.x ?? 0,
+      y: saved?.y ?? 0,
+    })
+  }
+
+  private createWindow(role: WindowRole): BrowserWindow {
+    const spec = WINDOW_SPECS[role]
+    const window = new BrowserWindow({
+      ...this.initialBounds(role),
+      ...(spec.title ? { title: spec.title } : {}),
+      show: false,
+      autoHideMenuBar: false,
+      webPreferences: {
+        preload: join(__dirname, '../preload/index.js'),
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+        // Audio capture and analysis run in the main window and drive the show. Chromium throttles
+        // timers and frames in a hidden window, which is exactly the case where a game is running
+        // full-screen in front of it.
+        ...(role === 'main' ? { backgroundThrottling: false } : {}),
+      },
+    })
+    this.windows.set(role, window)
+
+    window.on('resized', () => this.scheduleSave(role))
+    window.on('moved', () => this.scheduleSave(role))
+    window.on('ready-to-show', () => window.show())
+    if (role !== 'main') {
+      window.on('closed', () => {
+        if (this.windows.get(role) === window) {
+          this.windows.delete(role)
+        }
+      })
+    }
+
+    window.webContents.setWindowOpenHandler((details) => {
+      this.openExternalSafely(details.url)
+      return { action: 'deny' }
+    })
+    denyWebContentsWillNavigate(window.webContents)
+
+    const devUrl = process.env['ELECTRON_RENDERER_URL']
+    const failed = onLoadFailure(spec.label)
+    if (is.dev && devUrl) {
+      window.loadURL(spec.query ? `${devUrl}?window=${spec.query}` : devUrl).catch(failed)
+    } else if (spec.query) {
+      window
+        .loadFile(join(__dirname, '../renderer/index.html'), { query: { window: spec.query } })
+        .catch(failed)
+    } else {
+      window.loadFile(join(__dirname, '../renderer/index.html')).catch(failed)
+    }
+
+    return window
+  }
+
+  /** Fronts the window open in a role, or creates it. */
+  private openOrFocus(role: WindowRole): BrowserWindow {
+    const window = this.openWindow(role)
+    if (window) {
+      window.focus()
+      return window
+    }
+    return this.createWindow(role)
+  }
+
   /**
    * Creates the main application window
    */
   public createMainWindow(): BrowserWindow {
-    // Load saved window state or use defaults
-    let windowState = {
-      width: 1280,
-      height: 1000,
-      x: undefined as number | undefined,
-      y: undefined as number | undefined,
-    }
-
-    if (this.controllerManager) {
-      const savedState = this.controllerManager.getConfig().getPreference('windowState')
-      if (savedState) {
-        windowState = {
-          width: savedState.width || 1280,
-          height: savedState.height || 1000,
-          x: savedState.x,
-          y: savedState.y,
-        }
-      }
-    }
-
-    // Validate bounds
-    const validatedBounds = this.validateWindowBounds({
-      width: windowState.width,
-      height: windowState.height,
-      x: windowState.x ?? 0,
-      y: windowState.y ?? 0,
-    })
-
-    // Create the browser window
-    this.mainWindow = new BrowserWindow({
-      width: validatedBounds.width,
-      height: validatedBounds.height,
-      x: validatedBounds.x,
-      y: validatedBounds.y,
-      show: false,
-      autoHideMenuBar: false,
-      webPreferences: {
-        preload: join(__dirname, '../preload/index.js'),
-        sandbox: true,
-        contextIsolation: true,
-        nodeIntegration: false,
-        // Audio capture and analysis run in this window and drive the show. Chromium throttles
-        // timers and frames in a hidden window, which is exactly the case where a game is running
-        // full-screen in front of it.
-        backgroundThrottling: false,
-      },
-    })
-
-    // Set up event listeners for window state persistence
-    this.mainWindow.on('resized', () => {
-      this.debouncedSaveMainResize()
-    })
-
-    this.mainWindow.on('moved', () => {
-      this.debouncedSaveMainMove()
-    })
-
-    this.mainWindow.on('ready-to-show', () => {
-      this.mainWindow?.show()
-    })
-
-    this.mainWindow.webContents.setWindowOpenHandler((details) => {
-      this.openExternalSafely(details.url)
-      return { action: 'deny' }
-    })
-    denyWebContentsWillNavigate(this.mainWindow.webContents)
-
-    // Load the renderer
-    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      this.mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']).catch(onLoadFailure('main'))
-    } else {
-      this.mainWindow
-        .loadFile(join(__dirname, '../renderer/index.html'))
-        .catch(onLoadFailure('main'))
-    }
-
-    return this.mainWindow
-  }
-
-  /**
-   * Creates the cue editor window
-   */
-  private createCueEditorWindow(): BrowserWindow {
-    let windowState = {
-      width: 1200,
-      height: 900,
-      x: undefined as number | undefined,
-      y: undefined as number | undefined,
-    }
-
-    if (this.controllerManager) {
-      const savedState = this.controllerManager.getConfig().getPreference('cueEditorWindowState')
-      if (savedState) {
-        windowState = {
-          width: savedState.width || 1200,
-          height: savedState.height || 900,
-          x: savedState.x,
-          y: savedState.y,
-        }
-      }
-    }
-
-    const validatedBounds = this.validateWindowBounds({
-      width: windowState.width,
-      height: windowState.height,
-      x: windowState.x ?? 0,
-      y: windowState.y ?? 0,
-    })
-
-    this.cueEditorWindow = new BrowserWindow({
-      width: validatedBounds.width,
-      height: validatedBounds.height,
-      x: validatedBounds.x,
-      y: validatedBounds.y,
-      title: 'Cue Editor - Photonics',
-      show: false,
-      autoHideMenuBar: false,
-      webPreferences: {
-        preload: join(__dirname, '../preload/index.js'),
-        sandbox: true,
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
-    })
-
-    this.cueEditorWindow.on('resized', () => {
-      this.debouncedSaveCueEditorResize()
-    })
-
-    this.cueEditorWindow.on('moved', () => {
-      this.debouncedSaveCueEditorMove()
-    })
-
-    this.cueEditorWindow.on('ready-to-show', () => {
-      this.cueEditorWindow?.show()
-    })
-
-    this.cueEditorWindow.on('closed', () => {
-      this.cueEditorWindow = null
-    })
-
-    this.cueEditorWindow.webContents.setWindowOpenHandler((details) => {
-      this.openExternalSafely(details.url)
-      return { action: 'deny' }
-    })
-    denyWebContentsWillNavigate(this.cueEditorWindow.webContents)
-
-    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      this.cueEditorWindow
-        .loadURL(`${process.env['ELECTRON_RENDERER_URL']}?window=cue-editor`)
-        .catch(onLoadFailure('cue editor'))
-    } else {
-      this.cueEditorWindow
-        .loadFile(join(__dirname, '../renderer/index.html'), {
-          query: { window: 'cue-editor' },
-        })
-        .catch(onLoadFailure('cue editor'))
-    }
-
-    return this.cueEditorWindow
+    return this.createWindow('main')
   }
 
   /**
    * Opens the cue editor window (focuses existing)
    */
   public openCueEditorWindow(): BrowserWindow {
-    if (this.cueEditorWindow && !this.cueEditorWindow.isDestroyed()) {
-      this.cueEditorWindow.focus()
-      return this.cueEditorWindow
-    }
-
-    return this.createCueEditorWindow()
-  }
-
-  /**
-   * Forwards analysed audio to the Audio Preview window (single target; avoids duplicate capture).
-   */
-  public broadcastAudioMirror(data: AudioLightingData): void {
-    if (this.audioPreviewWindow && !this.audioPreviewWindow.isDestroyed()) {
-      this.audioPreviewWindow.webContents.send(RENDERER_RECEIVE.AUDIO_DATA_MIRROR, data)
-    }
-  }
-
-  /**
-   * Creates the audio preview window
-   */
-  private createAudioPreviewWindow(): BrowserWindow {
-    let windowState = {
-      width: 560,
-      height: 584,
-      x: undefined as number | undefined,
-      y: undefined as number | undefined,
-    }
-
-    if (this.controllerManager) {
-      const savedState = this.controllerManager.getConfig().getPreference('audioPreviewWindowState')
-      if (savedState) {
-        windowState = {
-          width: savedState.width || 560,
-          height: savedState.height || 584,
-          x: savedState.x,
-          y: savedState.y,
-        }
-      }
-    }
-
-    const validatedBounds = this.validateWindowBounds({
-      width: windowState.width,
-      height: windowState.height,
-      x: windowState.x ?? 0,
-      y: windowState.y ?? 0,
-    })
-
-    this.audioPreviewWindow = new BrowserWindow({
-      width: validatedBounds.width,
-      height: validatedBounds.height,
-      x: validatedBounds.x,
-      y: validatedBounds.y,
-      title: 'Audio Preview - Photonics',
-      show: false,
-      autoHideMenuBar: false,
-      webPreferences: {
-        preload: join(__dirname, '../preload/index.js'),
-        sandbox: true,
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
-    })
-
-    this.audioPreviewWindow.on('resized', () => {
-      this.debouncedSaveAudioPreviewResize()
-    })
-
-    this.audioPreviewWindow.on('moved', () => {
-      this.debouncedSaveAudioPreviewMove()
-    })
-
-    this.audioPreviewWindow.on('ready-to-show', () => {
-      this.audioPreviewWindow?.show()
-    })
-
-    this.audioPreviewWindow.on('closed', () => {
-      this.audioPreviewWindow = null
-    })
-
-    this.audioPreviewWindow.webContents.setWindowOpenHandler((details) => {
-      this.openExternalSafely(details.url)
-      return { action: 'deny' }
-    })
-    denyWebContentsWillNavigate(this.audioPreviewWindow.webContents)
-
-    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-      this.audioPreviewWindow
-        .loadURL(`${process.env['ELECTRON_RENDERER_URL']}?window=audio-preview`)
-        .catch(onLoadFailure('audio preview'))
-    } else {
-      this.audioPreviewWindow
-        .loadFile(join(__dirname, '../renderer/index.html'), {
-          query: { window: 'audio-preview' },
-        })
-        .catch(onLoadFailure('audio preview'))
-    }
-
-    return this.audioPreviewWindow
+    return this.openOrFocus('cueEditor')
   }
 
   /**
    * Opens the audio preview window (focuses existing)
    */
   public openAudioPreviewWindow(): BrowserWindow {
-    if (this.audioPreviewWindow && !this.audioPreviewWindow.isDestroyed()) {
-      this.audioPreviewWindow.focus()
-      return this.audioPreviewWindow
-    }
+    return this.openOrFocus('audioPreview')
+  }
 
-    return this.createAudioPreviewWindow()
+  /**
+   * Forwards analysed audio to the Audio Preview window, its only target, so capture runs once.
+   */
+  public broadcastAudioMirror(data: AudioLightingData): void {
+    this.openWindow('audioPreview')?.webContents.send(RENDERER_RECEIVE.AUDIO_DATA_MIRROR, data)
   }
 
   /**
@@ -492,78 +279,41 @@ export class WindowManager {
    * Gets the main window instance
    */
   public getMainWindow(): BrowserWindow | null {
-    return this.mainWindow
+    return this.windows.get('main') ?? null
   }
 
   /**
    * Brings the main window to the front, creating it if there is none.
    */
   public focusMainWindow(): void {
-    if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+    const window = this.openWindow('main')
+    if (!window) {
       this.createMainWindow()
       return
     }
-    if (this.mainWindow.isMinimized()) {
-      this.mainWindow.restore()
+    if (window.isMinimized()) {
+      window.restore()
     }
-    this.mainWindow.show()
-    this.mainWindow.focus()
+    window.show()
+    window.focus()
   }
 
   /**
-   * Closes all application windows
+   * Saves every open window's geometry, then closes them all.
    */
   public async closeAllWindows(): Promise<void> {
-    // Save window state one final time before closing
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      await this.saveWindowState(this.mainWindow, 'windowState')
-    }
-    if (this.cueEditorWindow && !this.cueEditorWindow.isDestroyed()) {
-      await this.saveWindowState(this.cueEditorWindow, 'cueEditorWindowState')
-    }
-    if (this.audioPreviewWindow && !this.audioPreviewWindow.isDestroyed()) {
-      await this.saveWindowState(this.audioPreviewWindow, 'audioPreviewWindowState')
+    for (const role of WINDOW_ROLES) {
+      await this.saveWindowState(role)
     }
 
-    // Clear any pending timeouts
-    if (this.resizeTimeout) {
-      clearTimeout(this.resizeTimeout)
-      this.resizeTimeout = null
+    for (const timer of this.saveTimers.values()) {
+      clearTimeout(timer)
     }
-    if (this.moveTimeout) {
-      clearTimeout(this.moveTimeout)
-      this.moveTimeout = null
-    }
-    if (this.cueEditorResizeTimeout) {
-      clearTimeout(this.cueEditorResizeTimeout)
-      this.cueEditorResizeTimeout = null
-    }
-    if (this.cueEditorMoveTimeout) {
-      clearTimeout(this.cueEditorMoveTimeout)
-      this.cueEditorMoveTimeout = null
-    }
-    if (this.audioPreviewResizeTimeout) {
-      clearTimeout(this.audioPreviewResizeTimeout)
-      this.audioPreviewResizeTimeout = null
-    }
-    if (this.audioPreviewMoveTimeout) {
-      clearTimeout(this.audioPreviewMoveTimeout)
-      this.audioPreviewMoveTimeout = null
-    }
+    this.saveTimers.clear()
 
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.close()
+    for (const role of WINDOW_ROLES) {
+      this.openWindow(role)?.close()
     }
-    this.mainWindow = null
-
-    if (this.cueEditorWindow && !this.cueEditorWindow.isDestroyed()) {
-      this.cueEditorWindow.close()
-    }
-    this.cueEditorWindow = null
-
-    if (this.audioPreviewWindow && !this.audioPreviewWindow.isDestroyed()) {
-      this.audioPreviewWindow.close()
-    }
-    this.audioPreviewWindow = null
+    this.windows.clear()
   }
 }
