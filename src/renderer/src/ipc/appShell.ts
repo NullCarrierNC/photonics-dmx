@@ -2,12 +2,14 @@
  * App shell calls: lifecycle, windows, app info, system status and the OS shell.
  */
 import { CONFIG, LIFECYCLE, LIGHT, SHELL, WINDOW } from '../../../shared/ipcChannels'
+import { orThrow } from './ipcResult'
 
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-export const getLifecyclePhase = () => window.api.invoke(LIFECYCLE.GET_PHASE, undefined)
+export const getLifecyclePhase = () =>
+  window.api.invoke(LIFECYCLE.GET_PHASE, undefined).then(orThrow)
 
 export const retryControllerInit = () => window.api.invoke(LIFECYCLE.RETRY_INIT, undefined)
 

@@ -7,7 +7,7 @@ import { NodeCueMode, NodeCueFile, NodeCueKind } from '../../photonics-dmx/cues/
 import { validateNodeCueFile } from '../../photonics-dmx/cues/node/schema/validation'
 import { NodeExecutionEngine } from '../../photonics-dmx/cues/node/runtime/NodeExecutionEngine'
 import { cueDomainBinding, reconcileAndApplyGroups } from '../controllers/cueDomainBindings'
-import { ipcError } from './ipcResult'
+import { validationRefusal } from './ipcResult'
 import { NODE_CUES, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { handleInvoke } from './handleInvoke'
@@ -90,26 +90,23 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
   })
 
   handleInvoke(ipcMain, NODE_CUES.VALIDATE, log, async (_event, payload: ValidatePayload) => {
-    const loader = ensureLoader(controllerManager)
+    try {
+      const loader = ensureLoader(controllerManager)
 
-    if (payload.content) {
-      return validateNodeCueFile(payload.content)
-    }
-
-    if (payload.path) {
-      try {
-        const file = await loader.readFile(payload.path)
-        // readFile rejects invalid JSON/schema; still run the canonical validator for parity with the content branch.
-        return validateNodeCueFile(file)
-      } catch (error) {
-        return {
-          valid: false,
-          errors: [ipcError(error).error],
-        }
+      if (payload.content) {
+        return validateNodeCueFile(payload.content)
       }
-    }
 
-    throw new Error('Validation payload must include either content or path.')
+      if (payload.path) {
+        // readFile rejects invalid JSON or schema, and the canonical validator runs on both
+        // branches.
+        return validateNodeCueFile(await loader.readFile(payload.path))
+      }
+
+      throw new Error('Validation payload must include either content or path.')
+    } catch (error) {
+      return validationRefusal(error)
+    }
   })
 
   handleInvoke(

@@ -24,7 +24,7 @@ export interface AppShellInvokeMap {
   // ---- Lifecycle ----
   [LIFECYCLE.GET_PHASE]: {
     request: void
-    response: LifecyclePhase
+    response: LifecyclePhase | IpcErrorResult
   }
   [LIFECYCLE.RETRY_INIT]: {
     request: void

@@ -59,6 +59,8 @@ async function mount(binding: Partial<BlackoutShortcutBinding> = {}) {
     </Provider>,
   )
   await waitFor(() => expect(invoke).toHaveBeenCalledWith(CONFIG.GET_PREFS, undefined))
+  // A macrotask turn settles the whole promise chain the read sets the binding from.
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
   return { ...utils, store }
 }
 

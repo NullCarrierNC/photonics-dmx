@@ -27,10 +27,10 @@ export interface ListenerInvokeMap {
   }
   [CUE.GET_YARG_ENABLED]: {
     request: void
-    response: boolean
+    response: boolean | IpcErrorResult
   }
   [CUE.GET_RB3_ENABLED]: {
     request: void
-    response: boolean
+    response: boolean | IpcErrorResult
   }
 }
