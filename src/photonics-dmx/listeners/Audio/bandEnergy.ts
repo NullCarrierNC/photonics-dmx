@@ -4,12 +4,12 @@
  */
 
 /**
- * Compute normalized energy (0-1) in a frequency range from raw FFT byte data.
- * Average of normalized bin values in the range; same algorithm used by
- * AudioNodeCue trigger nodes so EQ bars and trigger thresholds match.
+ * Compute normalized energy (0-1) in a frequency range from raw FFT byte data, a plain array or
+ * the analyser's own byte buffer. Average of normalized bin values in the range. Same algorithm
+ * used by AudioNodeCue trigger nodes so EQ bars and trigger thresholds match.
  */
 export function getBandEnergy(
-  rawData: number[],
+  rawData: ArrayLike<number>,
   sampleRate: number,
   fftSize: number,
   minHz: number,
