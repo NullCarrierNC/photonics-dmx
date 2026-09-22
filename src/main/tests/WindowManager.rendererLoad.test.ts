@@ -6,7 +6,7 @@ const mockLoadURL = jest.fn(() => Promise.resolve())
 jest.mock('electron', () => ({
   BrowserWindow: jest.fn(() => ({
     on: jest.fn(),
-    webContents: { setWindowOpenHandler: jest.fn() },
+    webContents: { setWindowOpenHandler: jest.fn(), on: jest.fn() },
     loadFile: mockLoadFile,
     loadURL: mockLoadURL,
   })),

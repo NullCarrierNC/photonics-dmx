@@ -2,8 +2,8 @@ import { jest } from '@jest/globals'
 
 /**
  * A stand-in for an Electron `BrowserWindow`, enough for `WindowManager` to build, save, front
- * and close one. `emit` fires the handlers the manager registered, so a test can move, resize or
- * close the window the way the OS would.
+ * and close one. `emit` and `webContents.emit` fire the handlers the manager registered, so a test
+ * can move, resize, close or unload the window the way Electron would.
  */
 export interface FakeBrowserWindow {
   destroyed: boolean
@@ -25,22 +25,33 @@ export interface FakeBrowserWindow {
   webContents: {
     send: jest.Mock<(...args: unknown[]) => void>
     setWindowOpenHandler: jest.Mock<(...args: unknown[]) => void>
+    on: (event: string, handler: (...args: unknown[]) => void) => void
+    emit: (event: string, ...args: unknown[]) => void
+  }
+}
+
+/** Registers handlers by event name and fires them in the order they were added. */
+function eventHub() {
+  const handlers = new Map<string, Array<(...args: unknown[]) => void>>()
+  return {
+    on: (event: string, handler: (...args: unknown[]) => void) => {
+      handlers.set(event, [...(handlers.get(event) ?? []), handler])
+    },
+    emit: (event: string, ...args: unknown[]) => {
+      for (const handler of handlers.get(event) ?? []) handler(...args)
+    },
   }
 }
 
 export function createFakeBrowserWindow(options: Record<string, unknown> = {}): FakeBrowserWindow {
-  const handlers = new Map<string, Array<(...args: unknown[]) => void>>()
+  const windowEvents = eventHub()
   const window: FakeBrowserWindow = {
     destroyed: false,
     minimized: false,
     bounds: { width: 1280, height: 800, x: 10, y: 20 },
     options,
-    on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
-      handlers.set(event, [...(handlers.get(event) ?? []), handler])
-    }),
-    emit: (event, ...args) => {
-      for (const handler of handlers.get(event) ?? []) handler(...args)
-    },
+    on: jest.fn(windowEvents.on),
+    emit: windowEvents.emit,
     isDestroyed: () => window.destroyed,
     isMinimized: () => window.minimized,
     getBounds: () => window.bounds,
@@ -50,7 +61,7 @@ export function createFakeBrowserWindow(options: Record<string, unknown> = {}): 
     restore: jest.fn(),
     loadFile: jest.fn(() => Promise.resolve()),
     loadURL: jest.fn(() => Promise.resolve()),
-    webContents: { send: jest.fn(), setWindowOpenHandler: jest.fn() },
+    webContents: { send: jest.fn(), setWindowOpenHandler: jest.fn(), ...eventHub() },
   }
   return window
 }

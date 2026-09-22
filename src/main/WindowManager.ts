@@ -1,4 +1,4 @@
-import { BrowserWindow, shell, screen } from 'electron'
+import { BrowserWindow, dialog, shell, screen } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import type { ControllerManager } from './controllers/ControllerManager'
@@ -60,6 +60,8 @@ export class WindowManager {
   private readonly windows = new Map<WindowRole, BrowserWindow>()
   private readonly saveTimers = new Map<WindowRole, NodeJS.Timeout>()
   private controllerManager: ControllerManager | null = null
+  /** Set once the app closes its windows to quit. No page is asked to stay after that. */
+  private quitting = false
 
   /**
    * Sets the controller manager for accessing preferences
@@ -180,6 +182,13 @@ export class WindowManager {
       return { action: 'deny' }
     })
     denyWebContentsWillNavigate(window.webContents)
+    // A page with unsaved changes refuses to unload, and Electron cancels the close or reload
+    // unless this lets it go.
+    window.webContents.on('will-prevent-unload', (event) => {
+      if (this.quitting || this.confirmLeave(window)) {
+        event.preventDefault()
+      }
+    })
 
     const devUrl = process.env['ELECTRON_RENDERER_URL']
     const failed = onLoadFailure(spec.label)
@@ -194,6 +203,20 @@ export class WindowManager {
     }
 
     return window
+  }
+
+  /** Asks whether to leave a page that holds unsaved changes. True to leave. */
+  private confirmLeave(window: BrowserWindow): boolean {
+    const choice = dialog.showMessageBoxSync(window, {
+      type: 'question',
+      buttons: ['Leave', 'Stay'],
+      defaultId: 1,
+      cancelId: 1,
+      title: 'Unsaved changes',
+      message: 'This page has unsaved changes.',
+      detail: 'Leave anyway and lose them?',
+    })
+    return choice === 0
   }
 
   /** Fronts the window open in a role, or creates it. */
@@ -258,9 +281,11 @@ export class WindowManager {
   }
 
   /**
-   * Saves every open window's geometry, then closes them all.
+   * Saves every open window's geometry, then closes them all. The app calls this to quit, so no
+   * page with unsaved changes is asked to stay.
    */
   public async closeAllWindows(): Promise<void> {
+    this.quitting = true
     for (const role of WINDOW_ROLES) {
       await this.saveWindowState(role)
     }
