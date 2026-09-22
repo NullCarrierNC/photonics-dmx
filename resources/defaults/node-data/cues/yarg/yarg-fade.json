@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cueVersion": 4,
+  "cueVersion": 5,
   "mode": "yarg",
   "group": {
     "id": "yarg-fade",
@@ -2687,7 +2687,7 @@
     {
       "id": "cue-fade-stomp",
       "name": "Stomp",
-      "description": "Blue stage with a white bloom swelling on every keyframe",
+      "description": "A white bloom swells over the running look on every keyframe",
       "cueType": "Stomp",
       "style": "secondary",
       "kind": "lighting",
@@ -2704,75 +2704,7 @@
             "eventType": "keyframe"
           }
         ],
-        "actions": [
-          {
-            "id": "fade-stomp-field",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "blue"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          }
-        ],
+        "actions": [],
         "logic": [
           {
             "id": "fade-stomp-all",
@@ -2851,10 +2783,6 @@
         {
           "from": "fade-stomp-trig",
           "to": "fade-stomp-bloom"
-        },
-        {
-          "from": "fade-stomp-all",
-          "to": "fade-stomp-field"
         }
       ],
       "layout": {
@@ -2866,10 +2794,6 @@
           "fade-stomp-trig": {
             "x": 434.2947468049824,
             "y": 0
-          },
-          "fade-stomp-field": {
-            "x": -21.33333333333337,
-            "y": 223.9206180870533
           },
           "fade-stomp-all": {
             "x": 3.628080138315795,
@@ -3631,7 +3555,7 @@
     {
       "id": "cue-fade-search",
       "name": "Searchlights",
-      "description": "A yellow beam steps around a dark stage on the beat, with a bright red pulse on every measure",
+      "description": "A yellow beam steps around the lights on the beat over the running look, with a bright red pulse on every measure",
       "cueType": "Searchlights",
       "style": "secondary",
       "kind": "lighting",
@@ -3677,7 +3601,7 @@
               },
               "layer": {
                 "source": "literal",
-                "value": 1
+                "value": 10
               },
               "color": {
                 "source": "literal",
@@ -3847,7 +3771,7 @@
     {
       "id": "cue-fade-sweep",
       "name": "Sweep",
-      "description": "A soft red beam sweeps across a yellow stage",
+      "description": "A soft red beam sweeps across the lights over the running look",
       "cueType": "Sweep",
       "style": "secondary",
       "kind": "lighting",
@@ -3859,75 +3783,7 @@
             "eventType": "cue-started"
           }
         ],
-        "actions": [
-          {
-            "id": "fade-sweep-field",
-            "type": "action",
-            "effectType": "set-color",
-            "target": {
-              "groups": {
-                "source": "literal",
-                "value": "front,back"
-              },
-              "filter": {
-                "source": "literal",
-                "value": "all"
-              }
-            },
-            "color": {
-              "name": {
-                "source": "literal",
-                "value": "yellow"
-              },
-              "brightness": {
-                "source": "literal",
-                "value": "medium"
-              },
-              "blendMode": {
-                "source": "literal",
-                "value": "replace"
-              },
-              "opacity": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "timing": {
-              "waitForCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitForTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "duration": {
-                "source": "literal",
-                "value": 0
-              },
-              "waitUntilCondition": {
-                "source": "literal",
-                "value": "none"
-              },
-              "waitUntilTime": {
-                "source": "literal",
-                "value": 0
-              },
-              "easing": {
-                "source": "literal",
-                "value": "linear"
-              },
-              "level": {
-                "source": "literal",
-                "value": 1
-              }
-            },
-            "layer": {
-              "source": "literal",
-              "value": 0
-            }
-          }
-        ],
+        "actions": [],
         "logic": [
           {
             "id": "fade-sweep-front",
@@ -3985,7 +3841,7 @@
               },
               "blendMode": {
                 "source": "literal",
-                "value": "replace"
+                "value": "add"
               },
               "sweepTime": {
                 "source": "literal",
@@ -4013,7 +3869,7 @@
               },
               "lowColor": {
                 "source": "literal",
-                "value": "yellow"
+                "value": "black"
               }
             }
           }
@@ -4039,10 +3895,6 @@
         },
         {
           "from": "fade-sweep-ord",
-          "to": "fade-sweep-field"
-        },
-        {
-          "from": "fade-sweep-field",
           "to": "fade-sweep-comet"
         }
       ],
@@ -4051,10 +3903,6 @@
           "fade-sweep-start": {
             "x": 236,
             "y": -31.999999999999943
-          },
-          "fade-sweep-field": {
-            "x": 224,
-            "y": 484.05403350790334
           },
           "fade-sweep-front": {
             "x": 245.56316137562203,

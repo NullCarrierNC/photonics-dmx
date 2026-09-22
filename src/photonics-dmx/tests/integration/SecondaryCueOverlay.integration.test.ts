@@ -164,83 +164,85 @@ describe('secondary cue over a primary look', () => {
   })
 })
 
-describe('Stage Kit chart strobe through the YARG listener', () => {
-  afterEach(() => {
-    CueRegistry.getInstance().reset()
-    __resetStrobeStateManagerForTests()
-  })
+type YargRig = {
+  /** Sends one wire-format frame to the listener, then lets the clock run for 33 ms. */
+  frame: (lightingCue: number, strobe?: number) => Promise<void>
+  /** Front and back lights with any output. */
+  lit: () => number
+  /** Front and back lights whose red channel is above the given level. */
+  withRed: (level: number) => number
+  teardown: () => void
+}
 
-  async function litThroughStrobe(lightingCueByte: number): Promise<number[]> {
-    __resetStrobeStateManagerForTests()
-    const clock = new ManualTestClock(10)
-    const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => clock.getCurrentTimeMs())
-    const light = (group: 'front' | 'back' | 'strobe', position: number) =>
-      createMockDmxLight({
-        id: `${group}-${position}`,
-        group,
-        position,
-        isStrobeEnabled: group === 'strobe',
-      })
-    const lightManager = new DmxLightManager(
-      createMockLightingConfig({
-        numLights: 10,
-        frontLights: [1, 2, 3, 4].map((p) => light('front', p)),
-        backLights: [5, 6, 7, 8].map((p) => light('back', p)),
-        strobeLights: [9, 10].map((p) => light('strobe', p)),
-      }),
-    )
-    const lightStateManager = new LightStateManager()
-    const sequencer = new Sequencer(
-      new LightTransitionController(lightStateManager),
-      clock as never,
-    )
-
-    const registry = CueRegistry.getInstance()
-    registry.reset()
-    const file = validateYargNodeCueFile(
-      JSON.parse(fs.readFileSync(path.join(NODE_DATA, 'cues/yarg/yarg-stagekit.json'), 'utf8')),
-    )
-    if (!file.valid) throw new Error('yarg-stagekit.json failed validation')
-    const effects = allBundledYargEffects()
-    const group = await buildNetGroup(file.data as never, [], {
-      runtimeBroadcaster: noopCallbacks,
-      buildEffectRegistry: async () => effects,
+/**
+ * Four front, four back and two strobe-enabled strobe lights, driven through the real YARG
+ * listener into a cue handler bound to one bundled YARG group.
+ */
+async function createYargRig(groupFile: string): Promise<YargRig> {
+  __resetStrobeStateManagerForTests()
+  const clock = new ManualTestClock(10)
+  const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => clock.getCurrentTimeMs())
+  const light = (group: 'front' | 'back' | 'strobe', position: number) =>
+    createMockDmxLight({
+      id: `${group}-${position}`,
+      group,
+      position,
+      isStrobeEnabled: group === 'strobe',
     })
-    registry.registerGroup(group)
-    registry.setEnabledGroups([group.id])
-    registry.setActiveGroups([group.id])
+  const lightManager = new DmxLightManager(
+    createMockLightingConfig({
+      numLights: 10,
+      frontLights: [1, 2, 3, 4].map((p) => light('front', p)),
+      backLights: [5, 6, 7, 8].map((p) => light('back', p)),
+      strobeLights: [9, 10].map((p) => light('strobe', p)),
+    }),
+  )
+  const lightStateManager = new LightStateManager()
+  const sequencer = new Sequencer(new LightTransitionController(lightStateManager), clock as never)
 
-    const handler = new CueHandler(lightManager, sequencer, { registry })
-    const fanout = new ChainFanout()
-    fanout.setChains([
-      {
-        rigId: 'A',
-        isPrimary: true,
-        sequencer,
-        dmxLightManager: lightManager,
-        cueHandlers: { yarg: handler, rb3: null },
-        audioCueHandler: null,
-        rb3MenuCueHandler: null,
-      } as unknown as RigChain,
-    ])
-    const listener = new YargNetworkListener(fanout.cueRuntime('yarg'))
-    const deserialize = (packet: Buffer): void =>
-      (listener as unknown as { deserializePacket(b: Buffer): void }).deserializePacket(packet)
+  const registry = CueRegistry.getInstance()
+  registry.reset()
+  const file = validateYargNodeCueFile(
+    JSON.parse(fs.readFileSync(path.join(NODE_DATA, 'cues/yarg', groupFile), 'utf8')),
+  )
+  if (!file.valid) throw new Error(`${groupFile} failed validation`)
+  const effects = allBundledYargEffects()
+  const group = await buildNetGroup(file.data as never, [], {
+    runtimeBroadcaster: noopCallbacks,
+    buildEffectRegistry: async () => effects,
+  })
+  registry.registerGroup(group)
+  registry.setEnabledGroups([group.id])
+  registry.setActiveGroups([group.id])
 
-    const lit = (): number =>
-      lightManager
-        .getLights(['front', 'back'], ['all'])
-        .filter((l) => (lightStateManager.getLightState(l.id)?.intensity ?? 0) > 0).length
+  const handler = new CueHandler(lightManager, sequencer, { registry })
+  const fanout = new ChainFanout()
+  fanout.setChains([
+    {
+      rigId: 'A',
+      isPrimary: true,
+      sequencer,
+      dmxLightManager: lightManager,
+      cueHandlers: { yarg: handler, rb3: null },
+      audioCueHandler: null,
+      rb3MenuCueHandler: null,
+    } as unknown as RigChain,
+  ])
+  const listener = new YargNetworkListener(fanout.cueRuntime('yarg'))
+  const deserialize = (packet: Buffer): void =>
+    (listener as unknown as { deserializePacket(b: Buffer): void }).deserializePacket(packet)
+  const frontAndBack = lightManager.getLights(['front', 'back'], ['all'])
 
-    let beat = 0
-    const frame = async (strobe: number): Promise<void> => {
+  let beat = 0
+  return {
+    frame: async (lightingCue, strobe = StrobeByte.Strobe_Off) => {
       beat = (beat + 1) % 16
       deserialize(
         buildYargPacket({
           datagramVersion: 5,
           scene: SceneIndexByte.Gameplay,
           pause: PauseStateByte.Unpaused,
-          lightingCue: lightingCueByte,
+          lightingCue,
           strobe,
           beat: beat === 0 ? BeatByte.Measure : beat % 4 === 0 ? BeatByte.Strong : BeatByte.Off,
           guitarNotes: 0,
@@ -253,31 +255,64 @@ describe('Stage Kit chart strobe through the YARG listener', () => {
       for (let i = 0; i < 4; i++) await Promise.resolve()
       clock.tick(33)
       for (let i = 0; i < 4; i++) await Promise.resolve()
-    }
-
-    try {
-      for (let f = 0; f < 60; f++) await frame(StrobeByte.Strobe_Off)
-      const before = lit()
-      await frame(StrobeByte.Strobe_Fast)
-      const firstStrobeFrame = lit()
-      for (let f = 0; f < 29; f++) await frame(StrobeByte.Strobe_Fast)
-      for (let f = 0; f < 3; f++) await frame(StrobeByte.Strobe_Off)
-      const justAfter = lit()
-      for (let f = 0; f < 90; f++) await frame(StrobeByte.Strobe_Off)
-      return [before, firstStrobeFrame, justAfter, lit()]
-    } finally {
+    },
+    lit: () =>
+      frontAndBack.filter((l) => (lightStateManager.getLightState(l.id)?.intensity ?? 0) > 0)
+        .length,
+    withRed: (level) =>
+      frontAndBack.filter((l) => (lightStateManager.getLightState(l.id)?.red ?? 0) > level).length,
+    teardown: () => {
       handler.shutdown()
       sequencer.shutdown()
       nowSpy.mockRestore()
-    }
+      registry.reset()
+      __resetStrobeStateManagerForTests()
+    },
   }
+}
 
+describe('Stage Kit chart strobe through the YARG listener', () => {
   it.each([
     ['Intro', 15],
     ['Silhouettes', 17],
     ['Flare_Fast', 12],
-  ])('keeps every front and back light of %s lit through the strobe and after', async (_, byte) => {
-    expect(await litThroughStrobe(byte)).toEqual([8, 8, 8, 8])
+  ])('keeps every front and back light of %s lit through the strobe and after', async (_, cue) => {
+    const rig = await createYargRig('yarg-stagekit.json')
+    try {
+      for (let f = 0; f < 60; f++) await rig.frame(cue)
+      const before = rig.lit()
+      await rig.frame(cue, StrobeByte.Strobe_Fast)
+      const firstStrobeFrame = rig.lit()
+      for (let f = 0; f < 29; f++) await rig.frame(cue, StrobeByte.Strobe_Fast)
+      for (let f = 0; f < 3; f++) await rig.frame(cue)
+      const justAfter = rig.lit()
+      for (let f = 0; f < 90; f++) await rig.frame(cue)
+      expect([before, firstStrobeFrame, justAfter, rig.lit()]).toEqual([8, 8, 8, 8])
+    } finally {
+      rig.teardown()
+    }
+  })
+})
+
+describe('Fade Based Sweep over Cool_Automatic', () => {
+  const COOL_AUTOMATIC = 11
+  const SWEEP = 25
+
+  it('adds a red beam over the cool cross-fade and leaves the rest of the rig on it', async () => {
+    const rig = await createYargRig('yarg-fade.json')
+    try {
+      for (let f = 0; f < 60; f++) await rig.frame(COOL_AUTOMATIC)
+      let mostWithRed = 0
+      for (let f = 0; f < 150; f++) {
+        await rig.frame(SWEEP)
+        expect(rig.lit()).toBe(8)
+        mostWithRed = Math.max(mostWithRed, rig.withRed(60))
+      }
+      expect(mostWithRed).toBeGreaterThan(0)
+      expect(mostWithRed).toBeLessThanOrEqual(3)
+    } finally {
+      rig.teardown()
+    }
   })
 })
 
