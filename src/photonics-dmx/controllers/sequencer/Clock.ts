@@ -215,8 +215,9 @@ export class Clock {
 
     // Notify all registered callbacks. A subscriber that throws is isolated so the rest of the
     // pipeline still runs, and reported once per fault rather than on every tick: at the default
-    // rate an unlatched log writes a hundred lines a second for as long as the fault lasts.
-    this.updateCallbacks.forEach((callback) => {
+    // rate an unlatched log writes a hundred lines a second for as long as the fault lasts. The
+    // list is copied first, so a subscriber that unregisters during the pass cannot shift it.
+    Array.from(this.updateCallbacks).forEach((callback) => {
       try {
         callback(deltaTime)
         this.faultedCallbacks.delete(callback)
