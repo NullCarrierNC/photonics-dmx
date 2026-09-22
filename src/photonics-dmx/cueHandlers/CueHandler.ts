@@ -133,9 +133,11 @@ class CueHandler extends EventEmitter {
     return this.motionCoordinator.getRunningMotionRef()
   }
 
+  /** A new song starts with no chart blackout held, so a strobe that opens it plays. */
   public notifySongStart(): void {
     this.registry.onSongStart()
     this.registry.onMotionSongStart()
+    this.chartBlackoutHeld = false
   }
 
   public notifySongEnd(): void {

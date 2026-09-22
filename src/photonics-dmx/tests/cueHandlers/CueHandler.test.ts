@@ -865,6 +865,25 @@ describe('CueHandler chart blackout strobe suppression', () => {
 
     expect(strobe.execute).toHaveBeenCalled()
   })
+
+  it('plays a strobe that opens a song after a menu blackout', async () => {
+    const handler = new CueHandler(makeLightManager(), makeSequencer())
+    handler.setMotionEnabled(false)
+    const strobe = makeFakeCue(CueStyle.Secondary, 'strobe:Strobe_Fast')
+    await handler.handleCue(
+      CueType.Blackout_Fast,
+      gameplayCueData({ lightingCue: CueType.Blackout_Fast }),
+    )
+
+    handler.notifySongStart()
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(strobe)
+    await handler.handleCue(
+      CueType.Strobe_Fast,
+      gameplayCueData({ lightingCue: CueType.RB3, strobeState: 'Strobe_Fast' }),
+    )
+
+    expect(strobe.execute).toHaveBeenCalled()
+  })
 })
 
 describe('CueHandler cue change during a cue-driven fade', () => {
