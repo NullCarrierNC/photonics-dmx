@@ -58,4 +58,20 @@ describe('WindowManager restored bounds', () => {
 
     expect(lastWindowBounds()).toEqual({ x: 560, y: 252, width: 800, height: 600 })
   })
+
+  it('opens the audio preview at its own default size over a stored size with no position', () => {
+    managerWithSaved({
+      audioPreviewWindowState: { width: 560, height: 480 },
+    }).openAudioPreviewWindow()
+
+    expect(lastWindowBounds()).toMatchObject({ width: 560, height: 584 })
+  })
+
+  it('reopens a window the user sized and placed at that size', () => {
+    managerWithSaved({
+      audioPreviewWindowState: { x: 40, y: 60, width: 700, height: 480 },
+    }).openAudioPreviewWindow()
+
+    expect(lastWindowBounds()).toEqual({ x: 40, y: 60, width: 700, height: 480 })
+  })
 })

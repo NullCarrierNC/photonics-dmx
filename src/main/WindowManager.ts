@@ -126,10 +126,14 @@ export class WindowManager {
     )
   }
 
-  /** The saved geometry for a role, or its default size, kept on screen. */
+  /**
+   * The saved geometry for a role, or its default size, kept on screen. A saved window always has
+   * a position, so a stored size without one was never the user's and the default size applies.
+   */
   private initialBounds(role: WindowRole): WindowBounds {
     const spec = WINDOW_SPECS[role]
-    const saved = this.controllerManager?.getConfig().getPreference(spec.stateKey)
+    const stored = this.controllerManager?.getConfig().getPreference(spec.stateKey)
+    const saved = stored?.x !== undefined && stored.y !== undefined ? stored : undefined
     return fitWindowBounds(
       {
         width: saved?.width || spec.width,

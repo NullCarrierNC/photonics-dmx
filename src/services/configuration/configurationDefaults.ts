@@ -297,12 +297,4 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   videoLagCompensationMs: LAG_COMPENSATION_MS_DEFAULT,
   audioLagCompensationMs: LAG_COMPENSATION_MS_DEFAULT,
   audioConfig: DEFAULT_AUDIO_CONFIG,
-  cueEditorWindowState: {
-    width: 1200,
-    height: 900,
-  },
-  audioPreviewWindowState: {
-    width: 560,
-    height: 480,
-  },
 }
