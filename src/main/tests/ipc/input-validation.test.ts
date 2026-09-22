@@ -395,6 +395,73 @@ describe('inputValidation', () => {
       if (result.ok) expect(result.value.sender).toBe('opendmx')
     })
 
+    describe('sACN unicast destination', () => {
+      const sacn = (unicastDestination: unknown) =>
+        validateSenderEnablePayload({ sender: 'sacn', useUnicast: true, unicastDestination })
+
+      it('accepts an IP address or a hostname', () => {
+        for (const host of ['10.0.0.5', 'lights.local']) {
+          const result = sacn(host)
+          expect(
+            result.ok && result.value.sender === 'sacn' && result.value.unicastDestination,
+          ).toBe(host)
+        }
+      })
+
+      it('reads an empty destination as none', () => {
+        const result = sacn('')
+        expect(result.ok && result.value.sender === 'sacn' && result.value.unicastDestination).toBe(
+          undefined,
+        )
+      })
+
+      it('refuses a destination that is not a host', () => {
+        expect(sacn('not a host!').ok).toBe(false)
+        expect(sacn(42).ok).toBe(false)
+      })
+    })
+
+    describe('serial device paths', () => {
+      it.each([
+        'COM3',
+        'com12',
+        '\\\\.\\COM14',
+        '/dev/ttyUSB0',
+        '/dev/tty.usbserial-A10KDJ7N',
+        '/dev/cu.usbserial-A10KDJ7N',
+        '/dev/ttyACM0',
+        '/dev/serial/by-id/usb-FTDI_FT232R-if00-port0',
+      ])('accepts %s', (devicePath) => {
+        expect(validateSenderEnablePayload({ sender: 'enttecpro', devicePath }).ok).toBe(true)
+        expect(validateSenderEnablePayload({ sender: 'opendmx', devicePath }).ok).toBe(true)
+      })
+
+      it.each([
+        '/etc/passwd',
+        '/dev/../etc/passwd',
+        'ttyUSB0',
+        'COM3; rm -rf /',
+        '/tmp/port',
+        'COM',
+        '/dev/console',
+        '/dev/disk0',
+        '/dev/tty',
+      ])('refuses %s', (devicePath) => {
+        expect(validateSenderEnablePayload({ sender: 'enttecpro', devicePath }).ok).toBe(false)
+        expect(validateSenderEnablePayload({ sender: 'opendmx', devicePath }).ok).toBe(false)
+      })
+
+      it('holds a stored port to the same rule, with an empty port meaning none chosen', () => {
+        expect(validatePreferencesPayload({ enttecProConfig: { port: '/etc/passwd' } }).ok).toBe(
+          false,
+        )
+        expect(validatePreferencesPayload({ openDmxConfig: { port: '' } }).ok).toBe(true)
+        expect(validatePreferencesPayload({ openDmxConfig: { port: '/dev/ttyUSB0' } }).ok).toBe(
+          true,
+        )
+      })
+    })
+
     it('rejects non-object payload', () => {
       const result = validateSenderEnablePayload('bad')
       expect(result.ok).toBe(false)

@@ -151,6 +151,29 @@ export function validateHost(value: unknown): ValidationResult<string> {
   return { ok: true, value: host }
 }
 
+const WINDOWS_COM_PORT = /^(?:\\\\\.\\)?COM\d{1,3}$/i
+const SERIAL_DEVICE = /^\/dev\/(?:(?:tty|cu)[\w.:+@-]+|serial\/by-(?:id|path)\/[\w.:+@-]+)$/
+
+/**
+ * A serial device path as the serial port list reports one: a Windows COM port, plain or in its
+ * `\\.\` form, or a serial device under /dev (tty and cu devices, and the /dev/serial links).
+ * Anything else, another device, a file elsewhere or a path that climbs back out of /dev, is
+ * refused before it reaches the serial driver.
+ */
+export function validateSerialDevicePath(value: unknown): ValidationResult<string> {
+  if (!isNonEmptyString(value)) {
+    return { ok: false, error: 'Device path is required' }
+  }
+  const devicePath = value.trim()
+  if (WINDOWS_COM_PORT.test(devicePath)) {
+    return { ok: true, value: devicePath }
+  }
+  if (SERIAL_DEVICE.test(devicePath) && !devicePath.split('/').includes('..')) {
+    return { ok: true, value: devicePath }
+  }
+  return { ok: false, error: 'Device path must be a COM port or a serial device under /dev' }
+}
+
 export function validateSenderEnablePayload(data: unknown): ValidationResult<SenderConfig> {
   if (!isPlainObject(data)) {
     return { ok: false, error: 'Invalid sender payload' }
@@ -183,6 +206,15 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
       if (!universeValidation.ok) {
         return universeValidation
       }
+      // The stored config holds its destination to the same rule, and an empty one means none.
+      let unicastDestination: string | undefined
+      if (data.unicastDestination != null && data.unicastDestination !== '') {
+        const destination = validateHost(data.unicastDestination)
+        if (!destination.ok) {
+          return { ok: false, error: `SACN unicast destination: ${destination.error}` }
+        }
+        unicastDestination = destination.value
+      }
       const hz = dmxOutputRefreshRateHzFromUnknownPayload(data as Record<string, unknown>)
       const config: SacnSenderConfig = {
         sender: 'sacn',
@@ -192,8 +224,7 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
             ? data.networkInterface
             : undefined,
         useUnicast: Boolean(data.useUnicast),
-        unicastDestination:
-          typeof data.unicastDestination === 'string' ? data.unicastDestination : undefined,
+        unicastDestination,
         maxOutputRate: hz,
         minRefreshRate: hz,
       }
@@ -201,10 +232,14 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
     }
 
     case 'enttecpro': {
-      const port = data.devicePath
-      if (!isNonEmptyString(port)) {
+      if (!isNonEmptyString(data.devicePath)) {
         return { ok: false, error: 'Port (device path) is required for EnttecPro sender' }
       }
+      const devicePath = validateSerialDevicePath(data.devicePath)
+      if (!devicePath.ok) {
+        return devicePath
+      }
+      const port = devicePath.value
       // Absence selects the default rate (applied where the config is consumed). A supplied value
       // must be a finite number, or the payload is rejected.
       let dmxSpeed: number | undefined
@@ -225,10 +260,14 @@ export function validateSenderEnablePayload(data: unknown): ValidationResult<Sen
     }
 
     case 'opendmx': {
-      const port = data.devicePath
-      if (!isNonEmptyString(port)) {
+      if (!isNonEmptyString(data.devicePath)) {
         return { ok: false, error: 'Port (device path) is required for OpenDMX sender' }
       }
+      const devicePath = validateSerialDevicePath(data.devicePath)
+      if (!devicePath.ok) {
+        return devicePath
+      }
+      const port = devicePath.value
       // Absence selects the default rate (applied where the config is consumed). A supplied value
       // must be a finite number, or the payload is rejected.
       let dmxSpeed: number | undefined

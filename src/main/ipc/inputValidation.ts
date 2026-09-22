@@ -39,6 +39,7 @@ export {
   validateRigMirrorFlag,
   validateRigOutputs,
   validateHost,
+  validateSerialDevicePath,
   validateSenderEnablePayload,
   validateMasterOutputPayload,
 } from './validation/senderValidation'

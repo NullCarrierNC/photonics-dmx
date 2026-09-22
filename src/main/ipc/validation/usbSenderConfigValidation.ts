@@ -3,6 +3,7 @@ import {
   normalizeOpenDmxSpeedHz,
 } from '../../../shared/dmxOutputRefresh'
 import { isPlainObject, type ValidationResult } from './primitives'
+import { validateSerialDevicePath } from './senderValidation'
 
 /**
  * Validates one USB sender's stored config shape. When the config carries a `dmxSpeed`, returns a
@@ -19,6 +20,13 @@ export function validateUsbSenderConfig(
   }
   if ('port' in value && typeof value.port !== 'string') {
     return { ok: false, error: `${name}.port must be a string` }
+  }
+  // An empty port means none has been chosen yet.
+  if (typeof value.port === 'string' && value.port !== '') {
+    const port = validateSerialDevicePath(value.port)
+    if (!port.ok) {
+      return { ok: false, error: `${name}.port: ${port.error}` }
+    }
   }
   if ('dmxSpeed' in value) {
     if (typeof value.dmxSpeed !== 'number' || !Number.isFinite(value.dmxSpeed)) {
