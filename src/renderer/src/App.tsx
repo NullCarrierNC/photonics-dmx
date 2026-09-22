@@ -52,6 +52,7 @@ import {
   getSystemStatus,
 } from './ipcApi'
 import { registerIpcListener } from './utils/ipcHelpers'
+import { configRecoveryMessages, type ConfigRecoveryFile } from './utils/configRecoveryMessages'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('App')
@@ -144,13 +145,10 @@ export const App = (): JSX.Element => {
   )
 
   const handleConfigCorruptRecovered = useCallback(
-    (payload: { files: { fileName: string; message?: string }[] }): void => {
-      const list = payload.files.map((f) => f.fileName).join(', ')
-      showToast(
-        `A local settings file was invalid. Defaults were restored; your original file was saved as a backup. (${list})`,
-        'warning',
-        10000,
-      )
+    (payload: { files: ConfigRecoveryFile[] }): void => {
+      for (const message of configRecoveryMessages(payload.files)) {
+        showToast(message, 'warning', 10000)
+      }
     },
     [showToast],
   )

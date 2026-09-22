@@ -1,0 +1,33 @@
+import { describe, expect, it } from '@jest/globals'
+import { configRecoveryMessages } from './configRecoveryMessages'
+
+describe('configRecoveryMessages', () => {
+  it('says nothing when no file was recovered', () => {
+    expect(configRecoveryMessages([])).toEqual([])
+  })
+
+  it('reports a file replaced by defaults as backed up', () => {
+    const [message] = configRecoveryMessages([{ fileName: 'lights.json', reason: 'parse' }])
+    expect(message).toContain('saved as a backup')
+    expect(message).toContain('lights.json')
+  })
+
+  it('reports a repaired file as keeping everything but the reset values', () => {
+    const messages = configRecoveryMessages([
+      { fileName: 'prefs.json', reason: 'repaired', message: 'Reset to default: clockRate' },
+    ])
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toContain('Everything else was kept')
+    expect(messages[0]).toContain('clockRate')
+    expect(messages[0]).not.toContain('backup')
+  })
+
+  it('gives each kind its own message when both happened', () => {
+    expect(
+      configRecoveryMessages([
+        { fileName: 'lights.json', reason: 'schema' },
+        { fileName: 'prefs.json', reason: 'repaired' },
+      ]),
+    ).toHaveLength(2)
+  })
+})

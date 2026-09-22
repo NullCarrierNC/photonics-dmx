@@ -11,6 +11,7 @@ import {
   seedMissingRequiredPrefs,
 } from './preferencesMigration'
 import { validateAppPreferencesData } from './configDataValidators'
+import { repairInvalidPreferenceFields } from './preferencesFieldRepair'
 
 /**
  * App preferences (prefs.json) with v3 → v4 migration into `cueDomains`, a one-time v4 → v5
@@ -19,15 +20,19 @@ import { validateAppPreferencesData } from './configDataValidators'
  * requires are seeded from the defaults and every cue domain is completed, so a file short of one
  * of them keeps the rest of its settings instead of being moved aside. Stored values a driver or
  * the engine cannot use, a sender configuration or the clock rate, come back into range in the
- * same pass.
+ * same pass. Last, any value the schema still rejects goes back to its default, and the file is
+ * moved aside only when that is not enough.
  */
 export class PreferencesConfigFile extends ConfigFile<AppPreferences> {
   constructor(hooks: ConfigFileHooks<AppPreferences> = {}) {
     super('prefs.json', DEFAULT_PREFERENCES, 6, {
       validate: validateAppPreferencesData,
-      normalizeLoaded: (data) =>
-        healStoredClockRate(
-          healStoredSenderConfigs(repairCueDomains(seedMissingRequiredPrefs(data))),
+      normalizeLoaded: (data, reportRepair) =>
+        repairInvalidPreferenceFields(
+          healStoredClockRate(
+            healStoredSenderConfigs(repairCueDomains(seedMissingRequiredPrefs(data))),
+          ),
+          reportRepair,
         ),
       ...hooks,
     })

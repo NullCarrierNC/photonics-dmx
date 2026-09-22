@@ -11,6 +11,7 @@ import {
   OPEN_DMX_DEFAULT_REFRESH_RATE_HZ,
 } from '../../../shared/dmxOutputRefresh'
 import { createLogger } from '../../../shared/logger'
+import type { ConfigRecoveryFile } from '../utils/configRecoveryMessages'
 const log = createLogger('useAppIpcListeners')
 
 export interface UseAppIpcListenersParams {
@@ -35,9 +36,7 @@ export interface UseAppIpcListenersParams {
   handleCueValidationErrors: (
     errors: Array<{ source: 'node-cue' | 'effect'; errors: string[] }>,
   ) => void
-  handleConfigCorruptRecovered: (payload: {
-    files: { fileName: string; message?: string }[]
-  }) => void
+  handleConfigCorruptRecovered: (payload: { files: ConfigRecoveryFile[] }) => void
   handleAudioEnable: (config: AudioConfig) => void | Promise<void>
   handleAudioDisable: (payload: undefined) => void
   handleAudioConfigUpdate: (config: AudioConfig | undefined) => void

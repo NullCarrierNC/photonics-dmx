@@ -35,8 +35,11 @@ export type ConfigFileHooks<T> = {
    * reference) when nothing needs fixing, or a repaired copy otherwise; a changed reference is
    * persisted. Use to seed shape additions (e.g. new required keys) so a same-version file that
    * predates them passes validation instead of triggering corrupt-recovery.
+   *
+   * `reportRepair` tells the corrupt-recovery hook that stored values were put back to their
+   * defaults, with a message naming them.
    */
-  normalizeLoaded?: (data: T) => T
+  normalizeLoaded?: (data: T, reportRepair: (message: string) => void) => T
 }
 
 /**
@@ -59,7 +62,9 @@ export class ConfigFile<T> {
   private readonly validate: ConfigDataValidCheck<T> | undefined
   private readonly onCorruptRecovery: ((info: ConfigCorruptInfo) => void) | undefined
   private readonly coerceUnversioned: ((raw: unknown) => T) | undefined
-  private readonly normalizeLoaded: ((data: T) => T) | undefined
+  private readonly normalizeLoaded:
+    | ((data: T, reportRepair: (message: string) => void) => T)
+    | undefined
   // Serializes saves so only one writeFile+rename is in flight per file at a time,
   // avoiding concurrent renames racing the same destination.
   private saveChain: Promise<void> = Promise.resolve()
@@ -225,7 +230,14 @@ export class ConfigFile<T> {
       if (this.normalizeLoaded) {
         // Repair shape additions that a same-version file may predate (e.g. new required keys),
         // so validation below never fails on them. Persist only when it actually changed the data.
-        const normalized = this.normalizeLoaded(data)
+        const normalized = this.normalizeLoaded(data, (message) =>
+          this.onCorruptRecovery?.({
+            fileName: path.basename(this.filePath),
+            filePath: this.filePath,
+            reason: 'repaired',
+            message,
+          }),
+        )
         if (normalized !== data) {
           data = normalized
           migratedNeedsPersist = true

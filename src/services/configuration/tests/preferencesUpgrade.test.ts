@@ -34,6 +34,21 @@ afterAll(() => {
 })
 
 describe('PreferencesConfigFile upgrade path', () => {
+  it('resets one wrong-typed value, keeps the rest of the file and reports the repair', () => {
+    const appData = freshAppData()
+    seedPrefs(appData, 6, { ...DEFAULT_PREFERENCES, effectDebounce: 77, clockRate: 'fast' })
+
+    const onCorruptRecovery = jest.fn()
+    const prefs = new PreferencesConfigFile({ onCorruptRecovery }).get()
+
+    expect(prefs.clockRate).toBe(DEFAULT_PREFERENCES.clockRate)
+    expect(prefs.effectDebounce).toBe(77)
+    expect(onCorruptRecovery).toHaveBeenCalledTimes(1)
+    expect(onCorruptRecovery).toHaveBeenCalledWith(expect.objectContaining({ reason: 'repaired' }))
+    const files = fs.readdirSync(path.join(appData, 'Photonics.rocks'))
+    expect(files.filter((f) => f.includes('.corrupt-'))).toEqual([])
+  })
+
   it('migrates a stored v5 file (four domains) without corrupt-recovery and seeds rb3', () => {
     const appData = freshAppData()
     const all = createDefaultCueDomains()

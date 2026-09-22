@@ -209,6 +209,16 @@ export function validateAppPreferencesData(data: AppPreferences): ConfigValidati
   return runValidate(validateAppPreferencesCompiled, data, 'prefs')
 }
 
+/**
+ * Every schema error in `data`, with the path it points at, for a caller that repairs fields. Read
+ * straight after the call, since the compiled validator holds only its latest errors.
+ */
+export function appPreferenceErrors(data: unknown): ErrorObject[] {
+  return validateAppPreferencesCompiled(data)
+    ? []
+    : [...(validateAppPreferencesCompiled.errors ?? [])]
+}
+
 export function validateUserLightsData(data: { lights: DmxFixture[] }): ConfigValidationOutcome {
   return runValidate(validateUserLightsCompiled, data, 'lights')
 }
