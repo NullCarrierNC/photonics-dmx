@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
-import { getDefaultStore, useAtom } from 'jotai'
+import { useAtom } from 'jotai'
 import {
   audioListenerEnabledAtom,
   lightingPrefsAtom,
   previewRigIdAtom,
   rb3eListenerEnabledAtom,
   yargListenerEnabledAtom,
-  resolveLastUsedRigId,
 } from '@renderer/atoms'
+import { useActivePreviewRigs } from '@renderer/hooks/useActivePreviewRigs'
 import { EffectSelector } from '../../../photonics-dmx/types'
 import type { PostProcessing } from '../../../photonics-dmx/cues/types/cueTypes'
 import EffectsDropdown from '../components/EffectSelector'
@@ -37,7 +37,6 @@ import {
   getRb3CueGroups,
   getAvailableCues,
   getAvailableRb3Cues,
-  getActiveRigs,
   simulateBeat,
   simulateKeyframe,
   simulateMeasure,
@@ -90,6 +89,7 @@ const CueSimulation: React.FC = () => {
   const [currentGroup, setCurrentGroup] = useState<CueGroup | null>(null)
   const [isAboutOpen, setIsAboutOpen] = useState(false)
   const [selectedRigId, setSelectedRigId] = useAtom(previewRigIdAtom)
+  const activeRigs = useActivePreviewRigs()
   const { selectedRig, rigConfig } = useDmxPreview()
   const [selectedVenueSize, setSelectedVenueSize] = useState<'NoVenue' | 'Small' | 'Large'>('Large')
   const [selectedBpm, setSelectedBpm] = useState<number>(120)
@@ -142,28 +142,6 @@ const CueSimulation: React.FC = () => {
     if (venuePostProcessingEnabled) return
     setSelectedPostProcessing('Default')
   }, [venuePostProcessingEnabled])
-
-  useEffect(() => {
-    if (advancedModeEnabled) return
-    let cancelled = false
-    void (async () => {
-      try {
-        const activeRigs = await getActiveRigs()
-        if (cancelled) return
-        const orderedIds = activeRigs.map((r) => r.id)
-        const currentId = getDefaultStore().get(previewRigIdAtom)
-        const resolved = resolveLastUsedRigId(currentId, orderedIds)
-        if (resolved !== currentId) {
-          setSelectedRigId(resolved)
-        }
-      } catch (e) {
-        log.error('Failed to resolve preview rig when Advanced Mode is off', e)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [advancedModeEnabled, setSelectedRigId])
 
   // Cleanup effect: stop any running test effects when component unmounts
   useEffect(() => {
@@ -542,7 +520,11 @@ const CueSimulation: React.FC = () => {
       <CueSimulationAbout isOpen={isAboutOpen} onToggle={() => setIsAboutOpen(!isAboutOpen)} />
 
       {advancedModeEnabled && (
-        <DmxRigSelector selectedRigId={selectedRigId} onRigChange={setSelectedRigId} />
+        <DmxRigSelector
+          rigs={activeRigs}
+          selectedRigId={selectedRigId}
+          onRigChange={setSelectedRigId}
+        />
       )}
 
       <div className="my-6">

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { getDefaultStore, useAtom } from 'jotai'
+import { useAtom, useAtomValue } from 'jotai'
 import {
   DmxLight,
   DmxRig,
@@ -9,10 +9,11 @@ import {
 import { extraChannelDisplayLabel } from '../components/lightChannelDisplay'
 import { getDmxRig, getDmxRigs, enableConsole, disableConsole, sendConsoleDmx } from '../ipcApi'
 import {
+  consoleRigIdAtom,
+  consoleRigIdFor,
   lightingPrefsAtom,
   myDmxLightsAtom,
   previewRigIdAtom,
-  resolveLastUsedRigId,
 } from '../atoms'
 import LightsDmxPreview from '../components/LightsDmxPreview'
 import StrobeChannelPreviewNotice from '../components/StrobeChannelPreviewNotice'
@@ -55,7 +56,13 @@ const DmxConsole: React.FC = () => {
   const [rigs, setRigs] = useState<DmxRig[]>([])
   const [prefs] = useAtom(lightingPrefsAtom)
   const advancedModeEnabled = prefs.advancedModeEnabled ?? false
-  const [selectedRigId, setSelectedRigId] = useAtom(previewRigIdAtom)
+  const [consoleChoice, setConsoleChoice] = useAtom(consoleRigIdAtom)
+  const previewRigId = useAtomValue(previewRigIdAtom)
+  const selectedRigId = consoleRigIdFor(
+    consoleChoice,
+    previewRigId,
+    rigs.map((r) => r.id),
+  )
   // Templates drive which channels are displayed (so e.g. a newly-added Strobe Channel surfaces
   // without needing to re-save the rig); per-light DMX channel numbers still come from the rig.
   const [myLights] = useAtom(myDmxLightsAtom)
@@ -92,12 +99,6 @@ const DmxConsole: React.FC = () => {
         const list = await getDmxRigs()
         if (cancelled) return
         setRigs(list)
-        const orderedIds = list.map((r) => r.id)
-        const currentId = getDefaultStore().get(previewRigIdAtom)
-        const resolved = resolveLastUsedRigId(currentId, orderedIds)
-        if (resolved !== currentId) {
-          setSelectedRigId(resolved)
-        }
         setLoadError(null)
       } catch (e) {
         log.error('Failed to load DMX rigs', e)
@@ -109,7 +110,7 @@ const DmxConsole: React.FC = () => {
     return () => {
       cancelled = true
     }
-  }, [setSelectedRigId])
+  }, [])
 
   useEffect(() => {
     if (!selectedRigId) {
@@ -236,7 +237,7 @@ const DmxConsole: React.FC = () => {
       setConsoleBuffer({})
     }
     setChannelOverrides({})
-    setSelectedRigId(nextId)
+    setConsoleChoice(nextId)
   }
 
   const handleChannelValueChange = (channelNumber: number, value: number) => {

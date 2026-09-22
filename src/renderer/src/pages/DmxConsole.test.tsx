@@ -4,11 +4,11 @@
  * has to hand it back, including when the page leaves before main has answered.
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
-import { previewRigIdAtom } from '../atoms'
+import { lightingPrefsAtom, previewRigIdAtom } from '../atoms'
 import DmxConsole from './DmxConsole'
 import type { DmxRig } from '../../../photonics-dmx/types'
 
@@ -122,5 +122,62 @@ describe('DmxConsole', () => {
     failConsole(new Error('channel gone'))
 
     await waitFor(() => expect(jest.mocked(ipcApi.disableConsole)).toHaveBeenCalled())
+  })
+})
+
+describe('DmxConsole rig choice', () => {
+  const inactiveRig = { ...rig, id: 'rig-2', name: 'Rig two', active: false } as DmxRig
+  const rigById = (id: string) => [rig, inactiveRig].find((r) => r.id === id)
+
+  beforeEach(() => {
+    resetIpcApiMock()
+    localStorage.clear()
+    jest
+      .mocked(ipcApi.getDmxRigs)
+      .mockImplementation((() => Promise.resolve([rig, inactiveRig])) as never)
+    jest
+      .mocked(ipcApi.getDmxRig)
+      .mockImplementation(((id: string) => Promise.resolve(rigById(id))) as never)
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
+    localStorage.clear()
+  })
+
+  async function rigSelect(): Promise<HTMLSelectElement> {
+    const option = await screen.findByRole('option', { name: 'Rig two (inactive)' })
+    return option.closest('select') as HTMLSelectElement
+  }
+
+  it('keeps its own rig when a preview page moves the preview rig', async () => {
+    const { store } = renderWithProviders(<DmxConsole />, {
+      seed: (set) => {
+        set(lightingPrefsAtom, { advancedModeEnabled: true })
+        set(previewRigIdAtom, rig.id)
+      },
+    })
+    const select = await rigSelect()
+
+    fireEvent.change(select, { target: { value: inactiveRig.id } })
+    await waitFor(() => expect(select.value).toBe(inactiveRig.id))
+    act(() => store.set(previewRigIdAtom, rig.id))
+
+    expect(select.value).toBe(inactiveRig.id)
+  })
+
+  it('follows the preview rig while it has no rig of its own', async () => {
+    const { store } = renderWithProviders(<DmxConsole />, {
+      seed: (set) => {
+        set(lightingPrefsAtom, { advancedModeEnabled: true })
+        set(previewRigIdAtom, inactiveRig.id)
+      },
+    })
+    const select = await rigSelect()
+    await waitFor(() => expect(select.value).toBe(inactiveRig.id))
+
+    act(() => store.set(previewRigIdAtom, rig.id))
+
+    await waitFor(() => expect(select.value).toBe(rig.id))
   })
 })
