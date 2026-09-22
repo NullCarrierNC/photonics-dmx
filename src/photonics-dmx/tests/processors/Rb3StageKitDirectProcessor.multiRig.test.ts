@@ -307,6 +307,56 @@ describe('Rb3StageKitDirectProcessor multi-rig fanout', () => {
     expect(bHits).toHaveLength(1)
   })
 
+  it('a rig that joins during a strobe starts strobing with the others', async () => {
+    const strobeRig = (rigId: string) =>
+      makeChain(
+        rigId,
+        rigId === 'a',
+        createMockLightingConfig({
+          numLights: 4,
+          frontLights: [0, 1, 2, 3].map((position) =>
+            createMockDmxLight({
+              id: `${rigId}-f${position}`,
+              position,
+              fixtureId: `${rigId}-f${position}`,
+              isStrobeEnabled: position === 0,
+            }),
+          ),
+          backLights: [],
+          strobeLights: [
+            createMockDmxLight({
+              id: `${rigId}-f0`,
+              position: 0,
+              fixtureId: `${rigId}-f0`,
+              isStrobeEnabled: true,
+            }),
+          ],
+        }),
+      )
+    const a = strobeRig('a')
+    const b = strobeRig('b')
+    fanout.setChains([a.chain])
+    processor = new Rb3StageKitDirectProcessor(fanout)
+    processor.startListening(networkListener)
+    networkListener.emit('stagekit:data', {
+      positions: [0],
+      color: 'off',
+      strobeEffect: 'medium',
+      timestamp: Date.now(),
+    })
+
+    fanout.setChains([a.chain, b.chain])
+    processor.refreshRigs()
+    jest.advanceTimersByTime(100)
+    await Promise.resolve()
+
+    const bIds = b.setState.mock.calls.flatMap((c) => (c[0] as { id: string }[]).map((l) => l.id))
+    expect(bIds).toContain('b-f0')
+    expect(
+      processor.getStatus().activeStrobeEffects.some((s) => s.startsWith('stagekit-strobe-b-')),
+    ).toBe(true)
+  })
+
   it('one rig in strobe does not cause the other rig to receive setState calls', async () => {
     // Only chain A has a strobe-flagged light; chain B has no strobe lights configured.
     // The strobe should run on A only — B's sequencer never receives strobe-derived

@@ -122,6 +122,10 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
           this.config,
         )
         this.rigs.set(rig.rigId, rig)
+        // A rig that joins during a strobe strobes with the others straight away.
+        if (this._currentStrobeType) {
+          rig.applyStrobeEffect(this._currentStrobeType)
+        }
       } catch (err) {
         // Most likely the chain has <4 lights — skip it but keep the others working.
         log.warn(`Skipping StageKit rig ${chain.rigId}: ${(err as Error).message}`)
