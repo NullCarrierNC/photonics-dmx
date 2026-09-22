@@ -138,6 +138,7 @@ export class ControllerGraph {
    * never drives a fresh sequencer.
    */
   public buildChains(): void {
+    this.disposePreviousBuild()
     const config = this.deps.getConfig()
     const activeRigs = config.getActiveRigs()
 
@@ -414,6 +415,19 @@ export class ControllerGraph {
       }
       this.clock = null
     }
+  }
+
+  /**
+   * Tear down whatever an earlier build left standing, so a retry after a failed start drives one
+   * clock, one set of chains and one publisher. A restart has already torn these down, so for it
+   * and for a first build this does nothing.
+   */
+  private disposePreviousBuild(): void {
+    if (!this.clock && this.rigChains.length === 0 && !this.dmxPublisher) return
+    this.disposeChainsForShutdown()
+    this.shutdownPublisherSafe()
+    this.destroyClock()
+    this.clearBuildRefs()
   }
 
   /** Null the per-build shorthand refs after the chains they point into are gone. */
