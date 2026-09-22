@@ -87,10 +87,24 @@ describe('AudioController enable and disable', () => {
     await Promise.all([enabling, disabling])
 
     expect(controller.getIsAudioEnabled()).toBe(false)
-    expect(made.sendToAllWindows).toHaveBeenLastCalledWith(
-      RENDERER_RECEIVE.AUDIO_DISABLE,
-      undefined,
-    )
+    expect(made.sendToAllWindows).toHaveBeenLastCalledWith(RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED, {
+      enabled: false,
+    })
+  })
+
+  it('tells every window when audio starts and when it stops', async () => {
+    const made = makeController(() => Promise.resolve())
+    controller = made.controller
+    const announced = () =>
+      made.sendToAllWindows.mock.calls
+        .filter(([channel]) => channel === RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED)
+        .map(([, payload]) => payload)
+
+    await controller.enableAudioInternal()
+    await controller.enableAudioInternal()
+    await controller.disableAudio()
+
+    expect(announced()).toEqual([{ enabled: true }, { enabled: false }])
   })
 
   it('keeps audio running when the active cue type cannot be stored', async () => {

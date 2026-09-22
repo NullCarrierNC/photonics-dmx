@@ -288,8 +288,6 @@ export function registerAudioMotionConfigHandlers(
       await controllerManager.disableAudio()
     }
 
-    sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED, { enabled })
-
     return { success: true }
   })
 }

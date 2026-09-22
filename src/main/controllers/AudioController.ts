@@ -145,6 +145,7 @@ export class AudioController {
       this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLE, audioConfig)
       log.info('Sent audio:enable to renderer')
       this.isAudioEnabled = true
+      this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED, { enabled: true })
       log.info('Audio enabled successfully')
     } catch (error) {
       log.error('Failed to enable audio:', error)
@@ -195,6 +196,7 @@ export class AudioController {
     this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_DISABLE, undefined)
     log.info('Sent audio:disable to renderer')
     this.isAudioEnabled = false
+    this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED, { enabled: false })
     log.info('Audio disabled successfully')
   }
 

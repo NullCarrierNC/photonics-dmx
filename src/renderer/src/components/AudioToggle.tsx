@@ -54,10 +54,10 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
       }
     }
 
-    // Handle controllers restarted event - audio is disabled on restart
+    // A restart turns audio back on when it was the only input, so read what main is running.
     const handleControllersRestarted = () => {
-      log.info('Controllers restarted, audio disabled')
-      setIsAudioEnabled(false)
+      log.info('Controllers restarted, refreshing Audio toggle state')
+      void initializeState()
     }
 
     const handleAudioEnabledChanged = (payload: { enabled: boolean }) => {
