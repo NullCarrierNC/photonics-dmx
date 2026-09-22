@@ -33,8 +33,11 @@ import { createLogger } from '../../../../shared/logger'
 
 const log = createLogger('actionResolver')
 
-/** Whether a linear sweep without an axis has been reported, which happens once per process. */
-let reportedMissingSweepAxis = false
+/**
+ * Axisless linear sweeps already reported. Each compiled cue node holds its own setting, so each
+ * such node is reported once however often it runs.
+ */
+const reportedMissingSweepAxis = new WeakSet<NodeMotionPatternSetting>()
 
 export function resolveActionTiming(
   timing: ActionTimingConfig,
@@ -231,9 +234,9 @@ export function resolveMotionPattern(
     tiltAmplitudeDeg = sizeDeg
     tiltFreqMultiplier = 2
   } else if (pattern === 'linear-sweep') {
-    if (!setting.linearSweepAxis && !reportedMissingSweepAxis) {
-      reportedMissingSweepAxis = true
-      log.warn('linear-sweep motion pattern has no linearSweepAxis; sweeping horizontally (pan)')
+    if (!setting.linearSweepAxis && !reportedMissingSweepAxis.has(setting)) {
+      reportedMissingSweepAxis.add(setting)
+      log.warn('linear-sweep motion pattern has no linearSweepAxis, sweeping horizontally (pan)')
     }
     linearSweepAxis = setting.linearSweepAxis
       ? parseLinearSweepAxis(String(resolveValue('string', setting.linearSweepAxis, context)))
