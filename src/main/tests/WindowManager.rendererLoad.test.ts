@@ -12,8 +12,8 @@ jest.mock('electron', () => ({
   })),
   shell: { openExternal: jest.fn(() => Promise.resolve()) },
   screen: {
-    getAllDisplays: jest.fn(() => [{ bounds: { x: 0, y: 0, width: 1920, height: 1080 } }]),
-    getPrimaryDisplay: jest.fn(() => ({ bounds: { x: 0, y: 0, width: 1920, height: 1080 } })),
+    getAllDisplays: jest.fn(() => [{ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }]),
+    getPrimaryDisplay: jest.fn(() => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })),
   },
 }))
 jest.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))

@@ -6,6 +6,7 @@ import { RENDERER_RECEIVE } from '../shared/ipcChannels'
 import type { AudioLightingData } from '../photonics-dmx/listeners/Audio/AudioTypes'
 import { denyWebContentsWillNavigate } from './rendererSessionSecurity'
 import { createLogger } from '../shared/logger'
+import { fitWindowBounds, type WindowBounds } from './windowBounds'
 const log = createLogger('WindowManager')
 
 /** The window factories return synchronously and `ready-to-show` drives display, so nothing awaits a load. */
@@ -125,57 +126,20 @@ export class WindowManager {
     )
   }
 
-  /**
-   * Validates window bounds to ensure window is visible on screen
-   */
-  private validateWindowBounds(bounds: { width: number; height: number; x: number; y: number }): {
-    width: number
-    height: number
-    x: number
-    y: number
-  } {
-    const displays = screen.getAllDisplays()
-    let isValid = false
-
-    // Check if window is visible on any display
-    for (const display of displays) {
-      const { x, y, width, height } = display.bounds
-      if (
-        bounds.x >= x &&
-        bounds.y >= y &&
-        bounds.x + bounds.width <= x + width &&
-        bounds.y + bounds.height <= y + height
-      ) {
-        isValid = true
-        break
-      }
-    }
-
-    // If not valid, center on primary display
-    if (!isValid) {
-      const primaryDisplay = screen.getPrimaryDisplay()
-      const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize
-      return {
-        width: Math.min(bounds.width, screenWidth),
-        height: Math.min(bounds.height, screenHeight),
-        x: Math.floor((screenWidth - Math.min(bounds.width, screenWidth)) / 2),
-        y: Math.floor((screenHeight - Math.min(bounds.height, screenHeight)) / 2),
-      }
-    }
-
-    return bounds
-  }
-
   /** The saved geometry for a role, or its default size, kept on screen. */
-  private initialBounds(role: WindowRole): { width: number; height: number; x: number; y: number } {
+  private initialBounds(role: WindowRole): WindowBounds {
     const spec = WINDOW_SPECS[role]
     const saved = this.controllerManager?.getConfig().getPreference(spec.stateKey)
-    return this.validateWindowBounds({
-      width: saved?.width || spec.width,
-      height: saved?.height || spec.height,
-      x: saved?.x ?? 0,
-      y: saved?.y ?? 0,
-    })
+    return fitWindowBounds(
+      {
+        width: saved?.width || spec.width,
+        height: saved?.height || spec.height,
+        x: saved?.x ?? 0,
+        y: saved?.y ?? 0,
+      },
+      screen.getAllDisplays().map((display) => display.workArea),
+      screen.getPrimaryDisplay().workArea,
+    )
   }
 
   private createWindow(role: WindowRole): BrowserWindow {
