@@ -87,6 +87,24 @@ export class ControllerLifecycle {
     this.broadcastPhase(next)
   }
 
+  /**
+   * Move to `next` unless a shutdown has begun, which owns every phase from then on. Work that was
+   * already under way when the shutdown started finishes without reopening the phase.
+   */
+  public setPhaseUnlessShuttingDown(next: LifecyclePhase): void {
+    if (this.isShuttingDown()) return
+    this.setPhase(next)
+  }
+
+  /** Whether a shutdown has begun, whether or not it has finished. */
+  public isShuttingDown(): boolean {
+    return (
+      this.phaseValue === 'shuttingDown' ||
+      this.phaseValue === 'stopped' ||
+      this.shutdownPromise !== null
+    )
+  }
+
   public assertPhase(allowed: readonly LifecyclePhase[], context: string): void {
     if (!allowed.includes(this.phaseValue)) {
       throw new Error(

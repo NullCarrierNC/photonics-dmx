@@ -172,6 +172,22 @@ describe('ControllerLifecycle', () => {
     })
   })
 
+  describe('setPhaseUnlessShuttingDown', () => {
+    it('moves the phase on while no shutdown has begun', () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      lifecycle.setPhaseUnlessShuttingDown('running')
+      expect(lifecycle.phase).toBe('running')
+    })
+
+    it('leaves a shutdown in charge of the phase', () => {
+      const lifecycle = new ControllerLifecycle(() => {})
+      lifecycle.setPhase('running')
+      lifecycle.setPhase('shuttingDown')
+      lifecycle.setPhaseUnlessShuttingDown('running')
+      expect(lifecycle.phase).toBe('shuttingDown')
+    })
+  })
+
   describe('runSharedRestart', () => {
     it('memoizes overlapping calls onto one attempt and clears on resolve', async () => {
       const lifecycle = new ControllerLifecycle(() => {})

@@ -247,7 +247,7 @@ export class ControllerManager {
     }
 
     this.isInitialized = true
-    this.lifecycle.setPhase('running')
+    this.lifecycle.setPhaseUnlessShuttingDown('running')
   }
 
   /**

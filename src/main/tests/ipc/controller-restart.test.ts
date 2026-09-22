@@ -1054,6 +1054,38 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect(fake.lifecycle.phase).toBe('shuttingDown')
   })
 
+  it('reopens no listener or sender when a shutdown begins during reinit', async () => {
+    const listeners = listenerStub()
+    listeners.yargRb3.getIsYargEnabled.mockReturnValue(true)
+    const restoreSenderOutputsFromPrefs = jest.fn().mockImplementation(() => Promise.resolve())
+    const fake: RestartFake = Object.assign(Object.create(ControllerManager.prototype), {
+      graph: restartGraph(),
+      listenerLifecycle: listeners,
+      isInitialized: true,
+      lifecycle: lifecycleAt('running'),
+      init: jest.fn().mockImplementation(async () => {
+        fake.lifecycle.setPhase('shuttingDown')
+      }),
+      senderLifecycle: {
+        resetSenderForControllerRestart: jest.fn().mockImplementation(() => Promise.resolve()),
+        getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
+        restoreSenderOutputsFromPrefs,
+      },
+      consoleMode: {
+        onControllersReinitializedWhileConsoleOpen: jest.fn(),
+        getConsoleRestore: jest.fn().mockReturnValue(null),
+      },
+    })
+
+    await expect(
+      ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager),
+    ).rejects.toBeInstanceOf(LifecycleAbortedError)
+
+    expect(listeners.yargRb3.enableYarg).not.toHaveBeenCalled()
+    expect(restoreSenderOutputsFromPrefs).not.toHaveBeenCalled()
+    expect(fake.lifecycle.phase).toBe('shuttingDown')
+  })
+
   it('a listener toggle queued behind a restart waits for the restart to finish', async () => {
     let releaseRestart!: () => void
     const restartBarrier = new Promise<void>((r) => {
