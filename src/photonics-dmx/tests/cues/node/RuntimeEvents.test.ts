@@ -869,7 +869,7 @@ describe('Runtime Event System', () => {
       expect(mockSequencer.removeEffect).toHaveBeenCalledTimes(removeEffectCallsBefore)
     })
 
-    it('LightingNodeCue (Secondary): execute submits effect via addEffect', () => {
+    it('LightingNodeCue (Secondary): execute adds its effect without clearing the sequencer', () => {
       const cueStartedEvent: NetEventNode = {
         id: 'e-start',
         type: 'event',
@@ -914,9 +914,9 @@ describe('Runtime Event System', () => {
       const cueData = createCueData()
 
       cue.execute(cueData, mockSequencer, mockLightManager)
-      const setCalls = (mockSequencer.setEffectUnblockedName as jest.Mock).mock.calls.length
-      const addCalls = (mockSequencer.addEffect as jest.Mock).mock.calls.length
-      expect(setCalls + addCalls).toBeGreaterThanOrEqual(1)
+      expect(mockSequencer.setEffectUnblockedName).not.toHaveBeenCalled()
+      expect(mockSequencer.removeAllEffects).not.toHaveBeenCalled()
+      expect(mockSequencer.addEffect).toHaveBeenCalledTimes(1)
     })
 
     it('LightingNodeCue (Primary, no cue-started node): first execute uses setEffect', () => {

@@ -2,7 +2,7 @@ import { CueStyle } from '../../interfaces/INetCue'
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import type { VariableValue } from './executionTypes'
 import type { GraphExecutionPolicy } from './GraphExecutionPolicy'
-import { cueGraphPolicy } from './GraphExecutionPolicy'
+import { cueGraphPolicy, secondaryCueGraphPolicy } from './GraphExecutionPolicy'
 import type { NetLightingNodeCueDefinition } from '../../types/nodeCueTypes'
 import { BaseNodeCue } from './BaseNodeCue'
 
@@ -40,8 +40,13 @@ export class LightingNodeCue extends BaseNodeCue {
     return store
   }
 
+  /**
+   * Only a primary look clears the sequencer on its first submission. A secondary draws over it.
+   */
   protected policyFor(cueId: string): GraphExecutionPolicy {
-    return cueGraphPolicy(this.groupId, cueId)
+    return this.style === CueStyle.Primary
+      ? cueGraphPolicy(this.groupId, cueId)
+      : secondaryCueGraphPolicy(this.groupId, cueId)
   }
 
   protected sessionStoreFor(sequencer: ILightingController): Map<string, VariableValue> {

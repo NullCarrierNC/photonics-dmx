@@ -148,3 +148,12 @@ export function cueGraphPolicy(groupId: string, cueId: string): GraphExecutionPo
 export function motionCueGraphPolicy(groupId: string, cueId: string): GraphExecutionPolicy {
   return cueLikeGraphPolicy(groupId, cueId, false)
 }
+
+/**
+ * Secondary lighting cue graph policy: never uses the initial setEffect clear. A secondary look
+ * draws over the primary, so its first submission adds to the sequencer and leaves the primary's
+ * effects running.
+ */
+export function secondaryCueGraphPolicy(groupId: string, cueId: string): GraphExecutionPolicy {
+  return cueLikeGraphPolicy(groupId, cueId, false)
+}

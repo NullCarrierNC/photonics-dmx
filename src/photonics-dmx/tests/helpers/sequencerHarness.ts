@@ -96,6 +96,7 @@ const createLights = (
       id: `${group}-${startIndex + index + 1}`,
       group,
       position: startIndex + index + 1,
+      isStrobeEnabled: group === 'strobe',
     }),
   )
 }
