@@ -61,27 +61,22 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
   }
 
   // Listen for cue data
-  ipcMain.on(CUE.SET_LISTEN_CUE_DATA, (_, shouldListen: boolean) => {
-    // The YARG listener and RB3 cue mode expose the cue-mirror through separate handler refs;
-    // at most one is non-null at a time, so subscribing both covers whichever is active.
-    if (shouldListen) {
-      controllerManager.getCueHandler()?.addCueHandledListener(sendCueHandledData)
-      controllerManager.getRb3CueHandler()?.addCueHandledListener(sendCueHandledData)
-
-      // Also listen to ProcessorManager for RB3E direct mode
-      const processorManager = controllerManager.getProcessorManager()
-      if (processorManager) {
-        processorManager.on('cueHandled', sendCueHandledData)
-      }
-    } else {
-      controllerManager.getCueHandler()?.removeCueHandledListener(sendCueHandledData)
-      controllerManager.getRb3CueHandler()?.removeCueHandledListener(sendCueHandledData)
-
-      const processorManager = controllerManager.getProcessorManager()
-      if (processorManager) {
-        processorManager.off('cueHandled', sendCueHandledData)
-      }
+  ipcMain.on(CUE.SET_LISTEN_CUE_DATA, (_, shouldListen: unknown) => {
+    // The YARG listener and RB3 cue mode expose the cue-mirror through separate handler refs, and
+    // ProcessorManager carries RB3E direct mode, so all three are covered. Each subscription is
+    // removed before it is added, so however often the page asks there is one, and one request
+    // to stop ends it.
+    const listen = shouldListen === true
+    for (const handler of [
+      controllerManager.getCueHandler(),
+      controllerManager.getRb3CueHandler(),
+    ]) {
+      handler?.removeCueHandledListener(sendCueHandledData)
+      if (listen) handler?.addCueHandledListener(sendCueHandledData)
     }
+    const processorManager = controllerManager.getProcessorManager()
+    processorManager?.off('cueHandled', sendCueHandledData)
+    if (listen) processorManager?.on('cueHandled', sendCueHandledData)
   })
 
   // Set cue style
