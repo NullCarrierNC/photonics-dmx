@@ -222,7 +222,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
   /**
    * RB3E screen names that map to the main menu: drive the same Default menu cue as Menus game state.
-   * song_select_screen is skipped when that cue is already active to avoid restarting the menu loop.
+   * Either screen is skipped while that cue is already active, so the menu loop is not restarted.
    */
   private handleScreenNameEvent(event: { screenName: string; timestamp: number }): void {
     const { screenName } = event
@@ -230,10 +230,8 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       return
     }
 
-    if (screenName === RB3_SONG_SELECT_SCREEN && this.isDefaultMenuCueRunning()) {
-      log.info(
-        'StageKitDirectProcessor: song_select_screen skipped — Default menu cue already running',
-      )
+    if (this.isDefaultMenuCueRunning()) {
+      log.info(`StageKitDirectProcessor: ${screenName} skipped, Default menu cue already running`)
       return
     }
 

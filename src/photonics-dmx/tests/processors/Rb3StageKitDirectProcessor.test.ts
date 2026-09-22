@@ -342,6 +342,21 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     expect(handled).toHaveLength(1)
   })
 
+  it('a repeated main_hub_screen leaves the running Default menu alone', () => {
+    emitGameState(networkListener, 'InGame')
+    emitStageKit(networkListener)
+
+    const handled: CueData[] = []
+    processor.on('cueHandled', (d: CueData) => {
+      handled.push(d)
+    })
+
+    emitScreenName(networkListener, 'main_hub_screen')
+    emitScreenName(networkListener, 'main_hub_screen')
+
+    expect(handled).toHaveLength(1)
+  })
+
   it('main_hub_screen emits Default menu cue while game state is still InGame', () => {
     emitGameState(networkListener, 'InGame')
     emitStageKit(networkListener)
