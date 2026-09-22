@@ -233,5 +233,14 @@ describe('Sequencer', () => {
       expect(clockStopSpy).not.toHaveBeenCalled()
       expect(offTickSpy).toHaveBeenCalled()
     })
+
+    it('stops the debug monitor', () => {
+      const debugMonitor = (sequencer as unknown as { debugMonitor: { dispose: jest.Mock } })
+        .debugMonitor
+
+      sequencer.shutdown()
+
+      expect(debugMonitor.dispose).toHaveBeenCalledTimes(1)
+    })
   })
 })

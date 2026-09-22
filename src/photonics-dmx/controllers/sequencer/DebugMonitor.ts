@@ -65,6 +65,15 @@ export class DebugMonitor implements IDebugMonitor {
     }
   }
 
+  /** Stops the refresh timer, without logging, for a sequencer that is shutting down. */
+  public dispose(): void {
+    this._debugEnabled = false
+    if (this._debugInterval) {
+      clearInterval(this._debugInterval)
+      this._debugInterval = null
+    }
+  }
+
   /**
    * Refreshes the debug table if enough time has passed since last refresh.
    */

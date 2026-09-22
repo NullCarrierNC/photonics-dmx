@@ -324,6 +324,7 @@ export interface IDebugMonitor {
   refreshDebugTable(): void
   printLightLayerTable(): void
   debugLightLayers(): void
+  dispose(): void
 }
 
 /**
