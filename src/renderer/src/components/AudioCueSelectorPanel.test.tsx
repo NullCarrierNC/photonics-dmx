@@ -161,6 +161,28 @@ describe('AudioCueSelectorPanel load', () => {
     expect(screen.getByText('Motion Cue')).toBeInTheDocument()
   })
 
+  it('keeps the newest answer when an older reload lands after it', async () => {
+    await renderPanel()
+    let releaseOlder!: () => void
+    api.getAudioEnabled
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseOlder = () => resolve(true)
+          }),
+      )
+      .mockResolvedValue(false)
+    api.getAudioReactiveCues.mockResolvedValue(cueState({ cues: [cue()] }))
+
+    await emit(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, undefined)
+    await emit(RENDERER_RECEIVE.AUDIO_DISABLE, undefined)
+    await act(async () => releaseOlder())
+    for (let turn = 0; turn < 5; turn += 1) await act(async () => {})
+
+    expect(screen.getByText('Audio Reactive Disabled')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).toBeNull()
+  })
+
   it('treats game mode as off when the game-mode read fails', async () => {
     api.getAudioGameMode.mockRejectedValue(new Error('no'))
     api.getAudioReactiveCues.mockResolvedValue(cueState({ cues: [cue()] }))

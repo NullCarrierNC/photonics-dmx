@@ -17,6 +17,7 @@ import AudioCuePickers from './AudioCueSelectorPanel/AudioCuePickers'
 import AudioMotionPicker from './AudioCueSelectorPanel/AudioMotionPicker'
 import CurrentCueSummary from './AudioCueSelectorPanel/CurrentCueSummary'
 import { useRunningMotionLabels } from '../hooks/useRunningMotionLabels'
+import { useLatestGenerationGate } from '../hooks/useLatestGenerationGate'
 import type { AudioCueOption } from './AudioCueSelectorPanel/types'
 
 const log = createLogger('AudioCueSelectorPanel')
@@ -68,101 +69,113 @@ const AudioCueSelectorPanel: React.FC<AudioCueSelectorPanelProps> = ({ className
     null,
   )
   const [, setGameModeScheduleTick] = useState(0)
+  const { nextGeneration, isCurrentGeneration } = useLatestGenerationGate()
 
-  const loadCueState = useCallback(async (silent = false) => {
-    try {
-      if (!silent) {
-        setLoading(true)
-      }
-      const enabled = await getAudioEnabled()
-      setAudioEnabled(enabled)
-
+  /**
+   * Reads everything the panel shows. Several events can start a reload while one is running, so
+   * each checks after every await that no newer one has begun, and a superseded one stops there.
+   */
+  const loadCueState = useCallback(
+    async (silent = false) => {
+      const token = nextGeneration()
+      const superseded = () => !isCurrentGeneration(token)
       try {
-        const gm = await getAudioGameMode()
-        setGameModeEnabled(gm.enabled)
-        if (!gm.enabled) {
+        if (!silent) {
+          setLoading(true)
+        }
+        const enabled = await getAudioEnabled()
+        if (superseded()) return
+        setAudioEnabled(enabled)
+
+        const gm = await getAudioGameMode().catch(() => null)
+        if (superseded()) return
+        setGameModeEnabled(gm?.enabled ?? false)
+        if (!gm?.enabled) {
           setGameModeSchedule(null)
         }
-      } catch {
-        setGameModeEnabled(false)
-        setGameModeSchedule(null)
-      }
 
-      if (!enabled) {
-        setAvailableCues([])
-        setActiveCue(null)
-        setSecondaryCueType(null)
-        setStrobeCueType(null)
-        setSelectedCueId('')
-        setSelectedGroupId('')
-        setError(null)
-        setMotionGroups([])
-        setMotionGroupId('')
-        setMotionCueId('')
-        setMotionCuesOptions([])
-        setGameModeSchedule(null)
-        return
-      }
-
-      try {
-        // The picker shows the pinned preference. The playing labels come from
-        // useRunningMotionLabels.
-        const [groups, activeRef] = await Promise.all([
-          getAudioMotionCueGroups(),
-          getActiveAudioMotionCue(),
-        ])
-        const groupsList = groups ?? []
-        setMotionGroups(groupsList)
-        if (activeRef && typeof activeRef === 'object' && 'groupId' in activeRef) {
-          const ref = activeRef as { groupId: string; cueId: string }
-          setMotionGroupId(ref.groupId)
-          setMotionCueId(ref.cueId)
-          const cues = await getAvailableAudioMotionCues(ref.groupId)
-          setMotionCuesOptions(cues.map((c) => ({ id: c.id, name: c.name })))
-        } else {
+        if (!enabled) {
+          setAvailableCues([])
+          setActiveCue(null)
+          setSecondaryCueType(null)
+          setStrobeCueType(null)
+          setSelectedCueId('')
+          setSelectedGroupId('')
+          setError(null)
+          setMotionGroups([])
           setMotionGroupId('')
           setMotionCueId('')
           setMotionCuesOptions([])
+          setGameModeSchedule(null)
+          return
         }
-      } catch (e) {
-        log.error('Failed to load audio motion picker state', e)
-      }
 
-      const response: CueStateResponse = await getAudioReactiveCues()
-      if (response?.success) {
-        const sortedCues = (response.cues ?? []).sort((a, b) => {
-          if (a.groupName === b.groupName) {
-            return (a.label || a.id).localeCompare(b.label || b.id)
+        try {
+          // The picker shows the pinned preference. The playing labels come from
+          // useRunningMotionLabels.
+          const [groups, activeRef] = await Promise.all([
+            getAudioMotionCueGroups(),
+            getActiveAudioMotionCue(),
+          ])
+          if (superseded()) return
+          const groupsList = groups ?? []
+          setMotionGroups(groupsList)
+          if (activeRef && typeof activeRef === 'object' && 'groupId' in activeRef) {
+            const ref = activeRef as { groupId: string; cueId: string }
+            setMotionGroupId(ref.groupId)
+            setMotionCueId(ref.cueId)
+            const cues = await getAvailableAudioMotionCues(ref.groupId)
+            if (superseded()) return
+            setMotionCuesOptions(cues.map((c) => ({ id: c.id, name: c.name })))
+          } else {
+            setMotionGroupId('')
+            setMotionCueId('')
+            setMotionCuesOptions([])
           }
-          return a.groupName.localeCompare(b.groupName)
-        })
-        setAvailableCues(sortedCues)
-        // Main names no active cue with an empty string until it has picked one, so that falls back too.
-        const initialCueId = response.activeCueType || sortedCues[0]?.id || ''
-        const initialGroupId =
-          sortedCues.find((cue) => cue.id === initialCueId)?.groupId ?? sortedCues[0]?.groupId ?? ''
-        setActiveCue(initialCueId || null)
-        setSecondaryCueType(response.secondaryCueType ?? null)
-        setSelectedCueId(initialCueId || '')
-        setSelectedGroupId(initialGroupId || '')
-        setError(null)
-      } else {
-        setAvailableCues([])
-        setActiveCue(null)
-        setSecondaryCueType(null)
-        setSelectedCueId('')
-        setSelectedGroupId('')
-        setError(response?.error || 'Unable to load audio cue state')
+        } catch (e) {
+          log.error('Failed to load audio motion picker state', e)
+        }
+
+        const response: CueStateResponse = await getAudioReactiveCues()
+        if (superseded()) return
+        if (response?.success) {
+          const sortedCues = (response.cues ?? []).sort((a, b) => {
+            if (a.groupName === b.groupName) {
+              return (a.label || a.id).localeCompare(b.label || b.id)
+            }
+            return a.groupName.localeCompare(b.groupName)
+          })
+          setAvailableCues(sortedCues)
+          // Main names no active cue with an empty string until it has picked one, so that falls back too.
+          const initialCueId = response.activeCueType || sortedCues[0]?.id || ''
+          const initialGroupId =
+            sortedCues.find((cue) => cue.id === initialCueId)?.groupId ??
+            sortedCues[0]?.groupId ??
+            ''
+          setActiveCue(initialCueId || null)
+          setSecondaryCueType(response.secondaryCueType ?? null)
+          setSelectedCueId(initialCueId || '')
+          setSelectedGroupId(initialGroupId || '')
+          setError(null)
+        } else {
+          setAvailableCues([])
+          setActiveCue(null)
+          setSecondaryCueType(null)
+          setSelectedCueId('')
+          setSelectedGroupId('')
+          setError(response?.error || 'Unable to load audio cue state')
+        }
+      } catch (err) {
+        log.error('Failed to load audio reactive cues', err)
+        if (!superseded()) setError('Failed to load audio cue state')
+      } finally {
+        if (!silent) {
+          setLoading(false)
+        }
       }
-    } catch (err) {
-      log.error('Failed to load audio reactive cues', err)
-      setError('Failed to load audio cue state')
-    } finally {
-      if (!silent) {
-        setLoading(false)
-      }
-    }
-  }, [])
+    },
+    [nextGeneration, isCurrentGeneration],
+  )
 
   useEffect(() => {
     void loadCueState()
