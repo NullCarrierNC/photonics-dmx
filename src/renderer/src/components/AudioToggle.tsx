@@ -8,7 +8,6 @@ import {
 import { registerIpcListener } from '../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import {
-  getAudioEnabled,
   getAudioGameMode,
   setAudioEnabled,
   setAudioGameMode,
@@ -44,52 +43,10 @@ const AudioToggle = ({ disabled = false, className }: AudioToggleProps) => {
   }, [])
 
   useEffect(() => {
-    // Initialize toggle state from runtime enabled state (not config)
-    const initializeState = async () => {
-      try {
-        const enabled = await getAudioEnabled()
-        setIsAudioEnabled(enabled)
-      } catch (error) {
-        log.error('Error initializing Audio toggle state:', error)
-      }
-    }
-
-    // A restart turns audio back on when it was the only input, so read what main is running.
-    const handleControllersRestarted = () => {
-      log.info('Controllers restarted, refreshing Audio toggle state')
-      void initializeState()
-    }
-
-    const handleAudioEnabledChanged = (payload: { enabled: boolean }) => {
-      setIsAudioEnabled(payload.enabled)
-    }
-
-    const handleGameModeUpdate = (payload: { enabled: boolean }) => {
+    return registerIpcListener(RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE, (payload) => {
       setGameModeEnabled(payload.enabled)
-    }
-
-    const cleanupRestarted = registerIpcListener(
-      RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
-      handleControllersRestarted,
-    )
-    const cleanupEnabledChanged = registerIpcListener(
-      RENDERER_RECEIVE.AUDIO_ENABLED_CHANGED,
-      handleAudioEnabledChanged,
-    )
-    const cleanupGameMode = registerIpcListener(
-      RENDERER_RECEIVE.AUDIO_GAME_MODE_UPDATE,
-      handleGameModeUpdate,
-    )
-
-    // Initialize on mount
-    void initializeState()
-
-    return () => {
-      cleanupRestarted()
-      cleanupEnabledChanged()
-      cleanupGameMode()
-    }
-  }, [setIsAudioEnabled])
+    })
+  }, [])
 
   useEffect(() => {
     if (isAudioEnabled) {

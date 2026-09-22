@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useBlackoutShortcut } from '../hooks/useBlackoutShortcut'
 import { useMasterOutputSync } from '../hooks/useMasterOutputSync'
+import { useAudioEnabledSync } from '../hooks/useAudioEnabledSync'
 import { ToastStack } from './Toast'
 
 /**
@@ -12,6 +13,7 @@ import { ToastStack } from './Toast'
  */
 const WindowShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useMasterOutputSync()
+  useAudioEnabledSync()
   useBlackoutShortcut()
   return (
     <>
