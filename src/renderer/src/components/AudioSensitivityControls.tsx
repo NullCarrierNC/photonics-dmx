@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useId } from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 
 interface AudioSensitivityControlsProps {
@@ -8,6 +8,121 @@ interface AudioSensitivityControlsProps {
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value))
+
+/** The blue fill up to `percent` that shows where a slider sits. */
+const filledTo = (percent: number): React.CSSProperties => ({
+  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${percent}%, #e5e7eb ${percent}%, #e5e7eb 100%)`,
+})
+
+const COMPACT_LABEL_CLASS =
+  'text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 whitespace-nowrap'
+const COMPACT_RANGE_CLASS =
+  'flex-1 min-w-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider disabled:cursor-not-allowed'
+const COMPACT_NUMBER_CLASS =
+  'w-16 shrink-0 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center'
+const FULL_RANGE_CLASS =
+  'flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider'
+const FULL_NUMBER_CLASS =
+  'w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center'
+
+interface LevelRowProps {
+  label: string
+  /** Shown under the label in the full-size layout. */
+  help?: string
+  /** Names the number box beside the slider. */
+  numberLabel: string
+  min: number
+  max: number
+  step: number
+  value: number
+  /** Where the slider's fill ends, 0 to 100. */
+  fillPercent: number
+  disabled: boolean
+  compact: boolean
+  /** The slider moved. Nothing is stored until `onCommit`. */
+  onSlide: (value: number) => void
+  /** The number box changed, as typed. */
+  onType: (text: string) => void
+  /** The user let go of the slider or left the number box. */
+  onCommit: () => void
+}
+
+/** One level: a labelled slider and the number box beside it, which set the same value. */
+const LevelRow: React.FC<LevelRowProps> = ({
+  label,
+  help,
+  numberLabel,
+  min,
+  max,
+  step,
+  value,
+  fillPercent,
+  disabled,
+  compact,
+  onSlide,
+  onType,
+  onCommit,
+}) => {
+  const id = useId()
+  const labelElement = (
+    <label
+      htmlFor={id}
+      className={
+        compact ? COMPACT_LABEL_CLASS : 'text-sm font-medium text-gray-700 dark:text-gray-300'
+      }>
+      {label}
+    </label>
+  )
+  const controls = (
+    <>
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onSlide(Number(e.target.value))}
+        onMouseUp={onCommit}
+        onTouchEnd={onCommit}
+        onKeyUp={onCommit}
+        disabled={disabled}
+        className={compact ? COMPACT_RANGE_CLASS : FULL_RANGE_CLASS}
+        style={filledTo(fillPercent)}
+      />
+      <input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onType(e.target.value)}
+        onBlur={onCommit}
+        disabled={disabled}
+        className={compact ? COMPACT_NUMBER_CLASS : FULL_NUMBER_CLASS}
+        aria-label={numberLabel}
+      />
+    </>
+  )
+
+  if (compact) {
+    return (
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:gap-x-3">
+        {labelElement}
+        {controls}
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-1">
+      <div>
+        {labelElement}
+        {help && <p className="text-xs text-gray-500 dark:text-gray-400">{help}</p>}
+      </div>
+      <div className="flex items-center space-x-4">{controls}</div>
+    </div>
+  )
+}
 
 const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ compact = false }) => {
   const audio = useAudioConfigFields({
@@ -31,305 +146,105 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
 
   const commitStrobe = (): void => void audio.commit()
 
-  const sensitivityRangeStyle = {
-    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((sensitivity - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb ${((sensitivity - 0.1) / (5.0 - 0.1)) * 100}%, #e5e7eb 100%)`,
-  } as const
-
-  const noiseFloorRangeStyle = {
-    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(noiseFloor / 255) * 100}%, #e5e7eb ${(noiseFloor / 255) * 100}%, #e5e7eb 100%)`,
-  } as const
-
-  const strobeTriggerRangeStyle = {
-    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${strobeTriggerThreshold * 100}%, #e5e7eb ${strobeTriggerThreshold * 100}%, #e5e7eb 100%)`,
-  } as const
-
-  const strobeProbabilityRangeStyle = {
-    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${strobeProbability}%, #e5e7eb ${strobeProbability}%, #e5e7eb 100%)`,
-  } as const
-
   const controlsDisabled = !audio.loaded || audio.isSaving
   const strobeControlsDisabled = controlsDisabled || !strobeEnabled
 
-  const rangeClassName =
-    'flex-1 min-w-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider'
-  const compactStrobeRangeClassName = `${rangeClassName} disabled:cursor-not-allowed`
-  const numberClassName =
-    'w-16 shrink-0 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center'
+  const levels = (
+    <>
+      <LevelRow
+        label="Global Gain"
+        help="Adjust the global sensitivity. This is applied to all frequency bands."
+        numberLabel="Global sensitivity numeric"
+        min={0.1}
+        max={5.0}
+        step={0.1}
+        value={sensitivity}
+        fillPercent={((sensitivity - 0.1) / (5.0 - 0.1)) * 100}
+        disabled={controlsDisabled}
+        compact={compact}
+        onSlide={(value) => audio.set({ sensitivity: value })}
+        onType={(text) => audio.set({ sensitivity: clamp(parseFloat(text) || 0.1, 0.1, 5.0) })}
+        onCommit={commitSensitivity}
+      />
+      <LevelRow
+        label="Noise Floor"
+        help="Audio signal below this level is treated as silence. Increase to filter out background noise."
+        numberLabel="Noise floor numeric"
+        min={0}
+        max={255}
+        step={1}
+        value={noiseFloor}
+        fillPercent={(noiseFloor / 255) * 100}
+        disabled={controlsDisabled}
+        compact={compact}
+        onSlide={(value) => audio.set({ noiseFloor: value })}
+        onType={(text) => audio.set({ noiseFloor: clamp(parseFloat(text) || 0, 0, 255) })}
+        onCommit={commitNoiseFloor}
+      />
+    </>
+  )
 
-  if (compact) {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <label
-            htmlFor="audio-compact-sensitivity"
-            className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 whitespace-nowrap">
-            Global Gain
-          </label>
-          <input
-            id="audio-compact-sensitivity"
-            type="range"
-            min="0.1"
-            max="5.0"
-            step="0.1"
-            value={sensitivity}
-            onChange={(e) => audio.set({ sensitivity: parseFloat(e.target.value) })}
-            onMouseUp={commitSensitivity}
-            onTouchEnd={commitSensitivity}
-            onKeyUp={commitSensitivity}
-            disabled={controlsDisabled}
-            className={rangeClassName}
-            style={sensitivityRangeStyle}
-          />
-
-          <input
-            type="number"
-            min="0.1"
-            max="5.0"
-            step="0.1"
-            value={sensitivity}
-            onChange={(e) => {
-              const value = parseFloat(e.target.value) || 0.1
-              audio.set({ sensitivity: clamp(value, 0.1, 5.0) })
-            }}
-            onBlur={commitSensitivity}
-            disabled={controlsDisabled}
-            className={numberClassName}
-            aria-label="Global sensitivity numeric"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-3">
-          <label
-            htmlFor="audio-compact-noise-floor"
-            className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 whitespace-nowrap">
-            Noise Floor
-          </label>
-          <input
-            id="audio-compact-noise-floor"
-            type="range"
-            min="0"
-            max="255"
-            step="1"
-            value={noiseFloor}
-            onChange={(e) => audio.set({ noiseFloor: parseFloat(e.target.value) })}
-            onMouseUp={commitNoiseFloor}
-            onTouchEnd={commitNoiseFloor}
-            onKeyUp={commitNoiseFloor}
-            disabled={controlsDisabled}
-            className={rangeClassName}
-            style={noiseFloorRangeStyle}
-          />
-
-          <input
-            type="number"
-            min="0"
-            max="255"
-            step="1"
-            value={noiseFloor}
-            onChange={(e) => {
-              const value = parseFloat(e.target.value) || 0
-              audio.set({ noiseFloor: clamp(value, 0, 255) })
-            }}
-            onBlur={commitNoiseFloor}
-            disabled={controlsDisabled}
-            className={numberClassName}
-            aria-label="Noise floor numeric"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:gap-x-3">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 whitespace-nowrap">
-            Strobe
-          </span>
-          <input
-            type="checkbox"
-            id="audio-compact-strobe-enabled"
-            className="form-checkbox h-5 w-5 rounded text-blue-600 shrink-0"
-            checked={strobeEnabled}
-            disabled={controlsDisabled}
-            onChange={(e) => {
-              void audio.save({ strobeEnabled: e.target.checked })
-            }}
-            aria-label="Strobe"
-          />
-        </div>
-
-        <div className={strobeControlsDisabled ? 'space-y-3 opacity-60' : 'space-y-3'}>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:gap-x-3">
-            <label
-              htmlFor="audio-compact-strobe-threshold"
-              className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 whitespace-nowrap">
-              Threshold
-            </label>
-            <input
-              id="audio-compact-strobe-threshold"
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={strobeTriggerThreshold}
-              onChange={(e) => audio.set({ strobeTriggerThreshold: Number(e.target.value) })}
-              onMouseUp={commitStrobe}
-              onTouchEnd={commitStrobe}
-              onKeyUp={commitStrobe}
-              disabled={strobeControlsDisabled}
-              className={compactStrobeRangeClassName}
-              style={strobeTriggerRangeStyle}
-            />
-
-            <input
-              type="number"
-              min={0}
-              max={1}
-              step={0.01}
-              value={strobeTriggerThreshold}
-              onChange={(e) => {
-                const value = parseFloat(e.target.value)
-                if (Number.isFinite(value)) {
-                  audio.set({ strobeTriggerThreshold: clamp(value, 0, 1) })
-                }
-              }}
-              onBlur={commitStrobe}
-              disabled={strobeControlsDisabled}
-              className={numberClassName}
-              aria-label="Strobe threshold numeric"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:gap-x-3">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 whitespace-nowrap">
-              Strobe prob.
-            </span>
-            <input
-              id="audio-compact-strobe-probability"
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={strobeProbability}
-              onChange={(e) => audio.set({ strobeProbability: Number(e.target.value) })}
-              onMouseUp={commitStrobe}
-              onTouchEnd={commitStrobe}
-              onKeyUp={commitStrobe}
-              disabled={strobeControlsDisabled}
-              className={compactStrobeRangeClassName}
-              style={strobeProbabilityRangeStyle}
-            />
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={strobeProbability}
-              onChange={(e) => {
-                const value = parseFloat(e.target.value)
-                if (Number.isFinite(value)) {
-                  audio.set({ strobeProbability: clamp(Math.round(value), 0, 100) })
-                }
-              }}
-              onBlur={commitStrobe}
-              disabled={strobeControlsDisabled}
-              className={numberClassName}
-              aria-label="Strobe probability percent"
-            />
-          </div>
-        </div>
-      </div>
-    )
+  if (!compact) {
+    return <div className="space-y-4">{levels}</div>
   }
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Global Gain
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Adjust the global sensitivity. This is applied to all frequency bands.
-            </p>
-          </div>
-        </div>
+    <div className="space-y-3">
+      {levels}
 
-        <div className="flex items-center space-x-4">
-          <input
-            type="range"
-            min="0.1"
-            max="5.0"
-            step="0.1"
-            value={sensitivity}
-            onChange={(e) => audio.set({ sensitivity: parseFloat(e.target.value) })}
-            onMouseUp={commitSensitivity}
-            onTouchEnd={commitSensitivity}
-            onKeyUp={commitSensitivity}
-            disabled={controlsDisabled}
-            className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-            style={sensitivityRangeStyle}
-          />
-
-          <input
-            type="number"
-            min="0.1"
-            max="5.0"
-            step="0.1"
-            value={sensitivity}
-            onChange={(e) => {
-              const value = parseFloat(e.target.value) || 0.1
-              audio.set({ sensitivity: clamp(value, 0.1, 5.0) })
-            }}
-            onBlur={commitSensitivity}
-            disabled={controlsDisabled}
-            className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
-          />
-        </div>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:gap-x-3">
+        <span className={COMPACT_LABEL_CLASS}>Strobe</span>
+        <input
+          type="checkbox"
+          className="form-checkbox h-5 w-5 rounded text-blue-600 shrink-0"
+          checked={strobeEnabled}
+          disabled={controlsDisabled}
+          onChange={(e) => {
+            void audio.save({ strobeEnabled: e.target.checked })
+          }}
+          aria-label="Strobe"
+        />
       </div>
 
-      {/* Noise Floor */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Noise Floor
-            </label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Audio signal below this level is treated as silence. Increase to filter out background
-              noise.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-4">
-          <input
-            type="range"
-            min="0"
-            max="255"
-            step="1"
-            value={noiseFloor}
-            onChange={(e) => audio.set({ noiseFloor: parseFloat(e.target.value) })}
-            onMouseUp={commitNoiseFloor}
-            onTouchEnd={commitNoiseFloor}
-            onKeyUp={commitNoiseFloor}
-            disabled={controlsDisabled}
-            className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-            style={noiseFloorRangeStyle}
-          />
-
-          <input
-            type="number"
-            min="0"
-            max="255"
-            step="1"
-            value={noiseFloor}
-            onChange={(e) => {
-              const value = parseFloat(e.target.value) || 0
-              audio.set({ noiseFloor: clamp(value, 0, 255) })
-            }}
-            onBlur={commitNoiseFloor}
-            disabled={controlsDisabled}
-            className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
-          />
-        </div>
+      <div className={strobeControlsDisabled ? 'space-y-3 opacity-60' : 'space-y-3'}>
+        <LevelRow
+          label="Threshold"
+          numberLabel="Strobe threshold numeric"
+          min={0}
+          max={1}
+          step={0.01}
+          value={strobeTriggerThreshold}
+          fillPercent={strobeTriggerThreshold * 100}
+          disabled={strobeControlsDisabled}
+          compact
+          onSlide={(value) => audio.set({ strobeTriggerThreshold: value })}
+          onType={(text) => {
+            const value = parseFloat(text)
+            if (Number.isFinite(value)) {
+              audio.set({ strobeTriggerThreshold: clamp(value, 0, 1) })
+            }
+          }}
+          onCommit={commitStrobe}
+        />
+        <LevelRow
+          label="Strobe prob."
+          numberLabel="Strobe probability percent"
+          min={0}
+          max={100}
+          step={1}
+          value={strobeProbability}
+          fillPercent={strobeProbability}
+          disabled={strobeControlsDisabled}
+          compact
+          onSlide={(value) => audio.set({ strobeProbability: value })}
+          onType={(text) => {
+            const value = parseFloat(text)
+            if (Number.isFinite(value)) {
+              audio.set({ strobeProbability: clamp(Math.round(value), 0, 100) })
+            }
+          }}
+          onCommit={commitStrobe}
+        />
       </div>
     </div>
   )

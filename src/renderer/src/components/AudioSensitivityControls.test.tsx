@@ -71,3 +71,23 @@ describe('AudioSensitivityControls', () => {
     )
   })
 })
+
+describe.each([
+  ['compact', true],
+  ['full-size', false],
+])('AudioSensitivityControls %s', (_variant, compact) => {
+  beforeEach(() => {
+    resetIpcApiMock()
+    loadAudioConfig.mockResolvedValue({ sensitivity: 2.5, noiseFloor: 60 } as never)
+  })
+
+  it('names each slider and each number box', async () => {
+    renderWithProviders(<AudioSensitivityControls compact={compact} />)
+    await waitFor(() => expect(loadAudioConfig).toHaveBeenCalled())
+
+    expect(screen.getByLabelText('Global Gain')).toHaveAttribute('type', 'range')
+    expect(screen.getByLabelText('Noise Floor')).toHaveAttribute('type', 'range')
+    expect(screen.getByLabelText('Global sensitivity numeric')).toHaveAttribute('type', 'number')
+    expect(screen.getByLabelText('Noise floor numeric')).toHaveAttribute('type', 'number')
+  })
+})
