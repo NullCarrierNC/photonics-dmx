@@ -126,6 +126,21 @@ describe('YargNetworkListener', () => {
     mockClose.mockImplementation(defaultMockClose)
   })
 
+  it('rejects a start still binding when it is stopped, and binds again on the next start', async () => {
+    let lateBind: (() => void) | undefined
+    mockBind.mockImplementationOnce((_port: number, callback: () => void) => {
+      lateBind = callback
+    })
+    const first = listener.start()
+
+    await listener.stop()
+    await expect(first).rejects.toThrow()
+    lateBind?.()
+    await listener.start()
+
+    expect(mockBind).toHaveBeenCalledTimes(2)
+  })
+
   it('second start after await stop re-binds the UDP port', async () => {
     await listener.start()
     await listener.stop()

@@ -108,11 +108,14 @@ export class YargNetworkListener extends EventEmitter {
       this.setupServerEvents()
     }
 
+    const sock = this.server
     return new Promise<void>((resolve, reject) => {
       this.startBindReject = reject
       this.newerVersionWarningEmitted = false
       this.resetSessionInputState()
-      this.server!.bind(PORT, () => {
+      sock.bind(PORT, () => {
+        // A stop while the bind was pending has already rejected this start and closed the socket.
+        if (this.server !== sock) return
         this.startBindReject = null
         this.listening = true
         this.startFallbackPolling()
@@ -131,6 +134,10 @@ export class YargNetworkListener extends EventEmitter {
     const sock = this.server
     this.server = null
     this.listening = false
+    if (this.startBindReject) {
+      this.startBindReject(new Error('YargNetworkListener stopped before it started listening'))
+      this.startBindReject = null
+    }
     this.stopFallbackPolling()
     this.strobeWatchdog.stop()
     this.publishPostProcessing('Default')
