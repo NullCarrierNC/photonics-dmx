@@ -3,6 +3,7 @@ import { useAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
 import { persistPrefs } from '../ipc/persistPrefs'
 import { DraftNumberField } from './controls/DraftField'
+import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
 
 const BrightnessSettings: React.FC = () => {
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
@@ -85,6 +86,12 @@ const BrightnessSettings: React.FC = () => {
     { key: 'max' as const, label: 'Maximum', description: 'Only used by strobes' },
   ]
 
+  // One release serves the four sliders, and each names its level on the element.
+  const release = useCommitOnRelease((input) => {
+    const level = brightnessLevels.find(({ key }) => key === input.dataset.level)?.key
+    if (level) void handleBrightnessChange(level, parseInt(input.value))
+  })
+
   // Show loading state if preferences haven't been loaded yet
   if (!isLoaded) {
     return (
@@ -144,12 +151,12 @@ const BrightnessSettings: React.FC = () => {
                 min="0"
                 max="255"
                 value={localBrightness[key]}
-                onChange={(e) => previewBrightness(key, parseInt(e.target.value))}
-                onMouseUp={(e) => void handleBrightnessChange(key, parseInt(e.currentTarget.value))}
-                onTouchEnd={(e) =>
-                  void handleBrightnessChange(key, parseInt(e.currentTarget.value))
-                }
-                onKeyUp={(e) => void handleBrightnessChange(key, parseInt(e.currentTarget.value))}
+                data-level={key}
+                onChange={(e) => {
+                  previewBrightness(key, parseInt(e.target.value))
+                  release.changed()
+                }}
+                {...release.props}
                 className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
                 style={{
                   background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(localBrightness[key] / 255) * 100}%, #e5e7eb ${(localBrightness[key] / 255) * 100}%, #e5e7eb 100%)`,

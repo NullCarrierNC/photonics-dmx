@@ -53,6 +53,28 @@ describe('AudioSensitivityControls', () => {
     )
   })
 
+  it('keeps the slider live while its save is in flight, so focus stays on it', async () => {
+    const slider = await renderControls()
+    saveAudioConfig.mockReturnValue(new Promise(() => {}) as never)
+    slider.focus()
+
+    fireEvent.change(slider, { target: { value: '3' } })
+    fireEvent.keyUp(slider, { key: 'ArrowRight' })
+
+    await waitFor(() => expect(saveAudioConfig).toHaveBeenCalled())
+    expect(slider).not.toBeDisabled()
+    expect(document.activeElement).toBe(slider)
+  })
+
+  it('stores nothing when a key that moves nothing comes up', async () => {
+    const slider = await renderControls()
+
+    fireEvent.keyUp(slider, { key: 'Shift' })
+    fireEvent.keyUp(slider, { key: 'Tab' })
+
+    expect(saveAudioConfig).not.toHaveBeenCalled()
+  })
+
   it('stores nothing while the slider is still moving', async () => {
     const slider = await renderControls()
 
@@ -66,7 +88,7 @@ describe('AudioSensitivityControls', () => {
     const slider = await renderControls()
 
     fireEvent.change(slider, { target: { value: '4.5' } })
-    fireEvent.mouseUp(slider)
+    fireEvent.pointerUp(slider)
 
     await waitFor(() =>
       expect(saveAudioConfig).toHaveBeenCalledWith(expect.objectContaining({ sensitivity: 4.5 })),

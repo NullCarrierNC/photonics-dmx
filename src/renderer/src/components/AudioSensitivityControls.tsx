@@ -1,5 +1,6 @@
 import React, { useId } from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
+import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
 
 interface AudioSensitivityControlsProps {
   /** Omit long helper copy (e.g. DMX Preview quick controls). */
@@ -64,6 +65,7 @@ const LevelRow: React.FC<LevelRowProps> = ({
   onCommit,
 }) => {
   const id = useId()
+  const release = useCommitOnRelease(onCommit)
   const labelElement = (
     <label
       htmlFor={id}
@@ -82,10 +84,11 @@ const LevelRow: React.FC<LevelRowProps> = ({
         max={max}
         step={step}
         value={value}
-        onChange={(e) => onSlide(Number(e.target.value))}
-        onMouseUp={onCommit}
-        onTouchEnd={onCommit}
-        onKeyUp={onCommit}
+        onChange={(e) => {
+          onSlide(Number(e.target.value))
+          release.changed()
+        }}
+        {...release.props}
         disabled={disabled}
         className={compact ? COMPACT_RANGE_CLASS : FULL_RANGE_CLASS}
         style={filledTo(fillPercent)}
@@ -146,7 +149,8 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
 
   const commitStrobe = (): void => void audio.commit()
 
-  const controlsDisabled = !audio.loaded || audio.isSaving
+  // A slider stays live while a save is in flight, so keyboard focus stays on it.
+  const controlsDisabled = !audio.loaded
   const strobeControlsDisabled = controlsDisabled || !strobeEnabled
 
   const levels = (

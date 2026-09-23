@@ -81,8 +81,19 @@ describe('MasterOutputSidebar', () => {
     await waitFor(() => expect(setsMasterOutput()).toContainEqual({ dimmerPercent: 60 }))
     expect(savedPrefs()).toHaveLength(0)
 
-    fireEvent.mouseUp(fader)
+    fireEvent.pointerUp(fader)
     await waitFor(() => expect(savedPrefs()).toContainEqual({ masterDimmerPercent: 60 }))
+  })
+
+  it('writes nothing when a key that moves nothing comes up on the fader', async () => {
+    await renderSidebar()
+    const fader = screen.getByLabelText('Master dimmer') as HTMLInputElement
+
+    fireEvent.keyUp(fader, { key: 'Shift' })
+    fireEvent.keyUp(fader, { key: 'Tab' })
+    fireEvent.blur(fader)
+
+    expect(savedPrefs()).toHaveLength(0)
   })
 
   it('toggles blackout live and never persists it', async () => {

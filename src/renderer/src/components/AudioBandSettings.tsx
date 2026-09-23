@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
 import { DEFAULT_AUDIO_BANDS } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
+import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
 import { DraftNumberField } from './controls/DraftField'
 import {
   AUDIO_BAND_PRESETS,
@@ -36,7 +37,6 @@ const AudioBandSettings: React.FC = () => {
   const matchedPresetId = useMemo(() => matchAudioBandPresetId(bands), [bands])
 
   const handleSave = (updatedBands: AudioBandDefinition[]): void => {
-    if (isSaving) return
     void audio.save({ bands: updatedBands })
   }
 
@@ -49,12 +49,12 @@ const AudioBandSettings: React.FC = () => {
     audio.set({ bands: bands.map((b, i) => (i === index ? { ...b, gain: clamped } : b)) })
   }
 
-  const handleGainBlur = (): void => {
-    handleSave(bands)
-  }
+  // One release serves every gain slider, since a save writes all eight bands.
+  const gainRelease = useCommitOnRelease(() => handleSave(bands))
 
   const handleGainSliderChange = (index: number, e: React.ChangeEvent<HTMLInputElement>): void => {
     handleGainChange(index, parseFloat(e.target.value))
+    gainRelease.changed()
   }
 
   const handleResetGains = (): void => {
@@ -155,8 +155,7 @@ const AudioBandSettings: React.FC = () => {
                   step="0.1"
                   value={band.gain}
                   onChange={(e) => handleGainSliderChange(index, e)}
-                  onMouseUp={handleGainBlur}
-                  disabled={isSaving}
+                  {...gainRelease.props}
                   aria-label={`${band.name} gain multiplier`}
                   className="flex-1 min-w-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
                   style={{

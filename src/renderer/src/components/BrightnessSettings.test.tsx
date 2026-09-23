@@ -40,8 +40,19 @@ describe('BrightnessSettings', () => {
     fireEvent.change(slider, { target: { value: '90' } })
     expect(savePrefs).not.toHaveBeenCalled()
 
-    fireEvent.mouseUp(slider)
+    fireEvent.pointerUp(slider)
+    fireEvent.blur(slider)
     expect(savePrefs).toHaveBeenCalledTimes(1)
+  })
+
+  it('saves nothing when a key that moves nothing comes up', () => {
+    renderPanel()
+    const slider = screen.getAllByRole('slider')[0]
+
+    fireEvent.keyUp(slider, { key: 'Shift' })
+    fireEvent.keyUp(slider, { key: 'Tab' })
+
+    expect(savePrefs).not.toHaveBeenCalled()
   })
 
   it('saves a typed level when the user leaves the field', async () => {

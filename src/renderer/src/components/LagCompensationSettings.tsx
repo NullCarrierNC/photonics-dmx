@@ -4,6 +4,7 @@ import { lightingPrefsAtom } from '../atoms'
 import { persistPrefs } from '../ipc/persistPrefs'
 import { DraftNumberField } from './controls/DraftField'
 import { useDebouncedSave } from '../hooks/useDebouncedSave'
+import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
 import {
   LAG_COMPENSATION_MS_MAX,
   LAG_COMPENSATION_MS_MIN,
@@ -64,6 +65,7 @@ const DelayField: React.FC<DelayFieldProps> = ({ id, label, help, stored, onWrit
   const commit = useCallback((): void => {
     saver.flush()
   }, [saver])
+  const release = useCommitOnRelease(commit)
 
   return (
     <div className="mb-4">
@@ -80,11 +82,11 @@ const DelayField: React.FC<DelayFieldProps> = ({ id, label, help, stored, onWrit
           max={LAG_COMPENSATION_MS_MAX}
           step={1}
           value={shown}
-          onChange={(event) => report(Number(event.target.value))}
-          onMouseUp={commit}
-          onPointerUp={commit}
-          onKeyUp={commit}
-          onBlur={commit}
+          onChange={(event) => {
+            report(Number(event.target.value))
+            release.changed()
+          }}
+          {...release.props}
           aria-label={label}
           aria-describedby={`${id}-description`}
           className="flex-1 accent-blue-500"

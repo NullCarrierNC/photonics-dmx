@@ -2,6 +2,7 @@ import React, { useCallback } from 'react'
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { lightingPrefsAtom } from '../atoms'
 import { savePrefs } from '../ipcApi'
+import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
 import { applyMasterOutputAtom, masterOutputAtom, toggleBlackoutAtom } from '../state/masterOutput'
 import { createLogger } from '../../../shared/logger'
 
@@ -82,6 +83,7 @@ const MasterOutputSidebar: React.FC = () => {
       })
       .catch((err) => log.error('Failed to save master dimmer level', err))
   }, [dimmerPercent, prefs.masterDimmerPercent, setPrefs])
+  const dimmerRelease = useCommitOnRelease(commitDimmer)
 
   const toggleStrobe = useCallback((): void => {
     const next = !strobeEnabled
@@ -134,10 +136,11 @@ const MasterOutputSidebar: React.FC = () => {
             max={100}
             step={1}
             value={dimmerPercent}
-            onChange={handleDimmerChange}
-            onMouseUp={commitDimmer}
-            onKeyUp={commitDimmer}
-            onBlur={commitDimmer}
+            onChange={(event) => {
+              handleDimmerChange(event)
+              dimmerRelease.changed()
+            }}
+            {...dimmerRelease.props}
             aria-label="Master dimmer"
             aria-valuetext={`${dimmerPercent} percent`}
             className="console-fader h-full"

@@ -5,6 +5,7 @@
  */
 import React from 'react'
 import { DraftNumberField } from '../controls/DraftField'
+import { useCommitOnRelease } from '../../hooks/useCommitOnRelease'
 
 const LABEL_CLASS = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'
 const HELP_CLASS = 'text-xs text-gray-500 dark:text-gray-400 mt-2'
@@ -80,33 +81,37 @@ export const ProbabilitySlider: React.FC<ProbabilitySliderProps> = ({
   disabled,
   onChange,
   onCommit,
-}) => (
-  <div>
-    <label htmlFor={id} className={LABEL_CLASS}>
-      {label}
-    </label>
-    <div className="flex items-center space-x-4">
-      <input
-        type="range"
-        id={id}
-        min={0}
-        max={100}
-        step={1}
-        value={value}
-        onChange={(event) => onChange(parseInt(event.target.value, 10))}
-        onMouseUp={onCommit}
-        onPointerUp={onCommit}
-        onBlur={onCommit}
-        className="flex-1 max-w-xs accent-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled={disabled}
-      />
-      <span className="text-sm text-gray-700 dark:text-gray-300 w-12 text-right tabular-nums">
-        {value}%
-      </span>
+}) => {
+  const release = useCommitOnRelease(onCommit)
+  return (
+    <div>
+      <label htmlFor={id} className={LABEL_CLASS}>
+        {label}
+      </label>
+      <div className="flex items-center space-x-4">
+        <input
+          type="range"
+          id={id}
+          min={0}
+          max={100}
+          step={1}
+          value={value}
+          onChange={(event) => {
+            onChange(parseInt(event.target.value, 10))
+            release.changed()
+          }}
+          {...release.props}
+          className="flex-1 max-w-xs accent-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={disabled}
+        />
+        <span className="text-sm text-gray-700 dark:text-gray-300 w-12 text-right tabular-nums">
+          {value}%
+        </span>
+      </div>
+      <p className={HELP_CLASS}>{help}</p>
     </div>
-    <p className={HELP_CLASS}>{help}</p>
-  </div>
-)
+  )
+}
 
 interface BoundedNumberFieldProps {
   id: string

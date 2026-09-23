@@ -1,5 +1,6 @@
 import React from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
+import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
 
 const AudioBeatDetection: React.FC = () => {
   const audio = useAudioConfigFields({
@@ -20,6 +21,9 @@ const AudioBeatDetection: React.FC = () => {
   const handleSave = (): void => {
     void audio.commit()
   }
+  const thresholdRelease = useCommitOnRelease(handleSave)
+  const decayRelease = useCommitOnRelease(handleSave)
+  const intervalRelease = useCommitOnRelease(handleSave)
 
   return (
     <div className="space-y-1">
@@ -46,9 +50,11 @@ const AudioBeatDetection: React.FC = () => {
             max="1.0"
             step="0.05"
             value={threshold}
-            onChange={(e) => setThreshold(parseFloat(e.target.value))}
-            onMouseUp={() => handleSave()}
-            onTouchEnd={() => handleSave()}
+            onChange={(e) => {
+              setThreshold(parseFloat(e.target.value))
+              thresholdRelease.changed()
+            }}
+            {...thresholdRelease.props}
             className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
             style={{
               background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((threshold - 0.1) / (1.0 - 0.1)) * 100}%, #e5e7eb ${((threshold - 0.1) / (1.0 - 0.1)) * 100}%, #e5e7eb 100%)`,
@@ -87,9 +93,11 @@ const AudioBeatDetection: React.FC = () => {
             max="0.99"
             step="0.01"
             value={decayRate}
-            onChange={(e) => setDecayRate(parseFloat(e.target.value))}
-            onMouseUp={() => handleSave()}
-            onTouchEnd={() => handleSave()}
+            onChange={(e) => {
+              setDecayRate(parseFloat(e.target.value))
+              decayRelease.changed()
+            }}
+            {...decayRelease.props}
             className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
             style={{
               background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((decayRate - 0.8) / (0.99 - 0.8)) * 100}%, #e5e7eb ${((decayRate - 0.8) / (0.99 - 0.8)) * 100}%, #e5e7eb 100%)`,
@@ -130,9 +138,11 @@ const AudioBeatDetection: React.FC = () => {
             max="500"
             step="10"
             value={minInterval}
-            onChange={(e) => setMinInterval(parseInt(e.target.value))}
-            onMouseUp={() => handleSave()}
-            onTouchEnd={() => handleSave()}
+            onChange={(e) => {
+              setMinInterval(parseInt(e.target.value))
+              intervalRelease.changed()
+            }}
+            {...intervalRelease.props}
             className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
             style={{
               background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((minInterval - 50) / (500 - 50)) * 100}%, #e5e7eb ${((minInterval - 50) / (500 - 50)) * 100}%, #e5e7eb 100%)`,
