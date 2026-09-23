@@ -14,7 +14,7 @@ import { screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { refused, resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
-import { dmxRigsAtom, lightingPrefsAtom } from '../atoms'
+import { activeRigIdAtom, dmxRigsAtom, lightingPrefsAtom } from '../atoms'
 import {
   ConfigStrobeType,
   type DmxRig,
@@ -57,13 +57,18 @@ function makeRig(id: string, name: string, outputs?: WireSenderId[], active = tr
   return rig
 }
 
-function renderWith(opts: { rigs: DmxRig[]; allowMultipleActiveRigs: boolean }) {
+function renderWith(opts: {
+  rigs: DmxRig[]
+  allowMultipleActiveRigs: boolean
+  layoutRigId?: string
+}) {
   // Initial getDmxRigs call should return the same set (the component refetches on mount).
   getDmxRigsMock.mockResolvedValueOnce(opts.rigs)
   return renderWithProviders(<ActiveRigsSettings />, {
     seed: (set) => {
       set(dmxRigsAtom, opts.rigs)
       set(lightingPrefsAtom, { allowMultipleActiveRigs: opts.allowMultipleActiveRigs })
+      if (opts.layoutRigId) set(activeRigIdAtom, opts.layoutRigId)
     },
   }).store
 }
@@ -381,5 +386,57 @@ describe('ActiveRigsSettings rig writes', () => {
     expect(saveDmxRigMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1', active: true }))
     const radios = screen.getAllByRole('radio') as HTMLInputElement[]
     expect(radios.map((r) => r.checked)).toEqual([true, false, false])
+  })
+})
+
+describe('ActiveRigsSettings delete and the Lights Layout selection', () => {
+  async function deleteRig(index: number): Promise<void> {
+    fireEvent.click(screen.getAllByText('Delete')[index]!)
+    await act(async () => {
+      fireEvent.click(screen.getByText('Yes'))
+    })
+  }
+
+  it('lets Lights Layout pick again when the rig it has open is deleted', async () => {
+    const store = renderWith({
+      rigs: [makeRig('r1', 'Rig A'), makeRig('r2', 'Rig B', undefined, false)],
+      allowMultipleActiveRigs: false,
+      layoutRigId: 'r2',
+    })
+    await screen.findByText('Rig B')
+
+    await deleteRig(1)
+
+    await waitFor(() => expect(screen.queryByText('Rig B')).toBeNull())
+    expect(store.get(activeRigIdAtom)).toBeNull()
+  })
+
+  it('leaves the Lights Layout selection alone when another rig is deleted', async () => {
+    const store = renderWith({
+      rigs: [makeRig('r1', 'Rig A'), makeRig('r2', 'Rig B', undefined, false)],
+      allowMultipleActiveRigs: false,
+      layoutRigId: 'r1',
+    })
+    await screen.findByText('Rig B')
+
+    await deleteRig(1)
+
+    await waitFor(() => expect(screen.queryByText('Rig B')).toBeNull())
+    expect(store.get(activeRigIdAtom)).toBe('r1')
+  })
+
+  it('keeps the Lights Layout selection when the delete is refused', async () => {
+    deleteDmxRigMock.mockResolvedValue(refused('EPERM: rigs.json') as never)
+    const store = renderWith({
+      rigs: [makeRig('r1', 'Rig A'), makeRig('r2', 'Rig B', undefined, false)],
+      allowMultipleActiveRigs: false,
+      layoutRigId: 'r2',
+    })
+    await screen.findByText('Rig B')
+
+    await deleteRig(1)
+
+    await screen.findByRole('alert')
+    expect(store.get(activeRigIdAtom)).toBe('r2')
   })
 })

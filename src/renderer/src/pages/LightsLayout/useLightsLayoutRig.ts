@@ -32,7 +32,10 @@ export function useLightsLayoutRig(
         if (cancelled) return
         setRigs(loadedRigs || [])
 
-        if (!activeRigId && loadedRigs.length > 0) {
+        // A selection that is not on disk (deleted from Preferences while this page was closed)
+        // is replaced like a missing one, so the page never edits a rig that no longer exists.
+        const selectionOnDisk = loadedRigs.some((rig) => rig.id === activeRigId)
+        if (!selectionOnDisk && loadedRigs.length > 0) {
           setActiveRigId(loadedRigs[0].id)
         } else if (loadedRigs.length === 0) {
           const defaultRig = createDefaultDmxRig()

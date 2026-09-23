@@ -49,4 +49,27 @@ describe('useLightsLayoutRig', () => {
     expect(setRigs.mock.calls.every(([rigs]) => (rigs as unknown[]).length === 0)).toBe(true)
     expect(setActiveRigId).not.toHaveBeenCalled()
   })
+
+  it('selects the first rig when the selected one is no longer on disk', async () => {
+    jest.mocked(ipcApi.getDmxRigs).mockResolvedValue([{ id: 'a', name: 'Rig A' }] as never)
+    const setActiveRigId = jest.fn()
+    renderHook(() => useLightsLayoutRig('deleted-rig', jest.fn(), setActiveRigId, jest.fn()))
+
+    await waitFor(() => expect(setActiveRigId).toHaveBeenCalledWith('a'))
+  })
+
+  it('keeps the selected rig when it is still on disk', async () => {
+    jest.mocked(ipcApi.getDmxRigs).mockResolvedValue([
+      { id: 'a', name: 'Rig A' },
+      { id: 'b', name: 'Rig B' },
+    ] as never)
+    const setRigs = jest.fn()
+    const setActiveRigId = jest.fn()
+    renderHook(() => useLightsLayoutRig('b', setRigs, setActiveRigId, jest.fn()))
+
+    await waitFor(() => expect(setRigs).toHaveBeenCalled())
+    await act(async () => {})
+
+    expect(setActiveRigId).not.toHaveBeenCalled()
+  })
 })

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAtom } from 'jotai'
-import { dmxRigsAtom, lightingPrefsAtom } from '../atoms'
+import { activeRigIdAtom, dmxRigsAtom, lightingPrefsAtom } from '../atoms'
 import { DmxRig, WIRE_SENDER_IDS, WireSenderId } from '../../../photonics-dmx/types'
 import { getDmxRigs, saveDmxRig, deleteDmxRig } from '../ipcApi'
 import { persistPrefs } from '../ipc/persistPrefs'
@@ -83,6 +83,7 @@ function setRigMirrorFlag(rig: DmxRig, axis: 'horiz' | 'vert', enabled: boolean)
 const ActiveRigsSettings: React.FC = () => {
   const [rigs, setRigs] = useAtom(dmxRigsAtom)
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
+  const [layoutRigId, setLayoutRigId] = useAtom(activeRigIdAtom)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -238,6 +239,8 @@ const ActiveRigsSettings: React.FC = () => {
       const name = rigs.find((r) => r.id === rigId)?.name ?? 'the rig'
       setSaveError(null)
       if (!rigWriteLanded(await deleteDmxRig(rigId), `delete ${name}`)) return
+      // Lights Layout picks a surviving rig the next time it opens.
+      if (layoutRigId === rigId) setLayoutRigId(null)
       const remaining = rigs.filter((r) => r.id !== rigId)
 
       // If deletion collapses the rig set to a single rig, the routing UI is about to be
