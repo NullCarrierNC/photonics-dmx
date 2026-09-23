@@ -18,6 +18,7 @@ import { DmxLightManager } from '../../../controllers/DmxLightManager'
 import { CueData } from '../../../cues/types/cueTypes'
 import { VariableValue } from '../../../cues/node/runtime/executionTypes'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+import { createSequencerHarness } from '../../helpers/sequencerHarness'
 
 describe('Runtime Event System', () => {
   let mockSequencer: ILightingController
@@ -867,6 +868,59 @@ describe('Runtime Event System', () => {
       cue.onStop()
       // Effects must not be removed so the next cue's setEffect can transition from them instead of from black
       expect(mockSequencer.removeEffect).toHaveBeenCalledTimes(removeEffectCallsBefore)
+    })
+
+    it('the next primary fades in from the look a stopped primary left, on a real sequencer', () => {
+      const h = createSequencerHarness({ frontCount: 2, backCount: 0 })
+      const primary = (id: string, color: string, duration: number): LightingNodeCue => {
+        const start: NetEventNode = { id: `${id}-start`, type: 'event', eventType: 'cue-started' }
+        const action: ActionNode = {
+          id: `${id}-set`,
+          type: 'action',
+          effectType: 'set-color',
+          target: {
+            groups: { source: 'literal', value: 'front' },
+            filter: { source: 'literal', value: 'all' },
+          },
+          color: {
+            name: { source: 'literal', value: color },
+            brightness: { source: 'literal', value: 'high' },
+          },
+          timing: {
+            waitForCondition: { source: 'literal', value: 'none' },
+            waitForTime: { source: 'literal', value: 0 },
+            duration: { source: 'literal', value: duration },
+            waitUntilCondition: { source: 'literal', value: 'none' },
+            waitUntilTime: { source: 'literal', value: 0 },
+          },
+        }
+        const definition: NetNodeCueDefinition = {
+          id,
+          name: id,
+          kind: 'lighting',
+          cueType: 'Intro' as never,
+          style: 'primary',
+          nodes: { events: [start], actions: [action], logic: [] },
+          connections: [{ from: start.id, to: action.id }],
+          layout: { nodePositions: {} },
+        }
+        return new LightingNodeCue('group1', NodeCueCompiler.compileCue(definition, 'yarg'))
+      }
+      try {
+        const red = primary('red-cue', 'red', 0)
+        red.execute(createCueData(), h.sequencer, h.lightManager)
+        h.advanceBy(50)
+        const redLevel = h.getLightState(h.frontLightIds[0])?.red ?? 0
+        red.onStop()
+
+        primary('green-cue', 'green', 300).execute(createCueData(), h.sequencer, h.lightManager)
+        h.advanceBy(10)
+
+        expect(redLevel).toBeGreaterThan(0)
+        expect(h.getLightState(h.frontLightIds[0])?.red ?? 0).toBeGreaterThan(redLevel * 0.8)
+      } finally {
+        h.cleanup()
+      }
     })
 
     it('LightingNodeCue (Secondary): execute adds its effect without clearing the sequencer', () => {

@@ -339,7 +339,7 @@ export class EffectManager implements IEffectManager {
         // one, so the scene is not cleared on every re-trigger.
         this.removeEffect(name, 0)
       } else {
-        this.removeAllEffects()
+        this.removeAllEffects(true)
       }
     }
 
@@ -516,10 +516,10 @@ export class EffectManager implements IEffectManager {
   }
 
   /**
-   * Removes all active effects and clears the queue
-   * Immediately clears ALL state in the sequencer system as though it had just been initialized
+   * Removes every effect and clears the queues, as though the sequencer had just started. With
+   * `holdLook` the lights keep the previous look until the next frame, for a set that replaces it.
    */
-  public removeAllEffects(): void {
+  public removeAllEffects(holdLook = false): void {
     // Cancel any active blackouts first
     if (this.systemEffects.isBlackoutActive()) {
       log.warn('Cancelling blackout for removeAllEffects')
@@ -539,8 +539,8 @@ export class EffectManager implements IEffectManager {
       this.layerManager.clearAllLayerStates()
       this.layerManager.clearAllLayerTracking()
 
-      // 3. Use clearAllTransitions() which clears maps and publishes black states
-      this.lightTransitionController.clearAllTransitions()
+      // 3. Clear the transitions, publishing black unless the look is held for its replacement
+      this.lightTransitionController.clearAllTransitions(holdLook)
 
       // 4. Reset effect tracking state; cancel (not just drop) pending callbacks so blocking graph
       //    nodes waiting on these effects are told their action ended instead of stranding.

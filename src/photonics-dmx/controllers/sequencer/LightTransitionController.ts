@@ -40,6 +40,12 @@ export class LightTransitionController {
    * Tracks the per-layer interpolated colour for each light.
    */
   private _currentLayerStates: Map<string, Map<number, RGBIO>>
+  /**
+   * The colour each light showed when a set replaced the look, held until the next frame. The new
+   * look's transitions start from it (see {@link getLightState}), and a light the new look has not
+   * drawn by the end of that frame goes dark then.
+   */
+  private _heldLook = new Map<string, RGBIO>()
   /** Whether every published colour is forced dark. See {@link setOcclusionHeld}. */
   private _occlusionHeld: boolean = false
 
@@ -164,10 +170,11 @@ export class LightTransitionController {
   }
 
   /**
-   * Clears ALL transitions and resets all lights to black
-   * This is a nuclear option used when switching cues
+   * Clears every transition. By default every light goes black and is published at once. With
+   * `holdLook`, the lights keep showing the previous look until the next frame, which the look that
+   * replaces it draws over, so a cue change never passes through black.
    */
-  public clearAllTransitions(): void {
+  public clearAllTransitions(holdLook = false): void {
     // Set the clearing flag to prevent new transitions from being added
     this._clearingTransitions = true
 
@@ -184,6 +191,19 @@ export class LightTransitionController {
       // Clear all transitions
       this._transitionsByLight.clear()
       this._currentLayerStates.clear()
+      this._heldLook.clear()
+
+      if (holdLook) {
+        for (const lightId of allLightIds) {
+          const showing = this._lightStateManager.getLightState(lightId)
+          if (showing) {
+            // Colour only, so a new colour layer never carries the old aim over a position layer.
+            const { pan: _pan, tilt: _tilt, ...color } = showing
+            this._heldLook.set(lightId, color)
+          }
+        }
+        return
+      }
 
       // Reset all lights to black
       const blackState = opaqueBlack()
@@ -281,19 +301,16 @@ export class LightTransitionController {
   }
 
   /**
-   * Returns the last interpolated color for the specified (light, layer).
-   * If not found, returns a transparent (all 0) color instead of null.
+   * Returns the last interpolated color for the specified (light, layer). A light with nothing on
+   * that layer gives the held look after a set replaced it, and transparent otherwise.
    */
   public getLightState(lightId: string, layer: number): RGBIO {
-    const layerMap = this._currentLayerStates.get(lightId)
-    if (!layerMap) {
-      return transparentColor()
+    const c = this._currentLayerStates.get(lightId)?.get(layer)
+    if (c) {
+      return c
     }
-    const c = layerMap.get(layer)
-    if (!c) {
-      return transparentColor()
-    }
-    return c
+    const held = this._heldLook.get(lightId)
+    return held ? { ...held } : transparentColor()
   }
 
   /**
@@ -309,6 +326,7 @@ export class LightTransitionController {
   public immediateBlackout(): void {
     this._transitionsByLight.clear()
     this._currentLayerStates.clear()
+    this._heldLook.clear()
 
     // Immediately push black to all known lights
     const allLightIds = this._lightStateManager.getTrackedLightIds()
@@ -423,6 +441,12 @@ export class LightTransitionController {
       this._currentLayerStates.forEach((layerStates, lightId) => {
         this.blendAndSetFinalColor(lightId, layerStates)
       })
+      for (const lightId of this._heldLook.keys()) {
+        if (!this._currentLayerStates.has(lightId)) {
+          this._lightStateManager.setLightState(lightId, opaqueBlack())
+        }
+      }
+      this._heldLook.clear()
 
       // Phase 4: Clean up completed transitions
       layersToRemove.forEach(({ lightId, layer }) => {
@@ -488,6 +512,7 @@ export class LightTransitionController {
   public shutdown(): void {
     this._transitionsByLight.clear()
     this._currentLayerStates.clear()
+    this._heldLook.clear()
     log.info('LightTransitionController has been shut down.')
   }
 
