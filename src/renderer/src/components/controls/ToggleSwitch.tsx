@@ -35,9 +35,11 @@ export const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
       {label}
     </label>
     <button
+      type="button"
+      role="switch"
       onClick={onToggle}
       disabled={disabled}
-      aria-pressed={checked}
+      aria-checked={checked}
       aria-label={label}
       className={`${compact ? 'w-9 h-5' : 'w-12 h-6'} rounded-full transition-colors ${
         checked ? 'bg-green-500' : 'bg-gray-400'
