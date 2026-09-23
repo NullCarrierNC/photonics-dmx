@@ -1,16 +1,25 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import {
+  closesLikeAPage,
   createFakeBrowserWindow as mockCreateFakeBrowserWindow,
   type FakeBrowserWindow,
 } from './fakeBrowserWindow'
 
-const mockShowMessageBoxSync = jest.fn<(...args: unknown[]) => number>()
+/** Answers the open prompt. Replaced by each prompt the manager opens. */
+let answerPrompt: (choice: number) => void = () => {}
+
+const mockShowMessageBox = jest.fn<(...args: unknown[]) => Promise<{ response: number }>>(
+  () =>
+    new Promise((resolve) => {
+      answerPrompt = (choice) => resolve({ response: choice })
+    }),
+)
 
 jest.mock('electron', () => ({
   BrowserWindow: jest.fn((options: Record<string, unknown>) =>
     mockCreateFakeBrowserWindow(options),
   ),
-  dialog: { showMessageBoxSync: (...args: unknown[]) => mockShowMessageBoxSync(...args) },
+  dialog: { showMessageBox: (...args: unknown[]) => mockShowMessageBox(...args) },
   shell: { openExternal: jest.fn() },
   screen: {
     getAllDisplays: jest.fn(() => [{ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }]),
@@ -31,24 +40,15 @@ function lastBuiltWindow(): FakeBrowserWindow {
   return results[results.length - 1].value as FakeBrowserWindow
 }
 
-/** Fires the unload a dirty page refused and reports whether main let the page go. */
+async function flush(): Promise<void> {
+  for (let i = 0; i < 10; i++) await Promise.resolve()
+}
+
+/** Fires an unload the page refused and reports whether main let the page go. */
 function unloadRefusedByPage(window: FakeBrowserWindow): boolean {
   const event = { preventDefault: jest.fn() }
   window.webContents.emit('will-prevent-unload', event)
   return event.preventDefault.mock.calls.length > 0
-}
-
-/**
- * Makes `close()` behave as Electron does for a page with or without unsaved changes: a clean page
- * closes, and a dirty one refuses to unload and closes only if main lets it go.
- */
-function closesLikeAPage(window: FakeBrowserWindow, dirty: boolean): void {
-  window.close.mockImplementation(() => {
-    if (!dirty || unloadRefusedByPage(window)) {
-      window.destroyed = true
-      window.emit('closed')
-    }
-  })
 }
 
 function managerWithMainAndEditor(dirty: { main: boolean; editor: boolean }) {
@@ -67,32 +67,97 @@ describe('WindowManager unsaved-changes prompt', () => {
     jest.clearAllMocks()
   })
 
-  it('lets the page go when the user chooses to leave', () => {
-    mockShowMessageBoxSync.mockReturnValue(LEAVE)
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it('closes the page once the user chooses to leave', async () => {
+    const wm = new WindowManager()
+    wm.createMainWindow()
+    const window = lastBuiltWindow()
+    closesLikeAPage(window, true)
+
+    window.close()
+    await flush()
+    expect(mockShowMessageBox).toHaveBeenCalledWith(window, expect.anything())
+    expect(window.destroyed).toBe(false)
+
+    answerPrompt(LEAVE)
+    await flush()
+
+    expect(window.destroyed).toBe(true)
+    expect(mockShowMessageBox).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the page when the user chooses to stay', async () => {
+    const wm = new WindowManager()
+    wm.createMainWindow()
+    const window = lastBuiltWindow()
+    closesLikeAPage(window, true)
+
+    window.close()
+    await flush()
+    answerPrompt(STAY)
+    await flush()
+
+    expect(window.destroyed).toBe(false)
+    expect(window.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks before the Cue Editor window closes over unsaved changes', async () => {
+    const wm = new WindowManager()
+    wm.openCueEditorWindow()
+    const editor = lastBuiltWindow()
+    closesLikeAPage(editor, true)
+
+    editor.close()
+    await flush()
+
+    expect(mockShowMessageBox).toHaveBeenCalledWith(editor, expect.anything())
+  })
+
+  it('reloads a page the user leaves on a reload', async () => {
     const wm = new WindowManager()
     wm.createMainWindow()
     const window = lastBuiltWindow()
 
+    expect(unloadRefusedByPage(window)).toBe(false)
+    answerPrompt(LEAVE)
+    await flush()
+
+    expect(window.webContents.reload).toHaveBeenCalledTimes(1)
     expect(unloadRefusedByPage(window)).toBe(true)
-    expect(mockShowMessageBoxSync).toHaveBeenCalledWith(window, expect.anything())
   })
 
-  it('keeps the page when the user chooses to stay', () => {
-    mockShowMessageBoxSync.mockReturnValue(STAY)
+  it('opens one prompt for a page closed again while it asks', async () => {
     const wm = new WindowManager()
     wm.createMainWindow()
+    const window = lastBuiltWindow()
+    closesLikeAPage(window, true)
 
-    expect(unloadRefusedByPage(lastBuiltWindow())).toBe(false)
+    window.close()
+    await flush()
+    window.close()
+    await flush()
+
+    expect(mockShowMessageBox).toHaveBeenCalledTimes(1)
   })
 
-  it('asks before the Cue Editor window closes over unsaved changes', () => {
-    mockShowMessageBoxSync.mockReturnValue(STAY)
+  it('keeps Node timers running while the prompt waits for an answer', async () => {
+    jest.useFakeTimers()
     const wm = new WindowManager()
-    wm.openCueEditorWindow()
-    const editor = lastBuiltWindow()
+    wm.createMainWindow()
+    const window = lastBuiltWindow()
+    closesLikeAPage(window, true)
+    const tick = jest.fn()
+    setInterval(tick, 100)
 
-    expect(unloadRefusedByPage(editor)).toBe(false)
-    expect(mockShowMessageBoxSync).toHaveBeenCalledWith(editor, expect.anything())
+    window.close()
+    await jest.advanceTimersByTimeAsync(1000)
+
+    expect(tick).toHaveBeenCalledTimes(10)
+    expect(window.destroyed).toBe(false)
+    answerPrompt(STAY)
   })
 })
 
@@ -101,25 +166,64 @@ describe('WindowManager windows closed for a Quit', () => {
     jest.clearAllMocks()
   })
 
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
   it('asks a page with unsaved changes and keeps the app when the user stays', async () => {
-    mockShowMessageBoxSync.mockReturnValue(STAY)
     const { wm, main, editor } = managerWithMainAndEditor({ main: false, editor: true })
 
-    await expect(wm.closeWindowsForQuit()).resolves.toBe(false)
+    const quit = wm.closeWindowsForQuit()
+    await flush()
+    answerPrompt(STAY)
 
-    expect(mockShowMessageBoxSync).toHaveBeenCalledWith(editor, expect.anything())
+    await expect(quit).resolves.toBe(false)
+    expect(mockShowMessageBox).toHaveBeenCalledWith(editor, expect.anything())
     expect(editor.destroyed).toBe(false)
     expect(main.close).not.toHaveBeenCalled()
     expect(wm.getMainWindow()).not.toBeNull()
   })
 
   it('closes every window once the user leaves the page with unsaved changes', async () => {
-    mockShowMessageBoxSync.mockReturnValue(LEAVE)
     const { wm, main, editor } = managerWithMainAndEditor({ main: false, editor: true })
 
-    await expect(wm.closeWindowsForQuit()).resolves.toBe(true)
+    const quit = wm.closeWindowsForQuit()
+    await flush()
+    answerPrompt(LEAVE)
 
+    await expect(quit).resolves.toBe(true)
     expect(editor.destroyed).toBe(true)
+    expect(main.destroyed).toBe(true)
+  })
+
+  it('waits for the answer however long the prompt stays open', async () => {
+    jest.useFakeTimers()
+    const { wm, main } = managerWithMainAndEditor({ main: false, editor: true })
+    let settled = false
+
+    const quit = wm.closeWindowsForQuit().then((closed) => {
+      settled = true
+      return closed
+    })
+    await jest.advanceTimersByTimeAsync(30_000)
+    expect(settled).toBe(false)
+    expect(main.close).not.toHaveBeenCalled()
+
+    answerPrompt(LEAVE)
+    await jest.advanceTimersByTimeAsync(0)
+
+    await expect(quit).resolves.toBe(true)
+  })
+
+  it('carries on without a page that never answers the close', async () => {
+    jest.useFakeTimers()
+    const { wm, main, editor } = managerWithMainAndEditor({ main: false, editor: false })
+    editor.close.mockImplementation(() => {})
+
+    const quit = wm.closeWindowsForQuit()
+    await jest.advanceTimersByTimeAsync(5000)
+
+    await expect(quit).resolves.toBe(true)
     expect(main.destroyed).toBe(true)
   })
 
@@ -128,7 +232,7 @@ describe('WindowManager windows closed for a Quit', () => {
 
     await expect(wm.closeWindowsForQuit()).resolves.toBe(true)
 
-    expect(mockShowMessageBoxSync).not.toHaveBeenCalled()
+    expect(mockShowMessageBox).not.toHaveBeenCalled()
     expect(editor.destroyed).toBe(true)
     expect(main.destroyed).toBe(true)
   })
@@ -139,6 +243,6 @@ describe('WindowManager windows closed for a Quit', () => {
     await wm.closeAllWindows()
 
     expect(unloadRefusedByPage(main)).toBe(true)
-    expect(mockShowMessageBoxSync).not.toHaveBeenCalled()
+    expect(mockShowMessageBox).not.toHaveBeenCalled()
   })
 })

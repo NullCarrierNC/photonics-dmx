@@ -62,6 +62,16 @@ const CLOSE_ANSWER_MS = 5000
 /** How long a window's geometry has to settle after a move or resize before it is saved. */
 const SAVE_DELAY_MS = 500
 
+/** Where a page with unsaved changes stands on the close or reload it refused. */
+interface UnloadState {
+  /** The window was asked to close, so Leave closes it. Otherwise the unload was a reload. */
+  closing: boolean
+  /** The user is being asked. */
+  asking: boolean
+  /** The user chose Leave, so the next unload goes through without asking. */
+  leaving: boolean
+}
+
 export class WindowManager {
   private readonly windows = new Map<WindowRole, BrowserWindow>()
   private readonly saveTimers = new Map<WindowRole, NodeJS.Timeout>()
@@ -70,6 +80,8 @@ export class WindowManager {
   private quitting = false
   /** Called when the user keeps a page a Quit is closing. */
   private readonly closeRefused = new Map<BrowserWindow, () => void>()
+  /** Called when a page a Quit is closing starts asking, so the Quit waits for the answer. */
+  private readonly closeAnswering = new Map<BrowserWindow, () => void>()
 
   /**
    * Sets the controller manager for accessing preferences
@@ -201,15 +213,13 @@ export class WindowManager {
       return { action: 'deny' }
     })
     denyWebContentsWillNavigate(window.webContents)
-    // A page with unsaved changes refuses to unload, and Electron cancels the close or reload
-    // unless this lets it go.
-    window.webContents.on('will-prevent-unload', (event) => {
-      if (this.quitting || this.confirmLeave(window)) {
-        event.preventDefault()
-      } else {
-        this.closeRefused.get(window)?.()
-      }
+    const unload: UnloadState = { closing: false, asking: false, leaving: false }
+    window.on('close', () => {
+      unload.closing = true
     })
+    window.webContents.on('will-prevent-unload', (event) =>
+      this.onUnloadRefused(window, unload, event),
+    )
 
     const devUrl = process.env['ELECTRON_RENDERER_URL']
     const failed = onLoadFailure(spec.label)
@@ -240,18 +250,63 @@ export class WindowManager {
     window.webContents.on('render-process-gone', stop)
   }
 
-  /** Asks whether to leave a page that holds unsaved changes. True to leave. */
-  private confirmLeave(window: BrowserWindow): boolean {
-    const choice = dialog.showMessageBoxSync(window, {
-      type: 'question',
-      buttons: ['Leave', 'Stay'],
-      defaultId: 1,
-      cancelId: 1,
-      title: 'Unsaved changes',
-      message: 'This page has unsaved changes.',
-      detail: 'Leave anyway and lose them?',
+  /**
+   * A page with unsaved changes refused to unload, and Electron cancels the close or reload unless
+   * this lets it go. The user is asked without holding up the main process, whose timers drive the
+   * show, and a Leave repeats the close or reload with the page let through.
+   */
+  private onUnloadRefused(
+    window: BrowserWindow,
+    unload: UnloadState,
+    event: { preventDefault: () => void },
+  ): void {
+    if (this.quitting || unload.leaving) {
+      unload.leaving = false
+      event.preventDefault()
+      return
+    }
+    this.closeAnswering.get(window)?.()
+    if (unload.asking) {
+      return
+    }
+    unload.asking = true
+    void this.confirmLeave(window).then((leave) => {
+      const closing = unload.closing
+      unload.asking = false
+      unload.closing = false
+      if (window.isDestroyed()) {
+        return
+      }
+      if (!leave) {
+        this.closeRefused.get(window)?.()
+        return
+      }
+      unload.leaving = true
+      if (closing) {
+        window.close()
+      } else {
+        window.webContents.reload()
+      }
     })
-    return choice === 0
+  }
+
+  /** Asks whether to leave a page that holds unsaved changes. True to leave. */
+  private async confirmLeave(window: BrowserWindow): Promise<boolean> {
+    try {
+      const { response } = await dialog.showMessageBox(window, {
+        type: 'question',
+        buttons: ['Leave', 'Stay'],
+        defaultId: 1,
+        cancelId: 1,
+        title: 'Unsaved changes',
+        message: 'This page has unsaved changes.',
+        detail: 'Leave anyway and lose them?',
+      })
+      return response === 0
+    } catch (error) {
+      log.error('Could not ask about unsaved changes, keeping the page:', error)
+      return false
+    }
   }
 
   /** Fronts the window open in a role, or creates it. */
@@ -333,16 +388,21 @@ export class WindowManager {
     return true
   }
 
-  /** Closes a window and answers whether it went. A page that never answers counts as gone. */
+  /**
+   * Closes a window and answers whether it went. A page that never answers counts as gone, and one
+   * that asks the user waits for the answer.
+   */
   private closeAsking(window: BrowserWindow): Promise<boolean> {
     return new Promise((resolve) => {
       const settle = (closed: boolean): void => {
         clearTimeout(timer)
         this.closeRefused.delete(window)
+        this.closeAnswering.delete(window)
         resolve(closed)
       }
       const timer = setTimeout(() => settle(true), CLOSE_ANSWER_MS)
       this.closeRefused.set(window, () => settle(false))
+      this.closeAnswering.set(window, () => clearTimeout(timer))
       window.on('closed', () => settle(true))
       window.close()
     })

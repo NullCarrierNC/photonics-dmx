@@ -28,6 +28,7 @@ export interface FakeBrowserWindow {
   webContents: {
     send: jest.Mock<(...args: unknown[]) => void>
     setWindowOpenHandler: jest.Mock<(...args: unknown[]) => void>
+    reload: jest.Mock<() => void>
     on: (event: string, handler: (...args: unknown[]) => void) => void
     emit: (event: string, ...args: unknown[]) => void
   }
@@ -65,7 +66,34 @@ export function createFakeBrowserWindow(options: Record<string, unknown> = {}): 
     restore: jest.fn(),
     loadFile: jest.fn(() => Promise.resolve()),
     loadURL: jest.fn(() => Promise.resolve()),
-    webContents: { send: jest.fn(), setWindowOpenHandler: jest.fn(), ...eventHub() },
+    webContents: {
+      send: jest.fn(),
+      setWindowOpenHandler: jest.fn(),
+      reload: jest.fn(),
+      ...eventHub(),
+    },
   }
   return window
+}
+
+/**
+ * Makes `close()` behave as Electron does for a page with or without unsaved changes. The window
+ * emits `close` at once and settles on a later tick: a clean page closes, and a dirty one refuses
+ * to unload and closes only if a `will-prevent-unload` handler lets it go.
+ */
+export function closesLikeAPage(window: FakeBrowserWindow, dirty: boolean): void {
+  window.close.mockImplementation(() => {
+    window.emit('close')
+    // A promise job, since fake timers hold queueMicrotask back.
+    void Promise.resolve().then(() => {
+      if (window.destroyed) return
+      if (dirty) {
+        const event = { preventDefault: jest.fn() }
+        window.webContents.emit('will-prevent-unload', event)
+        if (event.preventDefault.mock.calls.length === 0) return
+      }
+      window.destroyed = true
+      window.emit('closed')
+    })
+  })
 }
