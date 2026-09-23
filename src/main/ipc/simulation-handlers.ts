@@ -6,7 +6,6 @@ import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistrie
 import {
   DrumNoteType,
   InstrumentNoteType,
-  getCueTypeFromId,
   type CueData,
 } from '../../photonics-dmx/cues/types/cueTypes'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
@@ -17,7 +16,13 @@ import { createMockAudioCueData, createMockCueData, type MockCueDataOptions } fr
 import { sendMotionSimCleared, sendMotionSimStarted } from './motionSimulationEvents'
 import { LIGHT, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
-import { isNonEmptyString, isPlainObject, validateTestEffectPayload } from './inputValidation'
+import {
+  isNonEmptyString,
+  isPlainObject,
+  validateInstrumentNotePayload,
+  validateSimulationContextPayload,
+  validateTestEffectPayload,
+} from './inputValidation'
 import type { MotionRuntimeDomain } from '../../shared/ipc/common'
 import type { ChainFanout } from '../controllers/ChainFanout'
 import type { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
@@ -271,129 +276,120 @@ export function setupSimulationHandlers(
       ipcMain,
       timing.channel,
       log,
-      async (
-        _,
-        data?: {
-          venueSize?: 'NoVenue' | 'Small' | 'Large'
-          bpm?: number
-          cueGroup?: string
-          effectId?: string | null
-        },
-      ) => {
+      // Answers true once the event fired and false for anything else, a throw included, since the
+      // renderer reads the answer as a boolean.
+      async (_, data: unknown) => {
         if (rb3Blocked() || !controllerManager.getIsInitialized()) return false
-        // Make sure every chain has a YARG handler so the fanout `handleCue` actually
-        // reaches secondary rigs even when no real network listener has run.
-        controllerManager.ensureChainsHaveHandlersForSimulation('yarg')
-        const fanout = controllerManager.getChainFanout()
-
-        const mockCueData = simCueData({
-          ...(data && {
-            venueSize: data.venueSize ?? 'Small',
-            bpm: data.bpm ?? 120,
-            effectId: data.effectId ?? undefined,
-            simulationCueGroup: data.cueGroup,
-          }),
-          beat: timing.beat,
-          keyframe: timing.keyframe,
-        })
-
-        const cueType = data?.effectId ? getCueTypeFromId(data.effectId) : undefined
-        if (cueType) {
-          try {
-            await fanout.handleCue(cueType, mockCueData)
-          } catch (error) {
-            log.error(`Error handling cue in simulate ${timing.what}:`, error)
-          }
+        const context = validateSimulationContextPayload(data)
+        if (!context.ok) {
+          log.warn(`Refusing a simulated ${timing.what}: ${context.error}`)
+          return false
         }
-        sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
-        await sim.runAll(mockCueData)
-        timing.fire(fanout)
-        return true
+        const request = context.value
+        try {
+          // Make sure every chain has a YARG handler so the fanout `handleCue` actually
+          // reaches secondary rigs even when no real network listener has run.
+          controllerManager.ensureChainsHaveHandlersForSimulation('yarg')
+          const fanout = controllerManager.getChainFanout()
+
+          const mockCueData = simCueData({
+            ...(data !== undefined && {
+              venueSize: request.venueSize ?? 'Small',
+              bpm: request.bpm ?? 120,
+              effectId: request.effectId,
+              simulationCueGroup: request.cueGroup,
+            }),
+            beat: timing.beat,
+            keyframe: timing.keyframe,
+          })
+
+          if (request.effectId) {
+            try {
+              await fanout.handleCue(request.effectId, mockCueData)
+            } catch (error) {
+              log.error(`Error handling cue in simulate ${timing.what}:`, error)
+            }
+          }
+          sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
+          await sim.runAll(mockCueData)
+          timing.fire(fanout)
+          return true
+        } catch (error) {
+          log.error(`Error simulating a ${timing.what}:`, error)
+          return false
+        }
       },
     )
   }
 
-  handleInvoke(
-    ipcMain,
-    LIGHT.SIMULATE_INSTRUMENT_NOTE,
-    log,
-    async (
-      _,
-      data: {
-        instrument: string
-        noteType: string
-        venueSize?: 'NoVenue' | 'Small' | 'Large'
-        bpm?: number
-        cueGroup?: string
-        effectId?: string | null
-      },
-    ) => {
-      try {
-        const { instrument, noteType, venueSize = 'Small', bpm = 120, cueGroup, effectId } = data
-        if (rb3Blocked()) {
-          return { success: false, error: RB3_BLOCKED_ERROR }
-        }
-        if (!controllerManager.getIsInitialized()) {
-          return { success: false, error: 'Lighting system not initialized' }
-        }
-        controllerManager.ensureChainsHaveHandlersForSimulation('yarg')
-        const fanout = controllerManager.getChainFanout()
-
-        const mockCueData = simCueData({
-          venueSize,
-          bpm,
-          effectId: effectId ?? undefined,
-          beat: 'Unknown',
-          keyframe: 'Unknown',
-          simulationCueGroup: cueGroup,
-        })
-        switch (instrument) {
-          case 'guitar': {
-            const normalizedNote = String(noteType) as InstrumentNoteType
-            mockCueData.guitarNotes = [normalizedNote]
-            fanout.handleGuitarNote(normalizedNote, mockCueData)
-            break
-          }
-          case 'bass': {
-            const normalizedNote = String(noteType) as InstrumentNoteType
-            mockCueData.bassNotes = [normalizedNote]
-            fanout.handleBassNote(normalizedNote, mockCueData)
-            break
-          }
-          case 'keys': {
-            const normalizedNote = String(noteType) as InstrumentNoteType
-            mockCueData.keysNotes = [normalizedNote]
-            fanout.handleKeysNote(normalizedNote, mockCueData)
-            break
-          }
-          case 'drums': {
-            const normalizedNote = String(noteType) as DrumNoteType
-            mockCueData.drumNotes = [normalizedNote]
-            fanout.handleDrumNote(normalizedNote, mockCueData)
-            break
-          }
-          default:
-            log.warn(`Unknown instrument: ${instrument}`)
-            return { success: false, error: `Unknown instrument: ${instrument}` }
-        }
-
-        // Run the current test cue with CueData that includes the note so the node graph
-        // runs the instrument-event branch (e.g. drum-red).
-        if (effectId && cueGroup) {
-          const cueType = getCueTypeFromId(effectId)
-          if (cueType) {
-            await fanout.handleCue(cueType, mockCueData)
-          }
-        }
-
-        sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
-        return { success: true }
-      } catch (error) {
-        log.error('Error simulating instrument note:', error)
-        return ipcError(error)
+  handleInvoke(ipcMain, LIGHT.SIMULATE_INSTRUMENT_NOTE, log, async (_, data: unknown) => {
+    try {
+      const payload = validateInstrumentNotePayload(data)
+      if (!payload.ok) {
+        return { success: false, error: payload.error }
       }
-    },
-  )
+      const { instrument, noteType, venueSize = 'Small', bpm = 120, cueGroup } = payload.value
+      const effectId = payload.value.effectId
+      if (rb3Blocked()) {
+        return { success: false, error: RB3_BLOCKED_ERROR }
+      }
+      if (!controllerManager.getIsInitialized()) {
+        return { success: false, error: 'Lighting system not initialized' }
+      }
+      controllerManager.ensureChainsHaveHandlersForSimulation('yarg')
+      const fanout = controllerManager.getChainFanout()
+
+      const mockCueData = simCueData({
+        venueSize,
+        bpm,
+        effectId: effectId ?? undefined,
+        beat: 'Unknown',
+        keyframe: 'Unknown',
+        simulationCueGroup: cueGroup,
+      })
+      switch (instrument) {
+        case 'guitar': {
+          const normalizedNote = String(noteType) as InstrumentNoteType
+          mockCueData.guitarNotes = [normalizedNote]
+          fanout.handleGuitarNote(normalizedNote, mockCueData)
+          break
+        }
+        case 'bass': {
+          const normalizedNote = String(noteType) as InstrumentNoteType
+          mockCueData.bassNotes = [normalizedNote]
+          fanout.handleBassNote(normalizedNote, mockCueData)
+          break
+        }
+        case 'keys': {
+          const normalizedNote = String(noteType) as InstrumentNoteType
+          mockCueData.keysNotes = [normalizedNote]
+          fanout.handleKeysNote(normalizedNote, mockCueData)
+          break
+        }
+        case 'drums': {
+          const normalizedNote = String(noteType) as DrumNoteType
+          mockCueData.drumNotes = [normalizedNote]
+          fanout.handleDrumNote(normalizedNote, mockCueData)
+          break
+        }
+        default:
+          log.warn(`Unknown instrument: ${instrument}`)
+          return { success: false, error: `Unknown instrument: ${instrument}` }
+      }
+
+      // Run the current test cue with CueData that includes the note so the node graph
+      // runs the instrument-event branch (e.g. drum-red).
+      if (effectId && cueGroup) {
+        await fanout.handleCue(effectId, mockCueData)
+      }
+
+      sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, mockCueData)
+      return { success: true }
+    } catch (error) {
+      log.error('Error simulating instrument note:', error)
+      return ipcError(error)
+    }
+  })
 
   /**
    * Starts one motion cue on every rig chain, for any platform: checks the payload, finds the cue

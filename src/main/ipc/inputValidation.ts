@@ -28,6 +28,8 @@ export {
   validateStageKitPriority,
   validateCueType,
   validateTestEffectPayload,
+  validateSimulationContextPayload,
+  validateInstrumentNotePayload,
   validateAudioCueType,
   validateCueRefPayload,
   validateDisabledCuesMap,

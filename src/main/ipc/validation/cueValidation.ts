@@ -4,7 +4,11 @@
 
 import type { AudioCueType } from '../../../photonics-dmx/cues/types/audioCueTypes'
 import type { ValidationResult } from './primitives'
-import { CueType } from '../../../photonics-dmx/cues/types/cueTypes'
+import {
+  CueType,
+  DrumNoteType,
+  InstrumentNoteType,
+} from '../../../photonics-dmx/cues/types/cueTypes'
 import { AudioCueRegistry } from '../../../photonics-dmx/cues/registries/AudioCueRegistry'
 import {
   isPlainObject,
@@ -56,20 +60,53 @@ export function validateCueType(value: unknown): ValidationResult<CueType> {
 
 const VENUE_SIZES = ['NoVenue', 'Small', 'Large'] as const
 
-/**
- * What a test-effect start runs: a known cue type, with the venue, BPM and cue group it asks for.
- */
-export interface TestEffectRequest {
-  effectId: CueType
+/** The venue, BPM and cue group a simulation runs with. */
+interface SimulationOptions {
   venueSize?: (typeof VENUE_SIZES)[number]
   bpm?: number
   cueGroup?: string
 }
 
 /**
- * Validates a test-effect start. The BPM is held to the range the YARG listener accepts from the
- * game, so a simulated song can do nothing a real one cannot.
+ * What a test-effect start runs: a known cue type, with the venue, BPM and cue group it asks for.
  */
+export interface TestEffectRequest extends SimulationOptions {
+  effectId: CueType
+}
+
+/** What a simulate button sends: its options and the cue being simulated, when there is one. */
+export interface SimulationContextRequest extends SimulationOptions {
+  effectId?: CueType
+}
+
+/**
+ * Reads the simulation options off a payload. The BPM is held to the range the YARG listener
+ * accepts from the game, so a simulated song can do nothing a real one cannot.
+ */
+function readSimulationOptions(
+  data: Record<string, unknown>,
+  into: SimulationOptions,
+): ValidationResult<void> {
+  if (data.venueSize !== undefined) {
+    const venueSize = validateStringUnion(data.venueSize, VENUE_SIZES, 'venueSize')
+    if (!venueSize.ok) return venueSize
+    into.venueSize = venueSize.value
+  }
+  if (data.bpm !== undefined) {
+    const bpm = validateNumberInRange(data.bpm, MIN_BPM, MAX_BPM, 'bpm')
+    if (!bpm.ok) return bpm
+    into.bpm = bpm.value
+  }
+  if (data.cueGroup !== undefined) {
+    if (typeof data.cueGroup !== 'string') {
+      return { ok: false, error: 'cueGroup must be a string' }
+    }
+    into.cueGroup = data.cueGroup
+  }
+  return { ok: true, value: undefined }
+}
+
+/** Validates a test-effect start. */
 export function validateTestEffectPayload(data: unknown): ValidationResult<TestEffectRequest> {
   if (!isPlainObject(data)) {
     return { ok: false, error: 'Invalid test effect payload' }
@@ -77,23 +114,67 @@ export function validateTestEffectPayload(data: unknown): ValidationResult<TestE
   const effectId = validateCueType(data.effectId)
   if (!effectId.ok) return effectId
   const request: TestEffectRequest = { effectId: effectId.value }
-  if (data.venueSize !== undefined) {
-    const venueSize = validateStringUnion(data.venueSize, VENUE_SIZES, 'venueSize')
-    if (!venueSize.ok) return venueSize
-    request.venueSize = venueSize.value
+  const options = readSimulationOptions(data, request)
+  return options.ok ? { ok: true, value: request } : options
+}
+
+/** Validates the context a simulated beat, measure, keyframe or note carries. None is fine. */
+export function validateSimulationContextPayload(
+  data: unknown,
+): ValidationResult<SimulationContextRequest> {
+  if (data === undefined) {
+    return { ok: true, value: {} }
   }
-  if (data.bpm !== undefined) {
-    const bpm = validateNumberInRange(data.bpm, MIN_BPM, MAX_BPM, 'bpm')
-    if (!bpm.ok) return bpm
-    request.bpm = bpm.value
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'Invalid simulation payload' }
   }
-  if (data.cueGroup !== undefined) {
-    if (typeof data.cueGroup !== 'string') {
-      return { ok: false, error: 'cueGroup must be a string' }
-    }
-    request.cueGroup = data.cueGroup
+  const request: SimulationContextRequest = {}
+  if (data.effectId !== undefined && data.effectId !== null) {
+    const effectId = validateCueType(data.effectId)
+    if (!effectId.ok) return effectId
+    request.effectId = effectId.value
   }
-  return { ok: true, value: request }
+  const options = readSimulationOptions(data, request)
+  return options.ok ? { ok: true, value: request } : options
+}
+
+const INSTRUMENT_NOTES = {
+  guitar: Object.values(InstrumentNoteType),
+  bass: Object.values(InstrumentNoteType),
+  keys: Object.values(InstrumentNoteType),
+  drums: Object.values(DrumNoteType),
+} as const satisfies Record<string, readonly string[]>
+
+export type SimulatedInstrument = keyof typeof INSTRUMENT_NOTES
+
+/** A simulated note: an instrument, a note that instrument plays, and the simulation context. */
+export interface InstrumentNoteRequest extends SimulationContextRequest {
+  instrument: SimulatedInstrument
+  noteType: string
+}
+
+export function validateInstrumentNotePayload(
+  data: unknown,
+): ValidationResult<InstrumentNoteRequest> {
+  if (!isPlainObject(data)) {
+    return { ok: false, error: 'Invalid instrument note payload' }
+  }
+  const instrument = validateStringUnion(
+    data.instrument,
+    Object.keys(INSTRUMENT_NOTES) as SimulatedInstrument[],
+    'instrument',
+  )
+  if (!instrument.ok) return instrument
+  const notes: readonly string[] = INSTRUMENT_NOTES[instrument.value]
+  if (typeof data.noteType !== 'string' || !notes.includes(data.noteType)) {
+    return { ok: false, error: `Unknown ${instrument.value} note: ${String(data.noteType)}` }
+  }
+  const context = validateSimulationContextPayload(data)
+  if (!context.ok) return context
+  return {
+    ok: true,
+    value: { ...context.value, instrument: instrument.value, noteType: data.noteType },
+  }
 }
 
 /**
