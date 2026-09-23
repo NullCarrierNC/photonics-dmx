@@ -4,6 +4,10 @@ asar: true
 # Fuses baked into the Electron binary. Off: running it as plain Node, NODE_OPTIONS and --inspect,
 # each a way to run other code with the app's own permissions. On: the archive integrity check and
 # loading the app from app.asar alone. tools/packaged-files-check.mjs reads them back.
+# grantFileProtocolExtraPrivileges and enableCookieEncryption stay at Electron's default. The
+# renderer loads from file://, so the first waits on a packaged launch that proves the window still
+# loads without it. The second keys cookies from the macOS keychain, which can prompt on an unsigned
+# build. Once set here, the check holds them off and on.
 electronFuses:
   runAsNode: false
   enableNodeOptionsEnvironmentVariable: false

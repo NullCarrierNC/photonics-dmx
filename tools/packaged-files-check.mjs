@@ -7,14 +7,26 @@
  * inside out/ for the three files that make the difference between an app and a blank window.
  *
  * It also reads the Electron fuses from the binary each archive belongs to, and checks they are
- * set the way electron-builder.yml's electronFuses block sets them.
+ * set the way electron-builder.yml's electronFuses block sets them. That block has to set the
+ * hardened fuses fuseConfigCore.cjs names, and any further fuse it sets is checked the same way.
  *
  * Run it after `npm run build:unpack` or any of the per-platform builds.
  */
-import { openSync, readSync, closeSync, existsSync, readdirSync, statSync } from 'node:fs'
+import {
+  openSync,
+  readSync,
+  closeSync,
+  existsSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+} from 'node:fs'
 import { dirname, join } from 'node:path'
+import { createRequire } from 'node:module'
 import fuses from '@electron/fuses'
 
+const require = createRequire(import.meta.url)
+const { readElectronFuses, fuseConfigProblems } = require('./fuseConfigCore.cjs')
 const { getCurrentFuseWire, FuseV1Options } = fuses
 
 /** What a packaged build holds at the top level of its archive. */
@@ -33,18 +45,11 @@ const ALLOWED_IN_OUT = ['main', 'preload', 'renderer']
 
 const DIST = 'dist'
 
-/**
- * The fuses a packaged build carries, as electron-builder.yml sets them. Off: running the binary
- * as plain Node, NODE_OPTIONS and --inspect. On: the archive integrity check and loading the app
- * from the archive alone.
- */
-const EXPECTED_FUSES = {
-  RunAsNode: false,
-  EnableNodeOptionsEnvironmentVariable: false,
-  EnableNodeCliInspectArguments: false,
-  EnableEmbeddedAsarIntegrityValidation: true,
-  OnlyLoadAppFromAsar: true,
-}
+/** The fuses a packaged build carries, as electron-builder.yml sets them. */
+const EXPECTED_FUSES = readElectronFuses(
+  readFileSync('electron-builder.yml', 'utf8'),
+  Object.keys(FuseV1Options).filter((key) => Number.isNaN(Number(key))),
+)
 
 /** How the fuse wire records a fuse: the characters '1' and '0'. */
 const FUSE_ON = '1'.charCodeAt(0)
@@ -169,6 +174,15 @@ function namesIn(index, dir) {
   return Object.keys(index?.files?.[dir]?.files ?? {})
 }
 
+const configIssues = fuseConfigProblems(EXPECTED_FUSES)
+if (configIssues.length > 0) {
+  console.error('electron-builder.yml does not harden the Electron fuses')
+  for (const issue of configIssues) {
+    console.error(`  ${issue}`)
+  }
+  process.exit(1)
+}
+
 if (!existsSync(DIST)) {
   console.error(`No ${DIST}/ directory. Build first, for example: npm run build:unpack`)
   process.exit(1)
@@ -234,8 +248,6 @@ for (const archive of archives) {
 }
 
 if (failed) {
-  console.error(
-    'Update electron-builder.yml, or SHIPPED or EXPECTED_FUSES here, whichever is wrong.',
-  )
+  console.error('Update electron-builder.yml, or SHIPPED here, whichever is wrong.')
   process.exit(1)
 }
