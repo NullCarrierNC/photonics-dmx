@@ -60,10 +60,10 @@ module.exports = {
   // test happens to import. Ratchet upward as coverage improves.
   coverageThreshold: {
     global: {
-      statements: 74,
-      branches: 78,
-      functions: 70,
-      lines: 74,
+      statements: 77,
+      branches: 80,
+      functions: 73,
+      lines: 77,
     },
   },
 }
