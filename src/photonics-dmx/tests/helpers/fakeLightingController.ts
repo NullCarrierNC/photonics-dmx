@@ -85,3 +85,79 @@ export function fakeLightingController(
   }
   return fake
 }
+
+/** A fake whose completions wait for the suite, as the real sequencer's wait for a later frame. */
+export type CompletingLightingController = FakeLightingController & {
+  /** Finishes every held effect, oldest first, and settles a pending blackout. */
+  tick(): void
+  /** The names whose completion callbacks are held, oldest first. */
+  heldCompletions(): string[]
+}
+
+/**
+ * A fake that holds every completion callback and blackout until the suite calls `tick`, so a
+ * suite can order a completion against a cue change. `removeAllEffects` cancels what is held and
+ * tells the motion-wipe subscribers, as the real sequencer does. A later submission of a held name
+ * does not displace the earlier one.
+ */
+export function completingLightingController(
+  overrides: Partial<ILightingController> = {},
+): CompletingLightingController {
+  let held: Array<{ name: string; onComplete: (cancelled: boolean) => void }> = []
+  let blackouts: Array<() => void> = []
+  const wipeListeners = new Set<() => void>()
+  const hold = (name: string, onComplete: (cancelled: boolean) => void): void => {
+    held.push({ name, onComplete })
+  }
+  const release = (cancelled: boolean): void => {
+    const due = held
+    held = []
+    for (const { onComplete } of due) onComplete(cancelled)
+  }
+  const settleBlackouts = (): void => {
+    const due = blackouts
+    blackouts = []
+    for (const resolve of due) resolve()
+  }
+  const fake = fakeLightingController({
+    addEffectWithCallback: (name, _effect, onComplete) => hold(name, onComplete),
+    setEffectWithCallback: (name, _effect, onComplete) => hold(name, onComplete),
+    replaceEffectWithCallback: (name, _effect, onComplete) => {
+      hold(name, onComplete)
+      return true
+    },
+    addEffectUnblockedNameWithCallback: (name, _effect, onComplete) => {
+      hold(name, onComplete)
+      return true
+    },
+    setEffectUnblockedNameWithCallback: (name, _effect, onComplete) => {
+      hold(name, onComplete)
+      return true
+    },
+    removeEffectCallback: (name) => {
+      held = held.filter((entry) => entry.name !== name)
+    },
+    removeAllEffects: () => {
+      settleBlackouts()
+      release(true)
+      for (const listener of Array.from(wipeListeners)) listener()
+    },
+    onMotionPatternsCleared: (listener) => {
+      wipeListeners.add(listener)
+      return () => {
+        wipeListeners.delete(listener)
+      }
+    },
+    blackout: () => new Promise<void>((resolve) => blackouts.push(resolve)),
+    cancelBlackout: settleBlackouts,
+    isBlackoutActive: () => blackouts.length > 0,
+    ...overrides,
+  })
+  return Object.assign(fake, {
+    tick: () => {
+      settleBlackouts()
+      release(false)
+    },
+    heldCompletions: () => held.map((entry) => entry.name),
+  })
+}
