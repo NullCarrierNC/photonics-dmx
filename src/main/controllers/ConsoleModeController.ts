@@ -16,6 +16,10 @@ type ListenerChannelSnapshot = { yarg: boolean; rb3: boolean }
 
 type ConsoleListenerSnapshot = { yarg: boolean; rb3: boolean; audio: boolean }
 
+/** The console page's answer when the controllers are between phases and cannot take the wire. */
+export const CONSOLE_UNAVAILABLE_MESSAGE =
+  'The lighting controllers are restarting or shutting down. Try the console again in a moment.'
+
 export interface ConsoleModeControllerDeps {
   getConfig: () => ConfigurationManager
   ensureInitialized: () => Promise<void>
@@ -25,6 +29,7 @@ export interface ConsoleModeControllerDeps {
   } | null
   getListenerSnapshot: () => ListenerChannelSnapshot
   getIsAudioEnabled: () => boolean
+  /** The three pauses run while console entry holds the lifecycle queue, so they must not queue. */
   pauseYarg: () => Promise<void>
   pauseRb3: () => Promise<void>
   pauseAudio: () => Promise<void>

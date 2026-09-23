@@ -73,6 +73,7 @@ export function restartGraph(): ControllerGraph {
     destroyClock: jest.fn(),
     clearBuildRefs: jest.fn(),
     getChains: jest.fn().mockReturnValue([]),
+    getDmxPublisher: jest.fn().mockReturnValue(null),
   } as unknown as ControllerGraph
 }
 
@@ -82,6 +83,7 @@ export function stubConfig(prefs: Record<string, unknown> = {}): ConfigurationMa
     getPreference: (key: string) => prefs[key],
     getAllPreferences: () => prefs,
     getCueGroupSelectionMode: () => 'withinSong',
+    getDmxRig: (id: string) => ({ id }),
   } as unknown as ConfigurationManager
 }
 
@@ -110,6 +112,8 @@ export interface StubbedManagerOptions {
   listeners?: ReturnType<typeof listenerStub>
   senders?: ReturnType<typeof senderLifecycleStub>
   consoleMode?: ReturnType<typeof consoleModeStub>
+  /** Let the manager build its own console controller over the stub listeners. */
+  ownConsoleMode?: boolean
   /**
    * Stands in for the graph build. Brings the lifecycle to running unless a suite says otherwise.
    */
@@ -144,7 +148,7 @@ export function stubbedManager(options: StubbedManagerOptions = {}): StubbedMana
     collaborators: {
       listenerLifecycle: listeners,
       senderLifecycle: senders,
-      consoleMode,
+      ...(options.ownConsoleMode ? {} : { consoleMode }),
       motionCueSimulator: { reset: jest.fn() },
       testEffectRunner: testEffects(),
       rb3TestEffectRunner: testEffects(),

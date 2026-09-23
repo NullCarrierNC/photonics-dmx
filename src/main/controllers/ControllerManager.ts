@@ -23,7 +23,7 @@ import {
   SenderLifecycleController,
   type OutputSenderStateSnapshot,
 } from './SenderLifecycleController'
-import { ConsoleModeController } from './ConsoleModeController'
+import { ConsoleModeController, CONSOLE_UNAVAILABLE_MESSAGE } from './ConsoleModeController'
 import { RegistryInitializer } from './RegistryInitializer'
 import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycle'
 import { ControllerGraph } from './ControllerGraph'
@@ -35,7 +35,7 @@ import {
   type ControllerHost,
 } from './controllerWiring'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
-import type { LifecyclePhase } from '../../shared/ipcTypes'
+import type { IpcErrorResult, IpcSuccessResult, LifecyclePhase } from '../../shared/ipcTypes'
 import { CUE_DOMAIN_BINDINGS, applyAllEnabledGroupsFromConfig } from './cueDomainBindings'
 import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import type { MotionCueRef } from '../../photonics-dmx/cues/types/cueTypes'
@@ -56,7 +56,7 @@ import { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCueLoade
  * - `failed`: reinitialization after teardown did not complete; call `restartControllers()` or `init()` to recover.
  *
  * Concurrency:
- * - Listener toggles, audio included, and `restartControllers()` serialize on one lifecycle queue
+ * - Listener toggles, audio included, console entry and restarts share one lifecycle queue
  *   (`runQueuedOp`), so no two of them ever interleave. Queued ops await any in-flight shutdown.
  * - `shutdown()` runs off the queue and must NEVER drain it: queued ops await the in-flight
  *   shutdown via `awaitShutdownWork`, so a shutdown that waited on the queue would deadlock
@@ -186,9 +186,9 @@ export class ControllerManager {
         this.refreshAudioCueSelection()
       },
       getIsAudioEnabled: () => this.getIsAudioEnabled(),
-      pauseYarg: () => this.disableYarg(),
-      pauseRb3: () => this.disableRb3(),
-      pauseAudio: () => this.disableAudio(),
+      pauseYarg: () => this.listenerLifecycle.yargRb3.disableYarg(),
+      pauseRb3: () => this.listenerLifecycle.yargRb3.disableRb3(),
+      pauseAudio: () => this.listenerLifecycle.audio.disableAudio(),
       refreshActiveRigs: () => this.refreshActiveRigs(),
       restartControllers: () => this.restartControllers(),
     }
@@ -585,18 +585,18 @@ export class ControllerManager {
     this.graph.setManualMotionRefOnChains('rb3', ref)
   }
 
-  public async enableConsoleMode(
-    rigId: string,
-  ): Promise<{ success: true } | { success: false; error: string }> {
-    await this.init()
-    if (this.lifecycle.phase !== 'consoleMode') {
-      this.lifecycle.assertPhase(['running'], 'enableConsoleMode')
-    }
-    const r = await this.consoleMode.enableConsoleMode(rigId)
-    if (r.success) {
-      this.lifecycle.setPhaseUnlessShuttingDown('consoleMode')
-    }
-    return r
+  public async enableConsoleMode(rigId: string): Promise<IpcSuccessResult | IpcErrorResult> {
+    return this.lifecycle.runQueuedOp(async () => {
+      await this.init()
+      if (this.lifecycle.phase !== 'running' && this.lifecycle.phase !== 'consoleMode') {
+        return { success: false as const, error: CONSOLE_UNAVAILABLE_MESSAGE }
+      }
+      const r = await this.consoleMode.enableConsoleMode(rigId)
+      if (r.success) {
+        this.lifecycle.setPhaseUnlessShuttingDown('consoleMode')
+      }
+      return r
+    })
   }
 
   public async disableConsoleMode(): Promise<

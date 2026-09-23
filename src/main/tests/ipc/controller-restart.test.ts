@@ -384,11 +384,89 @@ describe('ControllerManager console mode', () => {
     expect(lifecycle.phase).toBe('consoleMode')
   })
 
+  it('waits for a restart in flight and then enters console mode', async () => {
+    const teardown = barrier()
+    const listeners = listenerStub()
+    // Every restart awaits disableRb3, so holding it holds the teardown.
+    listeners.yargRb3.disableRb3.mockImplementation(() => teardown.wait)
+    const consoleMode = {
+      ...consoleModeStub(),
+      enableConsoleMode: jest.fn(async (_rigId: string) => ({ success: true as const })),
+    }
+    const { manager, lifecycle } = stubbedManager({
+      listeners,
+      consoleMode,
+      // The manager's own init returns at once while the graph still counts as initialized.
+      init: async (current) => {
+        if (!manager.getIsInitialized()) current.setPhase('running')
+      },
+    })
+
+    const restart = manager.restartControllers()
+    await Promise.resolve()
+    expect(lifecycle.phase).toBe('restarting')
+    const entering = manager.enableConsoleMode('rig-1')
+    await Promise.resolve()
+    expect(consoleMode.enableConsoleMode).not.toHaveBeenCalled()
+    teardown.release()
+    await restart
+
+    await expect(entering).resolves.toEqual({ success: true })
+    expect(lifecycle.phase).toBe('consoleMode')
+  })
+
+  it('answers in plain words when the controllers cannot take the console', async () => {
+    const consoleMode = {
+      ...consoleModeStub(),
+      enableConsoleMode: jest.fn(async (_rigId: string) => ({ success: true as const })),
+    }
+    const { manager } = stubbedManager({
+      lifecycle: lifecycleAt('shuttingDown'),
+      consoleMode,
+      init: async () => {},
+    })
+
+    const result = await manager.enableConsoleMode('rig-1')
+
+    expect(result).toEqual({ success: false, error: expect.stringMatching(/controllers/i) })
+    expect(result).not.toEqual({ success: false, error: expect.stringMatching(/phase=/) })
+    expect(consoleMode.enableConsoleMode).not.toHaveBeenCalled()
+  })
+
+  it('pauses a listener that a toggle queued ahead of it turns on', async () => {
+    const queue = barrier()
+    const listeners = listenerStub()
+    let yargOn = false
+    listeners.yargRb3.getIsYargEnabled.mockImplementation(() => yargOn)
+    listeners.yargRb3.enableYarg.mockImplementation(async () => {
+      yargOn = true
+    })
+    listeners.yargRb3.disableYarg.mockImplementation(async () => {
+      yargOn = false
+    })
+    const { manager, lifecycle } = stubbedManager({
+      lifecycle: lifecycleBlockedOn(queue.wait),
+      listeners,
+      ownConsoleMode: true,
+    })
+
+    const enablingYarg = manager.enableYarg()
+    const entering = manager.enableConsoleMode('rig-1')
+    queue.release()
+    await enablingYarg
+
+    await expect(entering).resolves.toEqual({ success: true })
+    expect(yargOn).toBe(false)
+    expect(lifecycle.phase).toBe('consoleMode')
+  })
+
   it('leaves the phase shutting down when a shutdown starts while console mode comes up', async () => {
+    const entered = barrier()
     const enable = barrier()
     const consoleMode = {
       ...consoleModeStub(),
       enableConsoleMode: jest.fn(async () => {
+        entered.release()
         await enable.wait
         return { success: true as const }
       }),
@@ -396,8 +474,7 @@ describe('ControllerManager console mode', () => {
     const { manager, lifecycle } = stubbedManager({ consoleMode })
 
     const enabling = manager.enableConsoleMode('rig-1')
-    await Promise.resolve()
-    await Promise.resolve()
+    await entered.wait
     lifecycle.setPhase('shuttingDown')
     enable.release()
     await enabling
