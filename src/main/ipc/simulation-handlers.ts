@@ -101,7 +101,6 @@ export function setupSimulationHandlers(
       const registry = CueRegistry.getInstance()
       const targetGroupId =
         typeof groupId === 'string' && groupId.trim() !== '' ? groupId : 'default'
-      log.info(`Getting cues for group: ${targetGroupId}`)
       const group = registry.getGroup(targetGroupId)
       if (!group) {
         log.error(`Group not found: ${targetGroupId}`)
