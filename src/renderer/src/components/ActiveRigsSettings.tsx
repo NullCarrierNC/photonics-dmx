@@ -4,6 +4,8 @@ import { dmxRigsAtom, lightingPrefsAtom } from '../atoms'
 import { DmxRig, WIRE_SENDER_IDS, WireSenderId } from '../../../photonics-dmx/types'
 import { getDmxRigs, saveDmxRig, deleteDmxRig } from '../ipcApi'
 import { persistPrefs } from '../ipc/persistPrefs'
+import { wasRefused } from '../ipc/ipcResult'
+import type { IpcErrorResult, IpcSavedResult } from '../../../shared/ipcTypes'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('ActiveRigsSettings')
 
@@ -104,31 +106,36 @@ const ActiveRigsSettings: React.FC = () => {
     void loadRigs()
   }, [setRigs])
 
+  /**
+   * Reads what main answered for one rig write and says whether it landed. A refusal, or a restart
+   * that failed after the write landed, is shown in the panel's alert.
+   */
+  const rigWriteLanded = (result: IpcSavedResult | IpcErrorResult, what: string): boolean => {
+    if (wasRefused(result)) {
+      log.error(`Refused to ${what}:`, result.error)
+      setSaveError(`Could not ${what}. ${result.error ?? ''}`.trim())
+      return false
+    }
+    if (result.restartError) {
+      log.error(`The restart after the write to ${what} failed:`, result.restartError)
+      setSaveError(`Saved, but the lights did not restart. ${result.restartError}`)
+    }
+    return true
+  }
+
   const handleActiveToggle = async (rigId: string, newActive: boolean) => {
     try {
       const rig = rigs.find((r) => r.id === rigId)
       if (!rig) return
+      setSaveError(null)
 
-      // If multiple active rigs are not allowed and we're activating a rig,
-      // deactivate all other rigs first
-      if (!allowMultipleActiveRigs && newActive) {
-        // Deactivate all other rigs
-        const otherRigs = rigs.filter((r) => r.id !== rigId && r.active)
-        for (const otherRig of otherRigs) {
-          const deactivatedRig: DmxRig = {
-            ...otherRig,
-            active: false,
-          }
-          await saveDmxRig(deactivatedRig)
-        }
-      }
-
-      // Update the selected rig
+      // With one active rig allowed, main deactivates the others in the same write, so only the
+      // chosen rig is sent and the controllers restart once.
       const updatedRig: DmxRig = {
         ...rig,
         active: newActive,
       }
-      await saveDmxRig(updatedRig)
+      if (!rigWriteLanded(await saveDmxRig(updatedRig), `save ${rig.name}`)) return
 
       // Update local state
       setRigs((prev) =>
@@ -171,35 +178,26 @@ const ActiveRigsSettings: React.FC = () => {
       //   2. The routing UI is about to be hidden, so strip `outputs` on every rig that has it
       //      — otherwise rigs are silently stuck on a routing choice the user can no longer see.
       if (!enabled) {
-        const activeRigs = rigs.filter((r) => r.active)
-        const deactivatedIds = new Set<string>()
-        if (activeRigs.length > 1) {
-          const otherActiveRigs = activeRigs.slice(1)
-          for (const otherRig of otherActiveRigs) {
-            await saveDmxRig({ ...otherRig, active: false })
-            deactivatedIds.add(otherRig.id)
-          }
+        const [kept, ...alsoActive] = rigs.filter((r) => r.active)
+        const written = new Map<string, DmxRig>()
+        // Saving the kept rig active makes main deactivate every other rig in the same write, so
+        // the controllers restart once however many rigs were on.
+        if (kept && (alsoActive.length > 0 || kept.outputs !== undefined)) {
+          const next = clearRigOutputs(kept)
+          if (!rigWriteLanded(await saveDmxRig(next), `save ${kept.name}`)) return
+          written.set(kept.id, next)
+          for (const rig of alsoActive) written.set(rig.id, { ...rig, active: false })
         }
 
-        const clearedIds = new Set<string>()
         for (const rig of rigs) {
-          if (rig.outputs === undefined) continue
-          const next = clearRigOutputs(rig)
-          // Persist with the deactivated-active flag too if this rig is one we just deactivated.
-          const persisted = deactivatedIds.has(rig.id) ? { ...next, active: false } : next
-          await saveDmxRig(persisted)
-          clearedIds.add(rig.id)
+          const current = written.get(rig.id) ?? rig
+          if (current.outputs === undefined) continue
+          const next = clearRigOutputs(current)
+          if (!rigWriteLanded(await saveDmxRig(next), `save ${rig.name}`)) break
+          written.set(rig.id, next)
         }
 
-        setRigs((prev) =>
-          prev.map((r) => {
-            const wasDeactivated = deactivatedIds.has(r.id)
-            const wasCleared = clearedIds.has(r.id)
-            if (!wasDeactivated && !wasCleared) return r
-            const next = wasCleared ? clearRigOutputs(r) : r
-            return wasDeactivated ? { ...next, active: false } : next
-          }),
-        )
+        setRigs((prev) => prev.map((r) => written.get(r.id) ?? r))
       }
     } catch (error) {
       log.error('Failed to update allow multiple active rigs preference:', error)
@@ -213,7 +211,8 @@ const ActiveRigsSettings: React.FC = () => {
       const nextOutputs = toggleRigOutput(rig, senderId, checked)
       const updatedRig: DmxRig =
         nextOutputs === undefined ? clearRigOutputs(rig) : { ...rig, outputs: nextOutputs }
-      await saveDmxRig(updatedRig)
+      setSaveError(null)
+      if (!rigWriteLanded(await saveDmxRig(updatedRig), `save ${rig.name}`)) return
       setRigs((prev) => prev.map((r) => (r.id === rigId ? updatedRig : r)))
     } catch (error) {
       log.error('Failed to update rig outputs:', error)
@@ -226,7 +225,8 @@ const ActiveRigsSettings: React.FC = () => {
       if (!rig) return
       const updatedRig = setRigMirrorFlag(rig, axis, enabled)
       if (updatedRig === rig) return
-      await saveDmxRig(updatedRig)
+      setSaveError(null)
+      if (!rigWriteLanded(await saveDmxRig(updatedRig), `save ${rig.name}`)) return
       setRigs((prev) => prev.map((r) => (r.id === rigId ? updatedRig : r)))
     } catch (error) {
       log.error('Failed to update rig mirror:', error)
@@ -235,7 +235,9 @@ const ActiveRigsSettings: React.FC = () => {
 
   const handleDelete = async (rigId: string) => {
     try {
-      await deleteDmxRig(rigId)
+      const name = rigs.find((r) => r.id === rigId)?.name ?? 'the rig'
+      setSaveError(null)
+      if (!rigWriteLanded(await deleteDmxRig(rigId), `delete ${name}`)) return
       const remaining = rigs.filter((r) => r.id !== rigId)
 
       // If deletion collapses the rig set to a single rig, the routing UI is about to be
@@ -244,8 +246,10 @@ const ActiveRigsSettings: React.FC = () => {
       let survivorCleared: DmxRig | null = null
       if (remaining.length === 1) {
         const cleared = clearRigOutputs(remaining[0]!)
-        if (cleared !== remaining[0]) {
-          await saveDmxRig(cleared)
+        if (
+          cleared !== remaining[0] &&
+          rigWriteLanded(await saveDmxRig(cleared), `save ${cleared.name}`)
+        ) {
           survivorCleared = cleared
         }
       }

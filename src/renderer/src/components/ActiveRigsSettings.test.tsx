@@ -263,3 +263,123 @@ describe('ActiveRigsSettings — mirror controls', () => {
     expect(jest.mocked(ipcApi.saveDmxRig)).not.toHaveBeenCalled()
   })
 })
+
+describe('ActiveRigsSettings rig writes', () => {
+  it('sends only the chosen rig when the active rig changes', async () => {
+    renderWith({
+      rigs: [makeRig('r1', 'Rig A'), makeRig('r2', 'Rig B', undefined, false)],
+      allowMultipleActiveRigs: false,
+    })
+    await screen.findByText('Rig B')
+
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('radio')[1]!)
+    })
+
+    expect(saveDmxRigMock).toHaveBeenCalledTimes(1)
+    expect(saveDmxRigMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'r2', active: true }))
+    const [radioA, radioB] = screen.getAllByRole('radio') as HTMLInputElement[]
+    expect(radioA!.checked).toBe(false)
+    expect(radioB!.checked).toBe(true)
+  })
+
+  it('keeps the active rig and says why when main refuses the switch', async () => {
+    saveDmxRigMock.mockResolvedValue(refused('EPERM: rigs.json') as never)
+    renderWith({
+      rigs: [makeRig('r1', 'Rig A'), makeRig('r2', 'Rig B', undefined, false)],
+      allowMultipleActiveRigs: false,
+    })
+    await screen.findByText('Rig B')
+
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('radio')[1]!)
+    })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('EPERM: rigs.json')
+    const [radioA, radioB] = screen.getAllByRole('radio') as HTMLInputElement[]
+    expect(radioA!.checked).toBe(true)
+    expect(radioB!.checked).toBe(false)
+  })
+
+  it('shows the switch and says so when the lights did not restart after it', async () => {
+    saveDmxRigMock.mockResolvedValue({ success: true, restartError: 'sACN port busy' } as never)
+    renderWith({
+      rigs: [makeRig('r1', 'Rig A'), makeRig('r2', 'Rig B', undefined, false)],
+      allowMultipleActiveRigs: false,
+    })
+    await screen.findByText('Rig B')
+
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('radio')[1]!)
+    })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('sACN port busy')
+    expect((screen.getAllByRole('radio')[1] as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('keeps the row and says why when main refuses the delete', async () => {
+    deleteDmxRigMock.mockResolvedValue(refused('EPERM: rigs.json') as never)
+    renderWith({
+      rigs: [makeRig('r1', 'Rig A'), makeRig('r2', 'Rig B', undefined, false)],
+      allowMultipleActiveRigs: false,
+    })
+    await screen.findByText('Rig B')
+
+    fireEvent.click(screen.getAllByText('Delete')[1]!)
+    await act(async () => {
+      fireEvent.click(screen.getByText('Yes'))
+    })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('EPERM: rigs.json')
+    expect(screen.getByText('Rig B')).toBeInTheDocument()
+  })
+
+  it('leaves the mirror box as it was when main refuses the save', async () => {
+    saveDmxRigMock.mockResolvedValue(refused('EPERM: rigs.json') as never)
+    renderWith({ rigs: [makeRig('r1', 'Solo')], allowMultipleActiveRigs: false })
+    await screen.findByText('Solo')
+    const horiz = document.getElementById('rig-r1-mirror-horiz') as HTMLInputElement
+
+    await act(async () => {
+      fireEvent.click(horiz)
+    })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('EPERM: rigs.json')
+    expect(horiz.checked).toBe(false)
+  })
+
+  it('leaves the outputs as they were when main refuses the save', async () => {
+    saveDmxRigMock.mockResolvedValue(refused('EPERM: rigs.json') as never)
+    renderWith({
+      rigs: [makeRig('r1', 'Rig A', ['sacn']), makeRig('r2', 'Rig B')],
+      allowMultipleActiveRigs: true,
+    })
+    await screen.findByText('Rig A')
+    const artnet = document.getElementById('rig-r1-output-artnet') as HTMLInputElement
+
+    await act(async () => {
+      fireEvent.click(artnet)
+    })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('EPERM: rigs.json')
+    expect(artnet.checked).toBe(false)
+  })
+
+  it('keeps the first active rig through one write when multiple rigs are turned off', async () => {
+    renderWith({
+      rigs: [makeRig('r1', 'Rig A'), makeRig('r2', 'Rig B'), makeRig('r3', 'Rig C')],
+      allowMultipleActiveRigs: true,
+    })
+    await screen.findByText('Rig A')
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Allow Multiple Active Rigs'))
+    })
+
+    await waitFor(() => expect(screen.getAllByRole('radio')).toHaveLength(3))
+    expect(saveDmxRigMock).toHaveBeenCalledTimes(1)
+    expect(saveDmxRigMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1', active: true }))
+    const radios = screen.getAllByRole('radio') as HTMLInputElement[]
+    expect(radios.map((r) => r.checked)).toEqual([true, false, false])
+  })
+})
