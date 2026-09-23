@@ -230,6 +230,66 @@ describe('LightsLayout save confirmation', () => {
   })
 })
 
+describe('LightsLayout save that answers after a rig switch', () => {
+  const otherRig: DmxRig = {
+    id: 'r2',
+    name: 'Rig B',
+    active: false,
+    config: {
+      numLights: 3,
+      lightLayout: { id: 'front', label: 'Front only' },
+      strobeType: ConfigStrobeType.None,
+      frontLights: [1, 2, 3].map(
+        (position) =>
+          ({
+            ...initialFront,
+            id: `b${position}`,
+            position,
+            channels: { masterDimmer: 100 + position * 4, red: 0, green: 0, blue: 0 },
+          }) as unknown as DmxLight,
+      ),
+      backLights: [],
+      strobeLights: [],
+    },
+  }
+
+  it('keeps the rig the user switched to in the editor and holds Save while it waits', async () => {
+    let answerSave!: () => void
+    saveDmxRigMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answerSave = () => resolve({ success: true })
+        }) as never,
+    )
+    getDmxRigsMock.mockImplementation(async () => [initialRig, otherRig])
+    getDmxRigMock.mockImplementation(async (id: string) => (id === 'r2' ? otherRig : initialRig))
+    const { store } = renderWithProviders(<LightsLayout />, {
+      seed: (set) => {
+        set(activeRigIdAtom, 'r1')
+        set(dmxRigsAtom, [initialRig, otherRig])
+        set(activeDmxLightsConfigAtom, initialRig.config)
+        set(myDmxLightsAtom, [fixture])
+        set(lightingPrefsAtom, {})
+      },
+    })
+    const save = await screen.findByText('Save Changes')
+
+    await act(async () => {
+      fireEvent.click(save)
+    })
+    expect(save).toBeDisabled()
+    act(() => {
+      store.set(activeRigIdAtom, 'r2')
+      store.set(activeDmxLightsConfigAtom, otherRig.config)
+    })
+    await act(async () => answerSave())
+
+    expect(store.get(activeRigIdAtom)).toBe('r2')
+    expect(store.get(activeDmxLightsConfigAtom)?.numLights).toBe(3)
+    await waitFor(() => expect(save).toBeEnabled())
+  })
+})
+
 describe('LightsLayout import dialog', () => {
   it('does not build the import dialog until there is an import to name', async () => {
     // The dialog seeds its name field when it mounts. Kept mounted behind an isOpen prop it
