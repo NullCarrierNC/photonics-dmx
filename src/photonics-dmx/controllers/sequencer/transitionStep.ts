@@ -14,6 +14,14 @@ export type TransitionStep = {
 }
 
 /**
+ * Pan and tilt are percentages of the fixture's range. They stay fractional, so a fade reaches
+ * every position the fixture resolves, and `correctLightState` keeps them within 0-100.
+ */
+function interpolatePosition(start: number, end: number, t: number): number {
+  return start + (end - start) * t
+}
+
+/**
  * Samples a transition at `now`, which every layer in a frame shares so they move together.
  *
  * A zero duration lands on the end state at once. pan and tilt are interpolated only when an
@@ -41,13 +49,13 @@ export function stepTransition(data: TransitionData, now: number): TransitionSte
   if (startState.pan !== undefined || endState.pan !== undefined) {
     const startPan = startState.pan ?? endState.pan ?? 0
     const endPan = endState.pan ?? startState.pan ?? 0
-    state.pan = interpolate(startPan, endPan, easedProgress)
+    state.pan = interpolatePosition(startPan, endPan, easedProgress)
   }
 
   if (startState.tilt !== undefined || endState.tilt !== undefined) {
     const startTilt = startState.tilt ?? endState.tilt ?? 0
     const endTilt = endState.tilt ?? startState.tilt ?? 0
-    state.tilt = interpolate(startTilt, endTilt, easedProgress)
+    state.tilt = interpolatePosition(startTilt, endTilt, easedProgress)
   }
 
   // Completion lands on the frame where elapsed reaches the duration, so the fade runs its full

@@ -131,6 +131,14 @@ describe('stepTransition', () => {
       expect([state.pan, state.tilt]).toEqual([40, 60])
     })
 
+    it('moves between whole percents, so a fade reaches every position the head resolves', () => {
+      const { state } = stepTransition(
+        transition(color({ pan: 0, tilt: 10 }), color({ pan: 1, tilt: 11 }), 1000),
+        START_TIME + 250,
+      )
+      expect([state.pan, state.tilt]).toEqual([0.25, 10.25])
+    })
+
     it('holds the end value throughout when only the end state names one', () => {
       const { state } = stepTransition(
         transition(color(), color({ pan: 80 }), 1000),
