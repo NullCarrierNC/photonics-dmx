@@ -50,6 +50,7 @@ export class AudioCueHandler extends EventEmitter {
   /** The motion cue this chain last applied, so a change to nothing homes its heads once. */
   private appliedMotionCue: IAudioCue | null = null
   private executionCount = 0
+  private readonly unsubscribeMotionWipe: () => void
 
   constructor(
     private lightManager: DmxLightManager,
@@ -60,6 +61,18 @@ export class AudioCueHandler extends EventEmitter {
     this.registry = AudioCueRegistry.getInstance()
     this.motionCoordinator = options?.motionCoordinator ?? createAudioMotionCoordinator()
     this.strobeState = options?.strobeState ?? new StrobeStateManager()
+    this.unsubscribeMotionWipe = this.sequencer.onMotionPatternsCleared(() => {
+      this.onMotionPatternsWiped()
+    })
+  }
+
+  /** This chain's sequencer dropped its motion patterns without a pick asking it to. */
+  private onMotionPatternsWiped(): void {
+    if (!this.appliedMotionCue) {
+      return
+    }
+    this.appliedMotionCue = null
+    this.motionCoordinator.notifyExternalWipe()
   }
 
   public isMotionLayerEnabled(): boolean {
@@ -306,6 +319,7 @@ export class AudioCueHandler extends EventEmitter {
    * Cleanup
    */
   public destroy(): void {
+    this.unsubscribeMotionWipe()
     this.clearCurrentCue()
   }
 }

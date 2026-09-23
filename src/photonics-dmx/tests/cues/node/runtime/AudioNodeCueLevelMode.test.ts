@@ -25,6 +25,7 @@ import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
 import type { TrackedLight } from '../../../../types'
 import { fakeLightingController } from '../../../helpers/fakeLightingController'
+import { createSequencerHarness } from '../../../helpers/sequencerHarness'
 
 function makeSequencerStub(): ILightingController {
   return fakeLightingController()
@@ -298,12 +299,47 @@ describe('AudioNodeCue level mode', () => {
     const cue = new AudioNodeCue('g1', compiled)
 
     await cue.execute(audioCueData(0.5), sequencer, lightManager)
-    expect(sequencer.addEffect).toHaveBeenCalledTimes(1)
-    const effectKey = (sequencer.addEffect as jest.Mock).mock.calls[0][0] as string
+    expect(sequencer.setEffect).toHaveBeenCalledTimes(1)
+    const effectKey = (sequencer.setEffect as jest.Mock).mock.calls[0][0] as string
     ;(sequencer.removeEffect as jest.Mock).mockClear()
 
     cue.stopAndClearEffects()
     expect(sequencer.removeEffect).toHaveBeenCalledWith(effectKey, 120)
+  })
+
+  it('leaves motion running when a primary level effect takes over the rig', async () => {
+    const def = {
+      kind: 'lighting',
+      id: 'level-primary',
+      cueTypeId: 'level-primary',
+      name: 'Level primary',
+      style: 'primary',
+      variables: [],
+      nodes: {
+        events: [levelEnergyEvent(0.3)],
+        actions: [setColor('sc1', { source: 'literal', value: 'front' }, 10)],
+        logic: [],
+      },
+      connections: [{ from: 'ev-energy', to: 'sc1' }],
+      layout: { nodePositions: {} },
+    } as unknown as AudioLightingNodeCueDefinition
+    const h = createSequencerHarness({ frontCount: 2, backCount: 0 })
+    const motionWiped = jest.fn()
+    h.sequencer.onMotionPatternsCleared(motionWiped)
+    const cue = new AudioNodeCue(
+      'g1',
+      NodeCueCompiler.compileCue<AudioEventNodeUnion>(def, 'audio'),
+    )
+
+    try {
+      await cue.execute(audioCueData(0.5), h.sequencer, h.lightManager)
+      h.advanceBy(20)
+
+      expect(motionWiped).not.toHaveBeenCalled()
+    } finally {
+      cue.stopAndClearEffects()
+      h.cleanup()
+    }
   })
 
   it('takes a secondary level effect off when the cue is replaced', async () => {

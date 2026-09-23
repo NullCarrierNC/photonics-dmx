@@ -5,7 +5,10 @@ import { AudioCueRegistry } from '../../cues/registries/AudioCueRegistry'
 import type { IAudioCue } from '../../cues/interfaces/IAudioCue'
 import type { DmxLightManager } from '../../controllers/DmxLightManager'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { fakeLightingController } from '../helpers/fakeLightingController'
+import {
+  completingLightingController,
+  fakeLightingController,
+} from '../helpers/fakeLightingController'
 
 type FakeCue = IAudioCue & { execute: jest.Mock; onStop: jest.Mock }
 
@@ -91,5 +94,32 @@ describe('AudioCueHandler motion reporting', () => {
 
     expect(motion.onStop).not.toHaveBeenCalled()
     expect(handler.getRunningMotionCue().ref).toEqual(REF)
+  })
+})
+
+describe('AudioCueHandler motion after its sequencer drops the patterns', () => {
+  it('picks motion again on the next frame, inside the hold', () => {
+    jest.restoreAllMocks()
+    const registry = AudioCueRegistry.getInstance()
+    const sequencer = completingLightingController()
+    const handler = new AudioCueHandler({} as DmxLightManager, sequencer, {
+      motionCoordinator: createAudioMotionCoordinator({ getMotionCueMinimumHoldMs: () => 60_000 }),
+    })
+    jest.spyOn(registry, 'findMotionCueRef').mockReturnValue(REF)
+    jest.spyOn(registry, 'getCueImplementation').mockReturnValue(makeFakeCue('primary'))
+    const getRandom = jest
+      .spyOn(registry, 'getRandomMotionCue')
+      .mockReturnValueOnce(makeFakeCue('motion-a'))
+      .mockReturnValueOnce(makeFakeCue('motion-b'))
+
+    try {
+      handler.syncSlots('wash', null)
+      sequencer.removeAllEffects()
+      handler.syncSlots('wash', null)
+
+      expect(getRandom).toHaveBeenCalledTimes(2)
+    } finally {
+      handler.destroy()
+    }
   })
 })

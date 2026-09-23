@@ -294,12 +294,13 @@ export abstract class BaseAudioNodeCue {
           if (effect) {
             const layer = action.layer?.source === 'literal' ? Number(action.layer.value) : 0
             if (state.firstSubmissionUsesSetEffectRef.use) {
+              // The first submission replaces the look like the engine's, leaving motion running.
               state.firstSubmissionUsesSetEffectRef.use = false
-              sequencer.removeAllEffects()
+              sequencer.setEffect(effectKey, effect)
             } else {
               sequencer.removeEffect(effectKey, layer)
+              sequencer.addEffect(effectKey, effect)
             }
-            sequencer.addEffect(effectKey, effect)
             state.activeLevelEffects.set(effectKey, layer)
           }
         } else if (state.activeLevelEffects.has(effectKey)) {
