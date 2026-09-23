@@ -113,6 +113,25 @@ describe('a set that replaces the look', () => {
     }
   })
 
+  it('shows the new look under a position move that starts with it', () => {
+    show('red', RED)
+    h.advanceBy(50)
+
+    show('green', GREEN)
+    h.sequencer.addEffect(
+      'aim',
+      getEffectSingleColor({
+        color: { ...RED, intensity: 0, opacity: 0, pan: 60, tilt: 40 },
+        duration: 1000,
+        lights: h.lightManager.getLights(['front', 'back'], 'all'),
+        layer: 120,
+      }),
+    )
+    h.advanceBy(100)
+
+    expect(h.getLightState(h.frontLightIds[0])).toMatchObject({ green: 255, red: 0 })
+  })
+
   it('blacks the rig out at once on an explicit clear', () => {
     show('red', RED)
     h.advanceBy(50)

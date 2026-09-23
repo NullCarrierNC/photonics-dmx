@@ -127,6 +127,16 @@ export class LightTransitionController {
         effectiveStartState = transparentColor()
       }
     }
+    // A move to a transparent colour, such as a position change, draws no colour. On a layer with
+    // nothing of its own it starts transparent too, keeping only the pan and tilt, so it never
+    // paints the look held over a set on top of what the new cue draws below it.
+    if (
+      endState.opacity === 0 &&
+      this._heldLook.has(lightId) &&
+      !this._currentLayerStates.get(lightId)?.has(layer)
+    ) {
+      effectiveStartState.opacity = 0
+    }
 
     // Prepare transition data
     const data: TransitionData = {
