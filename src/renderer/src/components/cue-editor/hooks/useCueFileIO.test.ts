@@ -274,6 +274,108 @@ describe('useCueFileIO handleSave', () => {
     expect(setIsDirty).toHaveBeenLastCalledWith(true)
   })
 
+  it.each([
+    ['cue', 'saveNodeCueFile', 'validateNodeCue'],
+    ['effect', 'saveEffectFile', 'validateEffect'],
+  ] as const)(
+    'keeps an edit made while the %s file saved in the open document',
+    async (docMode, save, validate) => {
+      jest.mocked(ipcApi[validate]).mockResolvedValue({ valid: true, errors: [] } as never)
+      jest
+        .mocked(ipcApi[save])
+        .mockResolvedValue({ success: true, path: '/cues/motion-cues.json' } as never)
+      const added = { ...mixedFile(), cues: [...mixedFile().cues, { id: 'cue-new', name: 'New' }] }
+      const getUpdatedDocument = jest.fn(() => mixedFile() as unknown)
+      getUpdatedDocument.mockReturnValueOnce(mixedFile()).mockReturnValue(added)
+      const { rendered, setEditorDoc, setIsDirty } = setup({
+        ...openCueDoc(),
+        editorDoc: { mode: docMode, path: '/cues/motion-cues.json', file: mixedFile() },
+        getUpdatedDocument: getUpdatedDocument as never,
+      } as unknown as Partial<UseCueFileIOParams>)
+
+      let saved: boolean | undefined
+      await act(async () => {
+        saved = await rendered.result.current.handleSave()
+      })
+
+      expect(saved).toBe(true)
+      expect(setEditorDoc).toHaveBeenLastCalledWith({
+        mode: docMode,
+        path: '/cues/motion-cues.json',
+        file: expect.objectContaining({
+          bundled: false,
+          cues: expect.arrayContaining([expect.objectContaining({ id: 'cue-new' })]),
+        }),
+      })
+      expect(setIsDirty).toHaveBeenLastCalledWith(true)
+    },
+  )
+
+  it('leaves a file opened while the save ran as it is', async () => {
+    jest.mocked(ipcApi.validateNodeCue).mockResolvedValue({ valid: true, errors: [] } as never)
+    let answerSave: (value: unknown) => void = () => {}
+    jest.mocked(ipcApi.saveNodeCueFile).mockReturnValue(
+      new Promise((resolve) => {
+        answerSave = resolve
+      }) as never,
+    )
+    const mocks = {
+      setEditorDoc: jest.fn(),
+      setIsDirty: jest.fn(),
+      rememberLastFilePath: jest.fn(),
+    }
+    const saving = {
+      ...openCueDoc(),
+      ...mocks,
+      refreshFiles: jest.fn(async () => undefined),
+    } as unknown as UseCueFileIOParams
+    const other = { mode: 'cue', path: '/cues/other.json', file: mixedFile() }
+    const { result, rerender } = renderHook((params) => useCueFileIO(params), {
+      initialProps: saving,
+    })
+
+    let pending: Promise<boolean> = Promise.resolve(false)
+    await act(async () => {
+      pending = result.current.handleSave()
+    })
+    rerender({
+      ...saving,
+      editorDoc: other,
+      getUpdatedDocument: () => other.file,
+    } as unknown as UseCueFileIOParams)
+    await act(async () => {
+      answerSave({ success: true, path: '/cues/motion-cues.json' })
+      await pending
+    })
+
+    expect(ipcApi.saveNodeCueFile).toHaveBeenCalledTimes(1)
+    expect(mocks.setEditorDoc).not.toHaveBeenCalled()
+    expect(mocks.setIsDirty).not.toHaveBeenCalled()
+    expect(mocks.rememberLastFilePath).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['cue', 'Select a cue'],
+    ['effect', 'Select an effect'],
+  ] as const)('says so when no %s in the file is selected', async (docMode, message) => {
+    const { rendered, onSaveError } = setup({
+      ...openCueDoc(),
+      editorDoc: { mode: docMode, path: '/cues/motion-cues.json', file: mixedFile() },
+      selectedCueId: 'not-in-file',
+      getUpdatedDocument: jest.fn(() => null) as never,
+    } as unknown as Partial<UseCueFileIOParams>)
+
+    let saved: boolean | undefined
+    await act(async () => {
+      saved = await rendered.result.current.handleSave()
+    })
+
+    expect(saved).toBe(false)
+    expect(onSaveError).toHaveBeenCalledWith(expect.stringContaining(message))
+    expect(ipcApi.saveNodeCueFile).not.toHaveBeenCalled()
+    expect(ipcApi.saveEffectFile).not.toHaveBeenCalled()
+  })
+
   it('marks the file clean when nothing changed while the save ran', async () => {
     jest.mocked(ipcApi.validateNodeCue).mockResolvedValue({ valid: true, errors: [] } as never)
     jest

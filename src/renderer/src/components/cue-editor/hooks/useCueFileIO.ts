@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useLayoutEffect, useRef } from 'react'
 import equal from 'fast-deep-equal'
 import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type {
@@ -108,6 +108,11 @@ export function useCueFileIO({
   // Monotonic token shared by every read below: only the most recently issued read may commit
   // state, so fast tab switches cannot land a slower earlier read on top of a newer one.
   const selectRequestRef = useRef(0)
+  // The document open now, read by a save that resolves after the user carried on editing.
+  const openDocRef = useRef(editorDoc)
+  useLayoutEffect(() => {
+    openDocRef.current = editorDoc
+  }, [editorDoc])
 
   const selectFile = useCallback(
     async (
@@ -208,10 +213,34 @@ export function useCueFileIO({
     ],
   )
 
+  /**
+   * Points the open document at the file just saved. The document as it stands now goes in, so an
+   * edit made while the save ran stays in the editor and keeps the file dirty. A different file
+   * opened meanwhile is left as it is.
+   */
+  const installSaved = useCallback(
+    (saved: EditorDocument, snapshot: NodeCueFile | EffectFile, path: string): void => {
+      const open = openDocRef.current
+      if (!open || open.mode !== saved.mode || open.path !== saved.path) return
+      const current = getUpdatedDocument() ?? open.file
+      setEditorDoc({ mode: open.mode, file: { ...current, bundled: false }, path })
+      rememberLastFilePath(path)
+      setValidationErrors([])
+      setIsDirty(!equal(current, snapshot))
+    },
+    [getUpdatedDocument, rememberLastFilePath, setEditorDoc, setValidationErrors, setIsDirty],
+  )
+
   const handleSave = useCallback(async (): Promise<boolean> => {
-    if (!editorDoc) return false
-    const snapshot = getUpdatedDocument()
-    if (!snapshot) return false
+    const snapshot = editorDoc ? getUpdatedDocument() : null
+    if (!editorDoc || !snapshot) {
+      onSaveError?.(
+        editorDoc?.mode === 'effect'
+          ? 'Nothing to save. Select an effect first.'
+          : 'Nothing to save. Select a cue first.',
+      )
+      return false
+    }
     // A saved file is the user's, so a newer shipped version never replaces it.
     const updatedFile = { ...snapshot, bundled: false }
 
@@ -232,12 +261,7 @@ export function useCueFileIO({
           onSaveError?.(`Failed to save effect: ${filename}`)
           return false
         }
-        // An edit made while the save ran is not in the saved file, so the file stays dirty.
-        const editedMeanwhile = !equal(getUpdatedDocument(), snapshot)
-        setEditorDoc({ mode: 'effect', file: updatedFile, path: response.path })
-        rememberLastFilePath(response.path)
-        setValidationErrors([])
-        setIsDirty(editedMeanwhile)
+        installSaved(editorDoc, snapshot, response.path)
         await refreshEffectFiles()
         onSaveSuccess?.(`Effect saved: ${filename}`)
         return true
@@ -263,11 +287,7 @@ export function useCueFileIO({
           onSaveError?.(`Failed to save cue: ${filename}`)
           return false
         }
-        const editedMeanwhile = !equal(getUpdatedDocument(), snapshot)
-        setEditorDoc({ mode: 'cue', file: updatedFile, path: response.path })
-        rememberLastFilePath(response.path)
-        setValidationErrors([])
-        setIsDirty(editedMeanwhile)
+        installSaved(editorDoc, snapshot, response.path)
         await refreshFiles()
         onSaveSuccess?.(`Cue saved: ${filename}`)
         return true
@@ -281,14 +301,12 @@ export function useCueFileIO({
     editorDoc,
     filename,
     getUpdatedDocument,
+    installSaved,
     refreshFiles,
     refreshEffectFiles,
-    rememberLastFilePath,
     onSaveSuccess,
     onSaveError,
-    setEditorDoc,
     setValidationErrors,
-    setIsDirty,
   ])
 
   const handleDelete = useCallback(async () => {

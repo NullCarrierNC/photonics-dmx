@@ -144,6 +144,25 @@ describe('CueEditor delete confirmation', () => {
   })
 })
 
+describe('CueEditor save button', () => {
+  it.each([
+    ['cue', 'currentCueDefinition'],
+    ['effect', 'currentEffectDefinition'],
+  ] as const)('offers Save once the selected %s is in the file', (editorMode, current) => {
+    mockFiles = { ...filesFor(editorMode), selectedCueId: 'a', [current]: { id: 'a' } }
+    renderWithProviders(<CueEditor />)
+
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('holds Save while the selection is not in the open file', () => {
+    mockFiles = { ...filesFor('cue'), selectedCueId: 'gone' }
+    renderWithProviders(<CueEditor />)
+
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+})
+
 describe('CueEditor close guard', () => {
   const cleanJson = mockJson
 

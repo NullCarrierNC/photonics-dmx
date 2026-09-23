@@ -265,7 +265,7 @@ const CueEditor: React.FC = () => {
         onImport={() => void handleImport()}
         onExport={() => void handleExport()}
         onDelete={() => setShowDeleteConfirm(true)}
-        hasEditorDoc={!!editorDoc}
+        canSave={!!(editorDoc?.mode === 'effect' ? currentEffectDefinition : currentCueDefinition)}
         hasFile={hasFile}
         newFileLabel={newFileLabel}
         importLabel={importLabel}
