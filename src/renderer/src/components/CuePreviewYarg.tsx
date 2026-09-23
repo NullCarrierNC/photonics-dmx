@@ -7,11 +7,34 @@ import {
 import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 import PostProcessingStatus from './PostProcessingStatus'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import YargNoteGrid from './CuePreviewYarg/YargNoteGrid'
+import YargNoteGrid, { type ActiveInstrumentNotes } from './CuePreviewYarg/YargNoteGrid'
 import { setListenCueData } from '../ipcApi'
 import { useRunningMotionLabels } from '../hooks/useRunningMotionLabels'
 import { useAtom } from 'jotai'
 import { currentCueStateAtom, yargListenerEnabledAtom } from '../atoms'
+
+type Instrument = keyof ActiveInstrumentNotes
+
+const INSTRUMENTS: readonly Instrument[] = ['guitar', 'bass', 'keys', 'drums']
+
+const NO_NOTES: ActiveInstrumentNotes = {
+  guitar: new Set(),
+  bass: new Set(),
+  keys: new Set(),
+  drums: new Set(),
+}
+
+/** The notes a frame reports for each instrument, or nothing for an instrument it leaves out. */
+function notesIn(cueData: CueData): Partial<ActiveInstrumentNotes> {
+  const lit = <T extends string>(notes: readonly T[] | undefined, none: T) =>
+    notes && notes.length > 0 ? new Set(notes.filter((note) => note !== none)) : undefined
+  return {
+    guitar: lit(cueData.guitarNotes, InstrumentNoteType.None),
+    bass: lit(cueData.bassNotes, InstrumentNoteType.None),
+    keys: lit(cueData.keysNotes, InstrumentNoteType.None),
+    drums: lit(cueData.drumNotes, DrumNoteType.None),
+  }
+}
 
 /** How long the panel keeps the details after the last cue frame from outside a song. */
 const IDLE_CLEAR_MS = 60_000
@@ -64,17 +87,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   } = useRunningMotionLabels('yarg')
 
   // State for instrument note indicators
-  const [activeInstrumentNotes, setActiveInstrumentNotes] = useState<{
-    guitar: Set<InstrumentNoteType>
-    bass: Set<InstrumentNoteType>
-    keys: Set<InstrumentNoteType>
-    drums: Set<DrumNoteType>
-  }>({
-    guitar: new Set<InstrumentNoteType>(),
-    bass: new Set<InstrumentNoteType>(),
-    keys: new Set<InstrumentNoteType>(),
-    drums: new Set<DrumNoteType>(),
-  })
+  const [activeInstrumentNotes, setActiveInstrumentNotes] = useState(NO_NOTES)
 
   // Refs to track previous values for comparison
   const prevBeatRef = useRef<string | null>(null)
@@ -91,10 +104,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
   // Cue data only arrives when a cue is dispatched. Silence during a song leaves the details up,
   // and silence after a frame from outside one gives them up once IDLE_CLEAR_MS has passed.
   const idleClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const guitarClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const bassClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const keysClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const drumsClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const noteClearTimersRef = useRef<Partial<Record<Instrument, ReturnType<typeof setTimeout>>>>({})
 
   // What the primary row is showing, read by the effect below without depending on it. Depending
   // on the state it sets would restart the effect when its own clear timer fires, and the cue
@@ -179,6 +189,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
 
   // Listen for cue events when YARG listener is enabled or in simulation mode
   useEffect(() => {
+    const noteClearTimers = noteClearTimersRef.current
     /**
      * Puts the panel back to its waiting state.
      *
@@ -288,63 +299,14 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
       }
 
       // Handle instrument notes (ref-tracked timers so sustained notes stay solid; each new packet cancels previous clear)
-      if (cueData.guitarNotes && cueData.guitarNotes.length > 0) {
-        const guitarNotes = cueData.guitarNotes.filter((note) => note !== InstrumentNoteType.None)
-        clearTimeout(guitarClearTimerRef.current ?? undefined)
-        setActiveInstrumentNotes((prev) => ({
-          ...prev,
-          guitar: new Set(guitarNotes.map((note) => note)),
-        }))
-        guitarClearTimerRef.current = setTimeout(() => {
-          setActiveInstrumentNotes((prev) => ({
-            ...prev,
-            guitar: new Set<InstrumentNoteType>(),
-          }))
-        }, 100)
-      }
-
-      if (cueData.bassNotes && cueData.bassNotes.length > 0) {
-        const bassNotes = cueData.bassNotes.filter((note) => note !== InstrumentNoteType.None)
-        clearTimeout(bassClearTimerRef.current ?? undefined)
-        setActiveInstrumentNotes((prev) => ({
-          ...prev,
-          bass: new Set(bassNotes.map((note) => note)),
-        }))
-        bassClearTimerRef.current = setTimeout(() => {
-          setActiveInstrumentNotes((prev) => ({
-            ...prev,
-            bass: new Set<InstrumentNoteType>(),
-          }))
-        }, 100)
-      }
-
-      if (cueData.keysNotes && cueData.keysNotes.length > 0) {
-        const keysNotes = cueData.keysNotes.filter((note) => note !== InstrumentNoteType.None)
-        clearTimeout(keysClearTimerRef.current ?? undefined)
-        setActiveInstrumentNotes((prev) => ({
-          ...prev,
-          keys: new Set(keysNotes.map((note) => note)),
-        }))
-        keysClearTimerRef.current = setTimeout(() => {
-          setActiveInstrumentNotes((prev) => ({
-            ...prev,
-            keys: new Set<InstrumentNoteType>(),
-          }))
-        }, 100)
-      }
-
-      if (cueData.drumNotes && cueData.drumNotes.length > 0) {
-        const drumNotes = cueData.drumNotes.filter((note) => note !== DrumNoteType.None)
-        clearTimeout(drumsClearTimerRef.current ?? undefined)
-        setActiveInstrumentNotes((prev) => ({
-          ...prev,
-          drums: new Set(drumNotes.map((note) => note)),
-        }))
-        drumsClearTimerRef.current = setTimeout(() => {
-          setActiveInstrumentNotes((prev) => ({
-            ...prev,
-            drums: new Set<DrumNoteType>(),
-          }))
+      const reported = notesIn(cueData)
+      for (const instrument of INSTRUMENTS) {
+        const notes = reported[instrument]
+        if (!notes) continue
+        clearTimeout(noteClearTimers[instrument])
+        setActiveInstrumentNotes((prev) => ({ ...prev, [instrument]: notes }))
+        noteClearTimers[instrument] = setTimeout(() => {
+          setActiveInstrumentNotes((prev) => ({ ...prev, [instrument]: NO_NOTES[instrument] }))
         }, 100)
       }
 
@@ -371,10 +333,7 @@ const CuePreviewYarg: React.FC<CuePreviewYargProps> = ({
       clearTimeout(beatClearTimerRef.current ?? undefined)
       clearTimeout(measureClearTimerRef.current ?? undefined)
       clearTimeout(keyframeClearTimerRef.current ?? undefined)
-      clearTimeout(guitarClearTimerRef.current ?? undefined)
-      clearTimeout(bassClearTimerRef.current ?? undefined)
-      clearTimeout(keysClearTimerRef.current ?? undefined)
-      clearTimeout(drumsClearTimerRef.current ?? undefined)
+      for (const timer of Object.values(noteClearTimers)) clearTimeout(timer)
       clearTimeout(primaryClearTimerRef.current ?? undefined)
       clearTimeout(secondaryClearTimerRef.current ?? undefined)
     }
