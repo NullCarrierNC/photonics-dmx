@@ -2,6 +2,7 @@ import { EventEmitter } from 'events'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import chokidar, { FSWatcher } from 'chokidar'
+import { realPathOf } from '../../../helpers/realPath'
 
 /**
  * Shared file-system plumbing for the node-cue and effect loaders.
@@ -307,11 +308,15 @@ export abstract class BaseNodeFileLoader<
     return resolvedPath
   }
 
+  /**
+   * Whether a path lies in a directory once every link in either is followed, so a link inside a
+   * mode directory cannot lead a load or a save outside it.
+   */
   protected isPathWithinDir(targetPath: string, baseDir: string): boolean {
     const resolvedBase = this.resolvePath(baseDir)
-    const resolvedTarget = this.resolvePath(targetPath)
-    return (
-      resolvedTarget === resolvedBase || resolvedTarget.startsWith(`${resolvedBase}${path.sep}`)
-    )
+    const realBase = realPathOf(resolvedBase) ?? resolvedBase
+    const realTarget = realPathOf(this.resolvePath(targetPath))
+    if (realTarget === null) return false
+    return realTarget === realBase || realTarget.startsWith(`${realBase}${path.sep}`)
   }
 }

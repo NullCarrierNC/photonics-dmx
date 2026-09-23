@@ -53,6 +53,24 @@ describe('EffectLoader.resolveEffectFilePathForIpc (used by EXPORT)', () => {
     expect(resolved).toBe(path.resolve(yargDir, filename))
   })
 
+  it('refuses a link inside an effect root that leads outside it', () => {
+    const yargDir = path.join(tmpDir, 'node-data', 'effects', 'yarg')
+    fs.mkdirSync(yargDir, { recursive: true })
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-outside-'))
+    try {
+      fs.writeFileSync(path.join(outside, 'secret.json'), '{}', 'utf-8')
+      fs.symlinkSync(outside, path.join(yargDir, 'linked'))
+
+      expect(() =>
+        loader.resolveEffectFilePathForIpc(
+          path.join('node-data', 'effects', 'yarg', 'linked', 'secret.json'),
+        ),
+      ).toThrow(/must be under the YARG or audio effect directories/)
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true })
+    }
+  })
+
   it('rejects path traversal escaping the effect roots', () => {
     expect(() => loader.resolveEffectFilePathForIpc('../../etc/passwd')).toThrow(
       /must be under the YARG or audio effect directories/,

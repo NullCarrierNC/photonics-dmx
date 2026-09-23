@@ -7,6 +7,7 @@ import * as os from 'os'
 import * as path from 'path'
 import type { ValidationResult } from './primitives'
 import { isNonEmptyString } from './primitives'
+import { realPathOf } from '../../../photonics-dmx/helpers/realPath'
 
 /**
  * Resolves `targetPath`, following links, and confirms it sits under one of `allowedRoots`,
@@ -36,27 +37,6 @@ function isPackagedBuild(): boolean {
  */
 function defaultAllowedRoots(): string[] {
   return [...(isPackagedBuild() ? [] : [process.cwd()]), os.homedir(), os.tmpdir()]
-}
-
-/**
- * The path with every link in it followed, or null when the filesystem will not say. A path that
- * does not exist yet follows its nearest existing ancestor and keeps the rest, so a file about to
- * be written is judged by where it will land.
- */
-function realPathOf(target: string): string | null {
-  const missing: string[] = []
-  let existing = target
-  while (!fs.existsSync(existing)) {
-    const parent = path.dirname(existing)
-    if (parent === existing) return target
-    missing.unshift(path.basename(existing))
-    existing = parent
-  }
-  try {
-    return path.join(fs.realpathSync(existing), ...missing)
-  } catch {
-    return null
-  }
 }
 
 export function validatePathUnderAllowedRoots(
