@@ -22,6 +22,23 @@ describe('validatePreferencesSave', () => {
     expect(result.value.dmxOutputConfig).not.toHaveProperty('smuggled')
   })
 
+  it('drops fields named after what every object inherits', () => {
+    const result = validatePreferencesSave(
+      JSON.parse(
+        '{"dmxOutputConfig":{"sacnEnabled":true,"artNetEnabled":false,"enttecProEnabled":false,"openDmxEnabled":false,"constructor":"x","toString":"y"}}',
+      ),
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(Object.keys(result.value.dmxOutputConfig ?? {})).toEqual([
+      'sacnEnabled',
+      'artNetEnabled',
+      'enttecProEnabled',
+      'openDmxEnabled',
+    ])
+  })
+
   it('keeps the sender configs to their own fields', () => {
     const result = validatePreferencesSave({
       sacnConfig: { universe: 1, useUnicast: false, script: 'alert(1)' },

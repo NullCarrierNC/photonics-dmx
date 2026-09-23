@@ -102,7 +102,9 @@ export function validatePreferencesSave(data: unknown): ValidationResult<Partial
   for (const [key, fields] of Object.entries(NESTED_PREFERENCE_FIELDS)) {
     const value = cleaned[key]
     if (isPlainObject(value)) {
-      cleaned[key] = Object.fromEntries(Object.entries(value).filter(([field]) => field in fields))
+      cleaned[key] = Object.fromEntries(
+        Object.entries(value).filter(([field]) => Object.hasOwn(fields, field)),
+      )
     }
   }
   return { ok: true, value: cleaned as Partial<AppPreferences> }
