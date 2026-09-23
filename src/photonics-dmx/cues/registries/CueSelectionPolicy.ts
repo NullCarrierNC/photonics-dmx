@@ -393,7 +393,11 @@ export class CueSelectionPolicy {
           lastExecutionTime: executionTime,
           lastGroupId: lastSelection.groupId,
           timeSinceLastExecution,
-          isWithinWindow: timeSinceLastExecution < this.cueConsistencyWindow,
+          isWithinWindow: this.withinConsistencyWindow(
+            cueType,
+            lastSelection.groupId,
+            timeSinceLastExecution,
+          ),
         })
       }
     }
@@ -450,7 +454,11 @@ export class CueSelectionPolicy {
     }
 
     // If we have a previous selection and it's within the consistency window, validate it's still available
-    if (lastExecutionTime && lastSelection && now - lastExecutionTime < this.cueConsistencyWindow) {
+    if (
+      lastExecutionTime &&
+      lastSelection &&
+      this.withinConsistencyWindow(cueType, lastSelection.groupId, now - lastExecutionTime)
+    ) {
       if (this.catalog.cueFrom(lastSelection.groupId, cueType)) {
         if (lastSelection.isFallback) {
           // For fallback groups, ensure no active group has picked up this cue in the meantime.
@@ -478,6 +486,19 @@ export class CueSelectionPolicy {
     }
 
     return null
+  }
+
+  /**
+   * Whether a cue type called again keeps the group it last got. Inside the window it does. A
+   * window of 0 keeps it only while the cue type is still the one its role is playing, so a held
+   * cue never changes group and the chart calling it again after another cue rolls a new one.
+   */
+  private withinConsistencyWindow(cueType: CueType, groupId: string, sinceLastMs: number): boolean {
+    if (this.cueConsistencyWindow > 0) {
+      return sinceLastMs < this.cueConsistencyWindow
+    }
+    const cue = this.catalog.cueFrom(groupId, cueType)
+    return cue !== null && this.roleFor(cue).lastCueName === cueType
   }
 
   /** Record the execution of a cue for consistency tracking. */

@@ -94,8 +94,35 @@ describe('CueSelectionPolicy', () => {
       const groups = new Set<string>()
       for (let i = 0; i < 40; i++) {
         groups.add(policy.selectCue(CueType.Chorus, 'tracked')!.cueId)
+        policy.selectCue(CueType.Verse, 'tracked')
       }
       expect(groups.size).toBe(2)
+    })
+
+    it('keeps a held cue on its group at a window of 0, whatever the roll', () => {
+      registerPair(CueStyle.Primary)
+      policy.setCueConsistencyWindow(0)
+      let flip = 0
+      jest.spyOn(Math, 'random').mockImplementation(() => (flip++ % 2 === 0 ? 0 : 0.99))
+
+      const first = policy.selectCue(CueType.Chorus)!
+      for (let i = 0; i < 30; i++) {
+        expect(policy.selectCue(CueType.Chorus)).toBe(first)
+      }
+    })
+
+    it('rolls again at a window of 0 when the chart calls a cue after another', () => {
+      registerPair(CueStyle.Primary)
+      policy.setCueConsistencyWindow(0)
+      jest
+        .spyOn(Math, 'random')
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(0.99)
+
+      expect(policy.selectCue(CueType.Chorus)!.cueId).toBe('groupA-Chorus')
+      policy.selectCue(CueType.Verse)
+      expect(policy.selectCue(CueType.Chorus)!.cueId).toBe('groupB-Chorus')
     })
 
     it('pins the selection inside the consistency window', () => {
