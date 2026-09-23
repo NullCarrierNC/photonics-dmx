@@ -50,6 +50,14 @@ export interface NodeRuntimeCallbacks {
 }
 
 /**
+ * Turns node-cue debug logging on and off while engines run. Its owner hands the same object to
+ * every engine, so a change reaches the engines already running.
+ */
+export interface NodeCueDebugSwitch {
+  enabled: boolean
+}
+
+/**
  * Explicit high-level run state layered on top of the existing ExecutionContext-based runtime.
  */
 export enum ExecutionPhase {

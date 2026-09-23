@@ -5,7 +5,6 @@ import { ControllerManager } from '../controllers/ControllerManager'
 import { sendToAllWindows } from '../utils/windowUtils'
 import { NodeCueMode, NodeCueFile, NodeCueKind } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateNodeCueFile } from '../../photonics-dmx/cues/node/schema/validation'
-import { NodeExecutionEngine } from '../../photonics-dmx/cues/node/runtime/NodeExecutionEngine'
 import { cueDomainBinding, reconcileAndApplyGroups } from '../controllers/cueDomainBindings'
 import { validationRefusal } from './ipcResult'
 import { NODE_CUES, RENDERER_RECEIVE } from '../../shared/ipcChannels'
@@ -54,8 +53,9 @@ async function persistGroupEnableAfterNodeCueSave(
 
 export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: ControllerManager): void {
   handleInvoke(ipcMain, NODE_CUES.SET_DEBUG, log, async (_event, enabled: boolean) => {
-    NodeExecutionEngine.setDebugEnabled(Boolean(enabled))
-    return { success: true, enabled: NodeExecutionEngine.getDebugEnabled() }
+    const loader = ensureLoader(controllerManager)
+    loader.setDebugEnabled(Boolean(enabled))
+    return { success: true, enabled: loader.isDebugEnabled() }
   })
 
   handleInvoke(ipcMain, NODE_CUES.LIST, log, async () => {

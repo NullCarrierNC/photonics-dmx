@@ -46,6 +46,7 @@ export type NodeCueLoadResult = BaseLoadResult
 
 /** Optional host callbacks for node cue debug/error emission; used when the host provides them. */
 export type NodeRuntimeCallbacks = import('../runtime/executionTypes').NodeRuntimeCallbacks
+type NodeCueDebugSwitch = import('../runtime/executionTypes').NodeCueDebugSwitch
 
 /**
  * The registry each mode loads into, keyed by mode. Audio is a different class from the net modes,
@@ -112,6 +113,9 @@ const strategyForFile = (file: NodeCueFile): NodeCueKindStrategy | undefined =>
 export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSummary> {
   private fileRegistrations: Map<string, FileRegistration> = new Map()
   private customAudioCueTypes: Set<AudioCueType> = new Set()
+
+  /** The debug switch every cue this loader builds hands to its engines. */
+  private readonly nodeCueDebug: NodeCueDebugSwitch = { enabled: false }
 
   constructor(private readonly options: NodeCueLoaderOptions) {
     super(options.baseDir, 'cues', ['yarg', 'audio', 'rb3'])
@@ -414,10 +418,20 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
     )
   }
 
+  /** Turn debug logging on or off for every cue this loader built, running or not. */
+  public setDebugEnabled(enabled: boolean): void {
+    this.nodeCueDebug.enabled = enabled
+  }
+
+  public isDebugEnabled(): boolean {
+    return this.nodeCueDebug.enabled
+  }
+
   /** What the group builders need from this loader. */
   private buildContext(): CueGroupBuildContext {
     return {
       runtimeBroadcaster: this.options.runtimeBroadcaster,
+      nodeCueDebug: this.nodeCueDebug,
       getNodeRuntimeCallbacks: this.options.getNodeRuntimeCallbacks,
       buildEffectRegistry: (effects, mode) => this.buildEffectRegistry(effects, mode),
     }

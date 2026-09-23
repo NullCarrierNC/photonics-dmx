@@ -32,10 +32,13 @@ const log = createLogger('cueGroupBuilders')
 
 /** Optional host callbacks for node cue debug/error emission; used when the host provides them. */
 type NodeRuntimeCallbacks = import('../runtime/executionTypes').NodeRuntimeCallbacks
+type NodeCueDebugSwitch = import('../runtime/executionTypes').NodeCueDebugSwitch
 
 /** What the builders need from the loader that owns them. */
 export interface CueGroupBuildContext {
   runtimeBroadcaster: RuntimeBroadcaster
+  /** Handed to every cue's engines, so debug logging can be turned on while they run. */
+  nodeCueDebug?: NodeCueDebugSwitch
   getNodeRuntimeCallbacks?: () => NodeRuntimeCallbacks | undefined
   buildEffectRegistry: (
     effectReferences: EffectReference[],
@@ -114,6 +117,7 @@ export async function buildNetGroup(
             effects,
             ctx.getNodeRuntimeCallbacks?.(),
             ctx.runtimeBroadcaster,
+            ctx.nodeCueDebug,
           )
         },
       })
@@ -133,6 +137,7 @@ export async function buildNetGroup(
             effects,
             ctx.getNodeRuntimeCallbacks?.(),
             ctx.runtimeBroadcaster,
+            ctx.nodeCueDebug,
           )
         },
       })
@@ -182,7 +187,13 @@ export async function buildAudioGroup(
         compileErrors,
         build: async () => {
           const { compiled, effects } = await compile()
-          return new AudioNodeCue(file.group.id, compiled, effects, ctx.runtimeBroadcaster)
+          return new AudioNodeCue(
+            file.group.id,
+            compiled,
+            effects,
+            ctx.runtimeBroadcaster,
+            ctx.nodeCueDebug,
+          )
         },
       })
     } else {
@@ -195,7 +206,13 @@ export async function buildAudioGroup(
         compileErrors,
         build: async () => {
           const { compiled, effects } = await compile()
-          return new AudioMotionNodeCue(file.group.id, compiled, effects, ctx.runtimeBroadcaster)
+          return new AudioMotionNodeCue(
+            file.group.id,
+            compiled,
+            effects,
+            ctx.runtimeBroadcaster,
+            ctx.nodeCueDebug,
+          )
         },
       })
     }

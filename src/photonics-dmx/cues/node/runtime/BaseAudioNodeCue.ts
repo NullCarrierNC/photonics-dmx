@@ -15,7 +15,7 @@ import { NodeExecutionEngine } from './NodeExecutionEngine'
 import { ExecutionContext } from './ExecutionContext'
 import { evaluateLogicNode, LogicNodeEvaluatorContext } from './logicNodeEvaluator'
 import { createExecutionStateMachineLifecycle } from './executionStateMachineLifecycle'
-import { VariableValue } from './executionTypes'
+import { VariableValue, type NodeCueDebugSwitch } from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
 import { evaluateAudioEvent, type AudioEventState } from './audioEventEvaluator'
 import { evaluateBandTrigger } from '../../audio/bandReactivity'
@@ -86,6 +86,7 @@ export abstract class BaseAudioNodeCue {
     effectRegistry: EffectRegistry | undefined,
     private readonly runtimeBroadcaster: RuntimeBroadcaster,
     cueType: AudioCueType,
+    private readonly debug?: NodeCueDebugSwitch,
   ) {
     const definition = compiledCue.definition as AudioNodeCueDefinition
     this.id = `${groupId}:${definition.id}`
@@ -180,6 +181,7 @@ export abstract class BaseAudioNodeCue {
         {
           firstSubmissionUsesSetEffectRef: state.firstSubmissionUsesSetEffectRef,
           onContextLifecycle: state.esmLifecycle.onContextLifecycle,
+          debug: this.debug,
         },
       )
     }

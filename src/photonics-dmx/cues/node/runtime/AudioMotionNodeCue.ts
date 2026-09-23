@@ -6,6 +6,7 @@ import { EffectRegistry } from './EffectRegistry'
 import { BaseAudioNodeCue } from './BaseAudioNodeCue'
 import type { RuntimeBroadcaster } from '../../../runtime/broadcaster'
 import { noopRuntimeBroadcaster } from '../../../runtime/broadcaster'
+import type { NodeCueDebugSwitch } from './executionTypes'
 
 /**
  * Maximum BPM passed into audio motion graphs. Detected tempo can spike; motion-pattern speed is in Hz
@@ -33,6 +34,7 @@ export class AudioMotionNodeCue extends BaseAudioNodeCue implements IAudioCue {
     compiledCue: CompiledAudioCue,
     effectRegistry?: EffectRegistry,
     runtimeBroadcaster?: RuntimeBroadcaster,
+    debug?: NodeCueDebugSwitch,
   ) {
     const definition = compiledCue.definition as AudioNodeCueDefinition
     if (definition.kind !== 'motion') {
@@ -45,6 +47,7 @@ export class AudioMotionNodeCue extends BaseAudioNodeCue implements IAudioCue {
       effectRegistry,
       runtimeBroadcaster ?? noopRuntimeBroadcaster(),
       motion.id,
+      debug,
     )
   }
 

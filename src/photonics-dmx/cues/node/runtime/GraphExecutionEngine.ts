@@ -10,7 +10,7 @@ import type { CompiledNetCue } from '../compiler/NodeCueCompiler'
 import type { BaseEventNode } from '../../types/nodeCueTypes'
 import type { VariableDefinition } from '../../types/nodeCueTypes'
 import type { VariableValue } from './executionTypes'
-import type { NodeRuntimeCallbacks } from './executionTypes'
+import type { NodeCueDebugSwitch, NodeRuntimeCallbacks } from './executionTypes'
 import { NodeExecutionEngine } from './NodeExecutionEngine'
 import { EffectRegistry } from './EffectRegistry'
 import { createExecutionStateMachineLifecycle } from './executionStateMachineLifecycle'
@@ -51,6 +51,7 @@ export class GraphExecutionEngine {
   private readonly runtimeBroadcaster: RuntimeBroadcaster
   private effectRegistry?: EffectRegistry
   private compiledCue?: CompiledNetCue
+  private debug?: NodeCueDebugSwitch
   private readonly cueId: string
   private nodeEngine: NodeExecutionEngine | null = null
   /** Per-context state-machine tracking (cue graph only, when delegating to nodeEngine). */
@@ -87,6 +88,7 @@ export class GraphExecutionEngine {
     effectRegistry: EffectRegistry,
     variableDefinitions: VariableDefinition[],
     callbacks?: NodeRuntimeCallbacks,
+    debug?: NodeCueDebugSwitch,
   ): GraphExecutionEngine {
     const engine = new GraphExecutionEngine(
       policy,
@@ -100,6 +102,7 @@ export class GraphExecutionEngine {
     )
     engine.compiledCue = compiledCue
     engine.effectRegistry = effectRegistry
+    engine.debug = debug
     return engine
   }
 
@@ -143,6 +146,7 @@ export class GraphExecutionEngine {
         consumeInitialClearPolicy: () => this.session.consumeInitialClearPolicy(),
         onContextLifecycle: this.esmLifecycle.onContextLifecycle,
         revisitPolicy: this.policy.revisitPolicy,
+        debug: this.debug,
       },
     )
     return this.nodeEngine

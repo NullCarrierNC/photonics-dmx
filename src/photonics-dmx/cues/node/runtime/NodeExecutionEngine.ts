@@ -33,7 +33,12 @@ import {
 } from '../../types/nodeCueTypes'
 import { TrackedLight, Color } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
-import { ExecutionState, VariableValue, NodeRuntimeCallbacks } from './executionTypes'
+import {
+  ExecutionState,
+  VariableValue,
+  NodeRuntimeCallbacks,
+  type NodeCueDebugSwitch,
+} from './executionTypes'
 import { EffectRegistry } from './EffectRegistry'
 import { EffectExecutionEngine } from './EffectExecutionEngine'
 import { BaseNodeExecutionEngine, CompiledGraph } from './BaseNodeExecutionEngine'
@@ -62,23 +67,11 @@ export interface NodeExecutionEngineOptions {
   onContextLifecycle?: (contextId: string, event: ContextLifecycleEvent) => void
   /** Re-entry policy; defaults to 'strict'. */
   revisitPolicy?: RevisitPolicy
+  /** Turns debug logging on at runtime. */
+  debug?: NodeCueDebugSwitch
 }
 
 export class NodeExecutionEngine extends BaseNodeExecutionEngine {
-  /**
-   * Global runtime toggle for node-cue debug logging.
-   * This is useful in packaged builds where env vars are inconvenient.
-   */
-  private static globalDebugEnabled = false
-
-  public static setDebugEnabled(enabled: boolean): void {
-    NodeExecutionEngine.globalDebugEnabled = enabled
-  }
-
-  public static getDebugEnabled(): boolean {
-    return NodeExecutionEngine.globalDebugEnabled
-  }
-
   private compiledCue: CompiledNetCue | CompiledAudioCue
   private cueId: string
   private cueLevelVarStore: Map<string, VariableValue>
@@ -88,11 +81,9 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
   /** Node IDs that have emitted 'activated' but not yet 'deactivated', so cancelAll can flush them. */
   private pendingActivations: Set<string> = new Set()
   private readonly revisitPolicyValue: RevisitPolicy
-  /**
-   * Instance snapshot of env-based debug setting. Note that runtime toggles are handled via
-   * the static global flag so existing engines can start logging immediately.
-   */
-  private debugEnabled: boolean
+  /** The env-based debug setting, read once. The injected switch covers runtime toggles. */
+  private readonly envDebugEnabled: boolean
+  private readonly debug?: NodeCueDebugSwitch
   /** When set (GraphExecutionEngine supplies it), invoked on each context start/complete/cancel/blocked/running so the owner can drive its ExecutionStateMachine. */
   private readonly onContextLifecycle?: (contextId: string, event: ContextLifecycleEvent) => void
 
@@ -129,8 +120,9 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
     // Enable with either env var:
     // - PHOTONICS_NODE_CUE_DEBUG=1
     // - NODE_CUE_DEBUG=1
-    this.debugEnabled =
+    this.envDebugEnabled =
       process?.env?.PHOTONICS_NODE_CUE_DEBUG === '1' || process?.env?.NODE_CUE_DEBUG === '1'
+    this.debug = options.debug
 
     // Register all event listeners during initialization
     this.registerEventListeners()
@@ -293,9 +285,12 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
     return { onBlocked: () => this.onContextLifecycle?.(context.id, 'blocked') }
   }
 
+  private get debugging(): boolean {
+    return this.envDebugEnabled || this.debug?.enabled === true
+  }
+
   protected override debugLog(message: string, data?: unknown): void {
-    // Allow enabling debug at runtime via NodeExecutionEngine.setDebugEnabled(...)
-    if (!this.debugEnabled && !NodeExecutionEngine.globalDebugEnabled) return
+    if (!this.debugging) return
     // Use console.log (not debug) so it shows up consistently in packaged builds.
     if (data === undefined) {
       log.info(`[NodeCue] ${this.cueId} ${message}`)
@@ -395,7 +390,7 @@ export class NodeExecutionEngine extends BaseNodeExecutionEngine {
 
   /** Rich debug logging for a logic node before it executes (cue-only). */
   protected override logLogicNode(logicNode: LogicNode, context: ExecutionContext): void {
-    if (!this.debugEnabled && !NodeExecutionEngine.globalDebugEnabled) return
+    if (!this.debugging) return
     const logicLog: Record<string, unknown> = {
       logicType: logicNode.logicType,
       nodeId: logicNode.id,
