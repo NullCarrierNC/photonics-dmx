@@ -36,6 +36,7 @@ import { runFanOut as runFanOutLoop, computeLedChanges } from './fanOut'
 import type { AudioCueData } from '../../types/audioCueTypes'
 import type { Effect, TrackedLight } from '../../../types'
 import { ExecutionContext } from './ExecutionContext'
+import { delayPlaceholderAction } from './engineUtils'
 import { NodeRuntimeCallbacks, VariableValue } from './executionTypes'
 import {
   ActionEffectFactory,
@@ -432,28 +433,8 @@ export abstract class BaseNodeExecutionEngine {
       const delayMs = Number(resolveValue('number', delayNode.delayTime, context))
       this.debugLog(`exec delay nodeId=${nodeId} ctx=${context.id}`, { delayMs })
 
-      // Register as active to block execution. A dummy action node satisfies ExecutionContext.
-      const dummyAction: ActionNode = {
-        id: nodeId,
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'blue' },
-          brightness: { source: 'literal', value: 'medium' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 0 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-      context.registerActiveAction(nodeId, dummyAction)
+      // Registered as active so the delay blocks the nodes after it until it fires.
+      context.registerActiveAction(nodeId, delayPlaceholderAction(nodeId))
 
       context.startTimer(() => {
         // Guard on isActionActive: other blocking nodes (e.g. from a for-each-light body)
@@ -885,6 +866,7 @@ export abstract class BaseNodeExecutionEngine {
         if (shouldBlock) {
           context.registerActiveAction(actionNode.id, actionNode)
           this.submitBlockingEffect(
+            context,
             effectName,
             resolvedLayer,
             effect,
@@ -969,6 +951,7 @@ export abstract class BaseNodeExecutionEngine {
       if (chainHasBlockingStep) {
         context.registerActiveAction(lastChainNode.id, lastChainNode)
         this.submitBlockingEffect(
+          context,
           chainEffectName,
           chainData.baseLayer,
           composedEffect,
@@ -1097,7 +1080,7 @@ export abstract class BaseNodeExecutionEngine {
       }
       if (useSetEffect) {
         context.registerActiveAction(actionNode.id, actionNode)
-        this.submitBlockingEffect(effectName, resolvedLayer, effect, true, settle)
+        this.submitBlockingEffect(context, effectName, resolvedLayer, effect, true, settle)
       } else {
         // The submission replaces any in-flight move of this name, and the sequencer cancel-fires
         // the displaced callback during the call. The records below are therefore written after it
@@ -1135,10 +1118,12 @@ export abstract class BaseNodeExecutionEngine {
   /**
    * Submit an effect whose completion gates the nodes after it, and call `settle` when it ends. The
    * records cancelAll removes it by, and the pending mark isBusy reads, are written once the
-   * sequencer accepts it, so a refusal leaves a run already holding the name alone and settles at
-   * once.
+   * sequencer accepts it, so a refusal leaves a run already holding the name alone. A refusal
+   * settles on the context's next timer tick, so a loop refused through a timed blackout is paced
+   * by the event loop and lets the blackout end.
    */
   private submitBlockingEffect(
+    context: ExecutionContext,
     name: string,
     layer: number,
     effect: Effect,
@@ -1154,7 +1139,7 @@ export abstract class BaseNodeExecutionEngine {
       ? this.sequencer.setEffectUnblockedNameWithCallback(name, effect, onComplete)
       : this.sequencer.addEffectUnblockedNameWithCallback(name, effect, onComplete)
     if (!accepted) {
-      settle(false)
+      context.startTimer(() => settle(false), 0)
       return
     }
     this.markPendingCallbackEffect(name)

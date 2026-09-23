@@ -1,7 +1,7 @@
 /**
  * Shared utilities used by both NodeExecutionEngine and EffectExecutionEngine.
  */
-import type { Connection } from '../../types/nodeCueTypes'
+import type { ActionNode, Connection } from '../../types/nodeCueTypes'
 
 /**
  * Collect all node IDs reachable from startNodeIds via the adjacency graph,
@@ -38,4 +38,31 @@ export const MAX_TIMER_DELAY_MS = 2 ** 31 - 1
 export function clampTimerDelayMs(delayMs: number): number {
   if (Number.isNaN(delayMs)) return 0
   return Math.min(MAX_TIMER_DELAY_MS, Math.max(0, delayMs))
+}
+
+/**
+ * The action a delay node registers under its own id while it waits, so its context counts the
+ * delay as a blocking step. It never reaches the sequencer.
+ */
+export function delayPlaceholderAction(nodeId: string): ActionNode {
+  return {
+    id: nodeId,
+    type: 'action',
+    effectType: 'set-color',
+    target: {
+      groups: { source: 'literal', value: 'front' },
+      filter: { source: 'literal', value: 'all' },
+    },
+    color: {
+      name: { source: 'literal', value: 'blue' },
+      brightness: { source: 'literal', value: 'medium' },
+    },
+    timing: {
+      waitForCondition: { source: 'literal', value: 'none' },
+      waitForTime: { source: 'literal', value: 0 },
+      duration: { source: 'literal', value: 0 },
+      waitUntilCondition: { source: 'literal', value: 'none' },
+      waitUntilTime: { source: 'literal', value: 0 },
+    },
+  }
 }
