@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals'
+import { afterEach, describe, expect, it, jest } from '@jest/globals'
 
 // Stub electron window helpers so the phase broadcast is a no-op under test.
 jest.mock('../../utils/windowUtils', () => ({
@@ -9,7 +9,8 @@ jest.mock('../../utils/windowUtils', () => ({
 
 import { ControllerManager } from '../../controllers/ControllerManager'
 import type { ControllerLifecycle } from '../../controllers/ControllerLifecycle'
-import { lifecycleAt } from './lifecycleStub'
+import { resetLogConfiguration, setLogSink, type LogEntry } from '../../../shared/logger'
+import { lifecycleAt, listenerStub, restartGraph } from './lifecycleStub'
 
 /**
  * When tearing controllers down during a restart fails and no shutdown is concurrently running,
@@ -17,26 +18,36 @@ import { lifecycleAt } from './lifecycleStub'
  * torn-down graph, which would leave dangling listeners/timers publishing alongside the new ones.
  */
 describe('ControllerManager.runRestartControllers when teardown fails', () => {
-  it('aborts reinitialization and enters the failed phase when teardown throws', async () => {
+  afterEach(() => {
+    resetLogConfiguration()
+  })
+
+  it('aborts reinitialization and enters the failed phase when a rig chain fails to dispose', async () => {
+    const entries: LogEntry[] = []
+    setLogSink((entry) => {
+      entries.push(entry)
+    })
+    const disposeFailure = new Error('dispose failed')
+    const graph = restartGraph()
+    jest.mocked(graph.disposeChainsForRestart).mockImplementation(() => {
+      throw disposeFailure
+    })
+    const listeners = listenerStub()
     const init = jest.fn(() => Promise.resolve())
-    const stub = Object.create(ControllerManager.prototype) as Record<string, unknown>
-    stub.lifecycle = lifecycleAt('running')
-    stub.isInitialized = true
-    stub.listenerLifecycle = {
-      yargRb3: { getIsYargEnabled: () => false, getIsRb3Enabled: () => false },
-      audio: { getIsAudioEnabled: () => false },
-    }
-    stub.senderLifecycle = { getActiveOutputSenderSnapshotIfAny: () => null }
-    stub.consoleMode = { getConsoleRestore: () => null }
-    // Disposing a rig chain throws partway through teardown.
-    stub.rigChains = [
-      { rigId: 'merged', dispose: jest.fn(() => Promise.reject(new Error('dispose failed'))) },
-    ]
-    stub.dmxPublisher = { shutdown: jest.fn(() => Promise.resolve()) }
-    stub.cueHandler = null
-    stub.clock = { destroy: jest.fn() }
-    // init() must NOT run if teardown failed.
-    stub.init = init
+    const stub = Object.assign(Object.create(ControllerManager.prototype), {
+      lifecycle: lifecycleAt('running'),
+      isInitialized: true,
+      graph,
+      listenerLifecycle: listeners,
+      senderLifecycle: {
+        getActiveOutputSenderSnapshotIfAny: () => null,
+        resetSenderForControllerRestart: jest.fn(() => Promise.resolve()),
+      },
+      consoleMode: { getConsoleRestore: () => null },
+      motionCueSimulator: { reset: jest.fn() },
+      // init() must NOT run if teardown failed.
+      init,
+    }) as Record<string, unknown>
 
     const runRestart = (
       ControllerManager.prototype as unknown as {
@@ -45,6 +56,11 @@ describe('ControllerManager.runRestartControllers when teardown fails', () => {
     ).runRestartControllers
 
     await expect(runRestart.call(stub)).rejects.toThrow(/teardown failed/i)
+    expect(listeners.yargRb3.disableRb3).toHaveBeenCalled()
+    expect(graph.shutdownPublisher).not.toHaveBeenCalled()
+    expect(entries).toContainEqual(
+      expect.objectContaining({ level: 'error', data: [disposeFailure] }),
+    )
     expect(init).not.toHaveBeenCalled()
     expect((stub.lifecycle as ControllerLifecycle).phase).toBe('failed')
     expect(stub.isInitialized).toBe(false)

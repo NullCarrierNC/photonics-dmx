@@ -13,12 +13,13 @@ jest.mock('../../utils/windowUtils', () => ({
 }))
 
 import { ControllerManager, LifecycleAbortedError } from '../../controllers/ControllerManager'
-import type { ControllerGraph } from '../../controllers/ControllerGraph'
 import type { ControllerLifecycle } from '../../controllers/ControllerLifecycle'
 import {
   lifecycleAt,
   lifecycleBlockedOn,
   lifecycleShuttingDownOn,
+  listenerStub,
+  restartGraph,
 } from '../controllers/lifecycleStub'
 import { SenderLifecycleController } from '../../controllers/SenderLifecycleController'
 import { sendToAllWindows } from '../../utils/windowUtils'
@@ -57,40 +58,6 @@ function makeManagerForRestore(prefs: Record<string, unknown>): {
 
 type RestartFake = Record<string, unknown> & {
   lifecycle: ControllerLifecycle
-}
-
-function listenerStub() {
-  return {
-    yargRb3: {
-      getIsYargEnabled: jest.fn().mockReturnValue(false),
-      getIsRb3Enabled: jest.fn().mockReturnValue(false),
-      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
-    },
-    audio: {
-      getIsAudioEnabled: jest.fn().mockReturnValue(false),
-      disableAudio: jest.fn().mockImplementation(() => Promise.resolve()),
-      enableAudio: jest.fn().mockImplementation(() => Promise.resolve()),
-    },
-  }
-}
-
-/** A graph whose build/teardown steps are observable no-op mocks. */
-function restartGraph(): ControllerGraph {
-  return {
-    disposeChainsForRestart: jest.fn(),
-    disposeChainsForShutdown: jest.fn(),
-    disposeLoaders: jest.fn().mockImplementation(() => Promise.resolve()),
-    shutdownPublisher: jest.fn(),
-    shutdownPublisherSafe: jest.fn(),
-    shutdownDomainCueHandlerRefs: jest.fn(),
-    resetStrobeState: jest.fn(),
-    destroyClock: jest.fn(),
-    clearBuildRefs: jest.fn(),
-    getChains: jest.fn().mockReturnValue([]),
-  } as unknown as ControllerGraph
 }
 
 describe('ControllerManager lifecycle and sender restore', () => {

@@ -1,4 +1,6 @@
+import { jest } from '@jest/globals'
 import { ControllerLifecycle } from '../../controllers/ControllerLifecycle'
+import type { ControllerGraph } from '../../controllers/ControllerGraph'
 import type { LifecyclePhase } from '../../../shared/ipcTypes'
 
 /**
@@ -35,4 +37,39 @@ export function lifecycleShuttingDownOn(
   const lifecycle = lifecycleAt(phase)
   lifecycle.runExclusiveShutdown(() => barrier).catch(() => {})
   return lifecycle
+}
+
+/** Listener controllers that report everything off and toggle as resolved no-op mocks. */
+export function listenerStub() {
+  return {
+    yargRb3: {
+      getIsYargEnabled: jest.fn().mockReturnValue(false),
+      getIsRb3Enabled: jest.fn().mockReturnValue(false),
+      disableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      disableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableYarg: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableRb3: jest.fn().mockImplementation(() => Promise.resolve()),
+    },
+    audio: {
+      getIsAudioEnabled: jest.fn().mockReturnValue(false),
+      disableAudio: jest.fn().mockImplementation(() => Promise.resolve()),
+      enableAudio: jest.fn().mockImplementation(() => Promise.resolve()),
+    },
+  }
+}
+
+/** A graph whose build/teardown steps are observable no-op mocks. */
+export function restartGraph(): ControllerGraph {
+  return {
+    disposeChainsForRestart: jest.fn(),
+    disposeChainsForShutdown: jest.fn(),
+    disposeLoaders: jest.fn().mockImplementation(() => Promise.resolve()),
+    shutdownPublisher: jest.fn(),
+    shutdownPublisherSafe: jest.fn(),
+    shutdownDomainCueHandlerRefs: jest.fn(),
+    resetStrobeState: jest.fn(),
+    destroyClock: jest.fn(),
+    clearBuildRefs: jest.fn(),
+    getChains: jest.fn().mockReturnValue([]),
+  } as unknown as ControllerGraph
 }
