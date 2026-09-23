@@ -102,24 +102,46 @@ function overLimitEntries(sizes, limit) {
  * removes entries.
  * @param {Map<string, number>} sizes
  * @param {Baseline} baseline
+ * @param {number} [limit] the tool's own limit, which a header edited by hand cannot loosen
  * @returns {string[]}
  */
-function raisedByRewrite(sizes, baseline) {
+function raisedByRewrite(sizes, baseline, limit = baseline.limit) {
   /** @type {string[]} */
   const raised = []
   for (const [path, lines] of sizes) {
     const cap = baseline.allowances.get(path)
     if (cap === undefined) {
-      if (lines > baseline.limit) {
-        raised.push(
-          `${path} is ${lines} lines, over the ${baseline.limit} line limit and not listed`,
-        )
+      if (lines > limit) {
+        raised.push(`${path} is ${lines} lines, over the ${limit} line limit and not listed`)
       }
     } else if (lines > cap) {
       raised.push(`${path} is ${lines} lines, over its ${cap} line allowance`)
     }
   }
   return raised
+}
+
+/**
+ * The limit is the tool's, so a header that says otherwise was edited by hand to loosen it.
+ * @param {Baseline} baseline
+ * @param {number} limit
+ * @returns {string|null} what is wrong, or null when the header matches
+ */
+function limitMismatch(baseline, limit) {
+  return baseline.limit === limit
+    ? null
+    : `The budget file says limit ${baseline.limit}, but the limit is ${limit}`
+}
+
+/**
+ * The baseline a rewrite may not raise: the working file, or the committed one when the working
+ * file is gone, so deleting it cannot clear every allowance.
+ * @param {string|null} workingText
+ * @param {string|null} committedText
+ * @returns {string|null}
+ */
+function rewriteGuard(workingText, committedText) {
+  return workingText ?? committedText
 }
 
 /**
@@ -144,4 +166,6 @@ module.exports = {
   overLimitEntries,
   raisedByRewrite,
   renderBaseline,
+  limitMismatch,
+  rewriteGuard,
 }

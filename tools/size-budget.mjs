@@ -7,6 +7,7 @@
  * room to grow back.
  */
 import { readdirSync, readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { join, dirname, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
@@ -17,6 +18,8 @@ const {
   compareBudget,
   raisedByRewrite,
   renderBaseline,
+  limitMismatch,
+  rewriteGuard,
 } = require('./sizeBudgetCore.cjs')
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -76,22 +79,39 @@ function fail(messages, advice) {
   process.exit(1)
 }
 
+/** @returns {string|null} the baseline at HEAD, or null outside a checkout or with no commits */
+function committedBaselineText() {
+  try {
+    return execFileSync('git', ['show', 'HEAD:metrics/size-budget.txt'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+  } catch {
+    return null
+  }
+}
+
 const sizes = measureSources()
 
 if (process.argv.includes('--write')) {
   mkdirSync(join(root, 'metrics'), { recursive: true })
 
-  // Regenerating only lowers or removes entries. Adding or raising an allowance is a deliberate
-  // act, so it is done by editing the file, not by running this.
-  if (existsSync(BUDGET_FILE)) {
-    const baseline = parseBaseline(readFileSync(BUDGET_FILE, 'utf8'))
+  // Regenerating only lowers or removes entries. An allowance is added or raised by editing the
+  // file by hand. A deleted file is guarded by the committed one.
+  const guard = rewriteGuard(
+    existsSync(BUDGET_FILE) ? readFileSync(BUDGET_FILE, 'utf8') : null,
+    committedBaselineText(),
+  )
+  if (guard !== null) {
+    const baseline = parseBaseline(guard)
     if (!baseline) {
       fail(
         [`Budget file must start with a \`limit <number>\` line: ${BUDGET_FILE}`],
-        'Fix the header, or delete the file to regenerate it from scratch.',
+        'Fix the header, or restore the file from git.',
       )
     }
-    const raised = raisedByRewrite(sizes, baseline)
+    const raised = raisedByRewrite(sizes, baseline, LIMIT)
     if (raised.length > 0) {
       fail(
         raised,
@@ -116,6 +136,10 @@ if (!baseline) {
     ['Budget file must start with a `limit <number>` line'],
     `Fix the header, or regenerate it with: ${REGENERATE}`,
   )
+}
+const mismatch = limitMismatch(baseline, LIMIT)
+if (mismatch) {
+  fail([mismatch], 'The limit is set in tools/size-budget.mjs, so put the header back to match it.')
 }
 if (baseline.malformed.length > 0) {
   fail(

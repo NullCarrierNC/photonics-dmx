@@ -7,6 +7,8 @@ const {
   overLimitEntries,
   raisedByRewrite,
   renderBaseline,
+  limitMismatch,
+  rewriteGuard,
 } = require('../../../../tools/sizeBudgetCore.cjs')
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -120,6 +122,31 @@ describe('raisedByRewrite', () => {
 
   it('stays silent for a listed file that no longer exists', () => {
     expect(raisedByRewrite(sizesOf({}), baseline)).toEqual([])
+  })
+})
+
+describe('the ratchet against edits made by hand', () => {
+  it('holds an unlisted file to the tool limit when the header was raised', () => {
+    const loosened = parseBaseline(baselineText(2000, [])) as Baseline
+
+    expect(raisedByRewrite(sizesOf({ 'src/b.ts': 700 }), loosened, 600)).toEqual([
+      expect.stringContaining('src/b.ts'),
+    ])
+  })
+
+  it('reports a header limit other than the tool limit', () => {
+    expect(limitMismatch(parseBaseline(baselineText(2000, [])) as Baseline, 600)).toEqual(
+      expect.stringContaining('2000'),
+    )
+    expect(limitMismatch(parseBaseline(baselineText(600, [])) as Baseline, 600)).toBeNull()
+  })
+
+  it('guards a rewrite with the committed baseline when the file is gone', () => {
+    const committed = baselineText(600, [[700, 'src/a.ts']])
+
+    expect(rewriteGuard(null, committed)).toBe(committed)
+    expect(rewriteGuard('working', committed)).toBe('working')
+    expect(rewriteGuard(null, null)).toBeNull()
   })
 })
 
