@@ -1,6 +1,7 @@
 import { describe, it, expect, jest } from '@jest/globals'
 import {
   CUE_DOMAIN_BINDINGS,
+  applyAllEnabledGroupsFromConfig,
   cueDomainBinding,
   reconcileAndApplyGroups,
   registerCueDomainBinding,
@@ -120,5 +121,38 @@ describe('reconcileAndApplyGroups', () => {
 
     expect(persist).not.toHaveBeenCalled()
     expect(binding.applied.enabled).toEqual(['a'])
+  })
+})
+
+describe('applyAllEnabledGroupsFromConfig', () => {
+  const config = {} as ConfigurationManager
+
+  /** Runs the startup reconcile over these bindings alone, restoring the real table after. */
+  async function applyAllOver(
+    only: CueDomainRegistryBinding[],
+    refresh: () => void,
+  ): Promise<void> {
+    const list = CUE_DOMAIN_BINDINGS as unknown as CueDomainRegistryBinding[]
+    const real = list.splice(0, list.length, ...only)
+    try {
+      await applyAllEnabledGroupsFromConfig(config, refresh)
+    } finally {
+      list.splice(0, list.length, ...real)
+    }
+  }
+
+  it('applies every domain and finishes when a domain cannot save its selection', async () => {
+    const refused = makeBinding('yarg', { registered: ['a', 'b'] })
+    refused.persist = async () => {
+      throw new Error('Failed to save configuration')
+    }
+    const later = makeBinding('audio', { registered: ['c'] })
+    const refresh = jest.fn()
+
+    await applyAllOver([refused, later], refresh)
+
+    expect(refused.applied.enabled).toEqual(['a', 'b'])
+    expect(later.applied.enabled).toEqual(['c'])
+    expect(refresh).toHaveBeenCalledTimes(1)
   })
 })

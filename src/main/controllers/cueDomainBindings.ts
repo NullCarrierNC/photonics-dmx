@@ -223,9 +223,10 @@ export function applyCueConsistencyWindow(windowMs: number): void {
 }
 
 /**
- * Reconcile a domain's stored group selection against its registry, persist the result as one write
- * (skipped when it already matches), and apply enabled plus disabled state. `seedEnabled` opts extra
- * ids in before reconciling, which is how saving a cue file enables its group.
+ * Reconcile a domain's stored group selection against its registry, apply enabled plus disabled
+ * state, and persist the result as one write (skipped when it already matches). The registry holds
+ * the reconciled state whether or not the write succeeds. `seedEnabled` opts extra ids in before
+ * reconciling, which is how saving a cue file enables its group.
  */
 export async function reconcileAndApplyGroups(
   binding: CueDomainRegistryBinding,
@@ -238,6 +239,8 @@ export async function reconcileAndApplyGroups(
     stored.knownGroups,
     binding.getRegisteredIds(),
   )
+  binding.setEnabled(reconciled.active)
+  binding.setDisabled(stored.disabledCues)
   const unchanged =
     sameIds(reconciled.enabled, stored.enabledGroups ?? []) &&
     sameIds(reconciled.known, stored.knownGroups ?? [])
@@ -247,8 +250,6 @@ export async function reconcileAndApplyGroups(
       knownGroups: reconciled.known,
     })
   }
-  binding.setEnabled(reconciled.active)
-  binding.setDisabled(binding.readStored(config).disabledCues)
   return reconciled
 }
 
@@ -267,8 +268,14 @@ export async function applyAllEnabledGroupsFromConfig(
   refreshAudioCueSelection: () => void,
 ): Promise<void> {
   for (const binding of CUE_DOMAIN_BINDINGS) {
-    const reconciled = await reconcileAndApplyGroups(binding, config)
-    log.info(`${binding.domain} enabled groups re-applied from config:`, reconciled.enabled)
+    try {
+      const reconciled = await reconcileAndApplyGroups(binding, config)
+      log.info(`${binding.domain} enabled groups re-applied from config:`, reconciled.enabled)
+    } catch (error) {
+      // A refused save leaves the reconciled groups applied, and the next reconcile retries it, so
+      // the init carries on.
+      log.error(`${binding.domain} enabled groups failed to reconcile or save:`, error)
+    }
   }
   refreshAudioCueSelection()
 }
