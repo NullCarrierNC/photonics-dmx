@@ -50,7 +50,6 @@ jest.mock(
 const getDmxRigsMock = jest.mocked(ipcApi.getDmxRigs)
 const getDmxRigMock = jest.mocked(ipcApi.getDmxRig)
 const saveDmxRigMock = jest.mocked(ipcApi.saveDmxRig)
-jest.mock('../hooks/useConfirm', () => ({ useConfirm: () => async () => true }))
 // Presentational children are irrelevant to the save/dirty flow; stub them to keep the test focused.
 jest.mock('../components/LightLayoutPreview', () => ({ __esModule: true, default: () => null }))
 jest.mock('../components/Toast', () => ({ __esModule: true, default: () => null }))

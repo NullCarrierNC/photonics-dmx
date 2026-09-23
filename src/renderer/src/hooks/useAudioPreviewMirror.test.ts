@@ -5,6 +5,7 @@ import { getDefaultStore } from 'jotai'
 import { audioDataAtom } from '../atoms'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { useAudioPreviewMirror } from './useAudioPreviewMirror'
+import { renderHookWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import {
   emitIpc,
   ipcSubscribers,
@@ -32,6 +33,15 @@ describe('useAudioPreviewMirror', () => {
     emitIpc(RENDERER_RECEIVE.AUDIO_DATA_MIRROR, frame)
 
     expect(getDefaultStore().get(audioDataAtom)).toBe(frame)
+  })
+
+  it('puts the frame in the store the window renders from', () => {
+    const { store } = renderHookWithProviders(() => useAudioPreviewMirror())
+    const frame = { timestamp: 2 }
+
+    emitIpc(RENDERER_RECEIVE.AUDIO_DATA_MIRROR, frame)
+
+    expect(store.get(audioDataAtom)).toBe(frame)
   })
 
   it('clears the frame when audio is disabled', () => {
