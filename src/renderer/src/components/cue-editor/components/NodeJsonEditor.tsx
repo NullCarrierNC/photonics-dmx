@@ -139,6 +139,7 @@ function DefinitionTextEditor<
   // The definition changed from outside while the text held unsaved edits.
   const changedOutside = hasEdits && definitionText !== syncedText
   const [validationPassed, setValidationPassed] = useState(false)
+  const [validating, setValidating] = useState(false)
   const validationPassedRef = useRef(false)
   const [contentChangedAfterValidation, setContentChangedAfterValidation] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
@@ -205,12 +206,21 @@ function DefinitionTextEditor<
     }
 
     const fileWithDefinition = buildFile(parsed)
+    const validatedText = view.state.doc.toString()
+    setValidating(true)
     let result: JsonValidationResult
     try {
       result = await validate(fileWithDefinition)
     } catch (e) {
+      setValidating(false)
       const message = e instanceof Error ? e.message : String(e)
       setValidationErrors([`Validation failed: ${message}`])
+      setValidationPassed(false)
+      return
+    }
+    setValidating(false)
+    // Text typed while the validation ran is not what it judged, so that text is validated again.
+    if (view.state.doc.toString() !== validatedText) {
       setValidationPassed(false)
       return
     }
@@ -339,6 +349,7 @@ function DefinitionTextEditor<
           <button
             type="button"
             onClick={() => void handleValidate()}
+            disabled={validating}
             className="px-3 py-1.5 text-sm font-medium rounded text-white bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400">
             Validate
           </button>

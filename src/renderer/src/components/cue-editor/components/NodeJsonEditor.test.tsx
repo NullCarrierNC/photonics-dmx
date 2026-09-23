@@ -154,6 +154,25 @@ describe('NodeJsonEditor', () => {
     expect(screen.queryByText('never fires')).toBeNull()
   })
 
+  it('holds Validate while validating and offers no Apply for text typed meanwhile', async () => {
+    let finish!: (result: JsonValidationResult) => void
+    const { editor, onSave } = open({
+      validate: () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    })
+
+    fireEvent.click(validateButton())
+    expect(validateButton()).toBeDisabled()
+    setText(editor, JSON.stringify({ id: 'a', name: 'Typed meanwhile' }))
+    await act(async () => finish({ valid: true }))
+
+    expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull()
+    expect(validateButton()).toBeEnabled()
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
   it('reports itself dirty once the text is edited', () => {
     const { editor, onDirtyChange } = open()
     expect(onDirtyChange).toHaveBeenLastCalledWith(false)
