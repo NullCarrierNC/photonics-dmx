@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events'
 import { DmxLightManager } from '../../photonics-dmx/controllers/DmxLightManager'
 import { ILightingController } from '../../photonics-dmx/controllers/sequencer/interfaces'
 import { YargNetworkListener } from '../../photonics-dmx/listeners/YARG/YargNetworkListener'
@@ -5,7 +6,7 @@ import { Rb3eNetworkListener } from '../../photonics-dmx/listeners/RB3/Rb3eNetwo
 import { Rb3MenuCueHandler } from '../../photonics-dmx/cueHandlers/Rb3MenuCueHandler'
 import { CueHandler } from '../../photonics-dmx/cueHandlers/CueHandler'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
-import { CueType, type PostProcessing } from '../../photonics-dmx/cues/types/cueTypes'
+import { CueType, type CueData, type PostProcessing } from '../../photonics-dmx/cues/types/cueTypes'
 import type { CueRuntime } from '../../photonics-dmx/cueHandlers/CueRuntime'
 import type { NetCueMode } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { ProcessorManager } from '../../photonics-dmx/processors/ProcessorManager'
@@ -60,8 +61,24 @@ export class ListenerCoordinator {
   private isRb3Enabled = false
   private rb3TeardownPromise: Promise<void> | null = null
   private readonly domainRuntimes: Partial<Record<NetCueMode, CueRuntime>> = {}
+  /** Every cue the primary handlers and the RB3 direct processor handle, whichever exist now. */
+  private readonly cueHandledEvents = new EventEmitter()
+  private readonly forwardCueHandled = (data: CueData): void => {
+    this.cueHandledEvents.emit('cueHandled', data)
+  }
 
   constructor(private readonly deps: ListenerCoordinatorDeps) {}
+
+  /**
+   * Follows every handled cue across listener switches and controller restarts, which replace the
+   * handlers that emit them. Returns the unsubscribe.
+   */
+  public onCueHandled(listener: (data: CueData) => void): () => void {
+    this.cueHandledEvents.on('cueHandled', listener)
+    return () => {
+      this.cueHandledEvents.off('cueHandled', listener)
+    }
+  }
 
   /** Records whether a listener runs and tells every window, whatever started or stopped it. */
   private setListenerEnabled(listener: 'yarg' | 'rb3', enabled: boolean): void {
@@ -212,6 +229,7 @@ export class ListenerCoordinator {
       strobeState: this.deps.getChainFanout().strobeState,
       replaceExisting: true,
     })
+    primary?.addCueHandledListener(this.forwardCueHandled)
     if (domain === 'yarg') {
       this.cueHandler = primary
       this.deps.setCueHandlerRef(primary)
@@ -297,6 +315,7 @@ export class ListenerCoordinator {
         this.deps.sendToAllWindows(RENDERER_RECEIVE.RB3_GAME_MODE_DEADLINE, p),
     })
     this.processorManager.setCueHandler(this.deps.getChainFanout())
+    this.processorManager.on('cueHandled', this.forwardCueHandled)
     const listener = new Rb3eNetworkListener()
     this.rb3eListener = listener
     listener.on('rb3-error', (errorData: { type: string; message: string }) => {

@@ -46,32 +46,62 @@ describe('setupCueHandlers listener-toggle rejection handling', () => {
 })
 
 describe('setupCueHandlers cue-data mirror', () => {
-  it('keeps one subscription however often the page asks, and one request stops it', () => {
+  function setup() {
     const onHandlers = new Map<string, OnHandler>()
     const ipcMain = {
       on: (channel: string, fn: OnHandler) => onHandlers.set(channel, fn),
       handle: jest.fn(),
     }
-    const cueHandler = new EventEmitter()
-    const processorManager = new EventEmitter()
+    const cueEvents = new EventEmitter()
     const controllerManager = {
-      getCueHandler: () => ({
-        addCueHandledListener: (fn: () => void) => cueHandler.on('cueHandled', fn),
-        removeCueHandledListener: (fn: () => void) => cueHandler.off('cueHandled', fn),
+      getListenerLifecycle: () => ({
+        yargRb3: {
+          onCueHandled: (fn: () => void) => {
+            cueEvents.on('cueHandled', fn)
+            return () => cueEvents.off('cueHandled', fn)
+          },
+        },
       }),
-      getRb3CueHandler: () => null,
-      getProcessorManager: () => processorManager,
     }
     setupCueHandlers(ipcMain as never, controllerManager as never)
     const setListen = onHandlers.get(CUE.SET_LISTEN_CUE_DATA)!
+    const windowEvent = (id: number) => ({ sender: Object.assign(new EventEmitter(), { id }) })
+    return { setListen, cueEvents, windowEvent }
+  }
 
-    setListen({}, true)
-    setListen({}, true)
-    expect(cueHandler.listenerCount('cueHandled')).toBe(1)
-    expect(processorManager.listenerCount('cueHandled')).toBe(1)
+  it('keeps one subscription however often a window asks, and one request stops it', () => {
+    const { setListen, cueEvents, windowEvent } = setup()
+    const window = windowEvent(1)
 
-    setListen({}, false)
-    expect(cueHandler.listenerCount('cueHandled')).toBe(0)
-    expect(processorManager.listenerCount('cueHandled')).toBe(0)
+    setListen(window, true)
+    setListen(window, true)
+    expect(cueEvents.listenerCount('cueHandled')).toBe(1)
+
+    setListen(window, false)
+    expect(cueEvents.listenerCount('cueHandled')).toBe(0)
+  })
+
+  it('keeps mirroring for one window after another stops', () => {
+    const { setListen, cueEvents, windowEvent } = setup()
+    const first = windowEvent(1)
+    const second = windowEvent(2)
+
+    setListen(first, true)
+    setListen(second, true)
+    setListen(first, false)
+    expect(cueEvents.listenerCount('cueHandled')).toBe(1)
+
+    setListen(second, false)
+    expect(cueEvents.listenerCount('cueHandled')).toBe(0)
+  })
+
+  it('stops mirroring for a window that closes', () => {
+    const { setListen, cueEvents, windowEvent } = setup()
+    const window = windowEvent(1)
+
+    setListen(window, true)
+    window.sender.emit('destroyed')
+
+    expect(cueEvents.listenerCount('cueHandled')).toBe(0)
   })
 })

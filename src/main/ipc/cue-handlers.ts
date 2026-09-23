@@ -60,23 +60,36 @@ export function setupCueHandlers(ipcMain: IpcMain, controllerManager: Controller
     sendToAllWindows(RENDERER_RECEIVE.CUE_HANDLED, cueData)
   }
 
-  // Listen for cue data
-  ipcMain.on(CUE.SET_LISTEN_CUE_DATA, (_, shouldListen: unknown) => {
-    // The YARG listener and RB3 cue mode expose the cue-mirror through separate handler refs, and
-    // ProcessorManager carries RB3E direct mode, so all three are covered. Each subscription is
-    // removed before it is added, so however often the page asks there is one, and one request
-    // to stop ends it.
-    const listen = shouldListen === true
-    for (const handler of [
-      controllerManager.getCueHandler(),
-      controllerManager.getRb3CueHandler(),
-    ]) {
-      handler?.removeCueHandledListener(sendCueHandledData)
-      if (listen) handler?.addCueHandledListener(sendCueHandledData)
+  // Windows following the cue-data mirror. It runs while any of them follows it, and it follows
+  // the listener coordinator, so it carries on through a listener switch and a controller restart.
+  const mirroring = new Set<number>()
+  const watched = new Set<number>()
+  let stopMirror: (() => void) | null = null
+  const syncMirror = (): void => {
+    if (mirroring.size > 0 && !stopMirror) {
+      stopMirror = controllerManager.getListenerLifecycle().yargRb3.onCueHandled(sendCueHandledData)
+    } else if (mirroring.size === 0 && stopMirror) {
+      stopMirror()
+      stopMirror = null
     }
-    const processorManager = controllerManager.getProcessorManager()
-    processorManager?.off('cueHandled', sendCueHandledData)
-    if (listen) processorManager?.on('cueHandled', sendCueHandledData)
+  }
+
+  ipcMain.on(CUE.SET_LISTEN_CUE_DATA, (event, shouldListen: unknown) => {
+    const windowId = event.sender.id
+    if (shouldListen === true) {
+      mirroring.add(windowId)
+    } else {
+      mirroring.delete(windowId)
+    }
+    if (!watched.has(windowId)) {
+      watched.add(windowId)
+      event.sender.once('destroyed', () => {
+        watched.delete(windowId)
+        mirroring.delete(windowId)
+        syncMirror()
+      })
+    }
+    syncMirror()
   })
 
   // Set cue style

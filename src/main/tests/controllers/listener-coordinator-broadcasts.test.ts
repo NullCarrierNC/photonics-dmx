@@ -123,3 +123,37 @@ describe('ListenerCoordinator listener announcements', () => {
     ])
   })
 })
+
+describe('ListenerCoordinator handled-cue events', () => {
+  it('forwards cues from the handlers each enable builds after the subscription', async () => {
+    const deps = makeDeps()
+    const lc = new ListenerCoordinator(deps)
+    coordinators.push(lc)
+    const heard = jest.fn()
+    lc.onCueHandled(heard)
+
+    await lc.enableYarg(true, async () => {})
+    lc.getCueHandler()!.emit('cueHandled', { lightingCue: 'first' })
+    await lc.disableYarg()
+    await lc.enableYarg(true, async () => {})
+    lc.getCueHandler()!.emit('cueHandled', { lightingCue: 'second' })
+
+    expect(heard.mock.calls.map(([data]) => (data as { lightingCue: string }).lightingCue)).toEqual(
+      ['first', 'second'],
+    )
+  })
+
+  it('stops forwarding to a listener that unsubscribed', async () => {
+    const deps = makeDeps()
+    const lc = new ListenerCoordinator(deps)
+    coordinators.push(lc)
+    const heard = jest.fn()
+    const stop = lc.onCueHandled(heard)
+
+    await lc.enableYarg(true, async () => {})
+    stop()
+    lc.getCueHandler()!.emit('cueHandled', { lightingCue: 'after' })
+
+    expect(heard).not.toHaveBeenCalled()
+  })
+})
