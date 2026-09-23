@@ -199,6 +199,7 @@ export class ListenerCoordinator {
       ...motion,
       getMotionEnabled: this.deps.getMotionEnabled,
       runtimeBroadcaster: this.deps.runtimeBroadcaster,
+      strobeState: this.deps.getChainFanout().strobeState,
       replaceExisting: true,
     })
     if (domain === 'yarg') {

@@ -1,4 +1,3 @@
-import { getStrobeStateManager } from '../../photonics-dmx/controllers/StrobeStateManager'
 import { sendToAllWindows } from '../utils/windowUtils'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { ControllerLifecycle, LifecycleAbortedError } from './ControllerLifecycle'
@@ -76,11 +75,9 @@ export async function runControllerRestart(ctx: ControllerRestartContext): Promi
 
     ctx.graph.shutdownDomainCueHandlerRefs()
 
-    // Gguarantee the process-wide strobe state is cleared on every restart,
-    // even if no cue handler was active to clear it during its own shutdown.
-    // Prevents a stale strobe slot from driving hardware-strobe-channel
-    // lights after an input-platform switch.
-    getStrobeStateManager().reset()
+    // Clear the shared strobe state even when no cue handler was active to clear it on shutdown,
+    // so a stale strobe slot never drives hardware-strobe-channel lights after an input switch.
+    ctx.graph.resetStrobeState()
 
     // Drop process-scoped state bound to the engine/registry being rebuilt (e.g. an active laser sim
     // cue + its render tick). Each callback is wrapped so one consumer's failure can neither abort the

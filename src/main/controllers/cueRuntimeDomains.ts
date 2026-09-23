@@ -1,3 +1,4 @@
+import type { StrobeStateManager } from '../../photonics-dmx/controllers/StrobeStateManager'
 import { CueHandler } from '../../photonics-dmx/cueHandlers/CueHandler'
 import { MotionSelectionCoordinator } from '../../photonics-dmx/cueHandlers/MotionSelectionCoordinator'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
@@ -86,6 +87,8 @@ export interface DomainChainHandlerOptions {
   getMotionCueProbabilityPercent: () => number
   getActiveMotionCueRef: () => MotionCueRef | null
   runtimeBroadcaster: RuntimeBroadcaster
+  /** The strobe slot the publisher reads, shared by every handler on the graph. */
+  strobeState: StrobeStateManager
   /**
    * Replace a handler already in the slot. A listener enabling owns the domain and rebuilds; the
    * simulation top-up only fills empty slots so it never discards a running handler.
@@ -128,6 +131,7 @@ export function buildDomainChainHandlers(
     const handler = new CueHandler(chain.dmxLightManager, chain.sequencer, {
       registry: row.registry(),
       motionCoordinator,
+      strobeState: options.strobeState,
     })
     handler.setMotionEnabled(options.getMotionEnabled())
     handler.setManualMotionRef(options.getActiveMotionCueRef())

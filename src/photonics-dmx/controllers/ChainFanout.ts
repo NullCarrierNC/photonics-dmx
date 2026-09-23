@@ -5,6 +5,7 @@ import type { CueRuntime } from '../cueHandlers/CueRuntime'
 import { Rb3MenuCueDispatch } from '../cueHandlers/Rb3MenuCueHandler'
 import type { SongEventCondition } from './sequencer/interfaces'
 import { RigChain } from './RigChain'
+import { StrobeStateManager } from './StrobeStateManager'
 import { ChainCueRuntime } from './ChainCueRuntime'
 import type { NetCueMode } from '../cues/types/nodeCueTypes'
 import type { MotionCueChangePayload } from '../../shared/ipc/common'
@@ -30,6 +31,8 @@ function noMotionCue(): MotionCueChangePayload {
  */
 export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
   private chains: RigChain[] = []
+  /** The strobe slot every chain's cue handlers set and the publisher reads. */
+  public readonly strobeState = new StrobeStateManager()
 
   public setChains(chains: RigChain[]): void {
     this.chains = chains

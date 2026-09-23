@@ -24,7 +24,7 @@ import type {
 import { VenueFrameProcessor } from './VenueFrameProcessor'
 import { WireSlotGovernor } from './wireSlotGovernor'
 import { WireOutputDelay } from './WireOutputDelay'
-import { getStrobeStateManager, StrobeStateManager } from './StrobeStateManager'
+import { StrobeStateManager } from './StrobeStateManager'
 import { MASTER_DIMMER_MAX_PERCENT, MasterOutputState } from './MasterOutputState'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('DmxPublisher')
@@ -186,7 +186,7 @@ export class DmxPublisher {
   constructor(
     senderManager: SenderManager,
     lightStateManager: LightStateManager | null,
-    strobeStateManager: StrobeStateManager = getStrobeStateManager(),
+    strobeStateManager: StrobeStateManager = new StrobeStateManager(),
     options: DmxPublisherOptions = {},
   ) {
     this._sender = senderManager

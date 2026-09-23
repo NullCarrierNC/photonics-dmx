@@ -3,6 +3,7 @@ import { buildDomainChainHandlers } from '../../controllers/cueRuntimeDomains'
 import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
 import type { DmxLightManager } from '../../../photonics-dmx/controllers/DmxLightManager'
 import type { Sequencer } from '../../../photonics-dmx/controllers/sequencer/Sequencer'
+import { StrobeStateManager } from '../../../photonics-dmx/controllers/StrobeStateManager'
 
 function makeChainStub(rigId: string, isPrimary: boolean): RigChain {
   return {
@@ -27,6 +28,7 @@ function options(replaceExisting: boolean) {
     getMotionCueProbabilityPercent: () => 100,
     getActiveMotionCueRef: () => null,
     runtimeBroadcaster: { emit: jest.fn() },
+    strobeState: new StrobeStateManager(),
     replaceExisting,
   }
 }
@@ -42,6 +44,18 @@ describe('buildDomainChainHandlers motion coordinator', () => {
     expect(a.cueHandlers.yarg!.getMotionCoordinator()).toBe(
       b.cueHandlers.yarg!.getMotionCoordinator(),
     )
+  })
+
+  it('binds every chain to the strobe state it is given', () => {
+    const strobeState = new StrobeStateManager()
+    const a = makeChainStub('a', true)
+    const b = makeChainStub('b', false)
+    buildDomainChainHandlers('yarg', [a, b], { ...options(true), strobeState })
+
+    strobeState.setActive('fast', 'net')
+    b.cueHandlers.yarg!.shutdown()
+
+    expect(strobeState.getActive()).toBeNull()
   })
 
   it('a top-up joins the coordinator the running handlers already use', () => {

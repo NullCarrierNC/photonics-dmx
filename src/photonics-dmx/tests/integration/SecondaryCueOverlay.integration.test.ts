@@ -22,7 +22,6 @@ import { Sequencer } from '../../controllers/sequencer/Sequencer'
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
-import { __resetStrobeStateManagerForTests } from '../../controllers/StrobeStateManager'
 import { createMockCueData } from '../../../main/ipc/mockCueData'
 import { CueType } from '../../cues/types/cueTypes'
 import type { NetNodeCueDefinition } from '../../cues/types/nodeCueTypes'
@@ -179,7 +178,6 @@ type YargRig = {
  * listener into a cue handler bound to one bundled YARG group.
  */
 async function createYargRig(groupFile: string): Promise<YargRig> {
-  __resetStrobeStateManagerForTests()
   const clock = new ManualTestClock(10)
   const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => clock.getCurrentTimeMs())
   const light = (group: 'front' | 'back' | 'strobe', position: number) =>
@@ -266,7 +264,6 @@ async function createYargRig(groupFile: string): Promise<YargRig> {
       sequencer.shutdown()
       nowSpy.mockRestore()
       registry.reset()
-      __resetStrobeStateManagerForTests()
     },
   }
 }

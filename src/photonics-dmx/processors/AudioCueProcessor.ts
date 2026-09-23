@@ -88,8 +88,7 @@ export class AudioCueProcessor {
     this.registry = AudioCueRegistry.getInstance()
     this.currentPrimaryCueType = this.selectActiveCueType(preferredCueType)
     this.currentSecondaryCueType = preferredSecondaryCueType ?? null
-    // One AudioCueHandler per chain, bound to that chain's sequencer and light manager, all
-    // sharing one motion decision so every rig runs the same motion cue.
+    // One handler per chain, sharing one motion decision so every rig runs the same motion cue.
     const motionCoordinator = createAudioMotionCoordinator({
       getMotionCueMinimumHoldMs,
       getMotionCueProbabilityPercent,
@@ -99,6 +98,7 @@ export class AudioCueProcessor {
       chain.audioCueHandler?.destroy()
       chain.audioCueHandler = new AudioCueHandler(chain.dmxLightManager, chain.sequencer, {
         motionCoordinator,
+        strobeState: this.chainFanout.strobeState,
       })
     }
     this.chainFanout.audioSyncSlots(

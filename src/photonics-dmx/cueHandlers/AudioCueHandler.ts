@@ -5,7 +5,7 @@ import { IAudioCue } from '../cues/interfaces/IAudioCue'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
-import { getStrobeStateManager } from '../controllers/StrobeStateManager'
+import { StrobeStateManager } from '../controllers/StrobeStateManager'
 import type { MotionCueChangePayload } from '../../shared/ipc/common'
 import type { MotionSelectionCoordinator } from './MotionSelectionCoordinator'
 import { createAudioMotionCoordinator } from './audioMotionCoordinator'
@@ -31,6 +31,8 @@ export type AudioCueHandlerOptions = {
    * motion cue. A handler built without one decides for itself.
    */
   motionCoordinator?: MotionSelectionCoordinator<IAudioCue>
+  /** The strobe slot the publisher reads, shared with the net handlers. Defaults to its own. */
+  strobeState?: StrobeStateManager
 }
 
 /**
@@ -44,6 +46,7 @@ export class AudioCueHandler extends EventEmitter {
   private currentSecondaryCue: IAudioCue | null = null
   private currentStrobeCue: IAudioCue | null = null
   private readonly motionCoordinator: MotionSelectionCoordinator<IAudioCue>
+  private readonly strobeState: StrobeStateManager
   /** The motion cue this chain last applied, so a change to nothing homes its heads once. */
   private appliedMotionCue: IAudioCue | null = null
   private executionCount = 0
@@ -56,6 +59,7 @@ export class AudioCueHandler extends EventEmitter {
     super()
     this.registry = AudioCueRegistry.getInstance()
     this.motionCoordinator = options?.motionCoordinator ?? createAudioMotionCoordinator()
+    this.strobeState = options?.strobeState ?? new StrobeStateManager()
   }
 
   public isMotionLayerEnabled(): boolean {
@@ -239,7 +243,7 @@ export class AudioCueHandler extends EventEmitter {
       if (this.currentStrobeCue) {
         this.currentStrobeCue.onStop?.()
         this.currentStrobeCue = null
-        getStrobeStateManager().setActive(null, 'audio')
+        this.strobeState.setActive(null, 'audio')
       }
       return
     }
@@ -252,7 +256,7 @@ export class AudioCueHandler extends EventEmitter {
       if (this.currentStrobeCue) {
         this.currentStrobeCue.onStop?.()
         this.currentStrobeCue = null
-        getStrobeStateManager().setActive(null, 'audio')
+        this.strobeState.setActive(null, 'audio')
       }
       return
     }
@@ -264,7 +268,7 @@ export class AudioCueHandler extends EventEmitter {
     // Audio strobe cues aren't bucketed into discrete slow/medium/fast/fastest speeds the way YARG
     // cues are; map any active audio strobe to the medium slot. A future refinement could let each
     // audio strobe cue declare its preferred slot.
-    getStrobeStateManager().setActive('medium', 'audio')
+    this.strobeState.setActive('medium', 'audio')
   }
 
   /**
@@ -289,8 +293,8 @@ export class AudioCueHandler extends EventEmitter {
       this.currentStrobeCue = null
     }
     // Unconditional: an interrupted audio strobe (processing stops with no explicit clear) must
-    // not leave the process-wide StrobeStateManager stuck on a slot.
-    getStrobeStateManager().setActive(null, 'audio')
+    // not leave the shared StrobeStateManager stuck on a slot.
+    this.strobeState.setActive(null, 'audio')
     // The motion cue is shared by every chain, and clearing it takes its effects off each one.
     this.motionCoordinator.stop(stopAndClear)
     this.motionCoordinator.resetTracking()

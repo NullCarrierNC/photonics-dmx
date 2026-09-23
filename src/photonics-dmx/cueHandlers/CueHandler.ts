@@ -11,7 +11,7 @@ import {
 import type { MotionCueRef } from '../cues/types/cueTypes'
 import { ILightingController } from '../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../controllers/DmxLightManager'
-import { getStrobeStateManager } from '../controllers/StrobeStateManager'
+import { StrobeStateManager } from '../controllers/StrobeStateManager'
 import { INetCue, CueStyle } from '../cues/interfaces/INetCue'
 import { CueRegistry } from '../cues/registries/CueRegistry'
 import type { RuntimeBroadcaster } from '../runtime/broadcaster'
@@ -57,6 +57,11 @@ export type CueHandlerOptions = {
    * the motion options above.
    */
   motionCoordinator?: MotionSelectionCoordinator
+  /**
+   * The strobe slot the publisher reads, shared by every handler that drives one rig graph. A
+   * handler built without one keeps its own.
+   */
+  strobeState?: StrobeStateManager
 }
 
 class CueHandler extends EventEmitter {
@@ -64,6 +69,7 @@ class CueHandler extends EventEmitter {
   private readonly _sequencer: ILightingController
   private readonly registry: CueRegistry
   private readonly motionCoordinator: MotionSelectionCoordinator
+  private readonly strobeState: StrobeStateManager
   private readonly unsubscribeMotionWipe: () => void
   private currentPrimaryCue: INetCue | null = null
   private currentSecondaryCue: INetCue | null = null
@@ -109,6 +115,7 @@ class CueHandler extends EventEmitter {
     this._lightManager = lightManager
     this._sequencer = photonicsSequencer
     this.registry = options?.registry ?? CueRegistry.getInstance()
+    this.strobeState = options?.strobeState ?? new StrobeStateManager()
     this.motionCoordinator =
       options?.motionCoordinator ??
       new MotionSelectionCoordinator({
@@ -174,7 +181,7 @@ class CueHandler extends EventEmitter {
       this.currentStrobeCue.onStop?.()
       this.currentStrobeCue = null
     }
-    getStrobeStateManager().setActive(null, 'net')
+    this.strobeState.setActive(null, 'net')
   }
 
   /** Stops any active strobe slot and clears per-frame edge baselines at session boundaries. */
@@ -407,7 +414,7 @@ class CueHandler extends EventEmitter {
           this.currentStrobeCue = null
         }
         this.currentStrobeCue = cue
-        getStrobeStateManager().setActive(cueTypeToStrobeSlot(cueType), 'net')
+        this.strobeState.setActive(cueTypeToStrobeSlot(cueType), 'net')
       } else if (incomingIsSecondary) {
         // Non-strobe overlays run concurrently with primary and strobes, but replace the existing secondary overlay.
         if (this.currentSecondaryCue && this.currentSecondaryCue !== cue) {

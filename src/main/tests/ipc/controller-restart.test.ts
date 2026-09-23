@@ -86,6 +86,7 @@ function restartGraph(): ControllerGraph {
     shutdownPublisher: jest.fn(),
     shutdownPublisherSafe: jest.fn(),
     shutdownDomainCueHandlerRefs: jest.fn(),
+    resetStrobeState: jest.fn(),
     destroyClock: jest.fn(),
     clearBuildRefs: jest.fn(),
     getChains: jest.fn().mockReturnValue([]),
@@ -350,6 +351,7 @@ describe('ControllerManager lifecycle and sender restore', () => {
     await ControllerManager.prototype.restartControllers.call(fake as unknown as ControllerManager)
 
     expect(graph.shutdownDomainCueHandlerRefs).toHaveBeenCalledTimes(1)
+    expect(graph.resetStrobeState).toHaveBeenCalledTimes(1)
   })
 
   it('waits out an RB3 teardown already reporting disabled before disposing rig chains', async () => {

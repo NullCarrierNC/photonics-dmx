@@ -196,7 +196,8 @@ export class ControllerGraph {
     // pref is absent so the governor never throttles a sender below what it could output.
     const globalDmxRateHz =
       config.getPreference('globalDmxPublishingRateHz') ?? DMX_OUTPUT_REFRESH_RATE_HZ_MAX
-    this.dmxPublisher = new DmxPublisher(this.deps.getSenderManager(), null, undefined, {
+    const { strobeState } = this.deps.chainFanout
+    this.dmxPublisher = new DmxPublisher(this.deps.getSenderManager(), null, strobeState, {
       outputRateHz: globalDmxRateHz,
       whiteChannelMixMode: normalizeWhiteChannelMixMode(
         config.getPreference('whiteChannelMixMode'),
@@ -249,6 +250,7 @@ export class ControllerGraph {
       getMotionCueMinimumHoldMs: () => readMotionPrefs(config, 'yarg').minimumHoldMs,
       getMotionCueProbabilityPercent: () => readMotionPrefs(config, 'yarg').probabilityPercent,
       runtimeBroadcaster: mainRuntimeBroadcaster,
+      strobeState: this.deps.chainFanout.strobeState,
     })
     yargHandler.setMotionEnabled(config.getPreference('motionEnabled') ?? true)
     yargHandler.setManualMotionRef(readMotionPrefs(config, 'yarg').activeCueRef)
@@ -273,6 +275,7 @@ export class ControllerGraph {
       getMotionCueProbabilityPercent: () => readMotionPrefs(config, domain).probabilityPercent,
       getActiveMotionCueRef: () => readMotionPrefs(config, domain).activeCueRef,
       runtimeBroadcaster: mainRuntimeBroadcaster,
+      strobeState: this.deps.chainFanout.strobeState,
       replaceExisting: false,
     })
   }
@@ -355,6 +358,11 @@ export class ControllerGraph {
       this.rb3CueHandler = null
       log.info('ControllerManager teardown: RB3 cue handler stopped')
     }
+  }
+
+  /** Clear the strobe state every chain shares, which outlives a restart along with the fanout. */
+  public resetStrobeState(): void {
+    this.deps.chainFanout.strobeState.reset()
   }
 
   /**

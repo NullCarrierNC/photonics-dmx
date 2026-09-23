@@ -7,7 +7,8 @@ export type StrobeOwner = 'net' | 'audio'
 /**
  * Tracks the currently active strobe speed slot so DMX publishing can drive hardware-strobe-channel
  * fixtures. Cue handlers (YARG/Audio/RB3) call {@link setActive} when a strobe cue takes or gives up
- * the strobe slot; the {@link DmxPublisher} consults {@link getActive} each publish tick.
+ * the strobe slot, and the {@link DmxPublisher} consults {@link getActive} each publish tick. The
+ * app's one instance lives on its ChainFanout and is handed to both.
  *
  * The slot remembers who took it. Audio and the net domains can run at once, and each ends its own
  * cues without knowing about the other, so an unqualified release would let one of them stop a
@@ -46,19 +47,4 @@ export class StrobeStateManager extends EventEmitter {
   public getActive(): StrobeSpeedSlot | null {
     return this.active
   }
-}
-
-let _instance: StrobeStateManager | null = null
-
-/** Returns the process-wide {@link StrobeStateManager}. Lazily created on first call. */
-export function getStrobeStateManager(): StrobeStateManager {
-  if (!_instance) {
-    _instance = new StrobeStateManager()
-  }
-  return _instance
-}
-
-/** Test-only: drops the singleton so the next call creates a fresh instance. */
-export function __resetStrobeStateManagerForTests(): void {
-  _instance = null
 }

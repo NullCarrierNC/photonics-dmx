@@ -16,10 +16,7 @@ import { CueStyle, INetCue } from '../../cues/interfaces/INetCue'
 import { CueData, CueType, defaultCueData, DrumNoteType } from '../../cues/types/cueTypes'
 import { ILightingController } from '../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
-import {
-  getStrobeStateManager,
-  __resetStrobeStateManagerForTests,
-} from '../../controllers/StrobeStateManager'
+import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import { fakeLightingController } from '../helpers/fakeLightingController'
 import { resetLogConfiguration, setLogSink, type LogEntry } from '../../../shared/logger'
 
@@ -62,6 +59,12 @@ function seedRunningMotion(handler: CueHandler, cue: INetCue): void {
   internals.currentPick = { source: 'auto', manualFallback: false }
   ;(handler as unknown as { appliedMotionCue: INetCue | null }).appliedMotionCue = cue
 }
+
+let strobeState: StrobeStateManager
+
+beforeEach(() => {
+  strobeState = new StrobeStateManager()
+})
 
 function makeLightManager(): DmxLightManager {
   return {} as unknown as DmxLightManager
@@ -151,17 +154,15 @@ describe('CueHandler shutdown lifecycle', () => {
     expect(emit).toHaveBeenCalledTimes(1)
   })
 
-  it('shutdown clears shared strobe state even when no strobe cue was active (Fix 2)', () => {
-    __resetStrobeStateManagerForTests()
-    // Simulate a stale slot left by a prior interrupted strobe (no Strobe_Off received).
-    getStrobeStateManager().setActive('fast', 'net')
-    expect(getStrobeStateManager().getActive()).toBe('fast')
+  it('shutdown clears the strobe state even when no strobe cue was active', () => {
+    // A stale slot left by an interrupted strobe that never received Strobe_Off.
+    strobeState.setActive('fast', 'net')
+    expect(strobeState.getActive()).toBe('fast')
 
-    const handler = new CueHandler(makeLightManager(), makeSequencer())
-    // No currentStrobeCue set — old code only cleared when one was present.
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), { strobeState })
     handler.shutdown()
 
-    expect(getStrobeStateManager().getActive()).toBeNull()
+    expect(strobeState.getActive()).toBeNull()
   })
 
   it('shutdown ends the registry song so once-per-song and motion locks do not leak', () => {
@@ -178,10 +179,6 @@ describe('CueHandler shutdown lifecycle', () => {
 })
 
 describe('CueHandler strobe history isolation', () => {
-  beforeEach(() => {
-    __resetStrobeStateManagerForTests()
-  })
-
   afterEach(() => {
     jest.restoreAllMocks()
   })
@@ -339,24 +336,23 @@ describe('CueHandler input edge reset', () => {
   })
 
   it('resetSessionState stops active strobe slot and clears previousFrame', async () => {
-    __resetStrobeStateManagerForTests()
     const registry = CueRegistry.getInstance()
     const strobe = makeFakeCue(CueStyle.Primary, 'strobe')
     jest
       .spyOn(registry, 'getCueImplementation')
       .mockImplementation((cueType) => (cueType === CueType.Strobe_Fast ? strobe : null))
-    const handler = new CueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), { strobeState })
 
     await handler.handleCue(
       CueType.Strobe_Fast,
       gameplayCueData({ lightingCue: CueType.Default, strobeState: 'Strobe_Fast' }),
     )
-    expect(getStrobeStateManager().getActive()).not.toBeNull()
+    expect(strobeState.getActive()).not.toBeNull()
 
     handler.resetSessionState()
 
     expect(strobe.onStop).toHaveBeenCalledTimes(1)
-    expect(getStrobeStateManager().getActive()).toBeNull()
+    expect(strobeState.getActive()).toBeNull()
     const internals = handler as unknown as {
       currentStrobeCue: INetCue | null
       previousCueData?: CueData
@@ -366,7 +362,6 @@ describe('CueHandler input edge reset', () => {
   })
 
   it('stopActiveStrobe clears the strobe slot without clearing previousFrame baseline', async () => {
-    __resetStrobeStateManagerForTests()
     const registry = CueRegistry.getInstance()
     const primary = makeFakeCue(CueStyle.Primary, 'frenzy')
     const strobe = makeFakeCue(CueStyle.Primary, 'strobe')
@@ -376,7 +371,7 @@ describe('CueHandler input edge reset', () => {
         cueType === CueType.Frenzy ? primary : cueType === CueType.Strobe_Fast ? strobe : null,
       )
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
-    const handler = new CueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), { strobeState })
 
     await handler.handleCue(
       CueType.Frenzy,
@@ -395,7 +390,7 @@ describe('CueHandler input edge reset', () => {
     handler.stopActiveStrobe()
 
     expect(strobe.onStop).toHaveBeenCalledTimes(1)
-    expect(getStrobeStateManager().getActive()).toBeNull()
+    expect(strobeState.getActive()).toBeNull()
     expect(internals.currentStrobeCue).toBeNull()
     expect(internals.previousCueData?.drumNotes).toEqual([DrumNoteType.Kick])
   })
@@ -591,7 +586,6 @@ describe('CueHandler chart-driven Blackout_Slow handoff', () => {
 
   beforeEach(() => {
     registry = CueRegistry.getInstance()
-    __resetStrobeStateManagerForTests()
     jest.restoreAllMocks()
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
   })
@@ -632,7 +626,7 @@ describe('CueHandler chart-driven Blackout_Slow handoff', () => {
 
   it('does not end the fade for a strobe cue arriving while the blackout holds', async () => {
     const sequencer = makeSequencer()
-    const handler = new CueHandler(makeLightManager(), sequencer)
+    const handler = new CueHandler(makeLightManager(), sequencer, { strobeState })
     handler.setMotionEnabled(false)
 
     await handler.handleCue(
@@ -650,7 +644,7 @@ describe('CueHandler chart-driven Blackout_Slow handoff', () => {
 
     expect(instantBlackoutOrders(sequencer)).toHaveLength(0)
     expect(strobe.execute).not.toHaveBeenCalled()
-    expect(getStrobeStateManager().getActive()).toBeNull()
+    expect(strobeState.getActive()).toBeNull()
   })
 
   it('only ends the fade once, not on every repeated dispatch of the cue that follows', async () => {
@@ -700,13 +694,12 @@ describe('CueHandler chart blackout strobe suppression', () => {
 
   beforeEach(() => {
     registry = CueRegistry.getInstance()
-    __resetStrobeStateManagerForTests()
     jest.restoreAllMocks()
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
   })
 
   it('suppresses a strobe cue that arrives in the same frame as a fast blackout', async () => {
-    const handler = new CueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), { strobeState })
     handler.setMotionEnabled(false)
     const strobe = makeFakeCue(CueStyle.Secondary, 'strobe:Strobe_Fast')
     jest.spyOn(registry, 'getCueImplementation').mockReturnValue(strobe)
@@ -721,11 +714,11 @@ describe('CueHandler chart blackout strobe suppression', () => {
     )
 
     expect(strobe.execute).not.toHaveBeenCalled()
-    expect(getStrobeStateManager().getActive()).toBeNull()
+    expect(strobeState.getActive()).toBeNull()
   })
 
   it('keeps suppressing repeated strobes until the next primary cue', async () => {
-    const handler = new CueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), { strobeState })
     handler.setMotionEnabled(false)
     const strobeMedium = makeFakeCue(CueStyle.Secondary, 'strobe:Strobe_Medium')
     const strobeFast = makeFakeCue(CueStyle.Secondary, 'strobe:Strobe_Fast')
@@ -746,7 +739,7 @@ describe('CueHandler chart blackout strobe suppression', () => {
 
     expect(strobeMedium.execute).not.toHaveBeenCalled()
     expect(strobeFast.execute).not.toHaveBeenCalled()
-    expect(getStrobeStateManager().getActive()).toBeNull()
+    expect(strobeState.getActive()).toBeNull()
 
     const primary = makeFakeCue(CueStyle.Primary, 'primary:Chorus')
     implementation.mockReturnValue(primary)
@@ -759,11 +752,11 @@ describe('CueHandler chart blackout strobe suppression', () => {
       gameplayCueData({ lightingCue: CueType.Chorus, strobeState: 'Strobe_Fast' }),
     )
     expect(strobeFast.execute).toHaveBeenCalled()
-    expect(getStrobeStateManager().getActive()).toBe('fast')
+    expect(strobeState.getActive()).toBe('fast')
   })
 
   it('clears an active hardware strobe latch when chart blackout starts', async () => {
-    const handler = new CueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), { strobeState })
     handler.setMotionEnabled(false)
     const strobe = makeFakeCue(CueStyle.Secondary, 'strobe:Strobe_Slow')
     jest.spyOn(registry, 'getCueImplementation').mockReturnValue(strobe)
@@ -772,18 +765,18 @@ describe('CueHandler chart blackout strobe suppression', () => {
       CueType.Strobe_Slow,
       gameplayCueData({ lightingCue: CueType.Verse, strobeState: 'Strobe_Slow' }),
     )
-    expect(getStrobeStateManager().getActive()).toBe('slow')
+    expect(strobeState.getActive()).toBe('slow')
 
     await handler.handleCue(
       CueType.Blackout_Spotlight,
       gameplayCueData({ lightingCue: CueType.Blackout_Spotlight }),
     )
 
-    expect(getStrobeStateManager().getActive()).toBeNull()
+    expect(strobeState.getActive()).toBeNull()
   })
 
   it('Strobe_Off remains idempotent while chart blackout is held', async () => {
-    const handler = new CueHandler(makeLightManager(), makeSequencer())
+    const handler = new CueHandler(makeLightManager(), makeSequencer(), { strobeState })
     handler.setMotionEnabled(false)
 
     await handler.handleCue(
@@ -795,7 +788,7 @@ describe('CueHandler chart blackout strobe suppression', () => {
       gameplayCueData({ lightingCue: CueType.Blackout_Fast, strobeState: 'Strobe_Off' }),
     )
 
-    expect(getStrobeStateManager().getActive()).toBeNull()
+    expect(strobeState.getActive()).toBeNull()
   })
 
   it('re-enables strobes on a non-strobe cue the registry cannot resolve', async () => {
@@ -891,7 +884,6 @@ describe('CueHandler cue change during a cue-driven fade', () => {
 
   beforeEach(() => {
     registry = CueRegistry.getInstance()
-    __resetStrobeStateManagerForTests()
     jest.restoreAllMocks()
     jest.spyOn(registry, 'getRandomMotionCue').mockReturnValue(null)
   })
