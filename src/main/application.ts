@@ -129,7 +129,7 @@ export class Application {
         // At error level so a packaged build, which records nothing below it, still says why the
         // app went, and flushed before going since the line is still buffered in the stream.
         log.error('Shutdown taking too long, forcing exit')
-        void Promise.resolve(this.flushLogs?.()).finally(() => process.exit(0))
+        void Promise.resolve(this.flushLogs?.()).finally(() => process.exit(1))
       }, 5000)
 
       try {

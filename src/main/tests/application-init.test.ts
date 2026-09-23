@@ -102,7 +102,7 @@ describe('Application shutdown watchdog', () => {
     controllerShutdown.mockResolvedValue(undefined)
   })
 
-  it('gets the log onto disk before it forces the exit', async () => {
+  it('gets the log onto disk before it forces a failing exit', async () => {
     // The line saying why the app went is still buffered in the stream when the watchdog fires.
     const order: string[] = []
     controllerShutdown.mockImplementation(() => new Promise<void>(() => {}))
@@ -123,7 +123,7 @@ describe('Application shutdown watchdog', () => {
       await jest.advanceTimersByTimeAsync(5000)
 
       expect(order).toEqual(['flush', 'exit'])
-      expect(exit).toHaveBeenCalledWith(0)
+      expect(exit).toHaveBeenCalledWith(1)
     } finally {
       jest.clearAllTimers()
       jest.useRealTimers()
