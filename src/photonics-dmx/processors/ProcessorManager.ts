@@ -111,20 +111,6 @@ export class ProcessorManager extends EventEmitter {
   }
 
   /**
-   * Update StageKit configuration
-   */
-  public updateStageKitConfig(stageKitConfig: Partial<StageKitConfig>): void {
-    this.config.stageKitConfig = { ...this.config.stageKitConfig, ...stageKitConfig }
-
-    // Update StageKit processor if it exists
-    if (this.stageKitDirectProcessor) {
-      this.stageKitDirectProcessor.updateConfig(stageKitConfig)
-    }
-
-    log.info('ProcessorManager: StageKit config updated:', this.config.stageKitConfig)
-  }
-
-  /**
    * Get current configuration
    */
   public getConfig(): ProcessorManagerConfig {

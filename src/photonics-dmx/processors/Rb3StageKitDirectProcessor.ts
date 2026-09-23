@@ -436,14 +436,6 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   }
 
   /**
-   * Update configuration
-   */
-  public updateConfig(newConfig: Partial<StageKitConfig>): void {
-    this.config = { ...this.config, ...newConfig }
-    log.info('StageKitDirectProcessor: config updated:', this.config)
-  }
-
-  /**
    * Get current configuration
    */
   public getConfig(): StageKitConfig {
