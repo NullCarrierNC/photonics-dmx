@@ -496,8 +496,9 @@ export class YargNetworkListener extends EventEmitter {
         this.lastCueReceivedAt = monotonicNowMs()
         this.fallbackActive = false
         this.inNonDrivingRun = false
-        this.cueHandler.notifySongStart()
-        // Trigger a fast blackout to clear any menu lighting
+        // Trigger a fast blackout to clear any menu lighting. The song-start notice follows it
+        // because it ends the chart-blackout hold that blackout arms, so a strobe the chart opens
+        // with plays.
         void this.cueHandler.handleCue(CueType.Blackout_Fast, {
           datagramVersion: 0,
           platform: 'Unknown',
@@ -524,6 +525,7 @@ export class YargNetworkListener extends EventEmitter {
           keyframe: 'Off',
           bonusEffect: false,
         })
+        this.cueHandler.notifySongStart()
       }
 
       // Handle Gameplay -> other (song end)
