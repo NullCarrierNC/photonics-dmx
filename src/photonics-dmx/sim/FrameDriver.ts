@@ -37,6 +37,15 @@ export interface FrameTransient {
   keysNotes?: InstrumentNoteType[]
 }
 
+/** What the simulator's run loop drives, whatever the cue domain. */
+export interface SimDriver {
+  /** Send one frame built from the live state plus this frame's transient signals. */
+  dispatch(transient?: FrameTransient): Promise<void>
+  /** Stop every running cue, so the next frame starts the next cue fresh. */
+  stopCues(): void
+  shutdown(): void
+}
+
 const STROBE_STATE_BY_CUE: Partial<Record<CueType, StrobeState>> = {
   [CueType.Strobe_Slow]: 'Strobe_Slow',
   [CueType.Strobe_Medium]: 'Strobe_Medium',
@@ -53,7 +62,7 @@ const STROBE_STATE_BY_CUE: Partial<Record<CueType, StrobeState>> = {
  * Frames carry `trackMode: 'simulated'` + `simulationCueGroup`, pinning cue resolution to the
  * library under test (see {@link CueRegistry.getCueImplementationFromGroup}).
  */
-export class FrameDriver {
+export class FrameDriver implements SimDriver {
   constructor(
     private readonly handler: CueHandler,
     private readonly getState: () => FrameState,
@@ -114,6 +123,14 @@ export class FrameDriver {
     }
 
     this.handler.handleVocalNote(frame)
+  }
+
+  public stopCues(): void {
+    this.handler.stopActiveCue()
+  }
+
+  public shutdown(): void {
+    this.handler.shutdown()
   }
 
   private buildFrame(state: FrameState, transient: FrameTransient, cueIsStrobe: boolean): CueData {

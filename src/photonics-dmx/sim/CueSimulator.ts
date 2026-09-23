@@ -3,12 +3,15 @@ import { DmxLightManager } from '../controllers/DmxLightManager'
 import { LightStateManager } from '../controllers/sequencer/LightStateManager'
 import { LightTransitionController } from '../controllers/sequencer/LightTransitionController'
 import { Sequencer } from '../controllers/sequencer/Sequencer'
-import { ConfigStrobeType, DmxLight, FixtureTypes, LightingConfiguration, RGBIO } from '../types'
+import { RGBIO } from '../types'
 import { NodeCueLoader } from '../cues/node/loader/NodeCueLoader'
 import { EffectLoader } from '../cues/node/loader/EffectLoader'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
+import type { IAudioCue } from '../cues/interfaces/IAudioCue'
 import { getCueRegistry } from '../cues/registries/cueRegistries'
 import { CueHandler } from '../cueHandlers/CueHandler'
+import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
+import { CueStyle } from '../cues/interfaces/INetCue'
 import { noopRuntimeBroadcaster } from '../runtime/broadcaster'
 import {
   CueType,
@@ -17,11 +20,13 @@ import {
   getCueTypeFromId,
 } from '../cues/types/cueTypes'
 import { VirtualTime } from './VirtualTime'
-import { FrameDriver, FrameState, FrameTransient } from './FrameDriver'
-import type { NetCueMode } from '../cues/types/nodeCueTypes'
+import { buildSimRig } from './simRig'
+import { FrameDriver, FrameState, FrameTransient, SimDriver } from './FrameDriver'
+import { AudioFrameDriver, AudioFrameState } from './AudioFrameDriver'
 import {
   LedBanks,
   ScenarioEntry,
+  SimDomain,
   SimLightOrder,
   SimLightSample,
   SimSample,
@@ -32,8 +37,8 @@ import {
 export interface CueSimulatorOptions {
   /** Cue library to simulate: a loaded group id (e.g. `yarg-stagekit`) or its filename. */
   library: string
-  /** Which game cue domain the library belongs to. Defaults to YARG. */
-  domain?: NetCueMode
+  /** Which cue domain the library belongs to. Defaults to YARG. */
+  domain?: SimDomain
   /** Root of the cue/effect data tree; defaults to the bundled `resources/defaults`. */
   baseDir?: string
   frontCount?: number
@@ -48,6 +53,8 @@ export interface CueSimulatorOptions {
   sampleIntervalMs?: number
   /** Sequencer frame granularity; production default is 10 ms. */
   frameStepMs?: number
+  /** Audio only: the starting input level from 0 to 1. */
+  level?: number
 }
 
 interface ResolvedOptions extends Required<Omit<CueSimulatorOptions, 'baseDir'>> {
@@ -56,13 +63,20 @@ interface ResolvedOptions extends Required<Omit<CueSimulatorOptions, 'baseDir'>>
 
 const DEFAULT_BASE_DIR = path.resolve(__dirname, '../../../resources/defaults')
 
+const SIM_DOMAINS: readonly SimDomain[] = ['yarg', 'rb3', 'audio']
+
+/** The registry a domain's libraries load into. */
+function registryFor(domain: SimDomain) {
+  return domain === 'audio' ? AudioCueRegistry.getInstance() : getCueRegistry(domain)
+}
+
 const BEATS_PER_MEASURE = 4
 const EPSILON = 1e-6
 
 /**
  * Headless, deterministic cue simulator. Loads a bundled cue library through the real
- * loader/registry, runs a chosen cue under virtual time while synthesizing YARG frames and
- * scenario events, and records the resulting per-light RGBIO over time.
+ * loader/registry, runs a chosen cue under virtual time while synthesizing YARG, RB3 or audio
+ * frames and scenario events, and records the resulting per-light RGBIO over time.
  *
  * Usage:
  * ```ts
@@ -78,15 +92,19 @@ export class CueSimulator {
   private readonly lightStateManager: LightStateManager
   private readonly lightTransitionController: LightTransitionController
   private readonly sequencer: Sequencer
-  private readonly handler: CueHandler
   private readonly lightOrder: SimLightOrder
 
-  private frameDriver!: FrameDriver
+  private driver!: SimDriver
   private groupId = ''
-  /** Groups this run registered, per net domain, so teardown drops exactly what it loaded. */
-  private loadedGroupIdsByDomain: Record<NetCueMode, string[]> = { yarg: [], rb3: [] }
+  /** Groups this run registered, per domain, so teardown drops exactly what it loaded. */
+  private loadedGroupIdsByDomain: Record<SimDomain, string[]> = { yarg: [], rb3: [], audio: [] }
 
-  private currentCue: CueType | undefined
+  private currentCue: string | undefined
+  /** The secondary cue playing over the primary, or null for none. */
+  private secondaryCue: string | null = null
+  /** Audio only: the strobe cue in the strobe slot, or null for none. */
+  private strobeCue: string | null = null
+  private level: number
   private venue: VenueSize
   private bpm: number
   private vocalActive = false
@@ -106,15 +124,13 @@ export class CueSimulator {
     this.opts = opts
     this.venue = opts.venue
     this.bpm = opts.bpm
+    this.level = opts.level
 
-    const config = CueSimulator.buildConfig(opts.frontCount, opts.backCount, opts.strobeCount)
+    const config = buildSimRig(opts.frontCount, opts.backCount, opts.strobeCount)
     this.lightManager = new DmxLightManager(config)
     this.lightStateManager = new LightStateManager()
     this.lightTransitionController = new LightTransitionController(this.lightStateManager)
     this.sequencer = new Sequencer(this.lightTransitionController, this.virtualTime)
-    this.handler = new CueHandler(this.lightManager, this.sequencer, {
-      registry: getCueRegistry(opts.domain),
-    })
 
     this.lightOrder = {
       front: this.lightManager.getLights(['front'], ['all']).map((l) => l.id),
@@ -136,6 +152,7 @@ export class CueSimulator {
       frameRateHz: options.frameRateHz ?? 30,
       sampleIntervalMs: options.sampleIntervalMs ?? 50,
       frameStepMs: options.frameStepMs ?? 10,
+      level: options.level ?? 0.6,
     }
 
     const virtualTime = new VirtualTime({ frameStepMs: resolved.frameStepMs })
@@ -151,7 +168,7 @@ export class CueSimulator {
   }
 
   private async init(): Promise<void> {
-    const registry = getCueRegistry(this.opts.domain)
+    const registry = registryFor(this.opts.domain)
     registry.reset()
 
     const effectLoader = new EffectLoader({ baseDir: this.opts.baseDir })
@@ -168,44 +185,55 @@ export class CueSimulator {
     await loader.loadAll()
 
     const allSummaries = loader.getSummary()
-    for (const domain of ['yarg', 'rb3'] as const) {
+    for (const domain of SIM_DOMAINS) {
       this.loadedGroupIdsByDomain[domain] = allSummaries[domain].map((s) => s.groupId)
     }
-    const summaries = allSummaries[this.opts.domain]
-    const fileToGroup = new Map<string, string>()
-    for (const summary of summaries) {
-      fileToGroup.set(path.basename(summary.path, '.json'), summary.groupId)
-    }
-
     const requested = this.opts.library
-    const resolvedGroupId = registry.getGroup(requested) ? requested : fileToGroup.get(requested)
+    const libraryIn = (domain: SimDomain): string | undefined =>
+      allSummaries[domain].find(
+        (s) => s.groupId === requested || path.basename(s.path, '.json') === requested,
+      )?.groupId
+    const resolvedGroupId = libraryIn(this.opts.domain)
     if (!resolvedGroupId || !registry.getGroup(resolvedGroupId)) {
-      const available = Array.from(
-        new Set([
-          ...this.loadedGroupIdsByDomain[this.opts.domain],
-          ...Array.from(fileToGroup.keys()),
-        ]),
-      ).sort()
+      const owner = SIM_DOMAINS.find(
+        (domain) => domain !== this.opts.domain && libraryIn(domain) !== undefined,
+      )
+      const available = allSummaries[this.opts.domain]
+        .flatMap((s) => [s.groupId, path.basename(s.path, '.json')])
+        .filter((name, index, names) => names.indexOf(name) === index)
+        .sort()
       throw new Error(
-        `Cue library '${requested}' not found. Available libraries: ${available.join(', ')}`,
+        owner
+          ? `Cue library '${requested}' not found in the ${this.opts.domain} domain. It belongs to the ${owner} domain.`
+          : `Cue library '${requested}' not found. Available libraries: ${available.join(', ')}`,
       )
     }
     this.groupId = resolvedGroupId
-
-    this.frameDriver = new FrameDriver(
-      this.handler,
-      () => this.getFrameState(),
-      this.groupId,
-      this.opts.domain,
-    )
+    this.driver = this.createDriver()
   }
 
-  private getFrameState(): FrameState {
+  private createDriver(): SimDriver {
+    if (this.opts.domain === 'audio') {
+      AudioCueRegistry.getInstance().setEnabledGroups([this.groupId])
+      const handler = new AudioCueHandler(this.lightManager, this.sequencer)
+      return new AudioFrameDriver(handler, () => this.getAudioFrameState())
+    }
+    const handler = new CueHandler(this.lightManager, this.sequencer, {
+      registry: getCueRegistry(this.opts.domain),
+    })
+    return new FrameDriver(handler, () => this.getFrameState(), this.groupId, this.opts.domain)
+  }
+
+  private selectedCue(): string {
     if (this.currentCue === undefined) {
       throw new Error('No cue selected. Call setCue() before running the simulation.')
     }
+    return this.currentCue
+  }
+
+  private getFrameState(): FrameState {
     return {
-      cue: this.currentCue,
+      cue: this.resolveCueType(this.secondaryCue ?? this.selectedCue()),
       venue: this.venue,
       bpm: this.bpm,
       vocalActive: this.vocalActive,
@@ -214,14 +242,32 @@ export class CueSimulator {
     }
   }
 
+  private getAudioFrameState(): AudioFrameState {
+    return {
+      cue: this.selectedCue(),
+      secondary: this.secondaryCue,
+      strobe: this.strobeCue,
+      bpm: this.bpm,
+      level: this.level,
+    }
+  }
+
   /** RB3 only: set the StageKit LED bank masks the running cue mirrors. */
   public setLedBanks(banks: LedBanks): void {
     this.ledBanks = { ...banks }
   }
 
-  /** Select the cue to simulate. Accepts any {@link CueType} value (e.g. `Menu`, `Strobe_Fast`). */
+  /**
+   * Select the cue to simulate: any {@link CueType} value (e.g. `Menu`, `Strobe_Fast`), or an audio
+   * cue id the audio library carries.
+   */
   public setCue(cue: string): void {
-    this.currentCue = this.resolveCueType(cue)
+    if (this.opts.domain === 'audio') {
+      this.audioCue(cue)
+      this.currentCue = cue
+    } else {
+      this.currentCue = this.resolveCueType(cue)
+    }
   }
 
   /** Queue a scenario step (event injection or live state change) at `entry.at` ms. */
@@ -293,13 +339,13 @@ export class CueSimulator {
 
       if (nextBeat <= t + EPSILON && this.bpm > 0) {
         const isMeasure = beatCounter % BEATS_PER_MEASURE === 0
-        await this.frameDriver.dispatch({ beat: isMeasure ? 'Measure' : 'Strong' })
+        await this.driver.dispatch({ beat: isMeasure ? 'Measure' : 'Strong' })
         beatCounter++
         nextBeat += 60000 / this.bpm
       }
 
       if (nextSustain <= t + EPSILON) {
-        await this.frameDriver.dispatch({})
+        await this.driver.dispatch({})
         nextSustain += sustainInterval
       }
 
@@ -332,20 +378,19 @@ export class CueSimulator {
   /** Tear down the sequencer/handler and restore real timers. Safe to call once. */
   public dispose(): void {
     try {
-      this.handler.shutdown()
+      this.driver.shutdown()
       this.sequencer.shutdown()
-      // The loader fills every net registry, not just the one under test, so tear down both:
-      // a second simulator in the same process would otherwise find stale per-sequencer state and
-      // groups still registered from the previous run.
-      for (const domain of ['yarg', 'rb3'] as const) {
-        const registry = getCueRegistry(domain)
+      // The loader fills every registry, not just the one under test, so tear them all down: a
+      // second simulator in the same process finds no per-sequencer state or groups from this run.
+      for (const domain of SIM_DOMAINS) {
+        const registry = registryFor(domain)
         registry.releaseSequencerFromAllCues(this.sequencer)
         for (const id of this.loadedGroupIdsByDomain[domain]) {
           registry.unregisterGroup(id)
         }
       }
       // Only the domain under test had its registry reset on the way in, so only it is reset here.
-      getCueRegistry(this.opts.domain).reset()
+      registryFor(this.opts.domain).reset()
       this.lightStateManager.shutdown()
     } finally {
       this.virtualTime.dispose()
@@ -354,9 +399,19 @@ export class CueSimulator {
 
   private async applyScenario(entry: ScenarioEntry): Promise<void> {
     if (entry.cue !== undefined) {
-      this.handler.stopActiveCue()
-      this.currentCue = this.resolveCueType(entry.cue)
+      this.driver.stopCues()
+      this.setCue(entry.cue)
+      this.secondaryCue = null
+      this.strobeCue = null
       this.pendingEvents.push(`cue=${entry.cue}`)
+    }
+    if (entry.secondary !== undefined) {
+      this.setSecondary(entry.secondary)
+      this.pendingEvents.push(`secondary=${entry.secondary}`)
+    }
+    if (entry.level !== undefined) {
+      this.level = entry.level
+      this.pendingEvents.push(`level=${entry.level}`)
     }
     if (entry.bpm !== undefined) {
       this.bpm = entry.bpm
@@ -379,43 +434,66 @@ export class CueSimulator {
     }
   }
 
+  /** Put a secondary cue over the running primary, or with an empty name take it away. */
+  private setSecondary(name: string): void {
+    if (name === '') {
+      this.secondaryCue = null
+      this.strobeCue = null
+    } else if (this.opts.domain === 'audio') {
+      if (this.audioCue(name).style === 'strobe') this.strobeCue = name
+      else this.secondaryCue = name
+    } else {
+      const cueType = this.resolveCueType(name)
+      const registry = getCueRegistry(this.opts.domain)
+      if (
+        registry.getCueImplementationFromGroup(cueType, this.groupId)?.style !== CueStyle.Secondary
+      ) {
+        throw new Error(`'${name}' is not a secondary cue in '${this.groupId}'.`)
+      }
+      this.secondaryCue = cueType
+    }
+  }
+
   private async applyEvent(event: string): Promise<void> {
+    if (this.opts.domain === 'audio' && event !== 'beat' && event !== 'measure') {
+      throw new Error(`Audio frames carry beats only, so '${event}' does not apply.`)
+    }
     this.pendingEvents.push(event)
 
     if (event === 'vocal-note') {
       this.vocalActive = true
-      await this.frameDriver.dispatch({})
+      await this.driver.dispatch({})
       return
     }
     if (event === 'vocal-note-off') {
       this.vocalActive = false
-      await this.frameDriver.dispatch({})
+      await this.driver.dispatch({})
       return
     }
     if (event === 'beat') {
-      await this.frameDriver.dispatch({ beat: 'Strong' })
+      await this.driver.dispatch({ beat: 'Strong' })
       return
     }
     if (event === 'measure') {
-      await this.frameDriver.dispatch({ beat: 'Measure' })
+      await this.driver.dispatch({ beat: 'Measure' })
       return
     }
     if (event === 'keyframe-first') {
-      await this.frameDriver.dispatch({ keyframe: 'First' })
+      await this.driver.dispatch({ keyframe: 'First' })
       return
     }
     if (event === 'keyframe-next') {
-      await this.frameDriver.dispatch({ keyframe: 'Next' })
+      await this.driver.dispatch({ keyframe: 'Next' })
       return
     }
     if (event === 'keyframe-previous') {
-      await this.frameDriver.dispatch({ keyframe: 'Previous' })
+      await this.driver.dispatch({ keyframe: 'Previous' })
       return
     }
 
     const transient = CueSimulator.instrumentEventToTransient(event)
     if (transient) {
-      await this.frameDriver.dispatch(transient)
+      await this.driver.dispatch(transient)
       return
     }
 
@@ -471,53 +549,19 @@ export class CueSimulator {
     this.samples.push({ timeMs: Math.round(timeMs), lights, events })
   }
 
+  private audioCue(cue: string): IAudioCue {
+    const found = AudioCueRegistry.getInstance().getCueImplementationFromGroup(cue, this.groupId)
+    if (!found) {
+      throw new Error(`Unknown audio cue '${cue}' in '${this.groupId}'.`)
+    }
+    return found
+  }
+
   private resolveCueType(cue: string): CueType {
     const cueType = getCueTypeFromId(cue)
     if (!cueType) {
       throw new Error(`Unknown cue '${cue}'. Expected a CueType value (e.g. Menu, Intro, Default).`)
     }
     return cueType
-  }
-
-  private static buildConfig(
-    frontCount: number,
-    backCount: number,
-    strobeCount: number,
-  ): LightingConfiguration {
-    const makeLights = (count: number, group: 'front' | 'back' | 'strobe', start: number) =>
-      Array.from({ length: count }, (_, index) => {
-        const position = start + index + 1
-        const base = position * 4 - 3
-        return {
-          id: `${group}-${position}`,
-          name: `${group} ${position}`,
-          label: `${group} ${position}`,
-          isStrobeEnabled: group === 'strobe',
-          universe: 1,
-          fixture: FixtureTypes.RGB,
-          group,
-          position,
-          channels: {
-            red: base,
-            green: base + 1,
-            blue: base + 2,
-            masterDimmer: base + 3,
-          },
-          fixtureId: `${group}-${position}`,
-        } as DmxLight
-      })
-
-    const frontLights = makeLights(frontCount, 'front', 0)
-    const backLights = makeLights(backCount, 'back', frontCount)
-    const strobeLights = makeLights(strobeCount, 'strobe', frontCount + backCount)
-
-    return {
-      numLights: frontCount + backCount + strobeCount,
-      lightLayout: { id: 'two-rows', label: 'Two Rows (one in front of the other)' },
-      strobeType: ConfigStrobeType.None,
-      frontLights,
-      backLights,
-      strobeLights,
-    }
   }
 }
