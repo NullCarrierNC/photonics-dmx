@@ -1,5 +1,6 @@
 import React, { useId } from 'react'
 import Modal from '../../Modal'
+import { isSubmitShortcut } from '../../../utils/isSubmitShortcut'
 
 const INPUT_CLASS = 'w-full px-3 py-2 border rounded bg-white dark:bg-gray-700 text-sm'
 const INPUT_BORDER = 'border-gray-300 dark:border-gray-600'
@@ -15,7 +16,7 @@ interface CueFileModalProps {
   title: string
   /** The primary button's label. */
   actionLabel: string
-  /** Whether the form can be submitted, by the button or by Cmd+Enter. */
+  /** Whether the form can be submitted, by the button or by Cmd+Enter or Ctrl+Enter. */
   canSubmit: boolean
   onSubmit: () => void
   onCancel: () => void
@@ -24,7 +25,7 @@ interface CueFileModalProps {
 
 /**
  * The frame the cue-file dialogs share: the title, the form, and Cancel beside a primary button
- * that stays disabled, and ignores Cmd+Enter, until the form is complete.
+ * that stays disabled, and ignores the submit shortcut, until the form is complete.
  */
 export const CueFileModal: React.FC<CueFileModalProps> = ({
   title,
@@ -43,7 +44,7 @@ export const CueFileModal: React.FC<CueFileModalProps> = ({
       onClose={onCancel}
       labelledBy={titleId}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && e.metaKey) submit()
+        if (isSubmitShortcut(e)) submit()
       }}
       panelClassName="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-[500px] max-w-[90vw]">
       <h2 id={titleId} className="text-lg font-bold mb-4">

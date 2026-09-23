@@ -1,5 +1,6 @@
 import React, { useId, useMemo, useState } from 'react'
 import Modal from '../../../components/Modal'
+import { isSubmitShortcut } from '../../../utils/isSubmitShortcut'
 
 export type ImportRigSummary = {
   /** New templates that will be added to My Lights. */
@@ -43,7 +44,7 @@ const ImportRigModal: React.FC<Props> = ({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && e.metaKey) {
+    if (isSubmitShortcut(e)) {
       handleSave()
     }
   }

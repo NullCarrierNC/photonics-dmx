@@ -68,6 +68,23 @@ describe('NewFileModal', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })
 
+  it.each([
+    ['Cmd+Enter', { metaKey: true }],
+    ['Ctrl+Enter', { ctrlKey: true }],
+  ])('saves a complete form on %s', (_shortcut, modifier) => {
+    const onSave = renderNewFile()
+
+    type('Cue Group ID', 'my-cues')
+    type('Cue Group Name', 'My Cues')
+    type('First Cue Name', 'Opener')
+    fireEvent.keyDown(screen.getByLabelText('First Cue Name', { exact: false }), {
+      key: 'Enter',
+      ...modifier,
+    })
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+  })
+
   it('saves nothing and raises no alert when Cmd+Enter lands on an incomplete form', () => {
     const alert = jest.spyOn(window, 'alert').mockImplementation(() => undefined)
     const onSave = renderNewFile()
