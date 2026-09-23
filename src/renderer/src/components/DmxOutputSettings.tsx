@@ -1,5 +1,5 @@
-import React, { useCallback, useState, useEffect } from 'react'
-import { useAtom } from 'jotai'
+import React, { useCallback, useState, useEffect, useRef } from 'react'
+import { useAtom, useStore } from 'jotai'
 import {
   senderArtNetEnabledAtom,
   senderSacnEnabledAtom,
@@ -60,6 +60,9 @@ const DmxOutputSettings: React.FC = () => {
   const [comPort, setComPort] = useAtom(enttecProComPortAtom)
   const [openDmxComPort, setOpenDmxComPort] = useAtom(openDmxComPortAtom)
   const [prefs, setPrefs] = useAtom(lightingPrefsAtom)
+  const store = useStore()
+  // Flag saves run one at a time, each built from the config the one before it saved.
+  const flagSaves = useRef<Promise<unknown>>(Promise.resolve())
   const enttecProSpeed = prefs.enttecProConfig?.dmxSpeed ?? ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ
   const openDmxSpeed = prefs.openDmxConfig?.dmxSpeed ?? OPEN_DMX_DEFAULT_REFRESH_RATE_HZ
   const globalDmxPublishingRate = prefs.globalDmxPublishingRateHz ?? DMX_OUTPUT_REFRESH_RATE_HZ_MAX
@@ -266,8 +269,9 @@ const DmxOutputSettings: React.FC = () => {
    */
   const saveSenderFlag = async (name: SenderName) => {
     const toggle = senderToggles[name]
-    const enabled = !(prefs.dmxOutputConfig?.[toggle.flag] ?? false)
-    const newConfig = nextOutputConfig(prefs.dmxOutputConfig, toggle.flag, enabled)
+    const current = store.get(lightingPrefsAtom).dmxOutputConfig
+    const enabled = !(current?.[toggle.flag] ?? false)
+    const newConfig = nextOutputConfig(current, toggle.flag, enabled)
     log.info('Sender toggled:', name, enabled, newConfig)
 
     if (!(await persist({ dmxOutputConfig: newConfig }, 'the DMX output configuration'))) {
@@ -297,7 +301,9 @@ const DmxOutputSettings: React.FC = () => {
         return next
       })
     markSaving(true)
-    await saveSenderFlag(name).finally(() => markSaving(false))
+    const saving = flagSaves.current.then(() => saveSenderFlag(name))
+    flagSaves.current = saving.catch(() => undefined)
+    await saving.finally(() => markSaving(false))
   }
 
   const handleArtNetConfigChange = async (

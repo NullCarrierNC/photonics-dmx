@@ -132,6 +132,32 @@ describe('DmxOutputSettings sender checkboxes', () => {
     expect(enableSenderMock).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps both flags when a second box is ticked before the first one saves', async () => {
+    const finishes: Array<() => void> = []
+    savePrefsMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishes.push(() => resolve({ success: true }))
+        }),
+    )
+    const store = await renderPanel({ dmxOutputConfig: outputConfig() })
+
+    fireEvent.click(screen.getByLabelText('sACN'))
+    fireEvent.click(screen.getByLabelText('ArtNet'))
+    for (let i = 0; i < 2; i++) {
+      await waitFor(() => expect(finishes.length).toBeGreaterThan(i))
+      await act(async () => finishes[i]())
+    }
+
+    await waitFor(() =>
+      expect(store.get(lightingPrefsAtom).dmxOutputConfig).toEqual(
+        outputConfig({ sacnEnabled: true, artNetEnabled: true }),
+      ),
+    )
+    const lastSaved = savePrefsMock.mock.calls.at(-1)![0].dmxOutputConfig
+    expect(lastSaved).toEqual(outputConfig({ sacnEnabled: true, artNetEnabled: true }))
+  })
+
   it('offers every sender the panel can drive', async () => {
     await renderPanel({ dmxOutputConfig: outputConfig() })
 
