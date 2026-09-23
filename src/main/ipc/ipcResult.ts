@@ -10,9 +10,9 @@
  * Typed channel results live in IpcInvokeMap in shared/ipcTypes.ts.
  */
 
-import type { IpcErrorResult, IpcSuccessResult } from '../../shared/ipcTypes'
+import type { IpcErrorResult, IpcSavedResult, IpcSuccessResult } from '../../shared/ipcTypes'
 
-export type { IpcErrorResult, IpcSuccessResult }
+export type { IpcErrorResult, IpcSavedResult, IpcSuccessResult }
 
 /**
  * Build a standard failure payload for IPC responses.
@@ -36,4 +36,17 @@ export function validationRefusal(error: unknown): { valid: false; errors: strin
 /** Standard no-payload success for invoke channels that only need a boolean outcome. */
 export function ipcSuccess(): IpcSuccessResult {
   return { success: true }
+}
+
+/**
+ * Restarts the controllers after a save that has already landed. A failed restart is answered
+ * beside the save's success, so the renderer never reads a persisted change as refused.
+ */
+export async function restartAfterSave(restart: () => Promise<void>): Promise<IpcSavedResult> {
+  try {
+    await restart()
+    return { success: true }
+  } catch (error) {
+    return { success: true, restartError: ipcError(error).error }
+  }
 }

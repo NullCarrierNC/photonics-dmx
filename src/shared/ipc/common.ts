@@ -17,6 +17,12 @@ export interface IpcErrorResult {
 
 export type IpcSuccessResult = { success: true }
 
+/**
+ * A save that landed, followed by a controller restart. `restartError` says the restart failed,
+ * which leaves the saved data in place and the lifecycle on its failed phase.
+ */
+export type IpcSavedResult = IpcSuccessResult & { restartError?: string }
+
 /** The three inputs that run a motion cue of their own. */
 export type MotionRuntimeDomain = 'yarg' | 'rb3' | 'audio'
 

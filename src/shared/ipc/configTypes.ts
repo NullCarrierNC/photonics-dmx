@@ -13,7 +13,7 @@ import type {
   AudioConfig,
   AudioGameModeConfig,
 } from '../../photonics-dmx/listeners/Audio/AudioTypes'
-import type { IpcErrorResult, IpcSuccessResult } from './common'
+import type { IpcErrorResult, IpcSavedResult, IpcSuccessResult } from './common'
 
 export interface ConfigInvokeMap {
   // ---- Config ----
@@ -27,7 +27,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.SAVE_MY_LIGHTS]: {
     request: DmxFixture[]
-    response: IpcSuccessResult | IpcErrorResult
+    response: IpcSavedResult | IpcErrorResult
   }
   [CONFIG.GET_LIGHT_LAYOUT]: {
     request: void
@@ -51,11 +51,11 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.SAVE_DMX_RIG]: {
     request: DmxRig
-    response: IpcSuccessResult | IpcErrorResult
+    response: IpcSavedResult | IpcErrorResult
   }
   [CONFIG.DELETE_DMX_RIG]: {
     request: string
-    response: IpcSuccessResult | IpcErrorResult
+    response: IpcSavedResult | IpcErrorResult
   }
   [CONFIG.GET_APP_VERSION]: {
     request: void
@@ -91,7 +91,7 @@ export interface ConfigInvokeMap {
   }
   [CONFIG.SET_CLOCK_RATE]: {
     request: number
-    response: IpcSuccessResult | IpcErrorResult
+    response: IpcSavedResult | IpcErrorResult
   }
   [CONFIG.GET_AUDIO_CONFIG]: {
     request: void

@@ -3,7 +3,7 @@ import { IpcMain, dialog } from 'electron'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { ControllerManager } from '../../controllers/ControllerManager'
-import { ipcSuccess } from '../ipcResult'
+import { ipcSuccess, restartAfterSave } from '../ipcResult'
 import { CONFIG, RIGS } from '../../../shared/ipcChannels'
 import {
   validateLightingConfiguration,
@@ -53,7 +53,7 @@ export function registerLightsRigsConfigHandlers(
     // the fixture in LightsLayout. Restart controllers when at least one rig actually changed.
     const rigsChanged = await config.syncRigsWithUserLights()
     if (rigsChanged) {
-      await controllerManager.restartControllers()
+      return restartAfterSave(() => controllerManager.restartControllers())
     }
     return ipcSuccess()
   })
@@ -72,10 +72,8 @@ export function registerLightsRigsConfigHandlers(
     if (!validation.ok) {
       return { success: false, error: validation.error }
     }
+    // The standalone layout only seeds the first rig at startup. No running controller reads it.
     await controllerManager.getConfig().updateLightingLayout(validation.value)
-
-    await controllerManager.restartControllers()
-
     return { success: true }
   })
 
@@ -125,9 +123,8 @@ export function registerLightsRigsConfigHandlers(
 
     const isNowOrWasActive = rig.active || previousActiveState
     if (isNowOrWasActive) {
-      await controllerManager.restartControllers()
+      return restartAfterSave(() => controllerManager.restartControllers())
     }
-
     return { success: true }
   })
 
@@ -139,9 +136,8 @@ export function registerLightsRigsConfigHandlers(
     await config.deleteDmxRig(id)
 
     if (wasActive) {
-      await controllerManager.restartControllers()
+      return restartAfterSave(() => controllerManager.restartControllers())
     }
-
     return { success: true }
   })
 
