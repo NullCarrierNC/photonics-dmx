@@ -2,7 +2,7 @@ limit 600
 Auto-generated: non-test sources under src/ that exceed the line limit.
 Entries may only shrink. Regenerate after a split with: node tools/size-budget.mjs --write
 1153 src/photonics-dmx/cues/node/runtime/BaseNodeExecutionEngine.ts
-797 src/photonics-dmx/controllers/DmxPublisher.ts
+798 src/photonics-dmx/controllers/DmxPublisher.ts
 726 src/renderer/src/components/cue-editor/lib/graphLayout.ts
 717 src/photonics-dmx/cues/node/runtime/NodeExecutionEngine.ts
 694 src/renderer/src/pages/CueSimulation.tsx

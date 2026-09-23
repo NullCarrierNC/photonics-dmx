@@ -479,11 +479,12 @@ export class DmxPublisher {
     // covers the hardware strobe-speed channel, which is driven from `activeStrobeSlot` below. It
     // does NOT cover the opacity-driven flash: the blender has already folded that into the rgb /
     // intensity values arriving here, so those lights are zeroed individually in the light loop,
-    // which is what `suppressedStrobeLightIds` is for.
+    // which is what `suppressedStrobeLightIds` is for. A blackout disarms both as well.
     const masterPercent = this._masterOutput.getOutputPercent()
     const requestedStrobeSlot = this._strobeStateManager.getActive()
     const strobeSuppressed =
-      requestedStrobeSlot != null && !this._masterOutput.isStrobeOutputEnabled()
+      requestedStrobeSlot != null &&
+      (!this._masterOutput.isStrobeOutputEnabled() || this._masterOutput.isBlackoutActive())
     const activeStrobeSlot = strobeSuppressed ? null : requestedStrobeSlot
 
     // Strobe peak-hold state machine runs once per frame (across all rigs/lights).
