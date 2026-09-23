@@ -11,6 +11,28 @@ import { createLogger } from '../../shared/logger'
 
 const log = createLogger('ConfigFile')
 
+/** Rename failures another process holding the file can cause, which a short wait clears. */
+const TRANSIENT_RENAME_CODES = new Set(['EPERM', 'EACCES', 'EBUSY', 'ENOTEMPTY'])
+const RENAME_RETRY_DELAYS_MS = [10, 20, 40, 80, 160]
+
+function isTransientRenameFailure(error: unknown, attempt: number): boolean {
+  const code = (error as NodeJS.ErrnoException)?.code
+  return !!code && TRANSIENT_RENAME_CODES.has(code) && attempt < RENAME_RETRY_DELAYS_MS.length
+}
+
+/** The load path is synchronous, so its move-aside waits out a transient failure in place. */
+function renameSyncWithRetry(from: string, to: string): void {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      fs.renameSync(from, to)
+      return
+    } catch (error) {
+      if (!isTransientRenameFailure(error, attempt)) throw error
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, RENAME_RETRY_DELAYS_MS[attempt])
+    }
+  }
+}
+
 declare global {
   /** Set by the first ConfigFile constructed in the process, so the storage directory is logged once
    *  however many config files are opened. */
@@ -68,6 +90,8 @@ export class ConfigFile<T> {
   // Serializes saves so only one writeFile+rename is in flight per file at a time,
   // avoiding concurrent renames racing the same destination.
   private saveChain: Promise<void> = Promise.resolve()
+  /** Set while a corrupt file could not be moved aside. No write replaces it until one can. */
+  private corruptFileInPlace = false
   // Serializes every update and read-modify-write turn. `saveChain` only orders the writes, which
   // is not enough on its own: a write publishes `this.data` after it resolves, so a caller that
   // reads while one is in flight starts from the pre-write value and its later write wins.
@@ -122,7 +146,7 @@ export class ConfigFile<T> {
     if (fs.existsSync(this.filePath)) {
       const dest = corruptBackupFilePath(this.filePath)
       try {
-        fs.renameSync(this.filePath, dest)
+        renameSyncWithRetry(this.filePath, dest)
         canWriteDefaults = true
       } catch (e) {
         log.error(
@@ -130,6 +154,7 @@ export class ConfigFile<T> {
           e,
         )
         canWriteDefaults = false
+        this.corruptFileInPlace = true
       }
     }
 
@@ -339,6 +364,11 @@ export class ConfigFile<T> {
     const unique = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     const tempPath = path.join(dir, `.${basename}.tmp.${unique}`)
     try {
+      if (this.corruptFileInPlace) {
+        await this.renameWithRetry(this.filePath, corruptBackupFilePath(this.filePath))
+        this.corruptFileInPlace = false
+        log.info(`[Photonics Config] Moved the corrupt ${basename} aside before saving`)
+      }
       await fsPromises.writeFile(tempPath, content, 'utf-8')
       await this.renameWithRetry(tempPath, this.filePath)
     } catch (error) {
@@ -362,20 +392,18 @@ export class ConfigFile<T> {
    * succeeds. Non-transient errors (e.g. ENOSPC, ENOENT) are re-thrown immediately.
    */
   private async renameWithRetry(from: string, to: string): Promise<void> {
-    const transientCodes = new Set(['EPERM', 'EACCES', 'EBUSY', 'ENOTEMPTY'])
-    const delaysMs = [10, 20, 40, 80, 160]
     for (let attempt = 0; ; attempt++) {
       try {
         await fsPromises.rename(from, to)
         return
       } catch (error) {
-        const code = (error as NodeJS.ErrnoException)?.code
-        if (!code || !transientCodes.has(code) || attempt >= delaysMs.length) {
+        if (!isTransientRenameFailure(error, attempt)) {
           throw error
         }
-        const delay = delaysMs[attempt]
+        const delay = RENAME_RETRY_DELAYS_MS[attempt]
+        const code = (error as NodeJS.ErrnoException).code
         log.warn(
-          `Rename of ${to} hit ${code}; retrying in ${delay}ms (attempt ${attempt + 1}/${delaysMs.length})`,
+          `Rename of ${to} hit ${code}, retrying in ${delay}ms (attempt ${attempt + 1}/${RENAME_RETRY_DELAYS_MS.length})`,
         )
         await new Promise((resolve) => setTimeout(resolve, delay))
       }

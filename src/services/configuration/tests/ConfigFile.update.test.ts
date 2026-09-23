@@ -8,8 +8,15 @@ jest.mock('electron', () => ({
   app: { getPath: (n: string) => mockGetPath(n) },
 }))
 
-// Wrap fs/promises.rename so individual tests can simulate transient failures,
-// while every other call delegates to the real implementation.
+// Wrap the renames so individual tests can simulate transient failures, while every other call
+// delegates to the real implementation.
+jest.mock('fs', () => {
+  const actual = jest.requireActual('fs')
+  return {
+    ...actual,
+    renameSync: jest.fn((from: string, to: string) => actual.renameSync(from, to)),
+  }
+})
 jest.mock('fs/promises', () => {
   const actual = jest.requireActual('fs/promises')
   return {
@@ -208,6 +215,98 @@ describe('ConfigFile rename retry', () => {
 
     await expect(cf.update({ versionToken: 'b' })).rejects.toThrow('Failed to save configuration')
     expect(renameMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('ConfigFile corrupt file recovery', () => {
+  const renameMock = fsPromises.rename as unknown as jest.Mock
+  const realRename = jest.requireActual('fs/promises').rename
+
+  const errnoError = (code: string): NodeJS.ErrnoException => {
+    const err = new Error(`${code}: simulated`) as NodeJS.ErrnoException
+    err.code = code
+    return err
+  }
+
+  /** A config file on disk holding text that does not parse, and the directory it sits in. */
+  const corruptFile = (): { filename: string; configDir: string; filePath: string } => {
+    const filename = `config-corrupt-${Date.now()}-${Math.random().toString(36).slice(2)}.json`
+    const configDir = path.join(testAppData, 'Photonics.rocks')
+    fs.mkdirSync(configDir, { recursive: true })
+    const filePath = path.join(configDir, filename)
+    fs.writeFileSync(filePath, '{ not json')
+    return { filename, configDir, filePath }
+  }
+
+  /** Waits for the defaults a recovery writes, so its rename lands before another test counts. */
+  const defaultsWritten = async (filePath: string): Promise<void> => {
+    for (let i = 0; i < 200; i++) {
+      try {
+        if (JSON.parse(fs.readFileSync(filePath, 'utf8'))?.data?.versionToken === 'default') return
+      } catch {
+        // Not there yet, or mid-write.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    throw new Error(`${filePath} never held the defaults`)
+  }
+
+  const backupsOf = (configDir: string, filename: string): string[] =>
+    fs
+      .readdirSync(configDir)
+      .filter((f) => f.startsWith(`${path.basename(filename, '.json')}.corrupt-`))
+
+  const renameSyncMock = fs.renameSync as unknown as jest.Mock
+  const realRenameSync = jest.requireActual<typeof fs>('fs').renameSync
+
+  afterEach(() => {
+    renameSyncMock.mockReset()
+    renameSyncMock.mockImplementation((from, to) => realRenameSync(from as string, to as string))
+    renameMock.mockReset()
+    renameMock.mockImplementation((...args: unknown[]) => realRename(...args))
+  })
+
+  it('moves a corrupt file aside after a transient rename failure', async () => {
+    const { filename, configDir, filePath } = corruptFile()
+    let calls = 0
+    renameSyncMock.mockImplementation((from, to) => {
+      calls++
+      if (calls === 1) throw errnoError('EBUSY')
+      realRenameSync(from as string, to as string)
+    })
+
+    new ConfigFile<TestData>(filename, { versionToken: 'default' }, 1, {})
+
+    expect(backupsOf(configDir, filename)).toHaveLength(1)
+    await defaultsWritten(filePath)
+  })
+
+  it('keeps a corrupt file it could not move aside when a save comes', async () => {
+    const { filename, filePath } = corruptFile()
+    renameSyncMock.mockImplementation(() => {
+      throw errnoError('EPERM')
+    })
+    renameMock.mockImplementation((from: string, to: string) =>
+      to.includes('.corrupt-') ? Promise.reject(errnoError('EPERM')) : realRename(from, to),
+    )
+    const cf = new ConfigFile<TestData>(filename, { versionToken: 'default' }, 1, {})
+
+    await expect(cf.update({ versionToken: 'edited' })).rejects.toThrow()
+
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('{ not json')
+  })
+
+  it('moves the corrupt file aside before the first save that can', async () => {
+    const { filename, configDir, filePath } = corruptFile()
+    renameSyncMock.mockImplementation(() => {
+      throw errnoError('EPERM')
+    })
+    const cf = new ConfigFile<TestData>(filename, { versionToken: 'default' }, 1, {})
+
+    await cf.update({ versionToken: 'edited' })
+
+    expect(backupsOf(configDir, filename)).toHaveLength(1)
+    expect(JSON.parse(fs.readFileSync(filePath, 'utf8')).data.versionToken).toBe('edited')
   })
 })
 
