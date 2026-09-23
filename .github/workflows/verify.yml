@@ -15,6 +15,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # The whole history, so coverage:check can find the commit this change starts from.
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -53,6 +56,13 @@ jobs:
 
       - name: Referenced paths are tracked
         run: npm run paths:check
+
+      # The branch as it stood before the push, or the target of a pull request, so a threshold
+      # lowered on development itself is still held to what development had.
+      - name: Coverage settings do not loosen
+        run: npm run coverage:check
+        env:
+          COVERAGE_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
 
       - name: Security audit
         run: npm audit --audit-level=high
