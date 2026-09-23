@@ -3,7 +3,14 @@ import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
 
 import type { LightingPreferences } from '../atoms'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getAppVersion, getCorruptRecoveryEvents, getPrefs, getValidationErrors } from '../ipcApi'
+import {
+  getAppVersion,
+  getAudioConfig,
+  getAudioEnabled,
+  getCorruptRecoveryEvents,
+  getPrefs,
+  getValidationErrors,
+} from '../ipcApi'
 import type { CueStateUpdatePayload, NodeCueRuntimeErrorPayload } from '../../../shared/ipcTypes'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import {
@@ -164,6 +171,21 @@ export function useAppIpcListeners(params: UseAppIpcListenersParams): void {
         }
       } catch (error) {
         log.error('Failed to fetch validation errors:', error)
+      }
+    })()
+
+    void (async () => {
+      try {
+        // Main announces a start once, so a window opened while audio runs starts capture here.
+        if (!(await getAudioEnabled()) || isCancelled()) {
+          return
+        }
+        const config = await getAudioConfig()
+        if (config && !isCancelled()) {
+          await latest.current.handleAudioEnable(config)
+        }
+      } catch (error) {
+        log.error('Failed to pick up running audio:', error)
       }
     })()
 

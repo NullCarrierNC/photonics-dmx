@@ -313,11 +313,11 @@ export const App = (): JSX.Element => {
     [setPrefs],
   )
 
-  // After a controller restart the main process auto-restores senders from preferences and may
-  // mutate rigs via template-sync (see `syncRigsWithUserLights` in the main process). Sync the
-  // renderer atoms so the UI reflects the actual runtime state without waiting on a navigation.
+  // The running senders are read on mount, and again after a controller restart, which restores
+  // senders from preferences and may mutate rigs via template-sync (see `syncRigsWithUserLights` in
+  // the main process), so the UI reflects the actual runtime state without waiting on a navigation.
   useEffect(() => {
-    const handleControllersRestarted = () => {
+    const readSenders = (): void => {
       getSystemStatus()
         .then((status) => {
           if (status?.success && status.senderStatus) {
@@ -325,14 +325,18 @@ export const App = (): JSX.Element => {
           }
         })
         .catch((err) => {
-          log.error('App: failed to sync sender status after restart', err)
+          log.error('App: failed to read which senders are running', err)
         })
+    }
+    const handleControllersRestarted = () => {
+      readSenders()
 
       getDmxRigs()
         .then((rigs) => setDmxRigs(rigs || []))
         .catch((err) => log.error('App: failed to refresh DMX rigs after restart', err))
     }
 
+    readSenders()
     return registerIpcListener(RENDERER_RECEIVE.CONTROLLERS_RESTARTED, handleControllersRestarted)
   }, [setDmxRigs])
 
