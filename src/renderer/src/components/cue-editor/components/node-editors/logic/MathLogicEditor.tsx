@@ -5,6 +5,7 @@ import type {
 } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
+import VariableSelect from './VariableSelect'
 
 export interface MathLogicEditorProps extends LogicEditorCommonProps {
   node: MathLogicNode
@@ -44,20 +45,14 @@ const MathLogicEditor: React.FC<MathLogicEditorProps> = ({
       expected="number"
       availableVariables={availableVariables}
     />
-    <label className="flex flex-col font-medium">
-      Assign To (optional)
-      <select
-        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-        value={node.assignTo ?? ''}
-        onChange={(event) => updateNode({ assignTo: event.target.value || undefined })}>
-        <option value="">-- None --</option>
-        {availableVariables.map((v) => (
-          <option key={v.name} value={v.name}>
-            {v.name} ({v.type}, {v.scope})
-          </option>
-        ))}
-      </select>
-    </label>
+    <VariableSelect
+      label="Assign To (optional)"
+      value={node.assignTo ?? ''}
+      onChange={(name) => updateNode({ assignTo: name || undefined })}
+      variables={availableVariables}
+      placeholder="-- None --"
+      showType
+    />
   </div>
 )
 

@@ -2,6 +2,7 @@ import React from 'react'
 import type { PulseLogicNode } from '../../../../../../../photonics-dmx/cues/types/nodeCueTypes'
 import ValueSourceEditor from '../../shared/ValueSourceEditor'
 import type { LogicEditorCommonProps } from './LogicNodeEditorShared'
+import VariableSelect from './VariableSelect'
 
 export interface PulseLogicEditorProps extends LogicEditorCommonProps {
   node: PulseLogicNode
@@ -20,50 +21,30 @@ const PulseLogicEditor: React.FC<PulseLogicEditorProps> = ({
       expected="number"
       availableVariables={availableVariables}
     />
-    <label className="flex flex-col font-medium">
-      Anchor Variable (holds the cycle origin; resets each activation)
-      <select
-        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-        value={node.anchorVar}
-        onChange={(event) => updateNode({ anchorVar: event.target.value })}>
-        <option value="">-- select variable --</option>
-        {availableVariables.map((v) => (
-          <option key={v.name} value={v.name}>
-            {v.name} ({v.type}, {v.scope})
-          </option>
-        ))}
-      </select>
-    </label>
-    <label className="flex flex-col font-medium">
-      Assign Index To (integer cycles since anchor)
-      <select
-        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-        value={node.assignTo}
-        onChange={(event) => updateNode({ assignTo: event.target.value })}>
-        <option value="">-- select variable --</option>
-        {availableVariables.map((v) => (
-          <option key={v.name} value={v.name}>
-            {v.name} ({v.type}, {v.scope})
-          </option>
-        ))}
-      </select>
-    </label>
-    <label className="flex flex-col font-medium">
-      Assign Phase To (optional; fraction 0–1 within the cycle)
-      <select
-        className="mt-1 rounded border px-2 py-1 bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-        value={node.assignPhase ?? ''}
-        onChange={(event) =>
-          updateNode({ assignPhase: event.target.value === '' ? undefined : event.target.value })
-        }>
-        <option value="">-- none --</option>
-        {availableVariables.map((v) => (
-          <option key={v.name} value={v.name}>
-            {v.name} ({v.type}, {v.scope})
-          </option>
-        ))}
-      </select>
-    </label>
+    <VariableSelect
+      label="Anchor Variable (holds the cycle origin; resets each activation)"
+      value={node.anchorVar}
+      onChange={(name) => updateNode({ anchorVar: name })}
+      variables={availableVariables}
+      placeholder="-- select variable --"
+      showType
+    />
+    <VariableSelect
+      label="Assign Index To (integer cycles since anchor)"
+      value={node.assignTo}
+      onChange={(name) => updateNode({ assignTo: name })}
+      variables={availableVariables}
+      placeholder="-- select variable --"
+      showType
+    />
+    <VariableSelect
+      label="Assign Phase To (optional; fraction 0–1 within the cycle)"
+      value={node.assignPhase ?? ''}
+      onChange={(name) => updateNode({ assignPhase: name || undefined })}
+      variables={availableVariables}
+      placeholder="-- none --"
+      showType
+    />
   </div>
 )
 
