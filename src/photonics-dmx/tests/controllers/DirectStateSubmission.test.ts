@@ -76,3 +76,27 @@ describe('direct state submission', () => {
     expect(shown()).toBe('0,0,0,0')
   })
 })
+
+describe('direct state submission across lights', () => {
+  let harness: SequencerHarness
+
+  beforeEach(() => {
+    harness = createSequencerHarness({ frontCount: 2, backCount: 0 })
+  })
+
+  afterEach(() => harness.cleanup())
+
+  const BLUE: RGBIO = { ...WHITE, red: 0, green: 0 }
+
+  it('keeps a light on its last state when another light updates in the same frame', () => {
+    const [a, b] = harness.lightManager.getLights(['front'], ['all'])
+
+    harness.sequencer.setState([a], RED, 1)
+    harness.sequencer.setState([a], BLUE, 1)
+    harness.sequencer.setState([b], GREEN, 1)
+    for (let frame = 0; frame < 5; frame++) harness.advanceBy(FRAME_MS)
+
+    expect(harness.getLightState(a.id)).toMatchObject({ red: 0, green: 0, blue: 255 })
+    expect(harness.getLightState(b.id)).toMatchObject({ red: 0, green: 255, blue: 0 })
+  })
+})

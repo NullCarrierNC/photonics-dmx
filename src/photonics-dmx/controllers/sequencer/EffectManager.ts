@@ -597,8 +597,8 @@ export class EffectManager implements IEffectManager {
       transitions: transitions,
     }
 
-    // Use our existing mechanism to add the effect on layer 0
-    this.addEffect('setState', effect)
+    // Named by its lights, so one light's update never drops another light's queued update
+    this.addEffect(`setState:${lights.map((light) => light.id).join(',')}`, effect)
   }
 
   /**
