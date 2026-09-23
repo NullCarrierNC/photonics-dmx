@@ -1,9 +1,12 @@
 name: Build packages
 
-# Manual packaging smoke: verify electron-builder can complete per platform.
+# Packaging smoke, weekly and by hand: verify electron-builder can complete per platform.
 # Pushing version tags also runs `.github/workflows/release.yml` (macOS + Windows installers only; Linux is not part of that release).
+# The weekly run is what builds the Linux package, since no release does.
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
 
 permissions:
   contents: read
