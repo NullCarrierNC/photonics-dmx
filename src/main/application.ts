@@ -104,6 +104,14 @@ export class Application {
     this.windowManager.focusMainWindow()
   }
 
+  /**
+   * Closes every window for a user's Quit, asking any page with unsaved changes first. False when
+   * the user stays on one, and the app then keeps running.
+   */
+  public closeWindowsForQuit(): Promise<boolean> {
+    return this.windowManager.closeWindowsForQuit()
+  }
+
   public getControllerManager(): ControllerManager {
     return this.controllerManager
   }

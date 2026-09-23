@@ -15,6 +15,7 @@ import NotesNodeComponent from '../components/cue-editor/components/flow/NotesNo
 import NewFileModal from '../components/cue-editor/components/NewFileModal'
 import ImportCueFileModal from '../components/cue-editor/components/ImportCueFileModal'
 import { useToast } from '../hooks/useToast'
+import { useUnloadGuard } from '../hooks/useUnloadGuard'
 import { createLogger } from '../../../shared/logger'
 import { useCueFiles } from '../components/cue-editor/hooks/useCueFiles'
 import { useCueFlow } from '../components/cue-editor/hooks/useCueFlow'
@@ -156,6 +157,7 @@ const CueEditor: React.FC = () => {
     loadCueIntoFlow,
   })
   const { showJsonEditor, jsonEditorDirty, closeJsonEditor, getUpdatedDocument } = json
+  useUnloadGuard(isDirty || (showJsonEditor && jsonEditorDirty))
 
   useEffect(() => {
     getUpdatedDocumentRef.current = getUpdatedDocument

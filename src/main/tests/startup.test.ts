@@ -11,6 +11,7 @@ import type { LogEntry } from '../../shared/logger'
 
 const applicationInit = jest.fn<() => Promise<void>>()
 const applicationShutdown = jest.fn<() => Promise<void>>()
+const closeWindowsForQuit = jest.fn<() => Promise<boolean>>()
 const handleSecondInstance = jest.fn()
 const handleActivate = jest.fn()
 const applicationCtor = jest.fn()
@@ -71,6 +72,7 @@ jest.mock('../application', () => ({
     }
     init = applicationInit
     shutdown = applicationShutdown
+    closeWindowsForQuit = closeWindowsForQuit
     flushLogs: (() => Promise<void>) | null = null
     handleSecondInstance = handleSecondInstance
     handleAllWindowsClosed = jest.fn()
@@ -106,6 +108,8 @@ describe('main startup', () => {
     applicationInit.mockResolvedValue(undefined)
     applicationShutdown.mockReset()
     applicationShutdown.mockResolvedValue(undefined)
+    closeWindowsForQuit.mockReset()
+    closeWindowsForQuit.mockResolvedValue(true)
     handleSecondInstance.mockReset()
     handleActivate.mockReset()
     mockIsPackaged = false
@@ -177,6 +181,35 @@ describe('main startup', () => {
     ;(activate as () => void)()
 
     expect(handleActivate).toHaveBeenCalledTimes(1)
+  })
+
+  /** Sends the app the Quit a menu, Cmd+Q or the Dock sends, and lets it run to its end. */
+  async function quit(): Promise<void> {
+    const beforeQuit = appOn.mock.calls.find((c) => c[0] === 'before-quit')?.[1]
+    ;(beforeQuit as (event: { preventDefault: () => void }) => void)({ preventDefault: jest.fn() })
+    for (let i = 0; i < 5; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+  }
+
+  it('shuts down on a Quit once every window has closed', async () => {
+    await startUp()
+
+    await quit()
+
+    expect(closeWindowsForQuit).toHaveBeenCalledTimes(1)
+    expect(applicationShutdown).toHaveBeenCalledTimes(1)
+    expect(appExit).toHaveBeenCalledWith(0)
+  })
+
+  it('keeps the app and its controllers running when a window stays open on Quit', async () => {
+    closeWindowsForQuit.mockResolvedValue(false)
+    await startUp()
+
+    await quit()
+
+    expect(applicationShutdown).not.toHaveBeenCalled()
+    expect(appExit).not.toHaveBeenCalled()
   })
 
   it('keeps the configuration account recording when a packaged build raises the floor', async () => {

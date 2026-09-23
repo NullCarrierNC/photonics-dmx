@@ -3,7 +3,7 @@
  * The page's delete confirmation, with the hooks and the workspace behind it stubbed. The title
  * comes from the toolbar label, so a cue file and an effect file each name themselves.
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { fireEvent, screen, within } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 
@@ -32,7 +32,7 @@ const mockFlow = {
   loadCueIntoFlow: jest.fn(),
   reactFlowInstance: null,
 }
-const mockJson = {
+let mockJson = {
   showJsonEditor: false,
   jsonEditorDirty: false,
   closeJsonEditor: jest.fn(),
@@ -141,5 +141,44 @@ describe('CueEditor delete confirmation', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     expect(mockHandleDelete).not.toHaveBeenCalled()
     expect(screen.queryByRole('alertdialog')).toBeNull()
+  })
+})
+
+describe('CueEditor close guard', () => {
+  const cleanJson = mockJson
+
+  afterEach(() => {
+    mockJson = cleanJson
+  })
+
+  /** Fires the event a window close or reload sends the page and reports whether it asked. */
+  function closeAsks(): boolean {
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    return event.defaultPrevented
+  }
+
+  it('asks before the window closes while the graph has unsaved changes', () => {
+    mockFiles = { ...filesFor('cue'), isDirty: true }
+    renderWithProviders(<CueEditor />)
+
+    expect(closeAsks()).toBe(true)
+  })
+
+  it('asks while the JSON editor holds unsaved text', () => {
+    mockFiles = filesFor('cue')
+    mockJson = { ...cleanJson, showJsonEditor: true, jsonEditorDirty: true }
+    renderWithProviders(<CueEditor />)
+
+    expect(closeAsks()).toBe(true)
+  })
+
+  it('stops asking once the changes are saved', () => {
+    mockFiles = { ...filesFor('cue'), isDirty: true }
+    const view = renderWithProviders(<CueEditor />)
+    mockFiles = filesFor('cue')
+    view.rerender(<CueEditor />)
+
+    expect(closeAsks()).toBe(false)
   })
 })

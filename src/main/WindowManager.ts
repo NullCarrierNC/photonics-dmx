@@ -53,6 +53,12 @@ const WINDOW_SPECS: Record<WindowRole, WindowSpec> = {
 
 const WINDOW_ROLES = Object.keys(WINDOW_SPECS) as WindowRole[]
 
+/** A Quit closes the main window last, so a page that keeps the app open keeps it too. */
+const QUIT_CLOSE_ORDER: WindowRole[] = ['cueEditor', 'audioPreview', 'main']
+
+/** How long a closing page has to answer before a Quit carries on without it. */
+const CLOSE_ANSWER_MS = 5000
+
 /** How long a window's geometry has to settle after a move or resize before it is saved. */
 const SAVE_DELAY_MS = 500
 
@@ -62,6 +68,8 @@ export class WindowManager {
   private controllerManager: ControllerManager | null = null
   /** Set once the app closes its windows to quit. No page is asked to stay after that. */
   private quitting = false
+  /** Called when the user keeps a page a Quit is closing. */
+  private readonly closeRefused = new Map<BrowserWindow, () => void>()
 
   /**
    * Sets the controller manager for accessing preferences
@@ -189,6 +197,8 @@ export class WindowManager {
     window.webContents.on('will-prevent-unload', (event) => {
       if (this.quitting || this.confirmLeave(window)) {
         event.preventDefault()
+      } else {
+        this.closeRefused.get(window)?.()
       }
     })
 
@@ -283,8 +293,41 @@ export class WindowManager {
   }
 
   /**
-   * Saves every open window's geometry, then closes them all. The app calls this to quit, so no
-   * page with unsaved changes is asked to stay.
+   * Saves every open window's geometry, then closes each the way the user closing it would, so a
+   * page with unsaved changes asks first. True once every window has gone, false as soon as the
+   * user stays on one, which leaves it and the windows after it open.
+   */
+  public async closeWindowsForQuit(): Promise<boolean> {
+    for (const role of WINDOW_ROLES) {
+      await this.saveWindowState(role)
+    }
+    for (const role of QUIT_CLOSE_ORDER) {
+      const window = this.openWindow(role)
+      if (window && !(await this.closeAsking(window))) {
+        return false
+      }
+    }
+    return true
+  }
+
+  /** Closes a window and answers whether it went. A page that never answers counts as gone. */
+  private closeAsking(window: BrowserWindow): Promise<boolean> {
+    return new Promise((resolve) => {
+      const settle = (closed: boolean): void => {
+        clearTimeout(timer)
+        this.closeRefused.delete(window)
+        resolve(closed)
+      }
+      const timer = setTimeout(() => settle(true), CLOSE_ANSWER_MS)
+      this.closeRefused.set(window, () => settle(false))
+      window.on('closed', () => settle(true))
+      window.close()
+    })
+  }
+
+  /**
+   * Saves every open window's geometry, then closes them all. The app calls this to shut down, so
+   * no page with unsaved changes is asked to stay.
    */
   public async closeAllWindows(): Promise<void> {
     this.quitting = true

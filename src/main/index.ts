@@ -212,8 +212,27 @@ async function shutdownBeforeQuit(): Promise<void> {
   }
 }
 
+let quitInProgress = false
+
+/**
+ * A Quit from the menu, Cmd+Q or the Dock closes the windows first, so a page with unsaved changes
+ * can ask, and the controllers shut down only once every window has gone.
+ */
+async function quitWhenWindowsClose(): Promise<void> {
+  if (quitInProgress) {
+    return
+  }
+  quitInProgress = true
+  if (applicationInstance && !(await applicationInstance.closeWindowsForQuit())) {
+    log.info('Quit cancelled, a window kept its unsaved changes')
+    quitInProgress = false
+    return
+  }
+  await shutdownBeforeQuit()
+}
+
 app.on('before-quit', (event) => {
   // Prevent the default quit behavior
   event.preventDefault()
-  void shutdownBeforeQuit()
+  void quitWhenWindowsClose()
 })

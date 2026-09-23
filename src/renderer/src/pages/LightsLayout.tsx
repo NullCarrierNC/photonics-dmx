@@ -44,6 +44,7 @@ import { useLightsLayoutActiveConfigSync } from './LightsLayout/useLightsLayoutA
 import { useToast } from '../hooks/useToast'
 import { useTimeout } from '../utils/useTimeout'
 import { useConfirm } from '../hooks/useConfirm'
+import { useUnloadGuard } from '../hooks/useUnloadGuard'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('LightsLayout')
 
@@ -330,15 +331,7 @@ const LightsLayout = () => {
     }
   }, [setLightsLayoutUnsaved])
 
-  useEffect(() => {
-    if (!isDirty) return
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-      e.returnValue = ''
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [isDirty])
+  useUnloadGuard(isDirty)
 
   const tryConfirmUnsaved = useCallback(async () => {
     if (!isDirty) return true

@@ -7,6 +7,8 @@ const setupIpcHandlers = jest.fn()
 const setupMenu = jest.fn()
 const controllerInit = jest.fn<() => Promise<void>>()
 const controllerShutdown = jest.fn<() => Promise<void>>()
+const closeAllWindows = jest.fn(async () => {})
+const closeWindowsForQuit = jest.fn(async () => true)
 
 jest.mock('electron', () => ({
   app: { getPath: jest.fn(() => '/tmp/photonics-test'), quit: jest.fn() },
@@ -18,7 +20,8 @@ jest.mock('../WindowManager', () => ({
     setControllerManager,
     createMainWindow,
     getMainWindow,
-    closeAllWindows: jest.fn(async () => {}),
+    closeAllWindows,
+    closeWindowsForQuit,
   })),
 }))
 
@@ -150,5 +153,26 @@ describe('Application activate', () => {
     new Application().handleActivate()
 
     expect(createMainWindow).not.toHaveBeenCalled()
+  })
+})
+
+describe('Application quit', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    controllerShutdown.mockReset()
+    controllerShutdown.mockResolvedValue(undefined)
+  })
+
+  it('answers whether every window closed for a Quit', async () => {
+    closeWindowsForQuit.mockResolvedValueOnce(false)
+
+    await expect(new Application().closeWindowsForQuit()).resolves.toBe(false)
+  })
+
+  it('closes the windows without asking any of them when it shuts down', async () => {
+    await new Application().shutdown()
+
+    expect(closeAllWindows).toHaveBeenCalledTimes(1)
+    expect(closeWindowsForQuit).not.toHaveBeenCalled()
   })
 })
