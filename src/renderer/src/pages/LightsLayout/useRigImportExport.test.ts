@@ -168,6 +168,7 @@ describe('useRigImportExport export', () => {
     jest.mocked(ipcApi.exportRig).mockResolvedValue({
       success: false,
       error: 'User cancelled export.',
+      cancelled: true,
     })
     const view = renderRigs()
     await run(view, (h) => h.handleExport())
@@ -199,6 +200,7 @@ describe('useRigImportExport import', () => {
     jest.mocked(ipcApi.pickRigImportFile).mockResolvedValue({
       success: false,
       error: 'User cancelled import.',
+      cancelled: true,
     })
     const view = renderRigs()
     await run(view, (h) => h.handleImport())

@@ -236,7 +236,7 @@ describe('registerLightsRigsConfigHandlers (RIGS export / import)', () => {
     getDmxRig.mockReturnValue(exampleRig)
     mockShowSaveDialog.mockResolvedValue({ canceled: true })
     const r = await getHandler(RIGS.EXPORT)(null, 'r1')
-    expect(r).toEqual({ success: false, error: 'User cancelled export.' })
+    expect(r).toEqual({ success: false, error: 'User cancelled export.', cancelled: true })
     expect(mockWriteFile).not.toHaveBeenCalled()
   })
 
@@ -268,7 +268,7 @@ describe('registerLightsRigsConfigHandlers (RIGS export / import)', () => {
     registerLightsRigsConfigHandlers(mockIpcMain as never, mockControllerManager as never)
     mockShowOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] })
     const r = await getHandler(RIGS.IMPORT_PICK)(null, undefined)
-    expect(r).toEqual({ success: false, error: 'User cancelled import.' })
+    expect(r).toEqual({ success: false, error: 'User cancelled import.', cancelled: true })
   })
 
   it('import-pick: rejects malformed JSON', async () => {

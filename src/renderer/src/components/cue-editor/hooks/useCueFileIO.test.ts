@@ -269,6 +269,61 @@ describe('useCueFileIO handleSave', () => {
   })
 })
 
+describe('useCueFileIO delete and export', () => {
+  beforeEach(() => {
+    resetIpcApiMock()
+  })
+
+  const openCueDoc = (): Partial<UseCueFileIOParams> =>
+    ({
+      editorDoc: { mode: 'cue', path: '/cues/motion-cues.json', file: mixedFile() },
+      filename: 'motion-cues.json',
+      selectedCueId: 'cue-light',
+    }) as unknown as Partial<UseCueFileIOParams>
+
+  it('keeps the file open and says why when the delete is refused', async () => {
+    jest
+      .mocked(ipcApi.deleteNodeCueFile)
+      .mockResolvedValue({ success: false, error: 'file is read-only' } as never)
+    const { rendered, onSaveError, setEditorDoc } = setup(openCueDoc())
+
+    await act(async () => {
+      await rendered.result.current.handleDelete()
+    })
+
+    expect(onSaveError).toHaveBeenCalledWith(expect.stringContaining('file is read-only'))
+    expect(setEditorDoc).not.toHaveBeenCalled()
+  })
+
+  it('says why when the export is refused', async () => {
+    jest
+      .mocked(ipcApi.exportNodeCueFile)
+      .mockResolvedValue({ success: false, error: 'disk full' } as never)
+    const { rendered, onSaveError } = setup(openCueDoc())
+
+    await act(async () => {
+      await rendered.result.current.handleExport()
+    })
+
+    expect(onSaveError).toHaveBeenCalledWith(expect.stringContaining('disk full'))
+  })
+
+  it('says nothing when the export dialog is dismissed', async () => {
+    jest.mocked(ipcApi.exportNodeCueFile).mockResolvedValue({
+      success: false,
+      error: 'User cancelled export.',
+      cancelled: true,
+    } as never)
+    const { rendered, onSaveError } = setup(openCueDoc())
+
+    await act(async () => {
+      await rendered.result.current.handleExport()
+    })
+
+    expect(onSaveError).not.toHaveBeenCalled()
+  })
+})
+
 describe('useCueFileIO revertCurrentFileToDisk', () => {
   beforeEach(() => {
     resetIpcApiMock()

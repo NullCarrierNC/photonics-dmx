@@ -218,6 +218,7 @@ describe('useCueFiles import', () => {
     jest.mocked(ipcApi.pickNodeCueImportFile).mockResolvedValue({
       success: false,
       error: 'User cancelled import.',
+      cancelled: true,
     })
     const view = await renderLoaded()
     await run(view, (h) => h.handleImport())

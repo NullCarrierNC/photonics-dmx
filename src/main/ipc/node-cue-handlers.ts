@@ -126,7 +126,7 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     })
 
     if (result.canceled || result.filePaths.length === 0) {
-      return { success: false, error: 'User cancelled import.' }
+      return { success: false, error: 'User cancelled import.', cancelled: true }
     }
 
     const sourcePath = result.filePaths[0]
@@ -165,7 +165,7 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
     })
 
     if (result.canceled || !result.filePath) {
-      return { success: false, error: 'User cancelled export.' }
+      return { success: false, error: 'User cancelled export.', cancelled: true }
     }
 
     await fs.copyFile(resolvedSource, result.filePath)

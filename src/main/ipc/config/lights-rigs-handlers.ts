@@ -161,7 +161,7 @@ export function registerLightsRigsConfigHandlers(
       filters: [{ name: 'Photonics Rig Files', extensions: ['json'] }],
     })
     if (result.canceled || !result.filePath) {
-      return { success: false, error: 'User cancelled export.' }
+      return { success: false, error: 'User cancelled export.', cancelled: true }
     }
 
     await fs.writeFile(result.filePath, JSON.stringify(payload, null, 2), 'utf-8')
@@ -176,7 +176,7 @@ export function registerLightsRigsConfigHandlers(
       filters: [{ name: 'Photonics Rig Files', extensions: ['json'] }],
     })
     if (result.canceled || result.filePaths.length === 0) {
-      return { success: false, error: 'User cancelled import.' }
+      return { success: false, error: 'User cancelled import.', cancelled: true }
     }
 
     const sourcePath = result.filePaths[0]

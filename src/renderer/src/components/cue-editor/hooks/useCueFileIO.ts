@@ -31,6 +31,7 @@ import {
   validateNodeCue,
   validateEffect,
 } from '../../../ipcApi'
+import { orThrow, wasCancelled } from '../../../ipc/ipcResult'
 import { createLogger } from '../../../../../shared/logger'
 
 const log = createLogger('useCueFileIO')
@@ -288,11 +289,11 @@ export function useCueFileIO({
     if (!editorDoc?.path) return
 
     try {
-      if (editorDoc.mode === 'effect') {
-        await deleteEffectFile(editorDoc.path)
-      } else {
-        await deleteNodeCueFile(editorDoc.path)
-      }
+      orThrow(
+        editorDoc.mode === 'effect'
+          ? await deleteEffectFile(editorDoc.path)
+          : await deleteNodeCueFile(editorDoc.path),
+      )
     } catch (error) {
       log.error('Failed to delete file', error)
       onSaveError?.(`Failed to delete: ${error instanceof Error ? error.message : String(error)}`)
@@ -342,11 +343,11 @@ export function useCueFileIO({
   const handleExport = useCallback(async () => {
     if (!editorDoc?.path) return
     try {
-      if (editorDoc.mode === 'effect') {
-        await exportEffectFile(editorDoc.path)
-      } else {
-        await exportNodeCueFile(editorDoc.path)
-      }
+      const result =
+        editorDoc.mode === 'effect'
+          ? await exportEffectFile(editorDoc.path)
+          : await exportNodeCueFile(editorDoc.path)
+      if (!wasCancelled(result)) orThrow(result)
     } catch (error) {
       log.error('Failed to export current file', error)
       onSaveError?.(`Failed to export: ${formatSaveError(error)}`)

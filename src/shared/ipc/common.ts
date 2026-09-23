@@ -13,6 +13,8 @@
 export interface IpcErrorResult {
   success: false
   error: string
+  /** Set when the user dismissed a file dialog, which is no failure to report. */
+  cancelled?: true
 }
 
 export type IpcSuccessResult = { success: true }

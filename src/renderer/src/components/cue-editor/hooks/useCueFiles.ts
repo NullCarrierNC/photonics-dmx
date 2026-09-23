@@ -22,6 +22,7 @@ import {
   validateEffect,
   validateNodeCue,
 } from '../../../ipcApi'
+import { wasCancelled } from '../../../ipc/ipcResult'
 import { addIpcListener, removeIpcListener } from '../../../utils/ipcHelpers'
 import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import {
@@ -229,7 +230,7 @@ const useCueFiles = ({
         const effectMode: EffectMode = mode === 'audio' ? 'audio' : 'yarg'
         const result = await pickEffectImportFile(effectMode)
         if (!result.success) {
-          if (result.error !== 'User cancelled import.') {
+          if (!wasCancelled(result)) {
             onError?.(result.error)
           }
           return
@@ -250,7 +251,7 @@ const useCueFiles = ({
       } else {
         const result = await pickNodeCueImportFile(mode)
         if (!result.success) {
-          if (result.error !== 'User cancelled import.') {
+          if (!wasCancelled(result)) {
             onError?.(result.error)
           }
           return

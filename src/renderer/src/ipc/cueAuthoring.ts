@@ -4,6 +4,7 @@
 import type {
   EffectFile,
   EffectMode,
+  IpcErrorResult,
   NodeCueFile,
   NodeCueKind,
   NodeCueMode,
@@ -21,7 +22,7 @@ interface CueValidation {
  * A refusal carries an error rather than a verdict, and the editor reads the verdict either way,
  * so a refusal is reported as the file not being usable, with the reason main gave.
  */
-function asValidation<T extends CueValidation>(result: T | { success: false; error: string }): T {
+function asValidation<T extends CueValidation>(result: T | IpcErrorResult): T {
   if (wasRefused(result)) {
     const refusal: CueValidation = {
       valid: false,

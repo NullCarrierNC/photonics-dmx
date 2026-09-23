@@ -16,6 +16,7 @@ import {
   deleteDmxRig,
 } from '../../ipcApi'
 import type { ImportRigSummary } from './components/ImportRigModal'
+import { wasCancelled } from '../../ipc/ipcResult'
 import type { ToastType } from '../../hooks/useToast'
 import type { ConfirmOptions } from '../../hooks/useConfirm'
 import { createLogger } from '../../../../shared/logger'
@@ -68,9 +69,6 @@ interface UseRigImportExportParams {
   confirm: (options: ConfirmOptions) => Promise<boolean>
 }
 
-const CANCEL_EXPORT = 'User cancelled export.'
-const CANCEL_IMPORT = 'User cancelled import.'
-
 export function useRigImportExport({
   rigs,
   setRigs,
@@ -118,7 +116,7 @@ export function useRigImportExport({
     try {
       const result = await exportRig(activeRigId)
       if (!result.success) {
-        if (result.error !== CANCEL_EXPORT) {
+        if (!wasCancelled(result)) {
           showToast(result.error, 'error', 5000)
         }
         return
@@ -139,7 +137,7 @@ export function useRigImportExport({
     try {
       const result = await pickRigImportFile()
       if (!result.success) {
-        if (result.error !== CANCEL_IMPORT) {
+        if (!wasCancelled(result)) {
           showToast(result.error, 'error', 5000)
         }
         return
