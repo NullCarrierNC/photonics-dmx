@@ -11,10 +11,17 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const { tallyRuleReports } = require('./ruleReportsCore.cjs')
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** How many times the rule reports across src/. */
+/**
+ * How many times the rule reports across src/, a report an `eslint-disable` hides included, and
+ * where a disable gives no reason.
+ */
 function countReports(ruleId) {
   // Which files are linted is the flat config's to decide, so only src/ is named here.
   const args = [
@@ -42,17 +49,7 @@ function countReports(ruleId) {
       throw err
     }
   }
-  /** @type {Array<{ messages: Array<{ ruleId?: string | null }> }>} */
-  const fileReports = JSON.parse(raw)
-  let count = 0
-  for (const file of fileReports) {
-    for (const message of file.messages) {
-      if (message.ruleId === ruleId) {
-        count++
-      }
-    }
-  }
-  return count
+  return tallyRuleReports(JSON.parse(raw), ruleId)
 }
 
 /**
@@ -80,11 +77,18 @@ function readBudget(file) {
  */
 export function runRuleBudget({ ruleId, budgetFile, label, note }) {
   const file = join(root, budgetFile)
-  const current = countReports(ruleId)
+  const { count: current, unjustified } = countReports(ruleId)
+
+  if (unjustified.length > 0) {
+    for (const where of unjustified) {
+      console.error(`${where}: eslint-disable of ${ruleId} gives no reason`)
+    }
+    console.error('Say why after `--` on the disable comment, or fix the report it hides.')
+    process.exit(1)
+  }
 
   if (process.argv.includes('--write')) {
-    // A ratchet only holds if writing it can lower the number and never raise it. Otherwise the
-    // message a failing budget prints is also the way past the failure.
+    // A ratchet holds only while writing it can lower a count and never raise one.
     const previous = readBudget(file)
     if (previous !== null && current > previous) {
       console.error(`${label} count ${current} is above the recorded ${previous} (file ${file})`)
@@ -96,7 +100,7 @@ export function runRuleBudget({ ruleId, budgetFile, label, note }) {
     mkdirSync(dirname(file), { recursive: true })
     const lines = [
       String(current),
-      `Auto-generated: \`npx eslint src\` messages for ${ruleId}.`,
+      `Auto-generated: \`npx eslint src\` messages for ${ruleId}, suppressed ones included.`,
       note,
     ]
     writeFileSync(file, `${lines.join('\n')}\n`, 'utf8')

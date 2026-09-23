@@ -2,7 +2,7 @@
  * Execution engine for effect node graphs.
  * Similar to NodeExecutionEngine but for effects triggered by cues.
  */
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any -- author-typed parameter values, and effect listeners passed as event nodes */
 
 import { ILightingController } from '../../../controllers/sequencer/interfaces'
 import { DmxLightManager } from '../../../controllers/DmxLightManager'

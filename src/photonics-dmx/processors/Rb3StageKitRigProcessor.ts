@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any -- colour sets from the StageKit colour helpers are untyped */
 /**
  * Owns one rig's worth of RB3 StageKit render state and operations: the cached
  * `StageKitLightMapper` sized to that rig's light count, per-DMX-light colour-bank

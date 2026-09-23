@@ -8,7 +8,7 @@
  * Game state, menu animation timing, and renderer-bound `cueHandled` event emission stay
  * on this coordinator. The per-rig render machinery lives in `Rb3StageKitRigProcessor`.
  */
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any -- RB3E game-state events and blended colours arrive untyped */
 import { EventEmitter } from 'events'
 import { StageKitConfig, DEFAULT_STAGEKIT_CONFIG } from '../listeners/RB3/StageKitTypes'
 import { CueData } from '../cues/types/cueTypes'

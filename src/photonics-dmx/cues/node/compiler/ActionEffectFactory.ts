@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any -- the resolvers take an action field raw or already resolved */
 import {
   WaitCondition,
   TrackedLight,
