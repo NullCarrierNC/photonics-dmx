@@ -70,12 +70,16 @@ export function setupSimulationHandlers(
       ...options,
     })
 
-  // Simulation dispatches through the same chain cue handlers RB3E drives (cue mode re-dispatches
-  // the RB3 look at ~30 Hz), so simulation requests are refused while the RB3E listener is enabled.
-  const rb3Blocked = (): boolean => controllerManager.getIsRb3Enabled()
-  const RB3_BLOCKED_ERROR = 'Disable RB3E before simulating cues'
-  const livePostProcessingBlocked = (): boolean =>
-    controllerManager.getIsRb3Enabled() || controllerManager.getIsYargEnabled()
+  // Simulation dispatches through the same chain cue handlers a live listener drives, so simulation
+  // requests are refused while YARG or RB3E is enabled.
+  const liveInput = (): 'YARG' | 'RB3E' | null => {
+    if (controllerManager.getIsRb3Enabled()) return 'RB3E'
+    return controllerManager.getIsYargEnabled() ? 'YARG' : null
+  }
+  const liveInputRefusal = (): { success: false; error: string } | null => {
+    const live = liveInput()
+    return live ? { success: false, error: `Disable ${live} before simulating cues` } : null
+  }
 
   handleInvoke(ipcMain, LIGHT.GET_AUDIO_CUE_GROUPS, log, async () => {
     try {
@@ -136,9 +140,8 @@ export function setupSimulationHandlers(
 
   handleInvoke(ipcMain, LIGHT.START_TEST_EFFECT, log, async (_, data: unknown) => {
     try {
-      if (rb3Blocked()) {
-        return { success: false, error: RB3_BLOCKED_ERROR }
-      }
+      const refused = liveInputRefusal()
+      if (refused) return refused
       const request = validateTestEffectPayload(data)
       if (!request.ok) {
         return { success: false, error: request.error }
@@ -167,9 +170,8 @@ export function setupSimulationHandlers(
   // (same guard as every simulate handler).
   handleInvoke(ipcMain, LIGHT.START_RB3_TEST_EFFECT, log, async (_, data: unknown) => {
     try {
-      if (rb3Blocked()) {
-        return { success: false, error: RB3_BLOCKED_ERROR }
-      }
+      const refused = liveInputRefusal()
+      if (refused) return refused
       const request = validateTestEffectPayload(data)
       if (!request.ok) {
         return { success: false, error: request.error }
@@ -193,9 +195,8 @@ export function setupSimulationHandlers(
       data: { red?: unknown; green?: unknown; blue?: unknown; yellow?: unknown; fog?: unknown },
     ) => {
       try {
-        if (rb3Blocked()) {
-          return { success: false, error: RB3_BLOCKED_ERROR }
-        }
+        const refused = liveInputRefusal()
+        if (refused) return refused
         // Clamp each bank to a valid 8-bit mask; ignore non-numeric input rather than throw.
         const mask = (v: unknown): number => {
           const n = typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : 0
@@ -233,7 +234,7 @@ export function setupSimulationHandlers(
     LIGHT.SIMULATE_POST_PROCESSING,
     log,
     async (_, data?: { state?: unknown }) => {
-      if (livePostProcessingBlocked() || !controllerManager.getIsInitialized()) return false
+      if (liveInput() || !controllerManager.getIsInitialized()) return false
       const state = data?.state
       if (!isPostProcessingState(state)) {
         log.warn(`Ignoring unknown post-processing state: ${String(state)}`)
@@ -279,7 +280,7 @@ export function setupSimulationHandlers(
       // Answers true once the event fired and false for anything else, a throw included, since the
       // renderer reads the answer as a boolean.
       async (_, data: unknown) => {
-        if (rb3Blocked() || !controllerManager.getIsInitialized()) return false
+        if (liveInput() || !controllerManager.getIsInitialized()) return false
         const context = validateSimulationContextPayload(data)
         if (!context.ok) {
           log.warn(`Refusing a simulated ${timing.what}: ${context.error}`)
@@ -330,9 +331,8 @@ export function setupSimulationHandlers(
       }
       const { instrument, noteType, venueSize = 'Small', bpm = 120, cueGroup } = payload.value
       const effectId = payload.value.effectId
-      if (rb3Blocked()) {
-        return { success: false, error: RB3_BLOCKED_ERROR }
-      }
+      const refused = liveInputRefusal()
+      if (refused) return refused
       if (!controllerManager.getIsInitialized()) {
         return { success: false, error: 'Lighting system not initialized' }
       }
@@ -403,9 +403,8 @@ export function setupSimulationHandlers(
     cueDataFor: (groupId: string) => TData,
     remember: (cue: TCue) => void,
   ) {
-    if (rb3Blocked()) {
-      return ipcError(new Error(RB3_BLOCKED_ERROR))
-    }
+    const refused = liveInputRefusal()
+    if (refused) return refused
     if (!isPlainObject(data)) {
       return ipcError(new Error('Invalid motion simulation payload'))
     }

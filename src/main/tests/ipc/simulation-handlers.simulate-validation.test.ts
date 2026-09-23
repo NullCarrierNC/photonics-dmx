@@ -37,6 +37,7 @@ describe('simulate channel payloads', () => {
       getMotionCueSimulator: () => motionCueSimulator,
       getIsInitialized: () => true,
       getIsRb3Enabled: () => false,
+      getIsYargEnabled: () => false,
       ensureChainsHaveHandlersForSimulation: jest.fn(),
       getVenueFrameProcessor: () => ({ getVenuePostProcessing: () => 'Default' }),
       init: jest.fn(),

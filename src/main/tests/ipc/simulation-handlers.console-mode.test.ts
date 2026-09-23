@@ -22,6 +22,7 @@ describe('simulation handlers console integration', () => {
       getChainFanout,
       getMotionCueSimulator: () => motionCueSimulator,
       getIsRb3Enabled: () => false,
+      getIsYargEnabled: () => false,
     } as any)
 
     setupSimulationHandlers(ipcMain, controllerManager)

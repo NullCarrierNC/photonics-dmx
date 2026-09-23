@@ -271,6 +271,8 @@ export class ControllerManager {
    */
   public async enableYarg(): Promise<void> {
     await this.lifecycle.runQueuedOp(async () => {
+      await this.stopTestEffect()
+      this.onSimulationPreempt?.()
       await this.listenerLifecycle.audio.disableAudio()
       await this.listenerLifecycle.yargRb3.enableYarg(this.isInitialized, () => this.init())
     })

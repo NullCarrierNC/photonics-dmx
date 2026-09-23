@@ -37,6 +37,8 @@ interface InputMocks {
   disableRb3: jest.Mock
   enableAudio: jest.Mock
   disableAudio: jest.Mock
+  stopYargTestEffect: jest.Mock
+  stopRb3TestEffect: jest.Mock
 }
 
 /** A manager whose three input toggles are observable mocks. */
@@ -49,6 +51,8 @@ function makeManager(): { manager: ControllerManager; mocks: InputMocks } {
     disableRb3: resolved(),
     enableAudio: resolved(),
     disableAudio: resolved(),
+    stopYargTestEffect: resolved(),
+    stopRb3TestEffect: resolved(),
   }
   const graph = {
     disposeLoaders: resolved(),
@@ -72,7 +76,12 @@ function makeManager(): { manager: ControllerManager; mocks: InputMocks } {
   } as unknown as SenderLifecycleController
   const manager = new ControllerManager({
     config: stubConfig(),
-    collaborators: { listenerLifecycle, senderLifecycle },
+    collaborators: {
+      listenerLifecycle,
+      senderLifecycle,
+      testEffectRunner: { cancel: jest.fn(), stopTestEffect: mocks.stopYargTestEffect },
+      rb3TestEffectRunner: { cancel: jest.fn(), stopTestEffect: mocks.stopRb3TestEffect },
+    } as never,
     graph,
   })
   return { manager, mocks }
@@ -96,6 +105,27 @@ describe('one input drives the rig at a time', () => {
     expect(mocks.disableAudio).toHaveBeenCalled()
     expect(mocks.enableRb3).toHaveBeenCalled()
   })
+
+  it.each([
+    ['YARG', 'enableYarg', 'enableYarg'],
+    ['RB3', 'enableRb3', 'enableRb3'],
+  ] as const)(
+    'ends a running simulation before %s takes the rig',
+    async (_, enable, listenerEnable) => {
+      const { manager, mocks } = makeManager()
+      const preempt = jest.fn()
+      manager.setOnSimulationPreempt(preempt)
+
+      await manager[enable]()
+
+      expect(mocks.stopYargTestEffect).toHaveBeenCalled()
+      expect(mocks.stopRb3TestEffect).toHaveBeenCalled()
+      expect(preempt).toHaveBeenCalled()
+      const enabledAt = mocks[listenerEnable].mock.invocationCallOrder[0]
+      expect(mocks.stopYargTestEffect.mock.invocationCallOrder[0]).toBeLessThan(enabledAt)
+      expect(preempt.mock.invocationCallOrder[0]).toBeLessThan(enabledAt)
+    },
+  )
 
   it('switches both listeners off when audio is enabled', async () => {
     const { manager, mocks } = makeManager()

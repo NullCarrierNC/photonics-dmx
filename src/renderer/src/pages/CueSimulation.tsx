@@ -79,6 +79,8 @@ const CueSimulation: React.FC = () => {
   const [isAudioReactiveEnabled] = useAtom(audioListenerEnabledAtom)
   const [isRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
   const [isYargEnabled] = useAtom(yargListenerEnabledAtom)
+  // A live listener owns the rig chains, and main refuses every simulation while one runs.
+  const liveInput = isRb3Enabled ? 'RB3E' : isYargEnabled ? 'YARG' : null
   const [lightingPrefs] = useAtom(lightingPrefsAtom)
   const advancedModeEnabled = lightingPrefs.advancedModeEnabled ?? false
   const venuePostProcessingEnabled = lightingPrefs.venuePostProcessingEnabled ?? true
@@ -605,18 +607,13 @@ const CueSimulation: React.FC = () => {
 
       {!isAudioReactiveEnabled && (
         <>
-          {isRb3Enabled && (
+          {liveInput && (
             <div className="mb-4 p-3 rounded border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 text-sm text-amber-800 dark:text-amber-300">
-              RB3E is enabled and owns the lights. Disable RB3E to simulate cues.
-            </div>
-          )}
-          {isYargEnabled && !isRb3Enabled && (
-            <div className="mb-4 p-3 rounded border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 text-sm text-amber-800 dark:text-amber-300">
-              YARG is enabled and owns venue post-processing. Disable YARG to simulate effects here.
+              {liveInput} is enabled and owns the lights. Disable {liveInput} to simulate cues.
             </div>
           )}
           <CueSimulationActions
-            disabled={!selectedEffect || !selectedGroupId || isRb3Enabled}
+            disabled={!selectedEffect || !selectedGroupId || liveInput !== null}
             onTestEffect={() => void handleTestEffect()}
             onStopTestEffect={() => void handleStopTestEffect()}
             onSimulateBeat={() => void handleSimulateBeat()}
@@ -624,14 +621,14 @@ const CueSimulation: React.FC = () => {
             onSimulateKeyframe={() => void handleSimulateKeyframe()}
             showSongSimulation={selectedRegistryType !== 'RB3E'}
           />
-          {selectedRegistryType === 'RB3E' && !isRb3Enabled && <StageKitLedPanel />}
+          {selectedRegistryType === 'RB3E' && !liveInput && <StageKitLedPanel />}
           {/* RB3 mode has no instrument-note song events — LED state drives it instead. */}
           {selectedRegistryType !== 'RB3E' && (
             <CueSimulationInstrument
               selectedInstrument={selectedInstrument}
               onInstrumentChange={setSelectedInstrument}
               onSimulateNote={(noteType) => void handleSimulateInstrumentNote(noteType)}
-              disabled={!selectedGroupId || isRb3Enabled}
+              disabled={!selectedGroupId || liveInput !== null}
             />
           )}
           {/* Post-processing is a YARG venue signal, so RB3 mode has nothing to drive it, and the
@@ -640,11 +637,14 @@ const CueSimulation: React.FC = () => {
             <CueSimulationPostProcessing
               selectedState={selectedPostProcessing}
               onStateChange={(state) => void handlePostProcessingChange(state)}
-              disabled={isRb3Enabled || isYargEnabled}
+              disabled={liveInput !== null}
             />
           )}
           {advancedModeEnabled && (
-            <CueSimulationMotion platform={selectedRegistryType === 'RB3E' ? 'rb3' : 'yarg'} />
+            <CueSimulationMotion
+              platform={selectedRegistryType === 'RB3E' ? 'rb3' : 'yarg'}
+              disabled={liveInput !== null}
+            />
           )}
         </>
       )}

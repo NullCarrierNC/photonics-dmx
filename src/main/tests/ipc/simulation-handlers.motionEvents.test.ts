@@ -75,6 +75,7 @@ describe('motion simulation events', () => {
       getMotionCueSimulator: () => sim,
       getIsInitialized: () => true,
       getIsRb3Enabled: () => false,
+      getIsYargEnabled: () => false,
       getDmxPublisher: () => null,
       getVenueFrameProcessor: () => ({ getVenuePostProcessing: () => 'Default' }),
       init: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),

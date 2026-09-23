@@ -1,8 +1,3 @@
-/**
- * Simulation IPC handlers refuse to dispatch while the RB3E listener is enabled: the listener
- * owns the rig chains (cue mode re-dispatches the RB3 look at ~30 Hz), so each dispatching
- * handler returns its error shape and touches no chain. Stop handlers stay available.
- */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { withCollaboratorGetters } from './managerFacades'
 
@@ -18,9 +13,11 @@ import type { RigChain } from '../../../photonics-dmx/controllers/RigChain'
 
 type Handler = (...args: unknown[]) => Promise<unknown> | unknown
 
-const BLOCKED = { success: false, error: 'Disable RB3E before simulating cues' }
-
-describe('simulation IPC handlers while RB3E is enabled', () => {
+describe.each([
+  { listener: 'RB3E', rb3: true, yarg: false },
+  { listener: 'YARG', rb3: false, yarg: true },
+])('simulation IPC handlers while $listener is enabled', ({ listener, rb3, yarg }) => {
+  const BLOCKED = { success: false, error: `Disable ${listener} before simulating cues` }
   let handlers: Map<string, Handler>
   let onBeat: jest.Mock
   let startTestEffect: jest.Mock
@@ -61,7 +58,9 @@ describe('simulation IPC handlers while RB3E is enabled', () => {
       getChainFanout: () => fanout,
       getMotionCueSimulator: () => motionCueSimulator,
       getIsInitialized: () => true,
-      getIsRb3Enabled: () => true,
+      getVenueFrameProcessor: () => ({ getVenuePostProcessing: () => undefined }),
+      getIsRb3Enabled: () => rb3,
+      getIsYargEnabled: () => yarg,
       startTestEffect,
       startRb3TestEffect,
       setRb3SimulationLedState,
@@ -110,9 +109,10 @@ describe('simulation IPC handlers while RB3E is enabled', () => {
     expect(result).toEqual(BLOCKED)
   })
 
-  it('both motion-sim start handlers return the blocked error', async () => {
+  it('every motion-sim start handler returns the blocked error', async () => {
     for (const channel of [
       LIGHT.START_YARG_MOTION_CUE_SIMULATION,
+      LIGHT.START_RB3_MOTION_CUE_SIMULATION,
       LIGHT.START_AUDIO_MOTION_CUE_SIMULATION,
     ]) {
       const result = await handlers.get(channel)!({}, { groupId: 'g', cueId: 'c' })

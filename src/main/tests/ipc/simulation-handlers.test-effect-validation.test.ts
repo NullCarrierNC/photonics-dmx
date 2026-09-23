@@ -35,6 +35,7 @@ describe('START_TEST_EFFECT payload', () => {
       getMotionCueSimulator: () => motionCueSimulator,
       getIsInitialized: () => true,
       getIsRb3Enabled: () => false,
+      getIsYargEnabled: () => false,
       startTestEffect,
       init: jest.fn(),
     })
