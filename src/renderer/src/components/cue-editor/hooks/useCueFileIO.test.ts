@@ -288,6 +288,36 @@ describe('useCueFileIO handleSave', () => {
     expect(setIsDirty).toHaveBeenLastCalledWith(false)
   })
 
+  it.each([
+    ['cue', 'saveNodeCueFile', 'validateNodeCue'],
+    ['effect', 'saveEffectFile', 'validateEffect'],
+  ] as const)(
+    "saves a shipped %s file as the user's own and keeps it clean",
+    async (docMode, save, validate) => {
+      jest.mocked(ipcApi[validate]).mockResolvedValue({ valid: true, errors: [] } as never)
+      jest
+        .mocked(ipcApi[save])
+        .mockResolvedValue({ success: true, path: '/cues/motion-cues.json' } as never)
+      const shipped = { ...mixedFile(), bundled: true, cueVersion: 4 }
+      const { rendered, setEditorDoc, setIsDirty } = setup({
+        ...openCueDoc(),
+        editorDoc: { mode: docMode, path: '/cues/motion-cues.json', file: shipped },
+        getUpdatedDocument: jest.fn(() => shipped) as never,
+      } as unknown as Partial<UseCueFileIOParams>)
+
+      await act(async () => {
+        await rendered.result.current.handleSave()
+      })
+
+      const sent = jest.mocked(ipcApi[save]).mock.calls[0][0] as { content: { bundled?: boolean } }
+      expect(sent.content.bundled).toBe(false)
+      expect(setEditorDoc).toHaveBeenLastCalledWith(
+        expect.objectContaining({ file: expect.objectContaining({ bundled: false }) }),
+      )
+      expect(setIsDirty).toHaveBeenLastCalledWith(false)
+    },
+  )
+
   it('reports a validation call that rejects', async () => {
     jest.mocked(ipcApi.validateNodeCue).mockRejectedValue(new Error('channel gone') as never)
     const { rendered, onSaveError } = setup(openCueDoc())

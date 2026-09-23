@@ -79,6 +79,35 @@ describe('copyDefaultData', () => {
     expect(written.marker).toBe('new')
   })
 
+  it('keeps the replaced file beside the newer shipped one', async () => {
+    seedSource({ 'cue.json': JSON.stringify({ cueVersion: 2, marker: 'new' }) })
+    fs.writeFileSync(
+      path.join(appData, 'cue.json'),
+      JSON.stringify({ cueVersion: 1, bundled: true, marker: 'edited by hand' }),
+    )
+
+    await copyDefaultData(appRoot, appData)
+
+    const kept = fs.readdirSync(appData).filter((f) => f.startsWith('cue.json.v1-'))
+    expect(kept).toHaveLength(1)
+    const keptFile = JSON.parse(fs.readFileSync(path.join(appData, kept[0]), 'utf-8'))
+    expect(keptFile.marker).toBe('edited by hand')
+    const written = JSON.parse(fs.readFileSync(path.join(appData, 'cue.json'), 'utf-8'))
+    expect(written.marker).toBe('new')
+  })
+
+  it('keeps no copy when the shipped version is not newer', async () => {
+    seedSource({ 'cue.json': JSON.stringify({ cueVersion: 2, marker: 'shipped' }) })
+    fs.writeFileSync(
+      path.join(appData, 'cue.json'),
+      JSON.stringify({ cueVersion: 2, bundled: true, marker: 'shipped' }),
+    )
+
+    await copyDefaultData(appRoot, appData)
+
+    expect(fs.readdirSync(appData)).toEqual(['cue.json'])
+  })
+
   it('leaves a file the user has taken ownership of alone', async () => {
     seedSource({ 'cue.json': JSON.stringify({ cueVersion: 9, marker: 'shipped' }) })
     fs.writeFileSync(path.join(appData, 'cue.json'), JSON.stringify({ marker: 'mine' }))

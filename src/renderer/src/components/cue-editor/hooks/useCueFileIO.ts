@@ -210,8 +210,10 @@ export function useCueFileIO({
 
   const handleSave = useCallback(async (): Promise<boolean> => {
     if (!editorDoc) return false
-    const updatedFile = getUpdatedDocument()
-    if (!updatedFile) return false
+    const snapshot = getUpdatedDocument()
+    if (!snapshot) return false
+    // A saved file is the user's, so a newer shipped version never replaces it.
+    const updatedFile = { ...snapshot, bundled: false }
 
     if (editorDoc.mode === 'effect') {
       const effectContent = updatedFile as EffectFile
@@ -231,7 +233,7 @@ export function useCueFileIO({
           return false
         }
         // An edit made while the save ran is not in the saved file, so the file stays dirty.
-        const editedMeanwhile = !equal(getUpdatedDocument(), updatedFile)
+        const editedMeanwhile = !equal(getUpdatedDocument(), snapshot)
         setEditorDoc({ mode: 'effect', file: updatedFile, path: response.path })
         rememberLastFilePath(response.path)
         setValidationErrors([])
@@ -261,7 +263,7 @@ export function useCueFileIO({
           onSaveError?.(`Failed to save cue: ${filename}`)
           return false
         }
-        const editedMeanwhile = !equal(getUpdatedDocument(), updatedFile)
+        const editedMeanwhile = !equal(getUpdatedDocument(), snapshot)
         setEditorDoc({ mode: 'cue', file: updatedFile, path: response.path })
         rememberLastFilePath(response.path)
         setValidationErrors([])
