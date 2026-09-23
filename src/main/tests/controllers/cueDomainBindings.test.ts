@@ -85,7 +85,7 @@ function removeBinding(domain: CueDomainRegistryBinding['domain']): void {
 describe('reconcileAndApplyGroups', () => {
   const config = {} as ConfigurationManager
 
-  it('auto-enables newly registered groups and drops deregistered ones', async () => {
+  it('auto-enables newly registered groups and applies only the registered ones', async () => {
     const binding = makeBinding('yarg', {
       registered: ['a', 'c'],
       enabled: ['a', 'b'],
@@ -94,9 +94,9 @@ describe('reconcileAndApplyGroups', () => {
 
     const reconciled = await reconcileAndApplyGroups(binding, config)
 
-    expect(reconciled.enabled).toEqual(['a', 'c'])
+    expect(reconciled.enabled).toEqual(['a', 'b', 'c'])
     expect(binding.applied.enabled).toEqual(['a', 'c'])
-    expect(binding.readStored(config).knownGroups).toEqual(['a', 'c'])
+    expect(binding.readStored(config).knownGroups).toEqual(['a', 'b', 'c'])
   })
 
   it('seeds an extra group into the enabled set', async () => {

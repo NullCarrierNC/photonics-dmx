@@ -247,7 +247,7 @@ export async function reconcileAndApplyGroups(
       knownGroups: reconciled.known,
     })
   }
-  binding.setEnabled(reconciled.enabled)
+  binding.setEnabled(reconciled.active)
   binding.setDisabled(binding.readStored(config).disabledCues)
   return reconciled
 }
@@ -257,8 +257,8 @@ export async function reconcileAndApplyGroups(
  * are registered. Node cue groups are registered in initializeNodeCueLoader(), and each
  * registerGroup() adds the group to enabled by default, which would overwrite a saved "disabled"
  * preference; running this after the loader ensures the persisted preference wins. Auto-enables
- * groups never seen before (vs the known set); user-disabled groups stay disabled because they
- * remain in the known set, and deregistered groups are dropped.
+ * groups never seen before (vs the known set). User-disabled groups stay disabled because they
+ * remain in the known set, including through a launch where their file fails to load.
  * @param refreshAudioCueSelection Called once at the end: audio selection reads the freshly-applied
  *   enabled/disabled state
  */
