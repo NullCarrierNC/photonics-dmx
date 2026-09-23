@@ -217,6 +217,19 @@ export class DmxPublisher {
     if (this._lightStateManager) {
       this._lightStateManager.onLightStatesUpdated(this.publish)
     }
+    this._strobeStateManager.on('change', this._onStrobeSlotChange)
+  }
+
+  /**
+   * The strobe slot drives the hardware strobe channels, so a slot change goes out even when no
+   * light changed. On the chain path it rides the flush a light update in the same tick queued.
+   */
+  private readonly _onStrobeSlotChange = (): void => {
+    if (this._chainSubscriptions.length > 0) {
+      this._schedulePublishFlush()
+      return
+    }
+    queueMicrotask(() => this.publish(this._lastPublishedLights))
   }
 
   /**
@@ -746,6 +759,7 @@ export class DmxPublisher {
         this._lightStateManager.removeAllListeners()
         this._lightStateManager = null
       }
+      this._strobeStateManager.off('change', this._onStrobeSlotChange)
       for (const sub of this._chainSubscriptions) {
         sub.lightStateManager.offLightStatesUpdated(sub.handler)
       }

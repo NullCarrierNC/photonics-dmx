@@ -318,34 +318,34 @@ describe('AudioCueProcessor', () => {
     randomSpy.mockRestore()
   })
 
-  describe('strobe release hysteresis', () => {
-    const makeStrobeProcessor = (strobeProbability: number): AudioCueProcessor => {
-      const fakeChain = {
-        rigId: 'stub-hysteresis',
-        isPrimary: true,
-        dmxLightManager: lightManager,
-        sequencer,
-        cueHandlers: { yarg: null, rb3: null },
-        audioCueHandler: null,
-        rb3MenuCueHandler: null,
-      } as unknown as RigChain
-      const chainFanout = new ChainFanout()
-      chainFanout.setChains([fakeChain])
-      return new AudioCueProcessor(
-        chainFanout,
-        noopRuntimeBroadcaster(),
-        {
-          ...DEFAULT_AUDIO_CONFIG,
-          strobeEnabled: true,
-          strobeTriggerThreshold: 0.5,
-          strobeProbability,
-        },
-        'proc-primary',
-        'proc-secondary',
-        () => 5000,
-      )
-    }
+  const makeStrobeProcessor = (strobeProbability: number): AudioCueProcessor => {
+    const fakeChain = {
+      rigId: 'stub-hysteresis',
+      isPrimary: true,
+      dmxLightManager: lightManager,
+      sequencer,
+      cueHandlers: { yarg: null, rb3: null },
+      audioCueHandler: null,
+      rb3MenuCueHandler: null,
+    } as unknown as RigChain
+    const chainFanout = new ChainFanout()
+    chainFanout.setChains([fakeChain])
+    return new AudioCueProcessor(
+      chainFanout,
+      noopRuntimeBroadcaster(),
+      {
+        ...DEFAULT_AUDIO_CONFIG,
+        strobeEnabled: true,
+        strobeTriggerThreshold: 0.5,
+        strobeProbability,
+      },
+      'proc-primary',
+      'proc-secondary',
+      () => 5000,
+    )
+  }
 
+  describe('strobe release hysteresis', () => {
     const feed = async (processor: AudioCueProcessor, energies: number[]): Promise<void> => {
       for (const energy of energies) {
         processor.processAudioData(minimalLightingData(energy))
@@ -403,6 +403,64 @@ describe('AudioCueProcessor', () => {
 
       processor.shutdown()
       randomSpy.mockRestore()
+    })
+  })
+
+  describe('strobe watchdog', () => {
+    let perfNowSpy: ReturnType<typeof jest.spyOn>
+    let watched: AudioCueProcessor
+    let strobeStates: boolean[]
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+      jest.setSystemTime(0)
+      perfNowSpy = jest.spyOn(performance, 'now').mockImplementation(() => Date.now())
+      strobeStates = []
+      watched = makeStrobeProcessor(100)
+      watched.setOnStrobeStateChange((active) => strobeStates.push(active))
+      watched.start()
+      watched.processAudioData(minimalLightingData(0.9))
+    })
+
+    afterEach(() => {
+      watched.shutdown()
+      perfNowSpy.mockRestore()
+    })
+
+    it('stops a strobe 2 s after the audio frames stop', () => {
+      const strobeCue = registry.getCueImplementation('proc-strobe')!
+      expect(watched.getEffectiveStrobeCueType()).toBe('proc-strobe')
+
+      jest.advanceTimersByTime(2500)
+
+      expect(watched.getEffectiveStrobeCueType()).toBeNull()
+      expect(strobeCue.onStop).toHaveBeenCalled()
+      expect(strobeStates).toEqual([true, false])
+    })
+
+    it('leaves a strobe running while loud frames keep arriving', () => {
+      for (let elapsed = 0; elapsed < 6000; elapsed += 500) {
+        jest.advanceTimersByTime(500)
+        watched.processAudioData(minimalLightingData(0.9))
+      }
+
+      expect(watched.getEffectiveStrobeCueType()).toBe('proc-strobe')
+      expect(strobeStates).toEqual([true])
+    })
+
+    it('leaves a strobe running 1.9 s after the last frame', () => {
+      jest.advanceTimersByTime(1900)
+
+      expect(watched.getEffectiveStrobeCueType()).toBe('proc-strobe')
+    })
+
+    it('rolls again when loud frames return after the cut', () => {
+      jest.advanceTimersByTime(2500)
+
+      watched.processAudioData(minimalLightingData(0.9))
+
+      expect(watched.getEffectiveStrobeCueType()).toBe('proc-strobe')
+      expect(strobeStates).toEqual([true, false, true])
     })
   })
 

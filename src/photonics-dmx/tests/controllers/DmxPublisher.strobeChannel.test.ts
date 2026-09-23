@@ -162,6 +162,16 @@ describe('DmxPublisher strobe-channel runtime', () => {
     expect(ctx.lastBuffer()[5]).toBe(30)
   })
 
+  it('writes the strobe channel when the slot changes with no light change', async () => {
+    ctx.strobe.setActive('fast', 'net')
+    ctx.publisher.publish(new Map<string, RGBIO>([['light-1', makeBrightRgbio()]]))
+
+    ctx.strobe.setActive(null, 'net')
+    await Promise.resolve()
+
+    expect(ctx.lastBuffer()[5]).toBe(0)
+  })
+
   it('holds the peak blended color through the cue envelope (fade + primary showing through)', () => {
     // Models the real post-blend stream the publisher sees: stock strobe cues flash opacity,
     // which the blender folds into rgb/intensity. So a strobe-channel light sees: peak white

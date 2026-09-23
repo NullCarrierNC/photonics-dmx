@@ -13,6 +13,7 @@ import type { ChainFanout } from '../controllers/ChainFanout'
 import { pickStrobeCueType } from './audioStrobeHelpers'
 import { AudioGameModeManager } from './AudioGameModeManager'
 import { AudioIdleController } from './AudioIdleController'
+import { DEFAULT_STROBE_WATCHDOG_MS, StrobeWatchdog } from './strobeWatchdog'
 import { AUDIO_IDLE_EFFECT_NAME, AUDIO_IDLE_LAYER } from './audioIdleConstants'
 import { AudioCueType, AudioMotionCueRef } from '../cues/types/audioCueTypes'
 import { AudioCueRegistry } from '../cues/registries/AudioCueRegistry'
@@ -56,6 +57,13 @@ export class AudioCueProcessor {
    *  not re-evaluate every frame and strobe on most loud passages regardless of odds. */
   private strobeRolledForThisPeak = false
   private onStrobeStateChange: ((active: boolean) => void) | null = null
+  /**
+   * Releases a strobe the last loud frame left running once frames stop. Capture runs in the main
+   * window, so frames stop whenever that window closes or its page stops.
+   */
+  private readonly strobeWatchdog = new StrobeWatchdog(DEFAULT_STROBE_WATCHDOG_MS, () =>
+    this.cutStrobe(),
+  )
   private onGameModeCueChange: ((cueType: AudioCueType) => void) | null = null
   private onGameModeScheduleChange: ((info: AudioGameModeSchedulePayload) => void) | null = null
   private readonly idleController = new AudioIdleController()
@@ -137,6 +145,7 @@ export class AudioCueProcessor {
       return
     }
     this.isActive = true
+    this.strobeWatchdog.start()
     this.registry.onMotionSongStart()
     log.info(
       'AudioCueProcessor: Started with primary:',
@@ -154,6 +163,7 @@ export class AudioCueProcessor {
 
     this.tearDownIdleState()
     this.isActive = false
+    this.strobeWatchdog.stop()
     this.lightingSuppressed = false
     if (this.strobeActive) {
       this.strobeActive = false
@@ -191,6 +201,7 @@ export class AudioCueProcessor {
 
   public processAudioData(data: AudioLightingData): void {
     if (!this.isActive) return
+    this.strobeWatchdog.packetSeen()
 
     const now = monotonicNowMs()
     if (data.beatDetected && now - this.lastBeatTimestamp >= 100) {
@@ -232,6 +243,7 @@ export class AudioCueProcessor {
     const baseSecondary = this.gameModeManager ? null : this.currentSecondaryCueType
 
     this.evaluateStrobe(processedData)
+    this.strobeWatchdog.setStrobeRunning(this.strobeActive)
     const strobe = this.strobeActive && this.strobeCueType ? this.strobeCueType : null
 
     // Tee the same frame to the secondary consumer, following the same primary (manual pick or Game
@@ -488,6 +500,22 @@ export class AudioCueProcessor {
       return this.strobeCueType
     }
     return null
+  }
+
+  /** Drop the strobe the watchdog found running with no frames behind it, and free its slot. */
+  private cutStrobe(): void {
+    log.warn('AudioCueProcessor: strobe outlived its audio frames, cutting it.')
+    this.strobeActive = false
+    this.strobeCueType = null
+    this.strobeRolledForThisPeak = false
+    this.onStrobeStateChange?.(false)
+    const gameModeActive = this.gameModeManager != null
+    this.chainFanout.audioSyncSlots(
+      this.getCurrentCueType(),
+      this.getEffectiveSecondaryCueType(),
+      null,
+      gameModeActive,
+    )
   }
 
   private getStrobeSlotSyncType(): AudioCueType | null {
