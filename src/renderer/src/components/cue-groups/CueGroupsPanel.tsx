@@ -5,12 +5,11 @@
  * surface, so the domain arrives as a descriptor rather than the component being written per
  * domain.
  */
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createLogger } from '../../../../shared/logger'
 import { CueGroupEnableList } from './CueGroupEnableList'
 import { CueGroupRow } from './CueGroupRow'
 import { useCueGroupRovingTabIndex } from './useCueGroupRovingTabIndex'
-import { useLatestGenerationGate } from '../../hooks/useLatestGenerationGate'
 
 /** The least a group row needs. Each domain's own group type carries more. */
 export interface CueGroupRowData {
@@ -55,6 +54,9 @@ type GroupCueDetails<G extends CueGroupRowData, C extends CueRowData> = G & {
 
 type RowError = { message: string; onRetry: () => void }
 
+/** The enabled groups and the cues disabled within each, as the domain holds them. */
+type Selection = { enabled: string[]; disabled: Record<string, string[]> }
+
 export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>({
   domain,
 }: {
@@ -69,7 +71,10 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
   const [loadError, setLoadError] = useState<string | null>(null)
   const [expandErrorByGroup, setExpandErrorByGroup] = useState<Record<string, RowError>>({})
   const [persistErrorByGroup, setPersistErrorByGroup] = useState<Record<string, RowError>>({})
-  const persistGeneration = useLatestGenerationGate()
+  // What the domain last accepted. Writes run one at a time, each built from this once the one
+  // before it has landed, so a second tick carries the first.
+  const saved = useRef<Selection>({ enabled: [], disabled: {} })
+  const writes = useRef<Promise<unknown>>(Promise.resolve())
   const roving = useCueGroupRovingTabIndex(allGroups.map((g) => g.id))
 
   const fetchGroups = useCallback(async () => {
@@ -91,6 +96,7 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
 
       setAllGroups(groupsWithDetails)
+      saved.current = { enabled, disabled }
       setEnabledGroupIds(enabled)
       setDisabledByGroup(disabled)
       setExpandErrorByGroup({})
@@ -130,36 +136,29 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
     }
   }
 
-  const persistEnabledAndDisabled = async (
-    nextEnabled: string[],
-    nextDisabled: Record<string, string[]>,
-  ): Promise<{ ok: true } | { ok: false; error: string } | { stale: true }> => {
-    const token = persistGeneration.nextGeneration()
+  const writeSelection = async (
+    next: Selection,
+  ): Promise<{ ok: true } | { ok: false; error: string }> => {
     try {
-      const enabledResult = await domain.setEnabled(nextEnabled)
-      if (!persistGeneration.isCurrentGeneration(token)) {
-        return { stale: true }
-      }
+      const enabledResult = await domain.setEnabled(next.enabled)
       if (enabledResult && 'success' in enabledResult && enabledResult.success === false) {
         log.error('Failed to save enabled cue groups')
         return { ok: false, error: enabledResult.error || 'Failed to save enabled cue groups' }
       }
-      const disabledResult = await domain.setDisabled(nextDisabled)
-      if (!persistGeneration.isCurrentGeneration(token)) {
-        return { stale: true }
-      }
+      const disabledResult = await domain.setDisabled(next.disabled)
       if (disabledResult && 'success' in disabledResult && disabledResult.success === false) {
         log.error(`Failed to save disabled ${domain.label} cues`)
         // The enabled list is already on disk. Putting it back keeps what is stored matching what
         // the panel shows, rather than leaving the next launch on a state nobody chose.
-        await restoreEnabled(enabledGroupIds)
+        await restoreEnabled(saved.current.enabled)
         return {
           ok: false,
           error: disabledResult.error || `Failed to save disabled ${domain.label} cues`,
         }
       }
-      setEnabledGroupIds(nextEnabled)
-      setDisabledByGroup(nextDisabled)
+      saved.current = next
+      setEnabledGroupIds(next.enabled)
+      setDisabledByGroup(next.disabled)
       return { ok: true }
     } catch (error) {
       const message =
@@ -167,6 +166,15 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
       log.error(`Persistence error for ${domain.label} cue groups:`, error)
       return { ok: false, error: message }
     }
+  }
+
+  /** Queues a write behind any still in flight, building it from what those saved. */
+  const persistEnabledAndDisabled = (
+    build: (current: Selection) => Selection,
+  ): Promise<{ ok: true } | { ok: false; error: string }> => {
+    const run = writes.current.then(() => writeSelection(build(saved.current)))
+    writes.current = run.catch(() => undefined)
+    return run
   }
 
   const getGroupCheckboxState = (group: Row): { checked: boolean; indeterminate: boolean } => {
@@ -195,21 +203,23 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
     const group = allGroups.find((g) => g.id === groupId)
     if (!group) return
 
-    let nextEnabled = [...enabledGroupIds]
-    const nextDisabled = { ...disabledByGroup }
+    const build = (current: Selection): Selection => {
+      let nextEnabled = [...current.enabled]
+      const nextDisabled = { ...current.disabled }
 
-    if (turnOn) {
-      if (!nextEnabled.includes(groupId)) {
-        nextEnabled.push(groupId)
+      if (turnOn) {
+        if (!nextEnabled.includes(groupId)) {
+          nextEnabled.push(groupId)
+        }
+        delete nextDisabled[groupId]
+      } else {
+        nextEnabled = nextEnabled.filter((id) => id !== groupId)
       }
-      delete nextDisabled[groupId]
-    } else {
-      nextEnabled = nextEnabled.filter((id) => id !== groupId)
+      return { enabled: nextEnabled, disabled: nextDisabled }
     }
 
     void (async () => {
-      const result = await persistEnabledAndDisabled(nextEnabled, nextDisabled)
-      if ('stale' in result) return
+      const result = await persistEnabledAndDisabled(build)
       if (result.ok) {
         clearPersistError(groupId)
       } else {
@@ -276,34 +286,36 @@ export function CueGroupsPanel<G extends CueGroupRowData, C extends CueRowData>(
       }
     }
 
-    const nextDisabled = { ...disabledByGroup }
-    const set = new Set(nextDisabled[groupId] ?? [])
-    if (turnOn) {
-      set.delete(cueId)
-    } else {
-      set.add(cueId)
-    }
-    if (set.size === 0) {
-      delete nextDisabled[groupId]
-    } else {
-      nextDisabled[groupId] = Array.from(set)
-    }
-
-    let nextEnabled = [...enabledGroupIds]
-    const allIds = cues.map((c) => c.id)
-    const disabledSet = new Set(nextDisabled[groupId] ?? [])
-    const allDisabled = allIds.length > 0 && allIds.every((id) => disabledSet.has(id))
-
-    if (allDisabled) {
-      nextEnabled = nextEnabled.filter((id) => id !== groupId)
-    } else {
-      if (!nextEnabled.includes(groupId)) {
-        nextEnabled = [...nextEnabled, groupId]
+    const build = (current: Selection): Selection => {
+      const nextDisabled = { ...current.disabled }
+      const set = new Set(nextDisabled[groupId] ?? [])
+      if (turnOn) {
+        set.delete(cueId)
+      } else {
+        set.add(cueId)
       }
+      if (set.size === 0) {
+        delete nextDisabled[groupId]
+      } else {
+        nextDisabled[groupId] = Array.from(set)
+      }
+
+      let nextEnabled = [...current.enabled]
+      const allIds = cues.map((c) => c.id)
+      const disabledSet = new Set(nextDisabled[groupId] ?? [])
+      const allDisabled = allIds.length > 0 && allIds.every((id) => disabledSet.has(id))
+
+      if (allDisabled) {
+        nextEnabled = nextEnabled.filter((id) => id !== groupId)
+      } else {
+        if (!nextEnabled.includes(groupId)) {
+          nextEnabled = [...nextEnabled, groupId]
+        }
+      }
+      return { enabled: nextEnabled, disabled: nextDisabled }
     }
 
-    const result = await persistEnabledAndDisabled(nextEnabled, nextDisabled)
-    if ('stale' in result) return
+    const result = await persistEnabledAndDisabled(build)
     if (result.ok) {
       clearPersistError(groupId)
     } else {

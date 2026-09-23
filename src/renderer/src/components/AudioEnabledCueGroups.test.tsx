@@ -74,7 +74,7 @@ describe('AudioEnabledCueGroups', () => {
     expect(alert.textContent).toContain('save failed')
   })
 
-  it('does not let a stale persistence success overwrite a newer error from a fast follow-up toggle', async () => {
+  it('saves a fast follow-up toggle after the one before it and shows its failure', async () => {
     seedHappyPath()
     // First toggle: setEnabled hangs until we resolve it.
     let firstResolve!: (v: { success: true }) => void
@@ -96,15 +96,14 @@ describe('AudioEnabledCueGroups', () => {
     fireEvent.click(group2Checkbox)
     fireEvent.click(group2Checkbox)
 
-    await waitFor(() => expect(setEnabledAudioCueGroups).toHaveBeenCalledTimes(2))
-
-    const alert = await screen.findByRole('alert')
-    expect(alert.textContent).toContain('fast failure')
+    await waitFor(() => expect(setEnabledAudioCueGroups).toHaveBeenCalledTimes(1))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(setEnabledAudioCueGroups).toHaveBeenCalledTimes(1)
 
     firstResolve({ success: true })
 
-    // Stale success must not clear the newer error banner.
-    await new Promise((r) => setTimeout(r, 0))
-    expect(screen.getByRole('alert').textContent).toContain('fast failure')
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('fast failure')
+    expect(setEnabledAudioCueGroups).toHaveBeenCalledTimes(2)
   })
 })

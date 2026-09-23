@@ -4,7 +4,7 @@
  * covers its IPC wiring, its wording and the save-failure paths.
  */
 import { afterEach, describe, expect, it, jest } from '@jest/globals'
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import {
   CueGroupsPanel,
@@ -114,6 +114,28 @@ describe('CueGroupsPanel', () => {
     await waitFor(() => expect(groupCheckbox('Beta')).toBeChecked())
     expect(domain.setEnabled).toHaveBeenCalledWith(['alpha', 'beta'])
     expect(domain.setDisabled).toHaveBeenCalledWith({})
+  })
+
+  it('keeps both groups when a second is ticked before the first one saves', async () => {
+    const domain = fakeDomain()
+    let releaseFirst: (() => void) | undefined
+    domain.setEnabled.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => {
+        releaseFirst = resolve
+      })
+      return { success: true }
+    })
+    renderPanel(domain)
+    await groupCheckboxes()
+
+    fireEvent.click(groupCheckbox('Alpha'))
+    fireEvent.click(groupCheckbox('Beta'))
+    await waitFor(() => expect(releaseFirst).toBeDefined())
+    await act(async () => releaseFirst?.())
+
+    await waitFor(() => expect(groupCheckbox('Beta')).toBeChecked())
+    expect(groupCheckbox('Alpha')).toBeChecked()
+    expect(domain.setEnabled).toHaveBeenLastCalledWith(['alpha', 'beta'])
   })
 
   it('keeps the disabled cues of a group that is turned off', async () => {
