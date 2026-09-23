@@ -6,6 +6,22 @@
 
 /** @typedef {{ limit: number, allowances: Map<string, number>, malformed: string[] }} Baseline */
 
+/** Script and TypeScript sources, in every module flavour. */
+const SOURCE = /\.(?:[cm]?[jt]s|[jt]sx)$/
+
+/**
+ * @param {string} path repo-relative, with forward slashes
+ * @returns {boolean} true for a source file that is neither a test nor a declaration file
+ */
+function isMeasuredSource(path) {
+  return (
+    SOURCE.test(path) &&
+    !/\.d\.[cm]?ts$/.test(path) &&
+    !/\.(?:test|spec)\.[^/]+$/.test(path) &&
+    !/(^|\/)(?:tests|__tests__)\//.test(path)
+  )
+}
+
 /**
  * @param {string} text contents of the baseline file
  * @returns {Baseline|null} null when the header line is missing or unparseable
@@ -161,6 +177,7 @@ function renderBaseline(sizes, limit) {
 }
 
 module.exports = {
+  isMeasuredSource,
   parseBaseline,
   compareBudget,
   overLimitEntries,

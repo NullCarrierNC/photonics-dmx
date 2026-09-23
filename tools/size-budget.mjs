@@ -14,6 +14,7 @@ import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
 const {
+  isMeasuredSource,
   parseBaseline,
   compareBudget,
   raisedByRewrite,
@@ -30,19 +31,6 @@ const LIMIT = 600
 const REGENERATE = 'node tools/size-budget.mjs --write'
 
 /**
- * @param {string} path
- * @returns {boolean} true when the file is a test or declaration file
- */
-function isExcluded(path) {
-  return (
-    path.includes('/tests/') ||
-    path.endsWith('.d.ts') ||
-    /\.(test|spec)\.tsx?$/.test(path) ||
-    /(^|\/)__tests__\//.test(path)
-  )
-}
-
-/**
  * @returns {Map<string, number>} repo-relative posix path to line count, sorted by path
  */
 function measureSources() {
@@ -50,12 +38,12 @@ function measureSources() {
   /** @type {Map<string, number>} */
   const sizes = new Map()
   for (const entry of entries) {
-    if (!entry.isFile() || !/\.tsx?$/.test(entry.name)) {
+    if (!entry.isFile()) {
       continue
     }
     const absolute = join(entry.parentPath ?? entry.path, entry.name)
     const rel = relative(root, absolute).split(sep).join('/')
-    if (isExcluded(rel)) {
+    if (!isMeasuredSource(rel)) {
       continue
     }
     const lines = readFileSync(absolute, 'utf8').split(/\r?\n/)
