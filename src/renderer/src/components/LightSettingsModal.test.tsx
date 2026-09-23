@@ -5,7 +5,6 @@
  * the page decides whether it needs confirming.
  */
 import { describe, expect, it, jest, afterEach } from '@jest/globals'
-import '@testing-library/jest-dom/jest-globals'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { FixtureTypes, type DmxFixture } from '../../../photonics-dmx/types'
 import LightSettingsModal from './LightSettingsModal'

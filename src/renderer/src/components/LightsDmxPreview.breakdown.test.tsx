@@ -5,7 +5,6 @@
  * the primary it doubles. Plain fixtures keep the circle alone.
  */
 import { describe, expect, it, afterEach, jest } from '@jest/globals'
-import '@testing-library/jest-dom/jest-globals'
 import { render, screen, cleanup } from '@testing-library/react'
 import {
   ConfigStrobeType,

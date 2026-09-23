@@ -1,15 +1,9 @@
 /**
  * Rendering a renderer component the way the app renders it.
  *
- * Importing this also registers the jest-dom matchers, so a suite that renders gets
- * `toBeInTheDocument`, `toHaveValue` and `toBeDisabled` without repeating the import.
- *
  * Lives under `tests/` because `collectCoverageFrom` excludes that directory. A helper anywhere
  * else would add permanently uncovered lines to thresholds that only ratchet up.
  */
-// The jest-globals entry point, because the suites import `expect` from '@jest/globals' rather
-// than taking the global one, and only this build extends that expect and declares its types.
-import '@testing-library/jest-dom/jest-globals'
 import {
   render,
   renderHook,

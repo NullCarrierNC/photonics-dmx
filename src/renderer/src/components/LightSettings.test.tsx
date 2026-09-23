@@ -5,7 +5,6 @@
  * when none remain), and the Additional Channels section is present.
  */
 import { describe, expect, it, jest, afterEach } from '@jest/globals'
-import '@testing-library/jest-dom/jest-globals'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { FixtureTypes, type DmxFixture, type ExtraChannel } from '../../../photonics-dmx/types'
 import LightSettings from './LightSettings'
