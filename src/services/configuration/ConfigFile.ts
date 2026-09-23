@@ -400,8 +400,8 @@ export class ConfigFile<T> {
    * {@link recoverToDefault}, {@link load} and {@link applyLoadMigration}. Gating those would let a
    * validator fault block corruption recovery itself, leaving the file moved aside with nothing
    * written back. `update` is the only caller carrying user edits, so it is the only one that needs
-   * the gate. The throw happens before `this.data` is touched, so in-memory state is unchanged and
-   * the rollback below is not involved.
+   * the gate. `this.data` takes the new value only once the save succeeds, so a refused or failed
+   * save leaves the in-memory state as it was.
    */
   async update(newData: T): Promise<void> {
     if (this.validate) {
@@ -413,14 +413,8 @@ export class ConfigFile<T> {
       }
     }
 
-    const previous = this.data
-    try {
-      await this.save(newData)
-      this.data = newData
-    } catch (err) {
-      this.data = previous
-      throw err
-    }
+    await this.save(newData)
+    this.data = newData
   }
 
   /**
