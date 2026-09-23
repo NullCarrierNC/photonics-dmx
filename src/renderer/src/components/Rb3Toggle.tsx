@@ -1,13 +1,11 @@
 import { useAtom } from 'jotai'
-import { useEffect, useId } from 'react'
+import { useId } from 'react'
 import {
   rb3eListenerEnabledAtom,
   yargListenerEnabledAtom,
   audioListenerEnabledAtom,
 } from '../atoms'
-import { registerIpcListener } from '../utils/ipcHelpers'
-import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getSystemStatus, enableRb3, disableRb3, setAudioEnabled } from '../ipcApi'
+import { enableRb3, disableRb3, setAudioEnabled } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('Rb3Toggle')
 
@@ -20,37 +18,6 @@ const Rb3Toggle = ({ disabled = false }: Rb3ToggleProps) => {
   const [isYargEnabled] = useAtom(yargListenerEnabledAtom)
   const [isAudioEnabled, setIsAudioEnabled] = useAtom(audioListenerEnabledAtom)
   const labelId = useId()
-
-  useEffect(() => {
-    // Initialize toggle state from system status
-    const initializeState = async () => {
-      try {
-        const response = await getSystemStatus()
-        if (response.success) {
-          setIsRb3Enabled(response.isRb3Enabled)
-        }
-      } catch (error) {
-        log.error('Error initializing RB3E toggle state:', error)
-      }
-    }
-
-    // Handle controllers restarted event
-    const handleControllersRestarted = () => {
-      log.info('Controllers restarted, refreshing RB3E toggle state')
-      void initializeState()
-    }
-
-    const cleanup = registerIpcListener(
-      RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
-      handleControllersRestarted,
-    )
-
-    // Initialize on mount
-    void initializeState()
-
-    // Return the cleanup function
-    return cleanup
-  }, [setIsRb3Enabled])
 
   const handleToggle = () => {
     const newState = !isRb3Enabled

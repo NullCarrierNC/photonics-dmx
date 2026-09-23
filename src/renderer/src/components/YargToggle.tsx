@@ -1,13 +1,11 @@
 import { useAtom } from 'jotai'
-import { useEffect, useId } from 'react'
+import { useId } from 'react'
 import {
   yargListenerEnabledAtom,
   rb3eListenerEnabledAtom,
   audioListenerEnabledAtom,
 } from '../atoms'
-import { registerIpcListener } from '../utils/ipcHelpers'
-import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import { getSystemStatus, enableYarg, disableYarg, setAudioEnabled } from '../ipcApi'
+import { enableYarg, disableYarg, setAudioEnabled } from '../ipcApi'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('YargToggle')
 
@@ -20,36 +18,6 @@ const YargToggle = ({ disabled = false }: YargToggleProps) => {
   const [isRb3Enabled] = useAtom(rb3eListenerEnabledAtom)
   const [isAudioEnabled, setIsAudioEnabled] = useAtom(audioListenerEnabledAtom)
   const labelId = useId()
-
-  useEffect(() => {
-    // Initialize toggle state from system status
-    const initializeState = async () => {
-      try {
-        const response = await getSystemStatus()
-        if (response.success) {
-          setIsYargEnabled(response.isYargEnabled)
-        }
-      } catch (error) {
-        log.error('Error initializing YARG toggle state:', error)
-      }
-    }
-
-    // Handle controllers restarted event
-    const handleControllersRestarted = () => {
-      log.info('Controllers restarted, refreshing YARG toggle state')
-      void initializeState()
-    }
-
-    const cleanup = registerIpcListener(
-      RENDERER_RECEIVE.CONTROLLERS_RESTARTED,
-      handleControllersRestarted,
-    )
-
-    // Initialize on mount
-    void initializeState()
-
-    return cleanup
-  }, [setIsYargEnabled])
 
   const handleToggle = () => {
     const newState = !isYargEnabled

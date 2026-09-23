@@ -63,6 +63,16 @@ export class ListenerCoordinator {
 
   constructor(private readonly deps: ListenerCoordinatorDeps) {}
 
+  /** Records whether a listener runs and tells every window, whatever started or stopped it. */
+  private setListenerEnabled(listener: 'yarg' | 'rb3', enabled: boolean): void {
+    if (listener === 'yarg') {
+      this.isYargEnabled = enabled
+    } else {
+      this.isRb3Enabled = enabled
+    }
+    this.deps.sendToAllWindows(RENDERER_RECEIVE.LISTENER_ENABLED_CHANGED, { listener, enabled })
+  }
+
   public async enableYarg(isInitialized: boolean, initAsync: () => Promise<void>): Promise<void> {
     if (!isInitialized) {
       log.info('Initializing system before enabling YARG')
@@ -109,7 +119,7 @@ export class ListenerCoordinator {
         const stopped = errorData.severity !== 'warning' && errorData.type === 'runtime-error'
         if (stopped) {
           this.yargListener = null
-          this.isYargEnabled = false
+          this.setListenerEnabled('yarg', false)
           this.deps.setVenuePostProcessing('Default')
           this.notifyRuntimeDisabled('yarg')
           this.clearChainHandlers('yarg')
@@ -125,7 +135,7 @@ export class ListenerCoordinator {
     )
     try {
       await this.yargListener.start()
-      this.isYargEnabled = true
+      this.setListenerEnabled('yarg', true)
       log.info('YARG listener enabled')
     } catch (err) {
       const code = (err as NodeJS.ErrnoException)?.code
@@ -137,7 +147,7 @@ export class ListenerCoordinator {
           : String(err)
       log.error('Failed to start YARG listener:', err)
       this.yargListener = null
-      this.isYargEnabled = false
+      this.setListenerEnabled('yarg', false)
       this.deps.setVenuePostProcessing('Default')
       this.notifyRuntimeDisabled('yarg')
       this.clearChainHandlers('yarg')
@@ -163,7 +173,7 @@ export class ListenerCoordinator {
       await listenerClosing
       this.yargListener = null
     }
-    this.isYargEnabled = false
+    this.setListenerEnabled('yarg', false)
   }
 
   /** Apply the optional runtime decorator for a domain, or pass the base runtime through. */
@@ -321,7 +331,7 @@ export class ListenerCoordinator {
         await this.rb3TeardownPromise
         return
       }
-      this.isRb3Enabled = true
+      this.setListenerEnabled('rb3', true)
       log.info(`RB3 listener enabled in ${mode} StageKit mode`)
     } catch (err) {
       const code = (err as NodeJS.ErrnoException)?.code
@@ -333,7 +343,7 @@ export class ListenerCoordinator {
           : String(err)
       log.error('Failed to start RB3E listener:', err)
       this.rb3eListener = null
-      this.isRb3Enabled = false
+      this.setListenerEnabled('rb3', false)
       this.processorManager.destroy()
       this.processorManager = null
       this.notifyRuntimeDisabled('rb3')
@@ -367,7 +377,7 @@ export class ListenerCoordinator {
     if (!this.isRb3Enabled && !this.rb3eListener && !this.processorManager) {
       return
     }
-    this.isRb3Enabled = false
+    this.setListenerEnabled('rb3', false)
     // Input, then cues, then output, as disableYarg does. The socket closes synchronously and
     // destroying the processors stops the keepalive and the menu pump generating frames of their
     // own, so the blackout below is the last word on the lights rather than something a late

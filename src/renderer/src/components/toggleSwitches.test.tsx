@@ -38,25 +38,13 @@ beforeEach(() => {
 const switchNamed = (name: string) => screen.getByRole('switch', { name })
 
 describe('toggle switches', () => {
-  it('names the YARG listener switch and reports whether it is on', async () => {
-    ipcApiMock.getSystemStatus.mockResolvedValue({
-      success: true,
-      isYargEnabled: true,
-      isRb3Enabled: false,
-    } as never)
+  it('names the YARG listener switch and reports whether it is on', () => {
     renderWithProviders(<YargToggle />, { seed: (set) => set(yargListenerEnabledAtom, true) })
-    await waitFor(() => expect(ipcApiMock.getSystemStatus).toHaveBeenCalled())
     expect(switchNamed('Enable YARG')).toHaveAttribute('aria-checked', 'true')
   })
 
-  it('names the RB3E listener switch and reports whether it is on', async () => {
-    ipcApiMock.getSystemStatus.mockResolvedValue({
-      success: true,
-      isYargEnabled: false,
-      isRb3Enabled: false,
-    } as never)
+  it('names the RB3E listener switch and reports whether it is on', () => {
     renderWithProviders(<Rb3Toggle />)
-    await waitFor(() => expect(ipcApiMock.getSystemStatus).toHaveBeenCalled())
     expect(switchNamed('Enable RB3E')).toHaveAttribute('aria-checked', 'false')
   })
 

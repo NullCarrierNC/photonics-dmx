@@ -282,6 +282,8 @@ export const RENDERER_RECEIVE = {
   AUDIO_DISABLE: 'audio:disable',
   /** Broadcast after SET_AUDIO_ENABLED so all windows sync Enable Audio UI. */
   AUDIO_ENABLED_CHANGED: 'audio:enabled-changed',
+  /** Broadcast on every YARG or RB3 listener start and stop, whatever caused it. */
+  LISTENER_ENABLED_CHANGED: 'listener:enabled-changed',
   AUDIO_CONFIG_UPDATE: 'audio:config-update',
   AUDIO_GAME_MODE_UPDATE: 'audio:game-mode-update',
   /** Enabled audio cue groups or per-cue disables changed (Preferences → all windows). */
