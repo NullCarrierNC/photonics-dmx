@@ -133,6 +133,20 @@ describe('main startup', () => {
     expect(applicationInit).toHaveBeenCalledTimes(1)
   })
 
+  it('watches window shortcuts before the application builds its first window', async () => {
+    const order: string[] = []
+    appOn.mockImplementation((event: unknown) => {
+      if (event === 'browser-window-created') order.push('watch')
+    })
+    applicationInit.mockImplementation(async () => {
+      order.push('init')
+    })
+
+    await startUp()
+
+    expect(order).toEqual(['watch', 'init'])
+  })
+
   it('carries on to the window when the log directory cannot be created', async () => {
     createFileLogSink.mockImplementation(() => {
       throw new Error('EACCES: permission denied')

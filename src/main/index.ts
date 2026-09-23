@@ -155,15 +155,15 @@ function onReady(): void {
     return
   }
 
+  // Default session handlers, ahead of init so the main window it builds gets them too.
+  app.on('browser-window-created', (_, window) => {
+    optimizer.watchWindowShortcuts(window)
+  })
+
   // Initialize application. A controller failure resolves and leaves the window reporting the
   // failed phase, so a rejection here means the window or IPC could not be set up and there is
   // nothing left to report through. Say so and stop rather than idling with no interface.
   applicationInstance.init().catch(reportStartupFailure)
-
-  // Default session handlers
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
 }
 
 /**
