@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import equal from 'fast-deep-equal'
 import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
 import type {
   AudioNodeCueDefinition,
@@ -229,10 +230,12 @@ export function useCueFileIO({
           onSaveError?.(`Failed to save effect: ${filename}`)
           return false
         }
+        // An edit made while the save ran is not in the saved file, so the file stays dirty.
+        const editedMeanwhile = !equal(getUpdatedDocument(), updatedFile)
         setEditorDoc({ mode: 'effect', file: updatedFile, path: response.path })
         rememberLastFilePath(response.path)
         setValidationErrors([])
-        setIsDirty(false)
+        setIsDirty(editedMeanwhile)
         await refreshEffectFiles()
         onSaveSuccess?.(`Effect saved: ${filename}`)
         return true
@@ -258,10 +261,11 @@ export function useCueFileIO({
           onSaveError?.(`Failed to save cue: ${filename}`)
           return false
         }
+        const editedMeanwhile = !equal(getUpdatedDocument(), updatedFile)
         setEditorDoc({ mode: 'cue', file: updatedFile, path: response.path })
         rememberLastFilePath(response.path)
         setValidationErrors([])
-        setIsDirty(false)
+        setIsDirty(editedMeanwhile)
         await refreshFiles()
         onSaveSuccess?.(`Cue saved: ${filename}`)
         return true
