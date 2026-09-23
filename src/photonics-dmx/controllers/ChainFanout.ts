@@ -269,9 +269,8 @@ export class ChainFanout implements CueRuntime, Rb3MenuCueDispatch {
   }
 
   /**
-   * Blackout every chain's sequencer sequentially so per-chain fades start in chain order
-   * and don't race each other. Errors on any chain don't block the others (mirrors the
-   * `Promise.allSettled` pattern used elsewhere in the fanout).
+   * Blackout every chain's sequencer at once, so every rig fades together. Resolves when every
+   * fade has settled, and an error on one chain does not block the others.
    */
   public async blackout(durationMs: number): Promise<void> {
     await Promise.allSettled(this.chains.map((c) => c.sequencer.blackout(durationMs)))
