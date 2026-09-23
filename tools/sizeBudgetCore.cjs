@@ -97,22 +97,29 @@ function overLimitEntries(sizes, limit) {
 }
 
 /**
- * Files listed in the baseline that have grown past their allowance, which a rewrite must refuse
- * to launder.
+ * Files a rewrite would give more room than the baseline does: a listed file that grew past its
+ * entry, or an unlisted file now over the limit. A rewrite refuses both, so it only lowers or
+ * removes entries.
  * @param {Map<string, number>} sizes
  * @param {Baseline} baseline
  * @returns {string[]}
  */
-function grownSinceBaseline(sizes, baseline) {
+function raisedByRewrite(sizes, baseline) {
   /** @type {string[]} */
-  const grown = []
-  for (const [path, cap] of baseline.allowances) {
-    const now = sizes.get(path)
-    if (now !== undefined && now > cap) {
-      grown.push(`${path} is ${now} lines, over its ${cap} line allowance`)
+  const raised = []
+  for (const [path, lines] of sizes) {
+    const cap = baseline.allowances.get(path)
+    if (cap === undefined) {
+      if (lines > baseline.limit) {
+        raised.push(
+          `${path} is ${lines} lines, over the ${baseline.limit} line limit and not listed`,
+        )
+      }
+    } else if (lines > cap) {
+      raised.push(`${path} is ${lines} lines, over its ${cap} line allowance`)
     }
   }
-  return grown
+  return raised
 }
 
 /**
@@ -135,6 +142,6 @@ module.exports = {
   parseBaseline,
   compareBudget,
   overLimitEntries,
-  grownSinceBaseline,
+  raisedByRewrite,
   renderBaseline,
 }

@@ -5,7 +5,7 @@ const {
   parseBaseline,
   compareBudget,
   overLimitEntries,
-  grownSinceBaseline,
+  raisedByRewrite,
   renderBaseline,
 } = require('../../../../tools/sizeBudgetCore.cjs')
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -96,20 +96,30 @@ describe('compareBudget', () => {
   })
 })
 
-describe('grownSinceBaseline', () => {
+describe('raisedByRewrite', () => {
   const baseline = parseBaseline(baselineText(600, [[700, 'src/a.ts']])) as Baseline
 
   it('names a listed file that grew, so a rewrite can refuse to launder it', () => {
-    expect(grownSinceBaseline(sizesOf({ 'src/a.ts': 750 }), baseline)).toHaveLength(1)
+    expect(raisedByRewrite(sizesOf({ 'src/a.ts': 750 }), baseline)).toHaveLength(1)
+  })
+
+  it('names an unlisted file over the limit, so a rewrite can refuse to list it', () => {
+    expect(raisedByRewrite(sizesOf({ 'src/a.ts': 700, 'src/b.ts': 601 }), baseline)).toEqual([
+      expect.stringContaining('src/b.ts'),
+    ])
   })
 
   it('stays silent for a file that shrank or held steady', () => {
-    expect(grownSinceBaseline(sizesOf({ 'src/a.ts': 700 }), baseline)).toEqual([])
-    expect(grownSinceBaseline(sizesOf({ 'src/a.ts': 10 }), baseline)).toEqual([])
+    expect(raisedByRewrite(sizesOf({ 'src/a.ts': 700 }), baseline)).toEqual([])
+    expect(raisedByRewrite(sizesOf({ 'src/a.ts': 10 }), baseline)).toEqual([])
+  })
+
+  it('stays silent for an unlisted file at the limit', () => {
+    expect(raisedByRewrite(sizesOf({ 'src/b.ts': 600 }), baseline)).toEqual([])
   })
 
   it('stays silent for a listed file that no longer exists', () => {
-    expect(grownSinceBaseline(sizesOf({}), baseline)).toEqual([])
+    expect(raisedByRewrite(sizesOf({}), baseline)).toEqual([])
   })
 })
 

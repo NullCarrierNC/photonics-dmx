@@ -15,7 +15,7 @@ const require = createRequire(import.meta.url)
 const {
   parseBaseline,
   compareBudget,
-  grownSinceBaseline,
+  raisedByRewrite,
   renderBaseline,
 } = require('./sizeBudgetCore.cjs')
 
@@ -81,8 +81,8 @@ const sizes = measureSources()
 if (process.argv.includes('--write')) {
   mkdirSync(join(root, 'metrics'), { recursive: true })
 
-  // Regenerating must never launder a file that grew. Raising an allowance is a deliberate act, so
-  // it is done by editing the entry, not by running this.
+  // Regenerating only lowers or removes entries. Adding or raising an allowance is a deliberate
+  // act, so it is done by editing the file, not by running this.
   if (existsSync(BUDGET_FILE)) {
     const baseline = parseBaseline(readFileSync(BUDGET_FILE, 'utf8'))
     if (!baseline) {
@@ -91,11 +91,11 @@ if (process.argv.includes('--write')) {
         'Fix the header, or delete the file to regenerate it from scratch.',
       )
     }
-    const grown = grownSinceBaseline(sizes, baseline)
-    if (grown.length > 0) {
+    const raised = raisedByRewrite(sizes, baseline)
+    if (raised.length > 0) {
       fail(
-        grown,
-        `Refusing to raise an allowance. Shrink the file, or edit its entry in ${BUDGET_FILE} if the growth is intended.`,
+        raised,
+        `Refusing to add or raise an allowance. Shrink the file, or add or edit its entry in ${BUDGET_FILE} by hand if the size is intended.`,
       )
     }
   }
