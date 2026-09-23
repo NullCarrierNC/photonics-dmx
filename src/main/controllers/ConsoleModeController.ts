@@ -9,6 +9,7 @@ import {
   normalizeFixtureConfig,
 } from '../../photonics-dmx/types'
 import { createLogger } from '../../shared/logger'
+import { restartAfterSave, type IpcSavedResult } from '../ipc/ipcResult'
 
 const log = createLogger('ConsoleModeController')
 
@@ -127,7 +128,7 @@ export class ConsoleModeController {
     lightId: string
     fixtureId: string
     config: Partial<FixtureConfig>
-  }): Promise<{ success: true } | { success: false; error: string }> {
+  }): Promise<IpcSavedResult | { success: false; error: string }> {
     const { rigId, lightId, fixtureId, config: patch } = payload
     const rig = this.deps.getConfig().getDmxRig(rigId)
     if (!rig) {
@@ -169,8 +170,7 @@ export class ConsoleModeController {
     }
     await this.deps.getConfig().updateUserLights(newUserLights)
 
-    await this.deps.restartControllers()
-    return { success: true }
+    return restartAfterSave(() => this.deps.restartControllers())
   }
 
   private findLightInRig(rig: DmxRig, lightId: string): DmxLight | null {

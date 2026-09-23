@@ -6,7 +6,7 @@ import { sendToAllWindows } from '../utils/windowUtils'
 import { NodeCueMode, NodeCueFile, NodeCueKind } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateNodeCueFile } from '../../photonics-dmx/cues/node/schema/validation'
 import { cueDomainBinding, reconcileAndApplyGroups } from '../controllers/cueDomainBindings'
-import { validationRefusal } from './ipcResult'
+import { ipcError, validationRefusal } from './ipcResult'
 import { NODE_CUES, RENDERER_RECEIVE } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { handleInvoke } from './handleInvoke'
@@ -76,11 +76,18 @@ export function setupNodeCueHandlers(ipcMain: IpcMain, controllerManager: Contro
   handleInvoke(ipcMain, NODE_CUES.SAVE, log, async (_event, payload: SavePayload) => {
     const loader = ensureLoader(controllerManager)
     const result = await loader.saveFile(payload.mode, payload.filename, payload.content)
-    await persistGroupEnableAfterNodeCueSave(
-      controllerManager,
-      payload.mode,
-      payload.content.group.id,
-    )
+    try {
+      await persistGroupEnableAfterNodeCueSave(
+        controllerManager,
+        payload.mode,
+        payload.content.group.id,
+      )
+    } catch (error) {
+      // The file is written and loaded by now, so the save stands and the enable failure rides
+      // beside it.
+      log.error('Enabling the saved cue group failed:', error)
+      return { ...result, groupEnableError: ipcError(error).error }
+    }
     return result
   })
 

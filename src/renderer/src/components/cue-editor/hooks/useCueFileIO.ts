@@ -289,7 +289,11 @@ export function useCueFileIO({
         }
         installSaved(editorDoc, snapshot, response.path)
         await refreshFiles()
-        onSaveSuccess?.(`Cue saved: ${filename}`)
+        if (response.groupEnableError) {
+          onSaveError?.(`Cue saved, but its group was not turned on: ${response.groupEnableError}`)
+        } else {
+          onSaveSuccess?.(`Cue saved: ${filename}`)
+        }
         return true
       } catch (error) {
         log.error('Failed to save node cue file', error)

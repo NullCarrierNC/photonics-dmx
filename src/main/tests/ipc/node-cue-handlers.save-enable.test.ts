@@ -70,4 +70,42 @@ describe('node-cue save opts the saved group in', () => {
     // One combined enabled+known write for the change.
     expect(config.updateCueDomain).toHaveBeenCalledTimes(1)
   })
+
+  it('answers the save as saved with the enable failure beside it', async () => {
+    const registry = CueRegistry.getInstance()
+    registry.reset()
+    registry.registerGroup(makeGroup('newGroup'))
+
+    const stored = { yarg: { enabledGroups: [], knownGroups: [], disabledCues: {} } }
+    const config = {
+      getPreference: (key: string) => (key === 'cueDomains' ? stored : undefined),
+      updateCueDomain: jest.fn(async () => {
+        throw new Error('Failed to save configuration: disk full')
+      }),
+    }
+    const loader = { saveFile: jest.fn(async () => ({ success: true, path: '/cues/yarg/f.json' })) }
+    const controllerManager = {
+      getConfig: () => config,
+      getNodeCueLoader: () => loader,
+      refreshAudioCueSelection: jest.fn(),
+    }
+    const handlers = new Map<string, (...args: unknown[]) => unknown>()
+    const ipcMain = {
+      handle: (channel: string, fn: (...args: unknown[]) => unknown) => handlers.set(channel, fn),
+      on: jest.fn(),
+    }
+    setupNodeCueHandlers(ipcMain as never, controllerManager as never)
+
+    const result = await handlers.get(NODE_CUES.SAVE)!(
+      {},
+      { mode: 'yarg', filename: 'f.json', content: { group: { id: 'newGroup' } } },
+    )
+
+    expect(result).toEqual({
+      success: true,
+      path: '/cues/yarg/f.json',
+      groupEnableError: 'Failed to save configuration: disk full',
+    })
+    expect(loader.saveFile).toHaveBeenCalledTimes(1)
+  })
 })

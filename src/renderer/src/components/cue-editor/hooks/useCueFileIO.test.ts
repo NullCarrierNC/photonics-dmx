@@ -390,6 +390,23 @@ describe('useCueFileIO handleSave', () => {
     expect(setIsDirty).toHaveBeenLastCalledWith(false)
   })
 
+  it('says so when the cue saved but its group could not be turned on', async () => {
+    jest.mocked(ipcApi.validateNodeCue).mockResolvedValue({ valid: true, errors: [] } as never)
+    jest.mocked(ipcApi.saveNodeCueFile).mockResolvedValue({
+      success: true,
+      path: '/cues/motion-cues.json',
+      groupEnableError: 'disk full',
+    } as never)
+    const { rendered, onSaveError, setIsDirty } = setup(openCueDoc())
+
+    await act(async () => {
+      await rendered.result.current.handleSave()
+    })
+
+    expect(onSaveError).toHaveBeenCalledWith(expect.stringContaining('disk full'))
+    expect(setIsDirty).toHaveBeenLastCalledWith(false)
+  })
+
   it.each([
     ['cue', 'saveNodeCueFile', 'validateNodeCue'],
     ['effect', 'saveEffectFile', 'validateEffect'],

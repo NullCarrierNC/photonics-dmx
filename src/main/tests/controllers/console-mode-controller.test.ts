@@ -214,4 +214,36 @@ describe('ConsoleModeController', () => {
     expect(result).toEqual({ success: false, error: 'Fixture template not found in My Lights' })
     expect(saveDmxRig).not.toHaveBeenCalled()
   })
+
+  it('answers a saved fixture edit as saved when the restart after it fails', async () => {
+    const light = { id: 'mh-1', fixtureId: 'fixture-1', fixture: 'rgb/mh', config: {} }
+    const saveDmxRig = jest.fn(async () => {})
+    const updateUserLights = jest.fn(async () => {})
+    const c = new ConsoleModeController(
+      baseDeps({
+        getConfig: () =>
+          ({
+            getDmxRig: () => ({
+              id: 'rig-1',
+              config: { frontLights: [light], backLights: [], strobeLights: [] },
+            }),
+            getUserLights: () => [{ id: 'fixture-1', fixture: 'rgb/mh', config: {} }],
+            saveDmxRig,
+            updateUserLights,
+          }) as never,
+        restartControllers: () => Promise.reject(new Error('rig chain would not dispose')),
+      }),
+    )
+
+    const result = await c.setConsoleFixtureConfig({
+      rigId: 'rig-1',
+      lightId: 'mh-1',
+      fixtureId: 'fixture-1',
+      config: { panHome: 50 },
+    })
+
+    expect(result).toEqual({ success: true, restartError: 'rig chain would not dispose' })
+    expect(saveDmxRig).toHaveBeenCalledTimes(1)
+    expect(updateUserLights).toHaveBeenCalledTimes(1)
+  })
 })
