@@ -36,7 +36,9 @@ export class WireOutputDelay implements WireSink {
   }
 
   public send(wireId: WireSenderId, buffer: Record<number, number>): Promise<boolean> {
-    if (this.passThrough || this.getDelayMs() <= 0) {
+    // A frame goes straight out only with nothing held, so frames still waiting after the delay
+    // drops to 0 leave ahead of it.
+    if (this.passThrough || (this.getDelayMs() <= 0 && this.queue.pending === 0)) {
       return this.sender.send(wireId, buffer)
     }
     const held = { ...buffer }
