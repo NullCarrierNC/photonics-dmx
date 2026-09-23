@@ -309,11 +309,25 @@ export class NodeCueLoader extends BaseNodeFileLoader<NodeCueMode, NodeCueFileSu
       audioFile.cues.forEach((cue) => {
         if (cue.kind === 'lighting') {
           this.customAudioCueTypes.add(cue.cueTypeId)
+          this.warnIfCueIdShared(cue.cueTypeId)
         }
       })
     }
 
     this.fileRegistrations.set(filePath, { mode, groupId: file.group.id })
+  }
+
+  /**
+   * Audio selection plays the first enabled group that carries a cue id, so a second group with the
+   * same id never plays that cue. Said once per load, naming the group that wins.
+   */
+  private warnIfCueIdShared(cueTypeId: string): void {
+    const providers = this.options.registries.audio.getEnabledGroupsProviding(cueTypeId)
+    if (providers.length > 1) {
+      log.warn(
+        `Audio cue id '${cueTypeId}' is in several enabled groups (${providers.join(', ')}). Only ${providers[0]} plays it. Give each cue its own id.`,
+      )
+    }
   }
 
   private unregisterFile(filePath: string): void {

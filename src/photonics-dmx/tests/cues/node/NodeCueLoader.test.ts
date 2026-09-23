@@ -171,6 +171,37 @@ function audioMotionOnlyFile(): AudioNodeCueFile {
   }
 }
 
+/** A minimal audio lighting cue file whose one cue answers to `cueTypeId`. */
+function audioLightingFile(groupId: string, cueTypeId: string): AudioNodeCueFile {
+  const base = audioMotionOnlyFile()
+  const motion = base.cues[0] as AudioMotionNodeCueDefinition
+  const setColor: ActionNode = {
+    ...motion.nodes.actions[0],
+    effectType: 'set-color',
+    color: {
+      name: { source: 'literal', value: 'white' },
+      brightness: { source: 'literal', value: 'max' },
+    },
+    layer: { source: 'literal', value: 0 },
+  }
+  return {
+    ...base,
+    group: { id: groupId, name: groupId },
+    cues: [
+      {
+        kind: 'lighting',
+        id: `${groupId}-cue`,
+        name: 'Audio light',
+        cueTypeId,
+        style: 'primary',
+        nodes: { events: motion.nodes.events, actions: [setColor], logic: [] },
+        connections: [{ from: 'ev-b', to: 'mp1' }],
+        layout: { nodePositions: {} },
+      },
+    ],
+  } as AudioNodeCueFile
+}
+
 describe('NodeCueLoader', () => {
   let tmpDir: string
   let yargRegistry: CueRegistry
@@ -313,6 +344,33 @@ describe('NodeCueLoader', () => {
     // The failed cue is reported on the summary rather than silently dropped.
     const summary = loader.getSummary().yarg.find((s) => s.path.endsWith('partial.json'))
     expect(summary?.errors?.some((e) => e.includes('m-broken'))).toBe(true)
+  })
+
+  it('warns when two enabled audio groups answer to the same cue id', async () => {
+    const warnings: string[] = []
+    const logger = await import('../../../../shared/logger')
+    logger.setMinLogLevel('debug')
+    logger.setLogSink((entry) => {
+      if (entry.level === 'warn') warnings.push(entry.message)
+    })
+    try {
+      const audioDir = path.join(tmpDir, 'node-data', 'cues', 'audio')
+      fs.mkdirSync(audioDir, { recursive: true })
+      for (const [file, group] of [
+        ['a.json', 'group-a'],
+        ['b.json', 'group-b'],
+      ]) {
+        const content = audioLightingFile(group, 'custom-audio-cue')
+        expect(validateAudioNodeCueFile(content).valid).toBe(true)
+        fs.writeFileSync(path.join(audioDir, file), JSON.stringify(content), 'utf-8')
+      }
+
+      await loader.loadAll()
+    } finally {
+      logger.resetLogConfiguration()
+    }
+
+    expect(warnings.some((w) => w.includes('custom-audio-cue') && w.includes('group-a'))).toBe(true)
   })
 
   it('registers Audio kind motion into the group motion map', async () => {

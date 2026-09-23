@@ -142,10 +142,11 @@ const createBlankCue = (
   if (kind === 'motion') {
     return { ...base, kind: 'motion' } as NetNodeCueDefinition | AudioNodeCueDefinition
   }
-  // rb3 lighting is the single fixed always-active gameplay cue (CueType.RB3), YARG-shaped.
+  // rb3 lighting is the single fixed always-active gameplay cue (CueType.RB3), YARG-shaped. Each
+  // new audio cue gets its own id, so two groups built in the editor never collide.
   const cueType =
     mode === 'audio'
-      ? { cueTypeId: 'custom-audio-cue' }
+      ? { cueTypeId: `custom-audio-cue-${createId().slice(0, 8)}` }
       : { cueType: mode === 'rb3' ? 'RB3' : 'Chorus' }
   return { ...base, kind: 'lighting', style: 'primary', ...cueType } as
     | NetNodeCueDefinition

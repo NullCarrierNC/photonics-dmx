@@ -41,3 +41,13 @@ describe('cueDefaults rb3 platform', () => {
     expect(cue.style).toBe('primary')
   })
 })
+
+describe('cueDefaults audio platform', () => {
+  it('gives each new audio lighting cue its own cue type id', () => {
+    const first = createBlankCue('audio', 'lighting') as { cueTypeId: string }
+    const second = createBlankCue('audio', 'lighting') as { cueTypeId: string }
+
+    expect(first.cueTypeId).toMatch(/^custom-audio-cue-/)
+    expect(second.cueTypeId).not.toBe(first.cueTypeId)
+  })
+})

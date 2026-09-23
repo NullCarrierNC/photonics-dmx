@@ -124,6 +124,15 @@ export class AudioCueRegistry {
   }
 
   /**
+   * The enabled groups that carry `cueType`, in the order {@link getCueImplementation} tries them.
+   */
+  public getEnabledGroupsProviding(cueType: AudioCueType): string[] {
+    return this.catalog
+      .getEnabledGroups()
+      .filter((groupId) => this.catalog.cueFrom(groupId, cueType) !== null)
+  }
+
+  /**
    * Get all cue types available within enabled groups (or across all groups if includeAll=true)
    */
   public getAvailableCueTypes(includeAll = false): AudioCueType[] {
