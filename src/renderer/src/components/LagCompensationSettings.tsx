@@ -21,7 +21,8 @@ interface DelayFieldProps {
   label: string
   help: React.ReactNode
   stored: number
-  onWrite: (ms: number) => Promise<void>
+  /** Resolves whether the delay was stored. */
+  onWrite: (ms: number) => Promise<boolean>
 }
 
 /**
@@ -38,11 +39,12 @@ const DelayField: React.FC<DelayFieldProps> = ({ id, label, help, stored, onWrit
   const shown = pending ?? stored
 
   const write = useCallback(
-    async (ms: number): Promise<void> => {
-      await onWrite(ms)
+    async (ms: number): Promise<boolean> => {
+      const landed = await onWrite(ms)
       // Either way the control goes back to following what is stored, so a refusal cannot leave it
       // showing a delay the main process never took. A position moved on since is left alone.
       setPending((current) => (current === ms ? null : current))
+      return landed
     },
     [onWrite],
   )
@@ -120,12 +122,13 @@ const LagCompensationSettings: React.FC = () => {
 
   /** Each field writes only its own key, so a refused save of one cannot revert the other. */
   const writeKey = useCallback(
-    async (key: LagPrefKey, what: string, ms: number): Promise<void> => {
+    async (key: LagPrefKey, what: string, ms: number): Promise<boolean> => {
       setSaveError(null)
       const saved = await persistPrefs({ [key]: ms }, what, setSaveError)
       if (saved) {
         setPrefs((prev) => ({ ...prev, [key]: ms }))
       }
+      return saved
     },
     [setPrefs],
   )

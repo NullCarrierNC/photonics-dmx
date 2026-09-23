@@ -85,6 +85,77 @@ describe('useDebouncedSave', () => {
     expect(write).not.toHaveBeenCalled()
   })
 
+  it('drops a value that matches the last write that landed', async () => {
+    const write = jest.fn<(value: number) => Promise<boolean>>(async () => true)
+    const { result } = renderHook(() =>
+      useDebouncedSave(write, { quietMs: 100, isEqual: (a: number, b: number) => a === b }),
+    )
+
+    act(() => {
+      result.current.saveSoon(3)
+      result.current.flush()
+    })
+    await act(async () => {})
+    act(() => {
+      result.current.saveSoon(3)
+      result.current.flush()
+    })
+
+    expect(write).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['answered false', () => Promise.resolve(false)],
+    ['rejected', () => Promise.reject(new Error('channel gone'))],
+  ])('writes the same value again after a write that %s', async (_answer, fail) => {
+    const write = jest.fn<(value: number) => Promise<boolean>>(async () => true)
+    write.mockImplementationOnce(fail)
+    const { result } = renderHook(() =>
+      useDebouncedSave(write, { quietMs: 100, isEqual: (a: number, b: number) => a === b }),
+    )
+
+    act(() => {
+      result.current.saveSoon(3)
+      jest.advanceTimersByTime(100)
+    })
+    await act(async () => {})
+    act(() => {
+      result.current.saveSoon(3)
+      jest.advanceTimersByTime(100)
+    })
+
+    expect(write).toHaveBeenCalledTimes(2)
+    expect(write).toHaveBeenLastCalledWith(3)
+  })
+
+  it('keeps a value seeded while a write was in flight', async () => {
+    let answer!: (landed: boolean) => void
+    const write = jest.fn<(value: number) => Promise<boolean>>(
+      () => new Promise((resolve) => (answer = resolve)),
+    )
+    const { result } = renderHook(() =>
+      useDebouncedSave(write, { quietMs: 100, isEqual: (a: number, b: number) => a === b }),
+    )
+
+    act(() => {
+      result.current.saveSoon(50)
+      result.current.flush()
+      result.current.seed(40)
+    })
+    await act(async () => answer(true))
+    act(() => {
+      result.current.saveSoon(40)
+      result.current.flush()
+    })
+    expect(write).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      result.current.saveSoon(50)
+      result.current.flush()
+    })
+    expect(write).toHaveBeenCalledTimes(2)
+  })
+
   it('takes a per-burst quiet window', () => {
     const write = jest.fn<(value: number) => Promise<undefined>>(async () => undefined)
     const { result } = renderHook(() => useDebouncedSave(write, { quietMs: 1000 }))

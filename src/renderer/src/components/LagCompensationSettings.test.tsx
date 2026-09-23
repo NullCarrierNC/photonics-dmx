@@ -220,6 +220,21 @@ describe('LagCompensationSettings', () => {
     })
   })
 
+  it('writes the same delay again after a refusal', async () => {
+    savePrefs.mockResolvedValueOnce(refused('nope'))
+    renderWith({ videoLagCompensationMs: 100 })
+
+    fireEvent.change(slider(GAME), { target: { value: '210' } })
+    settle()
+    await waitFor(() => expect(slider(GAME).value).toBe('100'))
+
+    fireEvent.change(slider(GAME), { target: { value: '210' } })
+    settle()
+
+    await waitFor(() => expect(savePrefs).toHaveBeenCalledTimes(2))
+    expect(savePrefs).toHaveBeenLastCalledWith({ videoLagCompensationMs: 210 })
+  })
+
   it('writes a held change when the card goes away', async () => {
     const { unmount } = renderWithProviders(<LagCompensationSettings />, {
       seed: (set) => set(lightingPrefsAtom, {}),
