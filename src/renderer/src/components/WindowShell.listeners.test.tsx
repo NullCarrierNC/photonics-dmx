@@ -23,7 +23,7 @@ jest.mock(
 )
 
 import WindowShell from './WindowShell'
-import YargToggle from './YargToggle'
+import ListenerToggle from './ListenerToggle'
 import AudioToggle from './AudioToggle'
 
 beforeEach(() => {
@@ -44,7 +44,7 @@ describe('listener switches in every window', () => {
   it('shows YARG off in the main window once audio starts from another window', async () => {
     renderWithProviders(
       <WindowShell>
-        <YargToggle />
+        <ListenerToggle listener="yarg" />
         <AudioToggle />
       </WindowShell>,
     )

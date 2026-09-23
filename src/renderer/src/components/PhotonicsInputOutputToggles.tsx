@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useAtom } from 'jotai'
-import YargToggle from './YargToggle'
-import Rb3Toggle from './Rb3Toggle'
+import ListenerToggle from './ListenerToggle'
 import AudioToggle from './AudioToggle'
 import EnttecProToggle from './EnttecProToggle'
 import SacnToggle from './SacnToggle'
@@ -46,8 +45,8 @@ const DmxSettingsAccordion = ({ startOpen }: DmxSettingsProps) => {
           <div className="mb-6">
             <h3 className="text-md font-medium mb-3 text-gray-700 dark:text-gray-300">Input</h3>
             <div className="flex flex-row gap-8 items-start flex-wrap">
-              <YargToggle disabled={togglesDisabled} />
-              <Rb3Toggle disabled={togglesDisabled} />
+              <ListenerToggle listener="yarg" disabled={togglesDisabled} />
+              <ListenerToggle listener="rb3" disabled={togglesDisabled} />
               {advancedModeEnabled && <AudioToggle disabled={togglesDisabled} />}
             </div>
           </div>
