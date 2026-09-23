@@ -68,9 +68,9 @@ export class ConfigFile<T> {
   // Serializes saves so only one writeFile+rename is in flight per file at a time,
   // avoiding concurrent renames racing the same destination.
   private saveChain: Promise<void> = Promise.resolve()
-  // Serializes whole read-modify-write turns. `saveChain` only orders the writes, which is not
-  // enough on its own: `update` publishes `this.data` after its write resolves, so two callers
-  // that each read before awaiting both start from the pre-write value and the later write wins.
+  // Serializes every update and read-modify-write turn. `saveChain` only orders the writes, which
+  // is not enough on its own: a write publishes `this.data` after it resolves, so a caller that
+  // reads while one is in flight starts from the pre-write value and its later write wins.
   private mutateChain: Promise<unknown> = Promise.resolve()
 
   constructor(
@@ -401,9 +401,14 @@ export class ConfigFile<T> {
    * validator fault block corruption recovery itself, leaving the file moved aside with nothing
    * written back. `update` is the only caller carrying user edits, so it is the only one that needs
    * the gate. `this.data` takes the new value only once the save succeeds, so a refused or failed
-   * save leaves the in-memory state as it was.
+   * save leaves the in-memory state as it was. The write waits its turn behind every update and
+   * {@link mutate} called before it.
    */
   async update(newData: T): Promise<void> {
+    return this.enqueue(() => this.write(newData))
+  }
+
+  private async write(newData: T): Promise<void> {
     if (this.validate) {
       const v = this.validate(newData)
       if (!v.valid) {
@@ -426,13 +431,16 @@ export class ConfigFile<T> {
    * its argument. Returning the input unchanged skips the write.
    */
   async mutate(change: (current: T) => T): Promise<void> {
-    const turn = async (): Promise<void> => {
+    return this.enqueue(async () => {
       const next = change(this.data)
       if (next === this.data) {
         return
       }
-      await this.update(next)
-    }
+      await this.write(next)
+    })
+  }
+
+  private enqueue(turn: () => Promise<void>): Promise<void> {
     // Both arms run the turn: a rejected predecessor must not skip this one.
     const run = this.mutateChain.then(turn, turn)
     // A failed turn must not poison the ones behind it.

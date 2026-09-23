@@ -47,9 +47,7 @@ export function migrateLegacyLightsFormat(userLights: ConfigFile<UserLightsConfi
   // If legacy format (just an array), migrate
   if (Array.isArray(currentData)) {
     const migratedData: UserLightsConfig = { lights: currentData }
-    userLights
-      .update(migratedData)
-      .catch((err) => log.error('[Photonics Config] Failed to persist migrated lights:', err))
+    userLights.applyLoadMigration(migratedData)
     log.info(`[Photonics Config] Migrated legacy lights format to new format`)
   }
 }
@@ -110,9 +108,7 @@ export function normalizeStraySenderFlatKeys(preferences: PreferencesConfigFile)
     delete (base as unknown as Record<string, unknown>)[k]
   }
   const next = applyLegacySenderFlatToNested(full, base)
-  preferences
-    .update(next)
-    .catch((err) => log.error('[Photonics Config] Failed to persist sender key cleanup:', err))
+  preferences.applyLoadMigration(next)
 }
 
 /**
@@ -155,9 +151,7 @@ export function migrateToDmxRigs(
       config: safeLayout,
     }
 
-    dmxRigs
-      .update({ ...currentRigs, rigs: [defaultRig] })
-      .catch((err) => log.error('[Photonics Config] Failed to persist migrated DMX rigs:', err))
+    dmxRigs.applyLoadMigration({ ...currentRigs, rigs: [defaultRig] })
     log.info('[Photonics Config] Migrated existing layout to default DMX rig')
   }
 }

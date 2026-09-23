@@ -255,6 +255,34 @@ describe('ConfigFile.mutate', () => {
     expect(cf.get().a).toBe('written')
   })
 
+  it('reads the value an update in flight is saving', async () => {
+    const filename = `config-mutate-after-update-${Date.now()}.json`
+    const cf = new ConfigFile<Settings>(filename, { a: 'start', b: '' }, 1, {})
+
+    await Promise.all([
+      cf.update({ a: 'updated', b: '' }),
+      cf.mutate((current) => ({ ...current, b: current.a })),
+    ])
+
+    expect(cf.get()).toEqual({ a: 'updated', b: 'updated' })
+  })
+
+  it('lands an update after a turn queued before it', async () => {
+    const filename = `config-update-after-mutate-${Date.now()}.json`
+    const cf = new ConfigFile<Settings>(filename, { a: 'start', b: '' }, 1, {})
+
+    await Promise.all([
+      cf.mutate((current) => ({ ...current, a: 'mutated' })),
+      cf.update({ a: 'replaced', b: 'replaced' }),
+    ])
+
+    expect(cf.get()).toEqual({ a: 'replaced', b: 'replaced' })
+    const onDisk = JSON.parse(
+      fs.readFileSync(path.join(testAppData, 'Photonics.rocks', filename), 'utf-8'),
+    )
+    expect(onDisk.data).toEqual({ a: 'replaced', b: 'replaced' })
+  })
+
   it('lets the turns behind a failed one continue', async () => {
     const filename = `config-mutate-failure-${Date.now()}.json`
     const cf = new ConfigFile<Settings>(filename, { a: 'start', b: '' }, 1, {})
