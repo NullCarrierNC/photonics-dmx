@@ -37,7 +37,6 @@ import { AudioCaptureManager } from './services/AudioCaptureManager'
 import { AudioConfig } from '../../photonics-dmx/listeners/Audio/AudioTypes'
 import { useToast } from './hooks/useToast'
 import { useYargErrorHandler } from './hooks/useYargErrorHandler'
-import { ConfirmModalHost } from './components/ConfirmModalHost'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { useDarkMode } from './DarkModeProvider'
 import type { CueStateUpdatePayload, NodeCueRuntimeErrorPayload } from '../../shared/ipcTypes'
@@ -498,7 +497,6 @@ export const App = (): JSX.Element => {
         </div>
       </div>
       <MasterOutputSidebar />
-      <ConfirmModalHost />
     </div>
   )
 }

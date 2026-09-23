@@ -4,6 +4,7 @@ import { useMasterOutputSync } from '../hooks/useMasterOutputSync'
 import { useAudioEnabledSync } from '../hooks/useAudioEnabledSync'
 import { useListenerEnabledSync } from '../hooks/useListenerEnabledSync'
 import { ToastStack } from './Toast'
+import { ConfirmModalHost } from './ConfirmModalHost'
 
 /**
  * The behaviour every Photonics window carries, whichever root it renders.
@@ -21,6 +22,7 @@ const WindowShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <>
       {children}
       <ToastStack />
+      <ConfirmModalHost />
     </>
   )
 }

@@ -14,6 +14,8 @@ import type { EditorDocument } from '../../lib/types'
 import VariableList from './VariableList'
 import VariableFormDialog from './VariableFormDialog'
 import VariableReferenceModal from '../VariableReferenceModal'
+import { useConfirm } from '../../../../hooks/useConfirm'
+import { useToast } from '../../../../hooks/useToast'
 
 type VariableRegistryProps = {
   editorDoc: EditorDocument | null
@@ -30,6 +32,8 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
   onVariablesChange,
   getVariableReferences,
 }) => {
+  const confirm = useConfirm()
+  const { showToast } = useToast()
   const [showDialog, setShowDialog] = useState<'group' | 'cue' | null>(null)
   const [editingVar, setEditingVar] = useState<VariableDefinition | null>(null)
   const [referenceModal, setReferenceModal] = useState<{
@@ -96,7 +100,7 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
 
   const handleSave = () => {
     if (!formData.name || !formData.type || formData.initialValue === undefined) {
-      alert('Please fill in all required fields')
+      showToast('Please fill in all required fields', 'error')
       return
     }
 
@@ -116,7 +120,7 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
         if (index >= 0) updatedGroupVars[index] = newVar
       } else {
         if (updatedGroupVars.some((v) => v.name === newVar.name)) {
-          alert(`A group variable named "${newVar.name}" already exists`)
+          showToast(`A group variable named "${newVar.name}" already exists`, 'error')
           return
         }
         updatedGroupVars.push(newVar)
@@ -129,7 +133,7 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
         if (index >= 0) updatedEffectVars[index] = newVar
       } else {
         if (updatedEffectVars.some((v) => v.name === newVar.name)) {
-          alert(`An effect variable named "${newVar.name}" already exists`)
+          showToast(`An effect variable named "${newVar.name}" already exists`, 'error')
           return
         }
         updatedEffectVars.push(newVar)
@@ -142,7 +146,7 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
         if (index >= 0) updatedCueVars[index] = newVar
       } else {
         if (updatedCueVars.some((v) => v.name === newVar.name)) {
-          alert(`A cue variable named "${newVar.name}" already exists`)
+          showToast(`A cue variable named "${newVar.name}" already exists`, 'error')
           return
         }
         updatedCueVars.push(newVar)
@@ -153,16 +157,20 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
     closeDialog()
   }
 
-  const handleDelete = (varName: string, scope: 'cue' | 'cue-group') => {
+  const handleDelete = async (varName: string, scope: 'cue' | 'cue-group') => {
     const references = getVariableReferences(varName, scope)
     if (references.length > 0) {
       setReferenceModal({ varName, references })
       return
     }
 
-    if (!confirm(`Delete variable "${varName}"?`)) {
-      return
-    }
+    const confirmed = await confirm({
+      title: 'Delete variable',
+      message: `Delete variable "${varName}"?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!confirmed) return
 
     if (isEffectMode) {
       const updatedEffectVars = effectVariables.filter((v) => v.name !== varName)
@@ -208,7 +216,7 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
             <VariableList
               variables={effectVariables}
               onEdit={(v) => openDialog('cue', v)}
-              onDelete={(name) => handleDelete(name, 'cue')}
+              onDelete={(name) => void handleDelete(name, 'cue')}
               showParameterBadge
             />
           </div>
@@ -228,7 +236,7 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
               <VariableList
                 variables={groupVariables}
                 onEdit={(v) => openDialog('cue-group', v)}
-                onDelete={(name) => handleDelete(name, 'cue-group')}
+                onDelete={(name) => void handleDelete(name, 'cue-group')}
               />
             </div>
 
@@ -250,7 +258,7 @@ const VariableRegistry: React.FC<VariableRegistryProps> = ({
                 <VariableList
                   variables={cueVariables}
                   onEdit={(v) => openDialog('cue', v)}
-                  onDelete={(name) => handleDelete(name, 'cue')}
+                  onDelete={(name) => void handleDelete(name, 'cue')}
                 />
               )}
             </div>
