@@ -2,8 +2,8 @@
  * Fails when package.json, a git hook or a workflow runs a file git does not track.
  *
  * A fresh clone carries only what git tracks, so a script naming an ignored or uncommitted file
- * works for whoever wrote it and fails for everyone else. This asks git rather than the working
- * tree, since the working tree is the one place such a file always exists.
+ * works for whoever wrote it and fails for everyone else. This reads the committed tree at HEAD,
+ * since the working tree always has such a file and the index can hold one a push leaves behind.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
@@ -50,14 +50,18 @@ const commands = [
 ]
 
 const tracked = new Set(
-  execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  execFileSync('git', ['ls-tree', '-r', '--name-only', 'HEAD'], {
+    cwd: root,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  })
     .split(/\r?\n/)
     .filter((line) => line !== ''),
 )
 
 const missing = untrackedPaths(commands, tracked)
 if (missing.length > 0) {
-  console.error('Run by package.json, a git hook or a workflow, but not tracked by git:')
+  console.error('Run by package.json, a git hook or a workflow, but not committed:')
   for (const path of missing) {
     console.error(`  ${path}`)
   }
@@ -68,4 +72,4 @@ if (missing.length > 0) {
 }
 
 const checked = new Set(commands.flatMap(pathsInCommand)).size
-console.log(`Referenced paths: ${checked} checked, all tracked by git`)
+console.log(`Referenced paths: ${checked} checked, all committed`)
