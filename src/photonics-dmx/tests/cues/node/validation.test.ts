@@ -13,7 +13,55 @@ import {
 } from '../../../cues/node/schema/validation'
 import { NetNodeCueDefinition, AudioNodeCueDefinition } from '../../../cues/types/nodeCueTypes'
 import { CueType } from '../../../cues/types/cueTypes'
-import type { AudioEventNodeUnion } from '../../../cues/types/nodeCueTypes'
+import type { ActionNode, AudioEventNodeUnion } from '../../../cues/types/nodeCueTypes'
+
+const setColorAction = (): ActionNode => ({
+  id: 'action-1',
+  type: 'action',
+  effectType: 'set-color',
+  target: {
+    groups: { source: 'literal', value: 'front' },
+    filter: { source: 'literal', value: 'all' },
+  },
+  color: {
+    name: { source: 'literal', value: 'blue' },
+    brightness: { source: 'literal', value: 'medium' },
+    blendMode: { source: 'literal', value: 'replace' },
+  },
+  timing: {
+    waitForCondition: { source: 'literal', value: 'none' },
+    waitForTime: { source: 'literal', value: 0 },
+    duration: { source: 'literal', value: 200 },
+    waitUntilCondition: { source: 'literal', value: 'none' },
+    waitUntilTime: { source: 'literal', value: 0 },
+    easing: { source: 'literal', value: 'sinInOut' },
+    level: { source: 'literal', value: 1 },
+  },
+})
+
+const audioCueFile = (event: Record<string, unknown>, fields: Record<string, unknown> = {}) => ({
+  version: 1,
+  mode: 'audio',
+  group: { id: 'g', name: 'G' },
+  cues: [
+    {
+      id: 'audio-cue',
+      name: 'Audio Cue',
+      kind: 'lighting',
+      cueTypeId: 'custom-audio',
+      ...fields,
+      nodes: { events: [event], actions: [] },
+      connections: [],
+      layout: { nodePositions: {} },
+    },
+  ],
+})
+
+const readBundled = (relativePath: string): string =>
+  fs.readFileSync(
+    path.join(__dirname, '../../../../../resources/defaults/node-data', relativePath),
+    'utf8',
+  )
 
 describe('Node cue validation', () => {
   it('validates a simple YARG node cue', () => {
@@ -26,31 +74,7 @@ describe('Node cue validation', () => {
       style: 'primary',
       nodes: {
         events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
-        actions: [
-          {
-            id: 'action-1',
-            type: 'action',
-            effectType: 'set-color',
-            target: {
-              groups: { source: 'literal', value: 'front' },
-              filter: { source: 'literal', value: 'all' },
-            },
-            color: {
-              name: { source: 'literal', value: 'blue' },
-              brightness: { source: 'literal', value: 'medium' },
-              blendMode: { source: 'literal', value: 'replace' },
-            },
-            timing: {
-              waitForCondition: { source: 'literal', value: 'none' },
-              waitForTime: { source: 'literal', value: 0 },
-              duration: { source: 'literal', value: 200 },
-              waitUntilCondition: { source: 'literal', value: 'none' },
-              waitUntilTime: { source: 'literal', value: 0 },
-              easing: { source: 'literal', value: 'sinInOut' },
-              level: { source: 'literal', value: 1 },
-            },
-          },
-        ],
+        actions: [setColorAction()],
       },
       connections: [{ from: 'event-1', to: 'action-1' }],
       layout: {
@@ -71,50 +95,43 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
   })
 
-  it('validates a YARG node cue containing a pulse logic node, and rejects one missing anchorVar', () => {
-    const makeDef = (pulse: Record<string, unknown>): NetNodeCueDefinition =>
-      ({
-        id: 'pulse-cue',
-        name: 'Pulse Cue',
+  describe('logic node schemas', () => {
+    const isValidLogic = (
+      logic: Record<string, unknown>,
+      context: {
+        cueType?: CueType
+        eventType?: 'cue-called' | 'cue-started'
+        fromPort?: string
+      } = {},
+    ): boolean => {
+      const { cueType = CueType.Chorus, eventType = 'cue-called', fromPort } = context
+      const cue = {
+        id: 'logic-cue',
+        name: 'Logic Cue',
         description: '',
         kind: 'lighting',
-        cueType: CueType.Chorus,
+        cueType,
         style: 'primary',
         nodes: {
-          events: [{ id: 'event-1', type: 'event', eventType: 'cue-called' }],
-          actions: [
-            {
-              id: 'action-1',
-              type: 'action',
-              effectType: 'set-color',
-              target: {
-                groups: { source: 'literal', value: 'front' },
-                filter: { source: 'literal', value: 'all' },
-              },
-              color: {
-                name: { source: 'literal', value: 'blue' },
-                brightness: { source: 'literal', value: 'medium' },
-                blendMode: { source: 'literal', value: 'replace' },
-              },
-              timing: {
-                waitForCondition: { source: 'literal', value: 'none' },
-                waitForTime: { source: 'literal', value: 0 },
-                duration: { source: 'literal', value: 200 },
-                waitUntilCondition: { source: 'literal', value: 'none' },
-                waitUntilTime: { source: 'literal', value: 0 },
-                easing: { source: 'literal', value: 'sinInOut' },
-                level: { source: 'literal', value: 1 },
-              },
-            },
-          ],
-          logic: [pulse as never],
+          events: [{ id: 'event-1', type: 'event', eventType }],
+          actions: [setColorAction()],
+          logic: [logic as never],
         },
         connections: [
           { from: 'event-1', to: 'logic-1' },
-          { from: 'logic-1', to: 'action-1' },
+          fromPort
+            ? { from: 'logic-1', to: 'action-1', fromPort }
+            : { from: 'logic-1', to: 'action-1' },
         ],
         layout: { nodePositions: {} },
-      }) as NetNodeCueDefinition
+      } as NetNodeCueDefinition
+      return validateYargNodeCueFile({
+        version: 1,
+        mode: 'yarg',
+        group: { id: 'g1', name: 'Group' },
+        cues: [cue],
+      }).valid
+    }
 
     const validPulse = {
       id: 'logic-1',
@@ -125,97 +142,7 @@ describe('Node cue validation', () => {
       assignTo: 'idx',
       assignPhase: 'phase',
     }
-    expect(
-      validateYargNodeCueFile({
-        version: 1,
-        mode: 'yarg',
-        group: { id: 'g1', name: 'Group' },
-        cues: [makeDef(validPulse)],
-      }).valid,
-    ).toBe(true)
-
-    // anchorVar is required — omitting it fails schema validation.
-    const { anchorVar: _omit, ...missingAnchor } = validPulse
-    expect(
-      validateYargNodeCueFile({
-        version: 1,
-        mode: 'yarg',
-        group: { id: 'g1', name: 'Group' },
-        cues: [makeDef(missingAnchor)],
-      }).valid,
-    ).toBe(false)
-  })
-
-  it('validates multi-set variable and multi-roll random logic nodes, and rejects a roll missing assignTo', () => {
-    const makeDef = (logic: Record<string, unknown>): NetNodeCueDefinition =>
-      ({
-        id: 'logic-cue',
-        name: 'Logic Cue',
-        description: '',
-        kind: 'lighting',
-        cueType: CueType.Chorus,
-        style: 'primary',
-        nodes: {
-          events: [{ id: 'event-1', type: 'event', eventType: 'cue-called' }],
-          actions: [
-            {
-              id: 'action-1',
-              type: 'action',
-              effectType: 'set-color',
-              target: {
-                groups: { source: 'literal', value: 'front' },
-                filter: { source: 'literal', value: 'all' },
-              },
-              color: {
-                name: { source: 'literal', value: 'blue' },
-                brightness: { source: 'literal', value: 'medium' },
-                blendMode: { source: 'literal', value: 'replace' },
-              },
-              timing: {
-                waitForCondition: { source: 'literal', value: 'none' },
-                waitForTime: { source: 'literal', value: 0 },
-                duration: { source: 'literal', value: 200 },
-                waitUntilCondition: { source: 'literal', value: 'none' },
-                waitUntilTime: { source: 'literal', value: 0 },
-                easing: { source: 'literal', value: 'sinInOut' },
-                level: { source: 'literal', value: 1 },
-              },
-            },
-          ],
-          logic: [logic as never],
-        },
-        connections: [
-          { from: 'event-1', to: 'logic-1' },
-          { from: 'logic-1', to: 'action-1' },
-        ],
-        layout: { nodePositions: {} },
-      }) as NetNodeCueDefinition
-
-    const isValid = (logic: Record<string, unknown>): boolean =>
-      validateYargNodeCueFile({
-        version: 1,
-        mode: 'yarg',
-        group: { id: 'g1', name: 'Group' },
-        cues: [makeDef(logic)],
-      }).valid
-
-    // Multi-set variable: assignments alongside the (still required) single-var envelope.
-    expect(
-      isValid({
-        id: 'logic-1',
-        type: 'logic',
-        logicType: 'variable',
-        mode: 'set',
-        varName: 'a',
-        valueType: 'number',
-        assignments: [
-          { varName: 'a', valueType: 'number', value: { source: 'literal', value: 1 } },
-          { varName: 'b', valueType: 'string', value: { source: 'literal', value: 'x' } },
-        ],
-      }),
-    ).toBe(true)
-
-    // Multi-roll random: rolls alongside the (still required) single-roll envelope.
+    const { anchorVar: _omit, ...pulseWithoutAnchor } = validPulse
     const validRandom = {
       id: 'logic-1',
       type: 'logic',
@@ -232,214 +159,157 @@ describe('Node cue validation', () => {
         { mode: 'random-choice', assignTo: 'pick', choices: ['a', 'b'] },
       ],
     }
-    expect(isValid(validRandom)).toBe(true)
 
-    // A roll missing its assignTo fails schema validation.
-    const badRandom = {
-      ...validRandom,
-      rolls: [{ mode: 'random-integer', min: { source: 'literal', value: 0 } }],
-    }
-    expect(isValid(badRandom)).toBe(false)
-  })
-
-  it('validates a tempo logic node with only its required beat output, and full options', () => {
-    const makeDef = (logic: Record<string, unknown>): NetNodeCueDefinition =>
-      ({
-        id: 'tempo-cue',
-        name: 'Tempo Cue',
-        description: '',
-        kind: 'lighting',
-        cueType: CueType.Chorus,
-        style: 'primary',
-        nodes: {
-          events: [{ id: 'event-1', type: 'event', eventType: 'cue-started' }],
-          actions: [
-            {
-              id: 'action-1',
-              type: 'action',
-              effectType: 'set-color',
-              target: {
-                groups: { source: 'literal', value: 'front' },
-                filter: { source: 'literal', value: 'all' },
-              },
-              color: {
-                name: { source: 'literal', value: 'blue' },
-                brightness: { source: 'literal', value: 'medium' },
-                blendMode: { source: 'literal', value: 'replace' },
-              },
-              timing: {
-                waitForCondition: { source: 'literal', value: 'none' },
-                waitForTime: { source: 'literal', value: 0 },
-                duration: { source: 'literal', value: 200 },
-                waitUntilCondition: { source: 'literal', value: 'none' },
-                waitUntilTime: { source: 'literal', value: 0 },
-                easing: { source: 'literal', value: 'sinInOut' },
-                level: { source: 'literal', value: 1 },
-              },
-            },
+    it.each([
+      ['accepts a pulse node in a YARG cue', validPulse, true],
+      ['rejects a pulse node missing its required anchorVar', pulseWithoutAnchor, false],
+      [
+        'accepts a multi-set variable node alongside its required single-var envelope',
+        {
+          id: 'logic-1',
+          type: 'logic',
+          logicType: 'variable',
+          mode: 'set',
+          varName: 'a',
+          valueType: 'number',
+          assignments: [
+            { varName: 'a', valueType: 'number', value: { source: 'literal', value: 1 } },
+            { varName: 'b', valueType: 'string', value: { source: 'literal', value: 'x' } },
           ],
-          logic: [logic as never],
         },
-        connections: [
-          { from: 'event-1', to: 'logic-1' },
-          { from: 'logic-1', to: 'action-1' },
-        ],
-        layout: { nodePositions: {} },
-      }) as NetNodeCueDefinition
-
-    const isValid = (logic: Record<string, unknown>): boolean =>
-      validateYargNodeCueFile({
-        version: 1,
-        mode: 'yarg',
-        group: { id: 'g1', name: 'Group' },
-        cues: [makeDef(logic)],
-      }).valid
-
-    // Only assignBeatMs is required.
-    expect(
-      isValid({ id: 'logic-1', type: 'logic', logicType: 'tempo', assignBeatMs: 'beat_ms' }),
-    ).toBe(true)
-
-    // Every optional field populated.
-    expect(
-      isValid({
-        id: 'logic-1',
-        type: 'logic',
-        logicType: 'tempo',
-        assignBeatMs: 'beat_ms',
-        assignBarMs: 'bar_ms',
-        assignPhraseMs: 'phrase_ms',
-        beatsPerBar: { source: 'literal', value: 4 },
-        barsPerPhrase: { source: 'literal', value: 2 },
-        minBeatMs: { source: 'literal', value: 250 },
-        maxBeatMs: { source: 'literal', value: 1000 },
-        fallbackBeatMs: { source: 'literal', value: 461 },
-        assignCycles: 'wave_cycles',
-        cycleBands: [110, 150],
-        cycleValues: [2, 3, 5],
-      }),
-    ).toBe(true)
-
-    // assignBeatMs is required — omitting it fails.
-    expect(isValid({ id: 'logic-1', type: 'logic', logicType: 'tempo' })).toBe(false)
-  })
-
-  it('validates indexed-variable and led-changed logic nodes, rejecting missing required fields', () => {
-    const makeDef = (logic: Record<string, unknown>): NetNodeCueDefinition =>
-      ({
-        id: 'logic-cue',
-        name: 'Logic Cue',
-        description: '',
-        kind: 'lighting',
-        cueType: CueType.RB3,
-        style: 'primary',
-        nodes: {
-          events: [{ id: 'event-1', type: 'event', eventType: 'cue-called' }],
-          actions: [
-            {
-              id: 'action-1',
-              type: 'action',
-              effectType: 'set-color',
-              target: {
-                groups: { source: 'literal', value: 'front' },
-                filter: { source: 'literal', value: 'all' },
-              },
-              color: {
-                name: { source: 'literal', value: 'blue' },
-                brightness: { source: 'literal', value: 'medium' },
-                blendMode: { source: 'literal', value: 'replace' },
-              },
-              timing: {
-                waitForCondition: { source: 'literal', value: 'none' },
-                waitForTime: { source: 'literal', value: 0 },
-                duration: { source: 'literal', value: 200 },
-                waitUntilCondition: { source: 'literal', value: 'none' },
-                waitUntilTime: { source: 'literal', value: 0 },
-                easing: { source: 'literal', value: 'sinInOut' },
-                level: { source: 'literal', value: 1 },
-              },
-            },
-          ],
-          logic: [logic as never],
+        true,
+      ],
+      [
+        'accepts a multi-roll random node alongside its required single-roll envelope',
+        validRandom,
+        true,
+      ],
+      [
+        'rejects a random roll missing its assignTo',
+        {
+          ...validRandom,
+          rolls: [{ mode: 'random-integer', min: { source: 'literal', value: 0 } }],
         },
-        connections: [
-          { from: 'event-1', to: 'logic-1' },
-          { from: 'logic-1', to: 'action-1', fromPort: 'each' },
-        ],
-        layout: { nodePositions: {} },
-      }) as NetNodeCueDefinition
+        false,
+      ],
+    ])('%s', (_name, logic, valid) => {
+      expect(isValidLogic(logic)).toBe(valid)
+    })
 
-    const isValid = (logic: Record<string, unknown>): boolean =>
-      validateYargNodeCueFile({
-        version: 1,
-        mode: 'yarg',
-        group: { id: 'g1', name: 'Group' },
-        cues: [makeDef(logic)],
-      }).valid
+    it.each([
+      [
+        'accepts a tempo node with only its required beat output',
+        { id: 'logic-1', type: 'logic', logicType: 'tempo', assignBeatMs: 'beat_ms' },
+        true,
+      ],
+      [
+        'accepts a tempo node with every optional field populated',
+        {
+          id: 'logic-1',
+          type: 'logic',
+          logicType: 'tempo',
+          assignBeatMs: 'beat_ms',
+          assignBarMs: 'bar_ms',
+          assignPhraseMs: 'phrase_ms',
+          beatsPerBar: { source: 'literal', value: 4 },
+          barsPerPhrase: { source: 'literal', value: 2 },
+          minBeatMs: { source: 'literal', value: 250 },
+          maxBeatMs: { source: 'literal', value: 1000 },
+          fallbackBeatMs: { source: 'literal', value: 461 },
+          assignCycles: 'wave_cycles',
+          cycleBands: [110, 150],
+          cycleValues: [2, 3, 5],
+        },
+        true,
+      ],
+      [
+        'rejects a tempo node missing its required assignBeatMs',
+        { id: 'logic-1', type: 'logic', logicType: 'tempo' },
+        false,
+      ],
+    ])('%s', (_name, logic, valid) => {
+      expect(isValidLogic(logic, { eventType: 'cue-started' })).toBe(valid)
+    })
 
-    // indexed-variable: set (with value) and get (with assignTo).
-    expect(
-      isValid({
-        id: 'logic-1',
-        type: 'logic',
-        logicType: 'indexed-variable',
-        mode: 'set',
-        varName: 'lit',
-        index: { source: 'literal', value: 0 },
-        valueType: 'number',
-        value: { source: 'literal', value: 1 },
-      }),
-    ).toBe(true)
-    expect(
-      isValid({
-        id: 'logic-1',
-        type: 'logic',
-        logicType: 'indexed-variable',
-        mode: 'get',
-        varName: 'lit',
-        index: { source: 'variable', name: 'i' },
-        valueType: 'number',
-        assignTo: 'out',
-      }),
-    ).toBe(true)
-    // index and valueType are required.
-    expect(
-      isValid({
-        id: 'logic-1',
-        type: 'logic',
-        logicType: 'indexed-variable',
-        mode: 'set',
-        varName: 'lit',
-        valueType: 'number',
-      }),
-    ).toBe(false)
-    expect(
-      isValid({
-        id: 'logic-1',
-        type: 'logic',
-        logicType: 'indexed-variable',
-        mode: 'get',
-        varName: 'lit',
-        index: { source: 'literal', value: 0 },
-        assignTo: 'out',
-      }),
-    ).toBe(false)
-
-    // led-changed: only assignIndex required, colour/edge optional.
-    expect(
-      isValid({ id: 'logic-1', type: 'logic', logicType: 'led-changed', assignIndex: 'i' }),
-    ).toBe(true)
-    expect(
-      isValid({
-        id: 'logic-1',
-        type: 'logic',
-        logicType: 'led-changed',
-        assignIndex: 'i',
-        assignColor: 'c',
-        assignEdge: 'e',
-      }),
-    ).toBe(true)
-    expect(isValid({ id: 'logic-1', type: 'logic', logicType: 'led-changed' })).toBe(false)
+    it.each([
+      [
+        'accepts an indexed-variable set with a value',
+        {
+          id: 'logic-1',
+          type: 'logic',
+          logicType: 'indexed-variable',
+          mode: 'set',
+          varName: 'lit',
+          index: { source: 'literal', value: 0 },
+          valueType: 'number',
+          value: { source: 'literal', value: 1 },
+        },
+        true,
+      ],
+      [
+        'accepts an indexed-variable get with assignTo',
+        {
+          id: 'logic-1',
+          type: 'logic',
+          logicType: 'indexed-variable',
+          mode: 'get',
+          varName: 'lit',
+          index: { source: 'variable', name: 'i' },
+          valueType: 'number',
+          assignTo: 'out',
+        },
+        true,
+      ],
+      [
+        'rejects an indexed-variable missing its required index',
+        {
+          id: 'logic-1',
+          type: 'logic',
+          logicType: 'indexed-variable',
+          mode: 'set',
+          varName: 'lit',
+          valueType: 'number',
+        },
+        false,
+      ],
+      [
+        'rejects an indexed-variable missing its required valueType',
+        {
+          id: 'logic-1',
+          type: 'logic',
+          logicType: 'indexed-variable',
+          mode: 'get',
+          varName: 'lit',
+          index: { source: 'literal', value: 0 },
+          assignTo: 'out',
+        },
+        false,
+      ],
+      [
+        'accepts a led-changed node with only its required assignIndex',
+        { id: 'logic-1', type: 'logic', logicType: 'led-changed', assignIndex: 'i' },
+        true,
+      ],
+      [
+        'accepts a led-changed node with the optional colour and edge outputs',
+        {
+          id: 'logic-1',
+          type: 'logic',
+          logicType: 'led-changed',
+          assignIndex: 'i',
+          assignColor: 'c',
+          assignEdge: 'e',
+        },
+        true,
+      ],
+      [
+        'rejects a led-changed node missing its required assignIndex',
+        { id: 'logic-1', type: 'logic', logicType: 'led-changed' },
+        false,
+      ],
+    ])('%s', (_name, logic, valid) => {
+      expect(isValidLogic(logic, { cueType: CueType.RB3, fromPort: 'each' })).toBe(valid)
+    })
   })
 
   it('validates a simple RB3 node cue (YARG-shaped, mode rb3)', () => {
@@ -880,124 +750,16 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
   })
 
-  it('validates audio node cue with style primary and secondary', () => {
-    const primaryDef: AudioNodeCueDefinition = {
-      id: 'audio-primary-style',
-      name: 'Primary',
-      kind: 'lighting',
-      cueTypeId: 'custom-primary',
-      style: 'primary',
-      nodes: {
-        events: [
-          {
-            id: 'event-1',
-            type: 'event',
-            eventType: 'beat',
-            threshold: 0.5,
-            triggerMode: 'edge',
-          },
-        ],
-        actions: [],
-      },
-      connections: [],
-      layout: { nodePositions: {} },
-    }
-    const secondaryDef: AudioNodeCueDefinition = {
-      id: 'audio-secondary-style',
-      name: 'Secondary',
-      kind: 'lighting',
-      cueTypeId: 'custom-secondary',
-      style: 'secondary',
-      nodes: {
-        events: [
-          {
-            id: 'event-1',
-            type: 'event',
-            eventType: 'beat',
-            threshold: 0.5,
-            triggerMode: 'edge',
-          },
-        ],
-        actions: [],
-      },
-      connections: [],
-      layout: { nodePositions: {} },
-    }
-    const r1 = validateAudioNodeCueFile({
-      version: 1,
-      mode: 'audio',
-      group: { id: 'g', name: 'G' },
-      cues: [primaryDef],
-    })
-    const r2 = validateAudioNodeCueFile({
-      version: 1,
-      mode: 'audio',
-      group: { id: 'g', name: 'G' },
-      cues: [secondaryDef],
-    })
-    expect(r1.valid).toBe(true)
-    expect(r2.valid).toBe(true)
-  })
-
-  it('validates audio node cue with style strobe', () => {
-    const strobeDef: AudioNodeCueDefinition = {
-      id: 'audio-strobe-style',
-      name: 'Strobe',
-      kind: 'lighting',
-      cueTypeId: 'custom-strobe',
-      style: 'strobe',
-      nodes: {
-        events: [
-          {
-            id: 'event-1',
-            type: 'event',
-            eventType: 'beat',
-            threshold: 0.5,
-            triggerMode: 'edge',
-          },
-        ],
-        actions: [],
-      },
-      connections: [],
-      layout: { nodePositions: {} },
-    }
-    const result = validateAudioNodeCueFile({
-      version: 1,
-      mode: 'audio',
-      group: { id: 'g', name: 'G' },
-      cues: [strobeDef],
-    })
-    expect(result.valid).toBe(true)
-  })
-
-  it('validates audio cue with audio-hfc event type', () => {
-    const definition: AudioNodeCueDefinition = {
-      id: 'hfc-cue',
-      name: 'HFC Cue',
-      kind: 'lighting',
-      cueTypeId: 'custom-audio',
-      nodes: {
-        events: [
-          {
-            id: 'event-1',
-            type: 'event',
-            eventType: 'audio-hfc',
-            threshold: 0.4,
-            triggerMode: 'level',
-          },
-        ],
-        actions: [],
-      },
-      connections: [],
-      layout: { nodePositions: {} },
-    }
-    const result = validateAudioNodeCueFile({
-      version: 1,
-      mode: 'audio',
-      group: { id: 'g', name: 'G' },
-      cues: [definition],
-    })
-    expect(result.valid).toBe(true)
+  it.each([
+    ['primary', 'Primary'],
+    ['secondary', 'Secondary'],
+    ['strobe', 'Strobe'],
+  ])('validates audio node cue with style %s', (style, name) => {
+    const file = audioCueFile(
+      { id: 'event-1', type: 'event', eventType: 'beat', threshold: 0.5, triggerMode: 'edge' },
+      { id: `audio-${style}-style`, name, cueTypeId: `custom-${style}`, style },
+    )
+    expect(validateAudioNodeCueFile(file).valid).toBe(true)
   })
 
   it('validates audio cue with audio-trigger event (full trigger shape)', () => {
@@ -1061,203 +823,73 @@ describe('Node cue validation', () => {
     expect(result.valid).toBe(true)
   })
 
-  it('validates audio-trigger with frequency range at 20 Hz minimum (matches schema and runtime clamp)', () => {
-    const definition: AudioNodeCueDefinition = {
-      id: 'trigger-low-hz',
-      name: 'Low Hz',
-      kind: 'lighting',
-      cueTypeId: 'custom-audio',
-      nodes: {
-        events: [
-          {
-            id: 'event-1',
-            type: 'event',
-            eventType: 'audio-trigger',
-            frequencyRange: { minHz: 20, maxHz: 200 },
-            threshold: 0.4,
-            color: '#60a5fa',
-            nodeLabel: 'Sub',
-            outputs: ['enter', 'during', 'exit'],
-          },
-        ],
-        actions: [],
-      },
-      connections: [],
-      layout: { nodePositions: {} },
-    }
-    const result = validateAudioNodeCueFile({
-      version: 1,
-      mode: 'audio',
-      group: { id: 'g', name: 'G' },
-      cues: [definition],
-    })
-    expect(result.valid).toBe(true)
+  const triggerEvent = (fields: Record<string, unknown>) => ({
+    id: 'event-1',
+    type: 'event',
+    eventType: 'audio-trigger',
+    color: '#60a5fa',
+    outputs: ['enter', 'during', 'exit'],
+    ...fields,
   })
 
-  it('rejects audio-trigger when minHz is below schema minimum (20 Hz)', () => {
-    const definition: AudioNodeCueDefinition = {
-      id: 'bad-hz',
-      name: 'Bad Hz',
-      kind: 'lighting',
-      cueTypeId: 'custom-audio',
-      nodes: {
-        events: [
-          {
-            id: 'event-1',
-            type: 'event',
-            eventType: 'audio-trigger',
-            frequencyRange: { minHz: 19, maxHz: 200 },
-            threshold: 0.4,
-            color: '#60a5fa',
-            nodeLabel: 'X',
-            outputs: ['enter', 'during', 'exit'],
-          },
-        ],
-        actions: [],
+  it.each([
+    [
+      'audio cue with audio-hfc event type',
+      {
+        id: 'event-1',
+        type: 'event',
+        eventType: 'audio-hfc',
+        threshold: 0.4,
+        triggerMode: 'level',
       },
-      connections: [],
-      layout: { nodePositions: {} },
-    }
-    const result = validateAudioNodeCueFile({
-      version: 1,
-      mode: 'audio',
-      group: { id: 'g', name: 'G' },
-      cues: [definition],
-    })
-    expect(result.valid).toBe(false)
+    ],
+    [
+      'audio-trigger with frequency range at 20 Hz minimum (matches schema and runtime clamp)',
+      triggerEvent({ frequencyRange: { minHz: 20, maxHz: 200 }, threshold: 0.4, nodeLabel: 'Sub' }),
+    ],
+    [
+      'audio-trigger with attackMs and releaseMs set',
+      triggerEvent({
+        frequencyRange: { minHz: 100, maxHz: 500 },
+        threshold: 0.5,
+        attackMs: 30,
+        releaseMs: 300,
+        nodeLabel: 'T',
+      }),
+    ],
+  ])('validates %s', (_label, event) => {
+    expect(validateAudioNodeCueFile(audioCueFile(event)).valid).toBe(true)
   })
 
-  it('rejects audio-trigger when hysteresis is out of range', () => {
-    const definition: AudioNodeCueDefinition = {
-      id: 'bad-hyst',
-      name: 'Bad Hyst',
-      kind: 'lighting',
-      cueTypeId: 'custom-audio',
-      nodes: {
-        events: [
-          {
-            id: 'event-1',
-            type: 'event',
-            eventType: 'audio-trigger',
-            frequencyRange: { minHz: 100, maxHz: 500 },
-            threshold: 0.5,
-            hysteresis: 1.5,
-            color: '#60a5fa',
-            nodeLabel: 'T',
-            outputs: ['enter', 'during', 'exit'],
-          },
-        ],
-        actions: [],
-      },
-      connections: [],
-      layout: { nodePositions: {} },
-    }
-    const result = validateAudioNodeCueFile({
-      version: 1,
-      mode: 'audio',
-      group: { id: 'g', name: 'G' },
-      cues: [definition],
-    })
-    expect(result.valid).toBe(false)
-  })
-
-  it('validates audio-trigger with attackMs and releaseMs set', () => {
-    const definition: AudioNodeCueDefinition = {
-      id: 'asym-trigger',
-      name: 'Asymmetric',
-      kind: 'lighting',
-      cueTypeId: 'custom-audio',
-      nodes: {
-        events: [
-          {
-            id: 'event-1',
-            type: 'event',
-            eventType: 'audio-trigger',
-            frequencyRange: { minHz: 100, maxHz: 500 },
-            threshold: 0.5,
-            attackMs: 30,
-            releaseMs: 300,
-            color: '#60a5fa',
-            nodeLabel: 'T',
-            outputs: ['enter', 'during', 'exit'],
-          },
-        ],
-        actions: [],
-      },
-      connections: [],
-      layout: { nodePositions: {} },
-    }
-    const result = validateAudioNodeCueFile({
-      version: 1,
-      mode: 'audio',
-      group: { id: 'g', name: 'G' },
-      cues: [definition],
-    })
-    expect(result.valid).toBe(true)
-  })
-
-  it('rejects audio-trigger when releaseMs is negative', () => {
-    const definition: AudioNodeCueDefinition = {
-      id: 'bad-release',
-      name: 'Bad Release',
-      kind: 'lighting',
-      cueTypeId: 'custom-audio',
-      nodes: {
-        events: [
-          {
-            id: 'event-1',
-            type: 'event',
-            eventType: 'audio-trigger',
-            frequencyRange: { minHz: 100, maxHz: 500 },
-            threshold: 0.5,
-            releaseMs: -1,
-            color: '#60a5fa',
-            nodeLabel: 'T',
-            outputs: ['enter', 'during', 'exit'],
-          },
-        ],
-        actions: [],
-      },
-      connections: [],
-      layout: { nodePositions: {} },
-    }
-    const result = validateAudioNodeCueFile({
-      version: 1,
-      mode: 'audio',
-      group: { id: 'g', name: 'G' },
-      cues: [definition],
-    })
-    expect(result.valid).toBe(false)
-  })
-
-  it('rejects audio-trigger event missing required trigger fields', () => {
-    const definition: AudioNodeCueDefinition = {
-      id: 'bad-trigger-cue',
-      name: 'Bad Trigger',
-      kind: 'lighting',
-      cueTypeId: 'custom-audio',
-      nodes: {
-        events: [
-          {
-            id: 'event-1',
-            type: 'event',
-            eventType: 'audio-trigger',
-            // missing frequencyRange, threshold, color, nodeLabel, outputs
-          } as any,
-        ],
-        actions: [],
-      },
-      connections: [],
-      layout: { nodePositions: {} },
-    }
-
-    const result = validateAudioNodeCueFile({
-      version: 1,
-      mode: 'audio',
-      group: { id: 'g', name: 'G' },
-      cues: [definition],
-    })
-
+  it.each([
+    [
+      'when minHz is below schema minimum (20 Hz)',
+      triggerEvent({ frequencyRange: { minHz: 19, maxHz: 200 }, threshold: 0.4, nodeLabel: 'X' }),
+    ],
+    [
+      'when hysteresis is out of range',
+      triggerEvent({
+        frequencyRange: { minHz: 100, maxHz: 500 },
+        threshold: 0.5,
+        hysteresis: 1.5,
+        nodeLabel: 'T',
+      }),
+    ],
+    [
+      'when releaseMs is negative',
+      triggerEvent({
+        frequencyRange: { minHz: 100, maxHz: 500 },
+        threshold: 0.5,
+        releaseMs: -1,
+        nodeLabel: 'T',
+      }),
+    ],
+    [
+      'event missing required trigger fields',
+      { id: 'event-1', type: 'event', eventType: 'audio-trigger' },
+    ],
+  ])('rejects audio-trigger %s', (_label, event) => {
+    const result = validateAudioNodeCueFile(audioCueFile(event))
     expect(result.valid).toBe(false)
     expect(result.errors.length).toBeGreaterThan(0)
   })
@@ -1350,31 +982,7 @@ describe('Node cue validation', () => {
       style: 'primary',
       nodes: {
         events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
-        actions: [
-          {
-            id: 'action-1',
-            type: 'action',
-            effectType: 'set-color',
-            target: {
-              groups: { source: 'literal', value: 'front' },
-              filter: { source: 'literal', value: 'all' },
-            },
-            color: {
-              name: { source: 'literal', value: 'blue' },
-              brightness: { source: 'literal', value: 'medium' },
-              blendMode: { source: 'literal', value: 'replace' },
-            },
-            timing: {
-              waitForCondition: { source: 'literal', value: 'none' },
-              waitForTime: { source: 'literal', value: 0 },
-              duration: { source: 'literal', value: 200 },
-              waitUntilCondition: { source: 'literal', value: 'none' },
-              waitUntilTime: { source: 'literal', value: 0 },
-              easing: { source: 'literal', value: 'sinInOut' },
-              level: { source: 'literal', value: 1 },
-            },
-          },
-        ],
+        actions: [setColorAction()],
       },
       connections: [{ from: 'event-1', to: 'action-1' }],
       layout: { nodePositions: {} },
@@ -1387,121 +995,74 @@ describe('Node cue validation', () => {
       cues: [validCue()],
     })
 
-    it('rejects cue missing id', () => {
+    const withNodes = (nodes: Record<string, unknown>) => {
       const cue = validCue()
-      const { id: _id, ...cueWithoutId } = cue
-      const result = validateYargNodeCueFile({
-        ...validFile(),
-        cues: [cueWithoutId as NetNodeCueDefinition],
-      })
-      expect(result.valid).toBe(false)
-      expect(result.errors.length).toBeGreaterThan(0)
+      return { ...cue, nodes: { ...cue.nodes, ...nodes } }
+    }
+
+    const withLogic = (logic: Record<string, unknown>, fromPort?: string) => ({
+      ...withNodes({ logic: [logic] }),
+      connections: [
+        { from: 'event-1', to: 'logic-1' },
+        fromPort
+          ? { from: 'logic-1', to: 'action-1', fromPort }
+          : { from: 'logic-1', to: 'action-1' },
+      ],
     })
 
-    it('rejects cue missing name', () => {
-      const cue = validCue()
-      const { name: _n, ...cueWithoutName } = cue
-      const result = validateYargNodeCueFile({
-        ...validFile(),
-        cues: [{ ...cueWithoutName, name: undefined } as unknown as NetNodeCueDefinition],
-      })
-      expect(result.valid).toBe(false)
-      expect(result.errors.length).toBeGreaterThan(0)
-    })
+    const { id: _id, ...cueWithoutId } = validCue()
 
-    it('rejects invalid effectType on action node', () => {
-      const cue = validCue()
-      const action = cue.nodes.actions[0]
-      const invalidCue = {
-        ...cue,
-        nodes: {
-          ...cue.nodes,
-          actions: [{ ...action, effectType: 'invalid-effect' as any }],
-        },
-      }
-      const result = validateYargNodeCueFile({ ...validFile(), cues: [invalidCue] })
-      expect(result.valid).toBe(false)
-      expect(result.errors.length).toBeGreaterThan(0)
-    })
-
-    it('rejects invalid logicType on logic node', () => {
-      const cue = validCue()
-      cue.nodes.logic = [
-        {
+    it.each([
+      ['cue missing id', cueWithoutId],
+      ['cue missing name', { ...validCue(), name: undefined }],
+      [
+        'invalid effectType on action node',
+        withNodes({ actions: [{ ...setColorAction(), effectType: 'invalid-effect' }] }),
+      ],
+      [
+        'invalid logicType on logic node',
+        withLogic({
           id: 'logic-1',
           type: 'logic',
-          logicType: 'invalid-logic' as any,
+          logicType: 'invalid-logic',
           operator: 'add',
           left: { source: 'literal', value: 1 },
           right: { source: 'literal', value: 2 },
-        } as any,
-      ]
-      cue.connections = [
-        { from: 'event-1', to: 'logic-1' },
-        { from: 'logic-1', to: 'action-1' },
-      ]
-      const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
-      expect(result.valid).toBe(false)
-      expect(result.errors.length).toBeGreaterThan(0)
-    })
-
-    it('rejects build-ring node missing assignGroupSize', () => {
-      const cue = validCue()
-      cue.nodes.logic = [
+        }),
+      ],
+      [
+        'build-ring node missing assignGroupSize',
         {
-          id: 'logic-1',
-          type: 'logic',
-          logicType: 'build-ring',
-          assignTo: 'ring',
-        } as any,
-      ]
-      cue.connections = [
-        { from: 'event-1', to: 'logic-1' },
-        { from: 'logic-1', to: 'action-1' },
-      ]
-      cue.variables = [{ name: 'ring', type: 'light-array', scope: 'cue', initialValue: [] }]
-      const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
-      expect(result.valid).toBe(false)
-      expect(result.errors.length).toBeGreaterThan(0)
-    })
-
-    it('rejects invalid comparator on conditional node', () => {
-      const cue = validCue()
-      cue.nodes.logic = [
-        {
-          id: 'logic-1',
-          type: 'logic',
-          logicType: 'conditional',
-          comparator: 'invalid-comp' as any,
-          left: { source: 'literal', value: 1 },
-          right: { source: 'literal', value: 0 },
-        } as any,
-      ]
-      cue.connections = [
-        { from: 'event-1', to: 'logic-1' },
-        { from: 'logic-1', to: 'action-1', fromPort: 'true' },
-      ]
-      const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
-      expect(result.valid).toBe(false)
-      expect(result.errors.length).toBeGreaterThan(0)
-    })
-
-    it('rejects invalid operator on math node', () => {
-      const cue = validCue()
-      cue.nodes.logic = [
-        {
+          ...withLogic({ id: 'logic-1', type: 'logic', logicType: 'build-ring', assignTo: 'ring' }),
+          variables: [{ name: 'ring', type: 'light-array', scope: 'cue', initialValue: [] }],
+        },
+      ],
+      [
+        'invalid comparator on conditional node',
+        withLogic(
+          {
+            id: 'logic-1',
+            type: 'logic',
+            logicType: 'conditional',
+            comparator: 'invalid-comp',
+            left: { source: 'literal', value: 1 },
+            right: { source: 'literal', value: 0 },
+          },
+          'true',
+        ),
+      ],
+      [
+        'invalid operator on math node',
+        withLogic({
           id: 'logic-1',
           type: 'logic',
           logicType: 'math',
-          operator: 'invalid-op' as any,
+          operator: 'invalid-op',
           left: { source: 'literal', value: 1 },
           right: { source: 'literal', value: 2 },
-        } as any,
-      ]
-      cue.connections = [
-        { from: 'event-1', to: 'logic-1' },
-        { from: 'logic-1', to: 'action-1' },
-      ]
+        }),
+      ],
+    ])('rejects %s', (_label, cue) => {
       const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
       expect(result.valid).toBe(false)
       expect(result.errors.length).toBeGreaterThan(0)
@@ -1548,62 +1109,35 @@ describe('Node cue validation', () => {
     })
 
     describe('effect raiser and effect listener', () => {
-      it('rejects effect raiser with wrong type discriminator', () => {
-        const cue = validCue()
-        ;(cue.nodes as { effectRaisers?: unknown[] }).effectRaisers = [
-          { id: 'r1', type: 'effect-raisers', effectId: 'eff' },
-        ]
-        const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
-        expect(result.valid).toBe(false)
-        expect(result.errors.length).toBeGreaterThan(0)
-      })
-
-      it('rejects effect raiser with unknown additional property', () => {
-        const cue = validCue()
-        ;(cue.nodes as { effectRaisers?: unknown[] }).effectRaisers = [
+      it.each([
+        [
+          'effect raiser with wrong type discriminator',
+          { effectRaisers: [{ id: 'r1', type: 'effect-raisers', effectId: 'eff' }] },
+        ],
+        [
+          'effect raiser with unknown additional property',
           {
-            id: 'r1',
-            type: 'effect-raiser',
-            effectId: 'eff',
-            unknownProp: 'x',
+            effectRaisers: [{ id: 'r1', type: 'effect-raiser', effectId: 'eff', unknownProp: 'x' }],
           },
-        ]
-        const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
-        expect(result.valid).toBe(false)
-        expect(result.errors.length).toBeGreaterThan(0)
-      })
-
-      it('rejects effect raiser missing effectId', () => {
-        const cue = validCue()
-        ;(cue.nodes as { effectRaisers?: unknown[] }).effectRaisers = [
-          { id: 'r1', type: 'effect-raiser' },
-        ]
-        const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
-        expect(result.valid).toBe(false)
-        expect(result.errors.length).toBeGreaterThan(0)
-      })
-
-      it('rejects effect raiser with non-ValueSource parameterValues entry', () => {
-        const cue = validCue()
-        ;(cue.nodes as { effectRaisers?: unknown[] }).effectRaisers = [
+        ],
+        [
+          'effect raiser missing effectId',
+          { effectRaisers: [{ id: 'r1', type: 'effect-raiser' }] },
+        ],
+        [
+          'effect raiser with non-ValueSource parameterValues entry',
           {
-            id: 'r1',
-            type: 'effect-raiser',
-            effectId: 'eff',
-            parameterValues: { p: 42 },
+            effectRaisers: [
+              { id: 'r1', type: 'effect-raiser', effectId: 'eff', parameterValues: { p: 42 } },
+            ],
           },
-        ]
-        const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
-        expect(result.valid).toBe(false)
-        expect(result.errors.length).toBeGreaterThan(0)
-      })
-
-      it('rejects effect listener with unknown additional property', () => {
-        const cue = validCue()
-        ;(cue.nodes as { effectListeners?: unknown[] }).effectListeners = [
-          { id: 'l1', type: 'effect-listener', spurious: true },
-        ]
-        const result = validateYargNodeCueFile({ ...validFile(), cues: [cue] })
+        ],
+        [
+          'effect listener with unknown additional property',
+          { effectListeners: [{ id: 'l1', type: 'effect-listener', spurious: true }] },
+        ],
+      ])('rejects %s', (_label, nodes) => {
+        const result = validateYargNodeCueFile({ ...validFile(), cues: [withNodes(nodes)] })
         expect(result.valid).toBe(false)
         expect(result.errors.length).toBeGreaterThan(0)
       })
@@ -1620,31 +1154,7 @@ describe('Node cue validation', () => {
         style: 'primary',
         nodes: {
           events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
-          actions: [
-            {
-              id: 'action-1',
-              type: 'action',
-              effectType: 'set-color',
-              target: {
-                groups: { source: 'literal', value: 'front' },
-                filter: { source: 'literal', value: 'all' },
-              },
-              color: {
-                name: { source: 'literal', value: 'blue' },
-                brightness: { source: 'literal', value: 'medium' },
-                blendMode: { source: 'literal', value: 'replace' },
-              },
-              timing: {
-                waitForCondition: { source: 'literal', value: 'none' },
-                waitForTime: { source: 'literal', value: 0 },
-                duration: { source: 'literal', value: 200 },
-                waitUntilCondition: { source: 'literal', value: 'none' },
-                waitUntilTime: { source: 'literal', value: 0 },
-                easing: { source: 'literal', value: 'sinInOut' },
-                level: { source: 'literal', value: 1 },
-              },
-            },
-          ],
+          actions: [setColorAction()],
           effectRaisers: [{ id: 'raiser-1', type: 'effect-raiser', effectId: 'eff-1' }],
           effectListeners: [{ id: 'listener-1', type: 'effect-listener' }],
         },
@@ -1672,31 +1182,7 @@ describe('Node cue validation', () => {
         style: 'primary',
         nodes: {
           events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
-          actions: [
-            {
-              id: 'action-1',
-              type: 'action',
-              effectType: 'set-color',
-              target: {
-                groups: { source: 'literal', value: 'front' },
-                filter: { source: 'literal', value: 'all' },
-              },
-              color: {
-                name: { source: 'literal', value: 'blue' },
-                brightness: { source: 'literal', value: 'medium' },
-                blendMode: { source: 'literal', value: 'replace' },
-              },
-              timing: {
-                waitForCondition: { source: 'literal', value: 'none' },
-                waitForTime: { source: 'literal', value: 0 },
-                duration: { source: 'literal', value: 200 },
-                waitUntilCondition: { source: 'literal', value: 'none' },
-                waitUntilTime: { source: 'literal', value: 0 },
-                easing: { source: 'literal', value: 'sinInOut' },
-                level: { source: 'literal', value: 1 },
-              },
-            },
-          ],
+          actions: [setColorAction()],
           eventRaisers: [{ id: 'raiser-1', type: 'event-raiser', eventName: 'custom' }],
           eventListeners: [{ id: 'listener-1', type: 'event-listener', eventName: 'custom' }],
         },
@@ -1725,31 +1211,7 @@ describe('Node cue validation', () => {
         style: 'primary',
         nodes: {
           events: [{ id: 'event-1', type: 'event', eventType: 'beat' }],
-          actions: [
-            {
-              id: 'action-1',
-              type: 'action',
-              effectType: 'set-color',
-              target: {
-                groups: { source: 'literal', value: 'front' },
-                filter: { source: 'literal', value: 'all' },
-              },
-              color: {
-                name: { source: 'literal', value: 'blue' },
-                brightness: { source: 'literal', value: 'medium' },
-                blendMode: { source: 'literal', value: 'replace' },
-              },
-              timing: {
-                waitForCondition: { source: 'literal', value: 'none' },
-                waitForTime: { source: 'literal', value: 0 },
-                duration: { source: 'literal', value: 200 },
-                waitUntilCondition: { source: 'literal', value: 'none' },
-                waitUntilTime: { source: 'literal', value: 0 },
-                easing: { source: 'literal', value: 'sinInOut' },
-                level: { source: 'literal', value: 1 },
-              },
-            },
-          ],
+          actions: [setColorAction()],
           logic: [
             {
               id: 'rev-1',
@@ -1845,12 +1307,7 @@ describe('Node cue validation', () => {
     'audio-rock',
     'audio-motion-default',
   ])('validates bundled %s.json', (name) => {
-    const filePath = path.join(
-      __dirname,
-      `../../../../../resources/defaults/node-data/cues/audio/${name}.json`,
-    )
-    const raw = fs.readFileSync(filePath, 'utf8')
-    const result = validateAudioNodeCueFile(JSON.parse(raw))
+    const result = validateAudioNodeCueFile(JSON.parse(readBundled(`cues/audio/${name}.json`)))
     expect(result.valid).toBe(true)
     if (result.valid) {
       for (const cue of result.data.cues) {
@@ -1860,12 +1317,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates bundled yarg-stagekit.json', () => {
-    const filePath = path.join(
-      __dirname,
-      '../../../../../resources/defaults/node-data/cues/yarg/yarg-stagekit.json',
-    )
-    const raw = fs.readFileSync(filePath, 'utf8')
-    const result = validateYargNodeCueFile(JSON.parse(raw))
+    const result = validateYargNodeCueFile(JSON.parse(readBundled('cues/yarg/yarg-stagekit.json')))
     expect(result.valid).toBe(true)
     if (result.valid) {
       expect(result.data.group.id).toBe('yarg-stagekit')
@@ -1881,12 +1333,7 @@ describe('Node cue validation', () => {
   })
 
   it('validates bundled rb3-stagekit.json (strobes + RB3 base cue, compiles, lays out nodes)', () => {
-    const filePath = path.join(
-      __dirname,
-      '../../../../../resources/defaults/node-data/cues/rb3/rb3-stagekit.json',
-    )
-    const raw = fs.readFileSync(filePath, 'utf8')
-    const result = validateRb3NodeCueFile(JSON.parse(raw))
+    const result = validateRb3NodeCueFile(JSON.parse(readBundled('cues/rb3/rb3-stagekit.json')))
     expect(result.valid).toBe(true)
     if (result.valid) {
       expect(result.data.group.id).toBe('rb3-stagekit')
@@ -1910,7 +1357,7 @@ describe('Node cue validation', () => {
 
   // The interpretive RB3 libraries ship only their gameplay cue; the strobes live once, in
   // rb3-stagekit. Neither the StageKit nor the default slot may be claimed here.
-  for (const groupId of [
+  it.each([
     'rb3-mirror',
     'rb3-mirror-blended',
     'rb3-stagekit-reversed',
@@ -1918,48 +1365,40 @@ describe('Node cue validation', () => {
     'rb3-trail',
     'rb3-bloom',
     'rb3-glow',
-  ]) {
-    it(`validates bundled ${groupId}.json (RB3 gameplay cue only, compiles, lays out nodes)`, () => {
-      const filePath = path.join(
-        __dirname,
-        `../../../../../resources/defaults/node-data/cues/rb3/${groupId}.json`,
-      )
-      const result = validateRb3NodeCueFile(JSON.parse(fs.readFileSync(filePath, 'utf8')))
-      expect(result.valid).toBe(true)
-      if (result.valid) {
-        expect(result.data.group.id).toBe(groupId)
-        expect(result.data.group.isStageKit).toBeUndefined()
-        expect(result.data.group.isDefault).toBeUndefined()
-        const cueTypes = result.data.cues.map((c) => (c.kind === 'lighting' ? c.cueType : c.id))
-        expect(cueTypes).toEqual([CueType.RB3])
-        const positionsSeen = new Set<string>()
-        for (const cue of result.data.cues) {
-          expect(() => NodeCueCompiler.compileCue(cue, 'yarg')).not.toThrow()
-          const positions = cue.layout?.nodePositions ?? {}
-          const nodeCount = Object.values(cue.nodes ?? {}).reduce(
-            (total, bucket) => total + (Array.isArray(bucket) ? bucket.length : 0),
-            0,
-          )
-          // Every node is placed, and no two share a slot, so the graph opens legibly.
-          expect(Object.keys(positions).length).toBe(nodeCount)
-          if (cue.kind === 'lighting' && cue.cueType === CueType.RB3) {
-            for (const p of Object.values(positions)) {
-              const key = `${p.x},${p.y}`
-              expect(positionsSeen.has(key)).toBe(false)
-              positionsSeen.add(key)
-            }
+  ])('validates bundled %s.json (RB3 gameplay cue only, compiles, lays out nodes)', (groupId) => {
+    const result = validateRb3NodeCueFile(JSON.parse(readBundled(`cues/rb3/${groupId}.json`)))
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      expect(result.data.group.id).toBe(groupId)
+      expect(result.data.group.isStageKit).toBeUndefined()
+      expect(result.data.group.isDefault).toBeUndefined()
+      const cueTypes = result.data.cues.map((c) => (c.kind === 'lighting' ? c.cueType : c.id))
+      expect(cueTypes).toEqual([CueType.RB3])
+      const positionsSeen = new Set<string>()
+      for (const cue of result.data.cues) {
+        expect(() => NodeCueCompiler.compileCue(cue, 'yarg')).not.toThrow()
+        const positions = cue.layout?.nodePositions ?? {}
+        const nodeCount = Object.values(cue.nodes ?? {}).reduce(
+          (total, bucket) => total + (Array.isArray(bucket) ? bucket.length : 0),
+          0,
+        )
+        // Every node is placed, and no two share a slot, so the graph opens legibly.
+        expect(Object.keys(positions).length).toBe(nodeCount)
+        if (cue.kind === 'lighting' && cue.cueType === CueType.RB3) {
+          for (const p of Object.values(positions)) {
+            const key = `${p.x},${p.y}`
+            expect(positionsSeen.has(key)).toBe(false)
+            positionsSeen.add(key)
           }
         }
       }
-    })
-  }
+    }
+  })
 
   it('validates bundled rb3-motion-default.json (time-driven motion cues, compiles)', () => {
-    const filePath = path.join(
-      __dirname,
-      '../../../../../resources/defaults/node-data/cues/rb3/rb3-motion-default.json',
+    const result = validateRb3NodeCueFile(
+      JSON.parse(readBundled('cues/rb3/rb3-motion-default.json')),
     )
-    const result = validateRb3NodeCueFile(JSON.parse(fs.readFileSync(filePath, 'utf8')))
     expect(result.valid).toBe(true)
     if (result.valid) {
       expect(result.data.group.id).toBe('rb3-motion-default')
@@ -1974,13 +1413,10 @@ describe('Node cue validation', () => {
     }
   })
 
-  for (const fileName of ['yarg-fade.json']) {
-    it(`validates bundled ${fileName} (compiles, caps brightness at high, no strobes)`, () => {
-      const filePath = path.join(
-        __dirname,
-        `../../../../../resources/defaults/node-data/cues/yarg/${fileName}`,
-      )
-      const raw = fs.readFileSync(filePath, 'utf8')
+  it.each(['yarg-fade.json'])(
+    'validates bundled %s (compiles, caps brightness at high, no strobes)',
+    (fileName) => {
+      const raw = readBundled(`cues/yarg/${fileName}`)
       const result = validateYargNodeCueFile(JSON.parse(raw))
       expect(result.valid).toBe(true)
       if (result.valid) {
@@ -1993,35 +1429,30 @@ describe('Node cue validation', () => {
         /"brightness":\s*\{\s*"source":\s*"literal",\s*"value":\s*"(max|linear)"\s*\}/,
       )
       expect(raw).not.toContain('Strobe')
-    })
-  }
+    },
+  )
 
-  it('audio stagekit rotation effect raisers are persistent (seamless loop at wrap)', () => {
-    const filePath = path.join(
-      __dirname,
-      '../../../../../resources/defaults/node-data/cues/audio/audio-stagekit.json',
-    )
-    const raw = fs.readFileSync(filePath, 'utf8')
-    const data = JSON.parse(raw) as {
-      cues: Array<{
-        id: string
-        nodes?: {
-          effectRaisers?: Array<{
-            id: string
-            effectId?: string
-            isPersistent?: boolean
-          }>
-        }
-      }>
-    }
-    const cueIds = [
-      'cue-sk-audio-cool-auto',
-      'cue-sk-audio-warm-auto',
-      'cue-sk-audio-harmony',
-      'cue-sk-audio-searchlights',
-      'cue-sk-audio-sweep',
-    ]
-    for (const cueId of cueIds) {
+  it.each([
+    'cue-sk-audio-cool-auto',
+    'cue-sk-audio-warm-auto',
+    'cue-sk-audio-harmony',
+    'cue-sk-audio-searchlights',
+    'cue-sk-audio-sweep',
+  ])(
+    'audio stagekit cue %s keeps its rotation effect raisers persistent (seamless loop at wrap)',
+    (cueId) => {
+      const data = JSON.parse(readBundled('cues/audio/audio-stagekit.json')) as {
+        cues: Array<{
+          id: string
+          nodes?: {
+            effectRaisers?: Array<{
+              id: string
+              effectId?: string
+              isPersistent?: boolean
+            }>
+          }
+        }>
+      }
       const cue = data.cues.find((c) => c.id === cueId)
       expect(cue).toBeDefined()
       const raisers = cue!.nodes?.effectRaisers ?? []
@@ -2035,8 +1466,8 @@ describe('Node cue validation', () => {
           expect(r.isPersistent).toBe(true)
         }
       }
-    }
-  })
+    },
+  )
 
   describe('Effect file validation', () => {
     it('validates a minimal YARG effect file', () => {
@@ -2087,27 +1518,22 @@ describe('Node cue validation', () => {
       warnSpy.mockRestore()
     })
 
-    it('rejects duplicate effect ids (semantic)', () => {
-      const result = validateYargEffectFile({
+    it.each([
+      ['YARG', 'yarg', validateYargEffectFile],
+      ['Audio', 'audio', validateAudioEffectFile],
+    ] as const)('rejects duplicate %s effect ids (semantic)', (_label, mode, validate) => {
+      const effect = (name: string) => ({
+        id: 'dup',
+        name,
+        mode,
+        nodes: { events: [], actions: [] },
+        connections: [],
+      })
+      const result = validate({
         version: 1,
-        mode: 'yarg',
+        mode,
         group: { id: 'g', name: 'G' },
-        effects: [
-          {
-            id: 'dup',
-            name: 'First',
-            mode: 'yarg',
-            nodes: { events: [], actions: [] },
-            connections: [],
-          },
-          {
-            id: 'dup',
-            name: 'Second',
-            mode: 'yarg',
-            nodes: { events: [], actions: [] },
-            connections: [],
-          },
-        ],
+        effects: [effect('First'), effect('Second')],
       })
       expect(result.valid).toBe(false)
       expect(result.errors.some((e) => e.includes('Duplicate effect id'))).toBe(true)
@@ -2141,32 +1567,6 @@ describe('Node cue validation', () => {
       expect(result.valid).toBe(true)
       expect(result.data?.effects).toHaveLength(1)
       expect(result.mode).toBe('audio')
-    })
-
-    it('rejects duplicate effect ids for Audio (semantic)', () => {
-      const result = validateAudioEffectFile({
-        version: 1,
-        mode: 'audio',
-        group: { id: 'g', name: 'G' },
-        effects: [
-          {
-            id: 'dup',
-            name: 'First',
-            mode: 'audio',
-            nodes: { events: [], actions: [] },
-            connections: [],
-          },
-          {
-            id: 'dup',
-            name: 'Second',
-            mode: 'audio',
-            nodes: { events: [], actions: [] },
-            connections: [],
-          },
-        ],
-      })
-      expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.includes('Duplicate effect id'))).toBe(true)
     })
 
     it('rejects Audio effect file when effects array is empty (schema)', () => {
@@ -2242,12 +1642,7 @@ describe('Node cue validation', () => {
       ['audio', 'audio-stagekit-effects'],
       ['yarg', 'yarg-fade-effects'],
     ] as const)('validates bundled %s/%s.json', (mode, name) => {
-      const filePath = path.join(
-        __dirname,
-        `../../../../../resources/defaults/node-data/effects/${mode}/${name}.json`,
-      )
-      const raw = fs.readFileSync(filePath, 'utf8')
-      const result = validateEffectFile(JSON.parse(raw))
+      const result = validateEffectFile(JSON.parse(readBundled(`effects/${mode}/${name}.json`)))
       expect(result.valid).toBe(true)
       expect(result.mode).toBe(mode)
     })

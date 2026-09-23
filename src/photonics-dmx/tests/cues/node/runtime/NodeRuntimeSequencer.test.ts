@@ -4,12 +4,16 @@ import { EffectRegistry } from '../../../../cues/node/runtime/EffectRegistry'
 import type { CompiledNetCue } from '../../../../cues/node/compiler/NodeCueCompiler'
 import type {
   ActionNode,
+  ActionTimingConfig,
   Connection,
   EventListenerNode,
   EventRaiserNode,
   LogicNode,
   NetEventNode,
+  NetLightingNodeCueDefinition,
   NetNodeCueDefinition,
+  ValueSource,
+  VariableDefinition,
 } from '../../../../cues/types/nodeCueTypes'
 import {
   CueType,
@@ -19,7 +23,7 @@ import {
   InstrumentNoteType,
 } from '../../../../cues/types/cueTypes'
 import { getColor } from '../../../../helpers/dmxHelpers'
-import type { Color } from '../../../../types'
+import type { Color, RGBIO } from '../../../../types'
 import * as utils from '../../../../helpers/utils'
 import { createSequencerHarness } from '../../../helpers/sequencerHarness'
 import { noopRuntimeBroadcaster } from '../../../../runtime/broadcaster'
@@ -59,6 +63,94 @@ const compileCue = (definition: NetNodeCueDefinition): CompiledNetCue => {
   }
 }
 
+const beatEvent: NetEventNode = { id: 'event-1', type: 'event', eventType: 'beat' }
+
+/** A lighting cue started by `beatEvent`, with every node list defaulting to empty. */
+const defineCue = ({
+  id,
+  name,
+  nodes,
+  connections,
+  variables,
+}: {
+  id: string
+  name: string
+  nodes: Partial<NetLightingNodeCueDefinition['nodes']>
+  connections: Connection[]
+  variables?: VariableDefinition[]
+}): NetNodeCueDefinition => ({
+  id,
+  name,
+  kind: 'lighting',
+  cueType: CueType.Default,
+  style: 'primary',
+  nodes: {
+    events: [beatEvent],
+    actions: [],
+    logic: [],
+    eventRaisers: [],
+    eventListeners: [],
+    effectRaisers: [],
+    ...nodes,
+  },
+  connections,
+  ...(variables && { variables }),
+})
+
+interface SetColorOptions {
+  groups?: string | ValueSource
+  filter?: string
+  timing?: Partial<ActionTimingConfig>
+  layer?: number
+}
+
+/** A high-brightness replace set-color action that starts at once and holds for zero ms. */
+const setColorAction = (
+  id: string,
+  color: Color | ValueSource,
+  { groups = 'front', filter = 'all', timing = {}, layer }: SetColorOptions = {},
+): ActionNode => ({
+  id,
+  type: 'action',
+  effectType: 'set-color',
+  target: {
+    groups: typeof groups === 'string' ? { source: 'literal', value: groups } : groups,
+    filter: { source: 'literal', value: filter },
+  },
+  color: {
+    name: typeof color === 'string' ? { source: 'literal', value: color } : color,
+    brightness: { source: 'literal', value: 'high' },
+    blendMode: { source: 'literal', value: 'replace' },
+  },
+  timing: {
+    waitForCondition: { source: 'literal', value: 'none' },
+    waitForTime: { source: 'literal', value: 0 },
+    duration: { source: 'literal', value: 0 },
+    waitUntilCondition: { source: 'literal', value: 'none' },
+    waitUntilTime: { source: 'literal', value: 0 },
+    ...timing,
+  },
+  ...(layer === undefined ? {} : { layer: { source: 'literal' as const, value: layer } }),
+})
+
+const expectLit = (state: RGBIO | null, color: Color): void => {
+  const expected = getColor(color, 'high')
+  expect(state).toMatchObject({
+    red: expected.red,
+    green: expected.green,
+    blue: expected.blue,
+    blendMode: expected.blendMode,
+  })
+}
+
+interface GateStep {
+  id: string
+  condition: string
+  count?: number
+  color: Color
+  fire: (sequencer: ILightingController) => void
+}
+
 describe('Node runtime with real Sequencer', () => {
   let harness: ReturnType<typeof createSequencerHarness>
   let cueLevelVarStore: Map<string, any>
@@ -74,92 +166,47 @@ describe('Node runtime with real Sequencer', () => {
     harness.cleanup()
   })
 
-  it('chains actions across layers in sequence', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
-    const action1: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'red' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 30 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-      layer: { source: 'literal', value: 1 },
-    }
-
-    const action2: ActionNode = {
-      id: 'action-2',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'blue' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 30 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-      layer: { source: 'literal', value: 5 },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'chain-test',
-      name: 'Chain Test',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [action1, action2],
-        logic: [],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'action-1' },
-        { from: 'action-1', to: 'action-2' },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
+  const createEngine = (definition: NetNodeCueDefinition, target = harness): NodeExecutionEngine =>
+    new NodeExecutionEngine(
       compileCue(definition),
-      'test-group:chain-test',
-      harness.sequencer,
-      harness.lightManager,
+      `test-group:${definition.id}`,
+      target.sequencer,
+      target.lightManager,
       noopRuntimeBroadcaster(),
       cueLevelVarStore,
       groupLevelVarStore,
       new EffectRegistry(),
+      definition.variables,
     )
 
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
+  /** Runs the cue from `beatEvent` and advances the sequencer one tick. */
+  const startCue = (
+    definition: NetNodeCueDefinition,
+    cueData = createCueData(),
+    target = harness,
+  ): void => {
+    createEngine(definition, target).startExecution(beatEvent, cueData)
+    target.advanceBy(1)
+  }
+
+  it('chains actions across layers in sequence', () => {
+    const duration = { duration: { source: 'literal', value: 30 } } as const
+    startCue(
+      defineCue({
+        id: 'chain-test',
+        name: 'Chain Test',
+        nodes: {
+          actions: [
+            setColorAction('action-1', 'red', { timing: duration, layer: 1 }),
+            setColorAction('action-2', 'blue', { timing: duration, layer: 5 }),
+          ],
+        },
+        connections: [
+          { from: 'event-1', to: 'action-1' },
+          { from: 'action-1', to: 'action-2' },
+        ],
+      }),
+    )
 
     const lightId = harness.frontLightIds[0]
     const earlyLayers = harness.sequencer.getActiveEffectsForLight(lightId)
@@ -194,64 +241,20 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('gates transitions on beat events', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'red' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'beat' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'beat-gate',
-      name: 'Beat Gate',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [{ from: 'event-1', to: 'action-1' }],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:beat-gate',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
+    startCue(
+      defineCue({
+        id: 'beat-gate',
+        name: 'Beat Gate',
+        nodes: {
+          actions: [
+            setColorAction('action-1', 'red', {
+              timing: { waitForCondition: { source: 'literal', value: 'beat' } },
+            }),
+          ],
+        },
+        connections: [{ from: 'event-1', to: 'action-1' }],
+      }),
     )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
 
     const lightId = harness.frontLightIds[0]
     const beforeBeat = harness.getLightState(lightId)
@@ -260,23 +263,10 @@ describe('Node runtime with real Sequencer', () => {
     harness.sequencer.onBeat()
     harness.advanceBy(1)
 
-    const afterBeat = harness.getLightState(lightId)
-    const expected = getColor('red', 'high')
-    expect(afterBeat).toMatchObject({
-      red: expected.red,
-      green: expected.green,
-      blue: expected.blue,
-      blendMode: expected.blendMode,
-    })
+    expectLit(harness.getLightState(lightId), 'red')
   })
 
   it('uses light-array transforms to target a single light', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
     const configNode: LogicNode = {
       id: 'config-1',
       type: 'logic',
@@ -302,81 +292,37 @@ describe('Node runtime with real Sequencer', () => {
       assignTo: 'pickedLights',
     }
 
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'variable', name: 'pickedLights' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'green' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'array-target',
-      name: 'Array Target',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [configNode, reverseNode, indexNode],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'config-1' },
-        { from: 'config-1', to: 'reverse-1' },
-        { from: 'reverse-1', to: 'index-1' },
-        { from: 'index-1', to: 'action-1' },
-      ],
-      variables: [
-        { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'reversedLights', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'pickedLights', type: 'light-array', scope: 'cue', initialValue: [] },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:array-target',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-      definition.variables,
+    startCue(
+      defineCue({
+        id: 'array-target',
+        name: 'Array Target',
+        nodes: {
+          actions: [
+            setColorAction('action-1', 'green', {
+              groups: { source: 'variable', name: 'pickedLights' },
+            }),
+          ],
+          logic: [configNode, reverseNode, indexNode],
+        },
+        connections: [
+          { from: 'event-1', to: 'config-1' },
+          { from: 'config-1', to: 'reverse-1' },
+          { from: 'reverse-1', to: 'index-1' },
+          { from: 'index-1', to: 'action-1' },
+        ],
+        variables: [
+          { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'reversedLights', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'pickedLights', type: 'light-array', scope: 'cue', initialValue: [] },
+        ],
+      }),
     )
 
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const expected = getColor('green', 'high')
     const targetId = harness.frontLightIds[harness.frontLightIds.length - 1]
     for (const lightId of harness.frontLightIds) {
       const state = harness.getLightState(lightId)
       if (lightId === targetId) {
-        expect(state).toMatchObject({
-          red: expected.red,
-          green: expected.green,
-          blue: expected.blue,
-          blendMode: expected.blendMode,
-        })
+        expectLit(state, 'green')
       } else {
         expect(state?.intensity ?? 0).toBe(0)
       }
@@ -384,12 +330,6 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('selects palette colours by index with color-from-index (wraps around)', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
     const configNode: LogicNode = {
       id: 'config-1',
       type: 'logic',
@@ -416,93 +356,44 @@ describe('Node runtime with real Sequencer', () => {
       assignTo: 'curColor',
     }
 
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'variable', name: 'curLight' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'variable', name: 'curColor' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
     const palette = ['red', 'green', 'blue'] as const
 
-    const definition: NetNodeCueDefinition = {
-      id: 'color-index',
-      name: 'Color Index',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [configNode, eachNode, pickNode],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'config-1' },
-        { from: 'config-1', to: 'each-1' },
-        { from: 'each-1', to: 'pick-1', fromPort: 'each' },
-        { from: 'pick-1', to: 'action-1' },
-      ],
-      variables: [
-        { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'curLight', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
-        { name: 'curColor', type: 'color', scope: 'cue', initialValue: 'red' },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:color-index',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-      definition.variables,
+    startCue(
+      defineCue({
+        id: 'color-index',
+        name: 'Color Index',
+        nodes: {
+          actions: [
+            setColorAction(
+              'action-1',
+              { source: 'variable', name: 'curColor' },
+              { groups: { source: 'variable', name: 'curLight' } },
+            ),
+          ],
+          logic: [configNode, eachNode, pickNode],
+        },
+        connections: [
+          { from: 'event-1', to: 'config-1' },
+          { from: 'config-1', to: 'each-1' },
+          { from: 'each-1', to: 'pick-1', fromPort: 'each' },
+          { from: 'pick-1', to: 'action-1' },
+        ],
+        variables: [
+          { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'curLight', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+          { name: 'curColor', type: 'color', scope: 'cue', initialValue: 'red' },
+        ],
+      }),
     )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
 
     // 4 front lights, 3-colour palette: light 3 wraps to palette[0], proving modulo wraparound.
     harness.frontLightIds.forEach((lightId, i) => {
-      const expected = getColor(palette[i % palette.length], 'high')
-      const state = harness.getLightState(lightId)
-      expect(state).toMatchObject({
-        red: expected.red,
-        green: expected.green,
-        blue: expected.blue,
-        blendMode: expected.blendMode,
-      })
+      expectLit(harness.getLightState(lightId), palette[i % palette.length])
     })
   })
 
   it('reads a palette from a color-array variable set via the variable node', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
     const setPalette: LogicNode = {
       id: 'set-pal',
       type: 'logic',
@@ -539,94 +430,45 @@ describe('Node runtime with real Sequencer', () => {
       assignTo: 'curColor',
     }
 
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'variable', name: 'curLight' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'variable', name: 'curColor' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
     const palette = ['red', 'green', 'blue'] as const
 
-    const definition: NetNodeCueDefinition = {
-      id: 'color-var-index',
-      name: 'Color Var Index',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [setPalette, configNode, eachNode, pickNode],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'set-pal' },
-        { from: 'set-pal', to: 'config-1' },
-        { from: 'config-1', to: 'each-1' },
-        { from: 'each-1', to: 'pick-1', fromPort: 'each' },
-        { from: 'pick-1', to: 'action-1' },
-      ],
-      variables: [
-        { name: 'palette', type: 'color-array', scope: 'cue', initialValue: [] },
-        { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'curLight', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
-        { name: 'curColor', type: 'color', scope: 'cue', initialValue: 'red' },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:color-var-index',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-      definition.variables,
+    startCue(
+      defineCue({
+        id: 'color-var-index',
+        name: 'Color Var Index',
+        nodes: {
+          actions: [
+            setColorAction(
+              'action-1',
+              { source: 'variable', name: 'curColor' },
+              { groups: { source: 'variable', name: 'curLight' } },
+            ),
+          ],
+          logic: [setPalette, configNode, eachNode, pickNode],
+        },
+        connections: [
+          { from: 'event-1', to: 'set-pal' },
+          { from: 'set-pal', to: 'config-1' },
+          { from: 'config-1', to: 'each-1' },
+          { from: 'each-1', to: 'pick-1', fromPort: 'each' },
+          { from: 'pick-1', to: 'action-1' },
+        ],
+        variables: [
+          { name: 'palette', type: 'color-array', scope: 'cue', initialValue: [] },
+          { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'curLight', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'idx', type: 'number', scope: 'cue', initialValue: 0 },
+          { name: 'curColor', type: 'color', scope: 'cue', initialValue: 'red' },
+        ],
+      }),
     )
 
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
     harness.frontLightIds.forEach((lightId, i) => {
-      const expected = getColor(palette[i % palette.length], 'high')
-      const state = harness.getLightState(lightId)
-      expect(state).toMatchObject({
-        red: expected.red,
-        green: expected.green,
-        blue: expected.blue,
-        blendMode: expected.blendMode,
-      })
+      expectLit(harness.getLightState(lightId), palette[i % palette.length])
     })
   })
 
   it('transforms color-array variables with reverse, concat, and shuffle', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
     const setA: LogicNode = {
       id: 'set-a',
       type: 'logic',
@@ -671,50 +513,27 @@ describe('Node runtime with real Sequencer', () => {
       assignTo: 'shuffled',
     }
 
-    const definition: NetNodeCueDefinition = {
-      id: 'color-transforms',
-      name: 'Color Transforms',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [],
-        logic: [setA, setB, reverseNode, concatNode, shuffleNode],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'set-a' },
-        { from: 'set-a', to: 'set-b' },
-        { from: 'set-b', to: 'rev' },
-        { from: 'rev', to: 'cat' },
-        { from: 'cat', to: 'shuf' },
-      ],
-      variables: [
-        { name: 'a', type: 'color-array', scope: 'cue', initialValue: [] },
-        { name: 'b', type: 'color-array', scope: 'cue', initialValue: [] },
-        { name: 'reversed', type: 'color-array', scope: 'cue', initialValue: [] },
-        { name: 'combined', type: 'color-array', scope: 'cue', initialValue: [] },
-        { name: 'shuffled', type: 'color-array', scope: 'cue', initialValue: [] },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:color-transforms',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-      definition.variables,
+    startCue(
+      defineCue({
+        id: 'color-transforms',
+        name: 'Color Transforms',
+        nodes: { logic: [setA, setB, reverseNode, concatNode, shuffleNode] },
+        connections: [
+          { from: 'event-1', to: 'set-a' },
+          { from: 'set-a', to: 'set-b' },
+          { from: 'set-b', to: 'rev' },
+          { from: 'rev', to: 'cat' },
+          { from: 'cat', to: 'shuf' },
+        ],
+        variables: [
+          { name: 'a', type: 'color-array', scope: 'cue', initialValue: [] },
+          { name: 'b', type: 'color-array', scope: 'cue', initialValue: [] },
+          { name: 'reversed', type: 'color-array', scope: 'cue', initialValue: [] },
+          { name: 'combined', type: 'color-array', scope: 'cue', initialValue: [] },
+          { name: 'shuffled', type: 'color-array', scope: 'cue', initialValue: [] },
+        ],
+      }),
     )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
 
     expect(cueLevelVarStore.get('reversed')?.value).toEqual(['blue', 'green', 'red'])
     expect(cueLevelVarStore.get('combined')?.value).toEqual([
@@ -729,12 +548,6 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('branches on cue data string comparisons', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
     const cueDataNode: LogicNode = {
       id: 'cue-data-1',
       type: 'logic',
@@ -752,79 +565,30 @@ describe('Node runtime with real Sequencer', () => {
       right: { source: 'literal', value: 'Large' },
     }
 
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'purple' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'string-conditional',
-      name: 'String Conditional',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [cueDataNode, conditionalNode],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'cue-data-1' },
-        { from: 'cue-data-1', to: 'conditional-1' },
-        { from: 'conditional-1', to: 'action-1', fromPort: 'true' },
-      ],
-      variables: [{ name: 'venue', type: 'string', scope: 'cue', initialValue: '' }],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:string-conditional',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-      definition.variables,
+    startCue(
+      defineCue({
+        id: 'string-conditional',
+        name: 'String Conditional',
+        nodes: {
+          actions: [setColorAction('action-1', 'purple')],
+          logic: [cueDataNode, conditionalNode],
+        },
+        connections: [
+          { from: 'event-1', to: 'cue-data-1' },
+          { from: 'cue-data-1', to: 'conditional-1' },
+          { from: 'conditional-1', to: 'action-1', fromPort: 'true' },
+        ],
+        variables: [{ name: 'venue', type: 'string', scope: 'cue', initialValue: '' }],
+      }),
+      createCueData({ venueSize: 'Large' }),
     )
 
-    engine.startExecution(eventNode, createCueData({ venueSize: 'Large' }))
-    harness.advanceBy(1)
-
-    const state = harness.getLightState(harness.frontLightIds[0])
-    const expected = getColor('purple', 'high')
-    expect(state).toMatchObject({
-      red: expected.red,
-      green: expected.green,
-      blue: expected.blue,
-      blendMode: expected.blendMode,
-    })
+    expectLit(harness.getLightState(harness.frontLightIds[0]), 'purple')
   })
 
   it('holds a delay longer than a timer can count', () => {
     jest.useFakeTimers()
     try {
-      const eventNode: NetEventNode = { id: 'event-1', type: 'event', eventType: 'beat' }
       const delayNode = {
         id: 'delay-1',
         type: 'logic',
@@ -851,36 +615,19 @@ describe('Node runtime with real Sequencer', () => {
           waitUntilTime: { source: 'literal', value: 0 },
         },
       } as ActionNode
-      const engine = new NodeExecutionEngine(
-        compileCue({
+      const engine = createEngine(
+        defineCue({
           id: 'long-delay',
           name: 'Long Delay',
-          kind: 'lighting',
-          cueType: CueType.Default,
-          style: 'primary',
-          nodes: {
-            events: [eventNode],
-            actions: [actionNode],
-            logic: [delayNode],
-            eventRaisers: [],
-            eventListeners: [],
-            effectRaisers: [],
-          },
+          nodes: { actions: [actionNode], logic: [delayNode] },
           connections: [
             { from: 'event-1', to: 'delay-1' },
             { from: 'delay-1', to: 'action-1' },
           ],
         }),
-        'test-group:long-delay',
-        harness.sequencer,
-        harness.lightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
       )
 
-      engine.startExecution(eventNode, createCueData())
+      engine.startExecution(beatEvent, createCueData())
       jest.advanceTimersByTime(1000)
       harness.advanceBy(10)
 
@@ -893,12 +640,6 @@ describe('Node runtime with real Sequencer', () => {
   it('blocks execution through delay nodes', async () => {
     jest.useFakeTimers()
     try {
-      const eventNode: NetEventNode = {
-        id: 'event-1',
-        type: 'event',
-        eventType: 'beat',
-      }
-
       const delayNode: LogicNode = {
         id: 'delay-1',
         type: 'logic',
@@ -906,61 +647,17 @@ describe('Node runtime with real Sequencer', () => {
         delayTime: { source: 'literal', value: 20 },
       }
 
-      const actionNode: ActionNode = {
-        id: 'action-1',
-        type: 'action',
-        effectType: 'set-color',
-        target: {
-          groups: { source: 'literal', value: 'front' },
-          filter: { source: 'literal', value: 'all' },
-        },
-        color: {
-          name: { source: 'literal', value: 'blue' },
-          brightness: { source: 'literal', value: 'high' },
-          blendMode: { source: 'literal', value: 'replace' },
-        },
-        timing: {
-          waitForCondition: { source: 'literal', value: 'none' },
-          waitForTime: { source: 'literal', value: 0 },
-          duration: { source: 'literal', value: 0 },
-          waitUntilCondition: { source: 'literal', value: 'none' },
-          waitUntilTime: { source: 'literal', value: 0 },
-        },
-      }
-
-      const definition: NetNodeCueDefinition = {
-        id: 'delay-test',
-        name: 'Delay Test',
-        kind: 'lighting',
-        cueType: CueType.Default,
-        style: 'primary',
-        nodes: {
-          events: [eventNode],
-          actions: [actionNode],
-          logic: [delayNode],
-          eventRaisers: [],
-          eventListeners: [],
-          effectRaisers: [],
-        },
-        connections: [
-          { from: 'event-1', to: 'delay-1' },
-          { from: 'delay-1', to: 'action-1' },
-        ],
-      }
-
-      const engine = new NodeExecutionEngine(
-        compileCue(definition),
-        'test-group:delay-test',
-        harness.sequencer,
-        harness.lightManager,
-        noopRuntimeBroadcaster(),
-        cueLevelVarStore,
-        groupLevelVarStore,
-        new EffectRegistry(),
+      startCue(
+        defineCue({
+          id: 'delay-test',
+          name: 'Delay Test',
+          nodes: { actions: [setColorAction('action-1', 'blue')], logic: [delayNode] },
+          connections: [
+            { from: 'event-1', to: 'delay-1' },
+            { from: 'delay-1', to: 'action-1' },
+          ],
+        }),
       )
-
-      engine.startExecution(eventNode, createCueData())
-      harness.advanceBy(1)
 
       const lightId = harness.frontLightIds[0]
       const beforeDelay = harness.getLightState(lightId)
@@ -969,566 +666,168 @@ describe('Node runtime with real Sequencer', () => {
       jest.advanceTimersByTime(25)
       harness.advanceBy(1)
 
-      const afterDelay = harness.getLightState(lightId)
-      const expected = getColor('blue', 'high')
-      expect(afterDelay).toMatchObject({
-        red: expected.red,
-        green: expected.green,
-        blue: expected.blue,
-        blendMode: expected.blendMode,
-      })
+      expectLit(harness.getLightState(lightId), 'blue')
     } finally {
       jest.useRealTimers()
     }
   })
 
-  it('waits until beat to complete action', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'white' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'beat' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'wait-until-beat',
-      name: 'Wait Until Beat',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [{ from: 'event-1', to: 'action-1' }],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:wait-until-beat',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-    )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const lightId = harness.frontLightIds[0]
-    expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true)
-
-    for (let i = 0; i < 10; i += 1) {
-      harness.advanceBy(10)
-      expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true)
-    }
-
-    harness.sequencer.onBeat()
-    let cleared = false
-    for (let i = 0; i < 10; i += 1) {
-      harness.advanceBy(10)
-      if (!harness.sequencer.getActiveEffectsForLight(lightId).has(0)) {
-        cleared = true
-        break
-      }
-    }
-    expect(cleared).toBe(true)
-  })
-
-  it('waits until beat count before completing', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'white' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'beat' },
-        waitUntilConditionCount: { source: 'literal', value: 2 },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'wait-until-count',
-      name: 'Wait Until Count',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [{ from: 'event-1', to: 'action-1' }],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:wait-until-count',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-    )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const lightId = harness.frontLightIds[0]
-    expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true)
-
-    harness.sequencer.onBeat()
-    harness.advanceBy(1)
-    expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true)
-
-    harness.sequencer.onBeat()
-    let cleared = false
-    for (let i = 0; i < 10; i += 1) {
-      harness.advanceBy(10)
-      if (!harness.sequencer.getActiveEffectsForLight(lightId).has(0)) {
-        cleared = true
-        break
-      }
-    }
-    expect(cleared).toBe(true)
-  })
-
-  it('gates on measure and keyframe events', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
-    const measureAction: ActionNode = {
-      id: 'action-measure',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'red' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'measure' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const keyframeAction: ActionNode = {
-      id: 'action-keyframe',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'back' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'blue' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'keyframe' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'measure-keyframe',
-      name: 'Measure + Keyframe',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [measureAction, keyframeAction],
-        logic: [],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'action-measure' },
-        { from: 'event-1', to: 'action-keyframe' },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:measure-keyframe',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-    )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const frontId = harness.frontLightIds[0]
-    const backId = harness.backLightIds[0]
-    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
-    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0)
-
-    harness.sequencer.onMeasure()
-    harness.advanceBy(1)
-    const red = getColor('red', 'high')
-    expect(harness.getLightState(frontId)).toMatchObject({
-      red: red.red,
-      green: red.green,
-      blue: red.blue,
-      blendMode: red.blendMode,
-    })
-
-    harness.sequencer.onKeyframe()
-    harness.advanceBy(1)
-    const blue = getColor('blue', 'high')
-    expect(harness.getLightState(backId)).toMatchObject({
-      red: blue.red,
-      green: blue.green,
-      blue: blue.blue,
-      blendMode: blue.blendMode,
-    })
-  })
-
-  it('gates on measure count and keyframe until count', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
-    const measureAction: ActionNode = {
-      id: 'action-measure',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'red' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'measure' },
-        waitForConditionCount: { source: 'literal', value: 2 },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const keyframeAction: ActionNode = {
-      id: 'action-keyframe',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'back' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'blue' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'keyframe' },
-        waitForConditionCount: { source: 'literal', value: 2 },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'measure-keyframe-count',
-      name: 'Measure + Keyframe Count',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [measureAction, keyframeAction],
-        logic: [],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'action-measure' },
-        { from: 'event-1', to: 'action-keyframe' },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:measure-keyframe-count',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-    )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const frontId = harness.frontLightIds[0]
-    const backId = harness.backLightIds[0]
-    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
-    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0)
-
-    harness.sequencer.onMeasure()
-    harness.advanceBy(1)
-    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
-
-    harness.sequencer.onMeasure()
-    harness.advanceBy(1)
-    const red = getColor('red', 'high')
-    expect(harness.getLightState(frontId)).toMatchObject({
-      red: red.red,
-      green: red.green,
-      blue: red.blue,
-      blendMode: red.blendMode,
-    })
-
-    harness.sequencer.onKeyframe()
-    harness.advanceBy(1)
-    expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0)
-
-    harness.sequencer.onKeyframe()
-    harness.advanceBy(1)
-    const blue = getColor('blue', 'high')
-    expect(harness.getLightState(backId)).toMatchObject({
-      red: blue.red,
-      green: blue.green,
-      blue: blue.blue,
-      blendMode: blue.blendMode,
-    })
-  })
-
   it.each([
+    { name: 'waits until beat to complete action', id: 'wait-until-beat', beats: undefined },
+    { name: 'waits until beat count before completing', id: 'wait-until-count', beats: 2 },
+  ])('$name', ({ id, beats }) => {
+    startCue(
+      defineCue({
+        id,
+        name: id,
+        nodes: {
+          actions: [
+            setColorAction('action-1', 'white', {
+              timing: {
+                waitUntilCondition: { source: 'literal', value: 'beat' },
+                ...(beats === undefined
+                  ? {}
+                  : { waitUntilConditionCount: { source: 'literal' as const, value: beats } }),
+              },
+            }),
+          ],
+        },
+        connections: [{ from: 'event-1', to: 'action-1' }],
+      }),
+    )
+
+    const lightId = harness.frontLightIds[0]
+    const isHeld = (): boolean => harness.sequencer.getActiveEffectsForLight(lightId).has(0)
+    expect(isHeld()).toBe(true)
+
+    for (let i = 0; i < 10; i += 1) {
+      harness.advanceBy(10)
+      expect(isHeld()).toBe(true)
+    }
+
+    for (let beat = 1; beat < (beats ?? 1); beat += 1) {
+      harness.sequencer.onBeat()
+      harness.advanceBy(1)
+      expect(isHeld()).toBe(true)
+    }
+
+    harness.sequencer.onBeat()
+    let cleared = false
+    for (let i = 0; i < 10; i += 1) {
+      harness.advanceBy(10)
+      if (!isHeld()) {
+        cleared = true
+        break
+      }
+    }
+    expect(cleared).toBe(true)
+  })
+
+  it.each<{ label: string; first: GateStep; second: GateStep }>([
     {
-      label: 'drum and guitar',
+      label: 'measure and keyframe events',
+      first: { id: 'measure', condition: 'measure', color: 'red', fire: (s) => s.onMeasure() },
+      second: { id: 'keyframe', condition: 'keyframe', color: 'blue', fire: (s) => s.onKeyframe() },
+    },
+    {
+      label: 'measure and keyframe counts',
+      first: {
+        id: 'measure',
+        condition: 'measure',
+        count: 2,
+        color: 'red',
+        fire: (s) => s.onMeasure(),
+      },
+      second: {
+        id: 'keyframe',
+        condition: 'keyframe',
+        count: 2,
+        color: 'blue',
+        fire: (s) => s.onKeyframe(),
+      },
+    },
+    {
+      label: 'drum and guitar note counts',
       first: {
         id: 'drum',
         condition: 'drum-red',
+        count: 2,
         color: 'green',
-        fire: (sequencer: ILightingController) => sequencer.onDrumNote(DrumNoteType.RedDrum),
+        fire: (s) => s.onDrumNote(DrumNoteType.RedDrum),
       },
       second: {
         id: 'guitar',
         condition: 'guitar-green',
+        count: 1,
         color: 'yellow',
-        fire: (sequencer: ILightingController) => sequencer.onGuitarNote(InstrumentNoteType.Green),
+        fire: (s) => s.onGuitarNote(InstrumentNoteType.Green),
       },
     },
     {
-      label: 'bass and keys',
+      label: 'bass and keys note counts',
       first: {
         id: 'bass',
         condition: 'bass-blue',
+        count: 2,
         color: 'purple',
-        fire: (sequencer: ILightingController) => sequencer.onBassNote(InstrumentNoteType.Blue),
+        fire: (s) => s.onBassNote(InstrumentNoteType.Blue),
       },
       second: {
         id: 'keys',
         condition: 'keys-yellow',
+        count: 1,
         color: 'orange',
-        fire: (sequencer: ILightingController) => sequencer.onKeysNote(InstrumentNoteType.Yellow),
+        fire: (s) => s.onKeysNote(InstrumentNoteType.Yellow),
       },
     },
-  ] as const)('gates on $label note counts', ({ first, second }) => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
+  ])('gates on $label', ({ first, second }) => {
+    const waitFor = ({ condition, count }: GateStep): Partial<ActionTimingConfig> => ({
+      waitForCondition: { source: 'literal', value: condition },
+      ...(count === undefined
+        ? {}
+        : { waitForConditionCount: { source: 'literal' as const, value: count } }),
+    })
+    const firstAction = setColorAction(`action-${first.id}`, first.color, {
+      timing: waitFor(first),
+    })
+    const secondAction = setColorAction(`action-${second.id}`, second.color, {
+      groups: 'back',
+      timing: waitFor(second),
+    })
 
-    const firstAction: ActionNode = {
-      id: `action-${first.id}`,
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: first.color },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: first.condition },
-        waitForConditionCount: { source: 'literal', value: 2 },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const secondAction: ActionNode = {
-      id: `action-${second.id}`,
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'back' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: second.color },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: second.condition },
-        waitForConditionCount: { source: 'literal', value: 1 },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: `${first.id}-${second.id}-counts`,
-      name: `${first.id} and ${second.id} counts`,
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [firstAction, secondAction],
-        logic: [],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: firstAction.id },
-        { from: 'event-1', to: secondAction.id },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      `test-group:${definition.id}`,
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
+    startCue(
+      defineCue({
+        id: `${first.id}-${second.id}-counts`,
+        name: `${first.id} and ${second.id} counts`,
+        nodes: { actions: [firstAction, secondAction] },
+        connections: [
+          { from: 'event-1', to: firstAction.id },
+          { from: 'event-1', to: secondAction.id },
+        ],
+      }),
     )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
 
     const frontId = harness.frontLightIds[0]
     const backId = harness.backLightIds[0]
     expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
     expect(harness.getLightState(backId)?.intensity ?? 0).toBe(0)
 
-    first.fire(harness.sequencer)
-    harness.advanceBy(1)
-    expect(harness.getLightState(frontId)?.intensity ?? 0).toBe(0)
-
-    first.fire(harness.sequencer)
-    harness.advanceBy(1)
-    const firstColor = getColor(first.color, 'high')
-    expect(harness.getLightState(frontId)).toMatchObject({
-      red: firstColor.red,
-      green: firstColor.green,
-      blue: firstColor.blue,
-      blendMode: firstColor.blendMode,
-    })
-
-    second.fire(harness.sequencer)
-    harness.advanceBy(1)
-    const secondColor = getColor(second.color, 'high')
-    expect(harness.getLightState(backId)).toMatchObject({
-      red: secondColor.red,
-      green: secondColor.green,
-      blue: secondColor.blue,
-      blendMode: secondColor.blendMode,
-    })
+    // Every event short of the count leaves the light dark, and the last one lights it.
+    const fireUntilLit = (step: GateStep, lightId: string): void => {
+      for (let i = 1; i < (step.count ?? 1); i += 1) {
+        step.fire(harness.sequencer)
+        harness.advanceBy(1)
+        expect(harness.getLightState(lightId)?.intensity ?? 0).toBe(0)
+      }
+      step.fire(harness.sequencer)
+      harness.advanceBy(1)
+      expectLit(harness.getLightState(lightId), step.color)
+    }
+    fireUntilLit(first, frontId)
+    fireUntilLit(second, backId)
   })
 
   it('calculates math operators and feeds action duration', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
     const mathNode: LogicNode = {
       id: 'math-1',
       type: 'logic',
@@ -1539,63 +838,25 @@ describe('Node runtime with real Sequencer', () => {
       assignTo: 'durationMs',
     }
 
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'blue' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'variable', name: 'durationMs' },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'math-duration',
-      name: 'Math Duration',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [mathNode],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'math-1' },
-        { from: 'math-1', to: 'action-1' },
-      ],
-      variables: [{ name: 'durationMs', type: 'number', scope: 'cue', initialValue: 0 }],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:math-duration',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-      definition.variables,
+    startCue(
+      defineCue({
+        id: 'math-duration',
+        name: 'Math Duration',
+        nodes: {
+          actions: [
+            setColorAction('action-1', 'blue', {
+              timing: { duration: { source: 'variable', name: 'durationMs' } },
+            }),
+          ],
+          logic: [mathNode],
+        },
+        connections: [
+          { from: 'event-1', to: 'math-1' },
+          { from: 'math-1', to: 'action-1' },
+        ],
+        variables: [{ name: 'durationMs', type: 'number', scope: 'cue', initialValue: 0 }],
+      }),
     )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
 
     const lightId = harness.frontLightIds[0]
     expect(harness.sequencer.getActiveEffectsForLight(lightId).has(0)).toBe(true)
@@ -1613,122 +874,40 @@ describe('Node runtime with real Sequencer', () => {
     expect(cleared).toBe(true)
   })
 
-  it('supports all math operators for variable updates', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
+  it.each([
+    { operator: 'add', left: 5, right: 2, expected: 7 },
+    { operator: 'subtract', left: 10, right: 3, expected: 7 },
+    { operator: 'multiply', left: 3, right: 4, expected: 12 },
+    { operator: 'divide', left: 10, right: 2, expected: 5 },
+    { operator: 'modulus', left: 10, right: 3, expected: 1 },
+  ] as const)(
+    'updates a variable with $operator ($left and $right give $expected)',
+    ({ operator, left, right, expected }) => {
+      const mathNode: LogicNode = {
+        id: 'math-1',
+        type: 'logic',
+        logicType: 'math',
+        operator,
+        left: { source: 'literal', value: left },
+        right: { source: 'literal', value: right },
+        assignTo: 'result',
+      }
 
-    const addNode: LogicNode = {
-      id: 'math-add',
-      type: 'logic',
-      logicType: 'math',
-      operator: 'add',
-      left: { source: 'literal', value: 5 },
-      right: { source: 'literal', value: 2 },
-      assignTo: 'addResult',
-    }
+      startCue(
+        defineCue({
+          id: `math-${operator}`,
+          name: `Math ${operator}`,
+          nodes: { logic: [mathNode] },
+          connections: [{ from: 'event-1', to: 'math-1' }],
+          variables: [{ name: 'result', type: 'number', scope: 'cue', initialValue: 0 }],
+        }),
+      )
 
-    const subtractNode: LogicNode = {
-      id: 'math-sub',
-      type: 'logic',
-      logicType: 'math',
-      operator: 'subtract',
-      left: { source: 'literal', value: 10 },
-      right: { source: 'literal', value: 3 },
-      assignTo: 'subResult',
-    }
-
-    const multiplyNode: LogicNode = {
-      id: 'math-mul',
-      type: 'logic',
-      logicType: 'math',
-      operator: 'multiply',
-      left: { source: 'literal', value: 3 },
-      right: { source: 'literal', value: 4 },
-      assignTo: 'mulResult',
-    }
-
-    const divideNode: LogicNode = {
-      id: 'math-div',
-      type: 'logic',
-      logicType: 'math',
-      operator: 'divide',
-      left: { source: 'literal', value: 10 },
-      right: { source: 'literal', value: 2 },
-      assignTo: 'divResult',
-    }
-
-    const modulusNode: LogicNode = {
-      id: 'math-mod',
-      type: 'logic',
-      logicType: 'math',
-      operator: 'modulus',
-      left: { source: 'literal', value: 10 },
-      right: { source: 'literal', value: 3 },
-      assignTo: 'modResult',
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'math-ops',
-      name: 'Math Ops',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [],
-        logic: [addNode, subtractNode, multiplyNode, divideNode, modulusNode],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'math-add' },
-        { from: 'math-add', to: 'math-sub' },
-        { from: 'math-sub', to: 'math-mul' },
-        { from: 'math-mul', to: 'math-div' },
-        { from: 'math-div', to: 'math-mod' },
-      ],
-      variables: [
-        { name: 'addResult', type: 'number', scope: 'cue', initialValue: 0 },
-        { name: 'subResult', type: 'number', scope: 'cue', initialValue: 0 },
-        { name: 'mulResult', type: 'number', scope: 'cue', initialValue: 0 },
-        { name: 'divResult', type: 'number', scope: 'cue', initialValue: 0 },
-        { name: 'modResult', type: 'number', scope: 'cue', initialValue: 0 },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:math-ops',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-      definition.variables,
-    )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    expect(cueLevelVarStore.get('addResult')?.value).toBe(7)
-    expect(cueLevelVarStore.get('subResult')?.value).toBe(7)
-    expect(cueLevelVarStore.get('mulResult')?.value).toBe(12)
-    expect(cueLevelVarStore.get('divResult')?.value).toBe(5)
-    expect(cueLevelVarStore.get('modResult')?.value).toBe(1)
-  })
+      expect(cueLevelVarStore.get('result')?.value).toBe(expected)
+    },
+  )
 
   it('initializes variables and uses conditional branch', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
     const initNode: LogicNode = {
       id: 'var-init',
       type: 'logic',
@@ -1758,68 +937,26 @@ describe('Node runtime with real Sequencer', () => {
       right: { source: 'literal', value: 0 },
     }
 
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'yellow' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'init-fallback',
-      name: 'Init/Conditional',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [initNode, initMissingVarNode, conditionalNode],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'var-init' },
-        { from: 'var-init', to: 'init-missing' },
-        { from: 'init-missing', to: 'conditional-1' },
-        { from: 'conditional-1', to: 'action-1', fromPort: 'true' },
-      ],
-      variables: [
-        { name: 'flag', type: 'number', scope: 'cue', initialValue: 0 },
-        { name: 'missingVar', type: 'number', scope: 'cue', initialValue: 0 },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:init-fallback',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-      definition.variables,
+    startCue(
+      defineCue({
+        id: 'init-fallback',
+        name: 'Init/Conditional',
+        nodes: {
+          actions: [setColorAction('action-1', 'yellow')],
+          logic: [initNode, initMissingVarNode, conditionalNode],
+        },
+        connections: [
+          { from: 'event-1', to: 'var-init' },
+          { from: 'var-init', to: 'init-missing' },
+          { from: 'init-missing', to: 'conditional-1' },
+          { from: 'conditional-1', to: 'action-1', fromPort: 'true' },
+        ],
+        variables: [
+          { name: 'flag', type: 'number', scope: 'cue', initialValue: 0 },
+          { name: 'missingVar', type: 'number', scope: 'cue', initialValue: 0 },
+        ],
+      }),
     )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
 
     const storedValue = cueLevelVarStore.get('flag')
     expect(storedValue?.value).toBe(1)
@@ -1828,12 +965,6 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('passes through variable get mode without mutation', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
     const setNode: LogicNode = {
       id: 'var-set',
       type: 'logic',
@@ -1862,77 +993,29 @@ describe('Node runtime with real Sequencer', () => {
       right: { source: 'literal', value: 2 },
     }
 
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'green' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'variable-get',
-      name: 'Variable Get',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [setNode, getNode, conditionalNode],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'var-set' },
-        { from: 'var-set', to: 'var-get' },
-        { from: 'var-get', to: 'conditional-1' },
-        { from: 'conditional-1', to: 'action-1', fromPort: 'true' },
-      ],
-      variables: [{ name: 'counter', type: 'number', scope: 'cue', initialValue: 0 }],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:variable-get',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-      definition.variables,
+    startCue(
+      defineCue({
+        id: 'variable-get',
+        name: 'Variable Get',
+        nodes: {
+          actions: [setColorAction('action-1', 'green')],
+          logic: [setNode, getNode, conditionalNode],
+        },
+        connections: [
+          { from: 'event-1', to: 'var-set' },
+          { from: 'var-set', to: 'var-get' },
+          { from: 'var-get', to: 'conditional-1' },
+          { from: 'conditional-1', to: 'action-1', fromPort: 'true' },
+        ],
+        variables: [{ name: 'counter', type: 'number', scope: 'cue', initialValue: 0 }],
+      }),
     )
-
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
 
     expect(cueLevelVarStore.get('counter')?.value).toBe(2)
     expect(harness.getLightState(harness.frontLightIds[0])?.intensity ?? 0).toBeGreaterThan(0)
   })
 
   it('uses array-length and concat-lights for targeting', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
     const frontConfig: LogicNode = {
       id: 'front-1',
       type: 'logic',
@@ -1974,92 +1057,41 @@ describe('Node runtime with real Sequencer', () => {
       right: { source: 'literal', value: 6 },
     }
 
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'variable', name: 'allLights' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'green' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'concat-length',
-      name: 'Concat + Length',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [frontConfig, backConfig, concatNode, lengthNode, conditionalNode],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'front-1' },
-        { from: 'front-1', to: 'back-1' },
-        { from: 'back-1', to: 'concat-1' },
-        { from: 'concat-1', to: 'len-1' },
-        { from: 'len-1', to: 'conditional-1' },
-        { from: 'conditional-1', to: 'action-1', fromPort: 'true' },
-      ],
-      variables: [
-        { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'backLights', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'allLights', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'lightCount', type: 'number', scope: 'cue', initialValue: 0 },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:concat-length',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-      definition.variables,
+    startCue(
+      defineCue({
+        id: 'concat-length',
+        name: 'Concat + Length',
+        nodes: {
+          actions: [
+            setColorAction('action-1', 'green', {
+              groups: { source: 'variable', name: 'allLights' },
+            }),
+          ],
+          logic: [frontConfig, backConfig, concatNode, lengthNode, conditionalNode],
+        },
+        connections: [
+          { from: 'event-1', to: 'front-1' },
+          { from: 'front-1', to: 'back-1' },
+          { from: 'back-1', to: 'concat-1' },
+          { from: 'concat-1', to: 'len-1' },
+          { from: 'len-1', to: 'conditional-1' },
+          { from: 'conditional-1', to: 'action-1', fromPort: 'true' },
+        ],
+        variables: [
+          { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'backLights', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'allLights', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'lightCount', type: 'number', scope: 'cue', initialValue: 0 },
+        ],
+      }),
     )
 
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const green = getColor('green', 'high')
     for (const lightId of harness.allLightIds) {
-      const state = harness.getLightState(lightId)
-      expect(state).toMatchObject({
-        red: green.red,
-        green: green.green,
-        blue: green.blue,
-        blendMode: green.blendMode,
-      })
+      expectLit(harness.getLightState(lightId), 'green')
     }
   })
 
   it('creates pairs in opposite and diagonal patterns', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
     const configNode: LogicNode = {
       id: 'config-1',
       type: 'logic',
@@ -2095,83 +1127,39 @@ describe('Node runtime with real Sequencer', () => {
       assignTo: 'pairLights',
     }
 
-    const actionNode: ActionNode = {
-      id: 'action-1',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'variable', name: 'pairLights' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'blue' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'pairs-test',
-      name: 'Pairs Test',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionNode],
-        logic: [configNode, oppositeNode, diagonalNode, pickOpposite],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'config-1' },
-        { from: 'config-1', to: 'pairs-opposite' },
-        { from: 'pairs-opposite', to: 'pairs-diagonal' },
-        { from: 'pairs-diagonal', to: 'pick-opposite' },
-        { from: 'pick-opposite', to: 'action-1' },
-      ],
-      variables: [
-        { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'oppositePairs', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'diagonalPairs', type: 'light-array', scope: 'cue', initialValue: [] },
-        { name: 'pairLights', type: 'light-array', scope: 'cue', initialValue: [] },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:pairs-test',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
-      definition.variables,
+    startCue(
+      defineCue({
+        id: 'pairs-test',
+        name: 'Pairs Test',
+        nodes: {
+          actions: [
+            setColorAction('action-1', 'blue', {
+              groups: { source: 'variable', name: 'pairLights' },
+            }),
+          ],
+          logic: [configNode, oppositeNode, diagonalNode, pickOpposite],
+        },
+        connections: [
+          { from: 'event-1', to: 'config-1' },
+          { from: 'config-1', to: 'pairs-opposite' },
+          { from: 'pairs-opposite', to: 'pairs-diagonal' },
+          { from: 'pairs-diagonal', to: 'pick-opposite' },
+          { from: 'pick-opposite', to: 'action-1' },
+        ],
+        variables: [
+          { name: 'frontLights', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'oppositePairs', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'diagonalPairs', type: 'light-array', scope: 'cue', initialValue: [] },
+          { name: 'pairLights', type: 'light-array', scope: 'cue', initialValue: [] },
+        ],
+      }),
     )
 
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const blue = getColor('blue', 'high')
     const expectedIds = [harness.frontLightIds[0], harness.frontLightIds[2]]
     for (const lightId of harness.frontLightIds) {
       const state = harness.getLightState(lightId)
       if (expectedIds.includes(lightId)) {
-        expect(state).toMatchObject({
-          red: blue.red,
-          green: blue.green,
-          blue: blue.blue,
-          blendMode: blue.blendMode,
-        })
+        expectLit(state, 'blue')
       } else {
         expect(state?.intensity ?? 0).toBe(0)
       }
@@ -2184,105 +1172,31 @@ describe('Node runtime with real Sequencer', () => {
 
   it('targets back and strobe groups with filters', () => {
     const localHarness = createSequencerHarness({ frontCount: 4, backCount: 4, strobeCount: 2 })
-    const localCueStore = new Map()
-    const localGroupStore = new Map()
 
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
-    const backOddAction: ActionNode = {
-      id: 'action-back',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'back' },
-        filter: { source: 'literal', value: 'odd' },
-      },
-      color: {
-        name: { source: 'literal', value: 'red' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const strobeAction: ActionNode = {
-      id: 'action-strobe',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'strobe' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'blue' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'target-groups',
-      name: 'Target Groups',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [backOddAction, strobeAction],
-        logic: [],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'action-back' },
-        { from: 'event-1', to: 'action-strobe' },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:target-groups',
-      localHarness.sequencer,
-      localHarness.lightManager,
-      noopRuntimeBroadcaster(),
-      localCueStore,
-      localGroupStore,
-      new EffectRegistry(),
+    startCue(
+      defineCue({
+        id: 'target-groups',
+        name: 'Target Groups',
+        nodes: {
+          actions: [
+            setColorAction('action-back', 'red', { groups: 'back', filter: 'odd' }),
+            setColorAction('action-strobe', 'blue', { groups: 'strobe' }),
+          ],
+        },
+        connections: [
+          { from: 'event-1', to: 'action-back' },
+          { from: 'event-1', to: 'action-strobe' },
+        ],
+      }),
+      createCueData(),
+      localHarness,
     )
 
-    engine.startExecution(eventNode, createCueData())
-    localHarness.advanceBy(1)
-
-    const red = getColor('red', 'high')
-    const blue = getColor('blue', 'high')
     const backLights = localHarness.lightManager.getLights(['back'], ['all'])
     for (const light of backLights) {
       const state = localHarness.getLightState(light.id)
       if (light.position % 2 !== 0) {
-        expect(state).toMatchObject({
-          red: red.red,
-          green: red.green,
-          blue: red.blue,
-          blendMode: red.blendMode,
-        })
+        expectLit(state, 'red')
       } else {
         expect(state?.intensity ?? 0).toBe(0)
       }
@@ -2290,13 +1204,7 @@ describe('Node runtime with real Sequencer', () => {
 
     const strobeLights = localHarness.lightManager.getLights(['strobe'], ['all'])
     for (const light of strobeLights) {
-      const state = localHarness.getLightState(light.id)
-      expect(state).toMatchObject({
-        red: blue.red,
-        green: blue.green,
-        blue: blue.blue,
-        blendMode: blue.blendMode,
-      })
+      expectLit(localHarness.getLightState(light.id), 'blue')
     }
 
     localHarness.cleanup()
@@ -2308,76 +1216,22 @@ describe('Node runtime with real Sequencer', () => {
     const randomSpy = jest.spyOn(utils, 'randomBetween')
     randomSpy.mockReturnValue(0)
 
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
-    const randomAction: ActionNode = {
-      id: 'action-random',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'random-3' },
-      },
-      color: {
-        name: { source: 'literal', value: 'green' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'random-targets',
-      name: 'Random Targets',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [randomAction],
-        logic: [],
-        eventRaisers: [],
-        eventListeners: [],
-        effectRaisers: [],
-      },
-      connections: [{ from: 'event-1', to: 'action-random' }],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:random-targets',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
+    startCue(
+      defineCue({
+        id: 'random-targets',
+        name: 'Random Targets',
+        nodes: {
+          actions: [setColorAction('action-random', 'green', { filter: 'random-3' })],
+        },
+        connections: [{ from: 'event-1', to: 'action-random' }],
+      }),
     )
 
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const green = getColor('green', 'high')
     const litIds: string[] = []
     for (const lightId of harness.frontLightIds) {
       const state = harness.getLightState(lightId)
       if (state) {
-        expect(state).toMatchObject({
-          red: green.red,
-          green: green.green,
-          blue: green.blue,
-          blendMode: green.blendMode,
-        })
+        expectLit(state, 'green')
         litIds.push(lightId)
       } else {
         expect(state).toBeNull()
@@ -2396,12 +1250,6 @@ describe('Node runtime with real Sequencer', () => {
   })
 
   it('raises events to trigger listener actions in a new context', () => {
-    const eventNode: NetEventNode = {
-      id: 'event-1',
-      type: 'event',
-      eventType: 'beat',
-    }
-
     const raiserNode: EventRaiserNode = {
       id: 'raiser-1',
       type: 'event-raiser',
@@ -2419,100 +1267,27 @@ describe('Node runtime with real Sequencer', () => {
       outputs: ['action-listener'],
     }
 
-    const actionPrimary: ActionNode = {
-      id: 'action-primary',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'front' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'red' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const actionListener: ActionNode = {
-      id: 'action-listener',
-      type: 'action',
-      effectType: 'set-color',
-      target: {
-        groups: { source: 'literal', value: 'back' },
-        filter: { source: 'literal', value: 'all' },
-      },
-      color: {
-        name: { source: 'literal', value: 'blue' },
-        brightness: { source: 'literal', value: 'high' },
-        blendMode: { source: 'literal', value: 'replace' },
-      },
-      timing: {
-        waitForCondition: { source: 'literal', value: 'none' },
-        waitForTime: { source: 'literal', value: 0 },
-        duration: { source: 'literal', value: 0 },
-        waitUntilCondition: { source: 'literal', value: 'none' },
-        waitUntilTime: { source: 'literal', value: 0 },
-      },
-    }
-
-    const definition: NetNodeCueDefinition = {
-      id: 'event-chain',
-      name: 'Event Chain',
-      kind: 'lighting',
-      cueType: CueType.Default,
-      style: 'primary',
-      nodes: {
-        events: [eventNode],
-        actions: [actionPrimary, actionListener],
-        logic: [],
-        eventRaisers: [raiserNode],
-        eventListeners: [listenerNode],
-        effectRaisers: [],
-      },
-      connections: [
-        { from: 'event-1', to: 'action-primary' },
-        { from: 'event-1', to: 'raiser-1' },
-        { from: 'listener-1', to: 'action-listener' },
-      ],
-    }
-
-    const engine = new NodeExecutionEngine(
-      compileCue(definition),
-      'test-group:event-chain',
-      harness.sequencer,
-      harness.lightManager,
-      noopRuntimeBroadcaster(),
-      cueLevelVarStore,
-      groupLevelVarStore,
-      new EffectRegistry(),
+    startCue(
+      defineCue({
+        id: 'event-chain',
+        name: 'Event Chain',
+        nodes: {
+          actions: [
+            setColorAction('action-primary', 'red'),
+            setColorAction('action-listener', 'blue', { groups: 'back' }),
+          ],
+          eventRaisers: [raiserNode],
+          eventListeners: [listenerNode],
+        },
+        connections: [
+          { from: 'event-1', to: 'action-primary' },
+          { from: 'event-1', to: 'raiser-1' },
+          { from: 'listener-1', to: 'action-listener' },
+        ],
+      }),
     )
 
-    engine.startExecution(eventNode, createCueData())
-    harness.advanceBy(1)
-
-    const red = getColor('red', 'high')
-    const blue = getColor('blue', 'high')
-    const frontState = harness.getLightState(harness.frontLightIds[0])
-    const backState = harness.getLightState(harness.backLightIds[0])
-    expect(frontState).toMatchObject({
-      red: red.red,
-      green: red.green,
-      blue: red.blue,
-      blendMode: red.blendMode,
-    })
-    expect(backState).toMatchObject({
-      red: blue.red,
-      green: blue.green,
-      blue: blue.blue,
-      blendMode: blue.blendMode,
-    })
+    expectLit(harness.getLightState(harness.frontLightIds[0]), 'red')
+    expectLit(harness.getLightState(harness.backLightIds[0]), 'blue')
   })
 })
