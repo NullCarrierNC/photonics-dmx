@@ -172,3 +172,43 @@ describe('DraftTextField', () => {
     expect(onCommit).toHaveBeenCalledWith('10.0.0.1')
   })
 })
+
+describe('a draft field focused while its value changes elsewhere', () => {
+  it('shows the new text and writes nothing back when left untyped', () => {
+    const onCommit = jest.fn<(value: string) => void>()
+    const view = renderWithProviders(<DraftTextField value="old" onCommit={onCommit} />)
+    const input = screen.getByRole('textbox') as HTMLInputElement
+
+    fireEvent.focus(input)
+    view.rerender(<DraftTextField value="new" onCommit={onCommit} />)
+    fireEvent.blur(input)
+
+    expect(input.value).toBe('new')
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  it('shows the new number and writes nothing back when left untyped', () => {
+    const onCommit = jest.fn<(value: number) => void>()
+    const view = renderWithProviders(<DraftNumberField value={5} onCommit={onCommit} />)
+
+    fireEvent.focus(field())
+    view.rerender(<DraftNumberField value={8} onCommit={onCommit} />)
+    fireEvent.blur(field())
+
+    expect(field().value).toBe('8')
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  it('keeps what the user typed over the change', () => {
+    const onCommit = jest.fn<(value: string) => void>()
+    const view = renderWithProviders(<DraftTextField value="old" onCommit={onCommit} />)
+    const input = screen.getByRole('textbox') as HTMLInputElement
+
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: 'typed' } })
+    view.rerender(<DraftTextField value="new" onCommit={onCommit} />)
+    fireEvent.blur(input)
+
+    expect(onCommit).toHaveBeenCalledWith('typed')
+  })
+})

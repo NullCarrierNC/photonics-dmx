@@ -67,21 +67,22 @@ export const DraftTextField: React.FC<DraftTextFieldProps> = ({
 }) => {
   const [draft, setDraft] = useState(value)
   const [seen, setSeen] = useState(value)
-  // Whether the field is the one being typed in, which decides if an external change may replace
-  // the draft. State rather than a ref, because the render below reads it.
-  const [editing, setEditing] = useState(false)
+  // Whether the user has typed since the last commit, which decides if an external change may
+  // replace the draft. A focused field left untyped follows it. It is state, since the render
+  // below reads it.
+  const [typed, setTyped] = useState(false)
 
   // Follow the committed value while the user is elsewhere, so an external change still shows.
   // Adjusted during render rather than in an effect, which is what keeps it to one pass.
   if (value !== seen) {
     setSeen(value)
-    if (!editing) {
+    if (!typed) {
       setDraft(value)
     }
   }
 
   const commit = (): void => {
-    setEditing(false)
+    setTyped(false)
     if (draft !== value) {
       revertIfRefused(onCommit(draft), draft, value, setDraft)
     }
@@ -91,8 +92,10 @@ export const DraftTextField: React.FC<DraftTextFieldProps> = ({
     <input
       type="text"
       value={draft}
-      onFocus={() => setEditing(true)}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => {
+        setTyped(true)
+        setDraft(e.target.value)
+      }}
       onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
@@ -144,19 +147,20 @@ export const DraftNumberField: React.FC<DraftNumberFieldProps> = ({
 }) => {
   const [draft, setDraft] = useState(String(value))
   const [seen, setSeen] = useState(value)
-  // Whether the field is the one being typed in, which decides if an external change may replace
-  // the draft. State rather than a ref, because the render below reads it.
-  const [editing, setEditing] = useState(false)
+  // Whether the user has typed since the last commit, which decides if an external change may
+  // replace the draft. A focused field left untyped follows it. It is state, since the render
+  // below reads it.
+  const [typed, setTyped] = useState(false)
 
   if (value !== seen) {
     setSeen(value)
-    if (!editing) {
+    if (!typed) {
       setDraft(String(value))
     }
   }
 
   const commit = (): void => {
-    setEditing(false)
+    setTyped(false)
     const parsed = Number(draft)
     // An unreadable or empty entry means the user cleared it rather than chose something, so the
     // committed value stands and the field shows it again.
@@ -179,8 +183,10 @@ export const DraftNumberField: React.FC<DraftNumberFieldProps> = ({
       min={min}
       max={max}
       step={step}
-      onFocus={() => setEditing(true)}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => {
+        setTyped(true)
+        setDraft(e.target.value)
+      }}
       onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
