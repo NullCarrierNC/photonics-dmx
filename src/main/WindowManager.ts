@@ -6,7 +6,7 @@ import { RENDERER_RECEIVE } from '../shared/ipcChannels'
 import type { AudioLightingData } from '../photonics-dmx/listeners/Audio/AudioTypes'
 import { denyWebContentsWillNavigate } from './rendererSessionSecurity'
 import { createLogger } from '../shared/logger'
-import { fitWindowBounds, type WindowBounds } from './windowBounds'
+import { centredIn, fitWindowBounds, type WindowBounds } from './windowBounds'
 const log = createLogger('WindowManager')
 
 /** The window factories return synchronously and `ready-to-show` drives display, so nothing awaits a load. */
@@ -111,7 +111,9 @@ export class WindowManager {
       return
     }
 
-    const { width, height, x, y } = window.getBounds()
+    // The normal bounds, so a window closed maximised or full screen reopens at the size it
+    // returns to.
+    const { width, height, x, y } = window.getNormalBounds()
     try {
       await this.controllerManager
         .getConfig()
@@ -137,22 +139,26 @@ export class WindowManager {
   }
 
   /**
-   * The saved geometry for a role, or its default size, kept on screen. A saved window always has
-   * a position, so a stored size without one was never the user's and the default size applies.
+   * The saved geometry for a role, kept on screen, or its default size centred in the primary work
+   * area. A saved window always has a position, so a stored size without one was never the user's
+   * and the default size applies.
    */
   private initialBounds(role: WindowRole): WindowBounds {
     const spec = WINDOW_SPECS[role]
     const stored = this.controllerManager?.getConfig().getPreference(spec.stateKey)
-    const saved = stored?.x !== undefined && stored.y !== undefined ? stored : undefined
+    const primary = screen.getPrimaryDisplay().workArea
+    if (stored?.x === undefined || stored.y === undefined) {
+      return centredIn(spec, primary)
+    }
     return fitWindowBounds(
       {
-        width: saved?.width || spec.width,
-        height: saved?.height || spec.height,
-        x: saved?.x ?? 0,
-        y: saved?.y ?? 0,
+        width: stored.width || spec.width,
+        height: stored.height || spec.height,
+        x: stored.x,
+        y: stored.y,
       },
       screen.getAllDisplays().map((display) => display.workArea),
-      screen.getPrimaryDisplay().workArea,
+      primary,
     )
   }
 

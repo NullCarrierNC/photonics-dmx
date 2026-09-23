@@ -67,12 +67,46 @@ describe('WindowManager restored bounds', () => {
     expect(lastWindowBounds()).toMatchObject({ width: 560, height: 584 })
   })
 
+  it('opens the main window centred in the primary work area on a first launch', () => {
+    managerWithSaved({}).createMainWindow()
+
+    expect(lastWindowBounds()).toEqual({ x: 320, y: 52, width: 1280, height: 1000 })
+  })
+
   it('reopens a window the user sized and placed at that size', () => {
     managerWithSaved({
       audioPreviewWindowState: { x: 40, y: 60, width: 700, height: 480 },
     }).openAudioPreviewWindow()
 
     expect(lastWindowBounds()).toEqual({ x: 40, y: 60, width: 700, height: 480 })
+  })
+})
+
+describe('WindowManager saved bounds', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('saves the size and place a maximised window returns to', async () => {
+    const saved: Array<Record<string, unknown>> = []
+    const wm = new WindowManager()
+    wm.setControllerManager({
+      getConfig: () => ({
+        getPreference: () => undefined,
+        updatePreferences: async (updates: Record<string, unknown>) => {
+          saved.push(updates)
+        },
+      }),
+    } as never)
+    wm.createMainWindow()
+    const results = (BrowserWindow as unknown as jest.Mock).mock.results
+    const window = results[results.length - 1].value as FakeBrowserWindow
+    window.bounds = { ...PRIMARY }
+    window.normalBounds = { x: 100, y: 120, width: 900, height: 700 }
+
+    await wm.closeAllWindows()
+
+    expect(saved).toContainEqual({ windowState: { x: 100, y: 120, width: 900, height: 700 } })
   })
 })
 

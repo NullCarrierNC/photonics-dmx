@@ -9,6 +9,8 @@ export interface FakeBrowserWindow {
   destroyed: boolean
   minimized: boolean
   bounds: { width: number; height: number; x: number; y: number }
+  /** What the window returns to from maximised or full screen. Its bounds when not set. */
+  normalBounds?: { width: number; height: number; x: number; y: number }
   /** The options the manager built the window with. */
   options: Record<string, unknown>
   on: jest.Mock<(event: string, handler: (...args: unknown[]) => void) => void>
@@ -16,6 +18,7 @@ export interface FakeBrowserWindow {
   isDestroyed: () => boolean
   isMinimized: () => boolean
   getBounds: () => { width: number; height: number; x: number; y: number }
+  getNormalBounds: () => { width: number; height: number; x: number; y: number }
   close: jest.Mock<() => void>
   show: jest.Mock<() => void>
   focus: jest.Mock<() => void>
@@ -55,6 +58,7 @@ export function createFakeBrowserWindow(options: Record<string, unknown> = {}): 
     isDestroyed: () => window.destroyed,
     isMinimized: () => window.minimized,
     getBounds: () => window.bounds,
+    getNormalBounds: () => window.normalBounds ?? window.bounds,
     close: jest.fn(),
     show: jest.fn(),
     focus: jest.fn(),

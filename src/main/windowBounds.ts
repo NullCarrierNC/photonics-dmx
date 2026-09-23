@@ -34,12 +34,20 @@ export function fitWindowBounds(
   if (workAreas.some((area) => isReachableOn(bounds, area))) {
     return bounds
   }
-  const width = Math.min(bounds.width, primaryWorkArea.width)
-  const height = Math.min(bounds.height, primaryWorkArea.height)
+  return centredIn(bounds, primaryWorkArea)
+}
+
+/** A window of this size centred in a work area, shrunk to fit it. */
+export function centredIn(
+  size: { width: number; height: number },
+  area: WindowBounds,
+): WindowBounds {
+  const width = Math.min(size.width, area.width)
+  const height = Math.min(size.height, area.height)
   return {
     width,
     height,
-    x: primaryWorkArea.x + Math.floor((primaryWorkArea.width - width) / 2),
-    y: primaryWorkArea.y + Math.floor((primaryWorkArea.height - height) / 2),
+    x: area.x + Math.floor((area.width - width) / 2),
+    y: area.y + Math.floor((area.height - height) / 2),
   }
 }
