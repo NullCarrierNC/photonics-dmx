@@ -66,6 +66,21 @@ describe('ToastStack', () => {
     expect(regions[0].contains(screen.getByText('Page failed'))).toBe(true)
   })
 
+  it('keeps the newest few toasts when a burst arrives', () => {
+    renderWithProviders(
+      <>
+        {Array.from({ length: 12 }, (_, i) => (
+          <Toaster key={i} message={`Failure ${i + 1}`} duration={0} />
+        ))}
+        <ToastStack />
+      </>,
+    )
+
+    expect(screen.queryByText('Failure 1')).toBeNull()
+    expect(screen.getByText('Failure 12')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Dismiss' })).toHaveLength(5)
+  })
+
   it('drops each toast when its own time is up', () => {
     jest.useFakeTimers()
     renderWithProviders(

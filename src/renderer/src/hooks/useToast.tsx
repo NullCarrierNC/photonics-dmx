@@ -13,6 +13,11 @@ export interface Toast {
 /** Every toast a window is showing, in arrival order. The window's one ToastStack renders them. */
 export const toastsAtom = atom<Toast[]>([])
 
+/**
+ * The most toasts a window stacks. A burst past it drops the oldest, so the stack stays on screen.
+ */
+const MAX_TOASTS = 5
+
 /** Shows and hides toasts in the window's one stack. */
 export const useToast = () => {
   const setToasts = useSetAtom(toastsAtom)
@@ -20,7 +25,7 @@ export const useToast = () => {
   const showToast = useCallback(
     (message: string, type: ToastType = 'info', duration = 3000) => {
       const id = `toast-${Date.now()}-${Math.random()}`
-      setToasts((prev) => [...prev, { id, message, type, duration }])
+      setToasts((prev) => [...prev, { id, message, type, duration }].slice(-MAX_TOASTS))
     },
     [setToasts],
   )
