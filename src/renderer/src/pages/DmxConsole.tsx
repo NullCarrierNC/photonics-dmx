@@ -24,6 +24,7 @@ import EnttecProToggle from '../components/EnttecProToggle'
 import OpenDmxToggle from '../components/OpenDmxToggle'
 import { useRigDmxValues } from '../hooks/useRigDmxValues'
 import { useIpcPreviewSender } from '@renderer/hooks/useIpcPreviewSender'
+import { DraftNumberField } from '../components/controls/DraftField'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('DmxConsole')
 
@@ -340,21 +341,14 @@ const DmxConsole: React.FC = () => {
                   <label className="text-xs text-gray-600 dark:text-gray-400 shrink-0">
                     DMX ch
                   </label>
-                  <input
-                    type="number"
+                  <DraftNumberField
+                    value={channelNumber}
                     min={1}
                     max={512}
-                    defaultValue={channelNumber}
-                    key={`${light.id}-${channelName}-${channelNumber}`}
                     disabled={!consoleEnabled || light.id === null}
-                    onBlur={(e) => {
-                      const parsed = parseInt(e.target.value, 10)
-                      if (!Number.isFinite(parsed)) {
-                        e.target.value = String(channelNumber)
-                        return
-                      }
-                      handleChannelNumberCommit(light, channelName, channelNumber, parsed)
-                    }}
+                    onCommit={(channel) =>
+                      handleChannelNumberCommit(light, channelName, channelNumber, channel)
+                    }
                     className={`w-20 p-1 border rounded text-sm ${
                       channelInputModified
                         ? 'border-amber-400 dark:border-amber-500 bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100'

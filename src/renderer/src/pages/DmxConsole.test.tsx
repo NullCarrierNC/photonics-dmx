@@ -82,6 +82,22 @@ describe('DmxConsole', () => {
     await waitFor(() => expect(jest.mocked(ipcApi.disableConsole)).toHaveBeenCalled())
   })
 
+  it('shows the channel again when an entry cannot move it', async () => {
+    renderConsole()
+    const toggle = await screen.findByRole('button', { name: 'Enable console' })
+    await waitFor(() => expect(toggle).toBeEnabled())
+    fireEvent.click(toggle)
+    await screen.findByRole('button', { name: 'Disable console' })
+    const box = (screen.getAllByRole('spinbutton') as HTMLInputElement[]).find(
+      (input) => input.value === '1',
+    )!
+
+    fireEvent.change(box, { target: { value: '0' } })
+    fireEvent.blur(box)
+
+    expect(box.value).toBe('1')
+  })
+
   it('hands DMX output back when the page closes before the console opens', async () => {
     let openConsole!: (result: { success: true }) => void
     jest.mocked(ipcApi.enableConsole).mockImplementation(
