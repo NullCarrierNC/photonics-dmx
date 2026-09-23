@@ -1,6 +1,7 @@
 import React, { useId } from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
+import { DraftNumberField } from './controls/DraftField'
 
 const AudioSmoothingSettings: React.FC = () => {
   const audio = useAudioConfigFields({ smoothing: { enabled: true, alpha: 0.7 } })
@@ -80,17 +81,16 @@ const AudioSmoothingSettings: React.FC = () => {
               }}
             />
 
-            <input
-              type="number"
-              min="0.1"
-              max="0.95"
-              step="0.05"
+            <DraftNumberField
+              min={0.1}
+              max={0.95}
+              step={0.05}
+              decimals={2}
               value={alpha}
-              onChange={(e) => {
-                const value = parseFloat(e.target.value) || 0.1
-                handleAlphaChange(Math.max(0.1, Math.min(0.95, value)))
-              }}
-              onBlur={handleAlphaSave}
+              onCommit={(value) =>
+                void audio.save({ smoothing: { ...audio.values.smoothing, alpha: value } })
+              }
+              aria-label="Smoothing factor value"
               className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
             />
           </div>

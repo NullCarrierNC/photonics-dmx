@@ -1,6 +1,7 @@
 import React from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
+import { DraftNumberField } from './controls/DraftField'
 
 const AudioBeatDetection: React.FC = () => {
   const audio = useAudioConfigFields({
@@ -12,6 +13,11 @@ const AudioBeatDetection: React.FC = () => {
   /** Update one field locally, for controls that commit on release. */
   const setField = (patch: Partial<typeof audio.values.beatDetection>): void => {
     audio.set({ beatDetection: { ...audio.values.beatDetection, ...patch } })
+  }
+
+  /** Update one field and store it, for a number box the user has finished with. */
+  const saveField = (patch: Partial<typeof audio.values.beatDetection>): void => {
+    void audio.save({ beatDetection: { ...audio.values.beatDetection, ...patch } })
   }
 
   const setThreshold = (value: number): void => setField({ threshold: value })
@@ -61,17 +67,14 @@ const AudioBeatDetection: React.FC = () => {
             }}
           />
 
-          <input
-            type="number"
-            min="0.1"
-            max="1.0"
-            step="0.05"
+          <DraftNumberField
+            min={0.1}
+            max={1.0}
+            step={0.05}
+            decimals={2}
             value={threshold}
-            onChange={(e) => {
-              const value = parseFloat(e.target.value) || 0.1
-              setThreshold(Math.max(0.1, Math.min(1.0, value)))
-            }}
-            onBlur={() => handleSave()}
+            onCommit={(value) => saveField({ threshold: value })}
+            aria-label="Detection threshold value"
             className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
           />
         </div>
@@ -104,17 +107,14 @@ const AudioBeatDetection: React.FC = () => {
             }}
           />
 
-          <input
-            type="number"
-            min="0.80"
-            max="0.99"
-            step="0.01"
+          <DraftNumberField
+            min={0.8}
+            max={0.99}
+            step={0.01}
+            decimals={2}
             value={decayRate}
-            onChange={(e) => {
-              const value = parseFloat(e.target.value) || 0.8
-              setDecayRate(Math.max(0.8, Math.min(0.99, value)))
-            }}
-            onBlur={() => handleSave()}
+            onCommit={(value) => saveField({ decayRate: value })}
+            aria-label="Decay rate value"
             className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
           />
         </div>
@@ -149,17 +149,13 @@ const AudioBeatDetection: React.FC = () => {
             }}
           />
 
-          <input
-            type="number"
-            min="50"
-            max="500"
-            step="10"
+          <DraftNumberField
+            min={50}
+            max={500}
+            step={10}
             value={minInterval}
-            onChange={(e) => {
-              const value = parseInt(e.target.value) || 50
-              setMinInterval(Math.max(50, Math.min(500, value)))
-            }}
-            onBlur={() => handleSave()}
+            onCommit={(value) => saveField({ minInterval: value })}
+            aria-label="Minimum beat interval value"
             className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center"
           />
         </div>

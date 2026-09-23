@@ -4,7 +4,7 @@
  * whether they were dragged or moved with the keyboard.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
@@ -93,6 +93,34 @@ describe('AudioSensitivityControls', () => {
     await waitFor(() =>
       expect(saveAudioConfig).toHaveBeenCalledWith(expect.objectContaining({ sensitivity: 4.5 })),
     )
+  })
+
+  it('shows a gain as it is typed and stores it once the box is left', async () => {
+    await renderControls()
+    const box = screen.getByLabelText('Global sensitivity numeric') as HTMLInputElement
+    await waitFor(() => expect(box).not.toBeDisabled())
+
+    fireEvent.change(box, { target: { value: '0' } })
+    expect(box.value).toBe('0')
+    fireEvent.change(box, { target: { value: '0.5' } })
+    expect(saveAudioConfig).not.toHaveBeenCalled()
+    fireEvent.blur(box)
+
+    await waitFor(() =>
+      expect(saveAudioConfig).toHaveBeenCalledWith(expect.objectContaining({ sensitivity: 0.5 })),
+    )
+  })
+
+  it('stores nothing when a number box is only focused and left', async () => {
+    await renderControls()
+    const box = screen.getByLabelText('Noise floor numeric')
+    await waitFor(() => expect(box).not.toBeDisabled())
+
+    fireEvent.focus(box)
+    fireEvent.blur(box)
+    await act(async () => {})
+
+    expect(saveAudioConfig).not.toHaveBeenCalled()
   })
 })
 

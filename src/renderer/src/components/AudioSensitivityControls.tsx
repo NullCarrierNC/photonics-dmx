@@ -1,14 +1,12 @@
 import React, { useId } from 'react'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
 import { useCommitOnRelease } from '../hooks/useCommitOnRelease'
+import { DraftNumberField } from './controls/DraftField'
 
 interface AudioSensitivityControlsProps {
   /** Omit long helper copy (e.g. DMX Preview quick controls). */
   compact?: boolean
 }
-
-const clamp = (value: number, min: number, max: number): number =>
-  Math.max(min, Math.min(max, value))
 
 /** The blue fill up to `percent` that shows where a slider sits. */
 const filledTo = (percent: number): React.CSSProperties => ({
@@ -35,6 +33,8 @@ interface LevelRowProps {
   min: number
   max: number
   step: number
+  /** Decimal places the number box keeps. Whole numbers when omitted. */
+  decimals?: number
   value: number
   /** Where the slider's fill ends, 0 to 100. */
   fillPercent: number
@@ -42,10 +42,8 @@ interface LevelRowProps {
   compact: boolean
   /** The slider moved. Nothing is stored until `onCommit`. */
   onSlide: (value: number) => void
-  /** The number box changed, as typed. */
-  onType: (text: string) => void
-  /** The user let go of the slider or left the number box. */
-  onCommit: () => void
+  /** The user let go of the slider, or left the number box having typed a new value. */
+  onCommit: (value: number) => void
 }
 
 /** One level: a labelled slider and the number box beside it, which set the same value. */
@@ -56,16 +54,16 @@ const LevelRow: React.FC<LevelRowProps> = ({
   min,
   max,
   step,
+  decimals,
   value,
   fillPercent,
   disabled,
   compact,
   onSlide,
-  onType,
   onCommit,
 }) => {
   const id = useId()
-  const release = useCommitOnRelease(onCommit)
+  const release = useCommitOnRelease((input) => onCommit(Number(input.value)))
   const labelElement = (
     <label
       htmlFor={id}
@@ -93,14 +91,13 @@ const LevelRow: React.FC<LevelRowProps> = ({
         className={compact ? COMPACT_RANGE_CLASS : FULL_RANGE_CLASS}
         style={filledTo(fillPercent)}
       />
-      <input
-        type="number"
+      <DraftNumberField
         min={min}
         max={max}
         step={step}
+        decimals={decimals}
         value={value}
-        onChange={(e) => onType(e.target.value)}
-        onBlur={onCommit}
+        onCommit={onCommit}
         disabled={disabled}
         className={compact ? COMPACT_NUMBER_CLASS : FULL_NUMBER_CLASS}
         aria-label={numberLabel}
@@ -138,17 +135,6 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
   const { sensitivity, noiseFloor, strobeEnabled, strobeTriggerThreshold, strobeProbability } =
     audio.values
 
-  // The sliders carry their own bounds, the numeric boxes do not, so a commit clamps.
-  const commitSensitivity = (): void => {
-    void audio.save({ sensitivity: clamp(sensitivity, 0.1, 5.0) })
-  }
-
-  const commitNoiseFloor = (): void => {
-    void audio.save({ noiseFloor: clamp(noiseFloor, 0, 255) })
-  }
-
-  const commitStrobe = (): void => void audio.commit()
-
   // A slider stays live while a save is in flight, so keyboard focus stays on it.
   const controlsDisabled = !audio.loaded
   const strobeControlsDisabled = controlsDisabled || !strobeEnabled
@@ -162,13 +148,13 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
         min={0.1}
         max={5.0}
         step={0.1}
+        decimals={2}
         value={sensitivity}
         fillPercent={((sensitivity - 0.1) / (5.0 - 0.1)) * 100}
         disabled={controlsDisabled}
         compact={compact}
         onSlide={(value) => audio.set({ sensitivity: value })}
-        onType={(text) => audio.set({ sensitivity: clamp(parseFloat(text) || 0.1, 0.1, 5.0) })}
-        onCommit={commitSensitivity}
+        onCommit={(value) => void audio.save({ sensitivity: value })}
       />
       <LevelRow
         label="Noise Floor"
@@ -182,8 +168,7 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
         disabled={controlsDisabled}
         compact={compact}
         onSlide={(value) => audio.set({ noiseFloor: value })}
-        onType={(text) => audio.set({ noiseFloor: clamp(parseFloat(text) || 0, 0, 255) })}
-        onCommit={commitNoiseFloor}
+        onCommit={(value) => void audio.save({ noiseFloor: value })}
       />
     </>
   )
@@ -217,18 +202,13 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
           min={0}
           max={1}
           step={0.01}
+          decimals={2}
           value={strobeTriggerThreshold}
           fillPercent={strobeTriggerThreshold * 100}
           disabled={strobeControlsDisabled}
           compact
           onSlide={(value) => audio.set({ strobeTriggerThreshold: value })}
-          onType={(text) => {
-            const value = parseFloat(text)
-            if (Number.isFinite(value)) {
-              audio.set({ strobeTriggerThreshold: clamp(value, 0, 1) })
-            }
-          }}
-          onCommit={commitStrobe}
+          onCommit={(value) => void audio.save({ strobeTriggerThreshold: value })}
         />
         <LevelRow
           label="Strobe prob."
@@ -241,13 +221,7 @@ const AudioSensitivityControls: React.FC<AudioSensitivityControlsProps> = ({ com
           disabled={strobeControlsDisabled}
           compact
           onSlide={(value) => audio.set({ strobeProbability: value })}
-          onType={(text) => {
-            const value = parseFloat(text)
-            if (Number.isFinite(value)) {
-              audio.set({ strobeProbability: clamp(Math.round(value), 0, 100) })
-            }
-          }}
-          onCommit={commitStrobe}
+          onCommit={(value) => void audio.save({ strobeProbability: value })}
         />
       </div>
     </div>
