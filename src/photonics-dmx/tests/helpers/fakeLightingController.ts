@@ -96,9 +96,9 @@ export type CompletingLightingController = FakeLightingController & {
 
 /**
  * A fake that holds every completion callback and blackout until the suite calls `tick`, so a
- * suite can order a completion against a cue change. `removeAllEffects` cancels what is held and
- * tells the motion-wipe subscribers, as the real sequencer does. A later submission of a held name
- * does not displace the earlier one.
+ * suite can order a completion against a cue change. It answers waiters as the real sequencer does,
+ * which lightingControllerContract.test.ts checks against both, and `removeAllEffects` also tells
+ * the motion-wipe subscribers.
  */
 export function completingLightingController(
   overrides: Partial<ILightingController> = {},
@@ -114,26 +114,48 @@ export function completingLightingController(
     held = []
     for (const { onComplete } of due) onComplete(cancelled)
   }
+  const cancelHeld = (matches: (name: string) => boolean): void => {
+    const due = held.filter((entry) => matches(entry.name))
+    held = held.filter((entry) => !matches(entry.name))
+    for (const { onComplete } of due) onComplete(true)
+  }
+  const blackoutPending = (): boolean => blackouts.length > 0
   const settleBlackouts = (): void => {
     const due = blackouts
     blackouts = []
     for (const resolve of due) resolve()
   }
   const fake = fakeLightingController({
+    setEffect: () => cancelHeld(() => true),
     addEffectWithCallback: (name, _effect, onComplete) => hold(name, onComplete),
-    setEffectWithCallback: (name, _effect, onComplete) => hold(name, onComplete),
+    setEffectWithCallback: (name, _effect, onComplete) => {
+      cancelHeld(() => true)
+      hold(name, onComplete)
+    },
     replaceEffectWithCallback: (name, _effect, onComplete) => {
+      cancelHeld((heldName) => heldName === name)
       hold(name, onComplete)
       return true
     },
+    addEffectUnblockedName: (name) =>
+      !blackoutPending() && !held.some((entry) => entry.name === name),
+    setEffectUnblockedName: () => {
+      if (blackoutPending()) return false
+      cancelHeld(() => true)
+      return true
+    },
     addEffectUnblockedNameWithCallback: (name, _effect, onComplete) => {
+      if (blackoutPending()) return false
       hold(name, onComplete)
       return true
     },
     setEffectUnblockedNameWithCallback: (name, _effect, onComplete) => {
+      if (blackoutPending()) return false
+      cancelHeld(() => true)
       hold(name, onComplete)
       return true
     },
+    removeEffect: (name) => cancelHeld((heldName) => heldName === name),
     removeEffectCallback: (name) => {
       held = held.filter((entry) => entry.name !== name)
     },
