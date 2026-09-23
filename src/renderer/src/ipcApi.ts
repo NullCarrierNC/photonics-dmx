@@ -102,8 +102,6 @@ export {
 } from './ipc/cueAuthoring'
 
 export {
-  disableCueGroup,
-  enableCueGroup,
   getAudioCueGroups,
   getAudioMotionCueGroups,
   getAudioMotionCueProbabilityPercent,
