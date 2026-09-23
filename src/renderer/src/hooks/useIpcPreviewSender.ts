@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { disableSender, enableSender } from '../ipcApi'
+import { wasRefused } from '../ipc/ipcResult'
 import type { IpcSenderConfig } from '../../../photonics-dmx/types'
 import { createLogger } from '../../../shared/logger'
 
@@ -33,9 +34,14 @@ function acquire(): void {
   }
   if (!streamOn) {
     streamOn = true
-    enableSender({ sender: 'ipc' } as IpcSenderConfig).catch((err) =>
-      log.error('Failed to enable the IPC preview sender', err),
-    )
+    // A refused or failed start leaves the stream off, so the next viewer asks for it again.
+    const failed = (reason: unknown): void => {
+      log.error('Failed to enable the IPC preview sender', reason)
+      streamOn = false
+    }
+    enableSender({ sender: 'ipc' } as IpcSenderConfig).then((result) => {
+      if (wasRefused(result)) failed(result.error)
+    }, failed)
   }
 }
 
