@@ -9,6 +9,8 @@ interface LightSettingsModalProps {
   light: DmxFixture | null
   onChange: (light: DmxFixture | null) => void
   onSave: () => void
+  /** Holds Save while the library write is in flight. */
+  saving?: boolean
   /** Backdrop click, Escape and the Cancel button all route here. */
   onCancel: () => void
   /** Omitted for a light that has not been saved yet, which has nothing to delete. */
@@ -26,6 +28,7 @@ const LightSettingsModal: React.FC<LightSettingsModalProps> = ({
   light,
   onChange,
   onSave,
+  saving = false,
   onCancel,
   onDelete,
 }) => {
@@ -52,7 +55,8 @@ const LightSettingsModal: React.FC<LightSettingsModalProps> = ({
           <button
             type="button"
             onClick={onSave}
-            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm">
+            disabled={saving}
+            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 text-sm">
             Save
           </button>
           <button

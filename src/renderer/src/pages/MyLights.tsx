@@ -27,6 +27,7 @@ const MyLights = () => {
    * an existing one (its saved state).
    */
   const [editorBaseline, setEditorBaseline] = useState<DmxFixture | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const openEditor = (light: DmxFixture) => {
     setCurrentLight(light)
@@ -68,11 +69,13 @@ const MyLights = () => {
   }
 
   const handleSave = async () => {
-    if (!currentLight) return
+    if (!currentLight || saving) return
     const lightToSave: DmxFixture = {
       ...currentLight,
       id: currentLight.id || crypto.randomUUID(),
     }
+    // Kept on the working copy, so a save retried after a refusal writes the same light.
+    setCurrentLight(lightToSave)
 
     const existingIndex = myLights.findIndex((light) => light.id === lightToSave.id)
     const nextLibrary =
@@ -88,7 +91,9 @@ const MyLights = () => {
     // doesn't keep showing an unsaved state that isn't on disk.
     const previousLibrary = myLights
     setMyLights(nextLibrary)
-    if (!(await persistLibrary(nextLibrary, previousLibrary))) return
+    setSaving(true)
+    const saved = await persistLibrary(nextLibrary, previousLibrary).finally(() => setSaving(false))
+    if (!saved) return
     closeEditor()
   }
 
@@ -228,6 +233,7 @@ const MyLights = () => {
         light={currentLight}
         onChange={setCurrentLight}
         onSave={() => void handleSave()}
+        saving={saving}
         onCancel={() => void handleCancel()}
         onDelete={isExistingLight ? () => void handleDelete() : undefined}
       />

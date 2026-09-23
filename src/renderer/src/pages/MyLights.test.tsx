@@ -5,12 +5,20 @@
  * first and keeps the editor open when the prompt is declined.
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
-import { screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { screen, fireEvent, cleanup, waitFor, act } from '@testing-library/react'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import { FixtureTypes, type DmxFixture } from '../../../photonics-dmx/types'
 import { myDmxLightsAtom } from './../atoms'
+import { randomUUID as nodeRandomUUID } from 'node:crypto'
+
+if (typeof (globalThis.crypto as Crypto | undefined)?.randomUUID !== 'function') {
+  Object.defineProperty(globalThis, 'crypto', {
+    configurable: true,
+    value: { ...(globalThis.crypto ?? {}), randomUUID: nodeRandomUUID },
+  })
+}
 
 jest.mock(
   '../ipcApi',
@@ -96,6 +104,27 @@ describe('MyLights editor modal', () => {
     fireEvent.click(screen.getByText('Save'))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(saveMyLights).toHaveBeenCalledTimes(1)
+  })
+
+  it('holds Save while a new light saves, and writes it once under one id', async () => {
+    let finishSave!: (result: { success: true }) => void
+    saveMyLights.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishSave = resolve
+        }),
+    )
+    const { store } = renderPage([])
+    fireEvent.click(screen.getByText('+ Light'))
+    const save = await screen.findByRole('button', { name: 'Save' })
+
+    fireEvent.click(save)
+    await waitFor(() => expect(save).toBeDisabled())
+    fireEvent.click(save)
+    await act(async () => finishSave({ success: true }))
+
+    expect(saveMyLights).toHaveBeenCalledTimes(1)
+    expect(store.get(myDmxLightsAtom)).toHaveLength(1)
   })
 
   it('puts the library back when the save rejects', async () => {
