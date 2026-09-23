@@ -589,7 +589,7 @@ export class ControllerManager {
     }
     const r = await this.consoleMode.enableConsoleMode(rigId)
     if (r.success) {
-      this.lifecycle.setPhase('consoleMode')
+      this.lifecycle.setPhaseUnlessShuttingDown('consoleMode')
     }
     return r
   }

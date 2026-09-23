@@ -949,6 +949,32 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect((fake as { lifecycle: ControllerLifecycle }).lifecycle.phase).toBe('consoleMode')
   })
 
+  it('leaves the phase shutting down when a shutdown starts while console mode comes up', async () => {
+    let release!: () => void
+    const enableConsoleMode = jest.fn(
+      () =>
+        new Promise<{ success: true }>((resolve) => {
+          release = () => resolve({ success: true })
+        }),
+    )
+    const lifecycle = lifecycleAt('running')
+    const fake = Object.assign(Object.create(ControllerManager.prototype), {
+      graph: restartGraph(),
+      init: jest.fn().mockImplementation(() => Promise.resolve()),
+      lifecycle,
+      consoleMode: { enableConsoleMode },
+    })
+
+    const enabling = ControllerManager.prototype.enableConsoleMode.call(fake, 'rig-1')
+    await Promise.resolve()
+    await Promise.resolve()
+    lifecycle.setPhase('shuttingDown')
+    release()
+    await enabling
+
+    expect(lifecycle.phase).toBe('shuttingDown')
+  })
+
   it('ControllerManager disableConsoleMode returns to running phase when active', async () => {
     const disableConsoleMode = jest
       .fn<() => Promise<{ success: true }>>()
