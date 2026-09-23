@@ -50,6 +50,9 @@ import { createLogger } from '../../../shared/logger'
 
 const log = createLogger('DmxOutputSettings')
 
+const ENTTEC_PRO_DEFAULT_CONFIG = { port: '', dmxSpeed: ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ }
+const OPEN_DMX_DEFAULT_CONFIG = { port: '', dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ }
+
 const DmxOutputSettings: React.FC = () => {
   const [isArtNetEnabled, setIsArtNetEnabled] = useAtom(senderArtNetEnabledAtom)
   const [isSacnEnabled, setIsSacnEnabled] = useAtom(senderSacnEnabledAtom)
@@ -112,8 +115,7 @@ const DmxOutputSettings: React.FC = () => {
    * otherwise.
    */
   const commitEnttecConfig = useSerializedConfigCommit({
-    stored: prefs.enttecProConfig,
-    defaultConfig: { port: '', dmxSpeed: ENTTEC_PRO_DEFAULT_REFRESH_RATE_HZ },
+    stored: prefs.enttecProConfig ?? ENTTEC_PRO_DEFAULT_CONFIG,
     persist: (config, what) => persist({ enttecProConfig: config }, what),
     setStored: (config) => setPrefs((prev) => ({ ...prev, enttecProConfig: config })),
     applyToRunningSender: (config, what) =>
@@ -125,10 +127,29 @@ const DmxOutputSettings: React.FC = () => {
 
   /** Persists OpenDMX port/rate atomically. OpenDMX has no live-update channel to push to. */
   const commitOpenDmxConfig = useSerializedConfigCommit({
-    stored: prefs.openDmxConfig,
-    defaultConfig: { port: '', dmxSpeed: OPEN_DMX_DEFAULT_REFRESH_RATE_HZ },
+    stored: prefs.openDmxConfig ?? OPEN_DMX_DEFAULT_CONFIG,
     persist: (config, what) => persist({ openDmxConfig: config }, what),
     setStored: (config) => setPrefs((prev) => ({ ...prev, openDmxConfig: config })),
+  })
+
+  /** Persists the whole resolved ArtNet config and hands it to the sender if it runs. */
+  const commitArtNetConfig = useSerializedConfigCommit({
+    stored: artNetConfig,
+    persist: (config, what) => persist({ artNetConfig: config }, what),
+    setStored: (config) => setPrefs((prev) => ({ ...prev, artNetConfig: config })),
+    applyToRunningSender: async (config, what) => {
+      if (isArtNetEnabled) await applyToRunningSender(() => updateArtNetConfig(config), what)
+    },
+  })
+
+  /** Persists the whole resolved sACN config and hands it to the sender if it runs. */
+  const commitSacnConfig = useSerializedConfigCommit({
+    stored: sacnConfig,
+    persist: (config, what) => persist({ sacnConfig: config }, what),
+    setStored: (config) => setPrefs((prev) => ({ ...prev, sacnConfig: config })),
+    applyToRunningSender: async (config, what) => {
+      if (isSacnEnabled) await applyToRunningSender(() => updateSacnConfig(config), what)
+    },
   })
 
   // The port fields hold their own text while they are being edited and report on blur, so the
@@ -306,29 +327,12 @@ const DmxOutputSettings: React.FC = () => {
     await saving.finally(() => markSaving(false))
   }
 
-  const handleArtNetConfigChange = async (
+  const handleArtNetConfigChange = (
     field: keyof typeof artNetConfig,
     value: string | number,
   ): Promise<boolean> => {
     const parsed = field === 'refreshRateHz' ? clampRefreshRateValue(value) : value
-    const newConfig = {
-      ...artNetConfig,
-      [field]: parsed,
-    }
-
-    if (!(await persist({ artNetConfig: newConfig }, 'the ArtNet configuration'))) {
-      return false
-    }
-
-    setPrefs((prev) => ({
-      ...prev,
-      artNetConfig: newConfig,
-    }))
-
-    if (isArtNetEnabled) {
-      await applyToRunningSender(() => updateArtNetConfig(newConfig), 'the ArtNet configuration')
-    }
-    return true
+    return commitArtNetConfig({ [field]: parsed }, 'the ArtNet configuration')
   }
 
   const handleComPortChange = async (newPort: string): Promise<boolean> => {
@@ -365,30 +369,12 @@ const DmxOutputSettings: React.FC = () => {
     return true
   }
 
-  const handleSacnConfigChange = async (
+  const handleSacnConfigChange = (
     field: keyof typeof sacnConfig,
     value: string | number | boolean,
   ): Promise<boolean> => {
     const parsed = field === 'refreshRateHz' ? clampRefreshRateValue(value) : value
-    const newConfig = {
-      ...sacnConfig,
-      [field]: parsed,
-    }
-
-    if (!(await persist({ sacnConfig: newConfig }, 'the sACN configuration'))) {
-      return false
-    }
-
-    setPrefs((prev) => ({
-      ...prev,
-      sacnConfig: newConfig,
-    }))
-
-    // Update the running sender if sACN is enabled
-    if (isSacnEnabled) {
-      await applyToRunningSender(() => updateSacnConfig(newConfig), 'the sACN configuration')
-    }
-    return true
+    return commitSacnConfig({ [field]: parsed }, 'the sACN configuration')
   }
 
   const panelSetters = {

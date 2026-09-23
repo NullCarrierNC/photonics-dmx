@@ -362,6 +362,23 @@ function commit(field: Element, value: string): void {
   fireEvent.blur(field)
 }
 
+/** Holds the first prefs write open, answering every later one at once, until released. */
+function holdFirstPrefsWrite(): () => Promise<void> {
+  let release: (() => void) | undefined
+  savePrefsMock
+    .mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve
+      })
+      return { success: true }
+    })
+    .mockImplementation(async () => ({ success: true }))
+  return async () => {
+    await waitFor(() => expect(release).toBeDefined())
+    await act(async () => release?.())
+  }
+}
+
 describe('DmxOutputSettings global publishing rate', () => {
   const advanced = (over: LightingPreferences = {}): LightingPreferences => ({
     advancedModeEnabled: true,
@@ -700,6 +717,27 @@ describe('DmxOutputSettings sACN configuration', () => {
     expect(updateSacnConfigMock).not.toHaveBeenCalled()
   })
 
+  it('commits the universe then the rate from one round-trip without either clobbering the other', async () => {
+    const releaseFirst = holdFirstPrefsWrite()
+    const store = await renderPanel(sacnOpen(), { sacn: true })
+
+    commit(universeInput(), '9')
+    commit(refreshInput(), '20')
+    await releaseFirst()
+
+    const saved = () =>
+      savePrefsMock.mock.calls.filter((c) => 'sacnConfig' in c[0]).map((c) => c[0].sacnConfig)
+    await waitFor(() => expect(saved()).toHaveLength(2))
+    expect(saved()[1]).toEqual(expect.objectContaining({ universe: 9, refreshRateHz: 20 }))
+    await waitFor(() => expect(updateSacnConfigMock).toHaveBeenCalledTimes(2))
+    expect(updateSacnConfigMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ universe: 9, refreshRateHz: 20 }),
+    )
+    expect(store.get(lightingPrefsAtom).sacnConfig).toEqual(
+      expect.objectContaining({ universe: 9, refreshRateHz: 20 }),
+    )
+  })
+
   it('offers the loaded network interfaces alongside auto-detect', async () => {
     networkResult = {
       success: true,
@@ -759,6 +797,27 @@ describe('DmxOutputSettings ArtNet configuration', () => {
       expect(updateArtNetConfigMock).toHaveBeenCalledWith(
         expect.objectContaining({ host: '10.0.0.9' }),
       ),
+    )
+  })
+
+  it('commits the host then the port from one round-trip without either clobbering the other', async () => {
+    const releaseFirst = holdFirstPrefsWrite()
+    const store = await renderPanel(artNetOpen(), { artnet: true })
+
+    commit(screen.getByPlaceholderText('127.0.0.1'), '10.0.0.2')
+    commit(screen.getByLabelText('Port'), '6455')
+    await releaseFirst()
+
+    const saved = () =>
+      savePrefsMock.mock.calls.filter((c) => 'artNetConfig' in c[0]).map((c) => c[0].artNetConfig)
+    await waitFor(() => expect(saved()).toHaveLength(2))
+    expect(saved()[1]).toEqual(expect.objectContaining({ host: '10.0.0.2', port: 6455 }))
+    await waitFor(() => expect(updateArtNetConfigMock).toHaveBeenCalledTimes(2))
+    expect(updateArtNetConfigMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ host: '10.0.0.2', port: 6455 }),
+    )
+    expect(store.get(lightingPrefsAtom).artNetConfig).toEqual(
+      expect.objectContaining({ host: '10.0.0.2', port: 6455 }),
     )
   })
 })
