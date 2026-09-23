@@ -199,36 +199,39 @@ describe('main startup', () => {
     expect(entries.map((e) => e.scope)).toEqual(['ConfigFile', 'Main'])
   })
 
-  it('flushes the log before a forced exit on a signal', async () => {
-    const order: string[] = []
-    const closeFileLog = jest.fn(async () => {
-      order.push('flush')
-    })
-    createFileLogSink.mockReturnValue({ sink: jest.fn(), close: closeFileLog })
-    applicationShutdown.mockImplementation(() => new Promise<void>(() => {}))
+  it.each(['SIGINT', 'SIGTERM'] as const)(
+    'flushes the log before a forced exit on %s',
+    async (signal) => {
+      const order: string[] = []
+      const closeFileLog = jest.fn(async () => {
+        order.push('flush')
+      })
+      createFileLogSink.mockReturnValue({ sink: jest.fn(), close: closeFileLog })
+      applicationShutdown.mockImplementation(() => new Promise<void>(() => {}))
 
-    const before = new Set(process.listeners('SIGINT'))
-    await startUp()
-    const handler = process.listeners('SIGINT').find((l) => !before.has(l))
+      const before = new Set(process.listeners(signal))
+      await startUp()
+      const handler = process.listeners(signal).find((l) => !before.has(l))
 
-    const exit = jest.spyOn(process, 'exit').mockImplementation(((): never => {
-      order.push('exit')
-      return undefined as never
-    }) as never)
-    const logger = await loadedLogger()
-    logger.setLogSink(() => {})
-    jest.useFakeTimers()
-    try {
-      void handler?.('SIGINT')
-      await jest.advanceTimersByTimeAsync(2000)
+      const exit = jest.spyOn(process, 'exit').mockImplementation(((): never => {
+        order.push('exit')
+        return undefined as never
+      }) as never)
+      const logger = await loadedLogger()
+      logger.setLogSink(() => {})
+      jest.useFakeTimers()
+      try {
+        void handler?.(signal)
+        await jest.advanceTimersByTimeAsync(2000)
 
-      expect(order).toEqual(['flush', 'exit'])
-      expect(exit).toHaveBeenCalledWith(1)
-    } finally {
-      jest.clearAllTimers()
-      jest.useRealTimers()
-      exit.mockRestore()
-      logger.resetLogConfiguration()
-    }
-  })
+        expect(order).toEqual(['flush', 'exit'])
+        expect(exit).toHaveBeenCalledWith(1)
+      } finally {
+        jest.clearAllTimers()
+        jest.useRealTimers()
+        exit.mockRestore()
+        logger.resetLogConfiguration()
+      }
+    },
+  )
 })

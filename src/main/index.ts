@@ -68,11 +68,10 @@ process.on('unhandledRejection', (reason, _promise) => {
   log.error('Unhandled promise rejection:', reason)
 })
 
-// Handle clean shutdown on process signals
-async function shutdownOnSigint(): Promise<void> {
-  log.info('Received SIGINT signal, shutting down gracefully...')
+/** Shuts down cleanly on a process signal, forcing the exit if that takes more than 2 seconds. */
+async function shutdownOnSignal(signal: NodeJS.Signals): Promise<void> {
+  log.info(`Received ${signal} signal, shutting down gracefully...`)
 
-  // Set a hard timeout to force exit after 2 seconds
   const forceExitTimeout = setTimeout(() => {
     log.error('Forced exit due to shutdown timeout!')
     // The line explaining the forced exit is the one worth having, and it is still buffered in the
@@ -88,45 +87,18 @@ async function shutdownOnSigint(): Promise<void> {
   } catch (error) {
     // Log BEFORE closing the file log, or the one message explaining the failed shutdown never
     // reaches the log file.
-    log.error('Error during SIGINT shutdown:', error)
+    log.error(`Error during ${signal} shutdown:`, error)
     await closeFileLogWithTimeout()
     clearTimeout(forceExitTimeout)
     process.exit(1)
   }
 }
 
-process.on('SIGINT', () => {
-  void shutdownOnSigint()
-})
-
-async function shutdownOnSigterm(): Promise<void> {
-  log.info('Received SIGTERM signal, shutting down gracefully...')
-
-  // Set a hard timeout to force exit after 2 seconds
-  const forceExitTimeout = setTimeout(() => {
-    log.error('Forced exit due to shutdown timeout!')
-    // The line explaining the forced exit is the one worth having, and it is still buffered in the
-    // stream at this point, so give the flush its chance before going.
-    void closeFileLogWithTimeout().finally(() => process.exit(1))
-  }, 2000)
-
-  try {
-    await applicationInstance?.shutdown()
-    await closeFileLogWithTimeout()
-    clearTimeout(forceExitTimeout)
-    app.quit()
-  } catch (error) {
-    // Log BEFORE closing the file log so the shutdown-failure message is actually written.
-    log.error('Error during SIGTERM shutdown:', error)
-    await closeFileLogWithTimeout()
-    clearTimeout(forceExitTimeout)
-    process.exit(1)
-  }
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    void shutdownOnSignal(signal)
+  })
 }
-
-process.on('SIGTERM', () => {
-  void shutdownOnSigterm()
-})
 
 /**
  * Start writing to the daily log file, or carry on without it.
