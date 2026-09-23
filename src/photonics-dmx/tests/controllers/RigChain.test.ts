@@ -7,12 +7,11 @@ import { describe, expect, it, jest } from '@jest/globals'
 import { RigChain } from '../../controllers/RigChain'
 import { ManualTestClock } from '../helpers/sequencerHarness'
 import { makeAsymmetricTwoRigs, makeTwoRigs } from '../helpers/multiRigFixtures'
-import type { Clock } from '../../controllers/sequencer/Clock'
 
 describe('RigChain', () => {
   it('builds a DmxLightManager scoped to that rig only', () => {
     const [rigA, rigB] = makeAsymmetricTwoRigs({ smallFrontCount: 4, largeFrontCount: 8 })
-    const clock = new ManualTestClock() as unknown as Clock
+    const clock = new ManualTestClock()
     const chainA = new RigChain({ rigId: rigA.id, config: rigA.config, clock, isPrimary: true })
     const chainB = new RigChain({ rigId: rigB.id, config: rigB.config, clock, isPrimary: false })
 
@@ -31,7 +30,7 @@ describe('RigChain', () => {
 
   it("disposing one chain doesn't tear down a sibling chain's sequencer", () => {
     const [rigA, rigB] = makeTwoRigs({ frontPerRig: 4 })
-    const clock = new ManualTestClock() as unknown as Clock
+    const clock = new ManualTestClock()
     const chainA = new RigChain({ rigId: rigA.id, config: rigA.config, clock, isPrimary: true })
     const chainB = new RigChain({ rigId: rigB.id, config: rigB.config, clock, isPrimary: false })
 
@@ -47,7 +46,7 @@ describe('RigChain', () => {
 
   it('isPrimary defaults to true when no override is given', () => {
     const [rigA] = makeTwoRigs({ frontPerRig: 4 })
-    const clock = new ManualTestClock() as unknown as Clock
+    const clock = new ManualTestClock()
     const chain = new RigChain({ rigId: rigA.id, config: rigA.config, clock })
     expect(chain.isPrimary).toBe(true)
     chain.dispose()
@@ -55,7 +54,7 @@ describe('RigChain', () => {
 
   it('LightStateManager events from one chain do not bleed into the other', () => {
     const [rigA, rigB] = makeTwoRigs({ frontPerRig: 4 })
-    const clock = new ManualTestClock() as unknown as Clock
+    const clock = new ManualTestClock()
     const chainA = new RigChain({ rigId: rigA.id, config: rigA.config, clock, isPrimary: true })
     const chainB = new RigChain({ rigId: rigB.id, config: rigB.config, clock, isPrimary: false })
 
@@ -86,7 +85,7 @@ describe('RigChain', () => {
     // to every chain's YARG handler under multi-rig. This test pins that each chain has its
     // own independent flag so the toggle isn't visible only on the primary handler.
     const [rigA, rigB] = makeTwoRigs({ frontPerRig: 4 })
-    const clock = new ManualTestClock() as unknown as Clock
+    const clock = new ManualTestClock()
     const chainA = new RigChain({ rigId: rigA.id, config: rigA.config, clock, isPrimary: true })
     const chainB = new RigChain({ rigId: rigB.id, config: rigB.config, clock, isPrimary: false })
 
@@ -130,7 +129,7 @@ describe('RigChain', () => {
     const audioSpy = jest.spyOn(AudioCueRegistry.getInstance(), 'releaseSequencerFromAllCues')
     try {
       const [rigA] = makeTwoRigs({ frontPerRig: 4 })
-      const clock = new ManualTestClock() as unknown as Clock
+      const clock = new ManualTestClock()
       const chain = new RigChain({ rigId: rigA.id, config: rigA.config, clock })
       chain.dispose()
       expect(yargSpy).toHaveBeenCalledWith(chain.sequencer)

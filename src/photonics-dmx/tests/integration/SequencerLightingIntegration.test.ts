@@ -8,7 +8,6 @@ import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFix
 import { ManualTestClock } from '../helpers/sequencerHarness'
 import { getColor } from '../../helpers/dmxHelpers'
 import { Effect } from '../../types'
-import { Clock } from '../../controllers/sequencer/Clock'
 import { DrumNoteType } from '../../cues/types/cueTypes'
 
 type SequencerHarness = {
@@ -25,7 +24,7 @@ function createSequencerHarness(): SequencerHarness {
   const performanceSpy = jest
     .spyOn(performance, 'now')
     .mockImplementation(() => clock.getCurrentTimeMs())
-  const sequencer = new Sequencer(lightTransitionController, clock as unknown as Clock)
+  const sequencer = new Sequencer(lightTransitionController, clock)
 
   return {
     sequencer,

@@ -17,7 +17,7 @@ import { LayerManager } from './LayerManager'
 import { SystemEffectsController } from './SystemEffectsController'
 import { TransitionEngine } from './TransitionEngine'
 import { MotionPatternEngine } from './MotionPatternEngine'
-import { Clock } from './Clock'
+import type { ClockSource } from './Clock'
 import { performance } from 'perf_hooks'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('Sequencer')
@@ -41,7 +41,7 @@ export class Sequencer implements ILightingController {
   private debugMonitor: DebugMonitor
   private motionPatternEngine: MotionPatternEngine
   private readonly motionPatternsClearedListeners = new Set<() => void>()
-  private clock: Clock
+  private clock: ClockSource
   private frameIndex: number = 0
   private readonly handleClockTick: (deltaTime: number) => void
 
@@ -51,7 +51,11 @@ export class Sequencer implements ILightingController {
    * @param clock The shared Clock instance for timing synchronization
    * @param rigLabel Rig name passed to the effect manager for warning attribution
    */
-  constructor(lightTransitionController: LightTransitionController, clock: Clock, rigLabel = '') {
+  constructor(
+    lightTransitionController: LightTransitionController,
+    clock: ClockSource,
+    rigLabel = '',
+  ) {
     this.clock = clock
     this.lightTransitionController = lightTransitionController
     this.effectTransformer = new EffectTransformer()

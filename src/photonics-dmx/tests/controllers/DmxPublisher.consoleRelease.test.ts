@@ -7,7 +7,6 @@ import { Sequencer } from '../../controllers/sequencer/Sequencer'
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
-import type { Clock } from '../../controllers/sequencer/Clock'
 import type { DmxRig } from '../../types'
 import { ManualTestClock } from '../helpers/sequencerHarness'
 import { createMockLightingConfig, createMockDmxLight } from '../helpers/testFixtures'
@@ -47,10 +46,7 @@ describe('console channels on a retaining wire sender', () => {
     })
     const lightManager = new DmxLightManager(config)
     const lightStateManager = new LightStateManager()
-    sequencer = new Sequencer(
-      new LightTransitionController(lightStateManager),
-      clock as unknown as Clock,
-    )
+    sequencer = new Sequencer(new LightTransitionController(lightStateManager), clock)
     universe = {}
     const sender = {
       getEnabledWireSenders: () => ['artnet'],

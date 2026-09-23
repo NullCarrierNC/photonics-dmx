@@ -7,12 +7,11 @@ import { describe, expect, it } from '@jest/globals'
 import { RigChain } from '../../controllers/RigChain'
 import { ManualTestClock } from '../helpers/sequencerHarness'
 import { makeTwoRigs } from '../helpers/multiRigFixtures'
-import type { Clock } from '../../controllers/sequencer/Clock'
 
 describe('RigChain mirror', () => {
   it('Horiz mirror reverses the order returned by getLights(front, linear)', () => {
     const [rigA] = makeTwoRigs({ frontPerRig: 4 })
-    const clock = new ManualTestClock() as unknown as Clock
+    const clock = new ManualTestClock()
     const plain = new RigChain({ rigId: 'plain', config: rigA.config, clock })
     const mirrored = new RigChain({
       rigId: 'mirrored',
@@ -33,7 +32,7 @@ describe('RigChain mirror', () => {
 
   it('Horiz mirror swaps which physical lights match even vs odd', () => {
     const [rigA] = makeTwoRigs({ frontPerRig: 4 })
-    const clock = new ManualTestClock() as unknown as Clock
+    const clock = new ManualTestClock()
     const plain = new RigChain({ rigId: 'plain', config: rigA.config, clock })
     const mirrored = new RigChain({
       rigId: 'mirrored',
@@ -73,7 +72,7 @@ describe('RigChain mirror', () => {
 
   it('Vert mirror returns the back row when asked for front', () => {
     const [rigA] = makeTwoRigs({ frontPerRig: 4, backPerRig: 4 })
-    const clock = new ManualTestClock() as unknown as Clock
+    const clock = new ManualTestClock()
     const plain = new RigChain({ rigId: 'plain', config: rigA.config, clock })
     const mirrored = new RigChain({
       rigId: 'mirrored',
@@ -109,7 +108,7 @@ describe('RigChain mirror', () => {
 
   it('an unmirrored chain built from the same config is unaffected by a sibling mirror', () => {
     const [rigA] = makeTwoRigs({ frontPerRig: 4 })
-    const clock = new ManualTestClock() as unknown as Clock
+    const clock = new ManualTestClock()
     const chainA = new RigChain({ rigId: 'a', config: rigA.config, clock })
     const chainB = new RigChain({
       rigId: 'b',

@@ -3,7 +3,6 @@ import { DmxLightManager } from '../controllers/DmxLightManager'
 import { LightStateManager } from '../controllers/sequencer/LightStateManager'
 import { LightTransitionController } from '../controllers/sequencer/LightTransitionController'
 import { Sequencer } from '../controllers/sequencer/Sequencer'
-import type { Clock } from '../controllers/sequencer/Clock'
 import { ConfigStrobeType, DmxLight, FixtureTypes, LightingConfiguration, RGBIO } from '../types'
 import { NodeCueLoader } from '../cues/node/loader/NodeCueLoader'
 import { EffectLoader } from '../cues/node/loader/EffectLoader'
@@ -112,10 +111,7 @@ export class CueSimulator {
     this.lightManager = new DmxLightManager(config)
     this.lightStateManager = new LightStateManager()
     this.lightTransitionController = new LightTransitionController(this.lightStateManager)
-    this.sequencer = new Sequencer(
-      this.lightTransitionController,
-      this.virtualTime as unknown as Clock,
-    )
+    this.sequencer = new Sequencer(this.lightTransitionController, this.virtualTime)
     this.handler = new CueHandler(this.lightManager, this.sequencer, {
       registry: getCueRegistry(opts.domain),
     })

@@ -11,7 +11,6 @@ import { LightStateManager } from '../../controllers/sequencer/LightStateManager
 import { DmxLightManager } from '../../controllers/DmxLightManager'
 import { DmxPublisher } from '../../controllers/DmxPublisher'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
-import type { Clock } from '../../controllers/sequencer/Clock'
 import {
   ConfigStrobeType,
   FixtureTypes,
@@ -158,10 +157,7 @@ describe('a primary cue change on the wire', () => {
     const rig: DmxRig = { id: 'rig', name: 'rig', active: true, config }
     const lightManager = new DmxLightManager(config, 'rig', 'rig')
     const lightStateManager = new LightStateManager()
-    const sequencer = new Sequencer(
-      new LightTransitionController(lightStateManager),
-      clock as unknown as Clock,
-    )
+    const sequencer = new Sequencer(new LightTransitionController(lightStateManager), clock)
 
     // The publisher's deferred sends run on the same manual clock as the sequencer.
     let nextTimer = 1

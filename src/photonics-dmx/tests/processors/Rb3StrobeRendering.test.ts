@@ -6,7 +6,6 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals'
 import { performance } from 'perf_hooks'
 import { Sequencer } from '../../controllers/sequencer/Sequencer'
-import type { Clock } from '../../controllers/sequencer/Clock'
 import { LightTransitionController } from '../../controllers/sequencer/LightTransitionController'
 import { LightStateManager } from '../../controllers/sequencer/LightStateManager'
 import { DmxLightManager } from '../../controllers/DmxLightManager'
@@ -42,10 +41,7 @@ async function runStrobe(clockMs: number, type: 'fastest' | 'fast' | 'medium'): 
   )
   const clock = new ManualTestClock(clockMs)
   const lightStateManager = new LightStateManager()
-  const sequencer = new Sequencer(
-    new LightTransitionController(lightStateManager),
-    clock as unknown as Clock,
-  )
+  const sequencer = new Sequencer(new LightTransitionController(lightStateManager), clock)
   const rig = new Rb3StageKitRigProcessor('rig-a', lightManager, sequencer, { enabled: true })
 
   // A lit rig first, so a flash is something other than the colour underneath it.

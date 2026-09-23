@@ -9,7 +9,6 @@ import { CueRegistry } from '../../cues/registries/CueRegistry'
 import { CueStyle, type INetCue } from '../../cues/interfaces/INetCue'
 import { CueType, defaultCueData, type CueData } from '../../cues/types/cueTypes'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
-import type { Clock } from '../../controllers/sequencer/Clock'
 
 type FakeCue = INetCue & { execute: jest.Mock; onStop: jest.Mock }
 
@@ -45,7 +44,7 @@ describe('ChainCueRuntime motion selection across chains', () => {
     registry = CueRegistry.create()
     jest.restoreAllMocks()
     const [rigA, rigB] = makeTwoRigs({ frontPerRig: 2 })
-    const clock = new ManualTestClock() as unknown as Clock
+    const clock = new ManualTestClock()
     chains = [
       new RigChain({ rigId: rigA.id, config: rigA.config, clock, isPrimary: true }),
       new RigChain({ rigId: rigB.id, config: rigB.config, clock, isPrimary: false }),

@@ -17,13 +17,30 @@ const MAX_CATCHUP_TICKS = 5
 const DEFAULT_INTERVAL_MS = 10
 
 /**
+ * What a sequencer or rig chain needs from its clock, so the headless simulator's virtual time and
+ * a test's hand-driven clock can stand in for the real one.
+ */
+export interface ClockSource {
+  getIntervalMs(): number
+  onTick(callback: (deltaTime: number) => void): void
+  offTick(callback: (deltaTime: number) => void): void
+  start(): void
+  stop(): void
+  isActive(): boolean
+  getCurrentTimeMs(): number
+  getAbsoluteTimeMs(): number
+  getTickCount(): number
+  destroy(): void
+}
+
+/**
  * @class Clock
  * @description Centralized timing source for the lighting sequencer system.
  *
  * Uses a self-correcting setTimeout loop instead of setInterval to reduce
  * cumulative drift and jitter.
  */
-export class Clock {
+export class Clock implements ClockSource {
   private timeoutId: NodeJS.Timeout | null = null
   private startTime: number
   private lastUpdateTime: number

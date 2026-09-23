@@ -29,7 +29,6 @@ import {
   type LightingConfiguration,
 } from '../../../photonics-dmx/types'
 import type { DmxLightManager } from '../../../photonics-dmx/controllers/DmxLightManager'
-import type { Clock } from '../../../photonics-dmx/controllers/sequencer/Clock'
 
 // Loads the bundled libraries and runs thousands of virtual frames per cue.
 jest.setTimeout(120000)
@@ -152,7 +151,7 @@ async function harness(): Promise<Harness> {
   const chain = new RigChain({
     rigId: 'rig-under-test',
     config: buildConfig(),
-    clock: virtualTime as unknown as Clock,
+    clock: virtualTime,
   })
   const coordinator = new ListenerCoordinator(makeDeps([chain]))
   const lightManager = chain.dmxLightManager as DmxLightManager
