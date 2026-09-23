@@ -91,6 +91,12 @@ function masterDimmerInput(): HTMLInputElement {
   return el as HTMLInputElement
 }
 
+/** Types a master dimmer and leaves the box, which is when the card is told about it. */
+function commitMasterDimmer(value: string): void {
+  fireEvent.change(masterDimmerInput(), { target: { value } })
+  fireEvent.blur(masterDimmerInput())
+}
+
 const lastLight = (onChange: jest.Mock): DmxLight =>
   onChange.mock.calls[onChange.mock.calls.length - 1][0] as DmxLight
 
@@ -121,7 +127,7 @@ describe('LightChannelsConfig master dimmer', () => {
   it('re-derives every channel from the template offsets and hands back the whole light', () => {
     const { onChange } = renderCard()
 
-    fireEvent.change(masterDimmerInput(), { target: { value: '100' } })
+    commitMasterDimmer('100')
 
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(lastLight(onChange).channels).toEqual({
@@ -135,7 +141,7 @@ describe('LightChannelsConfig master dimmer', () => {
   it('preserves the fields it does not own', () => {
     const { onChange } = renderCard({ light: light({ group: 'back', position: 4 }) })
 
-    fireEvent.change(masterDimmerInput(), { target: { value: '50' } })
+    commitMasterDimmer('50')
 
     const updated = lastLight(onChange)
     expect(updated.id).toBe('l1')
@@ -147,7 +153,7 @@ describe('LightChannelsConfig master dimmer', () => {
   it('caps a master dimmer that would push the fixture past the universe', () => {
     const { onChange } = renderCard()
 
-    fireEvent.change(masterDimmerInput(), { target: { value: String(DMX_CHANNEL_MAX) } })
+    commitMasterDimmer(String(DMX_CHANNEL_MAX))
 
     // The RGB template spans 4 channels, so the highest master that still fits is 512 - 3.
     expect(lastLight(onChange).channels.masterDimmer).toBe(DMX_CHANNEL_MAX - 3)
@@ -156,25 +162,69 @@ describe('LightChannelsConfig master dimmer', () => {
   it('explains the cap rather than applying it silently', () => {
     renderCard()
 
-    fireEvent.change(masterDimmerInput(), { target: { value: '999' } })
+    commitMasterDimmer('999')
 
     expect(screen.getByText(/Capped at 509/)).toBeInTheDocument()
     expect(screen.getByText(/4 channels fit/)).toBeInTheDocument()
   })
 
+  it('shows the capped master when the light already sits at the cap', () => {
+    renderCard({
+      light: light({ channels: { masterDimmer: DMX_CHANNEL_MAX - 3 } as DmxLight['channels'] }),
+    })
+
+    commitMasterDimmer('999')
+
+    expect(masterDimmerInput().value).toBe(String(DMX_CHANNEL_MAX - 3))
+    expect(screen.getByText(/Capped at 509/)).toBeInTheDocument()
+  })
+
   it('drops the notice once a value inside the universe is entered', () => {
     renderCard()
 
-    fireEvent.change(masterDimmerInput(), { target: { value: '999' } })
+    commitMasterDimmer('999')
     expect(screen.queryByText(/Capped at/)).toBeInTheDocument()
 
-    fireEvent.change(masterDimmerInput(), { target: { value: '10' } })
+    commitMasterDimmer('10')
     expect(screen.queryByText(/Capped at/)).toBeNull()
+  })
+
+  it('changes nothing until the box is left', () => {
+    const { onChange } = renderCard()
+
+    fireEvent.change(masterDimmerInput(), { target: { value: '100' } })
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('keeps the master dimmer when the box is cleared', () => {
+    const { onChange } = renderCard({
+      light: light({ channels: { masterDimmer: 10 } as DmxLight['channels'] }),
+    })
+
+    fireEvent.change(masterDimmerInput(), { target: { value: '' } })
+    fireEvent.blur(masterDimmerInput())
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(masterDimmerInput().value).toBe('10')
+  })
+
+  it('takes a master dimmer typed into a cleared box one digit at a time', () => {
+    const { onChange } = renderCard()
+    const box = masterDimmerInput()
+
+    fireEvent.change(box, { target: { value: '' } })
+    for (const key of '20') {
+      fireEvent.change(box, { target: { value: box.value + key } })
+    }
+    fireEvent.blur(box)
+
+    expect(lastLight(onChange).channels.masterDimmer).toBe(20)
   })
 
   it('does not carry the notice onto a different light', () => {
     const { rerender } = renderCard()
-    fireEvent.change(masterDimmerInput(), { target: { value: '999' } })
+    commitMasterDimmer('999')
     expect(screen.queryByText(/Capped at/)).toBeInTheDocument()
 
     rerender(
@@ -201,7 +251,7 @@ describe('LightChannelsConfig extra channels', () => {
       light: light({ extraChannels: withWhite }),
     })
 
-    fireEvent.change(masterDimmerInput(), { target: { value: '100' } })
+    commitMasterDimmer('100')
 
     // white sat at master + 4 on the template, so it follows the move.
     expect(lastLight(onChange).extraChannels).toEqual([{ type: 'white', channel: 104 }])
@@ -217,7 +267,7 @@ describe('LightChannelsConfig extra channels', () => {
       light: light({ extraChannels: withWhite }),
     })
 
-    fireEvent.change(masterDimmerInput(), { target: { value: '100' } })
+    commitMasterDimmer('100')
 
     expect('extraChannels' in lastLight(onChange)).toBe(false)
   })
