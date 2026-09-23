@@ -365,9 +365,14 @@ export class ConfigFile<T> {
     const tempPath = path.join(dir, `.${basename}.tmp.${unique}`)
     try {
       if (this.corruptFileInPlace) {
-        await this.renameWithRetry(this.filePath, corruptBackupFilePath(this.filePath))
+        try {
+          await this.renameWithRetry(this.filePath, corruptBackupFilePath(this.filePath))
+          log.info(`[Photonics Config] Moved the corrupt ${basename} aside before saving`)
+        } catch (error) {
+          // A file deleted or moved by hand since the load leaves nothing to preserve.
+          if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error
+        }
         this.corruptFileInPlace = false
-        log.info(`[Photonics Config] Moved the corrupt ${basename} aside before saving`)
       }
       await fsPromises.writeFile(tempPath, content, 'utf-8')
       await this.renameWithRetry(tempPath, this.filePath)

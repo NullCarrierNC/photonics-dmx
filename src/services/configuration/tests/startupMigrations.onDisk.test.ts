@@ -53,6 +53,23 @@ function seedLayoutOnly(dir: string): void {
   )
 }
 
+// A read-only directory refuses the rename that moves a corrupt file aside, except on Windows,
+// where the mode does not stop it, and for root.
+const itWhenRenameCanBeRefused =
+  process.platform === 'win32' || process.getuid?.() === 0 ? it.skip : it
+
+/** Launches over a prefs.json that does not parse, in a directory that refuses the move-aside. */
+function launchOverCorruptPrefsLeftInPlace(dir: string): ConfigurationManager {
+  fs.writeFileSync(path.join(dir, 'prefs.json'), '{ "version": 6, "data": { not json')
+  const mode = fs.statSync(dir).mode
+  fs.chmodSync(dir, 0o555)
+  try {
+    return new ConfigurationManager()
+  } finally {
+    fs.chmodSync(dir, mode)
+  }
+}
+
 afterAll(() => {
   for (const d of createdDirs) {
     fs.rmSync(d, { recursive: true, force: true })
@@ -95,5 +112,19 @@ describe('startup migrations on a real config directory', () => {
     expect(onDisk.complex).toBe(true)
     expect(onDisk.enttecProConfig?.port).toBe('/dev/tty.usbserial-STRAY')
     expect(onDisk).not.toHaveProperty('enttecProPort')
+  })
+})
+
+describe('a corrupt prefs.json left in place at launch', () => {
+  itWhenRenameCanBeRefused('saves once the user has deleted the file', async () => {
+    const dir = freshConfigDir()
+    const cm = launchOverCorruptPrefsLeftInPlace(dir)
+    fs.unlinkSync(path.join(dir, 'prefs.json'))
+
+    await cm.setPreference('clockRate', 50)
+    await cm.setPreference('complex', false)
+
+    expect(cm.getPreference('clockRate')).toBe(50)
+    expect(readData(dir, 'prefs.json')).toMatchObject({ clockRate: 50, complex: false })
   })
 })
