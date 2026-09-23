@@ -192,6 +192,9 @@ export class WindowManager {
         this.windows.delete(role)
       }
     })
+    if (role === 'main') {
+      this.stopAudioWith(window)
+    }
 
     window.webContents.setWindowOpenHandler((details) => {
       this.openExternalSafely(details.url)
@@ -221,6 +224,20 @@ export class WindowManager {
     }
 
     return window
+  }
+
+  /**
+   * Audio capture runs in the main window's page, so audio stops when that page goes. The disable
+   * blacks the rig out and tells every window, as the audio switch does.
+   */
+  private stopAudioWith(window: BrowserWindow): void {
+    const stop = (): void => {
+      this.controllerManager?.disableAudio().catch((err: unknown) => {
+        log.error('Failed to stop audio with the main window:', err)
+      })
+    }
+    window.on('closed', stop)
+    window.webContents.on('render-process-gone', stop)
   }
 
   /** Asks whether to leave a page that holds unsaved changes. True to leave. */
