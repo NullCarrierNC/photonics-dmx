@@ -366,33 +366,24 @@ const CueSimulation: React.FC = () => {
   const simulationContextNow = (): SimulationContext =>
     simulationContext(selectedVenueSize, selectedBpm, selectedGroupId, selectedEffect)
 
-  const handleSimulateBeat = async () => {
+  // A lamp lights only for an event main ran, and its useTimeoutEffect turns it off again.
+  const simulateSongEvent = async (
+    kind: string,
+    simulate: (context: SimulationContext) => Promise<boolean>,
+    lightLamp: (on: boolean) => void,
+  ) => {
     try {
-      await simulateBeat(simulationContextNow())
-      // Simply turn on the indicator, the useTimeoutEffect will reset it
-      setShowBeatIndicator(true)
+      if ((await simulate(simulationContextNow())) === true) lightLamp(true)
+      else log.warn(`Main refused the simulated ${kind}`)
     } catch (error) {
-      log.error('Error simulating a beat:', error)
+      log.error(`Error simulating a ${kind}:`, error)
     }
   }
-
-  const handleSimulateKeyframe = async () => {
-    try {
-      await simulateKeyframe(simulationContextNow())
-      setShowKeyframeIndicator(true)
-    } catch (error) {
-      log.error('Error simulating a keyframe:', error)
-    }
-  }
-
-  const handleSimulateMeasure = async () => {
-    try {
-      await simulateMeasure(simulationContextNow())
-      setShowMeasureIndicator(true)
-    } catch (error) {
-      log.error('Error simulating a measure:', error)
-    }
-  }
+  const handleSimulateBeat = () => simulateSongEvent('beat', simulateBeat, setShowBeatIndicator)
+  const handleSimulateKeyframe = () =>
+    simulateSongEvent('keyframe', simulateKeyframe, setShowKeyframeIndicator)
+  const handleSimulateMeasure = () =>
+    simulateSongEvent('measure', simulateMeasure, setShowMeasureIndicator)
 
   const handleSimulateInstrumentNote = async (noteType: string) => {
     try {
