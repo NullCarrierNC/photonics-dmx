@@ -6,6 +6,7 @@ import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { useAppIpcListeners, type UseAppIpcListenersParams } from './useAppIpcListeners'
 import { useYargErrorHandler } from './useYargErrorHandler'
+import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
 
 jest.mock('../../../shared/logger', () => {
   const warn = jest.fn()
@@ -63,12 +64,7 @@ function minimalParams(over: Partial<UseAppIpcListenersParams> = {}): UseAppIpcL
 }
 
 beforeAll(() => {
-  Object.defineProperty(window, 'api', {
-    value: {
-      receive: jest.fn().mockReturnValue(jest.fn()),
-    },
-    configurable: true,
-  })
+  installWindowApi()
 })
 
 describe('useAppIpcListeners', () => {

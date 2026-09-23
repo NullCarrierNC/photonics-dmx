@@ -5,6 +5,7 @@
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
 import { screen, cleanup, waitFor, fireEvent } from '@testing-library/react'
+import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import {
   audioListenerEnabledAtom,
@@ -35,11 +36,7 @@ const invoke = jest.fn<(channel: string, payload?: unknown) => Promise<unknown>>
     return undefined
   },
 )
-;(window as unknown as { api: unknown }).api = {
-  invoke,
-  receive: jest.fn(() => jest.fn()),
-  send: jest.fn(),
-}
+installWindowApi(invoke)
 
 jest.mock('@renderer/hooks/useDmxPreview', () => ({
   useDmxPreview: () => ({ selectedRig: null, rigConfig: null }),

@@ -8,6 +8,7 @@ import YargToggle from './YargToggle'
 import Rb3Toggle from './Rb3Toggle'
 import AudioToggle from './AudioToggle'
 import AudioSmoothingSettings from './AudioSmoothingSettings'
+import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
 
 jest.mock(
   '../ipcApi',
@@ -29,10 +30,7 @@ jest.mock('../hooks/useAudioConfigFields', () => ({
 
 beforeEach(() => {
   resetIpcApiMock()
-  Object.defineProperty(window, 'api', {
-    value: { receive: jest.fn(() => jest.fn()), invoke: jest.fn() },
-    configurable: true,
-  })
+  installWindowApi()
 })
 
 const switchNamed = (name: string) => screen.getByRole('switch', { name })

@@ -1,26 +1,14 @@
 /** @jest-environment jsdom */
-import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, describe, expect, it, jest } from '@jest/globals'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { resetLogConfiguration, setLogSink, type LogEntry } from '../../../shared/logger'
 import { addIpcListener, registerIpcListener, removeIpcListener } from './ipcHelpers'
+import { emitWindowApi, installWindowApi } from '@renderer/tests/helpers/windowApiStub'
 
-type Native = (payload: unknown) => void
+const api = installWindowApi()
 
-const receive = jest.fn<(channel: string, listener: Native) => () => void>()
-const native = new Map<string, Native>()
-
-/** Sends `payload` as main would, through the one native listener on `channel`. */
-function send(channel: string, payload: unknown): void {
-  native.get(channel)?.(payload)
-}
-
-beforeAll(() => {
-  receive.mockImplementation((channel, listener) => {
-    native.set(channel, listener)
-    return () => native.delete(channel)
-  })
-  Object.defineProperty(window, 'api', { value: { receive }, configurable: true })
-})
+/** Sends `payload` as main would, through the native listeners on `channel`. */
+const send = emitWindowApi
 
 afterEach(() => {
   resetLogConfiguration()
@@ -37,7 +25,9 @@ describe('ipcHelpers', () => {
 
     send(RENDERER_RECEIVE.CUE_HANDLED, { beat: 'Strong' })
 
-    expect(receive.mock.calls.filter(([c]) => c === RENDERER_RECEIVE.CUE_HANDLED)).toHaveLength(1)
+    expect(api.receive.mock.calls.filter(([c]) => c === RENDERER_RECEIVE.CUE_HANDLED)).toHaveLength(
+      1,
+    )
     expect(first).toHaveBeenCalledWith({ beat: 'Strong' })
     expect(second).toHaveBeenCalledWith({ beat: 'Strong' })
   })

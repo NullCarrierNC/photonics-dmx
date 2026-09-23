@@ -6,6 +6,7 @@ import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../ipcApi'
 import Preferences from './Preferences'
 import { lightingPrefsAtom } from '../atoms'
+import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
 
 jest.mock(
   '../ipcApi',
@@ -16,13 +17,7 @@ jest.mock(
 )
 
 beforeAll(() => {
-  Object.defineProperty(window, 'api', {
-    value: {
-      receive: jest.fn().mockReturnValue(jest.fn()),
-      invoke: jest.fn(),
-    },
-    configurable: true,
-  })
+  installWindowApi()
 })
 
 jest.mock('../components/ActiveRigsSettings', () => ({

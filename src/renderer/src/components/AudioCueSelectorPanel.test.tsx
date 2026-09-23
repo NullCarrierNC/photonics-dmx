@@ -26,30 +26,28 @@ jest.mock(
 )
 
 const api = jest.mocked(ipcApi)
-jest.mock('../utils/ipcHelpers', () => ({
-  addIpcListener: jest.fn(),
-  removeIpcListener: jest.fn(),
-}))
+jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
 
-import { addIpcListener, removeIpcListener } from '../utils/ipcHelpers'
+import { ipcSubscribers, resetIpcListenerStub } from '@renderer/tests/helpers/ipcListenerStub'
 import AudioCueSelectorPanel from './AudioCueSelectorPanel'
 
-type Listener = (payload: unknown) => void
-const added = addIpcListener as unknown as jest.Mock<(c: string, f: Listener) => void>
-const removed = removeIpcListener as unknown as jest.Mock<(c: string, f: Listener) => void>
-
-/** The handlers registered for one channel, newest last. */
-const handlersFor = (channel: string): Listener[] =>
-  added.mock.calls.filter((call) => call[0] === channel).map((call) => call[1])
-
-/** Delivers one main-process event to every handler listening on its channel. */
+/** Delivers one main-process event to every handler listening on its channel now. */
 async function emit(channel: string, payload: unknown): Promise<void> {
   await act(async () => {
-    for (const handler of handlersFor(channel)) {
+    for (const handler of ipcSubscribers(channel)) {
       await handler(payload)
     }
   })
 }
+
+const listeningChannels = (): string[] =>
+  Object.values(RENDERER_RECEIVE).filter((channel) => ipcSubscribers(channel).length > 0)
 
 function cue(overrides: Partial<Cue> = {}): Cue {
   return {
@@ -94,6 +92,7 @@ async function renderPanel(): Promise<void> {
 beforeEach(() => {
   jest.clearAllMocks()
   resetIpcApiMock()
+  resetIpcListenerStub()
   jest.useRealTimers()
   api.getAudioEnabled.mockResolvedValue(true)
   api.getMotionEnabled.mockResolvedValue(true)
@@ -355,11 +354,11 @@ describe('AudioCueSelectorPanel main process events', () => {
 
   it('drops every listener it added on unmount', async () => {
     await renderPanel()
-    const addedChannels = added.mock.calls.map((call) => call[0]).sort()
+    expect(listeningChannels().length).toBeGreaterThan(0)
 
     cleanup()
 
-    expect(removed.mock.calls.map((call) => call[0]).sort()).toEqual(addedChannels)
+    expect(listeningChannels()).toEqual([])
   })
 })
 

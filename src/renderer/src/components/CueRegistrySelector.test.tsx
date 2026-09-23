@@ -7,10 +7,13 @@ import * as ipcApi from '../ipcApi'
 import { CueType } from '../../../photonics-dmx/cues/types/cueTypes'
 import CueRegistrySelector from './CueRegistrySelector'
 
-jest.mock('../utils/ipcHelpers', () => ({
-  addIpcListener: jest.fn(),
-  removeIpcListener: jest.fn(),
-}))
+jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
 
 jest.mock(
   '../ipcApi',

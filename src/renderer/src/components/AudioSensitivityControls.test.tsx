@@ -18,11 +18,13 @@ jest.mock(
     ).ipcApiMock,
 )
 
-jest.mock('../utils/ipcHelpers', () => ({
-  addIpcListener: jest.fn(),
-  removeIpcListener: jest.fn(),
-  registerIpcListener: jest.fn(() => () => undefined),
-}))
+jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
 
 const loadAudioConfig = jest.mocked(ipcApi.getAudioConfig)
 const saveAudioConfig = jest.mocked(ipcApi.saveAudioConfig)

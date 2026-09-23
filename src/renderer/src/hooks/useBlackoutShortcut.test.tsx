@@ -8,6 +8,7 @@ import { claimEscape, resetEscapeClaims } from '../utils/escClaims'
 import { CONFIG, LIGHT, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import * as ipcHelpers from '../utils/ipcHelpers'
 import type { BlackoutShortcutBinding, BlackoutShortcutKey } from '../../../shared/blackoutShortcut'
+import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
 
 const invoke = jest.fn() as jest.MockedFunction<
   (channel: string, data: unknown) => Promise<unknown>
@@ -34,10 +35,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   resetEscapeClaims()
   mockInvoke({ key: 'escape', scope: 'focused' })
-  Object.defineProperty(window, 'api', {
-    value: { invoke, send: jest.fn(), receive: jest.fn().mockReturnValue(jest.fn()) },
-    configurable: true,
-  })
+  installWindowApi(invoke)
 })
 
 afterEach(() => {

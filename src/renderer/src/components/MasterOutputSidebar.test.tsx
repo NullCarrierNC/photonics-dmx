@@ -7,6 +7,7 @@ import { useMasterOutputSync } from '../hooks/useMasterOutputSync'
 import { lightingPrefsAtom } from '../atoms'
 import { LIGHT, CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import * as ipcHelpers from '../utils/ipcHelpers'
+import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
 
 /**
  * The sidebar renders shared state that WindowShell keeps in step with main, so the two are
@@ -38,10 +39,7 @@ function mockInvoke(state = { dimmerPercent: 100, blackout: false, strobeOutputE
 beforeEach(() => {
   jest.clearAllMocks()
   mockInvoke()
-  Object.defineProperty(window, 'api', {
-    value: { invoke, send: jest.fn(), receive: jest.fn().mockReturnValue(jest.fn()) },
-    configurable: true,
-  })
+  installWindowApi(invoke)
 })
 
 async function renderSidebar() {

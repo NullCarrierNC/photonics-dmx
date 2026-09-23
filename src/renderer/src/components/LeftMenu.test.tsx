@@ -5,19 +5,14 @@ import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders
 import LeftMenu from './LeftMenu'
 import { currentPageAtom, lightingPrefsAtom } from '../atoms'
 import { Pages } from '../types'
+import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
 
 jest.mock('../hooks/useConfirm', () => ({
   useConfirm: () => async () => true,
 }))
 
 beforeAll(() => {
-  Object.defineProperty(window, 'api', {
-    value: {
-      receive: jest.fn().mockReturnValue(jest.fn()),
-      invoke: jest.fn(),
-    },
-    configurable: true,
-  })
+  installWindowApi()
 })
 
 function renderLeftMenu(advancedModeEnabled: boolean) {

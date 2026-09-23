@@ -8,6 +8,7 @@ import {
   toggleBlackoutAtom,
 } from './masterOutput'
 import { LIGHT } from '../../../shared/ipcChannels'
+import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
 
 const invoke = jest.fn() as jest.MockedFunction<
   (channel: string, data: unknown) => Promise<unknown>
@@ -28,10 +29,7 @@ function mockInvoke(state = FULL) {
 beforeEach(() => {
   jest.clearAllMocks()
   mockInvoke()
-  Object.defineProperty(window, 'api', {
-    value: { invoke, send: jest.fn(), receive: jest.fn().mockReturnValue(jest.fn()) },
-    configurable: true,
-  })
+  installWindowApi(invoke)
 })
 
 function setsMasterOutput(): unknown[] {

@@ -13,11 +13,13 @@ import DmxConsole from './DmxConsole'
 import type { DmxRig } from '../../../photonics-dmx/types'
 
 // The page subscribes to live DMX values, which needs the preload bridge that jsdom has no copy of.
-jest.mock('../utils/ipcHelpers', () => ({
-  addIpcListener: jest.fn(),
-  removeIpcListener: jest.fn(),
-  registerIpcListener: jest.fn(() => () => undefined),
-}))
+jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
 
 // The 3D preview pulls in three.js and a font asset, neither of which this page's behaviour needs.
 jest.mock('../components/LightsDmxPreview', () => ({
