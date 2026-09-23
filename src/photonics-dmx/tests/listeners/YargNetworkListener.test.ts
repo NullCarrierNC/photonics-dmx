@@ -704,7 +704,7 @@ describe('YargNetworkListener', () => {
 
       jest.advanceTimersByTime(FALLBACK_MS + 500)
 
-      expect(cueHandler.stopActiveStrobe).toHaveBeenCalledTimes(1)
+      expect(cueHandler.stopActiveStrobe).toHaveBeenCalled()
       const fallbackIndex = cueHandler.handleCue.mock.calls.findIndex(
         (c) => c[0] === CueType.Fallback,
       )
@@ -857,6 +857,74 @@ describe('YargNetworkListener', () => {
       jest.advanceTimersByTime(FALLBACK_MS - 500) // older than the window since Verse, but not since the blackout
 
       expect(dispatchedCues()).not.toContain(CueType.Fallback)
+    })
+  })
+
+  describe('strobe watchdog', () => {
+    let perfNowSpy: ReturnType<typeof jest.spyOn>
+    let wdListener: YargNetworkListener
+    let fallbackTime: number
+
+    beforeEach(async () => {
+      jest.useFakeTimers()
+      jest.setSystemTime(0)
+      perfNowSpy = jest.spyOn(performance, 'now').mockImplementation(() => Date.now())
+      fallbackTime = 20000
+      wdListener = new YargNetworkListener(cueHandler, {
+        getFallbackCueTimeMs: () => fallbackTime,
+      })
+      await wdListener.start()
+    })
+
+    afterEach(async () => {
+      await wdListener.shutdown()
+      perfNowSpy.mockRestore()
+      jest.useRealTimers()
+    })
+
+    const strobeFrame = (overrides: Partial<CueData> = {}): CueData => ({
+      ...defaultCueData,
+      currentScene: 'Gameplay',
+      pauseState: 'Unpaused',
+      lightingCue: CueType.Verse,
+      strobeState: 'Strobe_Fastest',
+      ...overrides,
+    })
+
+    it.each([
+      ['in Practice', { currentScene: 'Practice' as const }, 20000],
+      ['while paused', { pauseState: 'Paused' as const }, 20000],
+      ['with Fallback Time 0', {}, 0],
+      ['in Gameplay with the default Fallback Time', {}, 20000],
+    ])('stops a strobe after 2 s of silence %s', (_, overrides, fallbackMs) => {
+      fallbackTime = fallbackMs
+      wdListener.processCueData(strobeFrame(overrides))
+      cueHandler.stopActiveStrobe.mockClear()
+
+      jest.advanceTimersByTime(2500)
+
+      expect(cueHandler.stopActiveStrobe).toHaveBeenCalledTimes(1)
+    })
+
+    it('leaves a strobe running while packets keep arriving', () => {
+      wdListener.processCueData(strobeFrame())
+      cueHandler.stopActiveStrobe.mockClear()
+
+      for (let elapsed = 0; elapsed < 6000; elapsed += 500) {
+        jest.advanceTimersByTime(500)
+        wdListener.processCueData(strobeFrame({ beat: elapsed % 1000 === 0 ? 'Strong' : 'Off' }))
+      }
+
+      expect(cueHandler.stopActiveStrobe).not.toHaveBeenCalled()
+    })
+
+    it('leaves a strobe running after 1.9 s of silence', () => {
+      wdListener.processCueData(strobeFrame())
+      cueHandler.stopActiveStrobe.mockClear()
+
+      jest.advanceTimersByTime(1900)
+
+      expect(cueHandler.stopActiveStrobe).not.toHaveBeenCalled()
     })
   })
 

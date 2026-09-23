@@ -18,6 +18,7 @@ import { monotonicNowMs } from '../../../shared/time'
 import { MIN_SUPPORTED_DATAGRAM_VERSION, MAX_KNOWN_DATAGRAM_VERSION } from './yargTypes'
 import { parseYargPacket } from './yargPacketParser'
 import { computeInstrumentRisingEdges, shouldForwardFrame } from './yargFrameDispatch'
+import { DEFAULT_STROBE_WATCHDOG_MS, StrobeWatchdog } from '../../processors/strobeWatchdog'
 
 const log = createLogger('YargNetworkListener')
 
@@ -64,6 +65,11 @@ export class YargNetworkListener extends EventEmitter {
   private lastFallbackFireAt = 0
   /** Polls for the fallback condition independently of incoming packets (covers YARG going silent). */
   private fallbackTimer: NodeJS.Timeout | null = null
+  /** Stops a strobe once YARG has been silent for the window, in every scene and setting. */
+  private readonly strobeWatchdog = new StrobeWatchdog(DEFAULT_STROBE_WATCHDOG_MS, () => {
+    log.info('YARG: strobe stopped after YARG went silent')
+    this.cueHandler.stopActiveStrobe()
+  })
 
   // --- Venue post-processing ---
   /** Receives the venue effect YARG is applying on screen, on change only. */
@@ -110,6 +116,7 @@ export class YargNetworkListener extends EventEmitter {
         this.startBindReject = null
         this.listening = true
         this.startFallbackPolling()
+        this.strobeWatchdog.start()
         log.info(`YargNetworkListener started and listening on port ${PORT}`)
         resolve()
       })
@@ -125,6 +132,7 @@ export class YargNetworkListener extends EventEmitter {
     this.server = null
     this.listening = false
     this.stopFallbackPolling()
+    this.strobeWatchdog.stop()
     this.publishPostProcessing('Default')
     if (!sock) {
       return Promise.resolve()
@@ -251,6 +259,7 @@ export class YargNetworkListener extends EventEmitter {
   /** Reset dispatch and handler edge baselines at YARG session boundaries. */
   private resetSessionInputState(): void {
     this.cueHandler.resetSessionState()
+    this.strobeWatchdog.setStrobeRunning(false)
     this.lastData = null
     this.lastReceivedData = null
     this.lastForwardedAt = 0
@@ -329,6 +338,7 @@ export class YargNetworkListener extends EventEmitter {
    */
   public processCueData(YargCueData: CueData): void {
     const now = monotonicNowMs()
+    this.strobeWatchdog.packetSeen()
     const forward = shouldForwardFrame(
       this.lastReceivedData,
       YargCueData,
@@ -438,6 +448,7 @@ export class YargNetworkListener extends EventEmitter {
     } else if (previousHadActiveStrobe) {
       void this.cueHandler.handleCue(CueType.Strobe_Off, YargCueData)
     }
+    this.strobeWatchdog.setStrobeRunning(currentHasActiveStrobe)
 
     const noteEdges = computeInstrumentRisingEdges(this.lastData, YargCueData)
     for (const note of noteEdges.drumNotes) {

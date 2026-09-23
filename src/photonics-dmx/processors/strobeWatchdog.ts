@@ -7,15 +7,14 @@ const POLL_MS = 500
 export const DEFAULT_STROBE_WATCHDOG_MS = 2000
 
 /**
- * Cuts an RB3 strobe that outlives the packets driving it.
+ * Cuts a strobe that outlives the packets driving it.
  *
- * RB3E signals a strobe once and leaves it running until an explicit stop, so silence is the only
- * sign that a console has crashed, quit without a clean state packet, or dropped off the network.
- * Both RB3 processors keep the strobe alive on their own clock, and both run this.
+ * A game that crashes, quits without a clean state packet or drops off the network mid-strobe
+ * leaves the strobe running, and silence is the only sign.
  *
  * `windowMs` of 0 or less disables the cut.
  */
-export class Rb3StrobeWatchdog {
+export class StrobeWatchdog {
   private lastPacketAt = 0
   private strobeRunning = false
   private timer: ReturnType<typeof setInterval> | null = null

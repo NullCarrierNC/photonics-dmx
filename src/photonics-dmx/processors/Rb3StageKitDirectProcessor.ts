@@ -22,7 +22,7 @@ import {
 } from '../listeners/RB3/rb3eTypes'
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { Rb3MenuFramePump } from './rb3MenuAnimation'
-import { Rb3StrobeWatchdog } from './rb3StrobeWatchdog'
+import { StrobeWatchdog } from './strobeWatchdog'
 import { createLogger } from '../../shared/logger'
 import {
   buildInGameClearCueData,
@@ -52,7 +52,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private _inSong: boolean = false
 
   // Cuts a strobe the console stopped talking about.
-  private readonly strobeWatchdog: Rb3StrobeWatchdog
+  private readonly strobeWatchdog: StrobeWatchdog
 
   // The strobe type the rigs are running, so a repeated packet is not a second start.
   private _currentStrobeType: 'slow' | 'medium' | 'fast' | 'fastest' | null = null
@@ -84,7 +84,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   ) {
     super()
     this.config = { ...DEFAULT_STAGEKIT_CONFIG, ...stageKitConfig }
-    this.strobeWatchdog = new Rb3StrobeWatchdog(this.config.strobeWatchdogMs ?? 0, () => {
+    this.strobeWatchdog = new StrobeWatchdog(this.config.strobeWatchdogMs ?? 0, () => {
       log.warn('StageKitDirectProcessor: strobe outlived its packets, cutting it.')
       this.clearStrobeEffectsAtPositions([])
     })
