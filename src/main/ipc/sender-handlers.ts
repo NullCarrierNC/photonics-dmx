@@ -41,14 +41,12 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
     }
     const config = payloadValidation.value
     const sender = config.sender
-    const senderManager = controllerManager.getSenderManager()
-
-    if (senderManager.isSenderEnabled(sender)) {
-      return ipcSuccess()
-    }
-
     try {
-      await senderManager.enableSender(sender, sender, config)
+      await controllerManager.runSenderOp(async (senderManager) => {
+        if (!senderManager.isSenderEnabled(sender)) {
+          await senderManager.enableSender(sender, sender, config)
+        }
+      })
       return ipcSuccess()
     } catch (error) {
       const err = ipcError(error)
@@ -71,7 +69,9 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       sendToAllWindows(RENDERER_RECEIVE.SENDER_ERROR, senderValidation.error)
       return { success: false, error: senderValidation.error }
     }
-    await controllerManager.getSenderManager().disableSender(senderValidation.value)
+    await controllerManager.runSenderOp((senderManager) =>
+      senderManager.disableSender(senderValidation.value),
+    )
     return ipcSuccess()
   })
 
@@ -88,13 +88,14 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       if (sacnConfig.sender !== 'sacn') {
         return { success: false as const, error: 'Internal validation mismatch' }
       }
-      const senderManager = controllerManager.getSenderManager()
-      if (senderManager.getEnabledSenders().includes('sacn')) {
-        await senderManager.restartSender('sacn', sacnConfig)
-        log.info('sACN configuration updated and sender restarted')
-      } else {
-        log.info('sACN not currently enabled, nothing to restart')
-      }
+      await controllerManager.runSenderOp(async (senderManager) => {
+        if (senderManager.getEnabledSenders().includes('sacn')) {
+          await senderManager.restartSender('sacn', sacnConfig)
+          log.info('sACN configuration updated and sender restarted')
+        } else {
+          log.info('sACN not currently enabled, nothing to restart')
+        }
+      })
       return { success: true }
     } catch (error) {
       log.error('Error updating sACN configuration:', error)
@@ -122,13 +123,14 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       if (artnetConfig.sender !== 'artnet') {
         return { success: false as const, error: 'Internal validation mismatch' }
       }
-      const senderManager = controllerManager.getSenderManager()
-      if (senderManager.getEnabledSenders().includes('artnet')) {
-        await senderManager.restartSender('artnet', artnetConfig)
-        log.info('Art-Net configuration updated and sender restarted')
-      } else {
-        log.info('Art-Net not currently enabled, nothing to restart')
-      }
+      await controllerManager.runSenderOp(async (senderManager) => {
+        if (senderManager.getEnabledSenders().includes('artnet')) {
+          await senderManager.restartSender('artnet', artnetConfig)
+          log.info('Art-Net configuration updated and sender restarted')
+        } else {
+          log.info('Art-Net not currently enabled, nothing to restart')
+        }
+      })
       return { success: true }
     } catch (error) {
       log.error('Error updating Art-Net configuration:', error)
@@ -148,26 +150,27 @@ export function setupSenderHandlers(ipcMain: IpcMain, controllerManager: Control
       }
       // The renderer sends every saved edit, running or not. With nothing running or starting
       // there is nothing to apply it to, and a half-filled config (no port yet) is not an error.
-      const senderManager = controllerManager.getSenderManager()
-      if (!senderManager.isSenderEnabled('enttecpro')) {
-        log.info('Enttec Pro not currently enabled, nothing to restart')
-        return { success: true }
-      }
-      const payloadValidation = validateSenderEnablePayload({
-        sender: 'enttecpro',
-        devicePath: config.devicePath,
-        dmxSpeed: config.dmxSpeed,
+      return await controllerManager.runSenderOp(async (senderManager) => {
+        if (!senderManager.isSenderEnabled('enttecpro')) {
+          log.info('Enttec Pro not currently enabled, nothing to restart')
+          return { success: true as const }
+        }
+        const payloadValidation = validateSenderEnablePayload({
+          sender: 'enttecpro',
+          devicePath: config.devicePath,
+          dmxSpeed: config.dmxSpeed,
+        })
+        if (!payloadValidation.ok) {
+          return { success: false as const, error: payloadValidation.error }
+        }
+        const enttecConfig = payloadValidation.value
+        if (enttecConfig.sender !== 'enttecpro') {
+          return { success: false as const, error: 'Internal validation mismatch' }
+        }
+        await senderManager.restartSender('enttecpro', enttecConfig)
+        log.info('Enttec Pro configuration updated and sender restarted')
+        return { success: true as const }
       })
-      if (!payloadValidation.ok) {
-        return { success: false as const, error: payloadValidation.error }
-      }
-      const enttecConfig = payloadValidation.value
-      if (enttecConfig.sender !== 'enttecpro') {
-        return { success: false as const, error: 'Internal validation mismatch' }
-      }
-      await senderManager.restartSender('enttecpro', enttecConfig)
-      log.info('Enttec Pro configuration updated and sender restarted')
-      return { success: true }
     } catch (error) {
       log.error('Error updating Enttec Pro configuration:', error)
       const failed = ipcError(error)

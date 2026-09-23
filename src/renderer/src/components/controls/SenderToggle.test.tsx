@@ -102,6 +102,25 @@ describe('SenderToggle', () => {
     await waitFor(() => expect(store.get(runningAtom)).toBe(false))
   })
 
+  it('holds the switch while its request is in flight', async () => {
+    let finish!: (result: unknown) => void
+    renderToggle({
+      enable: () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    })
+    const button = screen.getByRole('button', { name: 'sACN Out' }) as HTMLButtonElement
+
+    fireEvent.click(button)
+    await waitFor(() => expect(button.disabled).toBe(true))
+    fireEvent.click(button)
+    finish({ success: true })
+
+    await waitFor(() => expect(button.disabled).toBe(false))
+    expect(disableSender).not.toHaveBeenCalled()
+  })
+
   it('blocks the switch while the sender is not ready to start', () => {
     renderToggle({ notReady: true })
 

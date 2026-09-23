@@ -29,8 +29,8 @@ const mockSenderManager = {
 }
 
 const mockControllerManager = {
-  getSenderManager: () => mockSenderManager,
-} as { getSenderManager: () => typeof mockSenderManager }
+  runSenderOp: <T>(op: (senders: typeof mockSenderManager) => Promise<T>) => op(mockSenderManager),
+}
 
 jest.mock('electron', () => ({
   ipcMain: mockIpcMain,

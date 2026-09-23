@@ -1220,3 +1220,28 @@ describe('ControllerManager lifecycle and sender restore', () => {
     expect(fake.onControllerRestartListeners).toEqual([b])
   })
 })
+
+describe('ControllerManager sender operations', () => {
+  it('runs a sender operation after the lifecycle op ahead of it, on the sender manager that op leaves', async () => {
+    let release!: () => void
+    const barrier = new Promise<void>((r) => {
+      release = r
+    })
+    const before = { id: 'before' }
+    const after = { id: 'after' }
+    let current = before
+    const fake = Object.assign(Object.create(ControllerManager.prototype), {
+      lifecycle: lifecycleBlockedOn(barrier),
+      senderLifecycle: { getSenderManager: () => current },
+    }) as ControllerManager
+    const op = jest.fn(async (senders: unknown) => senders)
+
+    const running = fake.runSenderOp(op as never)
+    await Promise.resolve()
+    expect(op).not.toHaveBeenCalled()
+    current = after
+    release()
+
+    await expect(running).resolves.toBe(after)
+  })
+})

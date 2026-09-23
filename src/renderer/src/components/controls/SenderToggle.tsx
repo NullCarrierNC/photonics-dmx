@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useAtom, type PrimitiveAtom } from 'jotai'
 import { lightingPrefsAtom, type LightingPreferences } from '../../atoms'
 import { disableSender } from '../../ipcApi'
@@ -43,12 +43,14 @@ const SenderToggle: React.FC<SenderToggleProps> = ({
 }) => {
   const [isRunning, setIsRunning] = useAtom(runningAtom)
   const [prefs] = useAtom(lightingPrefsAtom)
+  const [inFlight, setInFlight] = useState(false)
 
   const handleToggle = (): void => {
     const wanted = !isRunning
+    setInFlight(true)
     void applySenderRunState(senderId, wanted, setIsRunning, () =>
       wanted ? enable() : disableSender({ sender: senderId }),
-    )
+    ).finally(() => setInFlight(false))
   }
 
   if (!prefs.dmxOutputConfig?.[prefsFlag]) {
@@ -61,7 +63,7 @@ const SenderToggle: React.FC<SenderToggleProps> = ({
         label={label}
         checked={isRunning}
         onToggle={handleToggle}
-        disabled={notReady || disabled}
+        disabled={notReady || disabled || inFlight}
         compact={compact}
       />
       <RoutedRigsHint senderId={senderId} compact={compact} />

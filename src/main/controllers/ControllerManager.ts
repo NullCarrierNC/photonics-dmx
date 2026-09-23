@@ -270,9 +270,7 @@ export class ControllerManager {
     })
   }
 
-  /**
-   * Disable YARG listener
-   */
+  /** Disable YARG listener. */
   public async disableYarg(): Promise<void> {
     await this.lifecycle.runQueuedOp(async () => {
       await this.listenerLifecycle.yargRb3.disableYarg()
@@ -292,9 +290,7 @@ export class ControllerManager {
     })
   }
 
-  /**
-   * Disable Rb3 listener
-   */
+  /** Disable Rb3 listener. */
   public async disableRb3(): Promise<void> {
     await this.lifecycle.runQueuedOp(async () => {
       await this.listenerLifecycle.yargRb3.disableRb3()
@@ -338,6 +334,11 @@ export class ControllerManager {
 
   public getSenderManager(): SenderManager {
     return this.senderLifecycle.getSenderManager()
+  }
+
+  /** Runs a sender op on the lifecycle queue, against the sender manager a restart ahead leaves. */
+  public runSenderOp<T>(op: (senders: SenderManager) => Promise<T>): Promise<T> {
+    return this.lifecycle.runQueuedOp(() => op(this.getSenderManager()))
   }
 
   /** The sender lifecycle surface (status, error tracking, restore). */
@@ -531,9 +532,7 @@ export class ControllerManager {
     await this.lifecycle.runQueuedOp(() => this.listenerLifecycle.audio.disableAudio())
   }
 
-  /**
-   * Refresh active audio cue selection when enabled groups change
-   */
+  /** Refresh active audio cue selection when enabled groups change. */
   public refreshAudioCueSelection(): void {
     this.listenerLifecycle.audio.refreshAudioCueSelection()
   }
