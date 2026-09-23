@@ -7,16 +7,13 @@ import * as ipcApi from '../ipcApi'
 import { yargListenerEnabledAtom } from '../atoms'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
-const listeners = new Map<string, (payload: unknown) => void>()
-
-jest.mock('../utils/ipcHelpers', () => ({
-  addIpcListener: (channel: string, handler: (payload: unknown) => void) => {
-    listeners.set(channel, handler)
-  },
-  removeIpcListener: (channel: string) => {
-    listeners.delete(channel)
-  },
-}))
+jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
 
 jest.mock(
   '../ipcApi',
@@ -27,6 +24,7 @@ jest.mock(
 )
 
 import CuePreviewYarg from './CuePreviewYarg'
+import { emitIpc, resetIpcListenerStub } from '@renderer/tests/helpers/ipcListenerStub'
 
 const GROUP = { id: 'yarg-motion-default', name: 'Default motion' }
 const NOD = { id: 'motion-nod-slow', name: 'Nod (Slow)' }
@@ -34,7 +32,7 @@ const WAVE = { id: 'motion-wave-slow', name: 'Wave (Slow)' }
 
 async function fire(channel: string, payload?: unknown): Promise<void> {
   await act(async () => {
-    listeners.get(channel)?.(payload)
+    emitIpc(channel, payload)
   })
 }
 
@@ -47,7 +45,7 @@ async function renderEnabled(): Promise<void> {
 
 describe('CuePreviewYarg motion labels', () => {
   beforeEach(() => {
-    listeners.clear()
+    resetIpcListenerStub()
     resetIpcApiMock()
     jest.mocked(ipcApi.getMotionEnabled).mockResolvedValue(true)
     jest.mocked(ipcApi.getYargMotionCueGroups).mockResolvedValue([GROUP] as never)

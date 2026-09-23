@@ -3,20 +3,23 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { act, renderHook } from '@testing-library/react'
 import { RENDERER_RECEIVE } from '../../../../../shared/ipcChannels'
 import { useActiveNodes } from './useActiveNodes'
+import {
+  emitIpc,
+  ipcSubscribers,
+  resetIpcListenerStub,
+} from '@renderer/tests/helpers/ipcListenerStub'
 
-const mockListeners = new Map<string, (payload: unknown) => void>()
-const mockRemove = jest.fn()
-
-jest.mock('../../../utils/ipcHelpers', () => ({
-  addIpcListener: (channel: string, handler: (payload: unknown) => void) => {
-    mockListeners.set(channel, handler)
-  },
-  removeIpcListener: (channel: string, handler: unknown) => mockRemove(channel, handler),
-}))
+jest.mock(
+  '../../../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
 
 function emit(type: 'activated' | 'deactivated', cueId: string, nodeId: string): void {
   act(() => {
-    mockListeners.get(RENDERER_RECEIVE.NODE_EXECUTION)!({ type, cueId, nodeId, timestamp: 0 })
+    emitIpc(RENDERER_RECEIVE.NODE_EXECUTION, { type, cueId, nodeId, timestamp: 0 })
   })
 }
 
@@ -31,8 +34,7 @@ const FRAME_MS = 20
 
 beforeEach(() => {
   jest.useFakeTimers()
-  mockListeners.clear()
-  mockRemove.mockClear()
+  resetIpcListenerStub()
 })
 
 afterEach(() => {
@@ -94,7 +96,8 @@ describe('useActiveNodes', () => {
 
   it('stops listening on unmount', () => {
     const { unmount } = renderHook(() => useActiveNodes('cue-1'))
+    expect(ipcSubscribers(RENDERER_RECEIVE.NODE_EXECUTION)).toHaveLength(1)
     unmount()
-    expect(mockRemove).toHaveBeenCalledWith(RENDERER_RECEIVE.NODE_EXECUTION, expect.any(Function))
+    expect(ipcSubscribers(RENDERER_RECEIVE.NODE_EXECUTION)).toEqual([])
   })
 })

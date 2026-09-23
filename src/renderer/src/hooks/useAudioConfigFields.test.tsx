@@ -10,8 +10,6 @@ import * as ipcApi from '../ipcApi'
 import type { AudioConfig } from '../../../photonics-dmx/listeners/Audio/AudioTypes'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
-const listeners = new Map<string, (payload: unknown) => void>()
-
 jest.mock(
   '../ipcApi',
   () =>
@@ -26,14 +24,16 @@ const saveAudioConfig = jest.mocked(ipcApi.saveAudioConfig)
 /** A stored config holding only the fields these panels read. */
 const storedConfig = (fields: Partial<AudioConfig>): AudioConfig => fields as AudioConfig
 
-jest.mock('../utils/ipcHelpers', () => ({
-  registerIpcListener: (channel: string, handler: (payload: unknown) => void) => {
-    listeners.set(channel, handler)
-    return () => listeners.delete(channel)
-  },
-}))
+jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
 
 import { useAudioConfigFields, type AudioSaveOutcome } from './useAudioConfigFields'
+import { emitIpc, resetIpcListenerStub } from '@renderer/tests/helpers/ipcListenerStub'
 
 function Panel(): JSX.Element {
   const audio = useAudioConfigFields({ sensitivity: 2.5, noiseFloor: 60 })
@@ -63,7 +63,7 @@ const sensitivity = (): string => screen.getByTestId('sensitivity').textContent 
 describe('useAudioConfigFields', () => {
   beforeEach(() => {
     resetIpcApiMock()
-    listeners.clear()
+    resetIpcListenerStub()
     getAudioConfig.mockImplementation(async () => storedConfig({}))
     saveAudioConfig.mockImplementation(async () => ({ success: true }))
   })
@@ -223,7 +223,7 @@ describe('useAudioConfigFields', () => {
     await waitFor(() => expect(getAudioConfig).toHaveBeenCalled())
 
     act(() => {
-      listeners.get(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE)?.({ sensitivity: 0.9, noiseFloor: 120 })
+      emitIpc(RENDERER_RECEIVE.AUDIO_CONFIG_UPDATE, { sensitivity: 0.9, noiseFloor: 120 })
     })
 
     expect(sensitivity()).toBe('0.9')

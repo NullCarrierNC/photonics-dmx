@@ -13,16 +13,13 @@ import type { CueData } from '../../../photonics-dmx/cues/types/cueTypes'
 import { DrumNoteType, InstrumentNoteType } from '../../../photonics-dmx/cues/types/cueTypes'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
-const listeners = new Map<string, (payload: unknown) => void>()
-
-jest.mock('../utils/ipcHelpers', () => ({
-  addIpcListener: (channel: string, handler: (payload: unknown) => void) => {
-    listeners.set(channel, handler)
-  },
-  removeIpcListener: (channel: string) => {
-    listeners.delete(channel)
-  },
-}))
+jest.mock(
+  '../utils/ipcHelpers',
+  () =>
+    jest.requireActual<typeof import('@renderer/tests/helpers/ipcListenerStub')>(
+      '@renderer/tests/helpers/ipcListenerStub',
+    ).ipcListenerStub,
+)
 
 jest.mock(
   '../ipcApi',
@@ -42,6 +39,7 @@ beforeEach(() => {
 })
 
 import CuePreviewYarg from './CuePreviewYarg'
+import { emitIpc, resetIpcListenerStub } from '@renderer/tests/helpers/ipcListenerStub'
 
 function cueData(overrides: Partial<CueData> = {}): CueData {
   return {
@@ -86,13 +84,13 @@ async function renderWithCueData(
     },
   })
   await act(async () => {
-    listeners.get(RENDERER_RECEIVE.CUE_HANDLED)?.(data)
+    emitIpc(RENDERER_RECEIVE.CUE_HANDLED, data)
   })
 }
 
 describe('CuePreviewYarg post-processing field', () => {
   beforeEach(() => {
-    listeners.clear()
+    resetIpcListenerStub()
     jest.clearAllMocks()
   })
 
@@ -122,7 +120,7 @@ describe('CuePreviewYarg post-processing field', () => {
 
 describe('CuePreviewYarg post-processing chip', () => {
   beforeEach(() => {
-    listeners.clear()
+    resetIpcListenerStub()
     jest.clearAllMocks()
   })
 
@@ -265,7 +263,7 @@ describe('CuePreviewYarg drum notes', () => {
 
 describe('CuePreviewYarg primary cue row', () => {
   beforeEach(() => {
-    listeners.clear()
+    resetIpcListenerStub()
     jest.clearAllMocks()
     jest.useFakeTimers()
   })
@@ -282,7 +280,7 @@ describe('CuePreviewYarg primary cue row', () => {
 
     // The grid only renders once a cue frame has arrived.
     act(() => {
-      listeners.get(RENDERER_RECEIVE.CUE_HANDLED)?.(cueData())
+      emitIpc(RENDERER_RECEIVE.CUE_HANDLED, cueData())
     })
     act(() => {
       store.set(currentCueStateAtom, {
@@ -327,7 +325,7 @@ describe('CuePreviewYarg beat indicator', () => {
       seed: (set) => set(yargListenerEnabledAtom, true),
     })
     const send = (beat: CueData['beat']): void => {
-      listeners.get(RENDERER_RECEIVE.CUE_HANDLED)?.(cueData({ beat }))
+      emitIpc(RENDERER_RECEIVE.CUE_HANDLED, cueData({ beat }))
     }
 
     await act(async () => {
@@ -356,14 +354,14 @@ function renderPanelWithSender(): (data: CueData) => Promise<void> {
   })
   return async (data: CueData) => {
     await act(async () => {
-      listeners.get(RENDERER_RECEIVE.CUE_HANDLED)?.(data)
+      emitIpc(RENDERER_RECEIVE.CUE_HANDLED, data)
     })
   }
 }
 
 describe('CuePreviewYarg indicators against a note stream', () => {
   beforeEach(() => {
-    listeners.clear()
+    resetIpcListenerStub()
     jest.clearAllMocks()
     jest.useFakeTimers()
   })
@@ -422,7 +420,7 @@ describe('CuePreviewYarg indicators against a note stream', () => {
 
 describe('CuePreviewYarg when the cue data stops', () => {
   beforeEach(() => {
-    listeners.clear()
+    resetIpcListenerStub()
     jest.clearAllMocks()
     jest.useFakeTimers()
   })
@@ -434,7 +432,7 @@ describe('CuePreviewYarg when the cue data stops', () => {
 
   const yargError = async (payload: { type: string; autoDisabled?: boolean }): Promise<void> => {
     await act(async () => {
-      listeners.get(RENDERER_RECEIVE.YARG_ERROR)?.({ message: '', ...payload })
+      emitIpc(RENDERER_RECEIVE.YARG_ERROR, { message: '', ...payload })
     })
   }
 
