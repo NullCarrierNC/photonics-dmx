@@ -36,8 +36,11 @@ jest.mock('../menu', () => ({ setupMenu }))
 const initBlackoutShortcut = jest.fn()
 const disposeBlackoutShortcut = jest.fn()
 jest.mock('../blackoutShortcut', () => ({
-  initBlackoutShortcut,
-  disposeBlackoutShortcut,
+  BlackoutShortcut: jest.fn(() => ({
+    init: initBlackoutShortcut,
+    set: jest.fn(),
+    dispose: disposeBlackoutShortcut,
+  })),
 }))
 
 import { Application } from '../application'

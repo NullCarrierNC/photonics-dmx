@@ -132,7 +132,7 @@ describe('CONFIG motion IPC (config-handlers)', () => {
     mockConfig.setPreference.mockImplementation(async () => {})
     mockConfig.updateCueDomain.mockImplementation(async () => {})
     handlers = captureHandlers()
-    setupConfigHandlers(mockIpcMain as any, mockControllerManager as any)
+    setupConfigHandlers(mockIpcMain as any, mockControllerManager as any, jest.fn())
   })
 
   describe('GET_MOTION_ENABLED / SET_MOTION_ENABLED', () => {

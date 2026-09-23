@@ -4,7 +4,7 @@ import { setGlobalBrightnessConfig } from '../../../photonics-dmx/helpers/dmxHel
 import { ipcError } from '../ipcResult'
 import { CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { sendToAllWindows } from '../../utils/windowUtils'
-import { setBlackoutShortcut } from '../../blackoutShortcut'
+import type { BlackoutShortcutBinding } from '../../../shared/blackoutShortcut'
 import {
   normalizeBlackoutShortcutKey,
   normalizeBlackoutShortcutScope,
@@ -14,9 +14,14 @@ import { createLogger } from '../../../shared/logger'
 import { handleInvoke } from '../handleInvoke'
 const log = createLogger('preferences-handlers')
 
+/**
+ * @param onBlackoutShortcutChanged Rebinds the application's system-wide blackout shortcut after a
+ *   save changes its key or scope.
+ */
 export function registerPreferencesDiagnosticsConfigHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
+  onBlackoutShortcutChanged: (binding: BlackoutShortcutBinding) => void,
 ): void {
   handleInvoke(ipcMain, CONFIG.GET_APP_VERSION, log, () => {
     return app.getVersion()
@@ -103,7 +108,7 @@ export function registerPreferencesDiagnosticsConfigHandlers(
           key: normalizeBlackoutShortcutKey(saved.blackoutShortcutKey),
           scope: normalizeBlackoutShortcutScope(saved.blackoutShortcutScope),
         }
-        setBlackoutShortcut(binding)
+        onBlackoutShortcutChanged(binding)
         sendToAllWindows(RENDERER_RECEIVE.BLACKOUT_SHORTCUT_CHANGED, binding)
       }
 

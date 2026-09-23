@@ -3,7 +3,7 @@ import { WindowManager } from './WindowManager'
 import { setupIpcHandlers } from './ipc/index'
 import { ControllerManager } from './controllers/ControllerManager'
 import { setupMenu } from './menu'
-import { disposeBlackoutShortcut, initBlackoutShortcut } from './blackoutShortcut'
+import { BlackoutShortcut } from './blackoutShortcut'
 import { toggleMasterBlackout } from './ipc/master-output-handlers'
 import {
   normalizeBlackoutShortcutKey,
@@ -18,6 +18,7 @@ export class Application {
   private controllerManager: ControllerManager
   private applicationShutdownPromise: Promise<void> | null = null
   private applicationShutdownCompleted = false
+  private readonly blackoutShortcut = new BlackoutShortcut()
 
   /**
    * Get any buffered log lines onto disk before a forced exit.
@@ -52,7 +53,9 @@ export class Application {
     this.windowManager.createMainWindow()
 
     // Set up IPC handlers
-    setupIpcHandlers(ipcMain, this.controllerManager, this.windowManager)
+    setupIpcHandlers(ipcMain, this.controllerManager, this.windowManager, (binding) =>
+      this.blackoutShortcut.set(binding),
+    )
 
     // Set up application menu
     setupMenu()
@@ -62,7 +65,7 @@ export class Application {
     // treats a rejection from init as fatal, and a key binding is not worth the app over.
     try {
       const config = this.controllerManager.getConfig()
-      initBlackoutShortcut(
+      this.blackoutShortcut.init(
         () => {
           toggleMasterBlackout(this.controllerManager)
         },
@@ -125,7 +128,7 @@ export class Application {
         // Ahead of the controllers, but never at their expense: letting go of a key matters far
         // less than closing senders, so a failure here must not abort the rest of the shutdown.
         try {
-          disposeBlackoutShortcut()
+          this.blackoutShortcut.dispose()
         } catch (error) {
           log.error('Failed to release the blackout shortcut:', error)
         }
