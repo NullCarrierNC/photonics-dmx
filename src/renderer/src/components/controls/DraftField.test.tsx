@@ -74,14 +74,25 @@ describe('DraftNumberField', () => {
     expect(onCommit).not.toHaveBeenCalled()
   })
 
-  it('reports an unchanged value where the field asks it to', () => {
+  it('reports an unchanged value typed again where the field asks it to', () => {
     const onCommit = jest.fn<(value: number) => void>()
     renderWithProviders(<DraftNumberField value={5} commitWhenUnchanged onCommit={onCommit} />)
 
+    fireEvent.change(field(), { target: { value: '' } })
     fireEvent.change(field(), { target: { value: '5' } })
     fireEvent.blur(field())
 
     expect(onCommit).toHaveBeenCalledWith(5)
+  })
+
+  it('says nothing when a field that reports unchanged values is only focused and left', () => {
+    const onCommit = jest.fn<(value: number) => void>()
+    renderWithProviders(<DraftNumberField value={5} commitWhenUnchanged onCommit={onCommit} />)
+
+    field().focus()
+    fireEvent.blur(field())
+
+    expect(onCommit).not.toHaveBeenCalled()
   })
 
   it('reports on Enter', () => {

@@ -116,8 +116,9 @@ interface DraftNumberFieldProps extends DraftFieldBaseProps {
   /** Decimal places to keep. Whole numbers by default, since most of these are counts or channels. */
   decimals?: number
   /**
-   * Report a value the field already held. Wanted where committing does something beyond storing a
-   * number, e.g. restarting the controllers, so the user can ask for that again.
+   * Report a value the field already held when the user typed it. Wanted where committing does
+   * something beyond storing a number, e.g. restarting the controllers, so the user can ask for
+   * that again. A field only focused and left reports nothing.
    */
   commitWhenUnchanged?: boolean
   /** Given the typed number, held inside min and max. */
@@ -160,6 +161,7 @@ export const DraftNumberField: React.FC<DraftNumberFieldProps> = ({
   }
 
   const commit = (): void => {
+    const typedSinceCommit = typed
     setTyped(false)
     const parsed = Number(draft)
     // An unreadable or empty entry means the user cleared it rather than chose something, so the
@@ -171,7 +173,7 @@ export const DraftNumberField: React.FC<DraftNumberFieldProps> = ({
     const rounded = roundTo(parsed, decimals)
     const clamped = Math.max(min ?? -Infinity, Math.min(max ?? Infinity, rounded))
     setDraft(String(clamped))
-    if (clamped !== value || commitWhenUnchanged) {
+    if (clamped !== value || (commitWhenUnchanged && typedSinceCommit)) {
       revertIfRefused(onCommit(clamped), String(clamped), String(value), setDraft)
     }
   }
