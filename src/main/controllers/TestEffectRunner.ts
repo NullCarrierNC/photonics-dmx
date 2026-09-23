@@ -138,17 +138,22 @@ export class TestEffectRunner {
       })
   }
 
-  public async stopTestEffect(): Promise<void> {
+  /** Ends a running test effect without touching the rig, for a teardown disposing its chains. */
+  public cancel(): void {
     this.startGeneration++
-    if (!this.testEffectInterval && !this.effectId) {
-      return
-    }
-
     this.clearTestInterval()
     this.effectId = null
     this.testCueGroup = undefined
     this.rb3LedState = { ...RB3_LED_OFF }
     this.rb3LastColour = 'off'
+  }
+
+  public async stopTestEffect(): Promise<void> {
+    const running = this.testEffectInterval !== null || this.effectId !== null
+    this.cancel()
+    if (!running) {
+      return
+    }
 
     // Stop the active cue on every chain's handler and blackout every chain's sequencer
     // (not just the primary). Without this, secondary rigs would stay lit at the last

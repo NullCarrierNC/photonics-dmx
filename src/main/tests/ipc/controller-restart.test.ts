@@ -1220,6 +1220,7 @@ describe('ControllerManager lifecycle and sender restore', () => {
     stub.dmxPublisher = { shutdown: jest.fn().mockImplementation(() => Promise.resolve()) }
     stub.senderLifecycle = { shutdownSenderOnAppExit: senderShutdown }
     ;(stub as Record<string, unknown>).graph = restartGraph()
+    ;(stub as Record<string, unknown>).onControllerRestartListeners = []
 
     const p1 = ControllerManager.prototype.shutdown.call(stub as unknown as ControllerManager)
     const p2 = ControllerManager.prototype.shutdown.call(stub as unknown as ControllerManager)

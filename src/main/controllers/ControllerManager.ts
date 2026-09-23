@@ -120,9 +120,11 @@ export class ControllerManager {
   private isInitialized = false
   /** Phase state, the op queue, and the in-flight restart and shutdown memos. */
   private readonly lifecycle: ControllerLifecycle
-  /** Invoked during restart teardown so process-scoped consumers (e.g. laser sim) drop state tied to the
-   *  engine/registry being rebuilt. A list, not a single slot, so multiple consumers can register without
-   *  overwriting each other. */
+  /**
+   * Invoked during restart and shutdown teardown so process-scoped consumers (a test effect, the
+   * laser sim) drop state tied to the engine being torn down. A list, so consumers never overwrite
+   * each other.
+   */
   private readonly onControllerRestartListeners: Array<() => void> = []
 
   constructor(deps: ControllerManagerDeps = {}) {
@@ -140,6 +142,10 @@ export class ControllerManager {
     this.listenerLifecycle = collaborators.listenerLifecycle
     this.registryInit = collaborators.registryInit
     this.consoleMode = collaborators.consoleMode
+    this.addOnControllerRestart(() => {
+      this.testEffectRunner.cancel()
+      this.rb3TestEffectRunner.cancel()
+    })
     this.graph =
       deps.graph ??
       new ControllerGraph({
@@ -315,6 +321,7 @@ export class ControllerManager {
         setInitialized: (value) => {
           this.isInitialized = value
         },
+        teardownListeners: () => [...this.onControllerRestartListeners],
       }),
     )
   }
@@ -514,9 +521,7 @@ export class ControllerManager {
     return this.senderLifecycle.restoreSenderOutputsFromPrefs(activeSenders)
   }
 
-  /**
-   * Enable audio listener and processor
-   */
+  /** Enable audio listener and processor. */
   public async enableAudio(): Promise<void> {
     await this.lifecycle.runQueuedOp(async () => {
       await this.listenerLifecycle.yargRb3.disableYarg()
@@ -525,9 +530,7 @@ export class ControllerManager {
     })
   }
 
-  /**
-   * Disable audio processing
-   */
+  /** Disable audio processing. */
   public async disableAudio(): Promise<void> {
     await this.lifecycle.runQueuedOp(() => this.listenerLifecycle.audio.disableAudio())
   }

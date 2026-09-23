@@ -117,6 +117,32 @@ describe('TestEffectRunner under multi-rig', () => {
     }
   })
 
+  it('stops ticking on cancel without touching the rig', async () => {
+    jest.useFakeTimers()
+    try {
+      const chains = [makeChainStub('a')]
+      const fanout = makeFanout(chains)
+      const ctx: TestEffectRunnerContext = {
+        getChainFanout: () => fanout,
+        ensureInitialized: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      }
+      const runner = new TestEffectRunner(ctx, makeDispatcher(fanout, jest.fn()))
+      runner.startTestEffect('Chorus')
+      await Promise.resolve()
+      await Promise.resolve()
+
+      runner.cancel()
+      ;(fanout.handleCue as jest.Mock).mockClear()
+      jest.advanceTimersByTime(16 * 5)
+
+      expect(fanout.handleCue).not.toHaveBeenCalled()
+      expect(fanout.blackout).not.toHaveBeenCalled()
+      expect(jest.getTimerCount()).toBe(0)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   it('does nothing if no rig chains are active', async () => {
     const fanout = makeFanout([])
     const ctx: TestEffectRunnerContext = {
