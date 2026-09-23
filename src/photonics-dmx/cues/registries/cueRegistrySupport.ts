@@ -11,6 +11,7 @@ import type { ILightingController } from '../../controllers/sequencer/interfaces
 /** A cue that may hold a sequencer reference to release. Both INetCue and IAudioCue satisfy this. */
 interface ReleasableCue {
   releaseSequencer?(sequencer: ILightingController): void
+  releaseGroup?(): void
 }
 
 /**
@@ -36,6 +37,30 @@ export function releaseSequencersFor(
         motionCue.releaseSequencer?.(sequencer)
       }
     }
+  }
+}
+
+/** Tell every cue and motion cue in a group that the group has left its registry. */
+export function releaseGroupFrom(group: ReleasableGroup): void {
+  for (const cue of group.cues.values()) {
+    cue.releaseGroup?.()
+  }
+  for (const motionCue of group.motionCues?.values() ?? []) {
+    motionCue.releaseGroup?.()
+  }
+}
+
+/**
+ * Drop one group's shared variables on every sequencer, and a sequencer's entry once it holds no
+ * group's. Idempotent, so every cue in a group can call it for the group.
+ */
+export function dropGroupStore(
+  stores: Map<ILightingController, Map<string, unknown>>,
+  groupId: string,
+): void {
+  for (const [sequencer, perGroup] of stores) {
+    perGroup.delete(groupId)
+    if (perGroup.size === 0) stores.delete(sequencer)
   }
 }
 

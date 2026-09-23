@@ -5,6 +5,7 @@ import type { GraphExecutionPolicy } from './GraphExecutionPolicy'
 import { cueGraphPolicy, secondaryCueGraphPolicy } from './GraphExecutionPolicy'
 import type { NetLightingNodeCueDefinition } from '../../types/nodeCueTypes'
 import { BaseNodeCue } from './BaseNodeCue'
+import { dropGroupStore } from '../../registries/cueRegistrySupport'
 
 /**
  * A lighting node cue: the colour and intensity look for one CueType.
@@ -63,6 +64,10 @@ export class LightingNodeCue extends BaseNodeCue {
     // shared them are releasing the same sequencer in the same teardown. Idempotent, so a later
     // release for the same sequencer finds no entry and no-ops.
     LightingNodeCue.groupLevelVarStores.delete(sequencer)
+  }
+
+  releaseGroup(): void {
+    dropGroupStore(LightingNodeCue.groupLevelVarStores, this.groupId)
   }
 
   get cueId(): string {

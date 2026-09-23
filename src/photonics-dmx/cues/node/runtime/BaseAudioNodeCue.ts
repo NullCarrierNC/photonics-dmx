@@ -21,6 +21,7 @@ import { evaluateAudioEvent, type AudioEventState } from './audioEventEvaluator'
 import { evaluateBandTrigger } from '../../audio/bandReactivity'
 import { createLogger } from '../../../../shared/logger'
 import { monotonicNowMs } from '../../../../shared/time'
+import { dropGroupStore } from '../../registries/cueRegistrySupport'
 const log = createLogger('BaseAudioNodeCue')
 
 /**
@@ -363,6 +364,10 @@ export abstract class BaseAudioNodeCue {
    * instance (a registry singleton) would accumulate one stale entry per
    * `restartControllers` cycle, plus stale group var stores in the static map.
    */
+  releaseGroup(): void {
+    dropGroupStore(BaseAudioNodeCue.groupLevelVarStores, this.groupId)
+  }
+
   releaseSequencer(sequencer: ILightingController): void {
     const state = this.states.get(sequencer)
     if (state) {

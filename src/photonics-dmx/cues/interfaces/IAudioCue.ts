@@ -56,4 +56,10 @@ export interface IAudioCue {
    * collected and state doesn't accumulate across `restartControllers` cycles.
    */
   releaseSequencer?(sequencer: ILightingController): void
+
+  /**
+   * Called when the cue's group leaves its registry. A cue whose group shares variables across
+   * its cues drops that group's store on every sequencer, so a reloaded group starts fresh.
+   */
+  releaseGroup?(): void
 }

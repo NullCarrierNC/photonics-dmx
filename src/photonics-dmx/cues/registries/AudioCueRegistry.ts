@@ -4,6 +4,7 @@ import { IAudioCue } from '../interfaces/IAudioCue'
 import { CueGroupCatalog } from './CueGroupCatalog'
 import { MotionCueAccess } from './MotionCueAccess'
 import {
+  releaseGroupFrom,
   releaseSequencersFor,
   type MotionCueDetail,
   type MotionGroupInfo,
@@ -77,9 +78,11 @@ export class AudioCueRegistry {
    * @param groupId The group identifier
    */
   public unregisterGroup(groupId: string): boolean {
-    if (!this.catalog.unregister(groupId)) {
+    const group = this.catalog.getGroup(groupId)
+    if (!group || !this.catalog.unregister(groupId)) {
       return false
     }
+    releaseGroupFrom(group)
 
     this.cueDetailsCache.delete(groupId)
     this.motion.onUnregisterGroup(groupId)

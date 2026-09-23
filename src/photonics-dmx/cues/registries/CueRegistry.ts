@@ -12,6 +12,7 @@ import {
 import { MotionCueAccess } from './MotionCueAccess'
 import { MotionNodeCue } from '../node/runtime/MotionNodeCue'
 import {
+  releaseGroupFrom,
   releaseSequencersFor,
   type MotionCueDetail,
   type MotionGroupInfo,
@@ -111,9 +112,11 @@ export class CueRegistry {
    * @param groupId The group identifier to remove
    */
   public unregisterGroup(groupId: string): boolean {
-    if (!this.catalog.unregister(groupId)) {
+    const group = this.catalog.getGroup(groupId)
+    if (!group || !this.catalog.unregister(groupId)) {
       return false
     }
+    releaseGroupFrom(group)
     this.motion.onUnregisterGroup(groupId)
     this.selection.clearGroupConsistencyTracking(groupId)
     return true

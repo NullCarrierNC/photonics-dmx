@@ -25,6 +25,9 @@ import type { AudioCueData } from '../../../../cues/types/audioCueTypes'
 import { DEFAULT_AUDIO_CONFIG } from '../../../../listeners/Audio/AudioConfig'
 import type { AudioEventNodeUnion } from '../../../../cues/types/nodeCueTypes'
 import { fakeLightingController } from '../../../helpers/fakeLightingController'
+import { getCueRegistry } from '../../../../cues/registries/cueRegistries'
+import { AudioCueRegistry } from '../../../../cues/registries/AudioCueRegistry'
+import { CueType } from '../../../../cues/types/cueTypes'
 
 function makeSequencerStub(): ILightingController {
   return fakeLightingController()
@@ -261,5 +264,68 @@ describe('releaseSequencer drops per-sequencer state', () => {
     expect(groupStores.has(seqA)).toBe(true)
     expect(groupStores.has(seqB)).toBe(true)
     expect(groupStores.get(seqA)).not.toBe(groupStores.get(seqB))
+  })
+})
+
+type GroupStores = Map<ILightingController, Map<string, unknown>>
+
+describe('unregistering a group drops its shared variables', () => {
+  const lightManager = new DmxLightManager(createMockLightingConfig())
+  const lightingStores = (LightingNodeCue as unknown as { groupLevelVarStores: GroupStores })
+    .groupLevelVarStores
+
+  it('drops a lighting group store on every sequencer and keeps other groups', () => {
+    const registry = getCueRegistry('yarg')
+    const compiled = NodeCueCompiler.compileCue(trivialYargLightingCueDef(), 'yarg')
+    const leaving = new LightingNodeCue('g-leaving', compiled)
+    const staying = new LightingNodeCue('g-staying', compiled)
+    registry.registerGroup({
+      id: 'g-leaving',
+      name: 'Leaving',
+      cues: new Map([[CueType.Chorus, leaving]]),
+    })
+    registry.registerGroup({
+      id: 'g-staying',
+      name: 'Staying',
+      cues: new Map([[CueType.Chorus, staying]]),
+    })
+    const seqA = makeSequencerStub()
+    const seqB = makeSequencerStub()
+    for (const sequencer of [seqA, seqB]) {
+      leaving.execute(minimalYargCueData(), sequencer, lightManager)
+    }
+    staying.execute(minimalYargCueData(), seqA, lightManager)
+
+    registry.unregisterGroup('g-leaving')
+
+    expect(lightingStores.get(seqA)?.has('g-leaving')).toBe(false)
+    expect(lightingStores.get(seqA)?.has('g-staying')).toBe(true)
+    expect(lightingStores.has(seqB)).toBe(false)
+    registry.unregisterGroup('g-staying')
+    expect(lightingStores.has(seqA)).toBe(false)
+  })
+
+  it('drops an audio group store on every sequencer', async () => {
+    const registry = AudioCueRegistry.getInstance()
+    const compiled = NodeCueCompiler.compileCue<AudioEventNodeUnion>(
+      trivialAudioLightingCueDef(),
+      'audio',
+    )
+    const cue = new AudioNodeCue('g-audio-leaving', compiled)
+    registry.registerGroup({
+      id: 'g-audio-leaving',
+      name: 'Leaving',
+      description: '',
+      cues: new Map([['trivial-audio', cue]]),
+    })
+    const seqA = makeSequencerStub()
+    await cue.execute(minimalAudioCueData(), seqA, lightManager)
+    const audioStores = (cue.constructor as unknown as { groupLevelVarStores: GroupStores })
+      .groupLevelVarStores
+    expect(audioStores.get(seqA)?.has('g-audio-leaving')).toBe(true)
+
+    registry.unregisterGroup('g-audio-leaving')
+
+    expect(audioStores.has(seqA)).toBe(false)
   })
 })
