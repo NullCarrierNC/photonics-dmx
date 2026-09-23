@@ -8,6 +8,7 @@ import {
 } from '../../../photonics-dmx/types'
 import { extraChannelDisplayLabel } from '../components/lightChannelDisplay'
 import { getDmxRig, getDmxRigs, enableConsole, disableConsole, sendConsoleDmx } from '../ipcApi'
+import { leaveConsole } from '../utils/leaveConsole'
 import {
   consoleRigIdAtom,
   consoleRigIdFor,
@@ -30,17 +31,6 @@ const log = createLogger('DmxConsole')
 
 const messageFor = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
-
-/** Hands DMX output back. The cleanup that calls this cannot wait, so failure is reported here. */
-const leaveConsole = (): void => {
-  disableConsole()
-    .then((result) => {
-      if (!result.success) {
-        log.error('Main refused to leave DMX console mode:', result.error)
-      }
-    })
-    .catch((error) => log.error('Failed to leave DMX console mode:', error))
-}
 
 import {
   buildConsoleFixedSeed,
