@@ -2,6 +2,7 @@ import React from 'react'
 import type { DmxRig } from '../../../../photonics-dmx/types'
 import { ConfigStrobeType } from '../../../../photonics-dmx/types'
 import { saveDmxRig } from '../../ipcApi'
+import { orThrow } from '../../ipc/ipcResult'
 import { createLogger } from '../../../../shared/logger'
 const log = createLogger('LightsLayoutRigSection')
 
@@ -52,7 +53,7 @@ const LightsLayoutRigSection: React.FC<LightsLayoutRigSectionProps> = ({
       },
     }
     try {
-      await saveDmxRig(newRig)
+      orThrow(await saveDmxRig(newRig))
       onRigsChange([...rigs, newRig])
       setActiveRigId(newRig.id)
       setRigName(newRig.name)

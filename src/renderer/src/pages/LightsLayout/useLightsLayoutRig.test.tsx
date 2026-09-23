@@ -34,4 +34,19 @@ describe('useLightsLayoutRig', () => {
 
     expect(ipcApi.saveDmxRig).toHaveBeenCalledTimes(1)
   })
+
+  it('leaves the rig list empty when the save of the default rig is refused', async () => {
+    jest
+      .mocked(ipcApi.saveDmxRig)
+      .mockResolvedValue({ success: false, error: 'disk full' } as never)
+    const setRigs = jest.fn()
+    const setActiveRigId = jest.fn()
+    renderHook(() => useLightsLayoutRig(null, setRigs, setActiveRigId, jest.fn()))
+
+    await waitFor(() => expect(ipcApi.saveDmxRig).toHaveBeenCalled())
+    await act(async () => {})
+
+    expect(setRigs.mock.calls.every(([rigs]) => (rigs as unknown[]).length === 0)).toBe(true)
+    expect(setActiveRigId).not.toHaveBeenCalled()
+  })
 })

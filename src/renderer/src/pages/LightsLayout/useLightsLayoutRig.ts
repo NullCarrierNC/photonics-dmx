@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { LightingConfiguration } from '../../../../photonics-dmx/types'
 import type { DmxRig } from '../../../../photonics-dmx/types'
 import { getDmxRig, getDmxRigs, saveDmxRig } from '../../ipcApi'
+import { orThrow } from '../../ipc/ipcResult'
 import { createDefaultDmxRig } from './lightsLayoutHelpers'
 import type { Dispatch, SetStateAction } from 'react'
 import { createLogger } from '../../../../shared/logger'
@@ -35,7 +36,7 @@ export function useLightsLayoutRig(
           setActiveRigId(loadedRigs[0].id)
         } else if (loadedRigs.length === 0) {
           const defaultRig = createDefaultDmxRig()
-          await saveDmxRig(defaultRig)
+          orThrow(await saveDmxRig(defaultRig))
           if (cancelled) return
           setRigs([defaultRig])
           setActiveRigId(defaultRig.id)
