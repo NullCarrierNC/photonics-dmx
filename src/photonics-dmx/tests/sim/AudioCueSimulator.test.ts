@@ -1,5 +1,6 @@
 import { describe, it, expect, jest } from '@jest/globals'
 import { CueSimulator } from '../../sim/CueSimulator'
+import type { AudioCueHandler } from '../../cueHandlers/AudioCueHandler'
 
 // Loads a cue library and runs many virtual frames, over the 5s default on a slower CI runner.
 jest.setTimeout(30000)
@@ -54,6 +55,17 @@ describe('CueSimulator (audio)', () => {
       )
       expect(flashed).toBe(true)
       expect(lit(sim, timeline.lightOrder.front[0])).toBe(true)
+    } finally {
+      sim.dispose()
+    }
+  })
+
+  it('runs no automatic motion cue, as simulated YARG frames do not', async () => {
+    const sim = await CueSimulator.create({ library: LIBRARY, domain: 'audio', level: 0.8 })
+    try {
+      const handler = (sim as unknown as { driver: { handler: AudioCueHandler } }).driver.handler
+
+      expect(handler.isMotionLayerEnabled()).toBe(false)
     } finally {
       sim.dispose()
     }

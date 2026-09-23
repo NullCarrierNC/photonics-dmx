@@ -216,7 +216,13 @@ export class CueSimulator {
     if (this.opts.domain === 'audio') {
       AudioCueRegistry.getInstance().setEnabledGroups([this.groupId])
       const handler = new AudioCueHandler(this.lightManager, this.sequencer)
-      return new AudioFrameDriver(handler, () => this.getAudioFrameState())
+      // Simulated YARG frames skip motion, and audio does too: the motion pick is random.
+      handler.setMotionEnabled(false)
+      return new AudioFrameDriver(
+        handler,
+        () => this.getAudioFrameState(),
+        () => this.sequencer.onBeat(),
+      )
     }
     const handler = new CueHandler(this.lightManager, this.sequencer, {
       registry: getCueRegistry(this.opts.domain),
