@@ -30,14 +30,7 @@ export class YargNetworkListener extends EventEmitter {
   private server: dgram.Socket | null = null
   private cueHandler: CueRuntime
 
-  //private logFilePath = path.join(app.getPath('documents'), 'yargLog.json');
   private listening = false
-
-  // Batch logging
-  //  private logBuffer: Record<string, any>[] = [];
-  //  private flushThreshold = 50; // Flush after every 50 messages
-  // private flushIntervalMs = 5000; // Also flush every 5 seconds
-  private flushTimer: NodeJS.Timeout | null = null
 
   /** Last forwarded frame (used for strobe edge detection and fallback context). */
   private lastData: CueData | null = null
@@ -91,26 +84,6 @@ export class YargNetworkListener extends EventEmitter {
     this.onVenuePostProcessing = options?.onVenuePostProcessing ?? ((): void => {})
 
     log.info('YargNetworkListener initialized.')
-
-    /*
-    // Initialize the flush timer
-    this.flushTimer = setInterval(() => {
-      if (this.logBuffer.length > 0) {
-        this.flushLogBuffer();
-      }
-    }, this.flushIntervalMs);
-
-    // Ensure logs are flushed on application exit
-    process.on('exit', () => this.flushLogBuffer());
-    process.on('SIGINT', () => {
-      this.flushLogBuffer();
-      process.exit();
-    });
-    process.on('SIGTERM', () => {
-      this.flushLogBuffer();
-      process.exit();
-    });
-    */
   }
 
   public start(): Promise<void> {
@@ -551,13 +524,5 @@ export class YargNetworkListener extends EventEmitter {
 
     // Update the last scene
     this.lastScene = currentScene
-  }
-
-  public async destroy(): Promise<void> {
-    if (this.flushTimer) {
-      clearInterval(this.flushTimer)
-      this.flushTimer = null
-    }
-    return this.stop()
   }
 }
