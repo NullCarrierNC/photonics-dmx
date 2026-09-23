@@ -142,7 +142,6 @@ Some libraries/assets that are packaged with the source code have licenses that 
 | [dmx-ts](https://github.com/node-dmx/dmx-ts)                                  | MIT license        | ArtNet and Enttec Pro USB Support    |
 | [sacn](https://github.com/node-dmx/sacn)                                      | Apache 2.0 license | sACN DMX over network                |
 | [enttec-open-dmx-usb](https://github.com/moritzruth/node-enttec-open-dmx-usb) | MIT license        | OpenDMX (FTDI) USB output            |
-| [@electron-toolkit/preload](https://github.com/alex8088/electron-toolkit)     | MIT license        | Electron preload utilities           |
 | [@electron-toolkit/utils](https://github.com/alex8088/electron-toolkit)       | MIT license        | Electron utilities                   |
 | [jotai](https://github.com/pmndrs/jotai)                                      | MIT license        | State Management                     |
 | [reactflow](https://github.com/xyflow/xyflow)                                 | MIT license        | Node-based cue editor UI             |
@@ -158,7 +157,6 @@ Some libraries/assets that are packaged with the source code have licenses that 
 | [ajv-formats](https://github.com/ajv-validator/ajv-formats)                   | MIT license        | AJV format extensions                |
 | [chokidar](https://github.com/paulmillr/chokidar)                             | MIT license        | File watching for cue hot-reload     |
 | [react-icons](https://github.com/react-icons/react-icons)                     | MIT license        | UI Icons                             |
-| [date-fns](https://github.com/date-fns/date-fns)                              | MIT license        | Date Formatting and Manipulation     |
 | [fast-deep-equal](https://github.com/epoberezkin/fast-deep-equal)             | MIT license        | Deep equality checks                 |
 
 ## Building it Yourself
