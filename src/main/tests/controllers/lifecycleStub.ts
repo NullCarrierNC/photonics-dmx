@@ -1,11 +1,13 @@
 import { jest } from '@jest/globals'
 import { ControllerLifecycle } from '../../controllers/ControllerLifecycle'
+import { ControllerManager } from '../../controllers/ControllerManager'
 import type { ControllerGraph } from '../../controllers/ControllerGraph'
+import type { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
 import type { LifecyclePhase } from '../../../shared/ipcTypes'
 
 /**
- * A lifecycle already sitting in `phase`, for tests that drive ControllerManager methods against a
- * partial prototype stub. Phase broadcasts go nowhere, so no renderer stub is needed.
+ * A lifecycle already sitting in `phase`, for a manager built by {@link stubbedManager} or a suite
+ * that drives the lifecycle alone. Phase broadcasts go nowhere, so no renderer stub is needed.
  */
 export function lifecycleAt(phase: LifecyclePhase): ControllerLifecycle {
   const lifecycle = new ControllerLifecycle(() => {})
@@ -72,4 +74,94 @@ export function restartGraph(): ControllerGraph {
     clearBuildRefs: jest.fn(),
     getChains: jest.fn().mockReturnValue([]),
   } as unknown as ControllerGraph
+}
+
+/** Preferences a manager reads while it wires its collaborators. */
+export function stubConfig(prefs: Record<string, unknown> = {}): ConfigurationManager {
+  return {
+    getPreference: (key: string) => prefs[key],
+    getAllPreferences: () => prefs,
+    getCueGroupSelectionMode: () => 'withinSong',
+  } as unknown as ConfigurationManager
+}
+
+/** The sender surface a restart snapshots, resets and restores, and a shutdown stops. */
+export function senderLifecycleStub() {
+  return {
+    getActiveOutputSenderSnapshotIfAny: jest.fn().mockReturnValue(null),
+    resetSenderForControllerRestart: jest.fn(async () => {}),
+    restoreSenderOutputsFromPrefs: jest.fn(async (_snapshot?: unknown) => {}),
+    shutdownSenderOnAppExit: jest.fn(async () => {}),
+    getSenderManager: jest.fn(),
+  }
+}
+
+/** The console surface a restart reads and hands back to. */
+export function consoleModeStub() {
+  return {
+    getConsoleRestore: jest.fn().mockReturnValue(null),
+    onControllersReinitializedWhileConsoleOpen: jest.fn(),
+  }
+}
+
+export interface StubbedManagerOptions {
+  lifecycle?: ControllerLifecycle
+  graph?: ControllerGraph
+  listeners?: ReturnType<typeof listenerStub>
+  senders?: ReturnType<typeof senderLifecycleStub>
+  consoleMode?: ReturnType<typeof consoleModeStub>
+  /**
+   * Stands in for the graph build. Brings the lifecycle to running unless a suite says otherwise.
+   */
+  init?: (lifecycle: ControllerLifecycle) => Promise<void>
+}
+
+export interface StubbedManager {
+  manager: ControllerManager
+  lifecycle: ControllerLifecycle
+  graph: ControllerGraph
+  listeners: ReturnType<typeof listenerStub>
+  senders: ReturnType<typeof senderLifecycleStub>
+  consoleMode: ReturnType<typeof consoleModeStub>
+  init: jest.Mock<(lifecycle: ControllerLifecycle) => Promise<void>>
+}
+
+/**
+ * A ControllerManager built through its dependencies, with stub collaborators and graph, for
+ * suites that drive a restart, a shutdown or a toggle. It starts initialized, as a running app is.
+ */
+export function stubbedManager(options: StubbedManagerOptions = {}): StubbedManager {
+  const lifecycle = options.lifecycle ?? lifecycleAt('running')
+  const graph = options.graph ?? restartGraph()
+  const listeners = options.listeners ?? listenerStub()
+  const senders = options.senders ?? senderLifecycleStub()
+  const consoleMode = options.consoleMode ?? consoleModeStub()
+  const testEffects = () => ({ cancel: jest.fn(), stopTestEffect: jest.fn(async () => {}) })
+  const manager = new ControllerManager({
+    config: stubConfig(),
+    lifecycle,
+    graph,
+    collaborators: {
+      listenerLifecycle: listeners,
+      senderLifecycle: senders,
+      consoleMode,
+      motionCueSimulator: { reset: jest.fn() },
+      testEffectRunner: testEffects(),
+      rb3TestEffectRunner: testEffects(),
+      registryInit: {},
+    } as never,
+  })
+  const init = jest.fn(
+    options.init ??
+      (async (current: ControllerLifecycle) => {
+        current.setPhase('running')
+      }),
+  )
+  const internals = manager as unknown as { isInitialized: boolean; init: () => Promise<void> }
+  internals.isInitialized = true
+  internals.init = async () => {
+    await init(lifecycle)
+    internals.isInitialized = true
+  }
+  return { manager, lifecycle, graph, listeners, senders, consoleMode, init }
 }
