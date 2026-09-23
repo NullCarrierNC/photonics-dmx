@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
 import { DEFAULT_AUDIO_BANDS } from '../../../photonics-dmx/listeners/Audio/AudioConfig'
 import { useAudioConfigFields } from '../hooks/useAudioConfigFields'
+import { DraftNumberField } from './controls/DraftField'
 import {
   AUDIO_BAND_PRESETS,
   clonePresetBands,
@@ -162,21 +163,17 @@ const AudioBandSettings: React.FC = () => {
                     background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((band.gain - AUDIO_BAND_GAIN_MIN) / (AUDIO_BAND_GAIN_MAX - AUDIO_BAND_GAIN_MIN)) * 100}%, #e5e7eb ${((band.gain - AUDIO_BAND_GAIN_MIN) / (AUDIO_BAND_GAIN_MAX - AUDIO_BAND_GAIN_MIN)) * 100}%, #e5e7eb 100%)`,
                   }}
                 />
-                <input
-                  type="number"
-                  min={String(AUDIO_BAND_GAIN_MIN)}
-                  max={String(AUDIO_BAND_GAIN_MAX)}
-                  step="0.1"
+                <DraftNumberField
                   value={band.gain}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value) || AUDIO_BAND_GAIN_MIN
-                    handleGainChange(
-                      index,
-                      Math.max(AUDIO_BAND_GAIN_MIN, Math.min(AUDIO_BAND_GAIN_MAX, value)),
-                    )
-                  }}
-                  onBlur={handleGainBlur}
+                  min={AUDIO_BAND_GAIN_MIN}
+                  max={AUDIO_BAND_GAIN_MAX}
+                  step={0.1}
+                  decimals={2}
+                  onCommit={(gain) =>
+                    handleSave(bands.map((b, i) => (i === index ? { ...b, gain } : b)))
+                  }
                   disabled={isSaving}
+                  aria-label={`${band.name} gain value`}
                   className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white text-center disabled:opacity-50 shrink-0"
                 />
               </div>
