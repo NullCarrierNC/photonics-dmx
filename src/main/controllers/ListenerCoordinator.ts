@@ -15,6 +15,7 @@ import { createLogger } from '../../shared/logger'
 import type { RuntimeBroadcaster } from '../../photonics-dmx/runtime/broadcaster'
 import { buildDomainChainHandlers } from './cueRuntimeDomains'
 import type { RigChain } from './RigChain'
+import { clearAndBlackOutChains } from './chainBlackout'
 import type { ChainFanout } from './ChainFanout'
 const log = createLogger('ListenerCoordinator')
 
@@ -157,19 +158,7 @@ export class ListenerCoordinator {
     this.deps.setVenuePostProcessing('Default')
     this.notifyRuntimeDisabled('yarg')
     this.clearChainHandlers('yarg')
-    // Blackout via every chain's sequencer so a multi-rig setup doesn't leave secondary
-    // rigs lit while the primary fades out.
-    for (const chain of this.deps.getRigChains()) {
-      try {
-        chain.sequencer.removeAllEffects()
-        await chain.sequencer.blackout(0)
-      } catch (error) {
-        log.error(`Error clearing effects on rig ${chain.rigId} when disabling YARG:`, error)
-      }
-    }
-    log.info(
-      'ListenerCoordinator: Cleared running effects and blacked out every rig (disable YARG)',
-    )
+    await clearAndBlackOutChains(this.deps.getRigChains(), 'disabling YARG')
     if (listenerClosing) {
       await listenerClosing
       this.yargListener = null
@@ -396,17 +385,7 @@ export class ListenerCoordinator {
       }
     }
     if (options.blackout) {
-      for (const chain of this.deps.getRigChains()) {
-        try {
-          chain.sequencer.removeAllEffects()
-          await chain.sequencer.blackout(0)
-        } catch (error) {
-          log.error(`Error clearing effects on rig ${chain.rigId} when disabling RB3:`, error)
-        }
-      }
-      log.info(
-        'ListenerCoordinator: Cleared running effects and blacked out every rig (disable RB3)',
-      )
+      await clearAndBlackOutChains(this.deps.getRigChains(), 'disabling RB3')
     }
     // Awaited last, so the blackout stays in the toggle's own tick.
     if (listenerClosing) {

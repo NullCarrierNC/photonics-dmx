@@ -15,6 +15,7 @@ import { RENDERER_RECEIVE, RENDERER_SEND } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 import { validateAudioLightingData } from '../ipc/audioLightingValidation'
 import type { RigChain } from './RigChain'
+import { clearAndBlackOutChains } from './chainBlackout'
 import type { ChainFanout } from './ChainFanout'
 const log = createLogger('AudioController')
 
@@ -182,17 +183,7 @@ export class AudioController {
     // Input, then cues, then output: the processor is stopped before the rig is cleared, so the
     // blackout is the last word on the lights.
     this.releaseProcessor()
-    // Blackout via every chain's sequencer so multi-rig setups don't leave secondary rigs
-    // lit when the audio listener is turned off.
-    for (const chain of this.deps.getRigChains()) {
-      try {
-        chain.sequencer.removeAllEffects()
-        await chain.sequencer.blackout(0)
-      } catch (error) {
-        log.error(`Error clearing effects on rig ${chain.rigId} when disabling Audio:`, error)
-      }
-    }
-    log.info('AudioController: Cleared running effects and blacked out every rig (disable Audio)')
+    await clearAndBlackOutChains(this.deps.getRigChains(), 'disabling Audio')
     this.deps.sendToAllWindows(RENDERER_RECEIVE.AUDIO_DISABLE, undefined)
     log.info('Sent audio:disable to renderer')
     this.isAudioEnabled = false
