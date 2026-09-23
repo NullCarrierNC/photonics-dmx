@@ -307,7 +307,7 @@ describe('AudioNodeCue level mode', () => {
     expect(sequencer.removeEffect).toHaveBeenCalledWith(effectKey, 120)
   })
 
-  it('leaves motion running when a primary level effect takes over the rig', async () => {
+  it('draws a primary level effect and leaves motion running', async () => {
     const def = {
       kind: 'lighting',
       id: 'level-primary',
@@ -336,6 +336,7 @@ describe('AudioNodeCue level mode', () => {
       h.advanceBy(20)
 
       expect(motionWiped).not.toHaveBeenCalled()
+      expect(h.getLightState(h.frontLightIds[0])?.red ?? 0).toBeGreaterThan(0)
     } finally {
       cue.stopAndClearEffects()
       h.cleanup()
