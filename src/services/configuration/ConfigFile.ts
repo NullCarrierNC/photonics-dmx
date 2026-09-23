@@ -72,6 +72,13 @@ interface ConfigWithVersion<T> {
   data: T
 }
 
+type RecoveryDetail = { parseOrMigrateError?: unknown; schemaText?: string }
+
+/** A stored file's text read into data, or why it could not be. */
+type DecodedFile<T> =
+  | { ok: true; data: T; needsPersist: boolean }
+  | { ok: false; reason: ConfigCorruptReason; detail: RecoveryDetail }
+
 /**
  * Handles individual configuration file operations
  */
@@ -137,10 +144,7 @@ export class ConfigFile<T> {
     }
   }
 
-  private recoverToDefault(
-    reason: ConfigCorruptReason,
-    detail: { parseOrMigrateError?: unknown; schemaText?: string },
-  ): T {
+  private recoverToDefault(reason: ConfigCorruptReason, detail: RecoveryDetail): T {
     let canWriteDefaults = !fs.existsSync(this.filePath)
 
     if (fs.existsSync(this.filePath)) {
@@ -168,7 +172,7 @@ export class ConfigFile<T> {
             ? detail.parseOrMigrateError.message
             : String(detail.parseOrMigrateError ?? 'invalid configuration'))
     if (!canWriteDefaults) {
-      message = `${message}; corrupt file left in place: defaults are in memory only until the file can be moved aside.`
+      message = `${message}; corrupt file left in place and defaults in use. Repair it and relaunch to load it, or leave it and the next save moves it aside.`
     }
 
     this.onCorruptRecovery?.({
@@ -228,12 +232,38 @@ export class ConfigFile<T> {
       return this.recoverToDefault('read', { parseOrMigrateError: error })
     }
 
+    const decoded = this.decode(fileContent)
+    if (!decoded.ok) {
+      return this.recoverToDefault(decoded.reason, decoded.detail)
+    }
+
+    if (decoded.needsPersist) {
+      this.save(decoded.data).catch((err) =>
+        log.error(`[Photonics Config] Failed to save migrated data to ${this.filePath}:`, err),
+      )
+    }
+
+    if (!this.hasLoggedLoad) {
+      log.info(
+        `[Photonics Config] Loaded configuration from ${this.filePath} (v${this.currentVersion})`,
+      )
+      this.hasLoggedLoad = true
+    }
+
+    return decoded.data
+  }
+
+  /**
+   * Reads a stored file's text into data: parse, migrate, repair, validate. The load and the check
+   * for a hand repair share it, so both accept exactly the same files.
+   */
+  private decode(fileContent: string): DecodedFile<T> {
     let parsed: unknown
     try {
       parsed = JSON.parse(fileContent)
     } catch (error) {
       log.error(`[Photonics Config] JSON parse failed for ${this.filePath}:`, error)
-      return this.recoverToDefault('parse', { parseOrMigrateError: error })
+      return { ok: false, reason: 'parse', detail: { parseOrMigrateError: error } }
     }
 
     let data: T
@@ -273,7 +303,7 @@ export class ConfigFile<T> {
         `[Photonics Config] Migration or shape handling failed for ${this.filePath}:`,
         error,
       )
-      return this.recoverToDefault('schema', { parseOrMigrateError: error })
+      return { ok: false, reason: 'schema', detail: { parseOrMigrateError: error } }
     }
 
     if (this.validate) {
@@ -281,24 +311,11 @@ export class ConfigFile<T> {
       if (!v.valid) {
         const schemaText = v.errors.join('; ')
         log.error(`[Photonics Config] Schema validation failed for ${this.filePath}:`, schemaText)
-        return this.recoverToDefault('schema', { schemaText })
+        return { ok: false, reason: 'schema', detail: { schemaText } }
       }
     }
 
-    if (migratedNeedsPersist) {
-      this.save(data).catch((err) =>
-        log.error(`[Photonics Config] Failed to save migrated data to ${this.filePath}:`, err),
-      )
-    }
-
-    if (!this.hasLoggedLoad) {
-      log.info(
-        `[Photonics Config] Loaded configuration from ${this.filePath} (v${this.currentVersion})`,
-      )
-      this.hasLoggedLoad = true
-    }
-
-    return data
+    return { ok: true, data, needsPersist: migratedNeedsPersist }
   }
 
   /**
@@ -474,14 +491,41 @@ export class ConfigFile<T> {
   }
 
   private enqueue(turn: () => Promise<void>): Promise<void> {
+    const adoptThenTurn = async (): Promise<void> => {
+      await this.adoptRepairedFile()
+      await turn()
+    }
     // Both arms run the turn: a rejected predecessor must not skip this one.
-    const run = this.mutateChain.then(turn, turn)
+    const run = this.mutateChain.then(adoptThenTurn, adoptThenTurn)
     // A failed turn must not poison the ones behind it.
     this.mutateChain = run.then(
       () => undefined,
       () => undefined,
     )
     return run
+  }
+
+  /**
+   * A corrupt file left in place at load may have been repaired by hand since. One that now reads
+   * cleanly becomes the data the turn starts from, and the write saves over it.
+   */
+  private async adoptRepairedFile(): Promise<void> {
+    if (!this.corruptFileInPlace) {
+      return
+    }
+    let content: string
+    try {
+      content = await fsPromises.readFile(this.filePath, 'utf-8')
+    } catch {
+      // Gone or unreadable, which the write's move-aside handles.
+      return
+    }
+    const decoded = this.decode(content)
+    if (decoded.ok) {
+      this.data = decoded.data
+      this.corruptFileInPlace = false
+      log.info(`[Photonics Config] Adopted the repaired ${path.basename(this.filePath)}`)
+    }
   }
 
   /**

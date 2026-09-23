@@ -127,4 +127,26 @@ describe('a corrupt prefs.json left in place at launch', () => {
     expect(cm.getPreference('clockRate')).toBe(50)
     expect(readData(dir, 'prefs.json')).toMatchObject({ clockRate: 50, complex: false })
   })
+
+  itWhenRenameCanBeRefused('keeps a hand repair of the file at the next save', async () => {
+    const dir = freshConfigDir()
+    const cm = launchOverCorruptPrefsLeftInPlace(dir)
+    const repaired = { ...structuredClone(DEFAULT_PREFERENCES), clockRate: 33 }
+    fs.writeFileSync(path.join(dir, 'prefs.json'), JSON.stringify({ version: 6, data: repaired }))
+
+    await cm.setPreference('complex', false)
+
+    expect(cm.getPreference('clockRate')).toBe(33)
+    expect(readData(dir, 'prefs.json')).toMatchObject({ clockRate: 33, complex: false })
+    expect(fs.readdirSync(dir).filter((f) => f.startsWith('prefs.corrupt-'))).toEqual([])
+  })
+
+  itWhenRenameCanBeRefused('says a relaunch reads a repaired file', () => {
+    const cm = launchOverCorruptPrefsLeftInPlace(freshConfigDir())
+
+    const [event] = cm.drainConfigCorruptRecovery()
+
+    expect(event).toMatchObject({ fileName: 'prefs.json', reason: 'parse' })
+    expect(event.message).toMatch(/relaunch/i)
+  })
 })
