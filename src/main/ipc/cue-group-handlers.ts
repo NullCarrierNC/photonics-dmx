@@ -2,7 +2,7 @@ import { handleInvoke } from './handleInvoke'
 import { IpcMain } from 'electron'
 import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
-import { isNonEmptyString, validateCueType } from './inputValidation'
+import { validateCueType } from './inputValidation'
 import { LIGHT } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
 const log = createLogger('cue-group-handlers')
@@ -77,45 +77,6 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
     } catch (error) {
       log.error('Error getting available RB3 cues:', error)
       return []
-    }
-  })
-
-  handleInvoke(ipcMain, LIGHT.ENABLE_CUE_GROUP, log, async (_, groupId: unknown) => {
-    if (!isNonEmptyString(groupId)) {
-      return { success: false, error: 'groupId is required' }
-    }
-    const registry = CueRegistry.getInstance()
-    const group = registry.getGroup(groupId)
-    if (!group) {
-      return { success: false, error: `Group '${groupId}' not found` }
-    }
-    const result = registry.enableGroup(groupId)
-    if (result) {
-      log.info(`Enabled cue group: ${group.name}`)
-      return { success: true }
-    }
-    log.error(`Failed to enable group '${group.name}'.`)
-    return { success: false, error: `Failed to enable group '${group.name}'.` }
-  })
-
-  handleInvoke(ipcMain, LIGHT.DISABLE_CUE_GROUP, log, async (_, groupId: unknown) => {
-    if (!isNonEmptyString(groupId)) {
-      return { success: false, error: 'groupId is required' }
-    }
-    const registry = CueRegistry.getInstance()
-    const group = registry.getGroup(groupId)
-    if (!group) {
-      return { success: false, error: `Group '${groupId}' not found` }
-    }
-    const result = registry.disableGroup(groupId)
-    if (result) {
-      log.info(`Disabled cue group: ${group.name}`)
-      return { success: true }
-    }
-    log.error(`Failed to disable group '${group.name}'. It may be the default group.`)
-    return {
-      success: false,
-      error: `Failed to disable group '${group.name}'. It may be the default group.`,
     }
   })
 

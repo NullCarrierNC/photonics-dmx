@@ -77,8 +77,6 @@ export const LIGHT = {
   SENDER_DISABLE: 'sender-disable',
   GET_SYSTEM_STATUS: 'get-system-status',
   GET_CUE_GROUPS: 'get-cue-groups',
-  ENABLE_CUE_GROUP: 'enable-cue-group',
-  DISABLE_CUE_GROUP: 'disable-cue-group',
   GET_NETWORK_INTERFACES: 'get-network-interfaces',
   START_TEST_EFFECT: 'start-test-effect',
   START_RB3_TEST_EFFECT: 'start-rb3-test-effect',

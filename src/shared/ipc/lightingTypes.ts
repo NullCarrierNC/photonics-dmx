@@ -41,14 +41,6 @@ export interface LightingInvokeMap {
     request: void
     response: Array<{ id: string; name: string; description: string; cueTypes: CueType[] }>
   }
-  [LIGHT.ENABLE_CUE_GROUP]: {
-    request: string
-    response: IpcSuccessResult | IpcErrorResult
-  }
-  [LIGHT.DISABLE_CUE_GROUP]: {
-    request: string
-    response: IpcSuccessResult | IpcErrorResult
-  }
   [LIGHT.GET_NETWORK_INTERFACES]: {
     request: void
     response:
