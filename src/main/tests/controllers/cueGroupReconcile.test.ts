@@ -1,9 +1,11 @@
 import { describe, expect, it, jest } from '@jest/globals'
+import { reconcileEnabledGroups } from '../../controllers/cueGroupReconcile'
 import {
-  reconcileEnabledGroups,
-  persistReconciledGroups,
-} from '../../controllers/cueGroupReconcile'
-import type { CueDomain, CueDomainPrefs } from '../../../services/configuration/cueDomainTypes'
+  reconcileAndApplyGroups,
+  type CueDomainRegistryBinding,
+} from '../../controllers/cueDomainBindings'
+import type { CueDomainPrefs } from '../../../services/configuration/cueDomainTypes'
+import type { ConfigurationManager } from '../../../services/configuration/ConfigurationManager'
 
 describe('reconcileEnabledGroups', () => {
   it('auto-enables registered groups never seen before', () => {
@@ -52,53 +54,60 @@ describe('reconcileEnabledGroups', () => {
   })
 })
 
-describe('persistReconciledGroups', () => {
-  const makeConfig = () => ({
-    updateCueDomain: jest.fn<(domain: CueDomain, patch: Partial<CueDomainPrefs>) => Promise<void>>(
-      async () => {},
-    ),
-  })
+describe('reconcileAndApplyGroups', () => {
+  function binding(
+    stored: { enabledGroups?: string[]; knownGroups?: string[] },
+    registered: string[],
+  ) {
+    const persist = jest.fn(async (_config: unknown, patch: Partial<CueDomainPrefs>) => {
+      Object.assign(stored, patch)
+    })
+    const setEnabled = jest.fn()
+    const fake = {
+      domain: 'yarg',
+      getRegisteredIds: () => registered,
+      setEnabled,
+      setDisabled: jest.fn(),
+      readStored: () => ({ ...stored, disabledCues: {} }),
+      persist,
+    } as unknown as CueDomainRegistryBinding
+    return { fake, persist, setEnabled }
+  }
+
+  const config = {} as ConfigurationManager
 
   it('skips the write when the reconcile matches the stored values', async () => {
-    const config = makeConfig()
-    const wrote = await persistReconciledGroups(
-      config,
-      'yarg',
-      { enabled: ['a', 'b'], known: ['a', 'b'] },
-      ['a', 'b'],
-      ['a', 'b'],
-    )
-    expect(wrote).toBe(false)
-    expect(config.updateCueDomain).not.toHaveBeenCalled()
+    const { fake, persist } = binding({ enabledGroups: ['a', 'b'], knownGroups: ['a', 'b'] }, [
+      'a',
+      'b',
+    ])
+
+    await reconcileAndApplyGroups(fake, config)
+
+    expect(persist).not.toHaveBeenCalled()
   })
 
   it('writes enabled and known in a single call when changed', async () => {
-    const config = makeConfig()
-    const wrote = await persistReconciledGroups(
-      config,
-      'yarg',
-      { enabled: ['a', 'b'], known: ['a', 'b'] },
-      ['a'],
-      ['a'],
-    )
-    expect(wrote).toBe(true)
-    expect(config.updateCueDomain).toHaveBeenCalledTimes(1)
-    expect(config.updateCueDomain).toHaveBeenCalledWith('yarg', {
+    const { fake, persist, setEnabled } = binding({ enabledGroups: ['a'], knownGroups: ['a'] }, [
+      'a',
+      'b',
+    ])
+
+    await reconcileAndApplyGroups(fake, config)
+
+    expect(persist).toHaveBeenCalledTimes(1)
+    expect(persist).toHaveBeenCalledWith(config, {
       enabledGroups: ['a', 'b'],
       knownGroups: ['a', 'b'],
     })
+    expect(setEnabled).toHaveBeenCalledWith(['a', 'b'])
   })
 
   it('writes when only the known baseline changed', async () => {
-    const config = makeConfig()
-    const wrote = await persistReconciledGroups(
-      config,
-      'audio',
-      { enabled: ['a'], known: ['a', 'b'] },
-      ['a'],
-      ['a'],
-    )
-    expect(wrote).toBe(true)
-    expect(config.updateCueDomain).toHaveBeenCalledTimes(1)
+    const { fake, persist } = binding({ enabledGroups: ['a'], knownGroups: ['a', 'b'] }, ['a'])
+
+    await reconcileAndApplyGroups(fake, config)
+
+    expect(persist).toHaveBeenCalledTimes(1)
   })
 })
