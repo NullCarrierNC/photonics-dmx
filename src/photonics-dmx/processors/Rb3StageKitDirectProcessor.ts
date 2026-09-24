@@ -524,7 +524,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
 
   private handleDisableAll(event: StageKitData): void {
     this.strobeWatchdog.setStrobeRunning(false)
-    this.setStrobeType(null)
+    this.clearStrobeEffectsAtPositions([])
     this.ledBanks.reset()
     this.emit('stagekit:processed', {
       positions: event.positions,

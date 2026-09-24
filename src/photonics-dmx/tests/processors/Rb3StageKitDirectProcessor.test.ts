@@ -17,6 +17,8 @@ import { Effect, RGBIO } from '../../types'
 import { createMockDmxLight, createMockLightingConfig } from '../helpers/testFixtures'
 import { performance as perfHooks } from 'perf_hooks'
 import { fakeLightingController } from '../helpers/fakeLightingController'
+import { createRb3StreamHarness, type Rb3StreamHarness } from '../helpers/rb3StreamHarness'
+import { Rb3RightChannel } from '../../listeners/RB3/rb3eTypes'
 
 const MENU_BASE = 'rb3-menu-base'
 const menuLight = (i: number) => `rb3-menu-light-${i}`
@@ -283,13 +285,14 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     expect(handled[handled.length - 1].ledBanks).toEqual({ red: 0, green: 0, blue: 0, yellow: 0 })
   })
 
-  it('DisableAll during the menu look leaves the rig alone', async () => {
+  it('DisableAll during the menu look keeps the menu look and leaves no strobe running', async () => {
     emitGameState(networkListener, 'InGame')
     emitGameState(networkListener, 'Menus')
     jest.advanceTimersByTime(1000)
     await Promise.resolve()
     await Promise.resolve()
     blackout.mockClear()
+    setEffect.mockClear()
 
     networkListener.emit('stagekit:data', {
       positions: [],
@@ -299,8 +302,11 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
       rightChannel: 0xff,
       timestamp: Date.now(),
     })
+    jest.advanceTimersByTime(1000)
 
     expect(blackout).not.toHaveBeenCalled()
+    expect(setEffect).toHaveBeenCalledWith(MENU_BASE, expect.any(Object), true)
+    expect(processor.getStatus().hasActiveStrobeEffects).toBe(false)
   })
 
   it('leaves the menu look once on a gameplay packet, and a late InGame leaves the song lit', async () => {
@@ -469,6 +475,29 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     for (let i = 0; i < 4; i++) {
       expect(removeEffect).toHaveBeenCalledWith(menuLight(i), 1 + i)
     }
+  })
+})
+
+describe('Rb3StageKitDirectProcessor strobe and DisableAll after Menus', () => {
+  let h: Rb3StreamHarness | null = null
+  afterEach(() => {
+    h?.cleanup()
+    h = null
+  })
+
+  it('leaves no strobe run writing to the rig', async () => {
+    h = createRb3StreamHarness()
+    h.gameState('Menus')
+    await h.step(1100)
+    h.stageKit(0, Rb3RightChannel.StrobeFast)
+    await h.step(300)
+
+    h.stageKit(0, Rb3RightChannel.DisableAll)
+    const setState = jest.spyOn(h.chain.sequencer, 'setState')
+    await h.step(2000)
+
+    expect(h.processor?.getStatus().hasActiveStrobeEffects).toBe(false)
+    expect(setState).not.toHaveBeenCalled()
   })
 })
 
