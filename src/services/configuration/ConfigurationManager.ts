@@ -295,6 +295,29 @@ export class ConfigurationManager {
   }
 
   /**
+   * Saves the fixture templates and realigns every rig to them. A rig write that fails puts the
+   * previous templates back, so a failed save leaves both files as they were. Returns true when at
+   * least one rig changed.
+   */
+  async saveUserLights(lights: DmxFixture[]): Promise<boolean> {
+    const previous = this.userLights.get()
+    await this.userLights.update({ lights })
+    try {
+      return await this.syncRigsWithUserLights()
+    } catch (error) {
+      await this.userLights
+        .update(previous)
+        .catch((restoreError) =>
+          log.error(
+            '[Photonics Config] Could not put the previous fixture templates back:',
+            restoreError,
+          ),
+        )
+      throw error
+    }
+  }
+
+  /**
    * Changes one fixture template, starting from the stored one. Writes nothing when the template
    * is gone by the time the change runs.
    */
@@ -454,8 +477,8 @@ export class ConfigurationManager {
 
   /**
    * Realigns all rigs to the current MyLights library and persists if anything changed. Returns
-   * true when at least one rig was updated. Called after a successful `SAVE_MY_LIGHTS` so template
-   * edits propagate to rig snapshots without waiting for the next process restart.
+   * true when at least one rig was updated. {@link saveUserLights} runs it after the templates are
+   * written, so template edits reach rig snapshots without waiting for the next process restart.
    */
   async syncRigsWithUserLights(): Promise<boolean> {
     const { changed } = syncRigsConfigWithUserLights(this.dmxRigs.get(), this.getUserLights())

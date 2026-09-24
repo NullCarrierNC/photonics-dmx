@@ -47,12 +47,10 @@ export function registerLightsRigsConfigHandlers(
     if (!v.ok) {
       return { success: false, error: v.error }
     }
-    const config = controllerManager.getConfig()
-    await config.updateUserLights(v.value)
     // Template edits in MyLights cascade to rig snapshots so changes like adding a Strobe Channel
-    // reach the rig — and therefore the runtime publisher — without the user having to re-pick
-    // the fixture in LightsLayout. Restart controllers when at least one rig actually changed.
-    const rigsChanged = await config.syncRigsWithUserLights()
+    // reach the rig, and therefore the runtime publisher, without the user having to re-pick the
+    // fixture in LightsLayout. Restart controllers when at least one rig actually changed.
+    const rigsChanged = await controllerManager.getConfig().saveUserLights(v.value)
     if (rigsChanged) {
       return restartAfterSave(() => controllerManager.restartControllers())
     }
