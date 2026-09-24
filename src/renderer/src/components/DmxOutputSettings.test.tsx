@@ -39,6 +39,7 @@ const getNetworkInterfacesMock = jest.mocked(ipcApi.getNetworkInterfaces)
 
 import DmxOutputSettings from './DmxOutputSettings'
 import { ToastStack } from './Toast'
+import { DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT } from '../../../shared/dmxOutputRefresh'
 
 type OutputConfig = NonNullable<LightingPreferences['dmxOutputConfig']>
 type SettingsPrefs = NonNullable<LightingPreferences['dmxSettingsPrefs']>
@@ -273,7 +274,7 @@ describe('DmxOutputSettings sender startup payloads', () => {
         networkInterface: '',
         unicastDestination: '',
         useUnicast: false,
-        refreshRateHz: 40,
+        refreshRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
       }),
     )
   })
@@ -295,7 +296,7 @@ describe('DmxOutputSettings sender startup payloads', () => {
         subnet: 0,
         subuni: 0,
         port: 6454,
-        refreshRateHz: 40,
+        refreshRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
       }),
     )
   })
@@ -654,7 +655,7 @@ describe('DmxOutputSettings sACN configuration', () => {
           networkInterface: '',
           unicastDestination: '',
           useUnicast: false,
-          refreshRateHz: 40,
+          refreshRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
         },
       }),
     )
@@ -777,7 +778,7 @@ describe('DmxOutputSettings ArtNet configuration', () => {
           subnet: 0,
           subuni: 0,
           port: 6454,
-          refreshRateHz: 40,
+          refreshRateHz: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
         },
       }),
     )

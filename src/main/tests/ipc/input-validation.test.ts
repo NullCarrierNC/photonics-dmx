@@ -245,8 +245,8 @@ describe('inputValidation', () => {
       if (result.ok) {
         expect(result.value.sender).toBe('artnet')
         if (result.value.sender === 'artnet') {
-          expect(result.value.maxOutputRate).toBe(40)
-          expect(result.value.base_refresh_interval).toBe(25)
+          expect(result.value.maxOutputRate).toBe(DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT)
+          expect(result.value.base_refresh_interval).toBe(23)
         }
       }
     })
@@ -280,8 +280,8 @@ describe('inputValidation', () => {
       const result = validateSenderEnablePayload({ sender: 'sacn', universe: 1 })
       expect(result.ok).toBe(true)
       if (result.ok && result.value.sender === 'sacn') {
-        expect(result.value.maxOutputRate).toBe(40)
-        expect(result.value.minRefreshRate).toBe(40)
+        expect(result.value.maxOutputRate).toBe(DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT)
+        expect(result.value.minRefreshRate).toBe(DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT)
       }
     })
 

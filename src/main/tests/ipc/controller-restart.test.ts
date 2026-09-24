@@ -25,6 +25,7 @@ import {
 import { SenderLifecycleController } from '../../controllers/SenderLifecycleController'
 import { sendToAllWindows } from '../../utils/windowUtils'
 import { RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT } from '../../../shared/dmxOutputRefresh'
 
 /** A promise and the call that settles it. */
 function barrier(): { wait: Promise<void>; release: () => void } {
@@ -547,8 +548,8 @@ describe('SenderLifecycleController.restoreSenderOutputsFromPrefs', () => {
       networkInterface: '192.168.1.10',
       useUnicast: true,
       unicastDestination: '192.168.1.50',
-      maxOutputRate: 40,
-      minRefreshRate: 40,
+      maxOutputRate: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+      minRefreshRate: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
     })
   })
 
@@ -662,8 +663,8 @@ describe('SenderLifecycleController.restoreSenderOutputsFromPrefs', () => {
       networkInterface: '10.0.0.10',
       useUnicast: false,
       unicastDestination: undefined,
-      maxOutputRate: 40,
-      minRefreshRate: 40,
+      maxOutputRate: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+      minRefreshRate: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
     })
   })
 
@@ -692,8 +693,8 @@ describe('SenderLifecycleController.restoreSenderOutputsFromPrefs', () => {
       networkInterface: '10.0.0.12',
       useUnicast: false,
       unicastDestination: undefined,
-      maxOutputRate: 40,
-      minRefreshRate: 40,
+      maxOutputRate: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
+      minRefreshRate: DMX_OUTPUT_REFRESH_RATE_HZ_DEFAULT,
     }
     expect(enableSender).toHaveBeenCalledTimes(2)
     expect(enableSender).toHaveBeenNthCalledWith(1, 'sacn', 'sacn', restored)
