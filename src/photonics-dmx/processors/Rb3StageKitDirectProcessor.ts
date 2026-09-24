@@ -22,6 +22,7 @@ import {
 } from '../listeners/RB3/rb3eTypes'
 import type { StageKitData } from '../listeners/RB3/rb3eTypes'
 import { Rb3MenuFramePump } from './rb3MenuAnimation'
+import { isActiveGameplayPacket } from './rb3GameplayEvidence'
 import { StrobeWatchdog } from './strobeWatchdog'
 import type { StrobeSpeedSlot } from '../cues/types/cueTypes'
 import { createLogger } from '../../shared/logger'
@@ -272,6 +273,13 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
       return
     }
 
+    // A lost or late InGame state must not leave the song under the menu look.
+    if (this._currentGameState === 'Menus' && isActiveGameplayPacket(event)) {
+      log.info('StageKitDirectProcessor: Gameplay packet in Menus, leaving the menu look')
+      this.exitMenuLook()
+      this._currentGameState = 'InGame'
+    }
+
     if (!this._inSong) {
       log.info(
         'StageKitDirectProcessor: Received StageKit event while not in song, marking as in song',
@@ -352,21 +360,13 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
         )
 
         this._inSong = true
-        this.clearMenuAnimationTimer()
-
         this.turnOffAllRigs().catch((error) => {
           log.error(
             'StageKitDirectProcessor: Error clearing lights during InGame transition:',
             error,
           )
         })
-
-        this.blackoutAllRigs().catch((error) => {
-          log.error(
-            'StageKitDirectProcessor: Error calling sequencer blackout during InGame transition:',
-            error,
-          )
-        })
+        this.exitMenuLook()
       } else if (gameState === 'Menus') {
         log.info(
           'StageKitDirectProcessor: Transitioning to Menus - triggering cue handler and clearing LED positions',
@@ -556,6 +556,18 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   private startMenuAnimationTimer(): void {
     log.info('StageKitDirectProcessor: Starting the menu animation pump')
     this.menuFramePump.start()
+  }
+
+  /**
+   * Leave the menu look for gameplay: stop the pump, retire the menu's base and per-light layers,
+   * then black out every rig. Safe to repeat.
+   */
+  private exitMenuLook(): void {
+    this.clearMenuAnimationTimer()
+    this.cueHandler?.clear()
+    this.blackoutAllRigs().catch((error) => {
+      log.error('StageKitDirectProcessor: Error blacking out on leaving the menu look:', error)
+    })
   }
 
   /**

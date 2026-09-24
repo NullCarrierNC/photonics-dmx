@@ -303,6 +303,52 @@ describe('Rb3StageKitDirectProcessor (RB3 network data → menu lighting)', () =
     expect(blackout).not.toHaveBeenCalled()
   })
 
+  it('leaves the menu look once on a gameplay packet, and a late InGame leaves the song lit', async () => {
+    emitGameState(networkListener, 'Menus')
+    jest.advanceTimersByTime(1000)
+    await Promise.resolve()
+
+    networkListener.emit('stagekit:data', {
+      positions: [0, 1, 2, 3, 4, 5, 6, 7],
+      color: 'red',
+      fog: false,
+      leftChannel: 0xff,
+      rightChannel: 0x80,
+      timestamp: Date.now(),
+    })
+    expect(removeEffect).toHaveBeenCalledWith(MENU_BASE, 0)
+
+    blackout.mockClear()
+    setEffect.mockClear()
+    emitGameState(networkListener, 'InGame')
+    jest.advanceTimersByTime(3000)
+
+    expect(blackout).not.toHaveBeenCalled()
+    expect(setEffect).not.toHaveBeenCalledWith(MENU_BASE, expect.any(Object), true)
+  })
+
+  it.each([
+    ['a bank clear', { color: 'red', leftChannel: 0, rightChannel: 0x80 }],
+    ['strobe off', { color: 'off', leftChannel: 0, rightChannel: 0x07, strobeEffect: 'off' }],
+    ['fog off', { color: 'off', leftChannel: 0, rightChannel: 0x02 }],
+    ['DisableAll', { color: 'off', leftChannel: 0, rightChannel: 0xff }],
+  ])('keeps the menu look through %s', async (_label, fields) => {
+    emitGameState(networkListener, 'Menus')
+    jest.advanceTimersByTime(1000)
+    await Promise.resolve()
+    setEffect.mockClear()
+
+    networkListener.emit('stagekit:data', {
+      positions: [],
+      fog: false,
+      timestamp: Date.now(),
+      ...fields,
+    })
+    jest.advanceTimersByTime(1000)
+
+    expect(setEffect).toHaveBeenCalledWith(MENU_BASE, expect.any(Object), true)
+  })
+
   it('lights normally from a colour packet right after DisableAll', () => {
     emitGameState(networkListener, 'InGame')
     const handled: CueData[] = []
