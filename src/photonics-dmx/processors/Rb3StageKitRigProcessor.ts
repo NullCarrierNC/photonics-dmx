@@ -55,11 +55,16 @@ export class Rb3StageKitRigProcessor {
   private activeStrobeEffects = new Map<string, ActiveStrobeEffect>()
   private strobedLights = new Set<number>()
 
+  /**
+   * @param getOutputRateHz The DMX output rate, read at each strobe start. 0 or less when nothing
+   *   governs the wire.
+   */
   constructor(
     rigId: string,
     lightManager: DmxLightManager,
     sequencer: ILightingController,
     config: StageKitConfig,
+    private readonly getOutputRateHz: () => number = () => 0,
   ) {
     this.rigId = rigId
     this.lightManager = lightManager
@@ -149,13 +154,19 @@ export class Rb3StageKitRigProcessor {
         nominalInterval = 100
     }
 
-    // Each half of a flash needs a frame to start in and a frame to be shown in. Asked to go
-    // faster than that, the frames all sample the same half and the lights hold it, so the run
-    // slows to what the frame can show.
-    const strobeInterval = Math.max(nominalInterval, this.sequencer.getFrameIntervalMs() * 2)
+    // Each half of a flash needs a frame to start in and a frame to be shown in, and two wire
+    // sends to reach the fixture. Asked to go faster than that, the frames or the sends sample the
+    // same half and the lights hold it, so the run slows to what the frame and the wire can show.
+    const outputRateHz = this.getOutputRateHz()
+    const sendIntervalMs = outputRateHz > 0 ? 1000 / outputRateHz : 0
+    const strobeInterval = Math.max(
+      nominalInterval,
+      this.sequencer.getFrameIntervalMs() * 2,
+      sendIntervalMs * 2,
+    )
     if (strobeInterval !== nominalInterval) {
       log.info(
-        `Rig ${this.rigId}: ${strobeType} strobe runs at ${strobeInterval}ms, the fastest this clock rate renders`,
+        `Rig ${this.rigId}: ${strobeType} strobe runs at ${strobeInterval}ms, the fastest this clock and output rate show`,
       )
     }
 

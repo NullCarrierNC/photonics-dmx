@@ -80,12 +80,13 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
   /**
    * Builds one `Rb3StageKitRigProcessor` per active rig in the supplied `ChainFanout`.
    * Chains with fewer than 4 lights are skipped with a warning (StageKit's light mapper
-   * only supports 4- or 8-light modes).
+   * only supports 4- or 8-light modes). `getOutputRateHz` is the DMX output rate strobes slow to.
    */
   constructor(
     private chainFanout: ChainFanout,
     stageKitConfig: Partial<StageKitConfig> = {},
     private cueHandler?: Rb3MenuCueDispatch | null,
+    private readonly getOutputRateHz: () => number = () => 0,
   ) {
     super()
     this.config = { ...DEFAULT_STAGEKIT_CONFIG, ...stageKitConfig }
@@ -125,6 +126,7 @@ export class Rb3StageKitDirectProcessor extends EventEmitter {
           chain.dmxLightManager,
           chain.sequencer,
           this.config,
+          this.getOutputRateHz,
         )
         this.rigs.set(rig.rigId, rig)
         // A rig that joins during a strobe strobes with the others straight away.

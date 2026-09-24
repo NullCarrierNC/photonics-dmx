@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals'
 import { performance } from 'perf_hooks'
-import { DmxPublisher } from '../../controllers/DmxPublisher'
+import { DmxPublisher, type PublisherTiming } from '../../controllers/DmxPublisher'
 import { SenderManager } from '../../controllers/SenderManager'
 import { StrobeStateManager } from '../../controllers/StrobeStateManager'
 import type { LightStateManager } from '../../controllers/sequencer/LightStateManager'
@@ -19,6 +19,8 @@ export interface RecordingPublisherOptions {
   strobeState?: StrobeStateManager
   /** The publisher's output rate. Omitted, every frame goes straight out. */
   outputRateHz?: number
+  /** The rate governor's clock and timers. Omitted, the real ones. */
+  timing?: PublisherTiming
 }
 
 export interface RecordingPublisher {
@@ -49,6 +51,7 @@ export function createRecordingPublisher(options: RecordingPublisherOptions): Re
   const strobeState = options.strobeState ?? new StrobeStateManager()
   const publisher = new DmxPublisher(senderManager, null, strobeState, {
     outputRateHz: options.outputRateHz,
+    timing: options.timing,
   })
   publisher.setRigChains(options.chains)
   publisher.updateActiveRigs(options.rigs)

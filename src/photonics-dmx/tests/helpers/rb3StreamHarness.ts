@@ -2,6 +2,7 @@ import { EventEmitter } from 'events'
 import { jest } from '@jest/globals'
 import { performance } from 'perf_hooks'
 import { ChainFanout } from '../../controllers/ChainFanout'
+import type { PublisherTiming } from '../../controllers/DmxPublisher'
 import { RigChain } from '../../controllers/RigChain'
 import { Rb3MenuCueHandler } from '../../cueHandlers/Rb3MenuCueHandler'
 import {
@@ -28,10 +29,16 @@ export interface WireLevel {
 export interface Rb3StreamHarnessOptions {
   /** Render clock interval. Defaults to 10 ms. */
   clockMs?: number
-  /** The publisher's output rate. Omitted, every frame goes straight out. */
+  /** The publisher's output rate, which the processor's strobes also see. Omitted, every frame
+   *  goes straight out. */
   outputRateHz?: number
   /** False leaves the listener with no processor, for a test that attaches its own. */
   directProcessor?: boolean
+  /**
+   * Runs the publisher's rate-governor timers only between render ticks, the way a main thread busy
+   * with each frame gets to them.
+   */
+  governorTimersOnTick?: boolean
 }
 
 export interface Rb3StreamHarness {
@@ -51,6 +58,35 @@ export interface Rb3StreamHarness {
   lightState: (index: number) => RGBIO | null
   wireLevel: (index: number) => WireLevel | null
   cleanup: () => void
+}
+
+/** Timers that fire only when `runDue` is called, in the order they fell due. */
+class TickServicedTimers implements PublisherTiming {
+  private pending = new Map<ReturnType<typeof setTimeout>, { dueAt: number; cb: () => void }>()
+
+  constructor(public readonly now: () => number) {}
+
+  setTimer(cb: () => void, ms: number): ReturnType<typeof setTimeout> {
+    // A real (fake-timer) handle that does nothing, so the handle type needs no stand-in.
+    const handle = setTimeout(() => {}, ms)
+    this.pending.set(handle, { dueAt: this.now() + ms, cb })
+    return handle
+  }
+
+  clearTimer(handle: ReturnType<typeof setTimeout>): void {
+    clearTimeout(handle)
+    this.pending.delete(handle)
+  }
+
+  runDue(): void {
+    const due = [...this.pending.entries()]
+      .filter(([, timer]) => timer.dueAt <= this.now())
+      .sort(([, a], [, b]) => a.dueAt - b.dueAt)
+    for (const [handle, timer] of due) {
+      this.pending.delete(handle)
+      timer.cb()
+    }
+  }
 }
 
 /**
@@ -90,18 +126,21 @@ export function createRb3StreamHarness(options: Rb3StreamHarnessOptions = {}): R
   const fanout = new ChainFanout()
   fanout.setChains([chain])
 
+  const governorTimers = options.governorTimersOnTick ? new TickServicedTimers(() => now) : null
   const rig: DmxRig = { id: 'rig-a', name: 'A', active: true, config }
   const wire = createRecordingPublisher({
     rigs: [rig],
     chains: [chain],
     strobeState: fanout.strobeState,
     outputRateHz: options.outputRateHz,
+    timing: governorTimers ?? undefined,
   })
 
   const listener = new EventEmitter()
   let processor: Rb3StageKitDirectProcessor | null = null
   if (options.directProcessor !== false) {
-    processor = new Rb3StageKitDirectProcessor(fanout, {}, fanout)
+    const outputRateHz = options.outputRateHz ?? 0
+    processor = new Rb3StageKitDirectProcessor(fanout, {}, fanout, () => outputRateHz)
     processor.startListening(listener)
   }
 
@@ -130,6 +169,7 @@ export function createRb3StreamHarness(options: Rb3StreamHarnessOptions = {}): R
         now += 1
         await jest.advanceTimersByTimeAsync(1)
         if (now % clockMs === 0) {
+          governorTimers?.runDue()
           clock.tick(clockMs)
           await jest.advanceTimersByTimeAsync(0)
           onTick?.(now)

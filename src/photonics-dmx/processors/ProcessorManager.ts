@@ -43,6 +43,8 @@ export interface ProcessorManagerConfig {
   onRb3PrimaryCueChange?: (groupId: string | null) => void
   /** Renderer push: the RB3 primary-cue countdown schedule changed. */
   onRb3GameModeScheduleChange?: (info: Rb3GameModeSchedulePayload) => void
+  /** The DMX output rate, which direct-mode strobes slow to so every flash reaches the wire. */
+  getDmxOutputRateHz?: () => number
 }
 
 /**
@@ -148,6 +150,7 @@ export class ProcessorManager extends EventEmitter {
         this.chainFanout,
         this.config.stageKitConfig,
         this.cueHandler, // Pass cue handler for menu state handling
+        this.config.getDmxOutputRateHz,
       )
       log.info('ProcessorManager: StageKitDirectProcessor created successfully')
     } else {

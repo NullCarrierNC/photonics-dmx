@@ -44,6 +44,8 @@ export interface ListenerCoordinatorDeps {
   setCueHandlerRef: (h: CueHandler | null) => void
   setRb3CueHandlerRef: (h: CueHandler | null) => void
   getRb3ProcessingMode: () => ProcessingMode
+  /** The Global DMX Publishing Rate, which RB3 direct-mode strobes slow to. */
+  getDmxOutputRateHz?: () => number
   /**
    * Wrap a domain's runtime before the listener or processor consumes it, so an additional
    * consumer can be teed onto the same cue stream. Returns the base runtime when absent.
@@ -314,6 +316,7 @@ export class ListenerCoordinator {
         this.deps.sendToAllWindows(RENDERER_RECEIVE.RB3_GAME_MODE_CUE_CHANGE, { groupId: p }),
       onRb3GameModeScheduleChange: (p) =>
         this.deps.sendToAllWindows(RENDERER_RECEIVE.RB3_GAME_MODE_DEADLINE, p),
+      getDmxOutputRateHz: this.deps.getDmxOutputRateHz,
     })
     this.processorManager.setCueHandler(this.deps.getChainFanout())
     this.processorManager.on('cueHandled', this.forwardCueHandled)

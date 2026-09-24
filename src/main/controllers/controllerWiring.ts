@@ -10,6 +10,7 @@ import type { NodeCueLoader } from '../../photonics-dmx/cues/node/loader/NodeCue
 import type { EffectLoader } from '../../photonics-dmx/cues/node/loader/EffectLoader'
 import { sendToAllWindows, mainRuntimeBroadcaster, hasBrowserWindows } from '../utils/windowUtils'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
+import { DMX_OUTPUT_REFRESH_RATE_HZ_MAX } from '../../shared/dmxOutputRefresh'
 import { RigChain } from './RigChain'
 import { ChainFanout } from './ChainFanout'
 import { TestEffectRunner } from './TestEffectRunner'
@@ -146,6 +147,9 @@ export function buildControllerCollaborators(
         setRb3CueHandlerRef: (h) => host.setRb3CueHandlerRef(h),
         getRb3ProcessingMode: () =>
           normalizeRb3ProcessingMode(host.getConfig().getPreference('rb3Prefs')?.processingMode),
+        getDmxOutputRateHz: () =>
+          host.getConfig().getPreference('globalDmxPublishingRateHz') ??
+          DMX_OUTPUT_REFRESH_RATE_HZ_MAX,
       },
       {
         getDmxLightManager: () => host.getDmxLightManager(),
