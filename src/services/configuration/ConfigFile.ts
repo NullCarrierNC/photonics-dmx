@@ -7,18 +7,11 @@ import {
   type ConfigCorruptInfo,
   type ConfigCorruptReason,
 } from './configCorruptTypes'
+import { migrateStepwise, readEnvelope, type ConfigWithVersion } from './configFileEnvelope'
 import { renameSyncWithRetry, renameWithRetry } from './configFileRename'
 import { createLogger } from '../../shared/logger'
 
 const log = createLogger('ConfigFile')
-
-/**
- * A version a build could have stamped: a whole number from 0 up. A file without the envelope is
- * legacy and reads as version 0 without passing through here.
- */
-function isStoredVersion(version: unknown): version is number {
-  return typeof version === 'number' && Number.isSafeInteger(version) && version >= 0
-}
 
 declare global {
   /** Set by the first ConfigFile constructed in the process, so the storage directory is logged once
@@ -49,14 +42,6 @@ export type ConfigFileHooks<T> = {
    * defaults, with a message naming them.
    */
   normalizeLoaded?: (data: T, reportRepair: (message: string) => void) => T
-}
-
-/**
- * Configuration data with version tracking
- */
-interface ConfigWithVersion<T> {
-  version: number
-  data: T
 }
 
 type RecoveryDetail = { parseOrMigrateError?: unknown; schemaText?: string }
@@ -289,24 +274,25 @@ export class ConfigFile<T> {
       return { ok: false, reason: 'parse', detail: { parseOrMigrateError: error } }
     }
 
-    // Migration walks up one whole version at a time, so it needs a whole number to start from.
-    if (this.isVersionedFormat(parsed) && !isStoredVersion(parsed.version)) {
-      const schemaText = `version must be a whole number of 0 or more, got ${JSON.stringify(parsed.version)}`
+    const envelope = readEnvelope<T>(parsed)
+    if (!envelope.ok) {
+      const { schemaText } = envelope
       log.error(`[Photonics Config] Unusable version in ${this.filePath}: ${schemaText}`)
       return { ok: false, reason: 'schema', detail: { schemaText } }
     }
 
-    const version = this.isVersionedFormat(parsed) ? parsed.version : 0
+    const version = envelope.version
     // A newer build's file is held whatever this build makes of its shape.
     const newer = version > this.currentVersion ? { newerVersion: version } : {}
 
     let data: T
     let migratedNeedsPersist = false
     try {
-      if (this.isVersionedFormat(parsed)) {
-        data = parsed.data
+      if (envelope.versioned) {
+        data = envelope.data
       } else {
-        data = this.coerceUnversioned ? this.coerceUnversioned(parsed) : (parsed as T)
+        const { raw } = envelope
+        data = this.coerceUnversioned ? this.coerceUnversioned(raw) : (raw as T)
       }
       if (version < this.currentVersion) {
         data = this.migrateData(data, version, this.currentVersion)
@@ -349,14 +335,6 @@ export class ConfigFile<T> {
   }
 
   /**
-   * Checks if the parsed data is in versioned format
-   */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- JSON parse result before validation
-  private isVersionedFormat(parsed: any): parsed is ConfigWithVersion<T> {
-    return parsed && typeof parsed === 'object' && 'version' in parsed && 'data' in parsed
-  }
-
-  /**
    * Migrates data from one version to another
    */
   private migrateData(data: T, fromVersion: number, toVersion: number): T {
@@ -366,13 +344,9 @@ export class ConfigFile<T> {
 
     log.info(`[Photonics Config] Migrating configuration from v${fromVersion} to v${toVersion}`)
 
-    // Apply migrations in sequence
-    let migratedData = data
-    for (let version = fromVersion + 1; version <= toVersion; version++) {
-      migratedData = this.applyMigration(migratedData, version - 1, version)
-    }
-
-    return migratedData
+    return migrateStepwise(data, fromVersion, toVersion, (d, from, to) =>
+      this.applyMigration(d, from, to),
+    )
   }
 
   /**
