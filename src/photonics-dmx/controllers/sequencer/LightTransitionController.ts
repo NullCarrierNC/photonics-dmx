@@ -1,6 +1,6 @@
 import { RGBIO, Transition } from '../../types'
 import { blendWithOpacity, opaqueBlack, transparentColor } from './lightBlending'
-import { copyAims, dropAims, restoreLayers } from './positionLayers'
+import { copyAims, drawsColour, dropAims, restoreLayers } from './positionLayers'
 import {
   cleanupOrphanedTransitions,
   emergencyStateReset,
@@ -319,14 +319,17 @@ export class LightTransitionController {
 
   /**
    * Returns the last interpolated color for the specified (light, layer). A light with nothing on
-   * that layer gives the held look after a set replaced it, and transparent otherwise.
+   * that layer gives the held look after a set replaced it, until the new look draws a colour on
+   * it, and transparent otherwise. With `useHeldLook` false an empty layer is always transparent,
+   * for a transition that starts after the held frame has gone.
    */
-  public getLightState(lightId: string, layer: number): RGBIO {
+  public getLightState(lightId: string, layer: number, useHeldLook = true): RGBIO {
     const c = this._currentLayerStates.get(lightId)?.get(layer)
     if (c) {
       return c
     }
-    const held = this._heldLook.get(lightId)
+    const layers = this._currentLayerStates.get(lightId)
+    const held = useHeldLook && !drawsColour(layers) ? this._heldLook.get(lightId) : undefined
     return held ? { ...held } : transparentColor()
   }
 

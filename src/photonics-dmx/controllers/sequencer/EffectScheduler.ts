@@ -1,4 +1,4 @@
-import { applyWaitUntil } from './waitUntil'
+import { applyWaitUntil, firstTransitionWaits } from './waitUntil'
 import { Effect, EffectTransition, RGBIO, TrackedLight } from '../../types'
 import { IEffectTransformer, ILayerManager, LightEffectState } from './interfaces'
 import { LightTransitionController } from './LightTransitionController'
@@ -104,9 +104,14 @@ export class EffectScheduler {
       // Try to get existing state from layer manager
       let initialState = this.layerManager.getLightState(layer, light.id)
 
-      // Try transition controller if layer manager has no state
+      // Try transition controller if layer manager has no state. A first transition that waits
+      // starts once the held look has gone dark, so it starts from transparent.
       if (!initialState) {
-        initialState = this.lightTransitionController.getLightState(light.id, layer)
+        initialState = this.lightTransitionController.getLightState(
+          light.id,
+          layer,
+          !firstTransitionWaits(transitions, light.id),
+        )
       }
 
       // If no state exists, use default (create once per light)

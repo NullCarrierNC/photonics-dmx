@@ -132,6 +132,49 @@ describe('a set that replaces the look', () => {
     expect(h.getLightState(h.frontLightIds[0])).toMatchObject({ green: 255, red: 0 })
   })
 
+  const stepFrames = (ms: number): void => {
+    for (let elapsed = 0; elapsed < ms; elapsed += 10) h.advanceBy(10)
+  }
+
+  it('starts an overlay drawn after the new look from transparent', () => {
+    show('red', RED)
+    h.advanceBy(50)
+
+    show('green', GREEN)
+    h.sequencer.addEffect(
+      'wash',
+      getEffectSingleColor({
+        color: { ...GREEN, red: 255, blue: 255, opacity: 0.5 },
+        duration: 200,
+        lights: h.lightManager.getLights(['front', 'back'], 'all'),
+        layer: 5,
+      }),
+    )
+    h.advanceBy(10)
+
+    expect(h.getLightState(h.frontLightIds[0])?.red).toBeLessThan(60)
+  })
+
+  it('fades a first transition that waits from dark', () => {
+    show('red', RED)
+    h.advanceBy(50)
+
+    h.sequencer.setEffect(
+      'late-green',
+      getEffectSingleColor({
+        color: GREEN,
+        duration: 200,
+        waitFor: 'delay',
+        forTime: 100,
+        lights: h.lightManager.getLights(['front', 'back'], 'all'),
+        layer: 0,
+      }),
+    )
+    stepFrames(120)
+
+    expect(h.getLightState(h.frontLightIds[0])?.red).toBeLessThan(60)
+  })
+
   it('blacks the rig out at once on an explicit clear', () => {
     show('red', RED)
     h.advanceBy(50)

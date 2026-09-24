@@ -33,6 +33,14 @@ export function copyAims(
   }
 }
 
+/** Whether any of a light's layers draws a colour, rather than only aiming it. */
+export function drawsColour(layers: Map<number, RGBIO> | undefined): boolean {
+  for (const state of layers?.values() ?? []) {
+    if (!isPositionOnly(state)) return true
+  }
+  return false
+}
+
 /** Puts copied layers back into maps that were cleared. */
 export function restoreLayers<T>(into: ByLight<T>, from: ByLight<T>): void {
   from.forEach((layers, lightId) => into.set(lightId, layers))
