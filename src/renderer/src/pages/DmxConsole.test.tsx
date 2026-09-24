@@ -143,6 +143,52 @@ describe('DmxConsole', () => {
   })
 })
 
+describe('DmxConsole while an enable is in flight', () => {
+  let openConsole: (result: { success: true }) => void = () => undefined
+
+  beforeEach(() => {
+    resetIpcApiMock()
+    jest.mocked(ipcApi.getDmxRigs).mockResolvedValue([rig])
+    jest.mocked(ipcApi.getDmxRig).mockResolvedValue(rig)
+    jest.mocked(ipcApi.enableConsole).mockReturnValue(
+      new Promise((resolve) => {
+        openConsole = resolve
+      }),
+    )
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  async function clickEnable(times: number): Promise<void> {
+    const toggle = await screen.findByRole('button', { name: 'Enable console' })
+    await waitFor(() => expect(toggle).toBeEnabled())
+    for (let i = 0; i < times; i++) fireEvent.click(toggle)
+  }
+
+  it('sends one enable for a second click before main answers', async () => {
+    renderConsole()
+    await clickEnable(2)
+
+    await act(async () => openConsole({ success: true }))
+
+    expect(ipcApi.enableConsole).toHaveBeenCalledTimes(1)
+    await screen.findByRole('button', { name: 'Disable console' })
+  })
+
+  it('sends no channels from a page closed before main answers', async () => {
+    const view = renderConsole()
+    await clickEnable(1)
+
+    view.unmount()
+    await act(async () => openConsole({ success: true }))
+
+    await waitFor(() => expect(ipcApi.disableConsole).toHaveBeenCalled())
+    expect(ipcApi.sendConsoleDmx).not.toHaveBeenCalled()
+  })
+})
+
 describe('DmxConsole rig choice', () => {
   const inactiveRig = { ...rig, id: 'rig-2', name: 'Rig two', active: false } as DmxRig
   const rigById = (id: string) => [rig, inactiveRig].find((r) => r.id === id)

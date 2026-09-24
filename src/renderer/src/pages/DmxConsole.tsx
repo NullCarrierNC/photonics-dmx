@@ -71,6 +71,9 @@ const DmxConsole: React.FC = () => {
   // An enable that is still in flight owns console mode just as much as an open one does, so the
   // unmount cleanup waits for it rather than leaving the publisher in manual output.
   const enableInFlightRef = useRef<Promise<unknown> | null>(null)
+  const [enabling, setEnabling] = useState(false)
+  // Moves on when the page closes, so an enable answered after that seeds nothing.
+  const enableTokenRef = useRef(0)
   // Mirror the currently-selected rig id into a ref so the long-lived DMX_VALUES listener can
   // pick the right per-rig buffer from `kind: 'rigs'` payloads without re-registering on every
   // rig switch.
@@ -139,6 +142,7 @@ const DmxConsole: React.FC = () => {
 
   useEffect(() => {
     return () => {
+      enableTokenRef.current += 1
       const pending = enableInFlightRef.current
       if (pending) {
         // Either way it settles: an enable that rejects can still have left console mode open.
@@ -184,18 +188,25 @@ const DmxConsole: React.FC = () => {
       setActionError('Rig is still loading — try again in a moment')
       return
     }
+    if (enableInFlightRef.current) return
+    enableTokenRef.current += 1
+    const token = enableTokenRef.current
     const pending = enableConsole(selectedRigId)
     enableInFlightRef.current = pending
-    let result: Awaited<typeof pending>
-    try {
-      result = await pending
-    } catch (error) {
-      log.error('Failed to enter DMX console mode', error)
-      setActionError(messageFor(error))
+    setEnabling(true)
+    const answer = await pending.then(
+      (result) => ({ result }),
+      (error: unknown) => ({ error }),
+    )
+    enableInFlightRef.current = null
+    if (token !== enableTokenRef.current) return
+    setEnabling(false)
+    if ('error' in answer) {
+      log.error('Failed to enter DMX console mode', answer.error)
+      setActionError(messageFor(answer.error))
       return
-    } finally {
-      enableInFlightRef.current = null
     }
+    const { result } = answer
     if (result.success) {
       // Seed pinned fixed/mode channels so fixtures that need them light up during the session.
       const seed = buildConsoleFixedSeed(selectedRig.config, myLights)
@@ -478,7 +489,7 @@ const DmxConsole: React.FC = () => {
           <button
             type="button"
             onClick={() => void handleToggleConsole()}
-            disabled={!consoleEnabled && (selectedRigForUi == null || hasNoLights)}
+            disabled={enabling || (!consoleEnabled && (selectedRigForUi == null || hasNoLights))}
             className={`px-4 py-2 rounded-md font-medium text-white ${
               consoleEnabled
                 ? 'bg-red-600 hover:bg-red-500'
