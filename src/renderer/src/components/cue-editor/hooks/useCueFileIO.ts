@@ -114,6 +114,15 @@ export function useCueFileIO({
     openDocRef.current = editorDoc
   }, [editorDoc])
 
+  /** Whether nothing was selected since `token` was issued and the document is still `path`. */
+  const isStillOpen = useCallback(
+    (token: number, mode: EditorDocument['mode'], path: string): boolean => {
+      const open = openDocRef.current
+      return token === selectRequestRef.current && open?.mode === mode && open.path === path
+    },
+    [],
+  )
+
   const selectFile = useCallback(
     async (
       fileSummary: NodeCueFileSummary,
@@ -315,12 +324,14 @@ export function useCueFileIO({
 
   const handleDelete = useCallback(async () => {
     if (!editorDoc?.path) return
+    const deletedPath = editorDoc.path
+    const token = ++selectRequestRef.current
 
     try {
       orThrow(
         editorDoc.mode === 'effect'
-          ? await deleteEffectFile(editorDoc.path)
-          : await deleteNodeCueFile(editorDoc.path),
+          ? await deleteEffectFile(deletedPath)
+          : await deleteNodeCueFile(deletedPath),
       )
     } catch (error) {
       log.error('Failed to delete file', error)
@@ -328,7 +339,7 @@ export function useCueFileIO({
       return
     }
 
-    if (editorDoc.path === lastStoredFilePathRef.current) {
+    if (deletedPath === lastStoredFilePathRef.current) {
       clearLastFilePath()
     }
     const isEffectDoc = editorDoc.mode === 'effect'
@@ -341,12 +352,15 @@ export function useCueFileIO({
       isEffectDoc,
     )
     clearLastFilePathForMode(modeKey)
-    setEditorDoc(null)
-    setSelectedCueId(null)
-    setFilename('untitled.json')
-    loadCueIntoFlow(null)
-    setValidationErrors([])
-    setIsDirty(false)
+    // A file opened while the delete ran stays open, edits and all.
+    if (isStillOpen(token, editorDoc.mode, deletedPath)) {
+      setEditorDoc(null)
+      setSelectedCueId(null)
+      setFilename('untitled.json')
+      loadCueIntoFlow(null)
+      setValidationErrors([])
+      setIsDirty(false)
+    }
     if (editorDoc.mode === 'effect') {
       await refreshEffectFiles()
     } else {
@@ -355,6 +369,7 @@ export function useCueFileIO({
   }, [
     clearLastFilePath,
     editorDoc,
+    isStillOpen,
     selectedCueId,
     loadCueIntoFlow,
     onSaveError,
@@ -384,6 +399,7 @@ export function useCueFileIO({
 
   const handleReload = useCallback(async () => {
     const currentPath = editorDoc?.path
+    const token = ++selectRequestRef.current
 
     if (editorDoc?.mode === 'effect') {
       await refreshEffectFiles()
@@ -391,12 +407,12 @@ export function useCueFileIO({
       await refreshFiles()
     }
 
-    if (currentPath) {
-      const token = ++selectRequestRef.current
+    // A file selected while the list refreshed is the one the user wants.
+    if (currentPath && isStillOpen(token, editorDoc.mode, currentPath)) {
       try {
-        if (editorDoc?.mode === 'effect') {
+        if (editorDoc.mode === 'effect') {
           const file = await readEffectFile(currentPath)
-          if (token !== selectRequestRef.current) return
+          if (!isStillOpen(token, 'effect', currentPath)) return
           setEditorDoc({ mode: 'effect', file, path: currentPath })
           setMode(file.mode)
           setFilename(currentPath.split(/[/\\]/).pop() ?? currentPath)
@@ -408,7 +424,7 @@ export function useCueFileIO({
           loadCueIntoFlow(effectToLoad ?? null)
         } else {
           const file = await readNodeCueFile(currentPath)
-          if (token !== selectRequestRef.current) return
+          if (!isStillOpen(token, 'cue', currentPath)) return
           setEditorDoc({ mode: 'cue', file, path: currentPath })
           setMode(file.mode)
           setFilename(currentPath.split(/[/\\]/).pop() ?? currentPath)
@@ -429,6 +445,7 @@ export function useCueFileIO({
   }, [
     editorDoc,
     cueKind,
+    isStillOpen,
     selectedCueId,
     refreshFiles,
     refreshEffectFiles,

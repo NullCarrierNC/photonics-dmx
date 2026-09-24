@@ -1,5 +1,6 @@
 /** @jest-environment jsdom */
 import { act, renderHook } from '@testing-library/react'
+import { useState } from 'react'
 import { resetIpcApiMock } from '@renderer/tests/helpers/ipcApiMock'
 import * as ipcApi from '../../../ipcApi'
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
@@ -16,6 +17,8 @@ const readNodeCueFile = jest.mocked(ipcApi.readNodeCueFile)
 
 import { useCueFileIO, type UseCueFileIOParams } from './useCueFileIO'
 import type { NodeCueFileSummary } from '../../../../../photonics-dmx/cues/node/loader/NodeCueLoader'
+import type { NodeCueFile } from '../../../../../photonics-dmx/cues/types/nodeCueTypes'
+import type { EditorDocument } from '../lib/types'
 
 const fileSummary = (): NodeCueFileSummary =>
   ({
@@ -551,5 +554,114 @@ describe('useCueFileIO revertCurrentFileToDisk', () => {
 
     expect(setSelectedCueId).toHaveBeenCalledWith('cue-motion-a')
     expect(loadCueIntoFlow).toHaveBeenCalledWith(expect.objectContaining({ id: 'cue-motion-a' }))
+  })
+})
+
+describe('useCueFileIO with another file opened meanwhile', () => {
+  beforeEach(() => {
+    resetIpcApiMock()
+  })
+
+  const cueFile = (id: string): NodeCueFile => ({
+    version: 1,
+    mode: 'yarg',
+    group: { id, name: id },
+    cues: [],
+  })
+  const docAt = (id: string): EditorDocument => ({
+    mode: 'cue',
+    path: `/cues/${id}.json`,
+    file: cueFile(id),
+  })
+  const summaryAt = (id: string): NodeCueFileSummary => ({
+    path: `/cues/${id}.json`,
+    groupId: id,
+    groupName: id,
+    cueCount: 0,
+    lightingCueCount: 0,
+    motionCueCount: 0,
+    mode: 'yarg',
+    updatedAt: 0,
+  })
+
+  /** The hook over real document and dirty state, as the editor holds them. */
+  function useEditor(refreshFiles: () => Promise<void>) {
+    const [editorDoc, setEditorDoc] = useState<EditorDocument | null>(docAt('a'))
+    const [filename, setFilename] = useState('a.json')
+    const [isDirty, setIsDirty] = useState(false)
+    const [selectedCueId, setSelectedCueId] = useState<string | null>(null)
+    const io = useCueFileIO({
+      editorDoc,
+      setEditorDoc,
+      filename,
+      setFilename,
+      selectedCueId,
+      setSelectedCueId,
+      cueKind: 'lighting',
+      setMode: jest.fn(),
+      setCueKind: jest.fn(),
+      setValidationErrors: jest.fn(),
+      setIsDirty,
+      loadCueIntoFlow: jest.fn(),
+      getUpdatedDocument: () => null,
+      rememberLastFilePath: jest.fn(),
+      clearLastFilePath: jest.fn(),
+      refreshFiles,
+      refreshEffectFiles: async () => undefined,
+      lastStoredFilePathRef: { current: null },
+    })
+    return { io, editorDoc, isDirty, setEditorDoc, setIsDirty }
+  }
+
+  it('leaves a file opened and edited during a delete open and dirty', async () => {
+    let answerDelete: (value: { success: true; path: string }) => void = () => undefined
+    jest.mocked(ipcApi.deleteNodeCueFile).mockReturnValue(
+      new Promise((resolve) => {
+        answerDelete = resolve
+      }),
+    )
+    const refreshFiles = jest.fn(async () => undefined)
+    const { result } = renderHook(() => useEditor(refreshFiles))
+
+    let deleting: Promise<void> = Promise.resolve()
+    act(() => {
+      deleting = result.current.io.handleDelete()
+    })
+    act(() => {
+      result.current.setEditorDoc(docAt('b'))
+      result.current.setIsDirty(true)
+    })
+    await act(async () => {
+      answerDelete({ success: true, path: '/cues/a.json' })
+      await deleting
+    })
+
+    expect(result.current.editorDoc?.path).toBe('/cues/b.json')
+    expect(result.current.isDirty).toBe(true)
+    expect(refreshFiles).toHaveBeenCalled()
+  })
+
+  it('keeps a file selected while a reload refreshes the list', async () => {
+    readNodeCueFile.mockImplementation(async (path) => cueFile(path.includes('/b.') ? 'b' : 'a'))
+    let finishRefresh: () => void = () => undefined
+    const refreshFiles = () =>
+      new Promise<void>((resolve) => {
+        finishRefresh = resolve
+      })
+    const { result } = renderHook(() => useEditor(refreshFiles))
+
+    let reloading: Promise<void> = Promise.resolve()
+    act(() => {
+      reloading = result.current.io.handleReload()
+    })
+    await act(async () => {
+      await result.current.io.selectFile(summaryAt('b'))
+    })
+    await act(async () => {
+      finishRefresh()
+      await reloading
+    })
+
+    expect(result.current.editorDoc?.path).toBe('/cues/b.json')
   })
 })
