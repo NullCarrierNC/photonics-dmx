@@ -10,7 +10,7 @@ import { AudioCueHandler } from '../cueHandlers/AudioCueHandler'
 import { createAudioMotionCoordinator } from '../cueHandlers/audioMotionCoordinator'
 import type { AudioSecondaryRuntime } from './AudioSecondaryRuntime'
 import type { ChainFanout } from '../controllers/ChainFanout'
-import { pickStrobeCueType } from './audioStrobeHelpers'
+import { rollStrobeCueType } from './audioStrobeHelpers'
 import { AudioGameModeManager } from './AudioGameModeManager'
 import { AudioIdleController } from './AudioIdleController'
 import { DEFAULT_STROBE_WATCHDOG_MS, StrobeWatchdog } from './strobeWatchdog'
@@ -165,14 +165,7 @@ export class AudioCueProcessor {
     this.isActive = false
     this.strobeWatchdog.stop()
     this.lightingSuppressed = false
-    if (this.strobeActive) {
-      this.strobeActive = false
-      this.strobeCueType = null
-      this.onStrobeStateChange?.(false)
-    } else {
-      this.strobeCueType = null
-    }
-    this.strobeRolledForThisPeak = false
+    this.releaseStrobe()
     this.chainFanout.audioStop()
     this.registry.onMotionSongEnd()
 
@@ -220,6 +213,7 @@ export class AudioCueProcessor {
       config: this.config.idleDetection,
     })
     if (idleTransition === 'enter') {
+      this.releaseStrobe()
       this.applyIdleLook()
       this.secondaryRuntime?.blank()
       // Drop any solo suppression so lighting resumes cleanly when the audio comes back.
@@ -505,16 +499,27 @@ export class AudioCueProcessor {
   /** Drop the strobe the watchdog found running with no frames behind it, and free its slot. */
   private cutStrobe(): void {
     log.warn('AudioCueProcessor: strobe outlived its audio frames, cutting it.')
+    this.releaseStrobe()
+  }
+
+  /**
+   * End the running strobe and free the chains' strobe slots. The slots are left alone once
+   * processing has stopped, because audioStop clears every slot on the way out.
+   */
+  private releaseStrobe(): void {
+    const wasActive = this.strobeActive
     this.strobeActive = false
     this.strobeCueType = null
     this.strobeRolledForThisPeak = false
+    this.strobeWatchdog.setStrobeRunning(false)
+    if (!wasActive) return
     this.onStrobeStateChange?.(false)
-    const gameModeActive = this.gameModeManager != null
+    if (!this.isActive) return
     this.chainFanout.audioSyncSlots(
       this.getCurrentCueType(),
       this.getEffectiveSecondaryCueType(),
       null,
-      gameModeActive,
+      this.gameModeManager != null,
     )
   }
 
@@ -643,15 +648,10 @@ export class AudioCueProcessor {
       // almost every loud passage instead of the configured fraction of them.
       if (!this.strobeRolledForThisPeak) {
         this.strobeRolledForThisPeak = true
-        const prob = this.config.strobeProbability ?? 100
-        if (prob >= 100 || Math.random() * 100 < prob) {
-          const available = this.registry.getAvailableCueTypes()
-          const all = available.length > 0 ? available : this.registry.getAvailableCueTypes(true)
-          const chosen = pickStrobeCueType(this.registry, all)
-          if (chosen && this.registry.getCueImplementation(chosen)) {
-            this.strobeCueType = chosen
-            this.strobeActive = true
-          }
+        const chosen = rollStrobeCueType(this.registry, this.config.strobeProbability)
+        if (chosen) {
+          this.strobeCueType = chosen
+          this.strobeActive = true
         }
       }
     } else if (released) {
