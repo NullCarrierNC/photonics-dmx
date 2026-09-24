@@ -4,6 +4,9 @@ import type { CueRuntime } from '../cueHandlers/CueRuntime'
 import type { CueHandler } from '../cueHandlers/CueHandler'
 import type { SongEventCondition } from './sequencer/interfaces'
 import { ChainFanout } from './ChainFanout'
+import { createLogger } from '../../shared/logger'
+
+const log = createLogger('ChainCueRuntime')
 
 /**
  * Dispatch surface for one net domain, fanning each event to that domain's cue handler on every
@@ -14,19 +17,26 @@ import { ChainFanout } from './ChainFanout'
  * Chains without a handler for this domain are skipped silently.
  */
 export class ChainCueRuntime implements CueRuntime {
+  /** Rig and cue pairs whose failure is reported, so a cue failing on every frame logs once. */
+  private readonly reportedFailures = new Set<string>()
+
   constructor(
     private readonly fanout: ChainFanout,
     private readonly domain: NetCueMode,
   ) {}
 
-  /** This domain's handler on every chain that has one. */
-  private handlers(): CueHandler[] {
-    const out: CueHandler[] = []
+  /** This domain's handler on every chain that has one, with the rig it drives. */
+  private rigHandlers(): Array<{ rigId: string; handler: CueHandler }> {
+    const out: Array<{ rigId: string; handler: CueHandler }> = []
     for (const c of this.fanout.getChains()) {
       const handler = c.cueHandlers[this.domain]
-      if (handler) out.push(handler)
+      if (handler) out.push({ rigId: c.rigId, handler })
     }
     return out
+  }
+
+  private handlers(): CueHandler[] {
+    return this.rigHandlers().map(({ handler }) => handler)
   }
 
   public notifySongStart(): void {
@@ -62,9 +72,19 @@ export class ChainCueRuntime implements CueRuntime {
     // Fire all chain handlers concurrently; each chain awaits its own cue's effect chain.
     // Errors on any chain are isolated so a rig with an unloadable cue doesn't block siblings.
     const dispatchToken = {}
-    await Promise.allSettled(
-      this.handlers().map((h) => h.handleCue(cueType, parameters, dispatchToken)),
+    const rigs = this.rigHandlers()
+    const results = await Promise.allSettled(
+      rigs.map(({ handler }) => handler.handleCue(cueType, parameters, dispatchToken)),
     )
+    results.forEach((result, index) => {
+      const key = `${rigs[index].rigId}:${cueType}`
+      if (result.status === 'fulfilled') {
+        this.reportedFailures.delete(key)
+      } else if (!this.reportedFailures.has(key)) {
+        this.reportedFailures.add(key)
+        log.error(`Rig ${rigs[index].rigId} could not run ${cueType}:`, result.reason)
+      }
+    })
   }
 
   public stopActiveCue(): void {
