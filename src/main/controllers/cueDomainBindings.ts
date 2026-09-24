@@ -2,6 +2,7 @@ import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
 import { AudioCueRegistry } from '../../photonics-dmx/cues/registries/AudioCueRegistry'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import type { ConfigurationManager } from '../../services/configuration/ConfigurationManager'
+import type { ControllerManager } from './ControllerManager'
 import type { CueDomain, CueDomainPrefs } from '../../services/configuration/cueDomainTypes'
 import { reconcileEnabledGroups, sameIds, type ReconciledCueGroups } from './cueGroupReconcile'
 import { RENDERER_RECEIVE } from '../../shared/ipcChannels'
@@ -45,6 +46,11 @@ export interface CueDomainRegistryBinding {
    * that set of registries from this one list.
    */
   applyConsistencyWindow?: (windowMs: number) => void
+  /**
+   * Runs after the enabled groups change at runtime, from the settings page or a cue file save, so
+   * a newly enabled group is selectable at once.
+   */
+  afterEnabledChange?: (controllerManager: ControllerManager) => void
 }
 
 /** Default storage: the domain's own slot under the `cueDomains` preference. */
@@ -81,6 +87,13 @@ const applyYargConsistencyWindow = (windowMs: number): void =>
 const applyRb3ConsistencyWindow = (windowMs: number): void =>
   getCueRegistry('rb3').setCueConsistencyWindow(windowMs)
 
+/** Activate every enabled lighting group, so one enabled at runtime joins cue selection. */
+function activateEnabledGroups(
+  registry: Pick<CueRegistry, 'setActiveGroups' | 'getEnabledGroups'>,
+) {
+  registry.setActiveGroups(registry.getEnabledGroups())
+}
+
 const bindings: CueDomainRegistryBinding[] = [
   {
     domain: 'yarg',
@@ -90,6 +103,7 @@ const bindings: CueDomainRegistryBinding[] = [
     ...cueDomainStorage('yarg'),
     changedEvent: RENDERER_RECEIVE.YARG_CUE_GROUPS_CHANGED,
     applyConsistencyWindow: applyYargConsistencyWindow,
+    afterEnabledChange: () => activateEnabledGroups(CueRegistry.getInstance()),
     applyStartupSettings: (config) => {
       const registry = CueRegistry.getInstance()
       const enabledGroupIds = config.getPreference('cueDomains').yarg.enabledGroups ?? []
@@ -127,6 +141,7 @@ const bindings: CueDomainRegistryBinding[] = [
     setDisabled: (map) => AudioCueRegistry.getInstance().setDisabledCues(map),
     ...cueDomainStorage('audio'),
     changedEvent: RENDERER_RECEIVE.AUDIO_CUE_GROUPS_CHANGED,
+    afterEnabledChange: (controllerManager) => controllerManager.refreshAudioCueSelection(),
     applyStartupSettings: (config) => {
       const registry = AudioCueRegistry.getInstance()
       // An empty selection is one the user chose, so it is applied as it is. First-run defaults
@@ -159,6 +174,10 @@ const bindings: CueDomainRegistryBinding[] = [
     ...cueDomainStorage('rb3'),
     changedEvent: RENDERER_RECEIVE.RB3_CUE_GROUPS_CHANGED,
     applyConsistencyWindow: applyRb3ConsistencyWindow,
+    afterEnabledChange: (controllerManager) => {
+      activateEnabledGroups(getCueRegistry('rb3'))
+      controllerManager.refreshRb3CueSelection()
+    },
     applyStartupSettings: (config) => {
       const registry = getCueRegistry('rb3')
       applyRb3ConsistencyWindow(config.getPreference('cueConsistencyWindow'))
@@ -209,6 +228,26 @@ export function cueDomainBinding(domain: CueDomain): CueDomainRegistryBinding {
     throw new Error(`No cue-domain registry binding for '${domain}'`)
   }
   return binding
+}
+
+const domainQueues = new Map<CueDomain, Promise<unknown>>()
+
+/**
+ * Run one read-reconcile-persist-apply operation on a domain's groups after the ones already
+ * queued for it, so the settings handlers and a cue file save never apply a stale snapshot over
+ * each other. A failed operation does not block the next.
+ */
+export function serializeCueDomainOp<T>(domain: CueDomain, op: () => Promise<T>): Promise<T> {
+  const previous = domainQueues.get(domain) ?? Promise.resolve()
+  const run = previous.then(op, op)
+  domainQueues.set(
+    domain,
+    run.then(
+      () => undefined,
+      () => undefined,
+    ),
+  )
+  return run
 }
 
 /**

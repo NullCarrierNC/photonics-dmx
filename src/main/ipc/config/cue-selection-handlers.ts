@@ -1,11 +1,10 @@
 import { IpcMain } from 'electron'
 import { ControllerManager } from '../../controllers/ControllerManager'
 import { sendToAllWindows } from '../../utils/windowUtils'
-import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
-import { getCueRegistry } from '../../../photonics-dmx/cues/registries/cueRegistries'
 import {
   cueDomainBinding,
   reconcileAndApplyGroups,
+  serializeCueDomainOp,
   type CueDomainRegistryBinding,
 } from '../../controllers/cueDomainBindings'
 import { ipcError } from '../ipcResult'
@@ -25,8 +24,6 @@ interface CueGroupDomainSpec {
     setDisabled: string
   }
   disabledLabel: string
-  /** SET-enabled side effect (activate groups / refresh selection); runs after disabled is applied. */
-  afterSetEnabled?: (controllerManager: ControllerManager) => void
   /** SET-disabled side effect (refresh selection); runs after disabled is applied. */
   afterSetDisabled?: (controllerManager: ControllerManager) => void
 }
@@ -45,18 +42,7 @@ function registerCueGroupDomain(
   const { binding } = spec
   const { domain } = binding
 
-  // Serialize this domain's get/set handlers so a GET's read-reconcile-persist-apply sequence can't
-  // interleave with a concurrent SET and revert the registry to a stale snapshot. Each op waits for
-  // the previous to settle; failures don't poison the chain.
-  let opChain: Promise<unknown> = Promise.resolve()
-  const serialize = <T>(op: () => Promise<T>): Promise<T> => {
-    const run = opChain.then(op, op)
-    opChain = run.then(
-      () => undefined,
-      () => undefined,
-    )
-    return run
-  }
+  const serialize = <T>(op: () => Promise<T>): Promise<T> => serializeCueDomainOp(domain, op)
 
   handleInvoke(ipcMain, spec.channels.getEnabled, log, () =>
     serialize(async () => {
@@ -77,7 +63,7 @@ function registerCueGroupDomain(
         await config.updateCueDomain(domain, { enabledGroups: validation.value })
         binding.setEnabled(validation.value)
         binding.setDisabled(config.getPreference('cueDomains')[domain].disabledCues)
-        spec.afterSetEnabled?.(controllerManager)
+        binding.afterEnabledChange?.(controllerManager)
         if (binding.changedEvent) {
           sendToAllWindows(binding.changedEvent, undefined)
         }
@@ -123,17 +109,6 @@ function registerCueGroupDomain(
   )
 }
 
-/** Activate the enabled groups so a group enabled at runtime is immediately selectable (no restart). */
-function activateYargGroups(): void {
-  const registry = CueRegistry.getInstance()
-  registry.setActiveGroups(registry.getEnabledGroups())
-}
-
-function activateRb3Groups(): void {
-  const registry = getCueRegistry('rb3')
-  registry.setActiveGroups(registry.getEnabledGroups())
-}
-
 export function registerCueSelectionConfigHandlers(
   ipcMain: IpcMain,
   controllerManager: ControllerManager,
@@ -148,7 +123,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_YARG_CUES,
       },
       disabledLabel: 'disabledYargCues',
-      afterSetEnabled: activateYargGroups,
     },
     {
       binding: cueDomainBinding('audio'),
@@ -159,7 +133,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_AUDIO_CUES,
       },
       disabledLabel: 'disabledAudioCues',
-      afterSetEnabled: (cm) => cm.refreshAudioCueSelection(),
       afterSetDisabled: (cm) => cm.refreshAudioCueSelection(),
     },
     {
@@ -191,10 +164,6 @@ export function registerCueSelectionConfigHandlers(
         setDisabled: CONFIG.SET_DISABLED_RB3_CUES,
       },
       disabledLabel: 'disabledRb3Cues',
-      afterSetEnabled: (cm) => {
-        activateRb3Groups()
-        cm.refreshRb3CueSelection()
-      },
       afterSetDisabled: (cm) => cm.refreshRb3CueSelection(),
     },
     {

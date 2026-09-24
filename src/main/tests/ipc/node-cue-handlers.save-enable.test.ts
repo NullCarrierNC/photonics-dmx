@@ -4,8 +4,9 @@ jest.mock('electron', () => ({ dialog: {}, ipcMain: {} }))
 jest.mock('../../utils/windowUtils', () => ({ sendToAllWindows: jest.fn() }))
 
 import { setupNodeCueHandlers } from '../../ipc/node-cue-handlers'
+import { registerCueSelectionConfigHandlers } from '../../ipc/config/cue-selection-handlers'
 import { sendToAllWindows } from '../../utils/windowUtils'
-import { NODE_CUES, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
+import { CONFIG, NODE_CUES, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 import { CueRegistry } from '../../../photonics-dmx/cues/registries/CueRegistry'
 import { getCueRegistry } from '../../../photonics-dmx/cues/registries/cueRegistries'
 import { CueType } from '../../../photonics-dmx/cues/types/cueTypes'
@@ -154,5 +155,112 @@ describe('node-cue save opts the saved group in', () => {
     )
 
     expect(sendToAllWindows).toHaveBeenCalledWith(event, undefined)
+  })
+
+  it.each(['yarg', 'rb3'] as const)(
+    'makes a %s group the save enables selectable straight away',
+    async (mode) => {
+      const registry = mode === 'rb3' ? getCueRegistry('rb3') : CueRegistry.getInstance()
+      registry.reset()
+      registry.registerGroup(makeGroup('groupA'))
+      registry.registerGroup(makeGroup('savedGroup'))
+      registry.disableGroup('savedGroup')
+      const stored = {
+        [mode]: {
+          enabledGroups: ['groupA'],
+          knownGroups: ['groupA', 'savedGroup'],
+          disabledCues: {},
+        },
+      }
+      const config = {
+        getPreference: (key: string) => (key === 'cueDomains' ? stored : undefined),
+        updateCueDomain: jest.fn(async (domain: string, patch: Record<string, unknown>) => {
+          Object.assign(stored[domain], patch)
+        }),
+      }
+      const loader = {
+        saveFile: jest.fn(async () => ({ success: true })),
+        getModes: () => ['yarg', 'audio', 'rb3'],
+      }
+      const controllerManager = {
+        getConfig: () => config,
+        getNodeCueLoader: () => loader,
+        refreshAudioCueSelection: jest.fn(),
+        refreshRb3CueSelection: jest.fn(),
+      }
+      const handlers = new Map<string, (...args: unknown[]) => unknown>()
+      const ipcMain = {
+        handle: (channel: string, fn: (...args: unknown[]) => unknown) => handlers.set(channel, fn),
+        on: jest.fn(),
+      }
+      setupNodeCueHandlers(ipcMain as never, controllerManager as never)
+
+      await handlers.get(NODE_CUES.SAVE)!(
+        {},
+        { mode, filename: 'f.json', content: { group: { id: 'savedGroup' } } },
+      )
+
+      expect(registry.getActiveGroups()).toEqual(expect.arrayContaining(['groupA', 'savedGroup']))
+      if (mode === 'rb3') {
+        expect(controllerManager.refreshRb3CueSelection).toHaveBeenCalled()
+      }
+    },
+  )
+
+  it('reconciles a save after a group selection already being written', async () => {
+    const registry = CueRegistry.getInstance()
+    registry.reset()
+    registry.registerGroup(makeGroup('groupA'))
+    registry.registerGroup(makeGroup('groupB'))
+    registry.registerGroup(makeGroup('savedGroup'))
+    const stored = {
+      yarg: {
+        enabledGroups: ['groupA', 'groupB'],
+        knownGroups: ['groupA', 'groupB', 'savedGroup'],
+        disabledCues: {},
+      },
+    }
+    let releaseSet: () => void = () => undefined
+    const setLanded = new Promise<void>((resolve) => {
+      releaseSet = resolve
+    })
+    const config = {
+      getPreference: (key: string) => (key === 'cueDomains' ? stored : undefined),
+      updateCueDomain: jest.fn(async (domain: 'yarg', patch: Record<string, unknown>) => {
+        if (config.updateCueDomain.mock.calls.length === 1) {
+          await setLanded
+        }
+        Object.assign(stored[domain], patch)
+      }),
+    }
+    const loader = {
+      saveFile: jest.fn(async () => ({ success: true })),
+      getModes: () => ['yarg', 'audio', 'rb3'],
+    }
+    const controllerManager = {
+      getConfig: () => config,
+      getNodeCueLoader: () => loader,
+      refreshAudioCueSelection: jest.fn(),
+      refreshRb3CueSelection: jest.fn(),
+    }
+    const handlers = new Map<string, (...args: unknown[]) => unknown>()
+    const ipcMain = {
+      handle: (channel: string, fn: (...args: unknown[]) => unknown) => handlers.set(channel, fn),
+      on: jest.fn(),
+    }
+    registerCueSelectionConfigHandlers(ipcMain as never, controllerManager as never)
+    setupNodeCueHandlers(ipcMain as never, controllerManager as never)
+
+    const set = handlers.get(CONFIG.SET_ENABLED_CUE_GROUPS)!({}, ['groupA'])
+    const save = handlers.get(NODE_CUES.SAVE)!(
+      {},
+      { mode: 'yarg', filename: 'f.json', content: { group: { id: 'savedGroup' } } },
+    )
+    await new Promise((resolve) => setImmediate(resolve))
+    releaseSet()
+    await Promise.all([set, save])
+
+    expect(stored.yarg.enabledGroups).toEqual(['groupA', 'savedGroup'])
+    expect(registry.getEnabledGroups().sort()).toEqual(['groupA', 'savedGroup'])
   })
 })

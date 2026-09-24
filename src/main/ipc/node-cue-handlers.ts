@@ -5,7 +5,11 @@ import { ControllerManager } from '../controllers/ControllerManager'
 import { sendToAllWindows } from '../utils/windowUtils'
 import { NodeCueMode, NodeCueFile } from '../../photonics-dmx/cues/types/nodeCueTypes'
 import { validateNodeCueFile } from '../../photonics-dmx/cues/node/schema/validation'
-import { cueDomainBinding, reconcileAndApplyGroups } from '../controllers/cueDomainBindings'
+import {
+  cueDomainBinding,
+  reconcileAndApplyGroups,
+  serializeCueDomainOp,
+} from '../controllers/cueDomainBindings'
 import { ipcError, validationRefusal } from './ipcResult'
 import { NODE_CUES } from '../../shared/ipcChannels'
 import { createLogger } from '../../shared/logger'
@@ -39,11 +43,10 @@ async function persistGroupEnableAfterNodeCueSave(
   // other newly-registered groups are auto-enabled, deregistered ids are dropped, and the known
   // baseline is refreshed.
   const binding = cueDomainBinding(domain)
-  await reconcileAndApplyGroups(binding, config, [groupId])
-
-  if (domain === 'audio') {
-    controllerManager.refreshAudioCueSelection()
-  }
+  await serializeCueDomainOp(domain, async () => {
+    await reconcileAndApplyGroups(binding, config, [groupId])
+    binding.afterEnabledChange?.(controllerManager)
+  })
   if (binding.changedEvent) {
     sendToAllWindows(binding.changedEvent, undefined)
   }
