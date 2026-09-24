@@ -5,6 +5,7 @@ const {
   networkFailure,
   skipRequested,
   SKIP_ENV,
+  AUDIT_SKIP_ENV,
 } = require('../../../../tools/lockfileCheckCore.cjs')
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -42,11 +43,59 @@ describe('networkFailure', () => {
   })
 })
 
+describe('networkFailure for the audit', () => {
+  const auditOutage = (reason: string): string =>
+    [
+      `npm warn audit request to https://registry.npmjs.org/-/npm/v1/security/advisories/bulk failed, reason: ${reason}`,
+      'undefined',
+      'npm error audit endpoint returned an error',
+    ].join('\n')
+
+  it('names the audit and its own skip when the registry is out of reach', () => {
+    expect(
+      networkFailure(
+        auditOutage('getaddrinfo ENOTFOUND registry.npmjs.org'),
+        'audit:check',
+        AUDIT_SKIP_ENV,
+      ),
+    ).toBe(
+      `audit:check could not reach the npm registry (ENOTFOUND). Push again online, or skip this check on purpose with ${AUDIT_SKIP_ENV}=1.`,
+    )
+  })
+
+  it('reads a refused connection as the registry being out of reach', () => {
+    expect(
+      networkFailure(
+        auditOutage('connect ECONNREFUSED 127.0.0.1:443'),
+        'audit:check',
+        AUDIT_SKIP_ENV,
+      ),
+    ).toContain('(ECONNREFUSED)')
+  })
+
+  it('answers null for an audit that found an advisory', () => {
+    const report = [
+      '# npm audit report',
+      '',
+      'lodash  <4.17.21',
+      'Severity: high',
+      '1 high severity vulnerability',
+    ].join('\n')
+
+    expect(networkFailure(report, 'audit:check', AUDIT_SKIP_ENV)).toBeNull()
+  })
+})
+
 describe('skipRequested', () => {
   it('skips only when the variable is set to 1', () => {
     expect(skipRequested({ [SKIP_ENV]: '1' })).toBe(true)
     expect(skipRequested({ [SKIP_ENV]: '' })).toBe(false)
     expect(skipRequested({ [SKIP_ENV]: 'yes' })).toBe(false)
     expect(skipRequested({})).toBe(false)
+  })
+
+  it('reads the variable it is given', () => {
+    expect(skipRequested({ [AUDIT_SKIP_ENV]: '1' }, AUDIT_SKIP_ENV)).toBe(true)
+    expect(skipRequested({ [SKIP_ENV]: '1' }, AUDIT_SKIP_ENV)).toBe(false)
   })
 })

@@ -11,6 +11,7 @@
     "format:check": "prettier --check .",
     "lockfile:check": "node tools/lockfile-check.mjs",
     "overrides:check": "node tools/overrides-check.mjs",
+    "audit:check": "node tools/audit-check.mjs",
     "lint": "eslint . --fix",
     "lint:check": "eslint . --max-warnings 0",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
