@@ -15,6 +15,8 @@ export interface ConfigCorruptInfo {
   reason: ConfigCorruptReason
   /** human-readable, for logs and optional UI */
   message?: string
+  /** Set when a file that would not load could not be moved aside, so it is still there. */
+  leftInPlace?: boolean
 }
 
 export function corruptBackupFilePath(

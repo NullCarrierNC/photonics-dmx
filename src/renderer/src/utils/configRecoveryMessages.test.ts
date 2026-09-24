@@ -12,6 +12,16 @@ describe('configRecoveryMessages', () => {
     expect(message).toContain('lights.json')
   })
 
+  it('reports a file left in place with how to get it back', () => {
+    const messages = configRecoveryMessages([
+      { fileName: 'prefs.json', reason: 'parse', leftInPlace: true },
+    ])
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toContain('prefs.json')
+    expect(messages[0]).toMatch(/relaunch/i)
+    expect(messages[0]).not.toContain('backup')
+  })
+
   it('reports a repaired file as keeping everything but the reset values', () => {
     const messages = configRecoveryMessages([
       { fileName: 'prefs.json', reason: 'repaired', message: 'Reset to default: clockRate' },

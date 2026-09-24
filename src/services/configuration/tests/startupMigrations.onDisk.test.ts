@@ -161,7 +161,7 @@ describe('a corrupt prefs.json left in place at launch', () => {
 
     const [event] = cm.drainConfigCorruptRecovery()
 
-    expect(event).toMatchObject({ fileName: 'prefs.json', reason: 'parse' })
+    expect(event).toMatchObject({ fileName: 'prefs.json', reason: 'parse', leftInPlace: true })
     expect(event.message).toMatch(/relaunch/i)
   })
 })

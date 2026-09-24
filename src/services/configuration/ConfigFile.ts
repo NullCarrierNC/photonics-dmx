@@ -182,6 +182,7 @@ export class ConfigFile<T> {
       filePath: this.filePath,
       reason,
       message: message || undefined,
+      ...(canWriteDefaults ? {} : { leftInPlace: true }),
     })
     if (canWriteDefaults) {
       log.info(

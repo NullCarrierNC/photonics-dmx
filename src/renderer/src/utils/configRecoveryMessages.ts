@@ -7,22 +7,34 @@ export interface ConfigRecoveryFile {
    */
   reason?: string
   message?: string
+  /** Set when a file that would not load could not be moved aside, so it is still there. */
+  leftInPlace?: boolean
 }
 
 /**
  * What to tell the user about settings files recovered at startup: one message for files that
- * were replaced by defaults, one for files where only some values were reset, and one for files
- * from a newer version that are not saved to.
+ * were replaced by defaults, one for files that would not load and are still in place, one for
+ * files where only some values were reset, and one for files from a newer version that are not
+ * saved to.
  */
 export function configRecoveryMessages(files: readonly ConfigRecoveryFile[]): string[] {
   const messages: string[] = []
   const repaired = files.filter((f) => f.reason === 'repaired')
   const newer = files.filter((f) => f.reason === 'newerVersion')
-  const replaced = files.filter((f) => f.reason !== 'repaired' && f.reason !== 'newerVersion')
+  const leftInPlace = files.filter((f) => f.leftInPlace === true)
+  const replaced = files.filter(
+    (f) => f.reason !== 'repaired' && f.reason !== 'newerVersion' && f.leftInPlace !== true,
+  )
   if (replaced.length > 0) {
     const list = replaced.map((f) => f.fileName).join(', ')
     messages.push(
       `A local settings file was invalid. Defaults were restored and your original file was saved as a backup. (${list})`,
+    )
+  }
+  if (leftInPlace.length > 0) {
+    const list = leftInPlace.map((f) => f.fileName).join(', ')
+    messages.push(
+      `A local settings file was invalid and could not be moved aside, so defaults are in use. Repair it and relaunch to load it, or leave it and the next save moves it aside. (${list})`,
     )
   }
   if (repaired.length > 0) {
