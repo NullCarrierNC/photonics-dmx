@@ -25,7 +25,7 @@ import EnttecProToggle from '../components/EnttecProToggle'
 import OpenDmxToggle from '../components/OpenDmxToggle'
 import { useRigDmxValues } from '../hooks/useRigDmxValues'
 import { useIpcPreviewSender } from '@renderer/hooks/useIpcPreviewSender'
-import { DraftNumberField } from '../components/controls/DraftField'
+import { DraftNumberField, type CommitOutcome } from '../components/controls/DraftField'
 import { createLogger } from '../../../shared/logger'
 const log = createLogger('DmxConsole')
 
@@ -41,6 +41,7 @@ import {
   isLightModified,
   isMovingHeadFixture,
   isPanTiltChannelName,
+  lightOnChannel,
 } from './dmxConsoleChannels'
 
 const DmxConsole: React.FC = () => {
@@ -242,7 +243,7 @@ const DmxConsole: React.FC = () => {
     channelName: string,
     previousChannel: number,
     newChannel: number,
-  ) => {
+  ): CommitOutcome => {
     if (light.id === null) {
       return
     }
@@ -254,6 +255,14 @@ const DmxConsole: React.FC = () => {
     const baseChannels = getTemplateAlignedChannels(light, myLights)
     const baseline = baseChannels[channelName]
     const lightId = light.id
+    const config = selectedRig?.config
+    const moving = { lightId, channelName }
+    // Moving onto a channel in use overwrites that light's value, so it is refused.
+    const occupant = config && lightOnChannel(config, myLights, channelOverrides, clamped, moving)
+    if (occupant) {
+      setActionError(`Channel ${clamped} is already used by ${occupant.name}. Pick a free channel.`)
+      return false
+    }
 
     setChannelOverrides((prev) => {
       const nextForLight = { ...(prev[lightId] ?? {}) }
@@ -273,7 +282,10 @@ const DmxConsole: React.FC = () => {
 
     const next = { ...consoleBuffer }
     const moved = next[previousChannel] ?? 0
-    delete next[previousChannel]
+    // A light that shares the old channel keeps its value there.
+    if (!config || !lightOnChannel(config, myLights, channelOverrides, previousChannel, moving)) {
+      delete next[previousChannel]
+    }
     next[clamped] = moved
     pushConsoleBuffer(next)
   }

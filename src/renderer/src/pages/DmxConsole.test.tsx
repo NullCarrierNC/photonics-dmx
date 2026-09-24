@@ -199,3 +199,90 @@ describe('DmxConsole rig choice', () => {
     await waitFor(() => expect(select.value).toBe(rig.id))
   })
 })
+
+describe('DmxConsole channel remap', () => {
+  const front = (id: string, name: string, channels: Record<string, number>) => ({
+    id,
+    name,
+    fixture: 'RGB',
+    fixtureId: `fixture-${id}`,
+    universe: 1,
+    channels,
+  })
+  const twoLightRig = (second: Record<string, number>) =>
+    ({
+      ...rig,
+      config: {
+        ...rig.config,
+        frontLights: [
+          front('light-1', 'Front 1', { red: 1, green: 2, blue: 3 }),
+          front('light-2', 'Front 2', second),
+        ],
+      },
+    }) as unknown as DmxRig
+
+  async function openConsole(withRig: DmxRig): Promise<void> {
+    jest.mocked(ipcApi.getDmxRigs).mockImplementation((() => Promise.resolve([withRig])) as never)
+    jest.mocked(ipcApi.getDmxRig).mockImplementation((() => Promise.resolve(withRig)) as never)
+    renderConsole()
+    const toggle = await screen.findByRole('button', { name: 'Enable console' })
+    await waitFor(() => expect(toggle).toBeEnabled())
+    fireEvent.click(toggle)
+    await screen.findByRole('button', { name: 'Disable console' })
+  }
+
+  /** The DMX number boxes showing `channel`, one per light channel on it. */
+  const boxesOn = (channel: number): HTMLInputElement[] =>
+    (screen.getAllByRole('spinbutton') as HTMLInputElement[]).filter(
+      (input) => input.value === String(channel),
+    )
+
+  const sliderBeside = (box: HTMLInputElement): HTMLInputElement =>
+    box.parentElement!.querySelector('input[type="range"]') as HTMLInputElement
+
+  const lastBuffer = (): Record<number, number> =>
+    jest.mocked(ipcApi.sendConsoleDmx).mock.calls.at(-1)![0] as Record<number, number>
+
+  function moveChannel(box: HTMLInputElement, to: number): void {
+    fireEvent.change(box, { target: { value: String(to) } })
+    fireEvent.blur(box)
+  }
+
+  beforeEach(() => {
+    resetIpcApiMock()
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('refuses to move a channel onto one another light drives, and says so', async () => {
+    await openConsole(twoLightRig({ red: 4, green: 5, blue: 6 }))
+    fireEvent.change(sliderBeside(boxesOn(4)[0]), { target: { value: '200' } })
+    const red = boxesOn(1)[0]
+
+    moveChannel(red, 4)
+
+    expect(await screen.findByText(/Channel 4 is already used by Front 2/)).toBeInTheDocument()
+    expect(lastBuffer()[4]).toBe(200)
+    expect(red.value).toBe('1')
+  })
+
+  it('carries the value to a free channel', async () => {
+    await openConsole(twoLightRig({ red: 4, green: 5, blue: 6 }))
+    fireEvent.change(sliderBeside(boxesOn(1)[0]), { target: { value: '200' } })
+
+    moveChannel(boxesOn(1)[0], 10)
+
+    await waitFor(() => expect(lastBuffer()).toEqual({ 10: 200 }))
+  })
+
+  it('leaves a channel lit for the light still on it when another light moves away', async () => {
+    await openConsole(twoLightRig({ red: 1, green: 7, blue: 8 }))
+    fireEvent.change(sliderBeside(boxesOn(1)[0]), { target: { value: '200' } })
+
+    moveChannel(boxesOn(1)[0], 10)
+
+    await waitFor(() => expect(lastBuffer()).toEqual({ 1: 200, 10: 200 }))
+  })
+})
