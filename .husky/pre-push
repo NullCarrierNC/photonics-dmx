@@ -1,2 +1,2 @@
 pushed=$(cat)
-npm run lint:check && npm run format:check && npm run typecheck && npm run any:budget && npm run size:budget && npm run paths:check && printf '%s\n' "$pushed" | npm run coverage:check -- --pushed && npm run lockfile:check && npm run overrides:check && npm run test:coverage -- --randomize
+npm run lint:check && npm run format:check && npm run typecheck && npm run any:budget && npm run type-escape:budget && npm run size:budget && npm run paths:check && printf '%s\n' "$pushed" | npm run coverage:check -- --pushed && npm run lockfile:check && npm run overrides:check && npm run test:coverage -- --randomize

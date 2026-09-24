@@ -51,6 +51,9 @@ jobs:
       - name: Explicit any budget
         run: npm run any:budget
 
+      - name: Type escape budget
+        run: npm run type-escape:budget
+
       - name: File size budget
         run: npm run size:budget
 

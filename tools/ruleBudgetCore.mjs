@@ -3,6 +3,7 @@
  * `src/`, compare that to a budget file, and fail when the count has grown. `--write` records the
  * current count, which is how a budget comes down after a deliberate pass, and refuses to record a
  * higher one so the ratchet cannot be widened by rerunning the command the failure names.
+ * runCountBudget holds any other count to a budget file by the same rules.
  *
  * Rules that cannot go clean in one sitting are set to warn in the ESLint config and held here
  * instead, so the backlog is visible and cannot grow.
@@ -76,8 +77,7 @@ function readBudget(file) {
  * @param {string} options.note One line written into the budget file saying how to lower it.
  */
 export function runRuleBudget({ ruleId, budgetFile, label, note }) {
-  const file = join(root, budgetFile)
-  const { count: current, unjustified } = countReports(ruleId)
+  const { count, unjustified } = countReports(ruleId)
 
   if (unjustified.length > 0) {
     for (const where of unjustified) {
@@ -86,6 +86,28 @@ export function runRuleBudget({ ruleId, budgetFile, label, note }) {
     console.error('Say why after `--` on the disable comment, or fix the report it hides.')
     process.exit(1)
   }
+
+  runCountBudget({
+    count,
+    budgetFile,
+    label,
+    counted: `\`npx eslint src\` messages for ${ruleId}, suppressed ones included.`,
+    note,
+  })
+}
+
+/**
+ * Hold a count to the budget a file records, exiting the process with the result.
+ *
+ * @param {object} options
+ * @param {number} options.count The count now.
+ * @param {string} options.budgetFile Path under metrics/, relative to the repository root.
+ * @param {string} options.label What the count is called on screen, e.g. "Explicit any".
+ * @param {string} options.counted What is counted, written into the budget file.
+ * @param {string} options.note One line written into the budget file saying how to lower it.
+ */
+export function runCountBudget({ count: current, budgetFile, label, counted, note }) {
+  const file = join(root, budgetFile)
 
   if (process.argv.includes('--write')) {
     // A ratchet holds only while writing it can lower a count and never raise one.
@@ -98,11 +120,7 @@ export function runRuleBudget({ ruleId, budgetFile, label, note }) {
       process.exit(1)
     }
     mkdirSync(dirname(file), { recursive: true })
-    const lines = [
-      String(current),
-      `Auto-generated: \`npx eslint src\` messages for ${ruleId}, suppressed ones included.`,
-      note,
-    ]
+    const lines = [String(current), `Auto-generated: ${counted}`, note]
     writeFileSync(file, `${lines.join('\n')}\n`, 'utf8')
     console.log(`Wrote ${file} with count ${current}`)
     process.exit(0)

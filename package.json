@@ -18,6 +18,7 @@
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web && npm run typecheck:test",
     "any:budget": "node tools/any-budget.mjs",
+    "type-escape:budget": "node tools/type-escape-budget.mjs",
     "size:budget": "node tools/size-budget.mjs",
     "paths:check": "node tools/referenced-paths-check.mjs",
     "coverage:check": "node tools/coverage-threshold-check.mjs",
