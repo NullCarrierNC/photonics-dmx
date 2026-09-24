@@ -10,6 +10,9 @@
  * set the way electron-builder.yml's electronFuses block sets them. That block has to set the
  * hardened fuses fuseConfigCore.cjs names, and any further fuse it sets is checked the same way.
  *
+ * It also checks app.asar.unpacked and the packaged defaults, with the rules in
+ * packagedContentCore.cjs.
+ *
  * Run it after `npm run build:unpack` or any of the per-platform builds.
  */
 import {
@@ -27,6 +30,12 @@ import fuses from '@electron/fuses'
 
 const require = createRequire(import.meta.url)
 const { readElectronFuses, fuseConfigProblems } = require('./fuseConfigCore.cjs')
+const {
+  listFiles,
+  unpackedInIndex,
+  unpackedProblems,
+  defaultsProblems,
+} = require('./packagedContentCore.cjs')
 const { getCurrentFuseWire, FuseV1Options } = fuses
 
 /** What a packaged build holds at the top level of its archive. */
@@ -44,6 +53,9 @@ const REQUIRED_IN_OUT = ['main/index.js', 'preload/index.js', 'renderer/index.ht
 const ALLOWED_IN_OUT = ['main', 'preload', 'renderer']
 
 const DIST = 'dist'
+
+/** The bundled defaults as electron-builder copies them, which leaves dotfiles out. */
+const SOURCE_DEFAULTS = listFiles(join('resources', 'defaults'), { skipDotFiles: true })
 
 /** The fuses a packaged build carries, as electron-builder.yml sets them. */
 const EXPECTED_FUSES = readElectronFuses(
@@ -210,6 +222,31 @@ for (const archive of archives) {
   }
 
   const index = readIndex(archive)
+
+  const unpackedDir = `${archive}.unpacked`
+  const besideIssues = [
+    ...unpackedProblems(
+      unpackedInIndex(index),
+      existsSync(unpackedDir) ? listFiles(unpackedDir) : new Map(),
+    ),
+    ...defaultsProblems(
+      SOURCE_DEFAULTS,
+      existsSync(join(dirname(archive), 'defaults'))
+        ? listFiles(join(dirname(archive), 'defaults'))
+        : null,
+    ),
+  ]
+  if (besideIssues.length > 0) {
+    failed = true
+    console.error(
+      `${archive}: what sits beside the archive is not what the build is meant to carry`,
+    )
+    for (const issue of besideIssues) {
+      console.error(`  ${issue}`)
+    }
+  } else {
+    console.log(`${archive}: app.asar.unpacked and the bundled defaults match what the build ships`)
+  }
   const actual = topLevelNames(index).sort()
   const missing = expected.filter((name) => !actual.includes(name))
   const extra = actual.filter((name) => !expected.includes(name))
@@ -248,6 +285,8 @@ for (const archive of archives) {
 }
 
 if (failed) {
-  console.error('Update electron-builder.yml, or SHIPPED here, whichever is wrong.')
+  console.error(
+    'Update electron-builder.yml, SHIPPED here or UNPACKED_PACKAGES in packagedContentCore.cjs, whichever is wrong.',
+  )
   process.exit(1)
 }
