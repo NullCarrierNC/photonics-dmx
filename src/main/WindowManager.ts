@@ -208,6 +208,11 @@ export class WindowManager {
         this.windows.delete(role)
       }
     })
+    // The record belongs to the page's document, and a reload the page let go commits a new one.
+    // Emitted for the main frame only, and never for a same-document navigation.
+    window.webContents.on('did-navigate', () => {
+      this.unsavedPages.delete(webContentsId)
+    })
     if (role === 'main') {
       this.stopAudioWith(window)
     }

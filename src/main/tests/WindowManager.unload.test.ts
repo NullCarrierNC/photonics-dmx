@@ -132,6 +132,32 @@ describe('WindowManager unsaved-changes prompt', () => {
     expect(unloadRefusedByPage(window)).toBe(true)
   })
 
+  it('forgets the unsaved changes of a page the user leaves on a reload', async () => {
+    const { wm, main } = managerWithMainAndEditor({ main: true, editor: false })
+
+    unloadRefusedByPage(main)
+    answerPrompt(LEAVE)
+    await flush()
+    main.webContents.emit('did-navigate', {}, 'app://index.html')
+
+    await expect(wm.closeWindowsForQuit()).resolves.toBe(true)
+    expect(mockShowMessageBox).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the unsaved changes of a page the user stays on', async () => {
+    const { wm, main } = managerWithMainAndEditor({ main: true, editor: false })
+
+    unloadRefusedByPage(main)
+    answerPrompt(STAY)
+    await flush()
+
+    const quit = wm.closeWindowsForQuit()
+    await flush()
+    expect(mockShowMessageBox).toHaveBeenCalledTimes(2)
+    answerPrompt(STAY)
+    await expect(quit).resolves.toBe(false)
+  })
+
   it('opens one prompt for a page closed again while it asks', async () => {
     const wm = new WindowManager()
     wm.createMainWindow()
