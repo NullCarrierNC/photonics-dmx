@@ -24,13 +24,19 @@ const NO_GROUPS: CueGroup[] = []
 
 interface CueRegistrySelectorProps {
   onRegistryChange: (registryType: CueRegistryType) => void
-  onGroupChange: (groupIds: string[]) => void
+  /**
+   * A group was chosen, by the user or by the selector itself: the preferred group once listed,
+   * otherwise the first group standing in for a selection the list does not offer.
+   */
+  onGroupChange: (groupIds: string[], origin: 'user' | 'default') => void
   selectedVenueSize: 'NoVenue' | 'Small' | 'Large'
   onVenueSizeChange: (venueSize: 'NoVenue' | 'Small' | 'Large') => void
   selectedBpm: number
   onBpmChange: (bpm: number) => void
   /** The selected group. The selector shows it and reports changes, the parent owns it. */
   selectedGroupId: string
+  /** A group the parent is waiting for. It is chosen as soon as the list offers it. */
+  preferredGroupId?: string
   /** Which registry's cue groups to list (YARG lighting vs RB3 cue-mode groups). */
   selectedRegistryType: CueRegistryType
   /**
@@ -54,6 +60,7 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   selectedBpm,
   onBpmChange,
   selectedGroupId,
+  preferredGroupId = '',
   selectedRegistryType,
   ready = true,
 }) => {
@@ -71,15 +78,6 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
   useEffect(() => {
     registryRef.current = selectedRegistryType
   }, [selectedRegistryType])
-
-  // Wrap callback to avoid infinite loops
-  const handleGroupChangeCallback = useCallback(
-    (groupId: string) => {
-      // Pass the group ID directly
-      onGroupChange([groupId])
-    },
-    [onGroupChange],
-  )
 
   const fetchGroups = useCallback(async () => {
     try {
@@ -126,17 +124,23 @@ const CueRegistrySelector: React.FC<CueRegistrySelectorProps> = ({
     }
   }, [fetchGroups])
 
-  // An empty selection, one from another registry or one whose group went away falls back to the
-  // first group, and the parent hears it so the venue, BPM and effect controls enable.
+  // The preferred group is chosen once listed. Otherwise an empty selection, one from another
+  // registry or one whose group went away falls back to the first group, and the parent hears it
+  // so the venue, BPM and effect controls enable.
   useEffect(() => {
-    if (!ready || groups.length === 0 || groups.some((g) => g.id === selectedGroupId)) {
+    if (!ready || groups.length === 0) {
       return
     }
-    handleGroupChangeCallback(groups[0].id)
-  }, [ready, groups, selectedGroupId, handleGroupChangeCallback])
+    const listed = (groupId: string) => groups.some((g) => g.id === groupId)
+    if (preferredGroupId && preferredGroupId !== selectedGroupId && listed(preferredGroupId)) {
+      onGroupChange([preferredGroupId], 'default')
+    } else if (!listed(selectedGroupId)) {
+      onGroupChange([groups[0].id], 'default')
+    }
+  }, [ready, groups, selectedGroupId, preferredGroupId, onGroupChange])
 
   const handleGroupChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    handleGroupChangeCallback(event.target.value)
+    onGroupChange([event.target.value], 'user')
   }
 
   return (

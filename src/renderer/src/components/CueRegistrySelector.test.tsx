@@ -69,7 +69,7 @@ describe('CueRegistrySelector', () => {
 
     // Even though the sole group can't be chosen via the dropdown's onChange, the parent is
     // notified so the downstream cue selector enables.
-    await waitFor(() => expect(onGroupChange).toHaveBeenCalledWith(['rb3-stagekit']))
+    await waitFor(() => expect(onGroupChange).toHaveBeenCalledWith(['rb3-stagekit'], 'default'))
   })
 
   it('re-selects the new registry group when switching YARG -> RB3E', async () => {
@@ -97,7 +97,7 @@ describe('CueRegistrySelector', () => {
       />,
     )
 
-    await waitFor(() => expect(onGroupChange).toHaveBeenCalledWith(['rb3-stagekit']))
+    await waitFor(() => expect(onGroupChange).toHaveBeenCalledWith(['rb3-stagekit'], 'default'))
   })
 
   it('keeps a saved group that is not first in the list', async () => {
@@ -137,7 +137,54 @@ describe('CueRegistrySelector', () => {
         ready
       />,
     )
-    await waitFor(() => expect(onGroupChange).toHaveBeenCalledWith(['yarg-fade']))
+    await waitFor(() => expect(onGroupChange).toHaveBeenCalledWith(['yarg-fade'], 'default'))
+  })
+
+  it('chooses the preferred group once the list offers it', async () => {
+    const onGroupChange = jest.fn()
+    renderWithProviders(
+      <CueRegistrySelector
+        {...baseProps}
+        onGroupChange={onGroupChange}
+        selectedGroupId="yarg-fade"
+        preferredGroupId="yarg-stagekit"
+        selectedRegistryType="YARG"
+      />,
+    )
+
+    await waitFor(() => expect(onGroupChange).toHaveBeenCalledWith(['yarg-stagekit'], 'default'))
+  })
+
+  it('falls back to the first group while the preferred one is not listed', async () => {
+    const onGroupChange = jest.fn()
+    renderWithProviders(
+      <CueRegistrySelector
+        {...baseProps}
+        onGroupChange={onGroupChange}
+        preferredGroupId="yarg-gone"
+        selectedRegistryType="YARG"
+      />,
+    )
+
+    await waitFor(() => expect(onGroupChange).toHaveBeenCalledWith(['yarg-fade'], 'default'))
+    expect(onGroupChange).not.toHaveBeenCalledWith(['yarg-gone'], 'default')
+  })
+
+  it('reports a group the user picks as theirs', async () => {
+    const onGroupChange = jest.fn()
+    renderWithProviders(
+      <CueRegistrySelector
+        {...baseProps}
+        onGroupChange={onGroupChange}
+        selectedGroupId="yarg-fade"
+        selectedRegistryType="YARG"
+      />,
+    )
+    await screen.findByRole('option', { name: 'YARG Stage Kit' })
+
+    fireEvent.change(screen.getByLabelText('Cue Group'), { target: { value: 'yarg-stagekit' } })
+
+    expect(onGroupChange).toHaveBeenCalledWith(['yarg-stagekit'], 'user')
   })
 
   it('reports a BPM when the user leaves the field, not per keystroke', async () => {

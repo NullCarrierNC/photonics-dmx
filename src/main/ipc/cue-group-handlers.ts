@@ -1,5 +1,6 @@
 import { handleInvoke } from './handleInvoke'
 import { IpcMain } from 'electron'
+import type { ControllerManager } from '../controllers/ControllerManager'
 import { CueRegistry } from '../../photonics-dmx/cues/registries/CueRegistry'
 import { getCueRegistry } from '../../photonics-dmx/cues/registries/cueRegistries'
 import { validateCueType } from './inputValidation'
@@ -8,12 +9,29 @@ import { createLogger } from '../../shared/logger'
 const log = createLogger('cue-group-handlers')
 
 /**
+ * The window opens before the cold init has loaded the cue files, so a group list asked for then
+ * waits for that init to settle. A failed init is left for the user to retry.
+ */
+async function coldInitSettled(controllerManager: ControllerManager): Promise<void> {
+  if (controllerManager.getLifecyclePhase() !== 'initializing') return
+  try {
+    await controllerManager.init()
+  } catch {
+    // The init reports its own failure. The list answers with whatever the registry holds.
+  }
+}
+
+/**
  * Set up YARG cue group registry IPC handlers (enabled groups, source group, consistency status).
  * Cue selection preferences (consistency window, motion min-hold, group selection mode) live in
  * cue-selection-prefs-handlers.ts.
  */
-export function setupCueGroupHandlers(ipcMain: IpcMain): void {
+export function setupCueGroupHandlers(
+  ipcMain: IpcMain,
+  controllerManager: ControllerManager,
+): void {
   handleInvoke(ipcMain, LIGHT.GET_CUE_GROUPS, log, async () => {
+    await coldInitSettled(controllerManager)
     const registry = CueRegistry.getInstance()
     const groupIds = registry.getAllGroups()
     return groupIds
@@ -33,6 +51,7 @@ export function setupCueGroupHandlers(ipcMain: IpcMain): void {
   })
 
   handleInvoke(ipcMain, LIGHT.GET_RB3_CUE_GROUPS, log, async () => {
+    await coldInitSettled(controllerManager)
     const registry = getCueRegistry('rb3')
     return registry
       .getAllGroups()

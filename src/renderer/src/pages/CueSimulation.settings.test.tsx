@@ -4,8 +4,8 @@
  * written rather than dropped, and a refused write says so.
  */
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals'
-import { screen, cleanup, waitFor, fireEvent } from '@testing-library/react'
-import { installWindowApi } from '@renderer/tests/helpers/windowApiStub'
+import { screen, cleanup, waitFor, fireEvent, act } from '@testing-library/react'
+import { installWindowApi, emitWindowApi } from '@renderer/tests/helpers/windowApiStub'
 import { renderWithProviders } from '@renderer/tests/helpers/renderWithProviders'
 import {
   audioListenerEnabledAtom,
@@ -14,7 +14,7 @@ import {
   yargListenerEnabledAtom,
   previewRigIdAtom,
 } from '../atoms'
-import { LIGHT, CONFIG } from '../../../shared/ipcChannels'
+import { LIGHT, CONFIG, RENDERER_RECEIVE } from '../../../shared/ipcChannels'
 
 let savePrefsAnswer: unknown = undefined
 let prefsAnswer: unknown = {}
@@ -70,6 +70,31 @@ function savedSettings(): Record<string, unknown>[] {
     .map((p) => p.simulationSettings as Record<string, unknown>)
 }
 
+const STORED = {
+  registryType: 'YARG',
+  groupId: 'zeta',
+  effectId: 'Verse',
+  venueSize: 'Large',
+  bpm: 120,
+  instrument: 'guitar',
+}
+
+const ALPHA = { id: 'alpha', name: 'Alpha', description: '', cueTypes: ['Verse'] }
+const ZETA = { id: 'zeta', name: 'Zeta', description: '', cueTypes: ['Verse'] }
+
+const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function registryFills(groups: unknown[]): Promise<void> {
+  cueGroupsAnswer = groups
+  await act(async () => {
+    emitWindowApi(RENDERER_RECEIVE.NODE_CUES_CHANGED, {
+      loaded: groups.length,
+      failed: 0,
+      errors: [],
+    })
+  })
+}
+
 async function changeBpm(value: string): Promise<void> {
   const field = await screen.findByLabelText('BPM')
   fireEvent.change(field, { target: { value } })
@@ -120,6 +145,64 @@ describe('CueSimulation settings', () => {
     await waitFor(() => expect(screen.getByLabelText('Cue Group')).toHaveValue('zeta'))
     await new Promise((resolve) => setTimeout(resolve, 700))
     view.unmount()
+
+    expect(savedSettings()).toEqual([])
+  })
+
+  it('keeps the stored group while the registry does not list it and selects it once listed', async () => {
+    prefsAnswer = { simulationSettings: STORED }
+    availableCuesAnswer = [{ id: 'Verse', yargDescription: 'Verse', rb3Description: '' }]
+    const view = renderPage()
+
+    await settle(700)
+    expect(savedSettings()).toEqual([])
+
+    await registryFills([ALPHA, ZETA])
+    await waitFor(() => expect(screen.getByLabelText('Cue Group')).toHaveValue('zeta'))
+    await settle(700)
+    view.unmount()
+
+    expect(savedSettings()).toEqual([])
+  })
+
+  it('shows the first group in place of an unlisted stored one without storing it', async () => {
+    prefsAnswer = { simulationSettings: STORED }
+    cueGroupsAnswer = [ALPHA]
+    availableCuesAnswer = [{ id: 'Verse', yargDescription: 'Verse', rb3Description: '' }]
+    renderPage()
+
+    await waitFor(() => expect(screen.getByLabelText('Cue Group')).toHaveValue('alpha'))
+    await settle(700)
+    expect(savedSettings()).toEqual([])
+
+    await registryFills([ALPHA, ZETA])
+    await waitFor(() => expect(screen.getByLabelText('Cue Group')).toHaveValue('zeta'))
+    await settle(700)
+    expect(savedSettings()).toEqual([])
+  })
+
+  it('stores the shown group once the user picks a cue in it', async () => {
+    prefsAnswer = { simulationSettings: STORED }
+    cueGroupsAnswer = [ALPHA]
+    availableCuesAnswer = [{ id: 'Verse', yargDescription: 'Verse', rb3Description: '' }]
+    renderPage()
+
+    await waitFor(() => expect(screen.getByLabelText('Cue Group')).toHaveValue('alpha'))
+    const verse = await screen.findByRole('option', { name: 'Verse' })
+    fireEvent.change(verse.closest('select') as HTMLSelectElement, { target: { value: 'Verse' } })
+
+    await waitFor(() =>
+      expect(savedSettings()).toContainEqual({ ...STORED, groupId: 'alpha', effectId: 'Verse' }),
+    )
+  })
+
+  it('writes nothing when the stored settings cannot be read', async () => {
+    prefsAnswer = { success: false, error: 'unreadable' }
+    cueGroupsAnswer = [ALPHA]
+    renderPage()
+
+    await waitFor(() => expect(screen.getByLabelText('Cue Group')).toHaveValue('alpha'))
+    await settle(700)
 
     expect(savedSettings()).toEqual([])
   })

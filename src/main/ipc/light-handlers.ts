@@ -36,7 +36,7 @@ export function setupLightHandlers(ipcMain: IpcMain, controllerManager: Controll
 
   setupSenderHandlers(ipcMain, controllerManager)
   setupSimulationHandlers(ipcMain, controllerManager)
-  setupCueGroupHandlers(ipcMain)
+  setupCueGroupHandlers(ipcMain, controllerManager)
   setupCueSelectionPrefsHandlers(ipcMain, controllerManager)
   setupMotionGroupHandlers(ipcMain, controllerManager)
   setupMotionRuntimeHandlers(ipcMain, controllerManager)

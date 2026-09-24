@@ -32,11 +32,8 @@ import {
   startTestEffect,
   startRb3TestEffect,
   stopTestEffect,
-  getPrefs,
   getCueGroups,
   getRb3CueGroups,
-  getAvailableCues,
-  getAvailableRb3Cues,
   simulateBeat,
   simulateKeyframe,
   simulateMeasure,
@@ -45,18 +42,13 @@ import {
   stopMotionCueSimulation,
 } from '../ipcApi'
 import { useDmxPreview } from '@renderer/hooks/useDmxPreview'
-import { useDebouncedSave } from '@renderer/hooks/useDebouncedSave'
-import { persistPrefs } from '../ipc/persistPrefs'
 import { createLogger } from '../../../shared/logger'
-
-/** How long the selections have to stop changing before they are stored. */
-const SETTINGS_QUIET_MS = 500
 import {
   instrumentNotePayload,
   simulationContext,
   type SimulationContext,
 } from './CueSimulation/simulationPayload'
-import { sameSimulationSettings, type SimulationSettings } from './CueSimulation/simulationSettings'
+import { useSimulationSettings, type GroupOrigin } from './CueSimulation/useSimulationSettings'
 
 const log = createLogger('CueSimulation')
 
@@ -119,15 +111,6 @@ const CueSimulation: React.FC = () => {
   useTimeoutEffect(resetMeasureIndicator, showMeasureIndicator ? 200 : null)
   useTimeoutEffect(resetKeyframeIndicator, showKeyframeIndicator ? 200 : null)
 
-  // False until the saved selections are back in place. Nothing is stored before then, and the
-  // group selector leaves an empty selection alone.
-  const [settingsRestored, setSettingsRestored] = useState(false)
-  const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null)
-  // The effect to restore and the group it belongs to. Carrying the group is what makes the
-  // restore independent of when the load flag clears: the group arrives as a state update, so by
-  // the time the effects below run the flag has already gone false and cannot be used to tell a
-  // restored group apart from one the user picked.
-  const savedEffectRef = useRef<{ groupId: string; effectId: string } | null>(null)
   const postProcessingSimulationActiveRef = useRef(false)
 
   useEffect(() => {
@@ -142,6 +125,7 @@ const CueSimulation: React.FC = () => {
   // reported, so clear the picker rather than leave it naming an effect nothing is showing.
   useEffect(() => {
     if (venuePostProcessingEnabled) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when the preference turns off
     setSelectedPostProcessing('Default')
   }, [venuePostProcessingEnabled])
 
@@ -164,157 +148,34 @@ const CueSimulation: React.FC = () => {
     }
   }, [])
 
-  // The page remembers what was last simulated. A selection changes as fast as the user clicks, so
-  // the write waits for the clicking to stop and still goes out if the page is left first.
-  const writeSimulationSettings = useCallback(
-    (settings: SimulationSettings) =>
-      persistPrefs({ simulationSettings: settings }, 'the simulation settings', (message) =>
-        setSettingsSaveError(message),
-      ),
-    [],
-  )
-  const settingsSaver = useDebouncedSave(writeSimulationSettings, {
-    quietMs: SETTINGS_QUIET_MS,
-    isEqual: sameSimulationSettings,
-  })
-
-  // Load saved simulation settings on mount
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const prefs = await getPrefs()
-        const savedSettings = prefs.simulationSettings
-
-        if (savedSettings) {
-          settingsSaver.seed(savedSettings)
-          // Load all saved settings
-          if (savedSettings.registryType) {
-            setSelectedRegistryType(savedSettings.registryType)
-          }
-          if (savedSettings.venueSize) {
-            setSelectedVenueSize(savedSettings.venueSize)
-          }
-          if (savedSettings.bpm) {
-            setSelectedBpm(savedSettings.bpm)
-          }
-          if (savedSettings.instrument) {
-            setSelectedInstrument(savedSettings.instrument)
-          }
-          if (savedSettings.groupId) {
-            try {
-              const allGroups = await fetchCueGroupsForRegistry(
-                savedSettings.registryType ?? 'YARG',
-              )
-              const group = allGroups.find((g: CueGroup) => g.id === savedSettings.groupId)
-              if (group && isYargVisualCueGroup(group)) {
-                if (savedSettings.effectId) {
-                  savedEffectRef.current = {
-                    groupId: savedSettings.groupId,
-                    effectId: savedSettings.effectId,
-                  }
-                }
-                setSelectedGroupId(savedSettings.groupId)
-                setSelectedGroup(group.name)
-              }
-            } catch (error) {
-              log.error('Error fetching group details during load:', error)
-            }
-          }
-        }
-      } catch (error) {
-        log.error('Error loading simulation settings:', error)
-      } finally {
-        setSettingsRestored(true)
-      }
-    }
-
-    void loadSettings()
-  }, [settingsSaver])
-
-  useEffect(() => {
-    if (!settingsRestored) {
-      return
-    }
-    setSettingsSaveError(null)
-    settingsSaver.saveSoon({
+  // The page remembers what was last simulated.
+  const settings = useSimulationSettings(
+    {
       registryType: selectedRegistryType,
       groupId: selectedGroupId,
-      // A saved effect still being restored is kept, so a slow cue list never stores it as cleared.
-      effectId: selectedEffect?.id ?? savedEffectRef.current?.effectId ?? null,
+      effect: selectedEffect,
       venueSize: selectedVenueSize,
       bpm: selectedBpm,
       instrument: selectedInstrument,
-    })
-  }, [
-    settingsRestored,
-    settingsSaver,
-    selectedRegistryType,
-    selectedGroupId,
-    selectedEffect?.id,
-    selectedVenueSize,
-    selectedBpm,
-    selectedInstrument,
-  ])
+    },
+    {
+      setRegistryType: setSelectedRegistryType,
+      setVenueSize: setSelectedVenueSize,
+      setBpm: setSelectedBpm,
+      setInstrument: setSelectedInstrument,
+      setEffect: setSelectedEffect,
+    },
+  )
+  const { groupShown, releaseHeldGroup } = settings
 
-  // Load saved effect after group is loaded and effects are available
-  useEffect(() => {
-    let cancelled = false
-    const loadSavedEffect = (): void => {
-      const saved = savedEffectRef.current
-      if (!saved || saved.groupId !== selectedGroupId) {
-        return
-      }
-
-      // Wait for effects to be loaded by EffectsDropdown
-      const checkForEffects = async (retries = 10) => {
-        try {
-          const availableEffects =
-            selectedRegistryType === 'RB3E'
-              ? await getAvailableRb3Cues(selectedGroupId)
-              : await getAvailableCues(selectedGroupId)
-          if (cancelled || savedEffectRef.current !== saved) return
-          if (availableEffects && availableEffects.length > 0) {
-            const savedEffect = availableEffects.find(
-              (e: EffectSelector) => e.id === saved.effectId,
-            )
-            if (savedEffect) {
-              setSelectedEffect(savedEffect)
-            }
-            // Either it was restored or this group no longer offers it. Done either way.
-            savedEffectRef.current = null
-          } else if (retries > 0) {
-            // Effects not loaded yet, retry after a short delay
-            setTimeout(() => void checkForEffects(retries - 1), 200)
-          } else {
-            savedEffectRef.current = null
-          }
-        } catch (error) {
-          log.error('Error loading saved effect:', error)
-          savedEffectRef.current = null
-        }
-      }
-      // Settles after the first attempt: the retry chain carries on through a timer.
-      void checkForEffects()
-    }
-
-    loadSavedEffect()
-    return () => {
-      cancelled = true
-    }
-  }, [selectedGroupId, selectedRegistryType])
-
-  // Moving to a different group than the saved effect belongs to abandons the restore.
-  useEffect(() => {
-    const saved = savedEffectRef.current
-    if (saved && saved.groupId !== selectedGroupId) {
-      savedEffectRef.current = null
-    }
-  }, [selectedGroupId])
-
-  const handleEffectSelect = useCallback(async (effect: EffectSelector) => {
-    log.info('Effect selected:', effect)
-    setSelectedEffect(effect)
-  }, [])
+  const handleEffectSelect = useCallback(
+    async (effect: EffectSelector) => {
+      log.info('Effect selected:', effect)
+      releaseHeldGroup()
+      setSelectedEffect(effect)
+    },
+    [releaseHeldGroup],
+  )
 
   const handleTestEffect = async () => {
     if (!selectedEffect) {
@@ -397,6 +258,7 @@ const CueSimulation: React.FC = () => {
 
   const handleRegistryChange = (type: CueRegistryType) => {
     if (type === selectedRegistryType) return
+    releaseHeldGroup()
     // Switching registry invalidates the current group/effect (different registries, different
     // group ids); clear so the selector re-inits against the newly chosen registry.
     setSelectedRegistryType(type)
@@ -411,7 +273,7 @@ const CueSimulation: React.FC = () => {
 
   // Memoize handleGroupChange to prevent unnecessary re-renders/calls from CueRegistrySelector
   const handleGroupChange = useCallback(
-    async (groupIds: string[]) => {
+    async (groupIds: string[], origin: GroupOrigin) => {
       // Handle group selection - only single groups are supported
       if (groupIds.length === 1) {
         const groupId = groupIds[0]
@@ -426,6 +288,7 @@ const CueSimulation: React.FC = () => {
             setSelectedGroupId('')
             return
           }
+          groupShown(groupId, origin)
           setSelectedGroupId(groupId)
           const displayName = group.name
           // Only update state if the selection actually changed
@@ -447,7 +310,7 @@ const CueSimulation: React.FC = () => {
         setSelectedEffect(null)
       }
     },
-    [setSelectedGroup, selectedRegistryType],
+    [setSelectedGroup, selectedRegistryType, groupShown],
   )
 
   // Fetch current group info when selected group changes
@@ -499,9 +362,9 @@ const CueSimulation: React.FC = () => {
     <div className="p-6 w-full mx-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-200">
       <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Cue Simulation</h1>
 
-      {settingsSaveError && (
+      {settings.saveError && (
         <p className="mb-4 text-sm text-red-600 dark:text-red-400" role="alert">
-          {settingsSaveError}
+          {settings.saveError}
         </p>
       )}
 
@@ -558,14 +421,15 @@ const CueSimulation: React.FC = () => {
               <div>
                 <CueRegistrySelector
                   onRegistryChange={handleRegistryChange}
-                  onGroupChange={(groupIds) => void handleGroupChange(groupIds)}
+                  onGroupChange={(groupIds, origin) => void handleGroupChange(groupIds, origin)}
                   selectedVenueSize={selectedVenueSize}
                   onVenueSizeChange={setSelectedVenueSize}
                   selectedBpm={selectedBpm}
                   onBpmChange={setSelectedBpm}
                   selectedGroupId={selectedGroupId}
+                  preferredGroupId={settings.heldGroupId}
                   selectedRegistryType={selectedRegistryType}
-                  ready={settingsRestored}
+                  ready={settings.restored}
                 />
               </div>
               <div className="lg:w-64">
